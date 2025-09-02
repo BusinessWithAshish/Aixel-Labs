@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack --port=3003",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "prod": "rm -rf .next && next build && next start"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.10",

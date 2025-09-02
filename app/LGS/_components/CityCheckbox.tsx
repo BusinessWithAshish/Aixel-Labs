@@ -1,7 +1,6 @@
 import { Dispatch, SetStateAction } from "react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import {Card} from "@/components/ui/card";
 
 type TCityCheckboxProps = {
   city: string;
