@@ -1,6 +1,7 @@
 import { Dispatch, SetStateAction } from "react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {Card} from "@/components/ui/card";
 
 type TCityCheckboxProps = {
   city: string;
@@ -12,9 +13,9 @@ export const CityCheckBox = (props: TCityCheckboxProps) => {
   const { city, setSelectedCities} = props;
 
   return (
-    <div className='flex items-center space-x-2'>
-      <Label htmlFor={city}>{city}</Label>
-      <Checkbox
+    <div className='flex gap-2 flex-row items-center justify-between p-2 h-20 w-20'>
+        <Label htmlFor={city}>{city}</Label>
+        <Checkbox
         id={city}
         onCheckedChange={(value) => {
           if (value) {

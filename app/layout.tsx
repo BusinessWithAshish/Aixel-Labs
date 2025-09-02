@@ -10,7 +10,7 @@ const poppinsFont = Poppins({
 
 export const metadata: Metadata = {
   title: "Aixellabs",
-  description: "Agentic Lead management systems",
+  description: "Agentic Lead management system",
 };
 
 export default function RootLayout({ children, }: Readonly<{ children: React.ReactNode }>) {

@@ -6,11 +6,12 @@ import { ArrowRightIcon } from "lucide-react";
 export default function Home() {
   return (
 
-    <PageLayout title='Home'>
+    <PageLayout className='' title='Home'>
+
       <Card>
         <CardHeader>Aixel labs</CardHeader>
         <CardContent>
-          <Link className='flex items-center gap-2' href={'/tasks'}>
+          <Link className='flex items-center gap-2' href={'/LGS'}>
             Dashboard
             <ArrowRightIcon />
           </Link>
