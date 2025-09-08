@@ -118,3 +118,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .radix-table-fix [data-radix-scroll-area-viewport] > div[style*='display: table'] {
+    height: 100% !important;
+  }
+}

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {useEffect, useRef, useState} from "react";
 import axios from "axios";
-import { Device, Call } from "@twilio/voice-sdk";
+import {Device, Call} from "@twilio/voice-sdk";
 import PageLayout from "@/components/common/PageLayout";
 import {Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
+import {SMSPanel} from "@/app/web-dialer/_components/SMSPanel";
 
 const FUNCTIONS_URL1 = "https://api-aixellabs-5684.twil.io";
 
@@ -84,7 +85,7 @@ export default function WebDialerPage() {
         }
         try {
             setStatus("calling");
-            const call = await deviceRef.current.connect({ params: { To: to } });
+            const call = await deviceRef.current.connect({params: {To: to}});
             callRef.current = call;
             setStatus("in-call");
             call.on("disconnect", () => setStatus("registered"));
@@ -103,9 +104,8 @@ export default function WebDialerPage() {
     }
 
     return (
-        <PageLayout title='Web dialer'>
-            <Card>
-
+        <PageLayout className='space-y-3' title='Web dialer'>
+            <Card className='h-fit'>
                 <CardHeader>
                     <CardTitle>Web dialer</CardTitle>
                     <CardDescription>Identity: {identity}</CardDescription>
@@ -113,7 +113,6 @@ export default function WebDialerPage() {
                         <Badge>{status}</Badge>
                     </CardAction>
                 </CardHeader>
-
                 <CardContent>
                     <Input
                         type="text"
@@ -122,7 +121,6 @@ export default function WebDialerPage() {
                         onChange={(e) => setTo(e.target.value)}
                     />
                 </CardContent>
-
                 <CardFooter className='w-full flex flex-wrap justify-between items-center gap-2'>
                     <Button
                         onClick={makeCall}
@@ -138,8 +136,10 @@ export default function WebDialerPage() {
                         Hangup
                     </Button>
                 </CardFooter>
-
             </Card>
+
+            <SMSPanel/>
+
         </PageLayout>
     );
 }

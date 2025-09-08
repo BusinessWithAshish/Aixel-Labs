@@ -1,6 +1,6 @@
 import {ReactNode} from "react";
 import {SidebarInset, SidebarProvider, SidebarTrigger} from "@/components/ui/sidebar";
-import {AppSidebar} from "../app-sidebar";
+import {AppSidebar} from "../layout/app-sidebar";
 import {cn} from "@/lib/utils";
 
 type PageLayoutProps = {
@@ -14,8 +14,8 @@ export default function PageLayout(props: PageLayoutProps){
     return (
         <SidebarProvider>
             <AppSidebar />
-            <SidebarInset className='p-2 space-y-2'>
-                <header className="sticky bg-white flex justify-start items-center shadow-md w-full top-0 h-12 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+            <SidebarInset className='p-2 rounded-md space-y-2'>
+                <header className="z-10 sticky bg-white rounded-md flex justify-start items-center drop-shadow-md shadow-md w-full top-0 h-12 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
                     <SidebarTrigger />
                     {typeof props.title === 'string'
                         ? <span>{props.title}</span>

@@ -1,196 +1,368 @@
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { useMemo, useState } from "react";
-import { City, Country, State } from "country-state-city";
-import { z } from "zod";
-import { CityCheckBox } from "@/app/LGS/_components/CityCheckbox";
-import { Button } from "@/components/ui/button";
+"use client";
+
+import {useMemo, useState} from "react";
+import {City, Country, State} from "country-state-city";
+import {z} from "zod";
+import {cn} from "@/lib/utils";
+import {getBeUrl} from "@/helpers/get-be-url";
+
+import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
+import {Input} from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
 import {SearchableSelect} from "@/components/ui/searchable-select";
 import {Badge} from "@/components/ui/badge";
-import {MapPin, X} from "lucide-react";
+import {Separator} from "@/components/ui/separator";
+import {ScrollArea} from "@/components/ui/scroll-area";
+import {Tabs, TabsList, TabsTrigger, TabsContent} from "@/components/ui/tabs";
+import {InputWithLabel} from "@/components/wrappers/InputWithLabel";
+import {CityCheckBox} from "@/app/LGS/_components/CityCheckbox";
 
+import {MapPin, X, SortAsc, SortDesc} from "lucide-react";
+import {GmapsData, TGmapsScrapeResult} from "@/app/LGS/utlis/types";
+
+// ---------- Lead Card ----------
+const LeadCard = ({lead}: { lead: GmapsData["actualLeads"][0] }) => {
+    const getBgColor = () => {
+        if (!lead.website && lead.phoneNumber) return "bg-green-100"; // Hot lead
+        if (lead.website && lead.phoneNumber) return "bg-amber-100"; // Warm lead
+        if (!lead.website && !lead.phoneNumber) return "bg-gray-100"; // Cold lead
+        return "bg-white";
+    };
+
+    return (
+        <Card className={cn("gap-2 hover:shadow-md cursor-pointer", getBgColor())}>
+            <CardHeader>
+                <CardTitle>{lead.name}</CardTitle>
+                <CardDescription>{lead.numberOfReviews} reviews</CardDescription>
+                <CardAction>⭐ {lead.overAllRating}</CardAction>
+            </CardHeader>
+            <CardContent>
+                <div className="flex items-center gap-2">
+                    🌐
+                    <p
+                        onClick={() => lead.website && window.location.assign(lead.website)}
+                        className={cn(
+                            "truncate font-medium",
+                            lead.website ? "text-blue-500 cursor-pointer underline" : "text-red-500"
+                        )}
+                    >
+                        {lead.website || "No website"}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    📱 <p className="truncate">{lead.phoneNumber || "No phone number"}</p>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
+// ---------- Results Section ----------
+export const ResultsSection = ({data}: { data?: TGmapsScrapeResult }) => {
+    const [sortKey, setSortKey] = useState<"rating" | "reviews">("rating");
+    const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+    const leads = useMemo(() => data?.data?.actualLeads ?? [], [data?.data?.actualLeads]);
+
+    const sortedLeads = useMemo(() => {
+        return [...leads].sort((a, b) => {
+            const aVal = sortKey === "rating" ? parseFloat(a.overAllRating) : parseInt(a.numberOfReviews);
+            const bVal = sortKey === "rating" ? parseFloat(b.overAllRating) : parseInt(b.numberOfReviews);
+            return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+        });
+    }, [leads, sortKey, sortDir]);
+
+    const grouped = {
+        all: sortedLeads,
+        noWebsiteNoPhone: sortedLeads.filter((l) => !l.website && !l.phoneNumber),
+        noWebsiteYesPhone: sortedLeads.filter((l) => !l.website && l.phoneNumber),
+        yesWebsiteYesPhone: sortedLeads.filter((l) => l.website && l.phoneNumber),
+    };
+
+    const renderTabContent = (leads: typeof sortedLeads) => (
+        <ScrollArea className="h-[500px]">
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                {leads.map((lead) => (
+                    <LeadCard key={lead.id} lead={lead}/>
+                ))}
+            </div>
+        </ScrollArea>
+    );
+
+    return (
+        <div className="p-3 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Results</h2>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSortKey(sortKey === "rating" ? "reviews" : "rating")}
+                    >
+                        Sort by: {sortKey === "rating" ? "⭐ Rating" : "📝 Reviews"}
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")}
+                    >
+                        {sortDir === "asc" ? <SortAsc className="w-5 h-5"/> : <SortDesc className="w-5 h-5"/>}
+                    </Button>
+                </div>
+            </div>
+
+            <Separator/>
+
+            <Tabs defaultValue="all" className="w-full ">
+                <TabsList className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 h-fit w-full">
+                    <TabsTrigger value="all">All Leads</TabsTrigger>
+                    <TabsTrigger value="noWebsiteYesPhone">No Website + Phone</TabsTrigger>
+                    <TabsTrigger value="yesWebsiteYesPhone">Website + Phone</TabsTrigger>
+                    <TabsTrigger value="noWebsiteNoPhone">No Website & No Phone</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="all">{renderTabContent(grouped.all)}</TabsContent>
+                <TabsContent value="noWebsiteYesPhone">{renderTabContent(grouped.noWebsiteYesPhone)}</TabsContent>
+                <TabsContent value="yesWebsiteYesPhone">{renderTabContent(grouped.yesWebsiteYesPhone)}</TabsContent>
+                <TabsContent value="noWebsiteNoPhone">{renderTabContent(grouped.noWebsiteNoPhone)}</TabsContent>
+            </Tabs>
+        </div>
+    );
+};
+
+// ---------- Dummy Data ----------
+const dummyData: TGmapsScrapeResult = {
+    success: true,
+    data: {
+        foundedLeads: ["wjdkejd"],
+        foundedLeadsCount: 1,
+        actualLeadsCount: 1,
+        actualLeads: [
+            {
+                name: "Lil Italy",
+                numberOfReviews: "200",
+                overAllRating: "3.4",
+                website: "https://www.doesthispersonexists.com",
+                phoneNumber: "+2138209302",
+                id: "1",
+            },
+        ],
+    },
+};
+
+// ---------- Main Page ----------
 export const GenerateLeads = () => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [query, setQuery] = useState("");
+    const [selectedCountry, setSelectedCountry] = useState("");
+    const [selectedState, setSelectedState] = useState("");
+    const [cityQuery, setCityQuery] = useState("");
+    const [selectedCities, setSelectedCities] = useState<string[]>([]);
+    const [idsUrls, setIdUrls] = useState<string[]>([]);
+    const [data, setData] = useState<TGmapsScrapeResult>(dummyData);
 
-  const [country, setCountry] = useState('');
-  const [selectedState, setSelectedState] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const allCountries = Country.getAllCountries();
-  const [selectedCities, setSelectedCities] = useState<string[]>([]);
-  const [query, setQuery] = useState('');
-  const [cityQuery, setCityQuery] = useState<string>('');
+    const allCountries = Country.getAllCountries();
+    const allStatesOfCountry = useMemo(() => State.getStatesOfCountry(selectedCountry), [selectedCountry]);
+    const allCitiesOfState = useMemo(() => {
+        const cities = City.getCitiesOfState(selectedCountry, selectedState);
+        return cityQuery.length > 0
+            ? cities.filter((city) => city.name.toLowerCase().includes(cityQuery.toLowerCase()))
+            : cities;
+    }, [selectedState, selectedCountry, cityQuery]);
 
-  const allStatesOfCountry = useMemo(
-    () => State.getStatesOfCountry(country),
-    [country]
-  );
+    const buildQueries = useMemo(
+        () => selectedCities.map((city) => `${query} in ${city}, ${selectedState}, ${selectedCountry}`) ?? [],
+        [query, selectedCities, selectedState, selectedCountry]
+    );
 
-  const allCitiesOfState = useMemo(
-    () => {
-      if(cityQuery.length > 0) {
-        return City
-          .getCitiesOfState(country, selectedState)
-          .filter(city => city.name.toLowerCase().includes(cityQuery.toLowerCase()));
-      }
-      else {
-        return City.getCitiesOfState(country, selectedState);
-      }
-      },
-    [selectedState, country, cityQuery]
-  );
+    const handleSendCountryToGetStates = async () => {
+        const querySchema = z.object({
+            query: z.string(),
+            country: z.string(),
+            states: z.array(z.object({name: z.string(), cities: z.array(z.string())})),
+        });
 
-  const handleSendCountryToGetStates = async () => {
-
-    const querySchema = z.object({
-      query: z.string(),
-      country: z.string(),
-      states: z.array(z.object({
-        name: z.string(),
-        cities: z.array(z.string())
-      }))
-    });
-
-    if (!country && !selectedState && !query && !selectedCities.length) {
-      alert("Please select a country, state and query");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const backendURL = new URL(`${process.env.NEXT_PUBLIC_AIXELLABS_BE_URL}/gmaps/scrape/`);
-
-      const queryData = {
-        query: query,
-        country: Country.getCountryByCode(country)?.name,
-        states: [{
-          name: State.getStateByCode(selectedState)?.name,
-          cities: selectedCities
-        } ]
-      }
-
-      console.log('backendURL', backendURL.toString());
-      console.log('queryData', queryData);
-
-      if (!querySchema.safeParse(queryData).success) {
-        alert('Failed to parse query');
-        return;
-      }
-
-      const response = await fetch(backendURL.toString(), {
-        method: "POST",
-        body: JSON.stringify(queryData),
-        headers: {
-          "Content-Type": "application/json"
+        if (!selectedCountry || !selectedState || !query || !selectedCities.length) {
+            alert("Please select a country, state, query, and cities");
+            return;
         }
-      });
 
-      return await response.json();
-    } catch (error) {
-      console.error("Failed to POST:", error);
-      return {}
-    }
-    finally {
-      setIsLoading(false);
-    }
-  };
+        try {
+            setIsLoading(true);
+            const backendURL = getBeUrl("/gmaps/scrape/");
+            const queryData = {
+                query,
+                country: Country.getCountryByCode(selectedCountry)?.name,
+                states: [{
+                    name: State.getStateByCodeAndCountry(selectedState, selectedCountry)?.name,
+                    cities: selectedCities
+                }],
+            };
 
-  return (
-    <Card>
-
-      <CardHeader className='flex gap-2 items-center justify-between'>
-        <span>Generate Leads</span>
-
-        { }
-        <Button
-            disabled={isLoading || !selectedCities.length}
-            onClick={handleSendCountryToGetStates}
-        >
-          {!isLoading ? "Start scraping" : "Scraping..."}
-        </Button>
-
-      </CardHeader>
-
-      <CardContent className='flex flex-wrap gap-4'>
-
-        {/* QUERY */}
-        <Input
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Type your query..."
-          className='w-full'
-          value={query}
-        />
-
-        {/* COUNTRY DROPDOWN */}
-        <SearchableSelect
-            className='w-full'
-            value={country}
-            onChange={(value) => {
-              setCountry(value);
-              setSelectedState('')
+            if (!querySchema.safeParse(queryData).success) {
+                alert("Failed to parse query");
+                return;
             }
+
+            const response = await fetch(backendURL.toString(), {
+                method: "POST",
+                body: JSON.stringify(queryData),
+                headers: {"Content-Type": "application/json"},
+            });
+
+            const resData = (await response.json()) as TGmapsScrapeResult;
+            setData(resData);
+        } catch (error) {
+            console.error("Failed to POST:", error);
+        } finally {
+            setIsLoading(false);
         }
-            options={allCountries.map(country => ({
-          value: country.isoCode,
-          label: country.name
-        }))} />
+    };
 
-        {/* STATE DROPDOWN */}
-        <SearchableSelect
-            className='w-full'
-            value={selectedState}
-            disabled={!country}
-            onChange={(value) => setSelectedState(value)}
-            options={allStatesOfCountry.map(country => ({
-              value: country.isoCode,
-              label: country.name
-            }))}
-        />
+    const isSubmitDisabled = useMemo(() => {
+        return isLoading || (selectedCities.length < 0 && idsUrls.length < 0);
+    }, [isLoading, selectedCities, idsUrls]);
 
-      </CardContent>
+    const containerClassName = "flex flex-col p-3 gap-3 border rounded-md h-full";
 
-      <CardFooter className='flex-col items-start justify-between gap-4'>
+    return (
+        <Card>
+            <CardHeader className="flex items-center justify-between">
+                <CardTitle>📍 Generate Google Map Leads</CardTitle>
+                <Button disabled={isSubmitDisabled} onClick={handleSendCountryToGetStates}>
+                    {!isLoading ? "Start scraping" : "Scraping..."}
+                </Button>
+            </CardHeader>
 
-        <div className='w-full flex flex-wrap gap-4 justify-between items-center'>
-          {allCitiesOfState.length > 0 && (
-              <span className='font-medium text-xl'>Cities of {State.getStateByCodeAndCountry(selectedState, country)?.name}</span>
-          )}
-          <Badge>
-            <MapPin />
-            <span>Available locations: {allCitiesOfState.length}</span>
-            </Badge>
-        </div>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* FORM 1 */}
+                <ScrollArea>
+                    <div className={containerClassName}>
+
+                        <InputWithLabel
+                            label={{text: "Query"}}
+                            forId="Query"
+                            input={{
+                                disabled: idsUrls.length > 0,
+                                onChange: (e) => setQuery(e.target.value),
+                                placeholder: "Type your query...",
+                                value: query,
+                            }}
+                        />
+
+                        <SearchableSelect
+                            placeholder="Search by country"
+                            value={selectedCountry}
+                            disabled={idsUrls.length > 0}
+                            onChange={(value) => {
+                                setSelectedCountry(value);
+                                setSelectedState("");
+                            }}
+                            options={allCountries.map((c) => ({value: c.isoCode, label: c.name}))}
+                        />
+
+                        <SearchableSelect
+                            value={selectedState}
+                            placeholder="Select a state/province/region/county"
+                            disabled={!selectedCountry || idsUrls.length > 0}
+                            onChange={(value) => setSelectedState(value)}
+                            options={allStatesOfCountry.map((s) => ({value: s.isoCode, label: s.name}))}
+                        />
 
 
-        {/* SEARCH CITIES */}
-        <Input
-          onChange={(e) => setCityQuery(e.target.value)}
-          placeholder="Search for cities..."
-          className='w-full'
-          disabled={!selectedState}
-          value={cityQuery}
-        />
+                        <div className="flex w-full items-center justify-between">
+                            {allCitiesOfState.length > 0 && (
+                                <span className="font-medium">
+                  Cities of {State.getStateByCodeAndCountry(selectedState, selectedCountry)?.name}
+                </span>
+                            )}
+                            <Badge variant="secondary" className="gap-1">
+                                <MapPin className="w-4 h-4"/>
+                                <span>{allCitiesOfState.length} locations</span>
+                            </Badge>
+                        </div>
 
-        {/*{console.log('-->', selectedCities)}*/}
+                        {idsUrls.length <= 0 && (
+                            <Input
+                                onChange={(e) => setCityQuery(e.target.value)}
+                                placeholder="Search for cities..."
+                                disabled={!selectedState}
+                                value={cityQuery}
+                            />
+                        )}
 
-        {selectedCities.length > 0 && (
-            selectedCities.map(city => (
-                <Badge onClick={() => {
-                  setSelectedCities((prevState) => prevState.filter(c => c !== city));
-                }} className='flex hover:opacity-80 cursor-pointer justify-between items-center w-fit gap-2' key={city}>
-                  {city}
-                  <X  />
-                </Badge>
-            ))
-        )}
+                        <ScrollArea>
+                            {selectedCities.map((city) => (
+                                <Badge
+                                    key={city}
+                                    onClick={() => setSelectedCities((prev) => prev.filter((c) => c !== city))}
+                                    className="flex my-2 items-center gap-1 cursor-pointer hover:opacity-80"
+                                >
+                                    {city}
+                                    <X className="w-3 h-3"/>
+                                </Badge>
+                            ))}
+                        </ScrollArea>
 
-        <div className='flex flex-wrap h-[500px] overflow-auto gap-6'>
-          {allCitiesOfState.map(city => (
-            <CityCheckBox key={city.name} city={city.name} setSelectedCities={setSelectedCities} />
-          ))}
-        </div>
+                        {buildQueries.length > 0 && (
+                            <>
+                                <p>Build queries</p>
+                                <ScrollArea>
+                                    {buildQueries.map((q) => (
+                                        <p key={q} className="text-blue-500 underline cursor-pointer">
+                                            {q}
+                                        </p>
+                                    ))}
+                                </ScrollArea>
+                            </>
+                        )}
 
-      </CardFooter>
+                        <ScrollArea>
+                            <div className="grid grid-cols-2 gap-3">
+                                {allCitiesOfState.map((city) => (
+                                    <CityCheckBox
+                                        key={city.name}
+                                        city={city.name}
+                                        cities={selectedCities}
+                                        setSelectedCities={setSelectedCities}
+                                    />
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                </ScrollArea>
 
-    </Card>
-  )
+                {/* FORM 2 */}
+                <ScrollArea>
+                    <div className={containerClassName}>
+                        <InputWithLabel
+                            label={{text: "Comma separated ID(s) or URL(s)"}}
+                            forId="idsUrls"
+                            input={{
+                                disabled: !!query,
+                                onChange: (e) => {
+                                    if (!e.target.value) {
+                                        setQuery("");
+                                        setSelectedState("");
+                                        setCityQuery("");
+                                        setSelectedCountry("");
+                                        setSelectedCities([]);
+                                        setIdUrls([]);
+                                        return;
+                                    }
+                                    setIdUrls(e.target.value.split(",").map((idUrl) => idUrl.trim()));
+                                },
+                                placeholder: "Google maps Place ID(s) or URL(s)...",
+                                value: idsUrls,
+                            }}
+                        />
+                    </div>
+                </ScrollArea>
+            </CardContent>
 
-}
+            <div className="p-3 flex flex-col gap-3">
+                <ResultsSection data={data}/>
+            </div>
+        </Card>
+    );
+};

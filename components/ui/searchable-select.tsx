@@ -1,10 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { CheckIcon, ChevronsUpDownIcon } from "lucide-react"
+import {CheckIcon, ChevronsUpDownIcon} from "lucide-react"
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import {cn} from "@/lib/utils"
+import {Button} from "@/components/ui/button"
 import {
     Command,
     CommandEmpty,
@@ -18,6 +18,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+import {Label} from "@/components/ui/label";
 
 type OptionType = {
     value: string
@@ -37,7 +38,7 @@ export function SearchableSelect({
                                      options,
                                      placeholder = "Select option...",
                                      value,
-    disabled = false,
+                                     disabled = false,
                                      onChange,
                                      className,
                                  }: SearchableSelectProps) {
@@ -56,17 +57,17 @@ export function SearchableSelect({
                     className={cn("w-[200px] justify-between", className)}
                 >
                     {selectedLabel ?? placeholder}
-                    <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0">
+            <PopoverContent side='bottom' className="w-[200px] p-0">
                 <Command
                     filter={(value, search) => {
                         if (!search) return 1
                         return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
                     }}
                 >
-                    <CommandInput disabled={disabled} placeholder="Search option..." />
+                    <CommandInput disabled={disabled} placeholder="Search option..."/>
                     <CommandList>
                         <CommandEmpty>No option found.</CommandEmpty>
                         <CommandGroup>
