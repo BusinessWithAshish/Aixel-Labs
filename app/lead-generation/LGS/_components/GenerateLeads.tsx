@@ -15,10 +15,10 @@ import {Separator} from "@/components/ui/separator";
 import {ScrollArea} from "@/components/ui/scroll-area";
 import {Tabs, TabsList, TabsTrigger, TabsContent} from "@/components/ui/tabs";
 import {InputWithLabel} from "@/components/wrappers/InputWithLabel";
-import {CityCheckBox} from "@/app/LGS/_components/CityCheckbox";
+import {CityCheckBox} from "@/app/lead-generation/LGS/_components/CityCheckbox";
 
 import {MapPin, X, SortAsc, SortDesc} from "lucide-react";
-import {GmapsData, TGmapsScrapeResult} from "@/app/LGS/utlis/types";
+import {GmapsData, TGmapsScrapeResult} from "@/app/lead-generation/LGS/utlis/types";
 
 // ---------- Lead Card ----------
 const LeadCard = ({lead}: { lead: GmapsData["actualLeads"][0] }) => {

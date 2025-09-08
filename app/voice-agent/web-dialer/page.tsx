@@ -8,7 +8,6 @@ import {Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, 
 import {Badge} from "@/components/ui/badge";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
-import {SMSPanel} from "@/app/web-dialer/_components/SMSPanel";
 
 const FUNCTIONS_URL1 = "https://api-aixellabs-5684.twil.io";
 
@@ -137,8 +136,6 @@ export default function WebDialerPage() {
                     </Button>
                 </CardFooter>
             </Card>
-
-            <SMSPanel/>
 
         </PageLayout>
     );
