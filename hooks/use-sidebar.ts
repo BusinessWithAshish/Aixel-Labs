@@ -1,12 +1,4 @@
-import {
-    AudioWaveform,
-    Bot,
-    Command,
-    GalleryVerticalEnd,
-    Map,
-    Mail,
-    Settings2, UsersRound, MessageCircleMore,
-} from "lucide-react"
+import {AudioWaveform, Command, GalleryVerticalEnd, Mail, MessageCircleMore, Settings2, UsersRound,} from "lucide-react"
 
 export const LEFT_SIDEBAR_MENU = {
     user: {
@@ -16,17 +8,17 @@ export const LEFT_SIDEBAR_MENU = {
     },
     teams: [
         {
-            name: "Acme Inc",
+            name: "Aixel Labs",
             logo: GalleryVerticalEnd,
             plan: "Enterprise",
         },
         {
-            name: "Acme Corp.",
+            name: "Aixel Labs 2",
             logo: AudioWaveform,
             plan: "Startup",
         },
         {
-            name: "Evil Corp.",
+            name: "Aixel Labs 3",
             logo: Command,
             plan: "Free",
         },
