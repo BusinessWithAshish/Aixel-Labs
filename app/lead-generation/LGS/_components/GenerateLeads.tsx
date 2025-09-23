@@ -1,368 +1,153 @@
 "use client";
 
-import {useMemo, useState} from "react";
-import {City, Country, State} from "country-state-city";
-import {z} from "zod";
-import {cn} from "@/lib/utils";
-import {getBeUrl} from "@/helpers/get-be-url";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useLeadGenerationForm } from "../_hooks/useLeadGenerationForm";
+import { useUnifiedLeadStreaming } from "../_hooks/useUnifiedLeadStreaming";
+import { LocationForm } from "./LocationForm";
+import { IdUrlForm } from "./IdUrlForm";
+import { ConnectionConfig } from "./ConnectionConfig";
+import { UnifiedStreamingProgress } from "./UnifiedStreamingProgress";
+import { ResultsSection } from "./ResultsSection";
+import { Power, PowerOff, Settings } from "lucide-react";
 
-import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
-import {Input} from "@/components/ui/input";
-import {Button} from "@/components/ui/button";
-import {SearchableSelect} from "@/components/ui/searchable-select";
-import {Badge} from "@/components/ui/badge";
-import {Separator} from "@/components/ui/separator";
-import {ScrollArea} from "@/components/ui/scroll-area";
-import {Tabs, TabsList, TabsTrigger, TabsContent} from "@/components/ui/tabs";
-import {InputWithLabel} from "@/components/wrappers/InputWithLabel";
-import {CityCheckBox} from "@/app/lead-generation/LGS/_components/CityCheckbox";
 
-import {MapPin, X, SortAsc, SortDesc} from "lucide-react";
-import {GmapsData, TGmapsScrapeResult} from "@/app/lead-generation/LGS/utlis/types";
-
-// ---------- Lead Card ----------
-const LeadCard = ({lead}: { lead: GmapsData["actualLeads"][0] }) => {
-    const getBgColor = () => {
-        if (!lead.website && lead.phoneNumber) return "bg-green-100"; // Hot lead
-        if (lead.website && lead.phoneNumber) return "bg-amber-100"; // Warm lead
-        if (!lead.website && !lead.phoneNumber) return "bg-gray-100"; // Cold lead
-        return "bg-white";
-    };
-
-    return (
-        <Card className={cn("gap-2 hover:shadow-md cursor-pointer", getBgColor())}>
-            <CardHeader>
-                <CardTitle>{lead.name}</CardTitle>
-                <CardDescription>{lead.numberOfReviews} reviews</CardDescription>
-                <CardAction>⭐ {lead.overAllRating}</CardAction>
-            </CardHeader>
-            <CardContent>
-                <div className="flex items-center gap-2">
-                    🌐
-                    <p
-                        onClick={() => lead.website && window.location.assign(lead.website)}
-                        className={cn(
-                            "truncate font-medium",
-                            lead.website ? "text-blue-500 cursor-pointer underline" : "text-red-500"
-                        )}
-                    >
-                        {lead.website || "No website"}
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    📱 <p className="truncate">{lead.phoneNumber || "No phone number"}</p>
-                </div>
-            </CardContent>
-        </Card>
-    );
-};
-
-// ---------- Results Section ----------
-export const ResultsSection = ({data}: { data?: TGmapsScrapeResult }) => {
-    const [sortKey, setSortKey] = useState<"rating" | "reviews">("rating");
-    const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-    const leads = useMemo(() => data?.data?.actualLeads ?? [], [data?.data?.actualLeads]);
-
-    const sortedLeads = useMemo(() => {
-        return [...leads].sort((a, b) => {
-            const aVal = sortKey === "rating" ? parseFloat(a.overAllRating) : parseInt(a.numberOfReviews);
-            const bVal = sortKey === "rating" ? parseFloat(b.overAllRating) : parseInt(b.numberOfReviews);
-            return sortDir === "asc" ? aVal - bVal : bVal - aVal;
-        });
-    }, [leads, sortKey, sortDir]);
-
-    const grouped = {
-        all: sortedLeads,
-        noWebsiteNoPhone: sortedLeads.filter((l) => !l.website && !l.phoneNumber),
-        noWebsiteYesPhone: sortedLeads.filter((l) => !l.website && l.phoneNumber),
-        yesWebsiteYesPhone: sortedLeads.filter((l) => l.website && l.phoneNumber),
-    };
-
-    const renderTabContent = (leads: typeof sortedLeads) => (
-        <ScrollArea className="h-[500px]">
-            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                {leads.map((lead) => (
-                    <LeadCard key={lead.id} lead={lead}/>
-                ))}
-            </div>
-        </ScrollArea>
-    );
-
-    return (
-        <div className="p-3 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Results</h2>
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSortKey(sortKey === "rating" ? "reviews" : "rating")}
-                    >
-                        Sort by: {sortKey === "rating" ? "⭐ Rating" : "📝 Reviews"}
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")}
-                    >
-                        {sortDir === "asc" ? <SortAsc className="w-5 h-5"/> : <SortDesc className="w-5 h-5"/>}
-                    </Button>
-                </div>
-            </div>
-
-            <Separator/>
-
-            <Tabs defaultValue="all" className="w-full ">
-                <TabsList className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 h-fit w-full">
-                    <TabsTrigger value="all">All Leads</TabsTrigger>
-                    <TabsTrigger value="noWebsiteYesPhone">No Website + Phone</TabsTrigger>
-                    <TabsTrigger value="yesWebsiteYesPhone">Website + Phone</TabsTrigger>
-                    <TabsTrigger value="noWebsiteNoPhone">No Website & No Phone</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="all">{renderTabContent(grouped.all)}</TabsContent>
-                <TabsContent value="noWebsiteYesPhone">{renderTabContent(grouped.noWebsiteYesPhone)}</TabsContent>
-                <TabsContent value="yesWebsiteYesPhone">{renderTabContent(grouped.yesWebsiteYesPhone)}</TabsContent>
-                <TabsContent value="noWebsiteNoPhone">{renderTabContent(grouped.noWebsiteNoPhone)}</TabsContent>
-            </Tabs>
-        </div>
-    );
-};
-
-// ---------- Dummy Data ----------
-const dummyData: TGmapsScrapeResult = {
-    success: true,
-    data: {
-        foundedLeads: ["wjdkejd"],
-        foundedLeadsCount: 1,
-        actualLeadsCount: 1,
-        actualLeads: [
-            {
-                name: "Lil Italy",
-                numberOfReviews: "200",
-                overAllRating: "3.4",
-                website: "https://www.doesthispersonexists.com",
-                phoneNumber: "+2138209302",
-                id: "1",
-            },
-        ],
-    },
-};
-
-// ---------- Main Page ----------
 export const GenerateLeads = () => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [query, setQuery] = useState("");
-    const [selectedCountry, setSelectedCountry] = useState("");
-    const [selectedState, setSelectedState] = useState("");
-    const [cityQuery, setCityQuery] = useState("");
-    const [selectedCities, setSelectedCities] = useState<string[]>([]);
-    const [idsUrls, setIdUrls] = useState<string[]>([]);
-    const [data, setData] = useState<TGmapsScrapeResult>(dummyData);
+    const {
+        formState,
+        updateFormState,
+        isSubmitDisabled,
+    } = useLeadGenerationForm();
 
-    const allCountries = Country.getAllCountries();
-    const allStatesOfCountry = useMemo(() => State.getStatesOfCountry(selectedCountry), [selectedCountry]);
-    const allCitiesOfState = useMemo(() => {
-        const cities = City.getCitiesOfState(selectedCountry, selectedState);
-        return cityQuery.length > 0
-            ? cities.filter((city) => city.name.toLowerCase().includes(cityQuery.toLowerCase()))
-            : cities;
-    }, [selectedState, selectedCountry, cityQuery]);
+    const {
+        streamingState,
+        ec2State,
+        connectionConfig,
+        startStreaming,
+        resetStreaming,
+        stopEC2Instance,
+        isFormDisabled,
+        getButtonText,
+    } = useUnifiedLeadStreaming();
 
-    const buildQueries = useMemo(
-        () => selectedCities.map((city) => `${query} in ${city}, ${selectedState}, ${selectedCountry}`) ?? [],
-        [query, selectedCities, selectedState, selectedCountry]
-    );
-
-    const handleSendCountryToGetStates = async () => {
-        const querySchema = z.object({
-            query: z.string(),
-            country: z.string(),
-            states: z.array(z.object({name: z.string(), cities: z.array(z.string())})),
+    const handleStartScraping = async () => {
+        await startStreaming({
+            query: formState.query,
+            selectedCountry: formState.selectedCountry,
+            selectedState: formState.selectedState,
+            selectedCities: formState.selectedCities,
         });
-
-        if (!selectedCountry || !selectedState || !query || !selectedCities.length) {
-            alert("Please select a country, state, query, and cities");
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-            const backendURL = getBeUrl("/gmaps/scrape/");
-            const queryData = {
-                query,
-                country: Country.getCountryByCode(selectedCountry)?.name,
-                states: [{
-                    name: State.getStateByCodeAndCountry(selectedState, selectedCountry)?.name,
-                    cities: selectedCities
-                }],
-            };
-
-            if (!querySchema.safeParse(queryData).success) {
-                alert("Failed to parse query");
-                return;
-            }
-
-            const response = await fetch(backendURL.toString(), {
-                method: "POST",
-                body: JSON.stringify(queryData),
-                headers: {"Content-Type": "application/json"},
-            });
-
-            const resData = (await response.json()) as TGmapsScrapeResult;
-            setData(resData);
-        } catch (error) {
-            console.error("Failed to POST:", error);
-        } finally {
-            setIsLoading(false);
-        }
     };
 
-    const isSubmitDisabled = useMemo(() => {
-        return isLoading || (selectedCities.length < 0 && idsUrls.length < 0);
-    }, [isLoading, selectedCities, idsUrls]);
+    const handleStopEC2 = async () => {
+        await stopEC2Instance();
+        resetStreaming();
+    };
 
-    const containerClassName = "flex flex-col p-3 gap-3 border rounded-md h-full";
+    const isEC2Ready = connectionConfig.useAWS && ec2State.currentPhase === 'ready' && ec2State.progress === 100;
 
     return (
-        <Card>
-            <CardHeader className="flex items-center justify-between">
-                <CardTitle>📍 Generate Google Map Leads</CardTitle>
-                <Button disabled={isSubmitDisabled} onClick={handleSendCountryToGetStates}>
-                    {!isLoading ? "Start scraping" : "Scraping..."}
-                </Button>
-            </CardHeader>
+        <div className="space-y-4">
+            {/* Connection Configuration */}
+            <ConnectionConfig />
 
-            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* FORM 1 */}
-                <ScrollArea>
-                    <div className={containerClassName}>
-
-                        <InputWithLabel
-                            label={{text: "Query"}}
-                            forId="Query"
-                            input={{
-                                disabled: idsUrls.length > 0,
-                                onChange: (e) => setQuery(e.target.value),
-                                placeholder: "Type your query...",
-                                value: query,
-                            }}
-                        />
-
-                        <SearchableSelect
-                            placeholder="Search by country"
-                            value={selectedCountry}
-                            disabled={idsUrls.length > 0}
-                            onChange={(value) => {
-                                setSelectedCountry(value);
-                                setSelectedState("");
-                            }}
-                            options={allCountries.map((c) => ({value: c.isoCode, label: c.name}))}
-                        />
-
-                        <SearchableSelect
-                            value={selectedState}
-                            placeholder="Select a state/province/region/county"
-                            disabled={!selectedCountry || idsUrls.length > 0}
-                            onChange={(value) => setSelectedState(value)}
-                            options={allStatesOfCountry.map((s) => ({value: s.isoCode, label: s.name}))}
-                        />
-
-
-                        <div className="flex w-full items-center justify-between">
-                            {allCitiesOfState.length > 0 && (
-                                <span className="font-medium">
-                  Cities of {State.getStateByCodeAndCountry(selectedState, selectedCountry)?.name}
-                </span>
-                            )}
-                            <Badge variant="secondary" className="gap-1">
-                                <MapPin className="w-4 h-4"/>
-                                <span>{allCitiesOfState.length} locations</span>
-                            </Badge>
-                        </div>
-
-                        {idsUrls.length <= 0 && (
-                            <Input
-                                onChange={(e) => setCityQuery(e.target.value)}
-                                placeholder="Search for cities..."
-                                disabled={!selectedState}
-                                value={cityQuery}
-                            />
-                        )}
-
-                        <ScrollArea>
-                            {selectedCities.map((city) => (
-                                <Badge
-                                    key={city}
-                                    onClick={() => setSelectedCities((prev) => prev.filter((c) => c !== city))}
-                                    className="flex my-2 items-center gap-1 cursor-pointer hover:opacity-80"
-                                >
-                                    {city}
-                                    <X className="w-3 h-3"/>
-                                </Badge>
-                            ))}
-                        </ScrollArea>
-
-                        {buildQueries.length > 0 && (
-                            <>
-                                <p>Build queries</p>
-                                <ScrollArea>
-                                    {buildQueries.map((q) => (
-                                        <p key={q} className="text-blue-500 underline cursor-pointer">
-                                            {q}
-                                        </p>
-                                    ))}
-                                </ScrollArea>
-                            </>
-                        )}
-
-                        <ScrollArea>
-                            <div className="grid grid-cols-2 gap-3">
-                                {allCitiesOfState.map((city) => (
-                                    <CityCheckBox
-                                        key={city.name}
-                                        city={city.name}
-                                        cities={selectedCities}
-                                        setSelectedCities={setSelectedCities}
-                                    />
-                                ))}
+            <Card>
+                <CardHeader className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <CardTitle>📍 Generate Google Map Leads</CardTitle>
+                        {isEC2Ready && (
+                            <div className="flex items-center gap-2 text-sm text-green-600">
+                                <Power className="w-4 h-4" />
+                                <span>EC2 Ready</span>
                             </div>
-                        </ScrollArea>
+                        )}
+                        {connectionConfig.useLocalDev && (
+                            <div className="flex items-center gap-2 text-sm text-green-600">
+                                <Settings className="w-4 h-4" />
+                                <span>Local Dev</span>
+                            </div>
+                        )}
+                        {!connectionConfig.useLocalDev && !connectionConfig.useAWS && connectionConfig.isConfigValid && (
+                            <div className="flex items-center gap-2 text-sm text-blue-600">
+                                <Settings className="w-4 h-4" />
+                                <span>Manual Mode</span>
+                            </div>
+                        )}
                     </div>
-                </ScrollArea>
+                    <div className="flex items-center gap-2">
+                        {isEC2Ready && (
+                            <Button 
+                                variant="outline"
+                                size="sm"
+                                onClick={handleStopEC2}
+                                disabled={isFormDisabled}
+                            >
+                                <PowerOff className="w-4 h-4 mr-2" />
+                                Stop EC2
+                            </Button>
+                        )}
+                        <Button 
+                            disabled={isSubmitDisabled || isFormDisabled} 
+                            onClick={handleStartScraping}
+                        >
+                            {getButtonText()}
+                        </Button>
+                    </div>
+                </CardHeader>
 
-                {/* FORM 2 */}
-                <ScrollArea>
-                    <div className={containerClassName}>
-                        <InputWithLabel
-                            label={{text: "Comma separated ID(s) or URL(s)"}}
-                            forId="idsUrls"
-                            input={{
-                                disabled: !!query,
-                                onChange: (e) => {
-                                    if (!e.target.value) {
-                                        setQuery("");
-                                        setSelectedState("");
-                                        setCityQuery("");
-                                        setSelectedCountry("");
-                                        setSelectedCities([]);
-                                        setIdUrls([]);
-                                        return;
-                                    }
-                                    setIdUrls(e.target.value.split(",").map((idUrl) => idUrl.trim()));
-                                },
-                                placeholder: "Google maps Place ID(s) or URL(s)...",
-                                value: idsUrls,
-                            }}
-                        />
-                    </div>
-                </ScrollArea>
+            <CardContent className="grid grid-cols-1 h-full lg:grid-cols-2 gap-2 p-3">
+                <LocationForm
+                    query={formState.query}
+                    onQueryChange={(query) => updateFormState({ query })}
+                    selectedCountry={formState.selectedCountry}
+                    onCountryChange={(selectedCountry) => updateFormState({ 
+                        selectedCountry, 
+                        selectedState: "", 
+                        selectedCities: [] 
+                    })}
+                    selectedState={formState.selectedState}
+                    onStateChange={(selectedState) => updateFormState({ 
+                        selectedState, 
+                        selectedCities: [] 
+                    })}
+                    selectedCities={formState.selectedCities}
+                    onCitiesChange={(selectedCities) => updateFormState({ selectedCities })}
+                    disabled={isFormDisabled || formState.idsUrls.length > 0}
+                />
+
+                <IdUrlForm
+                    idsUrls={formState.idsUrls}
+                    onIdsUrlsChange={(idsUrls) => {
+                        updateFormState({ idsUrls });
+                        if (idsUrls.length === 0) {
+                            updateFormState({
+                                query: "",
+                                selectedCountry: "",
+                                selectedState: "",
+                                selectedCities: [],
+                            });
+                        }
+                    }}
+                    disabled={isFormDisabled || !!formState.query}
+                />
             </CardContent>
 
-            <div className="p-3 flex flex-col gap-3">
-                <ResultsSection data={data}/>
-            </div>
-        </Card>
+                <CardContent className="space-y-4">
+                    <UnifiedStreamingProgress 
+                        isStreaming={streamingState.isStreaming} 
+                        streamData={streamingState.streamData} 
+                        currentPhase={streamingState.currentPhase}
+                        useLocalDev={connectionConfig.useLocalDev}
+                        useAWS={connectionConfig.useAWS}
+                        ec2Phase={ec2State.currentPhase}
+                        ec2Message={ec2State.message}
+                        ec2Progress={ec2State.progress}
+                        ec2Error={ec2State.error}
+                        beUrl={connectionConfig.beUrl}
+                    />
+                    <ResultsSection data={streamingState.data} />
+                </CardContent>
+            </Card>
+        </div>
     );
 };

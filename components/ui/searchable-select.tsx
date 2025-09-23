@@ -54,13 +54,13 @@ export function SearchableSelect({
                     disabled={disabled}
                     role="combobox"
                     aria-expanded={open}
-                    className={cn("w-[200px] justify-between", className)}
+                    className={cn("justify-between", className)}
                 >
                     {selectedLabel ?? placeholder}
                     <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
                 </Button>
             </PopoverTrigger>
-            <PopoverContent side='bottom' className="w-[200px] p-0">
+            <PopoverContent side='bottom' className="p-0">
                 <Command
                     filter={(value, search) => {
                         if (!search) return 1

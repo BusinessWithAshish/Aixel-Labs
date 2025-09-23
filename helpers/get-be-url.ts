@@ -1,9 +1,18 @@
 
+export const getBeUrl = (path?: string, baseUrl?: string) => {
+    // Use provided baseUrl or default to localhost
+    const url = baseUrl || "http://localhost:8100";
 
-export const getBeUrl  = (path?: string) => {
+    // Ensure baseUrl has protocol
+    const cleanBaseUrl = url.startsWith('http://') || url.startsWith('https://') 
+        ? url 
+        : `http://${url}`;
 
-    const url = process.env.NODE_ENV === "development"
-        ? "http://localhost:8100"
-        : process.env.NEXT_PUBLIC_AIXELLABS_BE_URL;
-    return new URL(`${url}${path}`);
-}
+    // Ensure baseUrl doesn't end with slash
+    const finalBaseUrl = cleanBaseUrl.replace(/\/$/, '');
+
+    // Ensure path starts with slash
+    const cleanPath = path ? (path.startsWith('/') ? path : `/${path}`) : '';
+
+    return new URL(`${finalBaseUrl}${cleanPath}`);
+};

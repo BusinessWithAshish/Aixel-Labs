@@ -1,11 +1,10 @@
-import { Dispatch, SetStateAction } from "react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
 type TCityCheckboxProps = {
   city: string;
   cities: string[];
-  setSelectedCities: Dispatch<SetStateAction<string[]>>;
+  setSelectedCities: (cities: string[]) => void;
 }
 
 export const CityCheckBox = (props: TCityCheckboxProps) => {
@@ -19,9 +18,9 @@ export const CityCheckBox = (props: TCityCheckboxProps) => {
         checked={cities.includes(city)}
         onCheckedChange={(value) => {
           if (value) {
-            setSelectedCities(prev => [...prev, city])
+            setSelectedCities([...cities, city])
           } else {
-            setSelectedCities(prev => prev.filter(c => c !== city))
+            setSelectedCities(cities.filter(c => c !== city))
           }
         }}
       />

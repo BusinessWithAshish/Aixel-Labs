@@ -314,7 +314,30 @@ export default function WhatsAppPage() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="w-full flex gap-3">
+                                        <div className="w-full flex flex-col gap-3">
+
+                                            <div className="w-full flex flex-col gap-3">
+                                                <div className="text-sm text-gray-600">
+                                                    Send one of templated messages?
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {templatesLoading &&
+                                                        <div className="text-sm">Loading templates...</div>}
+                                                    {!templatesLoading && templates.length === 0 &&
+                                                        <div className="text-xs text-gray-500">No templates
+                                                            available</div>}
+                                                    {templates.map((t) => (
+                                                        <Button
+                                                            key={t.sid}
+                                                            onClick={() => sendTemplate(t.sid)}
+                                                            className="bg-green-600 hover:bg-green-700 text-white"
+                                                        >
+                                                            {t.friendlyName}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
                                             <Input
                                                 placeholder="Type a message..."
                                                 value={draft}
