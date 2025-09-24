@@ -2,23 +2,16 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { InputWithLabel } from "@/components/wrappers/InputWithLabel";
+import { useForm } from "../_contexts";
 
-interface IdUrlFormProps {
-  idsUrls: string[];
-  onIdsUrlsChange: (idsUrls: string[]) => void;
-  disabled?: boolean;
-}
+export const IdUrlForm = () => {
+  const { formData, updateFormData, isIdUrlFormValid } = useForm();
 
-export const IdUrlForm = ({
-  idsUrls,
-  onIdsUrlsChange,
-  disabled = false,
-}: IdUrlFormProps) => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     
     if (!value) {
-      onIdsUrlsChange([]);
+      updateFormData({ idsUrls: [] });
       return;
     }
     
@@ -27,24 +20,29 @@ export const IdUrlForm = ({
       .map((idUrl) => idUrl.trim())
       .filter(Boolean);
     
-    onIdsUrlsChange(parsedIdsUrls);
+    updateFormData({ idsUrls: parsedIdsUrls });
   };
 
   return (
     <ScrollArea className="h-full">
-        <div className="p-3">
-            <InputWithLabel
+      <div className="p-3 space-y-4">
+        <InputWithLabel
           label={{ text: "Comma separated ID(s) or URL(s)" }}
           forId="idsUrls"
           input={{
-            disabled,
             onChange: handleInputChange,
             placeholder: "Google maps Place ID(s) or URL(s)...",
-            value: idsUrls.join(", "),
+            value: formData.idsUrls.join(", "),
           }}
         />
-        </div>
-    
+        
+        {/* Form Status */}
+        {isIdUrlFormValid && (
+          <div className="text-sm text-green-600 font-medium">
+            ✓ ID/URL form is ready to submit
+          </div>
+        )}
+      </div>
     </ScrollArea>
   );
 };

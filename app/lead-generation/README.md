@@ -1,115 +1,159 @@
 # Lead Generation System
 
-A flexible lead generation system with AWS EC2 integration and manual connection options.
+A comprehensive lead generation system for extracting business information from Google Maps using React Context API for state management.
 
 ## Features
 
-- **Flexible Connection Modes**: AWS EC2 management or direct BE URL connection
-- **Real-time Progress**: Live updates for both EC2 startup and API operations
 - **Google Maps Scraping**: Extract business leads from Google Maps
-- **Streaming Results**: Real-time streaming of scraping progress and results
-
-## Connection Modes
-
-### Local Development Mode (Toggle ON)
-- Connects to localhost backend automatically
-- No configuration required
-- Uses `http://localhost:8100` by default
-
-### Remote Mode (Toggle OFF)
-When local development is disabled, choose between:
-
-#### AWS Mode (Toggle ON)
-- Automatic EC2 instance management
-- Validates AWS environment variables
-- Starts instance → Executes commands → Makes API calls
-- Shows comprehensive progress for both EC2 and API operations
-
-#### Manual Mode (Toggle OFF)
-- Direct connection to running backend
-- Enter BE URL directly (e.g., `http://your-server:8100`)
-- Immediate API calls (assumes backend is running)
-- Localhost URLs are not allowed when local development is disabled
-
-## Setup
-
-### Local Development Mode
-- No setup required
-- Automatically connects to `http://localhost:8100`
-
-### AWS Mode
-Set these environment variables:
-```bash
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your_key
-AWS_SECRET_ACCESS_KEY=your_secret
-AWS_EC2_INSTANCE_ID=i-1234567890abcdef0
-AWS_EC2_AMI_ID=ami-12345678
-AWS_EC2_INSTANCE_TYPE=t3.micro
-AWS_EC2_KEY_NAME=your-key-pair
-AWS_EC2_SECURITY_GROUP_IDS=sg-12345678
-AWS_EC2_SUBNET_ID=subnet-12345678
-```
-
-### Manual Mode
-1. Start your backend server
-2. Get the server URL
-3. Enter full URL in BE URL field: `http://your-server:8100`
-4. Localhost URLs are not allowed when local development is disabled
-
-## Usage
-
-1. **Configure Connection**: 
-   - Toggle "Use Local Development" for localhost
-   - Or choose AWS mode or manual BE URL for remote connection
-2. **Fill Form**: Select country, state, cities, and search query
-3. **Start Scraping**: Click "Start Scraping" button
-4. **Monitor Progress**: Watch real-time progress updates
-5. **View Results**: See extracted leads and business information
+- **Flexible Configuration**: Support for both AWS EC2 and direct backend connections
+- **Dual Form Types**: Location-based search or direct ID/URL input
+- **Real-time Results**: Live feedback and result display
+- **Context-based State**: Clean state management using React Context API
 
 ## Architecture
 
-### Core Components
-- `GenerateLeads`: Main component with connection config and form
-- `ConnectionConfig`: AWS toggle and BE URL input
-- `UnifiedStreamingProgress`: Progress display for both modes
-- `LocationForm`: Country/state/city selection
-- `IdUrlForm`: Direct URL/ID input option
-- `ResultsSection`: Display extracted leads
+### Context Providers
+- **ConfigurationContext**: Manages connection settings and validation
+- **FormContext**: Handles form data and validation logic
+- **SubmissionContext**: Manages API requests and results
 
-### Hooks
-- `useUnifiedLeadStreaming`: Handles both AWS and manual streaming
-- `useConnectionConfig`: Manages connection configuration
-- `useLeadGenerationForm`: Form state management
+### Components
+- **LeadGenerationProvider**: Main provider wrapper for all contexts
+- **ConfigurationForm**: Connection setup with password inputs and validation
+- **LocationForm**: Location-based search form
+- **IdUrlForm**: Direct ID/URL input form
+- **ResultsSection**: Displays API results and status
+- **GenerateLeads**: Main orchestrator component
 
-### Utilities
-- `streaming-utils.ts`: Shared streaming logic and validation
-- `get-be-url.ts`: Smart URL management for different modes
+## Configuration Setup
+
+### Step 1: Choose Connection Type
+
+#### AWS EC2 Management (Toggle ON)
+- **Automatic EC2 Management**: Manages EC2 instances automatically
+- **Manual Credentials**: Enter AWS credentials directly in the form
+- **Required Fields**:
+  - AWS Access Key ID (password-protected input)
+  - AWS Secret Access Key (password-protected input)
+  - AWS Region (e.g., us-east-1)
+  - EC2 Instance ID (e.g., i-1234567890abcdef0)
+- **Security**: All credentials are entered manually with show/hide toggles
+
+#### Direct Backend Connection (Toggle OFF)
+- **Simple URL Input**: Enter your backend server URL directly
+- **Flexible**: Works with localhost, AWS, or any backend server
+- **Format**: `http://localhost:8100` or `http://your-server:8100`
+- **Validation**: Basic URL format validation
+
+### Step 2: Validate Configuration
+- Click "Validate Configuration" button
+- System checks all required fields
+- Green checkmark indicates ready to proceed
+
+## Form Types
+
+### Location-Based Search
+- **Query**: Search term (e.g., "restaurants", "dentists")
+- **Country**: Select target country from dropdown
+- **State/Province**: Select state or province
+- **Cities**: Select specific cities within the state
+- **Validation**: All fields required for submission
+
+### Direct ID/URL Search
+- **IDs/URLs**: Enter Google Maps Place IDs or URLs directly
+- **Comma-separated**: Multiple entries supported
+- **Format**: `place_id_1, place_id_2, https://maps.google.com/...`
+- **Validation**: At least one valid ID/URL required
+
+## Usage Flow
+
+1. **Configure Connection**: 
+   - Choose AWS or direct backend connection
+   - Fill in required credentials/URL
+   - Validate configuration
+2. **Select Form Type**: Choose location-based or ID/URL search
+3. **Fill Form Data**: Complete the selected form type
+4. **Submit**: Click "Start Scraping" when form is valid
+5. **View Results**: See extracted leads and business information
+
+## Form Validation
+
+### Configuration Validation
+- **AWS Mode**: All AWS credentials must be provided
+- **Direct Mode**: Valid URL format required
+- **Real-time**: Validation happens on form change
+
+### Form Validation
+- **Location Form**: Query + Country + State + Cities required
+- **ID/URL Form**: At least one ID/URL required
+- **Mutual Exclusion**: Only one form type can be active at a time
+- **Submit Button**: Enabled only when form is valid and config is complete
+
+## Security Features
+
+- **Password Inputs**: AWS credentials use password-type inputs
+- **Show/Hide Toggle**: Eye icon to reveal/hide sensitive data
+- **No Environment Variables**: All credentials entered manually
+- **Client-side Validation**: Immediate feedback on input errors
+
+## API Integration
+
+- **Endpoint**: `POST /gmaps/scrape`
+- **Request Format**: JSON with form data
+- **Response**: JSON with extracted lead information
+- **Error Handling**: Clear error messages for failed requests
+
+## Error Handling
+
+- **Configuration Errors**: Clear messages for missing/invalid credentials
+- **Form Validation**: Real-time validation with helpful messages
+- **API Errors**: Network and server error handling
+- **User Feedback**: Loading states and success/error indicators
+
+## Development
+
+### Prerequisites
+- Node.js 18+
+- Backend server running (for testing)
+
+### Installation
+```bash
+npm install
+npm run dev
+```
+
+### Testing
+1. Start your backend server
+2. Configure connection (direct mode recommended for testing)
+3. Fill out a form and submit
+4. Check results display
 
 ## File Structure
 
 ```
 app/lead-generation/
 ├── README.md                    # This file
-├── page.tsx                     # Main page
+├── page.tsx                     # Main page with provider
 └── LGS/
     ├── _components/             # UI components
-    ├── _hooks/                  # React hooks
-    ├── _utils/                  # Shared utilities
+    │   ├── LeadGenerationProvider.tsx
+    │   ├── GenerateLeads.tsx
+    │   ├── ConfigurationForm.tsx
+    │   ├── LocationForm.tsx
+    │   ├── IdUrlForm.tsx
+    │   └── ResultsSection.tsx
+    ├── _contexts/               # Context providers
+    │   ├── ConfigurationContext.tsx
+    │   ├── FormContext.tsx
+    │   └── SubmissionContext.tsx
     └── utlis/types.ts          # Type definitions
 ```
 
-## Error Handling
+## Key Benefits
 
-- **Configuration Validation**: Real-time validation with clear error messages
-- **Connection Errors**: Network and server error handling
-- **Streaming Errors**: Data processing error recovery
-- **AWS Errors**: EC2 instance and command execution errors
-
-## Development
-
-The system is designed for easy maintenance and extension:
-- Clean separation of concerns
-- Reusable components and hooks
-- Type-safe implementation
-- Comprehensive error handling
+- **Single Source of Truth**: Context API provides centralized state management
+- **Clean Separation**: Configuration, forms, and results are separate contexts
+- **Immediate Feedback**: Real-time validation and status updates
+- **User-Friendly**: Clear instructions and error messages
+- **Maintainable**: Simple context structure easy to understand and extend
+- **Type-Safe**: Full TypeScript support with proper type definitions
