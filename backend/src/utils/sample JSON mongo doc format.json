@@ -1,0 +1,26 @@
+{
+  "state": "Maharashtra",
+  "cities": [
+    {
+      "city_name": "Pune",
+      "queries": [
+        {
+          "search_query": "Digital marketing agencies",
+          "query_slug": "digital-marketing-agencies",
+          "leads": [
+            {
+              "name": "Brandloom Consulting",
+              "phoneNumber": "+91 9899173970",
+              "website": "http://www.brandloom.com/",
+              "gmapsUrl": "https://maps.app.goo.gl/g6Lqg2B3gZJ3Y4PGA",
+              "overAllRatings": 4.6,
+              "numberOfReviews": 218
+            }
+          ],
+          "total_leads_found_for_query": "leadsArray.length"
+        }
+      ]
+    }
+  ],
+  "timestamp": "current date in simple hum readable format eg:(9th May 2025) (only attach timestamp to this document level)"
+}

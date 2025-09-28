@@ -1,0 +1,66 @@
+Generate a comprehensive geographical JSON structure for INDIA that captures all relevant administrative divisions from the highest level down to the level before local areas. First analyze INDIA's administrative structure to determine how many hierarchical levels exist (up to a maximum of 4 levels).
+
+Steps to follow:
+1. Identify how many meaningful administrative division levels exist in INDIA
+2. Structure the JSON hierarchy accordingly (1-4 levels plus the country root)
+3. At the most granular level, include empty arrays ([]) as placeholders instead of listing all local areas
+
+The JSON should follow this general structure:
+{
+  "INDIA": {
+    "{LEVEL_1_DIVISION}": {
+      // If country has only 2 levels:
+      "{LEVEL_2_DIVISION}": [],
+      "{LEVEL_2_DIVISION_2}": [],
+      
+      // OR if country has 3 levels:
+      "{LEVEL_2_DIVISION}": {
+        "{LEVEL_3_DIVISION}": [],
+        "{LEVEL_3_DIVISION_2}": []
+      },
+      
+      // OR if country has 4 levels:
+      "{LEVEL_2_DIVISION}": {
+        "{LEVEL_3_DIVISION}": {
+          "{LEVEL_4_DIVISION}": [],
+          "{LEVEL_4_DIVISION_2}": []
+        }
+      }
+    }
+  }
+}
+
+Critical requirements:
+1. ANALYZE the administrative structure of INDIA BEFORE generating the JSON
+2. ADAPT the hierarchy based on the country's actual administrative organization
+3. Do NOT exceed 4 nested levels (excluding the root)
+4. The country name and all division names MUST be in UPPERCASE
+5. Use empty arrays ([]) at the leaf nodes instead of listing all local areas
+6. ONLY the most granular divisions should contain empty arrays as leaf nodes
+7. Include ALL administrative divisions at each level (states/provinces, cities/districts, etc.)
+8. Use the most recent and accurate geographical data available
+9. Ensure consistent formatting throughout the entire JSON
+10. Balance comprehensiveness with practicality - include all significant populated areas
+
+Examples of different country structures:
+- Small countries might have: Country > Cities > []
+- Medium countries might have: Country > States/Provinces > Cities > []
+- Large countries might have: Country > States/Provinces > Districts/Counties > Cities > []
+
+For example, for India, the structure might look like:
+{
+  "INDIA": {
+    "MAHARASHTRA": {
+      "PUNE": [],
+      "MUMBAI": [],
+      "NASHIK": []
+    },
+    "GUJARAT": {
+      "AHMEDABAD": [],
+      "SURAT": [],
+      "VADODARA": []
+    }
+  }
+}
+
+Return valid, properly formatted JSON that can be parsed without errors.

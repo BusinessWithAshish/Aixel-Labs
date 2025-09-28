@@ -1,0 +1,15 @@
+If given state document already exits
+    yes:
+        if given city already exists in cities array of the state
+            yes:
+                if given query-slug exists in queries array of the city
+                Here only append the new leads to existing leads array for that query, city, state.
+            no:
+                Create a new object for the given query-slug, add the leads array and add it to the queries array of the city.
+    no:
+        1. Create a new object for the given city with city_name, add queries array to it.
+        2. Create a new object for the given query-slug, add the leads array and add it to the queries array of the city
+no:
+    1. Create a new object for the given state with state_name, add cities array to it.
+    2. Create a new object for the given city with city_name, add queries array to it.
+    3. Create a new object for the given query-slug, add the leads array and add it to the queries array of the city
