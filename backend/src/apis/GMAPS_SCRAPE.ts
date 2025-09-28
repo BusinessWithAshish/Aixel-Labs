@@ -2,8 +2,8 @@ import z from "zod";
 import { Request, Response } from 'express'
 import { generateGoogleMapsUrls } from "../utils/helpers";
 import { BrowserBatchHandler } from "../functions/common/browser-batch-handler";
-import {scrapeLinks} from "../functions/scrape-links";
-import {GmapsDetailsLeadInfoExtractor} from "../functions/gmap-details-lead-extractor";
+import { scrapeLinks } from "../functions/scrape-links";
+import { GmapsDetailsLeadInfoExtractor } from "../functions/gmap-details-lead-extractor";
 
 export const GmapsScrapeSchema = z.object({
   query: z.string(),
@@ -16,7 +16,7 @@ export const GmapsScrapeSchema = z.object({
 
 export type GmapsScrape = z.infer<typeof GmapsScrapeSchema>;
 
-export const GMAPS_SCRAPE =  async (req: Request, res: Response) => {
+export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
   const requestBody = req.body;
 
   const parsedBody = GmapsScrapeSchema.safeParse(requestBody);
@@ -46,7 +46,7 @@ export const GMAPS_SCRAPE =  async (req: Request, res: Response) => {
   res.write(`data: ${JSON.stringify({
     type: 'status',
     message: `Starting Google Maps scraping for "${parsedBody.data.query}" in ${parsedBody.data.states.length} states`,
-    data: { 
+    data: {
       total: finalScrappingUrls.length,
       stage: 'api_start'
     },
@@ -58,7 +58,7 @@ export const GMAPS_SCRAPE =  async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify({
       type: 'status',
       message: 'Phase 1: Searching for business listings...',
-      data: { 
+      data: {
         stage: 'phase_1_start',
         phase: 1
       },
@@ -66,9 +66,9 @@ export const GMAPS_SCRAPE =  async (req: Request, res: Response) => {
     })}\n\n`);
 
     const foundedLeads = await BrowserBatchHandler(finalScrappingUrls, scrapeLinks, res);
-    
+
     const foundedLeadsResults = foundedLeads.results.flat();
-    
+
     if (foundedLeadsResults.length === 0) {
       res.write(`data: ${JSON.stringify({
         type: 'complete',
@@ -90,7 +90,7 @@ export const GMAPS_SCRAPE =  async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify({
       type: 'status',
       message: `Phase 2: Extracting details from ${foundedLeadsResults.length} business listings...`,
-      data: { 
+      data: {
         stage: 'phase_2_start',
         phase: 2,
         total: foundedLeadsResults.length
@@ -100,7 +100,7 @@ export const GMAPS_SCRAPE =  async (req: Request, res: Response) => {
 
     const allLeads = await BrowserBatchHandler(foundedLeadsResults, GmapsDetailsLeadInfoExtractor, res);
     const allLeadsResults = allLeads.results.flat();
-    
+
     // Send final results
     res.write(`data: ${JSON.stringify({
       type: 'complete',
@@ -114,7 +114,7 @@ export const GMAPS_SCRAPE =  async (req: Request, res: Response) => {
       },
       timestamp: new Date().toISOString()
     })}\n\n`);
-    
+
     res.end();
   } catch (error) {
     res.write(`data: ${JSON.stringify({

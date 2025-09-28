@@ -1,0 +1,10 @@
+{
+    "name": "Aixellabs",
+    "private": true,
+    "scripts": {
+        "dev:install-frontend": "pnpm --filter frontend install",
+        "dev:frontend": "pnpm --filter frontend dev",
+        "dev:install-backend": "PUPPETEER_SKIP_DOWNLOAD=true && pnpm --filter backend install",
+        "dev:backend": "pnpm --filter backend run start"
+    }
+}

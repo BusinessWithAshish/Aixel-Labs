@@ -1,5 +1,5 @@
 {
-  "name": "aixellabs",
+  "name": "@aixellabs/backend",
   "version": "1.0.0",
   "description": "Internal Google Maps scraping API server",
   "main": "dist/index.js",
@@ -14,6 +14,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aixellabs/shared-types": "workspace:*",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
