@@ -1,14 +1,14 @@
 {
-    "name": "@aixellabs/shared-types",
+    "name": "@aixellabs/shared",
     "version": "1.0.0",
     "private": true,
     "main": "./index.ts",
     "types": "./index.ts",
     "exports": {
         ".": "./index.ts",
-        "./utils": "./utils/index.ts",
-        "./constants": "./utils/constants.ts",
-        "./helpers": "./utils/helpers.ts"
+        "./types": "./types.ts",
+        "./constants": "./constants.ts",
+        "./helpers": "./helpers.ts"
     },
     "scripts": {
         "build": "echo 'No build step needed for TypeScript types'",

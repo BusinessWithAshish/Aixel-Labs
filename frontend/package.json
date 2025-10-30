@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --port=3003",
+    "dev": "next dev --port=3003",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "prod": "rm -rf .next && next build && next start --port=3003"
   },
   "dependencies": {
-    "@aixellabs/shared-types": "workspace:*",
+    "@aixellabs/shared": "workspace:*",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-checkbox": "^1.2.3",
     "@radix-ui/react-collapsible": "^1.1.12",

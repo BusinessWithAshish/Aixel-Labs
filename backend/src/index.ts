@@ -53,44 +53,6 @@ app.get("/v1/ping", (_, res) => {
 });
 
 // ===================
-// 6️⃣ Browser Test Endpoint
-// ===================
-app.get("/v1/test-browser", async (_, res) => {
-  try {
-    console.log("🧪 Testing browser launch...");
-    const { getBrowserOptions } = await import("./utils/browser.js");
-    const browserOptions = await getBrowserOptions();
-    
-    console.log("🔧 Browser options:", JSON.stringify(browserOptions, null, 2));
-    
-    const puppeteer = await import("puppeteer");
-    const browser = await puppeteer.default.launch(browserOptions);
-    
-    console.log("✅ Browser launched successfully");
-    
-    const page = await browser.newPage();
-    await page.goto("https://www.google.com", { waitUntil: "networkidle2", timeout: 10000 });
-    const title = await page.title();
-    
-    await browser.close();
-    
-    res.json({ 
-      success: true, 
-      message: "Browser test successful",
-      title: title,
-      browserOptions: browserOptions
-    });
-  } catch (error) {
-    console.error("❌ Browser test failed:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Browser test failed",
-      details: error instanceof Error ? error.message : String(error)
-    });
-  }
-});
-
-// ===================
 // 7️⃣ Routes
 // ===================
 import { GMAPS_SCRAPE } from "./apis/GMAPS_SCRAPE.js";
