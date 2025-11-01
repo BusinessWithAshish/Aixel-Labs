@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Lead } from "@/app/lead-generation/LGS/utlis/types";
+import { Lead } from "@/app/lead-generation/LGS/_utlis/types";
 import { ExternalLink, Phone, Star, MessageSquare } from "lucide-react";
 
 interface LeadCardProps {
