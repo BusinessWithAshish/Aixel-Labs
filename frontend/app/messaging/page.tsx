@@ -5,7 +5,7 @@ export default function MessagingPage() {
 
     return (
         <PageLayout title='Messaging'>
-            Messaging page
+            Messaging page New
         </PageLayout>
     )
 
