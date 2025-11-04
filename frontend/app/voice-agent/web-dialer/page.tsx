@@ -129,7 +129,7 @@ export default function WebDialerPage() {
 
   return (
     <PageLayout className="space-y-3" title="Web dialer">
-      <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+      <div className="flex items-center justify-center min-h-full">
         <Card className="w-full max-w-md mx-auto shadow-xl">
           <CardContent className="p-6 sm:p-8 space-y-6">
             {/* Status Badge */}
