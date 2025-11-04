@@ -26,21 +26,26 @@ sudo npm install -g pnpm
 echo "🌐 Installing Chromium..."
 sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
 
-sudo git clone https://github.com/BusinessWithAshish/aixellabs-BE.git
-cd aixellabs-BE
+# Clone monorepo
+echo "📥 Cloning Aixel-Labs monorepo..."
+sudo git clone https://github.com/BusinessWithAshish/Aixel-Labs.git
+cd Aixel-Labs
 
-# Install project dependencies
-echo "📂 Installing project dependencies..."
-pnpm install
+# Install backend dependencies using monorepo script
+echo "📂 Installing backend dependencies..."
+pnpm installBE
+
+# Navigate to backend directory
+cd backend
 
 # Create .env file
 echo "📝 Creating .env file..."
 cat <<EOF > .env
-PORT=${PORT}
-NODE_ENV=${NODE_ENV}
-MAX_BROWSER_SESSIONS=${MAX_BROWSER_SESSIONS}
-MAX_PAGES_PER_BROWSER=${MAX_PAGES_PER_BROWSER}
-GOOGLE_MAPS_PLACES_API_KEY=${GOOGLE_MAPS_PLACES_API_KEY}
+PORT=
+NODE_ENV=
+MAX_BROWSER_SESSIONS=
+MAX_PAGES_PER_BROWSER=
+GOOGLE_MAPS_PLACES_API_KEY=
 EOF
 
 echo "✅ .env file created successfully!"
