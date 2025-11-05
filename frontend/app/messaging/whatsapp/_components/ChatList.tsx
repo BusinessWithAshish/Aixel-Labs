@@ -39,7 +39,7 @@ export function ChatList({
 }: ChatListProps) {
     return (
         <Card className="p-3 flex flex-col gap-3 col-span-2 h-full overflow-hidden">
-            <CardHeader className="drop-shadow-md border-b flex-shrink-0">
+            <CardHeader className="drop-shadow-md border-b shrink-0">
                 <CardTitle className="text-base">Customer Chats</CardTitle>
                 <CardAction>
                     <Popover

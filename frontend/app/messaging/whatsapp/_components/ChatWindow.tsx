@@ -42,7 +42,7 @@ export function ChatWindow({
 
     return (
         <Card className="col-span-4 flex flex-col gap-3 h-full overflow-hidden">
-            <CardHeader className="border-b drop-shadow-md flex-shrink-0">
+            <CardHeader className="border-b drop-shadow-md shrink-0">
                 <CardTitle className="flex items-center justify-between">
                     <span>Chat with: {currentChat.customerPhone}</span>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -102,7 +102,7 @@ export function ChatWindow({
                 )}
             </CardContent>
 
-            <CardFooter className="border-t flex-shrink-0">
+            <CardFooter className="border-t shrink-0">
                 {currentChat.state === ChatState.NEW || currentChat.state === ChatState.EXPIRED ? (
                     <div className="w-full flex flex-col gap-3">
                         <div className="text-sm text-gray-600">
