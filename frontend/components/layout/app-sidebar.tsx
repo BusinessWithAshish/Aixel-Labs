@@ -12,22 +12,20 @@ import {
     SidebarHeader,
     SidebarRail,
 } from "@/components/ui/sidebar"
-import {useSidebar} from "@/hooks/use-sidebar";
+import {sidebarConfig} from "@/config/sidebar.config"
 
 export function AppSidebar({...props}: React.ComponentProps<typeof Sidebar>) {
-
-    const data = useSidebar();
 
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
-                <TeamSwitcher teams={data.teams}/>
+                <TeamSwitcher teams={sidebarConfig.teams}/>
             </SidebarHeader>
             <SidebarContent>
-                <NavMain items={data.navMain}/>
+                <NavMain items={sidebarConfig.navMain}/>
             </SidebarContent>
             <SidebarFooter>
-                <NavUser user={data.user}/>
+                <NavUser user={sidebarConfig.user}/>
             </SidebarFooter>
             <SidebarRail/>
         </Sidebar>

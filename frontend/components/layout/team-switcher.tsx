@@ -18,15 +18,12 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar"
+import type { SidebarTeam } from "@/config/sidebar.config"
 
 export function TeamSwitcher({
                                  teams,
                              }: {
-    teams: {
-        name: string
-        logo: React.ElementType
-        plan: string
-    }[]
+    teams: SidebarTeam[]
 }) {
     const { isMobile } = useSidebar()
     const [activeTeam, setActiveTeam] = React.useState(teams[0])

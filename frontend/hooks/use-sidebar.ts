@@ -1,89 +1,11 @@
-import {AudioWaveform, Command, GalleryVerticalEnd, Mail, MessageCircleMore, Settings2, UsersRound,} from "lucide-react"
+/**
+ * @deprecated This hook is deprecated. Import sidebarConfig directly from @/config/sidebar.config instead.
+ * This file is kept for backward compatibility only.
+ */
+import { sidebarConfig } from "@/config/sidebar.config"
 
-export const LEFT_SIDEBAR_MENU = {
-    user: {
-        name: "Aixel Labs",
-        email: "hello@aixellabs.com",
-        avatar: "",
-    },
-    teams: [
-        {
-            name: "Aixel Labs",
-            logo: GalleryVerticalEnd,
-            plan: "Enterprise",
-        },
-        {
-            name: "Aixel Labs 2",
-            logo: AudioWaveform,
-            plan: "Startup",
-        },
-        {
-            name: "Aixel Labs 3",
-            logo: Command,
-            plan: "Free",
-        },
-    ],
-    navMain: [
-        {
-            title: "Lead Generation",
-            url: "/lead-generation",
-            icon: UsersRound,
-            items: [
-                {title: "All in 1 scraper", url: "/lead-generation/AI1"},
-                {title: "Google Maps Scraper", url: "/lead-generation/LGS"},
-                {title: "Google Advanced Search", url: "/lead-generation"},
-                {title: "LinkedIn", url: "/lead-generation"},
-                {title: "Instagram", url: "/lead-generation"},
-                {title: "Facebook", url: "/lead-generation"},
-            ],
-        },
-        {
-            title: "Voice Agent",
-            url: "/voice-agent",
-            icon: AudioWaveform,
-            items: [
-                {title: "Web dialer", url: "/voice-agent/web-dialer"},
-                {title: "Inquiry / Bookings", url: "/voice-agent"},
-                {title: "Custom Agent Analytics", url: "/voice-agent"},
-            ],
-        },
-        {
-            title: "Messaging",
-            url: "/messaging",
-            icon: MessageCircleMore,
-            items: [
-                {title: "Whatsapp", url: "/messaging/whatsapp"},
-                {title: "SMS", url: "/messaging/sms"},
-                {title: "Analytics", url: "/messaging"},
-            ],
-        },
-        {
-            title: "Email Module",
-            url: "/mail",
-            icon: Mail,
-            items: [
-                {title: "Cold Outreach", url: "/mail"},
-                {title: "Warm Outreach", url: "/mail"},
-                {title: "Templates", url: "/mail"},
-                {title: "AI Replies", url: "/mail"},
-                {title: "Analytics", url: "/mail"},
-            ],
-        },
-        {
-            title: "Client Management",
-            url: "/settings",
-            icon: Settings2,
-            items: [
-                {title: "Enabled Modules", url: "/settings/enabled-modules",},
-                {title: "Multi-tenant Accounts", url: "/settings/multi-tenant-accounts",},
-            ],
-        },
-    ],
-}
-
+export const LEFT_SIDEBAR_MENU = sidebarConfig
 
 export const useSidebar = () => {
-
-    return LEFT_SIDEBAR_MENU;
-
+    return sidebarConfig
 }
