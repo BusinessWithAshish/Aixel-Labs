@@ -1,108 +1,46 @@
 'use client';
 
 import PageLayout from '@/components/common/PageLayout';
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import axios from 'axios';
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChatState, MessageType, TMessageTemplates, TWhatsAppChat } from '@/app/messaging/types';
-import { TWILIO_FUNCTIONS_URL } from '@/app/messaging/constants';
+import { ChatState, MessageType, TWhatsAppChat } from '@/app/messaging/types';
 import { LoaderCircle, MessageCirclePlus, RefreshCw } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { PageProvider, usePage } from '@/contexts/PageStore';
+import { useWhatsAppPage, type UseWhatsAppPageReturn } from './_hooks';
 
-// Add your Twilio number here - this should be your purchased Twilio WhatsApp number
-const TWILIO_WHATSAPP_NUMBER = '+16466814490';
-
-export default function WhatsAppPage() {
-    const [chats, setChats] = useState<TWhatsAppChat[]>([]);
-    const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [draft, setDraft] = useState('');
-    const [newChatPhone, setNewChatPhone] = useState('');
-    const [messagesLoading, setMessagesLoading] = useState<boolean>(false);
-    const [isAddChatOpen, setIsAddChatOpen] = useState(false);
-    const [templates, setTemplates] = useState<TMessageTemplates[]>([]);
-    const [templatesLoading, setTemplatesLoading] = useState(false);
-
-    const fetchMessages = useCallback(async () => {
-        try {
-            setMessagesLoading(true);
-            const res = await axios.get<TWhatsAppChat[]>(`${TWILIO_FUNCTIONS_URL}/list-whatsapp`);
-            const allChats = res.data || [];
-
-            setChats(allChats);
-        } catch (e) {
-            console.error('fetchMessages error', e);
-        } finally {
-            setMessagesLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchMessages();
-    }, [fetchMessages]);
-
-    // fetch templates (available-templates)
-    const fetchTemplates = useCallback(async () => {
-        try {
-            setTemplatesLoading(true);
-            const res = await axios.get(`${TWILIO_FUNCTIONS_URL}/msg-templates`);
-            setTemplates(res.data || []);
-        } catch (e) {
-            console.error('fetch templates error', e);
-        } finally {
-            setTemplatesLoading(false);
-        }
-    }, []);
-
-    const currentChat = useMemo(() => {
-        return chats.find((c) => c.id === selectedId) ?? null;
-    }, [chats, selectedId]); // Fixed dependencies
-
-    // send WhatsApp message (freeform)
-    async function sendMessage() {
-        if (!draft.trim() || !currentChat) return;
-        try {
-            await axios.post(`${TWILIO_FUNCTIONS_URL}/send-whatsapp`, {
-                to: currentChat.customerPhone,
-                body: draft.trim(),
-            });
-            setDraft('');
-            await fetchMessages(); // Wait for refresh
-        } catch (e) {
-            console.error('sendMessage error', e);
-        }
-    }
-
-    // send a template (used for new/expired chats)
-    async function sendTemplate(templateSid: string) {
-        if (!currentChat) return;
-        try {
-            await axios.post(`${TWILIO_FUNCTIONS_URL}/send-whatsapp`, {
-                to: currentChat.customerPhone,
-                contentSid: templateSid,
-            });
-            await fetchMessages(); // Wait for refresh
-        } catch (e) {
-            console.error('sendTemplate error', e);
-        }
-    }
-
-    // Handle enter key press for sending messages
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    };
+function WhatsAppPageContent() {
+    const {
+        chats,
+        selectedId,
+        draft,
+        newChatPhone,
+        messagesLoading,
+        isAddChatOpen,
+        templates,
+        templatesLoading,
+        currentChat,
+        twilioWhatsAppNumber,
+        setSelectedId,
+        setDraft,
+        setNewChatPhone,
+        setIsAddChatOpen,
+        setChats,
+        fetchMessages,
+        fetchTemplates,
+        sendMessage,
+        sendTemplate,
+        handleKeyPress,
+    } = usePage<UseWhatsAppPageReturn>();
 
     return (
         <PageLayout
             className="grid relative grid-cols-6 gap-3"
             title={
                 <div className="flex w-full justify-between items-center ">
-                    <p>WhatsApp - Business Number: {TWILIO_WHATSAPP_NUMBER}</p>
+                    <p>WhatsApp - Business Number: {twilioWhatsAppNumber}</p>
                     <p className="flex items-center justify-between gap-2">
                         Refresh:{' '}
                         <RefreshCw
@@ -368,5 +306,13 @@ export default function WhatsAppPage() {
                 )}
             </Card>
         </PageLayout>
+    );
+}
+
+export default function WhatsAppPage() {
+    return (
+        <PageProvider usePageHook={useWhatsAppPage}>
+            <WhatsAppPageContent />
+        </PageProvider>
     );
 }
