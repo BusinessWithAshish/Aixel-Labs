@@ -53,7 +53,7 @@ function WhatsAppPageContent() {
             }
         >
             {messagesLoading && (
-                <div className="absolute z-[5] h-full w-full flex items-center justify-center backdrop-blur-xs">
+                <div className="absolute z-5 h-full w-full flex items-center justify-center backdrop-blur-xs">
                     <LoaderCircle className="animate-spin" />
                 </div>
             )}
@@ -212,7 +212,7 @@ function WhatsAppPageContent() {
                                             >
                                                 <div
                                                     className={cn(
-                                                        'max-w-xs px-4 py-2 rounded-lg break-words',
+                                                        'max-w-xs px-4 py-2 rounded-lg wrap-break-word',
                                                         isOutbound
                                                             ? 'bg-green-500 text-white rounded-br-none'
                                                             : 'bg-gray-200 text-gray-900 rounded-bl-none',
