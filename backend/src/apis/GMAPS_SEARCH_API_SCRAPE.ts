@@ -3,7 +3,7 @@ import { Request, Response } from 'express'
 import dotenv from "dotenv"
 dotenv.config()
 import {GOOGLE_MAPS_TEXT_FREE_FIELD_MASKS, GOOGLE_MAPS_TEXTSEARCH_API_URL} from "../utils/constants";
-import {generateGoogleMapsUrls} from "../utils/helpers";
+import {generateGoogleMapsUrls} from "@aixellabs/shared/apis";
 
 export const POSTv3ScrapeSchema = z.object({
     query: z.string(),

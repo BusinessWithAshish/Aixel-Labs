@@ -1,115 +1,188 @@
-"use client";
+'use client';
 
-import { createContext, useContext, useState, ReactNode } from "react";
-import { useConfiguration } from "./ConfigurationContext";
-import { useForm } from "./FormContext";
+import { createContext, useContext, useState, ReactNode } from 'react';
+import { useConfiguration } from './ConfigurationContext';
+import { useForm } from './FormContext';
+import { GmapsScrapeRequest, StreamMessage } from '@aixellabs/shared/apis';
 
 type SubmissionState = {
-  isSubmitting: boolean;
-  isSuccess: boolean;
-  error: string | null;
-  result: unknown;
+    isSubmitting: boolean;
+    isSuccess: boolean;
+    error: string | null;
+    result: unknown;
 };
 
 type SubmissionContextType = {
-  submissionState: SubmissionState;
-  submitForm: () => Promise<void>;
-  resetSubmission: () => void;
+    submissionState: SubmissionState;
+    submitForm: () => Promise<void>;
+    resetSubmission: () => void;
 };
 
 const SubmissionContext = createContext<SubmissionContextType | undefined>(undefined);
 
 const initialSubmissionState: SubmissionState = {
-  isSubmitting: false,
-  isSuccess: false,
-  error: null,
-  result: null,
+    isSubmitting: false,
+    isSuccess: false,
+    error: null,
+    result: null,
 };
 
 export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
-  const [submissionState, setSubmissionState] = useState<SubmissionState>(initialSubmissionState);
-  const { config } = useConfiguration();
-  const { formData } = useForm();
+    const [submissionState, setSubmissionState] = useState<SubmissionState>(initialSubmissionState);
+    const { config } = useConfiguration();
+    const { formData } = useForm();
 
-  const submitForm = async () => {
-    setSubmissionState(prev => ({
-      ...prev,
-      isSubmitting: true,
-      error: null,
-    }));
+    const submitForm = async () => {
+        setSubmissionState((prev) => ({
+            ...prev,
+            isSubmitting: true,
+            error: null,
+        }));
 
-    try {
-      // Determine backend URL
-      let backendUrl: string;
-      
-      if (config.useAWS) {
-        backendUrl = "http://aws-instance:8100"; // Placeholder for AWS
-      } else {
-        backendUrl = config.backendUrl;
-      }
+        try {
+            // Determine backend URL
+            let backendUrl: string;
 
-      // Prepare request data
-      const requestData = {
-        query: formData.query,
-        selectedCountry: formData.selectedCountry,
-        selectedState: formData.selectedState,
-        selectedCities: formData.selectedCities,
-        idsUrls: formData.idsUrls,
-      };
+            if (config.useAWS) {
+                backendUrl = 'http://aws-instance:8100'; // Placeholder for AWS
+            } else {
+                backendUrl = config.backendUrl;
+            }
 
-      // Make API request
-      const response = await fetch(`${backendUrl}/gmaps/scrape`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestData),
-      });
+            // Transform form data to API format
+            const requestData: GmapsScrapeRequest = {
+                query: formData.query,
+                country: formData.selectedCountry,
+                states:
+                    formData.selectedState && formData.selectedCities.length > 0
+                        ? [
+                              {
+                                  name: formData.selectedState,
+                                  cities: formData.selectedCities,
+                              },
+                          ]
+                        : [],
+            };
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+            // Make API request with SSE
+            const response = await fetch(`${backendUrl}/gmaps/scrape`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData),
+            });
 
-      const result = await response.json();
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
-      setSubmissionState(prev => ({
-        ...prev,
-        isSubmitting: false,
-        isSuccess: true,
-        result,
-      }));
+            // Handle Server-Sent Events (SSE)
+            if (!response.body) {
+                throw new Error('Response body is null');
+            }
 
-    } catch (error) {
-      setSubmissionState(prev => ({
-        ...prev,
-        isSubmitting: false,
-        isSuccess: false,
-        error: error instanceof Error ? error.message : "An error occurred",
-      }));
-    }
-  };
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-  const resetSubmission = () => {
-    setSubmissionState(initialSubmissionState);
-  };
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
 
-  return (
-    <SubmissionContext.Provider
-      value={{
-        submissionState,
-        submitForm,
-        resetSubmission,
-      }}
-    >
-      {children}
-    </SubmissionContext.Provider>
-  );
+                    if (done) {
+                        // Process any remaining buffer
+                        if (buffer.trim()) {
+                            const messages = buffer.split('\n\n').filter((msg) => msg.trim());
+                            for (const msg of messages) {
+                                if (msg.startsWith('data: ')) {
+                                    try {
+                                        const message: StreamMessage = JSON.parse(msg.slice(6));
+                                        if (message.type === 'complete') {
+                                            setSubmissionState((prev) => ({
+                                                ...prev,
+                                                isSubmitting: false,
+                                                isSuccess: true,
+                                                result: message.data,
+                                            }));
+                                        }
+                                    } catch (error) {
+                                        console.error('Error parsing final SSE message:', error);
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    }
+
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // Process complete SSE messages (separated by \n\n)
+                    const messages = buffer.split('\n\n');
+                    buffer = messages.pop() || ''; // Keep incomplete message in buffer
+
+                    for (const msg of messages) {
+                        if (msg.trim().startsWith('data: ')) {
+                            try {
+                                const message: StreamMessage = JSON.parse(msg.trim().slice(6));
+
+                                // Update state based on message type
+                                if (message.type === 'complete') {
+                                    setSubmissionState((prev) => ({
+                                        ...prev,
+                                        isSubmitting: false,
+                                        isSuccess: true,
+                                        result: message.data,
+                                    }));
+                                } else if (message.type === 'error') {
+                                    setSubmissionState((prev) => ({
+                                        ...prev,
+                                        isSubmitting: false,
+                                        isSuccess: false,
+                                        error: message.message || 'An error occurred',
+                                    }));
+                                }
+                                // For status/progress messages, you might want to emit events or update intermediate state
+                            } catch (error) {
+                                console.error('Error parsing SSE message:', error);
+                            }
+                        }
+                    }
+                }
+            } finally {
+                reader.releaseLock();
+            }
+        } catch (error) {
+            setSubmissionState((prev) => ({
+                ...prev,
+                isSubmitting: false,
+                isSuccess: false,
+                error: error instanceof Error ? error.message : 'An error occurred',
+            }));
+        }
+    };
+
+    const resetSubmission = () => {
+        setSubmissionState(initialSubmissionState);
+    };
+
+    return (
+        <SubmissionContext.Provider
+            value={{
+                submissionState,
+                submitForm,
+                resetSubmission,
+            }}
+        >
+            {children}
+        </SubmissionContext.Provider>
+    );
 };
 
 export const useSubmission = () => {
-  const context = useContext(SubmissionContext);
-  if (!context) {
-    throw new Error("useSubmission must be used within SubmissionProvider");
-  }
-  return context;
+    const context = useContext(SubmissionContext);
+    if (!context) {
+        throw new Error('useSubmission must be used within SubmissionProvider');
+    }
+    return context;
 };

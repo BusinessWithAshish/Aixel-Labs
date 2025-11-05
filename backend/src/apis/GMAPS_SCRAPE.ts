@@ -1,10 +1,11 @@
 import z from "zod";
 import { Request, Response } from 'express'
-import { generateGoogleMapsUrls } from "../utils/helpers";
+import { GmapsScrapeRequest, generateGoogleMapsUrls } from "@aixellabs/shared/apis";
 import { BrowserBatchHandler } from "../functions/common/browser-batch-handler";
 import { scrapeLinks } from "../functions/scrape-links";
 import { GmapsDetailsLeadInfoExtractor } from "../functions/gmap-details-lead-extractor";
 
+// Zod schema for runtime validation (matches shared type)
 export const GmapsScrapeSchema = z.object({
   query: z.string(),
   country: z.string(),
@@ -14,7 +15,8 @@ export const GmapsScrapeSchema = z.object({
   }))
 });
 
-export type GmapsScrape = z.infer<typeof GmapsScrapeSchema>;
+// Use shared type instead of inferring from schema
+export type GmapsScrape = GmapsScrapeRequest;
 
 export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
   const requestBody = req.body;
