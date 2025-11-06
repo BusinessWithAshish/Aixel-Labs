@@ -1,8 +1,6 @@
 'use client';
 
 import PageLayout from '@/components/common/PageLayout';
-import { cn } from '@/lib/utils';
-import { LoaderCircle, RefreshCw } from 'lucide-react';
 import { PageProvider, usePage } from '@/contexts/PageStore';
 import { useWhatsAppPage, type UseWhatsAppPageReturn } from './_hooks';
 import { ChatList } from './_components/ChatList';
@@ -36,25 +34,8 @@ function WhatsAppPageContent() {
     return (
         <PageLayout
             className="grid grid-cols-6 gap-3 h-full overflow-hidden"
-            title={
-                <div className="flex w-full justify-between items-center ">
-                    <p>WhatsApp - Business Number: {twilioWhatsAppNumber}</p>
-                    <p className="flex items-center justify-between gap-2">
-                        Refresh:{' '}
-                        <RefreshCw
-                            className={cn('cursor-pointer', messagesLoading ? 'animate-spin' : '')}
-                            onClick={() => fetchMessages()}
-                            size={16}
-                        />
-                    </p>
-                </div>
-            }
+            title={`WhatsApp - Business Number: ${twilioWhatsAppNumber}`}
         >
-            {messagesLoading && (
-                <div className="absolute z-5 h-full w-full flex items-center justify-center backdrop-blur-xs">
-                    <LoaderCircle className="animate-spin" />
-                </div>
-            )}
 
             <ChatList
                 chats={chats}

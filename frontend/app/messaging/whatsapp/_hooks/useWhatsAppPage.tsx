@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { toast } from 'sonner';
 import { ChatState, MessageType, TMessageTemplates, TWhatsAppChat } from '@/app/messaging/types';
 import { TWILIO_FUNCTIONS_URL } from '@/app/messaging/constants';
 
@@ -54,7 +55,7 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
 
             setChats(allChats);
         } catch (e) {
-            console.error('❌ Failed to load messages:', e);
+            toast.error('Failed to load messages');
         } finally {
             setMessagesLoading(false);
         }
@@ -64,12 +65,17 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
         fetchMessages();
     }, [fetchMessages]);
 
-    // Periodic refresh every 10 seconds when a chat is selected
+    // Periodic refresh every 10 seconds when a chat is selected (silent refresh)
     useEffect(() => {
         if (!selectedId) return;
-        const interval = setInterval(fetchMessages, 10000);
+        const interval = setInterval(() => {
+            // Silent refresh - don't show loading state
+            axios.get<TWhatsAppChat[]>(`${TWILIO_FUNCTIONS_URL}/list-whatsapp`)
+                .then(res => setChats(res.data || []))
+                .catch(() => {}); // Silent fail on background refresh
+        }, 10000);
         return () => clearInterval(interval);
-    }, [selectedId, fetchMessages]);
+    }, [selectedId]);
 
     // fetch templates (available-templates)
     const fetchTemplates = useCallback(async () => {
@@ -78,7 +84,7 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
             const res = await axios.get(`${TWILIO_FUNCTIONS_URL}/msg-templates`);
             setTemplates(res.data || []);
         } catch (e) {
-            console.error('❌ Failed to load templates:', e);
+            toast.error('Failed to load templates');
         } finally {
             setTemplatesLoading(false);
         }
@@ -137,9 +143,9 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
                         : chat
                 )
             );
-            console.log('✅ Message sent successfully');
+            toast.success('Message sent successfully');
         } catch (e: any) {
-            console.error('❌ Failed to send message:', e);
+            toast.error('Failed to send message');
             // Mark message as failed
             setChats((prev) =>
                 prev.map((chat) =>
@@ -168,10 +174,10 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
                     to: currentChat.customerPhone,
                     contentSid: templateSid,
                 });
-                console.log('✅ Template message sent');
+                toast.success('Template message sent');
                 await fetchMessages(); // Wait for refresh
             } catch (e: any) {
-                console.error('❌ Failed to send template:', e);
+                toast.error('Failed to send template');
             } finally {
                 setTemplatesLoading(false);
             }
