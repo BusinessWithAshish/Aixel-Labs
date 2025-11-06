@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { ChatState, TMessageTemplates, TWhatsAppChat } from '@/app/messaging/types';
+import { toast } from 'sonner';
+import { ChatState, MessageType, TMessageTemplates, TWhatsAppChat } from '@/app/messaging/types';
 import { TWILIO_FUNCTIONS_URL } from '@/app/messaging/constants';
 
 // Add your Twilio number here - this should be your purchased Twilio WhatsApp number
@@ -20,6 +21,7 @@ export type UseWhatsAppPageReturn = {
     templatesLoading: boolean;
     currentChat: TWhatsAppChat | null;
     twilioWhatsAppNumber: string;
+    sending: boolean;
 
     // Actions
     setSelectedId: (id: string | null) => void;
@@ -43,6 +45,7 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
     const [isAddChatOpen, setIsAddChatOpen] = useState(false);
     const [templates, setTemplates] = useState<TMessageTemplates[]>([]);
     const [templatesLoading, setTemplatesLoading] = useState(false);
+    const [sending, setSending] = useState(false);
 
     const fetchMessages = useCallback(async () => {
         try {
@@ -52,7 +55,7 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
 
             setChats(allChats);
         } catch (e) {
-            console.error('fetchMessages error', e);
+            toast.error('Failed to load messages');
         } finally {
             setMessagesLoading(false);
         }
@@ -62,6 +65,18 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
         fetchMessages();
     }, [fetchMessages]);
 
+    // Periodic refresh every 10 seconds when a chat is selected (silent refresh)
+    useEffect(() => {
+        if (!selectedId) return;
+        const interval = setInterval(() => {
+            // Silent refresh - don't show loading state
+            axios.get<TWhatsAppChat[]>(`${TWILIO_FUNCTIONS_URL}/list-whatsapp`)
+                .then(res => setChats(res.data || []))
+                .catch(() => {}); // Silent fail on background refresh
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [selectedId]);
+
     // fetch templates (available-templates)
     const fetchTemplates = useCallback(async () => {
         try {
@@ -69,7 +84,7 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
             const res = await axios.get(`${TWILIO_FUNCTIONS_URL}/msg-templates`);
             setTemplates(res.data || []);
         } catch (e) {
-            console.error('fetch templates error', e);
+            toast.error('Failed to load templates');
         } finally {
             setTemplatesLoading(false);
         }
@@ -79,33 +94,92 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
         return chats.find((c) => c.id === selectedId) ?? null;
     }, [chats, selectedId]);
 
-    // send WhatsApp message (freeform)
+    // send WhatsApp message (freeform) with optimistic UI
     const sendMessage = useCallback(async () => {
         if (!draft.trim() || !currentChat) return;
+
+        const tempSid = `temp-${Date.now()}`;
+        const optimisticMessage = {
+            sid: tempSid,
+            body: draft.trim(),
+            from: `whatsapp:${TWILIO_WHATSAPP_NUMBER}`,
+            to: `whatsapp:${currentChat.customerPhone}`,
+            dateCreated: new Date().toISOString(),
+            direction: MessageType.OUTBOUND_API,
+            isOptimistic: true,
+            status: 'sending' as const,
+            isFromBusiness: true,
+            isFromCustomer: false,
+        };
+
+        // Add optimistic message to UI immediately
+        setChats((prev) =>
+            prev.map((chat) =>
+                chat.id === currentChat.id ? { ...chat, messages: [...chat.messages, optimisticMessage] } : chat
+            )
+        );
+
+        const sentBody = draft.trim();
+        setDraft('');
+        setSending(true);
+
         try {
-            await axios.post(`${TWILIO_FUNCTIONS_URL}/send-whatsapp`, {
+            const res = await axios.post(`${TWILIO_FUNCTIONS_URL}/send-whatsapp`, {
                 to: currentChat.customerPhone,
-                body: draft.trim(),
+                body: sentBody,
             });
-            setDraft('');
-            await fetchMessages(); // Wait for refresh
-        } catch (e) {
-            console.error('sendMessage error', e);
+
+            const sid = res.data.sid;
+            // Update optimistic message with real SID and success status
+            setChats((prev) =>
+                prev.map((chat) =>
+                    chat.id === currentChat.id
+                        ? {
+                              ...chat,
+                              messages: chat.messages.map((m) =>
+                                  m.sid === tempSid ? { ...m, sid, isOptimistic: false, status: 'sent' as const } : m
+                              ),
+                          }
+                        : chat
+                )
+            );
+            toast.success('Message sent successfully');
+        } catch (e: any) {
+            toast.error('Failed to send message');
+            // Mark message as failed
+            setChats((prev) =>
+                prev.map((chat) =>
+                    chat.id === currentChat.id
+                        ? {
+                              ...chat,
+                              messages: chat.messages.map((m) =>
+                                  m.sid === tempSid ? { ...m, status: 'failed' as const } : m
+                              ),
+                          }
+                        : chat
+                )
+            );
+        } finally {
+            setSending(false);
         }
-    }, [draft, currentChat, fetchMessages]);
+    }, [draft, currentChat, setChats, setSending]);
 
     // send a template (used for new/expired chats)
     const sendTemplate = useCallback(
         async (templateSid: string) => {
             if (!currentChat) return;
+            setTemplatesLoading(true);
             try {
                 await axios.post(`${TWILIO_FUNCTIONS_URL}/send-whatsapp`, {
                     to: currentChat.customerPhone,
                     contentSid: templateSid,
                 });
+                toast.success('Template message sent');
                 await fetchMessages(); // Wait for refresh
-            } catch (e) {
-                console.error('sendTemplate error', e);
+            } catch (e: any) {
+                toast.error('Failed to send template');
+            } finally {
+                setTemplatesLoading(false);
             }
         },
         [currentChat, fetchMessages],
@@ -134,6 +208,7 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
         templatesLoading,
         currentChat,
         twilioWhatsAppNumber: TWILIO_WHATSAPP_NUMBER,
+        sending,
 
         // Actions
         setSelectedId,

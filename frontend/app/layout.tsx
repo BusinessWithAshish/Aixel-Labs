@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const poppinsFont = Poppins({
@@ -18,6 +19,7 @@ export default function RootLayout({ children, }: Readonly<{ children: React.Rea
     <html lang="en">
       <body suppressHydrationWarning className={`${poppinsFont.variable} h-dvh w-full`}>
       {children}
+      <Toaster />
       </body>
     </html>
   );

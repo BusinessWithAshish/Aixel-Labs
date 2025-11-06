@@ -11,6 +11,8 @@ export type TTwilioMessage = {
     body: string;
     dateCreated: string;
     direction: MessageType;
+    isOptimistic?: boolean;
+    status?: 'sending' | 'sent' | 'failed' | 'delivered' | 'read';
 }
 
 export enum ChatState {
