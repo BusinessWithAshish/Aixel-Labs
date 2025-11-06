@@ -11,6 +11,7 @@ type ChatWindowProps = {
     draft: string;
     templates: Array<{ sid: string; friendlyName: string }>;
     templatesLoading: boolean;
+    sending?: boolean;
     setDraft: (draft: string) => void;
     sendMessage: () => void;
     sendTemplate: (sid: string) => void;
@@ -22,6 +23,7 @@ export function ChatWindow({
     draft,
     templates,
     templatesLoading,
+    sending = false,
     setDraft,
     sendMessage,
     sendTemplate,
@@ -77,10 +79,11 @@ export function ChatWindow({
                                 >
                                     <div
                                         className={cn(
-                                            'max-w-xs px-4 py-2 rounded-lg wrap-break-word',
+                                            'max-w-xs px-4 py-2 rounded-lg break-words',
                                             isOutbound
                                                 ? 'bg-green-500 text-white rounded-br-none'
                                                 : 'bg-gray-200 text-gray-900 rounded-bl-none',
+                                            msg.status === 'failed' && 'bg-red-500 text-white'
                                         )}
                                     >
                                         <div>{msg.body}</div>
@@ -88,8 +91,12 @@ export function ChatWindow({
                                             className={cn(
                                                 'text-xs mt-1',
                                                 isOutbound ? 'text-blue-100' : 'text-gray-500',
+                                                msg.status === 'failed' && 'text-red-100'
                                             )}
                                         >
+                                            {msg.status === 'failed' && '❌ Failed • '}
+                                            {msg.status === 'sending' && '⏳ Sending... • '}
+                                            {msg.status === 'sent' && '✅ Sent • '}
                                             {new Date(msg.dateCreated).toLocaleTimeString()}
                                             {isOutbound && ' • You'}
                                             {!isOutbound && ' • Customer'}
@@ -151,13 +158,14 @@ export function ChatWindow({
                             onChange={(e) => setDraft(e.target.value)}
                             onKeyDown={handleKeyPress}
                             className="flex-1"
+                            disabled={sending}
                         />
                         <Button
                             onClick={sendMessage}
-                            disabled={!draft.trim()}
+                            disabled={!draft.trim() || sending}
                             className="bg-green-600 hover:bg-green-700"
                         >
-                            Send
+                            {sending ? 'Sending...' : 'Send'}
                         </Button>
                     </div>
                 )}

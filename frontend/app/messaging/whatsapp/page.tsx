@@ -20,6 +20,7 @@ function WhatsAppPageContent() {
         templatesLoading,
         currentChat,
         twilioWhatsAppNumber,
+        sending,
         setSelectedId,
         setDraft,
         setNewChatPhone,
@@ -75,6 +76,7 @@ function WhatsAppPageContent() {
                 draft={draft}
                 templates={templates}
                 templatesLoading={templatesLoading}
+                sending={sending}
                 setDraft={setDraft}
                 sendMessage={sendMessage}
                 sendTemplate={sendTemplate}
