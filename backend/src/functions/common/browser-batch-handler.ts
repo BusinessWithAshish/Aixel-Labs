@@ -2,6 +2,13 @@ import puppeteer, {Browser, Page} from "puppeteer";
 import {getBrowserOptions} from "../../utils/browser";
 import {config} from "dotenv";
 import {Response} from "express";
+import {
+  BrowserStreamSender,
+  BrowserStreamEventType,
+  BrowserStreamMetadata,
+  createStreamSender,
+  createStreamMessage
+} from "../../utils/stream-messages";
 
 config();
 
@@ -27,30 +34,28 @@ const processSingleBrowser = async <T>(
     browserIndex: number,
     batchNumber: number,
     scrapingFunction: (url: string, page: Page) => Promise<T>,
-    res: Response | null = null
+    streamSender: BrowserStreamSender
 ): Promise<SingleBrowserResult<T>> => {
 
   let browser: Browser | null = null;
   const pages: Page[] = [];
 
   try {
-    sendStreamMessage(res, {
-      type: 'status',
-      message: `Starting browser ${browserIndex} to process ${urlItems.length} items`,
-      data: { browser: browserIndex, batch: batchNumber },
-      timestamp: new Date().toISOString()
-    });
+    streamSender(createStreamMessage(
+      'browser_start',
+      `Starting browser ${browserIndex} to process ${urlItems.length} items`,
+      { browser: browserIndex, batch: batchNumber }
+    ));
 
     const browserOptions = await getBrowserOptions();
     browser = await puppeteer.launch(browserOptions);
 
     if (!browser) {
-      sendStreamMessage(res, {
-        type: 'error',
-        message: `Failed to start browser ${browserIndex} - system error`,
-        data: { browser: browserIndex, batch: batchNumber },
-        timestamp: new Date().toISOString()
-      });
+      streamSender(createStreamMessage(
+        'error',
+        `Failed to start browser ${browserIndex} - system error`,
+        { browser: browserIndex, batch: batchNumber }
+      ));
       return {
         results: [],
         error: `Browser launch failed - browser is null`,
@@ -63,18 +68,19 @@ const processSingleBrowser = async <T>(
       let page: Page | null = null;
 
       try {
-        sendStreamMessage(res, {
-          type: 'status',
-          message: `Processing item ${pageIndex + 1} of ${urlItems.length} in browser ${browserIndex}`,
-          data: { 
+        streamSender(createStreamMessage(
+          'page_start',
+          `Processing item ${pageIndex + 1} of ${urlItems.length} in browser ${browserIndex}`,
+          { 
             browser: browserIndex, 
             batch: batchNumber,
+            page: pageIndex + 1,
+            url: url,
             current: pageIndex + 1,
             total: urlItems.length,
             percentage: Math.round(((pageIndex + 1) / urlItems.length) * 100)
-          },
-          timestamp: new Date().toISOString()
-        });
+          }
+        ));
 
         page = await browser!.newPage();
         pages.push(page);
@@ -85,35 +91,37 @@ const processSingleBrowser = async <T>(
 
         const scrapeData = await scrapingFunction(url, page);
 
-        sendStreamMessage(res, {
-          type: 'progress',
-          message: `Successfully processed item ${pageIndex + 1} in browser ${browserIndex}`,
-          data: { 
+        streamSender(createStreamMessage(
+          'page_complete',
+          `Successfully processed item ${pageIndex + 1} in browser ${browserIndex}`,
+          { 
             browser: browserIndex, 
             batch: batchNumber,
+            page: pageIndex + 1,
+            url: url,
             current: pageIndex + 1,
             total: urlItems.length,
             percentage: Math.round(((pageIndex + 1) / urlItems.length) * 100)
-          },
-          timestamp: new Date().toISOString()
-        });
+          }
+        ));
 
         return { success: true, data: scrapeData };
 
       } catch (pageScrapeError) {
         const errorMessage = pageScrapeError instanceof Error ? pageScrapeError.message : String(pageScrapeError);
         
-        sendStreamMessage(res, {
-          type: 'error',
-          message: `Failed to process item ${pageIndex + 1} in browser ${browserIndex}`,
-          data: { 
+        streamSender(createStreamMessage(
+          'page_error',
+          `Failed to process item ${pageIndex + 1} in browser ${browserIndex}`,
+          { 
             browser: browserIndex, 
             batch: batchNumber,
+            page: pageIndex + 1,
+            url: url,
             current: pageIndex + 1,
             total: urlItems.length
-          },
-          timestamp: new Date().toISOString()
-        });
+          }
+        ));
         
         return { success: false, error: `Page had error for this url ${url} at Browser ${browserIndex} for page ${pageIndex + 1} : ${errorMessage}` };
       }
@@ -121,18 +129,17 @@ const processSingleBrowser = async <T>(
 
     const results = await Promise.all(pagePromises);
 
-    sendStreamMessage(res, {
-      type: 'status',
-      message: `Browser ${browserIndex} completed processing all ${urlItems.length} items`,
-      data: { 
+    streamSender(createStreamMessage(
+      'browser_complete',
+      `Browser ${browserIndex} completed processing all ${urlItems.length} items`,
+      { 
         browser: browserIndex, 
         batch: batchNumber,
         current: urlItems.length,
         total: urlItems.length,
         percentage: 100
-      },
-      timestamp: new Date().toISOString()
-    });
+      }
+    ));
 
     return {
       results,
@@ -142,15 +149,14 @@ const processSingleBrowser = async <T>(
   } catch (browserScrapeError) {
     const errorMessage = browserScrapeError instanceof Error ? browserScrapeError.message : String(browserScrapeError);
 
-    sendStreamMessage(res, {
-      type: 'error',
-      message: `Browser ${browserIndex} encountered a critical error and stopped`,
-      data: { 
+    streamSender(createStreamMessage(
+      'error',
+      `Browser ${browserIndex} encountered a critical error and stopped`,
+      { 
         browser: browserIndex, 
         batch: batchNumber
-      },
-      timestamp: new Date().toISOString()
-    });
+      }
+    ));
 
     return {
       results: [],
@@ -160,12 +166,11 @@ const processSingleBrowser = async <T>(
 
   } finally {
     // Cleanup pages first
-    sendStreamMessage(res, {
-      type: 'status',
-      message: `Cleaning up browser ${browserIndex} resources`,
-      data: { browser: browserIndex, batch: batchNumber },
-      timestamp: new Date().toISOString()
-    });
+    streamSender(createStreamMessage(
+      'browser_cleanup',
+      `Cleaning up browser ${browserIndex} resources`,
+      { browser: browserIndex, batch: batchNumber }
+    ));
 
     for (let i = 0; i < pages.length; i++) {
       try {
@@ -182,12 +187,11 @@ const processSingleBrowser = async <T>(
     if (browser) {
       try {
         await browser.close();
-        sendStreamMessage(res, {
-          type: 'status',
-          message: `Browser ${browserIndex} closed successfully`,
-          data: { browser: browserIndex, batch: batchNumber },
-          timestamp: new Date().toISOString()
-        });
+        streamSender(createStreamMessage(
+          'browser_cleanup',
+          `Browser ${browserIndex} closed successfully`,
+          { browser: browserIndex, batch: batchNumber }
+        ));
       } catch (browserCloseError) {
         console.error(`⚠️ Browser ${browserIndex}: Error closing browser:`, browserCloseError);
       }
@@ -199,18 +203,17 @@ const processBatchOfBrowsers = async <T>(
     urlItems: string[],
     batchNumber: number,
     scrapingFunction: (url: string, page: Page) => Promise<T>,
-    res: Response | null = null
+    streamSender: BrowserStreamSender
 ): Promise<SingleBrowserResult<T>[]> => {
-  sendStreamMessage(res, {
-    type: 'status',
-    message: `Starting batch ${batchNumber} with ${urlItems.length} items`,
-    data: { 
+  streamSender(createStreamMessage(
+    'batch_start',
+    `Starting batch ${batchNumber} with ${urlItems.length} items`,
+    { 
       batch: batchNumber,
       total: urlItems.length,
       stage: 'batch_start'
-    },
-    timestamp: new Date().toISOString()
-  });
+    }
+  ));
 
   // Split URLs into groups for each browser
   const browserPagesBatches: string[][] = [];
@@ -218,46 +221,43 @@ const processBatchOfBrowsers = async <T>(
     browserPagesBatches.push(urlItems.slice(i, i + MAX_PAGES_PER_BROWSER));
   }
 
-  sendStreamMessage(res, {
-    type: 'status',
-    message: `Batch ${batchNumber} will use ${browserPagesBatches.length} browsers`,
-    data: { 
+  streamSender(createStreamMessage(
+    'status',
+    `Batch ${batchNumber} will use ${browserPagesBatches.length} browsers`,
+    { 
       batch: batchNumber,
       total: browserPagesBatches.length,
       stage: 'browser_allocation'
-    },
-    timestamp: new Date().toISOString()
-  });
+    }
+  ));
 
   // Process all browsers in this batch concurrently
   const browserPromises = browserPagesBatches.map((batchUrls, index) =>
-    processSingleBrowser(batchUrls, index + 1, batchNumber, scrapingFunction, res)
+    processSingleBrowser(batchUrls, index + 1, batchNumber, scrapingFunction, streamSender)
   );
 
   const browserResults = await Promise.all(browserPromises);
   const flattenedBrowserResults = browserResults.flat();
 
-  sendStreamMessage(res, {
-    type: 'status',
-    message: `Batch ${batchNumber} completed successfully`,
-    data: { 
+  streamSender(createStreamMessage(
+    'batch_complete',
+    `Batch ${batchNumber} completed successfully`,
+    { 
       batch: batchNumber,
       total: flattenedBrowserResults.length,
       stage: 'batch_complete'
-    },
-    timestamp: new Date().toISOString()
-  });
+    }
+  ));
 
   // Add delay between batches to prevent overwhelming the system
-  sendStreamMessage(res, {
-    type: 'status',
-    message: `Waiting 10 seconds before starting next batch`,
-    data: { 
+  streamSender(createStreamMessage(
+    'batch_delay',
+    `Waiting 10 seconds before starting next batch`,
+    { 
       batch: batchNumber,
       stage: 'batch_delay'
-    },
-    timestamp: new Date().toISOString()
-  });
+    }
+  ));
   
   await new Promise(resolve => setTimeout(resolve, 10));
 
@@ -267,7 +267,7 @@ const processBatchOfBrowsers = async <T>(
   return flattenedBrowserResults;
 };
 
-type TBrowserBatchHandlerReturn<T> = {
+export type BrowserBatchHandlerReturn<T> = {
   success: boolean;
   results: T[];
   errors: string[];
@@ -278,60 +278,31 @@ type TBrowserBatchHandlerReturn<T> = {
   duration: number;
 }
 
-// Streaming message types
-type StreamMessage = {
-  type: 'progress' | 'status' | 'error' | 'complete';
-  message: string;
-  data?: {
-    current?: number;
-    total?: number;
-    percentage?: number;
-    stage?: string;
-    batch?: number;
-    browser?: number;
-  };
-  timestamp: string;
-}
-
-// Helper function to send streaming messages
-const sendStreamMessage = (res: Response | null, message: StreamMessage) => {
-  if (res && !res.headersSent) {
-    try {
-      res.write(`data: ${JSON.stringify(message)}\n\n`);
-    } catch (error) {
-      console.warn('Failed to send stream message:', error);
-    }
-  }
-  // Always log to console as well
-  console.log(`📡 [${message.type.toUpperCase()}] ${message.message}`);
-};
-
 export const BrowserBatchHandler = async <T>(
     urlItems: string[],
     scrapingFunction: (url: string, page: Page) => Promise<T>,
     res: Response | null = null
-): Promise<TBrowserBatchHandlerReturn<T>> => {
+): Promise<BrowserBatchHandlerReturn<T>> => {
   const startTime = Date.now();
+  const streamSender = createStreamSender<BrowserStreamEventType, BrowserStreamMetadata>(res);
   
-  sendStreamMessage(res, {
-    type: 'status',
-    message: `Starting processing of ${urlItems.length} items`,
-    data: { 
+  streamSender(createStreamMessage(
+    'status',
+    `Starting processing of ${urlItems.length} items`,
+    { 
       total: urlItems.length,
       stage: 'initialization'
-    },
-    timestamp: new Date().toISOString()
-  });
+    }
+  ));
 
-  sendStreamMessage(res, {
-    type: 'status',
-    message: `System configured for ${MAX_BROWSER_SESSIONS} browsers with ${MAX_PAGES_PER_BROWSER} pages each`,
-    data: { 
+  streamSender(createStreamMessage(
+    'status',
+    `System configured for ${MAX_BROWSER_SESSIONS} browsers with ${MAX_PAGES_PER_BROWSER} pages each`,
+    { 
       total: TOTAL_CONCURRENT_URLS,
       stage: 'configuration'
-    },
-    timestamp: new Date().toISOString()
-  });
+    }
+  ));
 
   try {
     // Split all URLs into batches that can be processed simultaneously
@@ -340,15 +311,14 @@ export const BrowserBatchHandler = async <T>(
       batches.push(urlItems.slice(i, i + TOTAL_CONCURRENT_URLS));
     }
 
-    sendStreamMessage(res, {
-      type: 'status',
-      message: `Organized items into ${batches.length} batches for processing`,
-      data: { 
+    streamSender(createStreamMessage(
+      'status',
+      `Organized items into ${batches.length} batches for processing`,
+      { 
         total: batches.length,
         stage: 'batching'
-      },
-      timestamp: new Date().toISOString()
-    });
+      }
+    ));
 
     const aggregatedResults: T[] = [];
     const aggregatedErrors: string[] = [];
@@ -358,7 +328,7 @@ export const BrowserBatchHandler = async <T>(
     // Process each batch sequentially to manage resource usage
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       try {
-        const currentBatchResults = await processBatchOfBrowsers(batches[batchIndex], batchIndex + 1, scrapingFunction, res);
+        const currentBatchResults = await processBatchOfBrowsers(batches[batchIndex], batchIndex + 1, scrapingFunction, streamSender);
         // Extract results and errors from each browser result
         currentBatchResults.forEach(browserResult => {
           // Add errors from this browser
@@ -378,30 +348,28 @@ export const BrowserBatchHandler = async <T>(
           });
         });
 
-        sendStreamMessage(res, {
-          type: 'progress',
-          message: `Batch ${batchIndex + 1} completed: ${successCount} successful, ${errorCount} failed`,
-          data: { 
+        streamSender(createStreamMessage(
+          'progress',
+          `Batch ${batchIndex + 1} completed: ${successCount} successful, ${errorCount} failed`,
+          { 
             current: successCount + errorCount,
             total: urlItems.length,
             percentage: Math.round(((successCount + errorCount) / urlItems.length) * 100),
             batch: batchIndex + 1
-          },
-          timestamp: new Date().toISOString()
-        });
+          }
+        ));
 
       } catch (batchError) {
         const batchErrorMessage = `Batch ${batchIndex + 1} processing failed: ${batchError instanceof Error ? batchError.message : String(batchError)}`;
         
-        sendStreamMessage(res, {
-          type: 'error',
-          message: `Batch ${batchIndex + 1} failed completely`,
-          data: { 
+        streamSender(createStreamMessage(
+          'error',
+          `Batch ${batchIndex + 1} failed completely`,
+          { 
             batch: batchIndex + 1,
             stage: 'batch_error'
-          },
-          timestamp: new Date().toISOString()
-        });
+          }
+        ));
 
         // Add error for this entire batch
         aggregatedErrors.push(batchErrorMessage);
@@ -412,29 +380,27 @@ export const BrowserBatchHandler = async <T>(
     const endTime = Date.now();
     const duration = Math.round((endTime - startTime) / 1000);
 
-    sendStreamMessage(res, {
-      type: 'complete',
-      message: `Processing completed successfully!`,
-      data: { 
+    streamSender(createStreamMessage(
+      'complete',
+      `Processing completed successfully!`,
+      { 
         current: urlItems.length,
         total: urlItems.length,
         percentage: 100,
         stage: 'complete'
-      },
-      timestamp: new Date().toISOString()
-    });
+      }
+    ));
 
-    sendStreamMessage(res, {
-      type: 'status',
-      message: `Final results: ${successCount} successful, ${errorCount} failed (${((successCount / urlItems.length) * 100).toFixed(1)}% success rate)`,
-      data: { 
+    streamSender(createStreamMessage(
+      'status',
+      `Final results: ${successCount} successful, ${errorCount} failed (${((successCount / urlItems.length) * 100).toFixed(1)}% success rate)`,
+      { 
         current: successCount,
         total: urlItems.length,
         percentage: Math.round((successCount / urlItems.length) * 100),
         stage: 'final_summary'
-      },
-      timestamp: new Date().toISOString()
-    });
+      }
+    ));
 
     return {
       success: errorCount < urlItems.length, // Success if not all URLs failed
@@ -451,14 +417,13 @@ export const BrowserBatchHandler = async <T>(
     const endTime = Date.now();
     const duration = Math.round((endTime - startTime) / 1000);
 
-    sendStreamMessage(res, {
-      type: 'error',
-      message: `Critical system error occurred during processing`,
-      data: { 
+    streamSender(createStreamMessage(
+      'error',
+      `Critical system error occurred during processing`,
+      { 
         stage: 'critical_error'
-      },
-      timestamp: new Date().toISOString()
-    });
+      }
+    ));
 
     return {
       duration,
