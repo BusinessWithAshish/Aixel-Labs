@@ -2,8 +2,7 @@
   "name": "@aixellabs/shared",
   "version": "1.0.0",
   "private": true,
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "main": "index.ts",
   "exports": {
     ".": "./index.ts",
     "./apis": "./apis/index.ts",
@@ -11,7 +10,10 @@
     "./utils": "./utils/index.ts"
   },
   "scripts": {
-    "build": "echo 'No build step needed for TypeScript types'",
-    "dev": "echo 'No dev step needed for TypeScript types'"
+    "build": "echo 'No build step needed for TypeScript shared/types'",
+    "dev": "echo 'No dev step needed for TypeScript shared/types'"
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
   }
 }

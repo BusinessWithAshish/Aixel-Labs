@@ -3,7 +3,8 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { useConfiguration } from './ConfigurationContext';
 import { useForm } from './FormContext';
-import { GmapsScrapeRequest, StreamMessage } from '@aixellabs/shared/apis';
+import { GMAPS_SCRAPE_REQUEST, StreamMessage } from '@aixellabs/shared/apis';
+import { API_ENDPOINTS } from '@aixellabs/shared/utils/constants';
 
 type SubmissionState = {
     isSubmitting: boolean;
@@ -50,22 +51,17 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
             }
 
             // Transform form data to API format
-            const requestData: GmapsScrapeRequest = {
+            const requestData: GMAPS_SCRAPE_REQUEST = {
                 query: formData.query,
-                country: formData.selectedCountry,
-                states:
-                    formData.selectedState && formData.selectedCities.length > 0
-                        ? [
-                              {
-                                  name: formData.selectedState,
-                                  cities: formData.selectedCities,
-                              },
-                          ]
-                        : [],
+                country: formData.country,
+                states: formData.states.map((state) => ({
+                    name: state.name,
+                    cities: state.cities,
+                })),
             };
 
             // Make API request with SSE
-            const response = await fetch(`${backendUrl}/gmaps/scrape`, {
+            const response = await fetch(`${backendUrl}${API_ENDPOINTS.GMAPS_SCRAPE}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

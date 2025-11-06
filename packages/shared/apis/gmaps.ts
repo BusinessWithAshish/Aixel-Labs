@@ -1,36 +1,40 @@
 // GMAPS API Types and Utilities
+import z from "zod";
 
-// Request type matching backend schema
-export type GmapsScrapeRequest = {
-  query: string;
-  country: string;
-  states: Array<{
-    name: string;
-    cities: string[];
-  }>;
-};
+// Constants
+export const GOOGLE_MAPS_BASE_URL = "https://www.google.com/maps/search/";
 
-// Response types
-export type Lead = {
-  id?: string;
-  name: string;
-  overAllRating: string;
-  phoneNumber: string;
-  numberOfReviews: string;
-  website: string;
-  gmapsUrl: string;
-};
+export const GMAPS_SCRAPE_REQUEST_SCHEMA = z.object({
+  query: z.string(),
+  country: z.string(),
+  states: z.array(
+    z.object({
+      name: z.string(),
+      cities: z.array(z.string()),
+    })
+  ),
+});
+export type GMAPS_SCRAPE_REQUEST = z.infer<typeof GMAPS_SCRAPE_REQUEST_SCHEMA>;
 
-export type GmapsScrapeResponse = {
+export type GMAPS_SCRAPE_RESPONSE = {
   founded: string[];
   foundedLeadsCount: number;
-  allLeads: Lead[];
+  allLeads: GMAPS_SCRAPE_LEAD_INFO[];
   allLeadsCount: number;
+};
+
+export type GMAPS_SCRAPE_LEAD_INFO = {
+  website: string;
+  phoneNumber: string;
+  name: string;
+  gmapsUrl: string;
+  overAllRating: string;
+  numberOfReviews: string;
 };
 
 // Streaming message types
 export type StreamMessage = {
-  type: 'progress' | 'status' | 'error' | 'complete';
+  type: "progress" | "status" | "error" | "complete";
   message: string;
   data?: {
     current?: number;
@@ -43,66 +47,43 @@ export type StreamMessage = {
     foundedLeadsCount?: number;
     allLeadsCount?: number;
     founded?: string[];
-    allLeads?: Lead[];
+    allLeads?: GMAPS_SCRAPE_LEAD_INFO[];
   };
   timestamp: string;
 };
 
-// Utility types
-export type TGoogleMapsUrls = {
-  city: string;
-  state: string;
-  country: string;
-  query: string;
-  url: string;
-};
-
-// Constants
-const GOOGLE_MAPS_BASE_URL = 'https://www.google.com/maps/search/';
-
 // Utility functions
-function createGoogleMapsUrl(query: string, city: string, state: string, country: string): string {
-  console.log(`🔗 Creating URL for: "${query}" in "${city}, ${state}, ${country}"`);
-  
-  // Clean and format the query
-  const formattedQuery = query.toLowerCase().trim().replace(/\s+/g, '+');
-  console.log(`🔗 Formatted query: "${formattedQuery}"`);
+export function generateGoogleMapsUrls(data: GMAPS_SCRAPE_REQUEST): string[] {
+  const urls: string[] = [];
 
-  // Create location string: City, State, Country
-  const location = `${city}, ${state}, ${country}`;
-  const formattedLocation = location.replace(/\s+/g, '+').replace(/,/g, ',');
-  console.log(`🔗 Formatted location: "${formattedLocation}"`);
+  data.states.forEach((state: { name: string; cities: string[] }) => {
+    state.cities.forEach((city: string) => {
+      // Clean and format the query
+      const formattedQuery = data.query
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "+");
 
-  // Construct the final URL
-  const searchTerm = `${formattedQuery}+in+${formattedLocation}`;
-  console.log(`🔗 Search term: "${searchTerm}"`);
+      // Create location string: City, State, Country
+      const location = `${city}, ${state.name}, ${data.country}`;
+      const formattedLocation = location
+        .replace(/\s+/g, "+")
+        .replace(/,/g, ",");
 
-  // URL encode the entire search term
-  const encodedSearchTerm = encodeURIComponent(searchTerm).replace(/%2B/g, '+');
-  console.log(`🔗 Encoded search term: "${encodedSearchTerm}"`);
+      // Construct the final URL
+      const searchTerm = `${formattedQuery}+in+${formattedLocation}`;
 
-  const finalUrl = `${GOOGLE_MAPS_BASE_URL}${encodedSearchTerm}`;
-  console.log(`🔗 Final URL: "${finalUrl}"`);
+      // URL encode the entire search term
+      const encodedSearchTerm = encodeURIComponent(searchTerm).replace(
+        /%2B/g,
+        "+"
+      );
 
-  return finalUrl;
-}
+      const finalUrl = `${GOOGLE_MAPS_BASE_URL}${encodedSearchTerm}`;
 
-export function generateGoogleMapsUrls(data: GmapsScrapeRequest): string[] {
-  const urls: TGoogleMapsUrls[] = [];
-
-  data.states.forEach(state => {
-    state.cities.forEach(city => {
-      const url = createGoogleMapsUrl(data.query, city, state.name, data.country);
-      urls.push({
-        city: city,
-        state: state.name,
-        country: data.country,
-        query: data.query,
-        url: url
-      });
+      urls.push(finalUrl);
     });
   });
 
-  return urls.map(url => url.url);
+  return urls;
 }
-

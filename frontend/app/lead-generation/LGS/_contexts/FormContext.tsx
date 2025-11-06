@@ -1,39 +1,27 @@
 'use client';
 
+import { GMAPS_SCRAPE_REQUEST } from '@aixellabs/shared/apis';
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-// UI-friendly form data structure (will be converted to API format on submit)
-type FormData = {
-    query: string;
-    selectedCountry: string;
-    selectedState: string;
-    selectedCities: string[];
-    idsUrls: string[];
-};
-
 type FormContextType = {
-    formData: FormData;
-    updateFormData: (updates: Partial<FormData>) => void;
+    formData: GMAPS_SCRAPE_REQUEST;
+    updateFormData: (updates: Partial<GMAPS_SCRAPE_REQUEST>) => void;
     resetForm: () => void;
-    isLocationFormValid: boolean;
-    isIdUrlFormValid: boolean;
     canSubmit: boolean;
 };
 
 const FormContext = createContext<FormContextType | undefined>(undefined);
 
-const initialFormData: FormData = {
+const initialFormData: GMAPS_SCRAPE_REQUEST = {
     query: '',
-    selectedCountry: '',
-    selectedState: '',
-    selectedCities: [],
-    idsUrls: [],
+    country: '',
+    states: [],
 };
 
 export const FormProvider = ({ children }: { children: ReactNode }) => {
-    const [formData, setFormData] = useState<FormData>(initialFormData);
+    const [formData, setFormData] = useState<GMAPS_SCRAPE_REQUEST>(initialFormData);
 
-    const updateFormData = (updates: Partial<FormData>) => {
+    const updateFormData = (updates: Partial<GMAPS_SCRAPE_REQUEST>) => {
         setFormData((prev) => ({ ...prev, ...updates }));
     };
 
@@ -42,13 +30,7 @@ export const FormProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Simple validation logic
-    const hasQuery = formData.query.trim().length > 0;
-    const hasLocation = !!formData.selectedCountry && !!formData.selectedState && formData.selectedCities.length > 0;
-    const hasIdsUrls = formData.idsUrls.length > 0;
-
-    const isLocationFormValid = hasQuery && hasLocation;
-    const isIdUrlFormValid = hasIdsUrls;
-    const canSubmit = isLocationFormValid || isIdUrlFormValid;
+    const canSubmit = formData.query.trim().length > 0 && formData.country.trim().length > 0 && formData.states.length > 0;
 
     return (
         <FormContext.Provider
@@ -56,8 +38,6 @@ export const FormProvider = ({ children }: { children: ReactNode }) => {
                 formData,
                 updateFormData,
                 resetForm,
-                isLocationFormValid,
-                isIdUrlFormValid,
                 canSubmit,
             }}
         >

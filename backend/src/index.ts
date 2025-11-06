@@ -4,6 +4,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import morgan from "morgan";
+import { API_ENDPOINTS } from "@aixellabs/shared/utils/constants";
 
 dotenv.config();
 
@@ -48,7 +49,7 @@ app.use(rateLimit({
 // ===================
 // 6️⃣ Health Check
 // ===================
-app.get("/v1/ping", (_, res) => {
+app.get(API_ENDPOINTS.PING, (_, res) => {
   res.json({ success: true, message: "Server is running" });
 });
 
@@ -58,8 +59,8 @@ app.get("/v1/ping", (_, res) => {
 import { GMAPS_SCRAPE } from "./apis/GMAPS_SCRAPE.js";
 import { GMAPS_SEARCH_API_SCRAPE } from "./apis/GMAPS_SEARCH_API_SCRAPE.js";
 
-app.post("/gmaps/scrape", GMAPS_SCRAPE);
-app.post("/gmaps/search_scrape", GMAPS_SEARCH_API_SCRAPE);
+app.post(API_ENDPOINTS.GMAPS_SCRAPE, GMAPS_SCRAPE);
+app.post(API_ENDPOINTS.GMAPS_SEARCH_API_SCRAPE, GMAPS_SEARCH_API_SCRAPE);
 
 // ===================
 // 9️⃣ Start Server

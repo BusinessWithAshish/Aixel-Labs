@@ -199,6 +199,13 @@ importers:
         specifier: ^5
         version: 5.9.3
 
+  packages:
+
+    dependencies:
+      zod:
+        specifier: ^4.1.12
+        version: 4.1.12
+
   packages/shared: {}
 
 packages:
@@ -6522,4 +6529,8 @@ packages:
 
   /zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+    dev: false
+
+  /zod@4.1.12:
+    resolution: {integrity: sha512-JInaHOamG8pt5+Ey8kGmdcAcg3OL9reK8ltczgHTAwNhMys/6ThXHityHxVV2p3fkw/c+MAvBHFVYHFZDmjMCQ==}
     dev: false
