@@ -15,7 +15,10 @@ const FormContext = createContext<FormContextType | undefined>(undefined);
 const initialFormData: GMAPS_SCRAPE_REQUEST = {
     query: '',
     country: '',
-    states: [],
+    states: [{
+        name: '',
+        cities: [],
+    }],
 };
 
 export const FormProvider = ({ children }: { children: ReactNode }) => {
