@@ -1,158 +1,151 @@
-"use client";
+'use client';
 
-import { useState, useMemo } from "react";
-import { Country, State, City } from "country-state-city";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { SearchableSelect } from "@/components/ui/searchable-select";
-import { InputWithLabel } from "@/components/wrappers/InputWithLabel";
-import { CityCheckBox } from "./CityCheckbox";
-import { useForm } from "../_contexts";
-import { MapPin, X } from "lucide-react";
+import { useState, useMemo } from 'react';
+import { Country, State, City } from 'country-state-city';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { InputWithLabel } from '@/components/wrappers/InputWithLabel';
+import { CityCheckBox } from './CityCheckbox';
+import { useForm } from '../_contexts';
+import { MapPin, X } from 'lucide-react';
 
 export const LocationForm = () => {
-  const { formData, updateFormData, isLocationFormValid } = useForm();
-  const [cityQuery, setCityQuery] = useState("");
+    const { formData, updateFormData } = useForm();
+    const [cityQuery, setCityQuery] = useState('');
 
-  const allCountries = Country.getAllCountries();
-  const allStatesOfCountry = useMemo(
-    () => State.getStatesOfCountry(formData.selectedCountry),
-    [formData.selectedCountry]
-  );
-  
-  const allCitiesOfState = useMemo(() => {
-    const cities = City.getCitiesOfState(formData.selectedCountry, formData.selectedState);
-    return cityQuery.length > 0
-      ? cities.filter((city) => 
-          city.name.toLowerCase().includes(cityQuery.toLowerCase())
-        )
-      : cities;
-  }, [formData.selectedState, formData.selectedCountry, cityQuery]);
+    const allCountries = Country.getAllCountries();
+    const allStatesOfCountry = useMemo(() => State.getStatesOfCountry(formData.country || ''), [formData.country]);
 
-  const handleCountryChange = (value: string) => {
-    updateFormData({
-      selectedCountry: value,
-      selectedState: "",
-      selectedCities: [],
-    });
-  };
+    const allCitiesOfState = useMemo(() => {
+        if (!formData.country || !formData.states) return [];
+        const cities = City.getCitiesOfState(formData.country, formData.states[0].name);
+        return cityQuery.length > 0
+            ? cities.filter((city) => city.name.toLowerCase().includes(cityQuery.toLowerCase()))
+            : cities;
+    }, [formData.states, formData.country, cityQuery]);
 
-  const handleStateChange = (value: string) => {
-    updateFormData({
-      selectedState: value,
-      selectedCities: [],
-    });
-  };
+    const handleCountryChange = (value: string) => {
+        updateFormData({
+            country: value,
+            states: [],
+        });
+    };
 
-  const handleCitiesChange = (cities: string[]) => {
-    updateFormData({ selectedCities: cities });
-  };
+    const handleStateChange = (value: string) => {
+        updateFormData({
+            states: [{ name: value, cities: [] }],
+        });
+    };
 
-  const removeCity = (cityToRemove: string) => {
-    const updatedCities = formData.selectedCities.filter((city) => city !== cityToRemove);
-    updateFormData({ selectedCities: updatedCities });
-  };
+    const handleCitiesChange = (cities: string[]) => {
+        updateFormData({ states: [{ name: formData.states[0].name, cities: cities }] });
+    };
 
-  return (
-    <ScrollArea className="h-full">
-      <div className="space-y-4 p-3 flex flex-col">
-        {/* Query Input */}
-        <InputWithLabel
-          label={{ text: "Query" }}
-          forId="Query"
-          input={{
-            onChange: (e) => updateFormData({ query: e.target.value }),
-            placeholder: "Type your query...",
-            value: formData.query,
-          }}
-        />
+    const removeCity = (cityToRemove: string) => {
+        const updatedCities = (formData.states[0].cities || []).filter((city: string) => city !== cityToRemove);
+        updateFormData({ states: [{ name: formData.states[0].name, cities: updatedCities }] });
+    };
 
-        {/* Country Selection */}
-        <SearchableSelect
-          placeholder="Search by country"
-          value={formData.selectedCountry}
-          onChange={handleCountryChange}
-          options={allCountries.map((c) => ({
-            value: c.isoCode,
-            label: c.name,
-          }))}
-        />
-
-        {/* State Selection */}
-        <SearchableSelect
-          value={formData.selectedState}
-          placeholder="Select a state/province/region/county"
-          disabled={!formData.selectedCountry}
-          onChange={handleStateChange}
-          options={allStatesOfCountry.map((s) => ({
-            value: s.isoCode,
-            label: s.name,
-          }))}
-        />
-
-        {/* Cities Header */}
-        {allCitiesOfState.length > 0 && (
-          <div className="flex items-center justify-between">
-            <span className="font-medium">
-              Cities of {State.getStateByCodeAndCountry(formData.selectedState, formData.selectedCountry)?.name}
-            </span>
-            <Badge variant="secondary" className="gap-1">
-              <MapPin className="w-4 h-4" />
-              <span>{allCitiesOfState.length} locations</span>
-            </Badge>
-          </div>
-        )}
-
-        {/* City Search */}
-        <Input
-          onChange={(e) => setCityQuery(e.target.value)}
-          placeholder="Search for cities..."
-          disabled={!formData.selectedState}
-          value={cityQuery}
-        />
-
-        {/* Selected Cities */}
-        {formData.selectedCities.length > 0 && (
-          <ScrollArea className="h-fit">
-            <div className="flex flex-wrap gap-2">
-              {formData.selectedCities.map((city) => (
-                <Badge
-                  key={city}
-                  onClick={() => removeCity(city)}
-                  className="flex items-center gap-1 cursor-pointer hover:opacity-80"
-                >
-                  {city}
-                  <X className="w-3 h-3" />
-                </Badge>
-              ))}
-            </div>
-          </ScrollArea>
-        )}
-
-        {/* Cities List */}
-        {allCitiesOfState.length > 0 && (
-          <ScrollArea className='h-56'>
-            <div className="grid grid-cols-2 gap-2">
-              {allCitiesOfState.map((city) => (
-                <CityCheckBox
-                  key={city.name}
-                  city={city.name}
-                  cities={formData.selectedCities}
-                  setSelectedCities={handleCitiesChange}
+    return (
+        <ScrollArea className="h-full">
+            <div className="space-y-4 p-3 flex flex-col">
+                {/* Query Input */}
+                <InputWithLabel
+                    label={{ text: 'Query' }}
+                    forId="Query"
+                    input={{
+                        onChange: (e) => updateFormData({ query: e.target.value }),
+                        placeholder: 'Type your query...',
+                        value: formData.query,
+                    }}
                 />
-              ))}
-            </div>
-          </ScrollArea>
-        )}
 
-        {/* Form Status */}
-        {isLocationFormValid && (
-          <div className="text-sm text-green-600 font-medium">
-            ✓ Location form is ready to submit
-          </div>
-        )}
-      </div>
-    </ScrollArea>
-  );
+                {/* Country Selection */}
+                <SearchableSelect
+                    placeholder="Search by country"
+                    value={formData.country}
+                    onChange={handleCountryChange}
+                    options={allCountries.map((c) => ({
+                        value: c.isoCode,
+                        label: c.name,
+                    }))}
+                />
+
+                {/* State Selection */}
+                <SearchableSelect
+                    value={formData.states[0].name}
+                    placeholder="Select a state/province/region/county"
+                    disabled={!formData.country}
+                    onChange={handleStateChange}
+                    options={allStatesOfCountry.map((s) => ({
+                        value: s.isoCode,
+                        label: s.name,
+                    }))}
+                />
+
+                {/* Cities Header */}
+                {allCitiesOfState.length > 0 && (
+                    <div className="flex items-center justify-between">
+                        <span className="font-medium">
+                            Cities of{' '}
+                            {State.getStateByCodeAndCountry(formData.states[0].name || '', formData.country || '')?.name}
+                        </span>
+                        <Badge variant="secondary" className="gap-1">
+                            <MapPin className="w-4 h-4" />
+                            <span>{allCitiesOfState.length} locations</span>
+                        </Badge>
+                    </div>
+                )}
+
+                {/* City Search */}
+                <Input
+                    onChange={(e) => setCityQuery(e.target.value)}
+                    placeholder="Search for cities..."
+                    disabled={!formData.states[0].name}
+                    value={cityQuery}
+                />
+
+                {/* Selected Cities */}
+                {(formData.states[0].cities?.length ?? 0) > 0 && (
+                    <ScrollArea className="h-fit">
+                        <div className="flex flex-wrap gap-2">
+                            {(formData.states[0].cities || []).map((city: string) => (
+                                <Badge
+                                    key={city}
+                                    onClick={() => removeCity(city)}
+                                    className="flex items-center gap-1 cursor-pointer hover:opacity-80"
+                                >
+                                    {city}
+                                    <X className="w-3 h-3" />
+                                </Badge>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                )}
+
+                {/* Cities List */}
+                {allCitiesOfState.length > 0 && (
+                    <ScrollArea className="h-56">
+                        <div className="grid grid-cols-2 gap-2">
+                            {allCitiesOfState.map((city) => (
+                                <CityCheckBox
+                                    key={city.name}
+                                    city={city.name}
+                                    cities={formData.states[0].cities || []}
+                                    setSelectedCities={handleCitiesChange}
+                                />
+                            ))}
+                        </div>
+                    </ScrollArea>
+                )}
+
+                {/* Form Status */}
+                {formData.states.length > 0 && formData.states[0].cities.length > 0 && (
+                    <div className="text-sm text-green-600 font-medium">✓ Location form is ready to submit</div>
+                )}
+            </div>
+        </ScrollArea>
+    );
 };

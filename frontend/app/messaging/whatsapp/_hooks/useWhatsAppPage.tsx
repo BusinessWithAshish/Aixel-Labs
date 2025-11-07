@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { ChatState, MessageType, TMessageTemplates, TWhatsAppChat } from '@/app/messaging/types';
+import { MessageType, TMessageTemplates, TWhatsAppChat } from '@/app/messaging/types';
 import { TWILIO_FUNCTIONS_URL } from '@/app/messaging/constants';
 
 // Add your Twilio number here - this should be your purchased Twilio WhatsApp number
@@ -54,7 +54,7 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
             const allChats = res.data || [];
 
             setChats(allChats);
-        } catch (e) {
+        } catch {
             toast.error('Failed to load messages');
         } finally {
             setMessagesLoading(false);
@@ -83,7 +83,7 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
             setTemplatesLoading(true);
             const res = await axios.get(`${TWILIO_FUNCTIONS_URL}/msg-templates`);
             setTemplates(res.data || []);
-        } catch (e) {
+        } catch {
             toast.error('Failed to load templates');
         } finally {
             setTemplatesLoading(false);
@@ -144,7 +144,7 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
                 )
             );
             toast.success('Message sent successfully');
-        } catch (e: any) {
+        } catch {
             toast.error('Failed to send message');
             // Mark message as failed
             setChats((prev) =>
@@ -176,7 +176,7 @@ export const useWhatsAppPage = (): UseWhatsAppPageReturn => {
                 });
                 toast.success('Template message sent');
                 await fetchMessages(); // Wait for refresh
-            } catch (e: any) {
+            } catch {
                 toast.error('Failed to send template');
             } finally {
                 setTemplatesLoading(false);

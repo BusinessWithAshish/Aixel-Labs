@@ -10,8 +10,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSubmission } from '../_contexts';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { Lead, GmapsScrapeResponse } from '@/app/lead-generation/LGS/_utlis/types';
 import { LeadCard } from './LeadCard';
+import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared/apis/gmaps';
 
 type SortKey = 'rating' | 'reviews';
 type SortDirection = 'asc' | 'desc';
@@ -21,17 +21,24 @@ export const ResultsSection = () => {
     const [sortKey, setSortKey] = useState<SortKey>('rating');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-    const result = submissionState.result as GmapsScrapeResponse | null;
+    const result = submissionState.result as GMAPS_SCRAPE_RESPONSE | null;
 
     const leads = useMemo(() => result?.allLeads ?? [], [result?.allLeads]);
 
     const sortedLeads = useMemo(() => {
         return [...leads].sort((a, b) => {
-            const getNumericValue = (lead: Lead, key: SortKey) => {
+            const getNumericValue = (lead: GMAPS_SCRAPE_LEAD_INFO, key: SortKey) => {
                 const value = key === 'rating' ? lead.overAllRating : lead.numberOfReviews;
                 if (value === 'N/A' || value === '') return 0;
-                const parsed = key === 'rating' ? parseFloat(value) : parseInt(value);
-                return isNaN(parsed) ? 0 : parsed;
+                if (key === 'rating') {
+                    const normalizedRating = value.replace(/[^\d.]/g, '') || '0';
+                    const rating = parseFloat(normalizedRating);
+                    return Number.isFinite(rating) ? rating : 0;
+                }
+
+                const normalizedReviews = value.replace(/\D/g, '') || '0';
+                const reviews = parseInt(normalizedReviews, 10);
+                return Number.isFinite(reviews) ? reviews : 0;
             };
 
             const aVal = getNumericValue(a, sortKey);
@@ -42,8 +49,8 @@ export const ResultsSection = () => {
     }, [leads, sortKey, sortDirection]);
 
     const leadGroups = useMemo(() => {
-        const hasWebsite = (lead: Lead) => lead.website && lead.website !== 'N/A';
-        const hasPhone = (lead: Lead) => lead.phoneNumber && lead.phoneNumber !== 'N/A';
+        const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.website && lead.website !== 'N/A';
+        const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.phoneNumber && lead.phoneNumber !== 'N/A';
 
         return {
             all: sortedLeads,
@@ -64,8 +71,8 @@ export const ResultsSection = () => {
     const renderTabContent = (leads: typeof sortedLeads) => (
         <ScrollArea className="h-[500px]">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {leads.map((lead) => (
-                    <LeadCard key={lead.id || lead.name} lead={lead} />
+                {leads.map((lead, index) => (
+                    <LeadCard key={lead.gmapsUrl || `${lead.name}-${index}`} lead={lead} />
                 ))}
             </div>
             {leads.length === 0 && (
@@ -115,10 +122,10 @@ export const ResultsSection = () => {
 
                 <Tabs defaultValue="all" className="w-full space-y-4">
                     <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full gap-2">
-                        <TabsTrigger value="all">All Leads</TabsTrigger>
-                        <TabsTrigger value="hotLeads">Hot Leads</TabsTrigger>
-                        <TabsTrigger value="warmLeads">Warm Leads</TabsTrigger>
-                        <TabsTrigger value="coldLeads">Cold Leads</TabsTrigger>
+                        <TabsTrigger value="all">All Leads ({leadGroups.all.length})</TabsTrigger>
+                        <TabsTrigger value="hotLeads">Hot Leads ({leadGroups.hotLeads.length})</TabsTrigger>
+                        <TabsTrigger value="warmLeads">Warm Leads ({leadGroups.warmLeads.length})</TabsTrigger>
+                        <TabsTrigger value="coldLeads">Cold Leads ({leadGroups.coldLeads.length})</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="all" className="mt-4">

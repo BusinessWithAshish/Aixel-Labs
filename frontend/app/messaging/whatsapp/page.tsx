@@ -24,7 +24,6 @@ function WhatsAppPageContent() {
         setNewChatPhone,
         setIsAddChatOpen,
         setChats,
-        fetchMessages,
         fetchTemplates,
         sendMessage,
         sendTemplate,

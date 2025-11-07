@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useConfiguration, useForm, useSubmission } from "../_contexts";
 import { LocationForm } from "./LocationForm";
-import { IdUrlForm } from "./IdUrlForm";
 import { ConfigurationForm } from "./ConfigurationForm";
 import { ResultsSection } from "./ResultsSection";
 import { MapPin, Link } from "lucide-react";
@@ -50,7 +49,6 @@ export const GenerateLeads = () => {
                 <Link className="w-4 h-4 text-green-500" />
                 <h3 className="font-medium">Direct ID/URL Search</h3>
               </div>
-              <IdUrlForm />
             </div>
           </CardContent>
 

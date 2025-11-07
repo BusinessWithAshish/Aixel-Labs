@@ -5,9 +5,9 @@
   "main": "index.ts",
   "exports": {
     ".": "./index.ts",
-    "./apis": "./apis/index.ts",
-    "./types": "./types/index.ts",
-    "./utils": "./utils/index.ts"
+    "./apis": "./shared/apis/index.ts",
+    "./types": "./shared/types/index.ts",
+    "./utils": "./shared/utils/index.ts"
   },
   "scripts": {
     "build": "echo 'No build step needed for TypeScript shared/types'",
