@@ -4,7 +4,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 import { useConfiguration } from './ConfigurationContext';
 import { useForm } from './FormContext';
 import { GMAPS_SCRAPE_REQUEST, StreamMessage } from '@aixellabs/shared/apis';
-import { API_ENDPOINTS } from '@aixellabs/shared/utils/constants';
+import { API_ENDPOINTS } from '@aixellabs/shared/utils';
 
 type SubmissionState = {
     isSubmitting: boolean;

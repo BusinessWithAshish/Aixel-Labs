@@ -4,7 +4,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import morgan from "morgan";
-import { API_ENDPOINTS } from "@aixellabs/shared/utils/constants";
+import { API_ENDPOINTS } from "@aixellabs/shared/utils";
 
 dotenv.config();
 

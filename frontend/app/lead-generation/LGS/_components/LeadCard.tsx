@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ExternalLink, Phone, Star, MessageSquare } from 'lucide-react';
-import { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/apis/gmaps';
+import { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/apis';
 
 export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
     const getLeadType = () => {

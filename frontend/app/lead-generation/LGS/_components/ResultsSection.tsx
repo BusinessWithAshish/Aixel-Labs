@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSubmission } from '../_contexts';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { LeadCard } from './LeadCard';
-import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared/apis/gmaps';
+import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared/apis';
 
 type SortKey = 'rating' | 'reviews';
 type SortDirection = 'asc' | 'desc';

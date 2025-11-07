@@ -29,7 +29,10 @@ export const LocationForm = () => {
     const handleCountryChange = (value: string) => {
         updateFormData({
             country: value,
-            states: [],
+            states: [{
+                name: '',
+                cities: []
+            }],
         });
     };
 

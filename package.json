@@ -1,5 +1,5 @@
 {
-    "name": "Aixellabs",
+    "name": "aixellabs",
     "private": true,
     "scripts": {
         "installFE": "pnpm --filter frontend install",
