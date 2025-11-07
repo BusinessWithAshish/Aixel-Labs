@@ -4,10 +4,10 @@
   "description": "Internal Google Maps scraping API server",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "pnpm --filter @aixellabs/shared build && tsc",
     "build:watch": "tsc --watch",
     "start": "tsx src/index.ts",
-    "start:prod": "npm run build && node dist/index.js"
+    "start:prod": "pnpm run build && node dist/index.js"
   },
   "keywords": [],
   "author": "",

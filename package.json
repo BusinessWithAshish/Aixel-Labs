@@ -5,6 +5,8 @@
         "installFE": "pnpm --filter frontend install",
         "installBE": "PUPPETEER_SKIP_DOWNLOAD=true && pnpm --filter backend install",
         "devFE": "pnpm --filter frontend dev",
-        "devBE": "pnpm --filter backend run start"
+        "devBE": "pnpm --filter backend run start",
+        "prodBE": "pnpm --filter backend run start:prod",
+        "prodFE": "pnpm --filter frontend run prod"
     }
 }
