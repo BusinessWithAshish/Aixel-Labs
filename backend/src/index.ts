@@ -19,12 +19,14 @@ app.disable("x-powered-by"); // Hide "Express" in headers
 // ===================
 // 2️⃣ CORS (Configurable)
 // ===================
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS
+app.use(
+  cors({
+    origin: process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(",")
       : "*",
-  methods: ["GET", "POST", "PUT", "DELETE"],
-}));
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  })
+);
 
 // ===================
 // 3️⃣ Body Parsing
@@ -39,12 +41,14 @@ app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 // ===================
 // 5️⃣ Rate Limiting
 // ===================
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 mins
-  limit: Number(process.env.RATE_LIMIT_MAX) || 100, // requests per IP
-  standardHeaders: true,
-  legacyHeaders: false,
-}));
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 mins
+    limit: Number(process.env.RATE_LIMIT_MAX) || 100, // requests per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
 
 // ===================
 // 6️⃣ Health Check

@@ -1,5 +1,5 @@
 import { Page } from "puppeteer";
-import { DEFAULT_PAGE_LOAD_TIMEOUT } from "../utils/constants";
+import { DEFAULT_PAGE_LOAD_TIMEOUT } from "../utils/constants.js";
 import { JSDOM } from "jsdom";
 import { GMAPS_SCRAPE_LEAD_INFO } from "@aixellabs/shared/apis";
 
