@@ -67,6 +67,7 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(requestData),
+                credentials: 'include', // Include credentials for CORS
             });
 
             if (!response.ok) {
