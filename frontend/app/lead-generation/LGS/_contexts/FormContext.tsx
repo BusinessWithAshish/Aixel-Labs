@@ -1,74 +1,55 @@
-"use client";
+'use client';
 
-import { createContext, useContext, useState, ReactNode } from "react";
-
-type FormData = {
-  query: string;
-  selectedCountry: string;
-  selectedState: string;
-  selectedCities: string[];
-  idsUrls: string[];
-};
+import { GMAPS_SCRAPE_REQUEST } from '@aixellabs/shared/apis';
+import { createContext, useContext, useState, ReactNode } from 'react';
 
 type FormContextType = {
-  formData: FormData;
-  updateFormData: (updates: Partial<FormData>) => void;
-  resetForm: () => void;
-  isLocationFormValid: boolean;
-  isIdUrlFormValid: boolean;
-  canSubmit: boolean;
+    formData: GMAPS_SCRAPE_REQUEST;
+    updateFormData: (updates: Partial<GMAPS_SCRAPE_REQUEST>) => void;
+    resetForm: () => void;
+    canSubmit: boolean;
 };
 
 const FormContext = createContext<FormContextType | undefined>(undefined);
 
-const initialFormData: FormData = {
-  query: "",
-  selectedCountry: "",
-  selectedState: "",
-  selectedCities: [],
-  idsUrls: [],
+const initialFormData: GMAPS_SCRAPE_REQUEST = {
+    query: '',
+    country: '',
+    states: [],
 };
 
 export const FormProvider = ({ children }: { children: ReactNode }) => {
-  const [formData, setFormData] = useState<FormData>(initialFormData);
+    const [formData, setFormData] = useState<GMAPS_SCRAPE_REQUEST>(initialFormData);
 
-  const updateFormData = (updates: Partial<FormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
-  };
+    const updateFormData = (updates: Partial<GMAPS_SCRAPE_REQUEST>) => {
+        setFormData((prev) => ({ ...prev, ...updates }));
+    };
 
-  const resetForm = () => {
-    setFormData(initialFormData);
-  };
+    const resetForm = () => {
+        setFormData(initialFormData);
+    };
 
-  // Simple validation logic
-  const hasQuery = formData.query.trim().length > 0;
-  const hasLocation = !!formData.selectedCountry && !!formData.selectedState && formData.selectedCities.length > 0;
-  const hasIdsUrls = formData.idsUrls.length > 0;
+    // Simple validation logic
+    const canSubmit = formData.query.trim().length > 0 && formData.country.trim().length > 0 && formData.states.length > 0;
 
-  const isLocationFormValid = hasQuery && hasLocation;
-  const isIdUrlFormValid = hasIdsUrls;
-  const canSubmit = isLocationFormValid || isIdUrlFormValid;
-
-  return (
-    <FormContext.Provider
-      value={{
-        formData,
-        updateFormData,
-        resetForm,
-        isLocationFormValid,
-        isIdUrlFormValid,
-        canSubmit,
-      }}
-    >
-      {children}
-    </FormContext.Provider>
-  );
+    return (
+        <FormContext.Provider
+            value={{
+                formData,
+                updateFormData,
+                resetForm,
+                canSubmit,
+            }}
+        >
+            {children}
+        </FormContext.Provider>
+    );
 };
 
 export const useForm = () => {
-  const context = useContext(FormContext);
-  if (!context) {
-    throw new Error("useForm must be used within FormProvider");
-  }
-  return context;
+    const context = useContext(FormContext);
+    if (!context) {
+        throw new Error('useForm must be used within FormProvider');
+    }
+    return context;
 };

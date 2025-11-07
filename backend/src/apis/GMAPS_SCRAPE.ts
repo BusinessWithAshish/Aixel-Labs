@@ -1,25 +1,13 @@
-import z from "zod";
 import { Request, Response } from 'express'
-import { generateGoogleMapsUrls } from "../utils/helpers";
+import { GMAPS_SCRAPE_REQUEST_SCHEMA, GMAPS_SCRAPE_RESPONSE, generateGoogleMapsUrls } from "@aixellabs/shared/apis";
 import { BrowserBatchHandler } from "../functions/common/browser-batch-handler";
 import { scrapeLinks } from "../functions/scrape-links";
 import { GmapsDetailsLeadInfoExtractor } from "../functions/gmap-details-lead-extractor";
 
-export const GmapsScrapeSchema = z.object({
-  query: z.string(),
-  country: z.string(),
-  states: z.array(z.object({
-    name: z.string(),
-    cities: z.array(z.string())
-  }))
-});
-
-export type GmapsScrape = z.infer<typeof GmapsScrapeSchema>;
-
 export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
   const requestBody = req.body;
 
-  const parsedBody = GmapsScrapeSchema.safeParse(requestBody);
+  const parsedBody = GMAPS_SCRAPE_REQUEST_SCHEMA.safeParse(requestBody);
 
   if (!parsedBody.success) {
     res.status(400).json({ success: false, error: "Invalid query parameters" });
@@ -69,24 +57,27 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
 
     const foundedLeadsResults = foundedLeads.results.flat();
 
+    // If no business listings found, send final message and end the response
     if (foundedLeadsResults.length === 0) {
+
+      const response: GMAPS_SCRAPE_RESPONSE = {
+        founded: [],
+        foundedLeadsCount: 0,
+        allLeads: [],
+        allLeadsCount: 0
+      };
+
       res.write(`data: ${JSON.stringify({
         type: 'complete',
         message: 'No business listings found',
-        data: {
-          founded: foundedLeadsResults,
-          foundedLeadsCount: foundedLeadsResults.length,
-          allLeads: [],
-          allLeadsCount: 0,
-          stage: 'no_results'
-        },
+        data: response,
         timestamp: new Date().toISOString()
       })}\n\n`);
       res.end();
       return;
     }
 
-    // Phase 2: Extract detailed business information
+    // Phase 2: Extract detailed business information from the business listings
     res.write(`data: ${JSON.stringify({
       type: 'status',
       message: `Phase 2: Extracting details from ${foundedLeadsResults.length} business listings...`,
@@ -101,17 +92,18 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
     const allLeads = await BrowserBatchHandler(foundedLeadsResults, GmapsDetailsLeadInfoExtractor, res);
     const allLeadsResults = allLeads.results.flat();
 
+    const response: GMAPS_SCRAPE_RESPONSE = {
+      founded: foundedLeadsResults,
+      foundedLeadsCount: foundedLeadsResults.length,
+      allLeads: allLeadsResults,
+      allLeadsCount: allLeadsResults.length
+    };
+
     // Send final results
     res.write(`data: ${JSON.stringify({
       type: 'complete',
       message: 'Scraping completed successfully!',
-      data: {
-        founded: foundedLeadsResults,
-        foundedLeadsCount: foundedLeadsResults.length,
-        allLeads: allLeadsResults,
-        allLeadsCount: allLeadsResults.length,
-        stage: 'final_results'
-      },
+      data: response,
       timestamp: new Date().toISOString()
     })}\n\n`);
 

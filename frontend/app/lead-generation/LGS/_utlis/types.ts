@@ -1,40 +1,9 @@
 import {TApiResponse} from "@/types/api";
+import { Lead, GmapsScrapeResponse, StreamMessage } from "@aixellabs/shared/apis";
 
-export type Lead = {
-    id?: string;
-    name: string;
-    overAllRating: string;
-    phoneNumber: string;
-    numberOfReviews: string;
-    website: string;
-    gmapsUrl: string;
-};
+// Re-export shared types for convenience
+export type { Lead, GmapsScrapeResponse, StreamMessage };
 
-export type GmapsData = {
-    founded: string[];
-    foundedLeadsCount: number;
-    allLeads: Lead[];
-    allLeadsCount: number;
-}
+export type GmapsData = GmapsScrapeResponse;
 
 export type TGmapsScrapeResult = TApiResponse<GmapsData>
-
-// Streaming message types
-export type StreamMessage = {
-    type: 'progress' | 'status' | 'error' | 'complete';
-    message: string;
-    data?: {
-        current?: number;
-        total?: number;
-        percentage?: number;
-        stage?: string;
-        batch?: number;
-        browser?: number;
-        phase?: number;
-        foundedLeadsCount?: number;
-        allLeadsCount?: number;
-        founded?: string[];
-        allLeads?: Lead[];
-    };
-    timestamp: string;
-}
