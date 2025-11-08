@@ -1,6 +1,7 @@
 {
     "name": "aixellabs",
     "private": true,
+    "packageManager": "pnpm@8.x",
     "scripts": {
         "installFE": "pnpm --filter frontend install",
         "installBE": "PUPPETEER_SKIP_DOWNLOAD=true && pnpm --filter backend install",
