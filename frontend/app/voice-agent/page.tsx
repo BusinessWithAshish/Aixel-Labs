@@ -4,7 +4,7 @@ export default function VoiceAgentPage() {
 
     return (
         <PageLayout title='Voice Agent'>
-            Voice Agent Page
+            Voice Agent Page sample
         </PageLayout>
     )
 
