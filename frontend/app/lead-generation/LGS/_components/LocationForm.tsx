@@ -60,7 +60,7 @@ export const LocationForm = () => {
                     forId="Query"
                     input={{
                         onChange: (e) => updateFormData({ query: e.target.value }),
-                        placeholder: 'Type your query...',
+                        placeholder: 'Type your query....',
                         value: formData.query,
                     }}
                 />
