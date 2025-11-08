@@ -15,6 +15,7 @@ export function WebDialerContent() {
     isInCall,
     isCallDisabled,
     handleDialpadClick,
+    handleDialpadLongPress,
     handleBackspace,
     handlePhoneNumberChange,
     makeCall,
@@ -53,7 +54,10 @@ export function WebDialerContent() {
             />
 
             {/* Dialpad */}
-            <Dialpad onButtonClick={handleDialpadClick} />
+            <Dialpad 
+              onButtonClick={handleDialpadClick}
+              onLongPress={handleDialpadLongPress}
+            />
 
             {/* Call Actions */}
             <CallActions

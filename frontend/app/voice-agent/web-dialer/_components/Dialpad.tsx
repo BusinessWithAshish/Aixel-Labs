@@ -2,12 +2,13 @@ import { DIALPAD_BUTTONS } from "../_utils/constants";
 import { DialpadButton } from "./DialpadButton";
 import { cn } from "@/lib/utils";
 
-interface DialpadProps {
+type DialpadProps = {
   onButtonClick: (value: string) => void;
+  onLongPress?: (value: string) => void;
   className?: string;
-}
+};
 
-export function Dialpad({ onButtonClick, className }: DialpadProps) {
+export function Dialpad({ onButtonClick, onLongPress, className }: DialpadProps) {
   return (
     <div
       className={cn(
@@ -22,6 +23,7 @@ export function Dialpad({ onButtonClick, className }: DialpadProps) {
           label={button.label}
           subLabel={button.subLabel}
           onClick={onButtonClick}
+          onLongPress={button.value === "0" ? onLongPress : undefined}
         />
       ))}
     </div>
