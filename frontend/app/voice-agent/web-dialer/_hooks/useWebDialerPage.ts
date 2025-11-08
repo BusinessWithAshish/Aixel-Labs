@@ -17,6 +17,7 @@ export interface UseWebDialerPageReturn {
 
   // Actions
   handleDialpadClick: (value: string) => void;
+  handleDialpadLongPress: (value: string) => void;
   handleBackspace: () => void;
   handlePhoneNumberChange: (value: string) => void;
   makeCall: () => Promise<void>;
@@ -104,6 +105,13 @@ export function useWebDialerPage(): UseWebDialerPageReturn {
     setPhoneNumber((prev) => prev + value);
   };
 
+  const handleDialpadLongPress = (value: string) => {
+    // For button "0", long press adds "+"
+    if (value === "0") {
+      setPhoneNumber((prev) => prev + "+");
+    }
+  };
+
   const handleBackspace = () => {
     setPhoneNumber((prev) => prev.slice(0, -1));
   };
@@ -157,6 +165,7 @@ export function useWebDialerPage(): UseWebDialerPageReturn {
     isInCall,
     isCallDisabled,
     handleDialpadClick,
+    handleDialpadLongPress,
     handleBackspace,
     handlePhoneNumberChange,
     makeCall,
