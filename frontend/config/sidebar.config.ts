@@ -10,10 +10,10 @@ export type SidebarNavItem = {
     }[]
 }
 
-export type SidebarTeam = {
+export type SidebarTenant = {
     name: string
     logo: LucideIcon
-    plan: string
+    url: string
 }
 
 export type SidebarUser = {
@@ -24,7 +24,7 @@ export type SidebarUser = {
 
 export type SidebarConfig = {
     user: SidebarUser
-    teams: SidebarTeam[]
+    tenants: SidebarTenant[]
     navMain: SidebarNavItem[]
 }
 
@@ -34,21 +34,21 @@ export const sidebarConfig: SidebarConfig = {
         email: "hello@aixellabs.com",
         avatar: "",
     },
-    teams: [
+    tenants: [
         {
             name: "Aixel Labs",
             logo: GalleryVerticalEnd,
-            plan: "Enterprise",
+            url: "http://localhost:3000",
         },
         {
-            name: "Aixel Labs 2",
+            name: "Tenant 2",
             logo: AudioWaveform,
-            plan: "Startup",
+            url: "http://localhost:3000",
         },
         {
-            name: "Aixel Labs 3",
+            name: "Tenant 3",
             logo: Command,
-            plan: "Free",
+            url: "http://localhost:3000",
         },
     ],
     navMain: [

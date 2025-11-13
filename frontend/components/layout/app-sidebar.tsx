@@ -4,7 +4,7 @@ import * as React from "react"
 
 import {NavMain} from "@/components/layout/nav-main"
 import {NavUser} from "@/components/layout/nav-user"
-import {TeamSwitcher} from "@/components/layout/team-switcher"
+import {TenantSwitcher} from "@/components/layout/tenant-switcher"
 import {
     Sidebar,
     SidebarContent,
@@ -19,7 +19,7 @@ export function AppSidebar({...props}: React.ComponentProps<typeof Sidebar>) {
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
-                <TeamSwitcher teams={sidebarConfig.teams}/>
+                <TenantSwitcher tenants={sidebarConfig.tenants}/>
             </SidebarHeader>
             <SidebarContent>
                 <NavMain items={sidebarConfig.navMain}/>
