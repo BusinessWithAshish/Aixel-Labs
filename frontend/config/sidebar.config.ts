@@ -38,17 +38,17 @@ export const sidebarConfig: SidebarConfig = {
         {
             name: "Aixel Labs",
             logo: GalleryVerticalEnd,
-            url: "http://localhost:3000",
+            url: "http://localhost:3003",
         },
         {
             name: "Tenant 2",
             logo: AudioWaveform,
-            url: "http://localhost:3000",
+            url: "http://localhost:3003",
         },
         {
             name: "Tenant 3",
             logo: Command,
-            url: "http://localhost:3000",
+            url: "http://localhost:3003",
         },
     ],
     navMain: [
