@@ -28,12 +28,13 @@ export async function GET(request: NextRequest) {
         { status: 503 }
       );
     }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to check MongoDB connection',
-        message: error.message,
+        message: errorMessage,
         timestamp: new Date().toISOString(),
       },
       { status: 500 }

@@ -21,11 +21,21 @@ import axios, {
 /**
  * API Response type for consistent response handling
  */
-export type ApiResponse<T = any> = {
+export type ApiResponse<T = unknown> = {
   success: boolean;
   data?: T;
   error?: string;
   message?: string;
+};
+
+/**
+ * API Error response type
+ */
+type ApiErrorResponse = {
+  success: false;
+  error: string;
+  message?: string;
+  status?: number;
 };
 
 /**
@@ -42,7 +52,7 @@ export type ApiClientConfig = {
  * Request options for API calls
  */
 export type RequestOptions = {
-  params?: Record<string, any>;
+  params?: Record<string, string | number | boolean>;
   headers?: Record<string, string>;
   timeout?: number;
   signal?: AbortSignal;
@@ -110,10 +120,10 @@ const getAuthToken = (): string | null => {
 /**
  * Handle API errors
  */
-const handleError = (error: AxiosError): Promise<never> => {
+const handleError = (error: AxiosError): Promise<ApiErrorResponse> => {
   if (error.response) {
     const status = error.response.status;
-    const data = error.response.data as any;
+    const data = error.response.data as { error?: string; message?: string } | undefined;
 
     if (process.env.NODE_ENV === 'development') {
       console.error(`[API] Error ${status}:`, data);
@@ -169,7 +179,7 @@ const mergeConfig = (options?: RequestOptions): AxiosRequestConfig => ({
 /**
  * GET request
  */
-export const get = async <T = any>(
+export const get = async <T = unknown>(
   url: string,
   options?: RequestOptions
 ): Promise<ApiResponse<T>> => {
@@ -179,17 +189,17 @@ export const get = async <T = any>(
       success: true,
       data: response.data,
     };
-  } catch (error: any) {
-    return error;
+  } catch (error) {
+    return error as ApiErrorResponse;
   }
 };
 
 /**
  * POST request
  */
-export const post = async <T = any>(
+export const post = async <T = unknown, D = unknown>(
   url: string,
-  data?: any,
+  data?: D,
   options?: RequestOptions
 ): Promise<ApiResponse<T>> => {
   try {
@@ -198,17 +208,17 @@ export const post = async <T = any>(
       success: true,
       data: response.data,
     };
-  } catch (error: any) {
-    return error;
+  } catch (error) {
+    return error as ApiErrorResponse;
   }
 };
 
 /**
  * PUT request
  */
-export const put = async <T = any>(
+export const put = async <T = unknown, D = unknown>(
   url: string,
-  data?: any,
+  data?: D,
   options?: RequestOptions
 ): Promise<ApiResponse<T>> => {
   try {
@@ -217,17 +227,17 @@ export const put = async <T = any>(
       success: true,
       data: response.data,
     };
-  } catch (error: any) {
-    return error;
+  } catch (error) {
+    return error as ApiErrorResponse;
   }
 };
 
 /**
  * PATCH request
  */
-export const patch = async <T = any>(
+export const patch = async <T = unknown, D = unknown>(
   url: string,
-  data?: any,
+  data?: D,
   options?: RequestOptions
 ): Promise<ApiResponse<T>> => {
   try {
@@ -236,15 +246,15 @@ export const patch = async <T = any>(
       success: true,
       data: response.data,
     };
-  } catch (error: any) {
-    return error;
+  } catch (error) {
+    return error as ApiErrorResponse;
   }
 };
 
 /**
  * DELETE request
  */
-export const del = async <T = any>(
+export const del = async <T = unknown>(
   url: string,
   options?: RequestOptions
 ): Promise<ApiResponse<T>> => {
@@ -254,8 +264,8 @@ export const del = async <T = any>(
       success: true,
       data: response.data,
     };
-  } catch (error: any) {
-    return error;
+  } catch (error) {
+    return error as ApiErrorResponse;
   }
 };
 
@@ -306,44 +316,44 @@ export const createApiClient = (config?: ApiClientConfig) => {
   const instance = createAxiosInstance(config);
 
   return {
-    get: async <T = any>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> => {
+    get: async <T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> => {
       try {
         const response = await instance.get<T>(url, mergeConfig(options));
         return { success: true, data: response.data };
-      } catch (error: any) {
-        return error;
+      } catch (error) {
+        return error as ApiErrorResponse;
       }
     },
-    post: async <T = any>(url: string, data?: any, options?: RequestOptions): Promise<ApiResponse<T>> => {
+    post: async <T = unknown, D = unknown>(url: string, data?: D, options?: RequestOptions): Promise<ApiResponse<T>> => {
       try {
         const response = await instance.post<T>(url, data, mergeConfig(options));
         return { success: true, data: response.data };
-      } catch (error: any) {
-        return error;
+      } catch (error) {
+        return error as ApiErrorResponse;
       }
     },
-    put: async <T = any>(url: string, data?: any, options?: RequestOptions): Promise<ApiResponse<T>> => {
+    put: async <T = unknown, D = unknown>(url: string, data?: D, options?: RequestOptions): Promise<ApiResponse<T>> => {
       try {
         const response = await instance.put<T>(url, data, mergeConfig(options));
         return { success: true, data: response.data };
-      } catch (error: any) {
-        return error;
+      } catch (error) {
+        return error as ApiErrorResponse;
       }
     },
-    patch: async <T = any>(url: string, data?: any, options?: RequestOptions): Promise<ApiResponse<T>> => {
+    patch: async <T = unknown, D = unknown>(url: string, data?: D, options?: RequestOptions): Promise<ApiResponse<T>> => {
       try {
         const response = await instance.patch<T>(url, data, mergeConfig(options));
         return { success: true, data: response.data };
-      } catch (error: any) {
-        return error;
+      } catch (error) {
+        return error as ApiErrorResponse;
       }
     },
-    delete: async <T = any>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> => {
+    delete: async <T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> => {
       try {
         const response = await instance.delete<T>(url, mergeConfig(options));
         return { success: true, data: response.data };
-      } catch (error: any) {
-        return error;
+      } catch (error) {
+        return error as ApiErrorResponse;
       }
     },
     getInstance: () => instance,

@@ -51,7 +51,7 @@ export async function getDatabase(dbName?: string): Promise<Db> {
  * @param dbName - Optional database name
  * @returns Promise with collection instance
  */
-export async function getCollection<T = any>(
+export async function getCollection<T extends Record<string, unknown> = Record<string, unknown>>(
   collectionName: string,
   dbName?: string
 ) {

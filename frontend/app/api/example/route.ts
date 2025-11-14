@@ -37,12 +37,13 @@ export async function GET(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to fetch documents',
-        message: error.message,
+        message: errorMessage,
       },
       { status: 500 }
     );
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
 // POST - Create new document
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json() as Record<string, unknown>;
 
     // Replace 'your_collection' with your actual collection name
     const collection = await getCollection('your_collection');
@@ -74,12 +75,13 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to create document',
-        message: error.message,
+        message: errorMessage,
       },
       { status: 500 }
     );
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
 // PUT - Update document (full replacement)
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json() as { id?: string } & Record<string, unknown>;
     const { id, ...updateData } = body;
 
     if (!id) {
@@ -134,12 +136,13 @@ export async function PUT(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to update document',
-        message: error.message,
+        message: errorMessage,
       },
       { status: 500 }
     );
@@ -149,7 +152,7 @@ export async function PUT(request: NextRequest) {
 // PATCH - Partial update document
 export async function PATCH(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json() as { id?: string } & Record<string, unknown>;
     const { id, ...updateData } = body;
 
     if (!id) {
@@ -193,12 +196,13 @@ export async function PATCH(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to patch document',
-        message: error.message,
+        message: errorMessage,
       },
       { status: 500 }
     );
@@ -244,12 +248,13 @@ export async function DELETE(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to delete document',
-        message: error.message,
+        message: errorMessage,
       },
       { status: 500 }
     );

@@ -8,7 +8,7 @@ import type { ApiResponse, RequestOptions } from '@/lib/api-client';
  * const { data, loading, error, execute } = useApi<User[]>();
  * await execute(() => apiClient.get('/api/users'));
  */
-export function useApi<T = any>() {
+export function useApi<T = unknown>() {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +28,8 @@ export function useApi<T = any>() {
           setError(response.error || 'Request failed');
           return response;
         }
-      } catch (err: any) {
-        const errorMessage = err.message || 'Unknown error occurred';
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
         setError(errorMessage);
         return {
           success: false,
@@ -65,7 +65,7 @@ export function useApi<T = any>() {
  * @example
  * const { data, loading, error, refetch } = useGet<User[]>('/api/users');
  */
-export function useGet<T = any>(
+export function useGet<T = unknown>(
   url: string,
   options?: RequestOptions,
   immediate = true
@@ -98,12 +98,12 @@ export function useGet<T = any>(
  * const { data, loading, error, post } = usePost<User>('/api/users');
  * await post({ name: 'John', email: 'john@example.com' });
  */
-export function usePost<T = any>(url: string, options?: RequestOptions) {
+export function usePost<T = unknown, D = unknown>(url: string, options?: RequestOptions) {
   const { data, loading, error, execute, reset } = useApi<T>();
 
   const post = useCallback(
-    async (body: any) => {
-      return execute(() => api.post<T>(url, body, options));
+    async (body: D) => {
+      return execute(() => api.post<T, D>(url, body, options));
     },
     [url, options, execute]
   );
@@ -123,12 +123,12 @@ export function usePost<T = any>(url: string, options?: RequestOptions) {
  * const { data, loading, error, put } = usePut<User>('/api/users');
  * await put({ id: '123', name: 'Jane', email: 'jane@example.com' });
  */
-export function usePut<T = any>(url: string, options?: RequestOptions) {
+export function usePut<T = unknown, D = unknown>(url: string, options?: RequestOptions) {
   const { data, loading, error, execute, reset } = useApi<T>();
 
   const put = useCallback(
-    async (body: any) => {
-      return execute(() => api.put<T>(url, body, options));
+    async (body: D) => {
+      return execute(() => api.put<T, D>(url, body, options));
     },
     [url, options, execute]
   );
@@ -148,12 +148,12 @@ export function usePut<T = any>(url: string, options?: RequestOptions) {
  * const { data, loading, error, patch } = usePatch<User>('/api/users');
  * await patch({ id: '123', name: 'Jane' });
  */
-export function usePatch<T = any>(url: string, options?: RequestOptions) {
+export function usePatch<T = unknown, D = unknown>(url: string, options?: RequestOptions) {
   const { data, loading, error, execute, reset } = useApi<T>();
 
   const patch = useCallback(
-    async (body: any) => {
-      return execute(() => api.patch<T>(url, body, options));
+    async (body: D) => {
+      return execute(() => api.patch<T, D>(url, body, options));
     },
     [url, options, execute]
   );
@@ -173,7 +173,7 @@ export function usePatch<T = any>(url: string, options?: RequestOptions) {
  * const { data, loading, error, del } = useDelete('/api/users');
  * await del({ params: { id: '123' } });
  */
-export function useDelete<T = any>(url: string, defaultOptions?: RequestOptions) {
+export function useDelete<T = unknown>(url: string, defaultOptions?: RequestOptions) {
   const { data, loading, error, execute, reset } = useApi<T>();
 
   const del = useCallback(
@@ -203,7 +203,7 @@ export function useDelete<T = any>(url: string, defaultOptions?: RequestOptions)
  * await users.update('123', { name: 'Jane' });
  * await users.remove('123');
  */
-export function useCrud<T = any>(baseUrl: string) {
+export function useCrud<T extends Record<string, unknown>>(baseUrl: string) {
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -238,7 +238,7 @@ export function useCrud<T = any>(baseUrl: string) {
     setLoading(true);
     setError(null);
 
-    const response = await api.post<T>(baseUrl, data);
+    const response = await api.post<T, Partial<T>>(baseUrl, data);
 
     if (response.success && response.data) {
       setItems((prev) => [...prev, response.data as T]);
@@ -254,11 +254,13 @@ export function useCrud<T = any>(baseUrl: string) {
     setLoading(true);
     setError(null);
 
-    const response = await api.put<T>(baseUrl, { id, ...data });
+    const response = await api.put<T, Partial<T> & { id: string }>(baseUrl, { id, ...data });
 
     if (response.success) {
       setItems((prev) =>
-        prev.map((item: any) => (item.id === id ? { ...item, ...data } : item))
+        prev.map((item) => 
+          ('id' in item && item.id === id) ? { ...item, ...data } : item
+        )
       );
     } else {
       setError(response.error || 'Failed to update item');
@@ -272,11 +274,13 @@ export function useCrud<T = any>(baseUrl: string) {
     setLoading(true);
     setError(null);
 
-    const response = await api.patch<T>(baseUrl, { id, ...data });
+    const response = await api.patch<T, Partial<T> & { id: string }>(baseUrl, { id, ...data });
 
     if (response.success) {
       setItems((prev) =>
-        prev.map((item: any) => (item.id === id ? { ...item, ...data } : item))
+        prev.map((item) => 
+          ('id' in item && item.id === id) ? { ...item, ...data } : item
+        )
       );
     } else {
       setError(response.error || 'Failed to patch item');
@@ -293,7 +297,9 @@ export function useCrud<T = any>(baseUrl: string) {
     const response = await api.del(`${baseUrl}?id=${id}`);
 
     if (response.success) {
-      setItems((prev) => prev.filter((item: any) => item.id !== id));
+      setItems((prev) => 
+        prev.filter((item) => !('id' in item) || item.id !== id)
+      );
     } else {
       setError(response.error || 'Failed to delete item');
     }
