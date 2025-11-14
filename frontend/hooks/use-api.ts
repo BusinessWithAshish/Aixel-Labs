@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import apiClient, { ApiResponse, RequestOptions } from '@/lib/api-client';
+import * as api from '@/lib/api-client';
+import type { ApiResponse, RequestOptions } from '@/lib/api-client';
 
 /**
  * Generic hook for API requests with loading and error states
@@ -72,7 +73,7 @@ export function useGet<T = any>(
   const { data, loading, error, execute, reset } = useApi<T>();
 
   const fetch = useCallback(async () => {
-    return execute(() => apiClient.get<T>(url, options));
+    return execute(() => api.get<T>(url, options));
   }, [url, options, execute]);
 
   // Auto-fetch on mount if immediate is true
@@ -102,7 +103,7 @@ export function usePost<T = any>(url: string, options?: RequestOptions) {
 
   const post = useCallback(
     async (body: any) => {
-      return execute(() => apiClient.post<T>(url, body, options));
+      return execute(() => api.post<T>(url, body, options));
     },
     [url, options, execute]
   );
@@ -127,7 +128,7 @@ export function usePut<T = any>(url: string, options?: RequestOptions) {
 
   const put = useCallback(
     async (body: any) => {
-      return execute(() => apiClient.put<T>(url, body, options));
+      return execute(() => api.put<T>(url, body, options));
     },
     [url, options, execute]
   );
@@ -152,7 +153,7 @@ export function usePatch<T = any>(url: string, options?: RequestOptions) {
 
   const patch = useCallback(
     async (body: any) => {
-      return execute(() => apiClient.patch<T>(url, body, options));
+      return execute(() => api.patch<T>(url, body, options));
     },
     [url, options, execute]
   );
@@ -178,7 +179,7 @@ export function useDelete<T = any>(url: string, defaultOptions?: RequestOptions)
   const del = useCallback(
     async (options?: RequestOptions) => {
       const mergedOptions = { ...defaultOptions, ...options };
-      return execute(() => apiClient.delete<T>(url, mergedOptions));
+      return execute(() => api.del<T>(url, mergedOptions));
     },
     [url, defaultOptions, execute]
   );
@@ -211,7 +212,7 @@ export function useCrud<T = any>(baseUrl: string) {
     setLoading(true);
     setError(null);
 
-    const response = await apiClient.get<T[]>(baseUrl, options);
+    const response = await api.get<T[]>(baseUrl, options);
 
     if (response.success && response.data) {
       setItems(response.data);
@@ -227,7 +228,7 @@ export function useCrud<T = any>(baseUrl: string) {
     setLoading(true);
     setError(null);
 
-    const response = await apiClient.get<T>(`${baseUrl}/${id}`);
+    const response = await api.get<T>(`${baseUrl}/${id}`);
 
     setLoading(false);
     return response;
@@ -237,7 +238,7 @@ export function useCrud<T = any>(baseUrl: string) {
     setLoading(true);
     setError(null);
 
-    const response = await apiClient.post<T>(baseUrl, data);
+    const response = await api.post<T>(baseUrl, data);
 
     if (response.success && response.data) {
       setItems((prev) => [...prev, response.data as T]);
@@ -253,7 +254,7 @@ export function useCrud<T = any>(baseUrl: string) {
     setLoading(true);
     setError(null);
 
-    const response = await apiClient.put<T>(baseUrl, { id, ...data });
+    const response = await api.put<T>(baseUrl, { id, ...data });
 
     if (response.success) {
       setItems((prev) =>
@@ -271,7 +272,7 @@ export function useCrud<T = any>(baseUrl: string) {
     setLoading(true);
     setError(null);
 
-    const response = await apiClient.patch<T>(baseUrl, { id, ...data });
+    const response = await api.patch<T>(baseUrl, { id, ...data });
 
     if (response.success) {
       setItems((prev) =>
@@ -289,7 +290,7 @@ export function useCrud<T = any>(baseUrl: string) {
     setLoading(true);
     setError(null);
 
-    const response = await apiClient.delete(`${baseUrl}?id=${id}`);
+    const response = await api.del(`${baseUrl}?id=${id}`);
 
     if (response.success) {
       setItems((prev) => prev.filter((item: any) => item.id !== id));
