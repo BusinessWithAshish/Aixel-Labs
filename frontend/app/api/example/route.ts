@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
     const skip = parseInt(searchParams.get('skip') || '0');
 
     // Replace 'your_collection' with your actual collection name
-    const collection = await getCollection('your_collection');
+    const collection = await getCollection('tenants');
+
     
     const documents = await collection
       .find({})
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as Record<string, unknown>;
 
     // Replace 'your_collection' with your actual collection name
-    const collection = await getCollection('your_collection');
+    const collection = await getCollection('tenants');
     
     const result = await collection.insertOne({
       ...body,
@@ -105,7 +106,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Replace 'your_collection' with your actual collection name
-    const collection = await getCollection('your_collection');
+    const collection = await getCollection('tenants');
     const { ObjectId } = await import('mongodb');
     
     const result = await collection.updateOne(
@@ -166,7 +167,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Replace 'your_collection' with your actual collection name
-    const collection = await getCollection('your_collection');
+    const collection = await getCollection('tenants');
     const { ObjectId } = await import('mongodb');
     
     const result = await collection.updateOne(
@@ -226,7 +227,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Replace 'your_collection' with your actual collection name
-    const collection = await getCollection('your_collection');
+    const collection = await getCollection('tenants');
     const { ObjectId } = await import('mongodb');
     
     const result = await collection.deleteOne({ _id: new ObjectId(id) });

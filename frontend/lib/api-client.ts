@@ -107,7 +107,7 @@ const createAxiosInstance = (config?: ApiClientConfig): AxiosInstance => {
 };
 
 // Default axios instance
-let defaultInstance = createAxiosInstance();
+const defaultInstance = createAxiosInstance();
 
 /**
  * Get authentication token from storage

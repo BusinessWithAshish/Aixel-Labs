@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'MongoDB connection failed',
+          error: '[ NON-CRITICAL ] MongoDB connection failed',
           timestamp: new Date().toISOString(),
         },
         { status: 503 }
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to check MongoDB connection',
+        error: '[ CRITICAL ] Failed to check MongoDB connection',
         message: errorMessage,
         timestamp: new Date().toISOString(),
       },
