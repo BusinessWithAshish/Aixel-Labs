@@ -1,109 +1,104 @@
 /**
  * API Client - Function-based approach for making HTTP requests
- * 
+ *
  * Usage:
  *   import apiClient from '@/lib/api-client';
  *   const response = await apiClient.get('/api/users');
  *   if (response.success) console.log(response.data);
- * 
+ *
  * Or import individual functions:
  *   import { get, post, put, patch, del } from '@/lib/api-client';
  *   const response = await get('/api/users');
  */
 
-import axios, {
-  AxiosInstance,
-  AxiosRequestConfig,
-  AxiosResponse,
-  AxiosError,
-} from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
 /**
  * API Response type for consistent response handling
  */
 export type ApiResponse<T = unknown> = {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
+    success: boolean;
+    data?: T;
+    error?: string;
+    message?: string;
 };
 
 /**
  * API Error response type
  */
 type ApiErrorResponse = {
-  success: false;
-  error: string;
-  message?: string;
-  status?: number;
+    success: false;
+    error: string;
+    message?: string;
+    status?: number;
 };
 
 /**
  * Configuration options for the API client
  */
 export type ApiClientConfig = {
-  baseURL?: string;
-  timeout?: number;
-  headers?: Record<string, string>;
-  withCredentials?: boolean;
+    baseURL?: string;
+    timeout?: number;
+    headers?: Record<string, string>;
+    withCredentials?: boolean;
 };
 
 /**
  * Request options for API calls
  */
 export type RequestOptions = {
-  params?: Record<string, string | number | boolean>;
-  headers?: Record<string, string>;
-  timeout?: number;
-  signal?: AbortSignal;
+    params?: Record<string, string | number | boolean>;
+    headers?: Record<string, string>;
+    timeout?: number;
+    signal?: AbortSignal;
 };
 
 // Create axios instance
 const createAxiosInstance = (config?: ApiClientConfig): AxiosInstance => {
-  const baseURL = config?.baseURL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-  
-  const instance = axios.create({
-    baseURL,
-    timeout: config?.timeout || 30000,
-    headers: {
-      'Content-Type': 'application/json',
-      ...config?.headers,
-    },
-    withCredentials: config?.withCredentials ?? true,
-  });
+    const baseURL = config?.baseURL;
 
-  // Request interceptor
-  instance.interceptors.request.use(
-    (config) => {
-      const token = getAuthToken();
-      if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, {
-          params: config.params,
-          data: config.data,
-        });
-      }
-      
-      return config;
-    },
-    (error: AxiosError) => Promise.reject(error)
-  );
+    const instance = axios.create({
+        baseURL,
+        timeout: config?.timeout || 30000,
+        headers: {
+            'Content-Type': 'application/json',
+            ...config?.headers,
+        },
+        withCredentials: config?.withCredentials ?? true,
+    });
 
-  // Response interceptor
-  instance.interceptors.response.use(
-    (response: AxiosResponse) => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[API] Response ${response.config.url}`, response.data);
-      }
-      return response;
-    },
-    (error: AxiosError) => handleError(error)
-  );
+    // Request interceptor
+    instance.interceptors.request.use(
+        (config) => {
+            const token = getAuthToken();
+            if (token && config.headers) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
 
-  return instance;
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, {
+                    params: config.params,
+                    data: config.data,
+                });
+            }
+
+            return config;
+        },
+        (error: AxiosError) => Promise.reject(error),
+    );
+
+    // Response interceptor
+    instance.interceptors.response.use(
+        (response: AxiosResponse) => {
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`[API] Response ${response.config.url}`, response.data);
+            }
+            return response;
+        },
+        (error: AxiosError) => handleError(error),
+    );
+
+    return instance;
 };
 
 // Default axios instance
@@ -113,265 +108,263 @@ const defaultInstance = createAxiosInstance();
  * Get authentication token from storage
  */
 const getAuthToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || null;
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || null;
 };
 
 /**
  * Handle API errors
  */
 const handleError = (error: AxiosError): Promise<ApiErrorResponse> => {
-  if (error.response) {
-    const status = error.response.status;
-    const data = error.response.data as { error?: string; message?: string } | undefined;
+    if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data as { error?: string; message?: string } | undefined;
 
-    if (process.env.NODE_ENV === 'development') {
-      console.error(`[API] Error ${status}:`, data);
-    }
-
-    switch (status) {
-      case 401:
-        if (typeof window !== 'undefined') {
-          console.warn('[API] Unauthorized access');
+        if (process.env.NODE_ENV === 'development') {
+            console.error(`[API] Error ${status}:`, data);
         }
-        break;
-      case 403:
-        console.warn('[API] Forbidden access');
-        break;
-      case 404:
-        console.warn('[API] Resource not found');
-        break;
-      case 500:
-        console.error('[API] Server error');
-        break;
-    }
 
-    return Promise.reject({
-      success: false,
-      error: data?.error || data?.message || 'Request failed',
-      status,
-    });
-  } else if (error.request) {
-    console.error('[API] No response received:', error.message);
-    return Promise.reject({
-      success: false,
-      error: 'Network error - no response from server',
-    });
-  } else {
-    console.error('[API] Request setup error:', error.message);
-    return Promise.reject({
-      success: false,
-      error: error.message || 'Request failed',
-    });
-  }
+        switch (status) {
+            case 401:
+                if (typeof window !== 'undefined') {
+                    console.warn('[API] Unauthorized access');
+                }
+                break;
+            case 403:
+                console.warn('[API] Forbidden access');
+                break;
+            case 404:
+                console.warn('[API] Resource not found');
+                break;
+            case 500:
+                console.error('[API] Server error');
+                break;
+        }
+
+        return Promise.reject({
+            success: false,
+            error: data?.error || data?.message || 'Request failed',
+            status,
+        });
+    } else if (error.request) {
+        console.error('[API] No response received:', error.message);
+        return Promise.reject({
+            success: false,
+            error: 'Network error - no response from server',
+        });
+    } else {
+        console.error('[API] Request setup error:', error.message);
+        return Promise.reject({
+            success: false,
+            error: error.message || 'Request failed',
+        });
+    }
 };
 
 /**
  * Merge request options with defaults
  */
 const mergeConfig = (options?: RequestOptions): AxiosRequestConfig => ({
-  params: options?.params,
-  headers: options?.headers,
-  timeout: options?.timeout,
-  signal: options?.signal,
+    params: options?.params,
+    headers: options?.headers,
+    timeout: options?.timeout,
+    signal: options?.signal,
 });
 
 /**
  * GET request
  */
-export const get = async <T = unknown>(
-  url: string,
-  options?: RequestOptions
-): Promise<ApiResponse<T>> => {
-  try {
-    const response = await defaultInstance.get<T>(url, mergeConfig(options));
-    return {
-      success: true,
-      data: response.data,
-    };
-  } catch (error) {
-    return error as ApiErrorResponse;
-  }
+export const get = async <T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> => {
+    try {
+        const response = await defaultInstance.get<T>(url, mergeConfig(options));
+        return {
+            success: true,
+            data: response.data,
+        };
+    } catch (error) {
+        return error as ApiErrorResponse;
+    }
 };
 
 /**
  * POST request
  */
 export const post = async <T = unknown, D = unknown>(
-  url: string,
-  data?: D,
-  options?: RequestOptions
+    url: string,
+    data?: D,
+    options?: RequestOptions,
 ): Promise<ApiResponse<T>> => {
-  try {
-    const response = await defaultInstance.post<T>(url, data, mergeConfig(options));
-    return {
-      success: true,
-      data: response.data,
-    };
-  } catch (error) {
-    return error as ApiErrorResponse;
-  }
+    try {
+        const response = await defaultInstance.post<T>(url, data, mergeConfig(options));
+        return {
+            success: true,
+            data: response.data,
+        };
+    } catch (error) {
+        return error as ApiErrorResponse;
+    }
 };
 
 /**
  * PUT request
  */
 export const put = async <T = unknown, D = unknown>(
-  url: string,
-  data?: D,
-  options?: RequestOptions
+    url: string,
+    data?: D,
+    options?: RequestOptions,
 ): Promise<ApiResponse<T>> => {
-  try {
-    const response = await defaultInstance.put<T>(url, data, mergeConfig(options));
-    return {
-      success: true,
-      data: response.data,
-    };
-  } catch (error) {
-    return error as ApiErrorResponse;
-  }
+    try {
+        const response = await defaultInstance.put<T>(url, data, mergeConfig(options));
+        return {
+            success: true,
+            data: response.data,
+        };
+    } catch (error) {
+        return error as ApiErrorResponse;
+    }
 };
 
 /**
  * PATCH request
  */
 export const patch = async <T = unknown, D = unknown>(
-  url: string,
-  data?: D,
-  options?: RequestOptions
+    url: string,
+    data?: D,
+    options?: RequestOptions,
 ): Promise<ApiResponse<T>> => {
-  try {
-    const response = await defaultInstance.patch<T>(url, data, mergeConfig(options));
-    return {
-      success: true,
-      data: response.data,
-    };
-  } catch (error) {
-    return error as ApiErrorResponse;
-  }
+    try {
+        const response = await defaultInstance.patch<T>(url, data, mergeConfig(options));
+        return {
+            success: true,
+            data: response.data,
+        };
+    } catch (error) {
+        return error as ApiErrorResponse;
+    }
 };
 
 /**
  * DELETE request
  */
-export const del = async <T = unknown>(
-  url: string,
-  options?: RequestOptions
-): Promise<ApiResponse<T>> => {
-  try {
-    const response = await defaultInstance.delete<T>(url, mergeConfig(options));
-    return {
-      success: true,
-      data: response.data,
-    };
-  } catch (error) {
-    return error as ApiErrorResponse;
-  }
+export const del = async <T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> => {
+    try {
+        const response = await defaultInstance.delete<T>(url, mergeConfig(options));
+        return {
+            success: true,
+            data: response.data,
+        };
+    } catch (error) {
+        return error as ApiErrorResponse;
+    }
 };
 
 /**
  * Set authentication token
  */
 export const setAuthToken = (token: string): void => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('auth_token', token);
-  }
+    if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_token', token);
+    }
 };
 
 /**
  * Clear authentication token
  */
 export const clearAuthToken = (): void => {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('auth_token');
-    sessionStorage.removeItem('auth_token');
-  }
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+        sessionStorage.removeItem('auth_token');
+    }
 };
 
 /**
  * Get base URL
  */
 export const getBaseURL = (): string => {
-  return defaultInstance.defaults.baseURL || '';
+    return defaultInstance.defaults.baseURL || '';
 };
 
 /**
  * Update base URL
  */
 export const setBaseURL = (url: string): void => {
-  defaultInstance.defaults.baseURL = url;
+    defaultInstance.defaults.baseURL = url;
 };
 
 /**
  * Get raw axios instance for advanced usage
  */
 export const getAxiosInstance = (): AxiosInstance => {
-  return defaultInstance;
+    return defaultInstance;
 };
 
 /**
  * Create a new API client instance with custom configuration
  */
 export const createApiClient = (config?: ApiClientConfig) => {
-  const instance = createAxiosInstance(config);
+    const instance = createAxiosInstance(config);
 
-  return {
-    get: async <T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> => {
-      try {
-        const response = await instance.get<T>(url, mergeConfig(options));
-        return { success: true, data: response.data };
-      } catch (error) {
-        return error as ApiErrorResponse;
-      }
-    },
-    post: async <T = unknown, D = unknown>(url: string, data?: D, options?: RequestOptions): Promise<ApiResponse<T>> => {
-      try {
-        const response = await instance.post<T>(url, data, mergeConfig(options));
-        return { success: true, data: response.data };
-      } catch (error) {
-        return error as ApiErrorResponse;
-      }
-    },
-    put: async <T = unknown, D = unknown>(url: string, data?: D, options?: RequestOptions): Promise<ApiResponse<T>> => {
-      try {
-        const response = await instance.put<T>(url, data, mergeConfig(options));
-        return { success: true, data: response.data };
-      } catch (error) {
-        return error as ApiErrorResponse;
-      }
-    },
-    patch: async <T = unknown, D = unknown>(url: string, data?: D, options?: RequestOptions): Promise<ApiResponse<T>> => {
-      try {
-        const response = await instance.patch<T>(url, data, mergeConfig(options));
-        return { success: true, data: response.data };
-      } catch (error) {
-        return error as ApiErrorResponse;
-      }
-    },
-    delete: async <T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> => {
-      try {
-        const response = await instance.delete<T>(url, mergeConfig(options));
-        return { success: true, data: response.data };
-      } catch (error) {
-        return error as ApiErrorResponse;
-      }
-    },
-    getInstance: () => instance,
-  };
+    return {
+        get: async <T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> => {
+            try {
+                const response = await instance.get<T>(url, mergeConfig(options));
+                return { success: true, data: response.data };
+            } catch (error) {
+                return error as ApiErrorResponse;
+            }
+        },
+        post: async <T = unknown, D = unknown>(url: string, data?: D, options?: RequestOptions): Promise<ApiResponse<T>> => {
+            try {
+                const response = await instance.post<T>(url, data, mergeConfig(options));
+                return { success: true, data: response.data };
+            } catch (error) {
+                return error as ApiErrorResponse;
+            }
+        },
+        put: async <T = unknown, D = unknown>(url: string, data?: D, options?: RequestOptions): Promise<ApiResponse<T>> => {
+            try {
+                const response = await instance.put<T>(url, data, mergeConfig(options));
+                return { success: true, data: response.data };
+            } catch (error) {
+                return error as ApiErrorResponse;
+            }
+        },
+        patch: async <T = unknown, D = unknown>(
+            url: string,
+            data?: D,
+            options?: RequestOptions,
+        ): Promise<ApiResponse<T>> => {
+            try {
+                const response = await instance.patch<T>(url, data, mergeConfig(options));
+                return { success: true, data: response.data };
+            } catch (error) {
+                return error as ApiErrorResponse;
+            }
+        },
+        delete: async <T = unknown>(url: string, options?: RequestOptions): Promise<ApiResponse<T>> => {
+            try {
+                const response = await instance.delete<T>(url, mergeConfig(options));
+                return { success: true, data: response.data };
+            } catch (error) {
+                return error as ApiErrorResponse;
+            }
+        },
+        getInstance: () => instance,
+    };
 };
 
 // Default export with all methods
 const apiClient = {
-  get,
-  post,
-  put,
-  patch,
-  delete: del,
-  setAuthToken,
-  clearAuthToken,
-  getBaseURL,
-  setBaseURL,
-  getAxiosInstance,
+    get,
+    post,
+    put,
+    patch,
+    delete: del,
+    setAuthToken,
+    clearAuthToken,
+    getBaseURL,
+    setBaseURL,
+    getAxiosInstance,
 };
 
 export default apiClient;
