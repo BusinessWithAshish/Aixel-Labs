@@ -1,26 +1,30 @@
-import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
-import "./globals.css";
-
-const poppinsFont = Poppins({
-  variable: "--font-geist-sans",
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
-});
+import type {Metadata} from 'next';
+import '@/app/globals.css';
+import {getCurrentTenant, validateTenant} from '@/helpers/validate-tenant';
+import NotFound from '@/components/layout/not-found';
+import {poppinsFont} from "@/helpers/fonts";
 
 export const metadata: Metadata = {
-  title: "Aixellabs",
-  description: "Agentic Lead management system",
+    title: 'Aixellabs',
+    description: 'Agentic Lead management system',
 };
 
-export default function RootLayout({ children, }: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <html lang="en">
-      <body suppressHydrationWarning className={`${poppinsFont.variable} h-dvh w-full`}>
-      {children}
-      <Toaster />
-      </body>
-    </html>
-  );
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+    const currentTenant = await getCurrentTenant();
+    if (!currentTenant) {
+        return <NotFound />;
+    }
+
+    const isTenantValid = await validateTenant(currentTenant);
+    if (!isTenantValid) {
+        return <NotFound />;
+    }
+
+    return (
+        <html lang="en">
+            <body className={`${poppinsFont.variable} h-dvh w-full`} suppressHydrationWarning>
+                {children}
+            </body>
+        </html>
+    );
 }
