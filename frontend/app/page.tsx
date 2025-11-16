@@ -1,24 +1,14 @@
-import Link from "next/link";
-import PageLayout from "@/components/common/PageLayout";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ArrowRightIcon } from "lucide-react";
+import PageLayout from '@/components/common/PageLayout';
+import {Card, CardHeader} from '@/components/ui/card';
+import {getCurrentTenant} from '@/helpers/validate-tenant';
 
-export default function Home() {
-  return (
-
-    <PageLayout className='' title='Home'>
-
-      <Card>
-        <CardHeader>Aixel labs</CardHeader>
-        <CardContent>
-          <Link className='flex items-center gap-2' href={'/LGS'}>
-            Dashboard
-            <ArrowRightIcon />
-          </Link>
-        </CardContent>
-
-      </Card>
-    </PageLayout>
-
-  );
+export default async function Home() {
+    const currentTenant = await getCurrentTenant();
+    return (
+        <PageLayout className="" title="Home">
+            <Card>
+                <CardHeader>{currentTenant}</CardHeader>
+            </Card>
+        </PageLayout>
+    );
 }
