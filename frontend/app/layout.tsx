@@ -1,16 +1,17 @@
-import type {Metadata} from 'next';
+import type { Metadata } from 'next';
 import '@/app/globals.css';
-import {getCurrentTenant, validateTenant} from '@/helpers/validate-tenant';
+import { getCurrentTenantData, getCurrentTenantFromHeaders, validateTenant } from '@/helpers/validate-tenant';
 import NotFound from '@/components/layout/not-found';
-import {poppinsFont} from "@/helpers/fonts";
+import { LovableEmbed } from '@/components/layout/custom-demo-layout';
+import { RootLayoutUI } from '@/components/common/RootLayout';
 
 export const metadata: Metadata = {
-    title: 'Aixellabs',
+    title: process.env.NEXT_PUBLIC_APP_NAME || 'AixelLabs',
     description: 'Agentic Lead management system',
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-    const currentTenant = await getCurrentTenant();
+    const currentTenant = await getCurrentTenantFromHeaders();
     if (!currentTenant) {
         return <NotFound />;
     }
@@ -20,11 +21,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         return <NotFound />;
     }
 
-    return (
-        <html lang="en">
-            <body className={`${poppinsFont.variable} h-dvh w-full`} suppressHydrationWarning>
-                {children}
-            </body>
-        </html>
-    );
+    const hasRedirectUrl = await getCurrentTenantData(currentTenant);
+    const redirectUrl = hasRedirectUrl?.redirect_url;
+    if (redirectUrl) {
+        return <LovableEmbed src={redirectUrl as string} />;
+    }
+
+    return <RootLayoutUI>{children}</RootLayoutUI>;
 }

@@ -2,7 +2,7 @@ import { getCollection } from '@/lib/mongodb';
 import { extractSubdomain } from '@/middleware';
 import { headers } from 'next/headers';
 
-export const getCurrentTenant = async (): Promise<string | null> => {
+export const getCurrentTenantFromHeaders = async (): Promise<string | null> => {
     const currentHeaders = await headers();
     const { subdomain } = extractSubdomain(currentHeaders);
     return subdomain;
@@ -16,5 +16,15 @@ export const validateTenant = async (tenant: string): Promise<boolean> => {
     } catch (error) {
         console.error('Error validating tenant:', error);
         return false;
+    }
+};
+
+export const getCurrentTenantData = async (tenant: string): Promise<Record<string, unknown> | null> => {
+    try {
+        const collection = await getCollection('tenants');
+        return await collection.findOne({ name: tenant });
+    } catch (error) {
+        console.error('Error getting tenant data:', error);
+        return null;
     }
 };

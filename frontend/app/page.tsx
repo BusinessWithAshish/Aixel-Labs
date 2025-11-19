@@ -1,9 +1,9 @@
 import PageLayout from '@/components/common/PageLayout';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { getCurrentTenant } from '@/helpers/validate-tenant';
+import { getCurrentTenantFromHeaders } from '@/helpers/validate-tenant';
 
 export default async function Home() {
-    const currentTenant = await getCurrentTenant();
+    const currentTenant = await getCurrentTenantFromHeaders();
     return (
         <PageLayout className="" title="Home">
             <Card>

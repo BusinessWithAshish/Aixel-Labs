@@ -1,38 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const extractSubdomain = (request: NextRequest | Headers) => {
-    let host = '';
-    if (request instanceof NextRequest) {
-        host = request.headers.get('host') || '';
-    } else {
-        host = request.get('host') || '';
-    }
-    const hostname = host.split(':')[0];
+    const host = request instanceof NextRequest ? request.headers.get('host') || '' : request.get('host') || '';
 
+    const hostname = host.split(':')[0];
     const parts = hostname.split('.');
-    if (parts.length > 1) {
-        return {
-            subdomain: parts[0],
-            hostname: hostname,
-        };
-    }
 
     return {
-        subdomain: null,
-        hostname: hostname,
+        subdomain: parts.length > 1 ? parts[0] : null,
+        hostname,
+        host,
     };
 };
 
 export async function middleware(req: NextRequest) {
     const { subdomain, hostname } = extractSubdomain(req);
 
-    // No subdomain - block access
+    // Skip middleware for API routes explicitly (safety check)
+    if (req.nextUrl.pathname.startsWith('/api')) {
+        return NextResponse.next();
+    }
+
+    // Handle missing or www subdomain
     if (!subdomain || subdomain === 'www') {
-        if (process.env.NODE_ENV === 'production') {
-            // Production: redirect root domain to marketing site
-            if (hostname.trim().toLowerCase() === process.env.ROOT_DOMAIN?.trim().toLowerCase()) {
-                return NextResponse.redirect(process.env.ROOT_URL as string);
-            }
+        if (
+            process.env.NODE_ENV === 'production' &&
+            hostname.trim().toLowerCase() === process.env.ROOT_DOMAIN?.trim().toLowerCase()
+        ) {
+            return NextResponse.redirect(process.env.ROOT_URL as string);
         }
     }
 
@@ -43,5 +38,15 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+    matcher: [
+        /*
+         * Match all request paths except:
+         * - api (API routes)
+         * - _next/static (static files)
+         * - _next/image (image optimization files)
+         * - favicon.ico (favicon file)
+         * - public files (files with extensions)
+         */
+        '/((?!api/|_next/static|_next/image|favicon.ico|.*\\..*).*)',
+    ],
 };
