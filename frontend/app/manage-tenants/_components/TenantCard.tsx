@@ -1,31 +1,73 @@
-"use client"
+'use client';
 
-import { Card } from "@/components/ui/card"
-import type { SidebarTenant } from "@/config/sidebar.config"
-import { cn } from "@/lib/utils"
+import { useState } from 'react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Pencil, Building2, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
+import type { Tenant } from '@/helpers/tenant-operations';
 
 type TenantCardProps = {
-    tenant: SidebarTenant
-    onClick?: () => void
-    className?: string
-}
+    tenant: Tenant;
+    onClick?: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
+    className?: string;
+};
 
-export function TenantCard({ tenant, onClick, className }: TenantCardProps) {
-    const Icon = tenant.logo
+export function TenantCard({ tenant, onClick, onEdit, onDelete, className }: TenantCardProps) {
+    const [isHovered, setIsHovered] = useState(false);
+    const tenantUrl = getTenantRedirectUrl(tenant);
+
+    const handleEditClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onEdit?.();
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onDelete?.();
+    };
 
     return (
         <Card
             className={cn(
-                "flex flex-col items-center justify-center p-6 cursor-pointer transition-all hover:shadow-lg hover:scale-105",
-                className
+                'relative flex flex-col items-center justify-center p-6 cursor-pointer transition-all hover:shadow-lg hover:scale-105',
+                className,
             )}
             onClick={onClick}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
         >
+            <div className={cn('absolute top-2 right-2 flex gap-1', 'max-md:flex', !isHovered && 'md:hidden')}>
+                {onEdit && (
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 shadow-sm hover:bg-secondary cursor-pointer"
+                        onClick={handleEditClick}
+                    >
+                        <Pencil className="h-4 w-4" />
+                    </Button>
+                )}
+                {onDelete && (
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 shadow-sm hover:bg-secondary hover:text-red-500 cursor-pointer"
+                        onClick={handleDeleteClick}
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                )}
+            </div>
+
             <div className="flex items-center justify-center w-16 h-16 rounded-lg bg-primary/10 mb-4">
-                <Icon className="w-8 h-8 text-primary" />
+                <Building2 className="w-8 h-8 text-primary" />
             </div>
             <h3 className="text-lg font-semibold text-center">{tenant.name}</h3>
-            <p className="text-sm text-muted-foreground text-center mt-1">{tenant.url}</p>
+            <p className="text-sm text-muted-foreground text-center mt-1 break-all px-2">{tenantUrl}</p>
         </Card>
-    )
+    );
 }

@@ -25,9 +25,9 @@ export async function middleware(req: NextRequest) {
     if (!subdomain || subdomain === 'www') {
         if (
             process.env.NODE_ENV === 'production' &&
-            hostname.trim().toLowerCase() === process.env.ROOT_DOMAIN?.trim().toLowerCase()
+            hostname.trim().toLowerCase() === process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim().toLowerCase()
         ) {
-            return NextResponse.redirect(process.env.ROOT_URL as string);
+            return NextResponse.redirect(process.env.NEXT_PUBLIC_ROOT_URL as string);
         }
     }
 
