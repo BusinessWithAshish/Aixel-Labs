@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChatState, TWhatsAppChat } from '@/app/messaging/types';
+import { ChatState, TWhatsAppChat } from '@/app/(protected)/messaging/types';
 import { MessageCirclePlus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 

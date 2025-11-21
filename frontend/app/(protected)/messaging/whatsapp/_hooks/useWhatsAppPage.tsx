@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { MessageType, TMessageTemplates, TWhatsAppChat } from '@/app/messaging/types';
-import { TWILIO_FUNCTIONS_URL } from '@/app/messaging/constants';
+import { MessageType, TMessageTemplates, TWhatsAppChat } from '@/app/(protected)/messaging/types';
+import { TWILIO_FUNCTIONS_URL } from '@/app/(protected)/messaging/constants';
 
 // Add your Twilio number here - this should be your purchased Twilio WhatsApp number
 const TWILIO_WHATSAPP_NUMBER = '+16466814490';

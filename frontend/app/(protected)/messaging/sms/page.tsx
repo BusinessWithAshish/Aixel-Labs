@@ -8,8 +8,8 @@ import {Input} from "@/components/ui/input"
 import {Button} from "@/components/ui/button"
 import {ScrollArea} from "@/components/ui/scroll-area"
 import {Badge} from "@/components/ui/badge"
-import {MessageType, TTwilioMessage} from "@/app/messaging/types";
-import {TWILIO_FUNCTIONS_URL} from "@/app/messaging/constants";
+import {MessageType, TTwilioMessage} from "@/app/(protected)/messaging/types";
+import {TWILIO_FUNCTIONS_URL} from "@/app/(protected)/messaging/constants";
 
 export default function SMSPage() {
 

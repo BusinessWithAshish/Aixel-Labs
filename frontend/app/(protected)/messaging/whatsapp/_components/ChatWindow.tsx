@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChatState, MessageType, TWhatsAppChat } from '@/app/messaging/types';
+import { ChatState, MessageType, TWhatsAppChat } from '@/app/(protected)/messaging/types';
 
 type ChatWindowProps = {
     currentChat: TWhatsAppChat | null;

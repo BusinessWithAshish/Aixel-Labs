@@ -10,7 +10,7 @@ import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
 import { deleteTenant, type Tenant } from '@/helpers/tenant-operations';
 import { usePage } from '@/contexts/PageStore';
 import { toast } from 'sonner';
-import type { UseManageTenantsPageReturn } from '@/app/manage-tenants/_hooks';
+import type { UseManageTenantsPageReturn } from '@/app/(protected)/manage-tenants/_hooks';
 
 export function ManageTenantsContent() {
     const {
