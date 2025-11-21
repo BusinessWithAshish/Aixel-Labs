@@ -4,6 +4,8 @@ import { getCurrentTenantData, getCurrentTenantFromHeaders, validateTenant } fro
 import NotFound from '@/components/layout/not-found';
 import { LovableEmbed } from '@/components/layout/custom-demo-layout';
 import { RootLayoutUI } from '@/components/common/RootLayout';
+import { auth } from '@/auth';
+import SigninLayout from '@/components/common/SigninLayout';
 
 export const metadata: Metadata = {
     title: process.env.NEXT_PUBLIC_APP_NAME || 'AixelLabs',
@@ -27,5 +29,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         return <LovableEmbed src={redirectUrl as string} />;
     }
 
-    return <RootLayoutUI>{children}</RootLayoutUI>;
+    const session = await auth();
+
+    return session?.user ? <RootLayoutUI>{children}</RootLayoutUI> : <SigninLayout />;
 }
