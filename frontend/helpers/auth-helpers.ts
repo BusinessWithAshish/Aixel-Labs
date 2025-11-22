@@ -15,5 +15,5 @@ export async function validateTenantAccess(tenantName: string) {
     }
 
     // Regular users can only access their assigned tenant
-    return user.name?.toLowerCase() === tenantName.toLowerCase();
+    return user.tenantId?.toLowerCase() === tenantName.toLowerCase();
 }
