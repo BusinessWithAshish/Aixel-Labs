@@ -28,7 +28,7 @@ export function ManageTenantsContent() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     const handleTenantClick = (tenant: (typeof tenants)[0]) => {
-        window.open(getTenantRedirectUrl(tenant), '_blank');
+        window.location.href = `/manage-tenants/${tenant._id}`;
     };
 
     const handleEditTenant = (tenant: (typeof tenants)[0]) => {
