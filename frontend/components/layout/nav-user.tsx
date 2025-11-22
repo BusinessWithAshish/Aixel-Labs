@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import type { SidebarUser } from '@/config/sidebar.config';
 import { handleSignOut } from '@/app/actions/auth-actions';
 
-export function NavUser({ user }: { user: SidebarUser; }) {
+export function NavUser({ user }: { user: SidebarUser }) {
     const { isMobile } = useSidebar();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -41,8 +41,10 @@ export function NavUser({ user }: { user: SidebarUser; }) {
             await handleSignOut();
         } catch (error) {
             console.error('Logout error:', error);
-            setIsLoggingOut(false);
             setShowLogoutDialog(false);
+        }
+        finally {
+            setIsLoggingOut(false);
         }
     };
 
