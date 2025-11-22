@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronsUpDown, Plus } from "lucide-react"
+import { ChevronsUpDown, Plus, GalleryVerticalEnd } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import {
@@ -23,16 +23,18 @@ import type { SidebarTenant } from "@/config/sidebar.config"
 
 export function TenantSwitcher({
     tenants,
+    isAdmin,
+    currentTenantName,
 }: {
     tenants: SidebarTenant[]
+    isAdmin: boolean
+    currentTenantName: string
 }) {
     const { isMobile } = useSidebar()
     const router = useRouter()
-    const [activeTenant, setActiveTenant] = React.useState(tenants[0])
-
-    if (!activeTenant) {
-        return null
-    }
+    const [activeTenant, setActiveTenant] = React.useState<SidebarTenant>(
+        tenants[0] || { name: currentTenantName, logo: GalleryVerticalEnd, url: "" }
+    )
 
     const handleTenantClick = (tenant: SidebarTenant) => {
         setActiveTenant(tenant)
@@ -41,6 +43,27 @@ export function TenantSwitcher({
 
     const handleManageTenantsClick = () => {
         router.push('/manage-tenants')
+    }
+
+    if (!isAdmin) {
+        return (
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <SidebarMenuButton
+                        size="lg"
+                        className="cursor-default"
+                        disabled
+                    >
+                        <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+                            <activeTenant.logo className="size-4" />
+                        </div>
+                        <div className="grid flex-1 text-left text-sm leading-tight">
+                            <span className="truncate font-medium">{activeTenant.name}</span>
+                        </div>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
+        )
     }
 
     return (

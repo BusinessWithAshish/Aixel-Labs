@@ -18,7 +18,7 @@ import {
 import type { SidebarNavItem } from '@/config/sidebar.config';
 import { useCallback } from 'react';
 
-export function NavMain({ items }: { items: SidebarNavItem[] }) {
+export function NavMain({ items, isAdmin }: { items: SidebarNavItem[], isAdmin?: boolean }) {
     const pathname = usePathname();
 
     // Memoize isItemActive to recalculate only when pathname or items change

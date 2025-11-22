@@ -23,34 +23,10 @@ export type SidebarUser = {
 }
 
 export type SidebarConfig = {
-    user: SidebarUser
-    tenants: SidebarTenant[]
     navMain: SidebarNavItem[]
 }
 
 export const sidebarConfig: SidebarConfig = {
-    user: {
-        name: "Aixel Labs",
-        email: "hello@aixellabs.com",
-        avatar: "",
-    },
-    tenants: [
-        {
-            name: "Aixel Labs",
-            logo: GalleryVerticalEnd,
-            url: "http://localhost:3003",
-        },
-        {
-            name: "Tenant 2",
-            logo: AudioWaveform,
-            url: "http://localhost:3003",
-        },
-        {
-            name: "Tenant 3",
-            logo: Command,
-            url: "http://localhost:3003",
-        },
-    ],
     navMain: [
         {
             title: "Lead Generation",
