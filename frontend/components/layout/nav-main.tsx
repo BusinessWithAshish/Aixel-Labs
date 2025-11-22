@@ -16,9 +16,10 @@ import {
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import type { SidebarNavItem } from '@/config/sidebar.config';
+import { getIcon } from '@/lib/icon-map';
 import { useCallback } from 'react';
 
-export function NavMain({ items, isAdmin }: { items: SidebarNavItem[], isAdmin?: boolean }) {
+export function NavMain({ items }: { items: SidebarNavItem[];}) {
     const pathname = usePathname();
 
     // Memoize isItemActive to recalculate only when pathname or items change
@@ -47,13 +48,14 @@ export function NavMain({ items, isAdmin }: { items: SidebarNavItem[], isAdmin?:
             <SidebarMenu>
                 {items.map((item) => {
                     const itemActive = isItemActive(item);
+                    const Icon = item.icon ? getIcon(item.icon) : null;
 
                     return (
                         <Collapsible key={item.title} asChild defaultOpen={itemActive} className="group/collapsible">
                             <SidebarMenuItem>
                                 <CollapsibleTrigger asChild>
                                     <SidebarMenuButton tooltip={item.title} isActive={itemActive}>
-                                        {item.icon && <item.icon />}
+                                        {Icon && <Icon />}
                                         <span>{item.title}</span>
                                         <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                                     </SidebarMenuButton>
