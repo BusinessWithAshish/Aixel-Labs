@@ -1,3 +1,5 @@
+'use server';
+
 import { getCollection } from '@/lib/mongodb';
 import { extractSubdomain } from '@/middleware';
 import { headers } from 'next/headers';
