@@ -69,11 +69,10 @@ export default function SignInPage() {
 
             if (result?.error) {
                 // Handle specific error messages from NextAuth
+                // NextAuth passes the error code in the error field
                 const errorType = result.error;
 
-                console.log('errorType', errorType);
-                console.log('result', result);
-
+                // Handle specific custom error codes
                 if (errorType === 'USER_NOT_FOUND') {
                     toast.error('User not found', {
                         description: 'You are not part of this app yet. Please contact hello@aixellabs.com for support.',
@@ -89,12 +88,17 @@ export default function SignInPage() {
                     toast.error('Incorrect password', {
                         description: 'The password you entered is incorrect. Please try again.',
                     });
+                } else if (errorType === 'INVALID_CREDENTIALS') {
+                    toast.error('Invalid input', {
+                        description: 'Please check your email and password format.',
+                    });
                 } else if (errorType === 'CredentialsSignin') {
-                    // Generic NextAuth error
+                    // Generic NextAuth error (fallback)
                     toast.error('Sign in failed', {
                         description: 'Invalid credentials. Please check your email and password.',
                     });
                 } else {
+                    // Catch-all for any other errors
                     toast.error('Sign in failed', {
                         description: 'An error occurred during sign in. Please try again.',
                     });

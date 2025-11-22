@@ -1,7 +1,24 @@
-import NextAuth, { DefaultSession } from 'next-auth';
+import NextAuth, { DefaultSession, CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { getCollection } from '@/lib/mongodb';
 import { z } from 'zod';
+
+// Custom error classes for specific error types
+class UserNotFoundError extends CredentialsSignin {
+    code = 'USER_NOT_FOUND';
+}
+
+class UserNotInTenantError extends CredentialsSignin {
+    code = 'USER_NOT_IN_TENANT';
+}
+
+class InvalidPasswordError extends CredentialsSignin {
+    code = 'INVALID_PASSWORD';
+}
+
+class InvalidCredentialsError extends CredentialsSignin {
+    code = 'INVALID_CREDENTIALS';
+}
 
 declare module 'next-auth' {
     interface User {
@@ -55,7 +72,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                     if (!userByEmail) {
                         // User doesn't exist at all
-                        throw new Error('USER_NOT_FOUND');
+                        throw new UserNotFoundError();
                     }
 
                     // Check if user exists with this email AND tenant
@@ -63,12 +80,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                     if (!user) {
                         // User exists but not for this tenant
-                        throw new Error('USER_NOT_IN_TENANT');
+                        throw new UserNotInTenantError();
                     }
 
                     // Plain text password comparison (not secure for production)
                     if (password !== user.password) {
-                        throw new Error('INVALID_PASSWORD');
+                        throw new InvalidPasswordError();
                     }
 
                     return {
@@ -79,17 +96,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         tenantId: user.tenantId as string,
                     };
                 } catch (error) {
-                    // Re-throw custom errors
+                    // Re-throw custom credential errors
                     if (
-                        error instanceof Error &&
-                        (error.message === 'USER_NOT_FOUND' ||
-                            error.message === 'USER_NOT_IN_TENANT' ||
-                            error.message === 'INVALID_PASSWORD')
+                        error instanceof UserNotFoundError ||
+                        error instanceof UserNotInTenantError ||
+                        error instanceof InvalidPasswordError
                     ) {
                         throw error;
                     }
-                    // For any other errors (including validation errors)
-                    throw new Error('INVALID_CREDENTIALS');
+                    // For validation errors or any other errors
+                    console.error('Authorization error:', error);
+                    throw new InvalidCredentialsError();
                 }
             },
         }),
