@@ -32,9 +32,11 @@ export function TenantSwitcher({
         tenants[0] || { name: currentTenantName, logo: 'GalleryVerticalEnd', url: '' },
     );
 
-    const handleTenantClick = (tenant: SidebarTenant) => {
+    const handleTenantClick = (e: React.MouseEvent, tenant: SidebarTenant) => {
+        e.preventDefault();
+        e.stopPropagation();
         setActiveTenant(tenant);
-        window.open(tenant.url, '_blank');
+        window.location.href = tenant.url;
     };
 
     const handleManageTenantsClick = () => {
@@ -90,7 +92,7 @@ export function TenantSwitcher({
                             return (
                                 <DropdownMenuItem
                                     key={tenant.name}
-                                    onClick={() => handleTenantClick(tenant)}
+                                    onClick={(e) => handleTenantClick(e, tenant)}
                                     className="gap-2 p-2"
                                 >
                                     <div className="flex size-6 items-center justify-center rounded-md border">
