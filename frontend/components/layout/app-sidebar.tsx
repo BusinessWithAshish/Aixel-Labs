@@ -11,8 +11,7 @@ import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
 export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const session = await auth();
 
-    const isAdmin = session?.user?.isAdmin ?? false;
-    const tenants = isAdmin ? await getAllTenants() : [];
+    const tenants = session?.user?.isAdmin ? await getAllTenants() : [];
 
     const tenantsForSwitcher = tenants.map((tenant) => ({
         name: tenant.name,
@@ -24,16 +23,14 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
         name: session?.user?.name || 'User',
         email: session?.user?.email || 'user@example.com',
         avatar: 'https://github.com/shadcn.png',
+        isAdmin: session?.user?.isAdmin ?? false,
+        tenantId: session?.user?.tenantId || '',
     };
 
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
-                <TenantSwitcher
-                    tenants={tenantsForSwitcher}
-                    isAdmin={isAdmin}
-                    currentTenantName={session?.user?.tenantId || ''}
-                />
+                <TenantSwitcher tenants={tenantsForSwitcher} isAdmin={user.isAdmin} currentTenantName={user.tenantId} />
             </SidebarHeader>
             <SidebarContent>
                 <NavMain items={sidebarConfig.navMain} />

@@ -21,6 +21,8 @@ export type SidebarUser = {
     name: string;
     email: string;
     avatar: string;
+    isAdmin: boolean;
+    tenantId: string;
 };
 
 export type SidebarConfig = {
