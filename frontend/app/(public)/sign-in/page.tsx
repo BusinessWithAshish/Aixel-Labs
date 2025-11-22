@@ -1,68 +1,220 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { FieldGroup, Field, FieldLabel, FieldDescription, FieldSeparator } from '@/components/ui/field';
+'use client';
+
+import * as React from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Controller, useForm, type ControllerRenderProps, type FieldError as RHFFieldError } from 'react-hook-form';
+import { toast } from 'sonner';
+import * as z from 'zod';
+import { signIn } from 'next-auth/react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { FieldGroup, Field, FieldLabel, FieldDescription, FieldError } from '@/components/ui/field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getTenantCurrentByUrl } from '@/helpers/get-current-tenant-by-url';
+
+const formSchema = z.object({
+    email: z
+        .string()
+        .min(1, 'Email is required.')
+        .email('Please enter a valid email address.')
+        .transform((val) => val.trim().toLowerCase()),
+    password: z.string().min(6, 'Password must be at least 6 characters.'),
+    name: z
+        .string()
+        .optional()
+        .transform((val) => (val ? val.trim() : val)),
+});
+
+type FormSchema = z.infer<typeof formSchema>;
 
 export default function SignInPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const callbackUrl = searchParams.get('callbackUrl') || '/';
+    const [isLoading, setIsLoading] = React.useState(false);
+
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            email: '',
+            password: '',
+            name: '',
+        },
+    });
+
+    async function onSubmit(data: z.infer<typeof formSchema>) {
+        setIsLoading(true);
+        try {
+            // Get tenantId from subdomain
+            const rawTenantId = getTenantCurrentByUrl();
+
+            if (!rawTenantId) {
+                toast.error('Tenant not found', {
+                    description: 'Unable to determine tenant from URL. Please access from the correct subdomain.',
+                });
+                setIsLoading(false);
+                return;
+            }
+
+            // Normalize tenantId to lowercase for database comparison
+            const tenantId = rawTenantId.toLowerCase().trim();
+
+            const result = await signIn('credentials', {
+                email: data.email,
+                password: data.password,
+                tenantId: tenantId,
+                redirect: false,
+            });
+
+            if (result?.error) {
+                // Handle specific error messages from NextAuth
+                const errorType = result.error;
+
+                console.log('errorType', errorType);
+                console.log('result', result);
+
+                if (errorType === 'USER_NOT_FOUND') {
+                    toast.error('User not found', {
+                        description: 'You are not part of this app yet. Please contact hello@aixellabs.com for support.',
+                        duration: 6000,
+                    });
+                } else if (errorType === 'USER_NOT_IN_TENANT') {
+                    toast.error('Access denied', {
+                        description:
+                            'Your account is not associated with this organization. Please contact hello@aixellabs.com for support.',
+                        duration: 6000,
+                    });
+                } else if (errorType === 'INVALID_PASSWORD') {
+                    toast.error('Incorrect password', {
+                        description: 'The password you entered is incorrect. Please try again.',
+                    });
+                } else if (errorType === 'CredentialsSignin') {
+                    // Generic NextAuth error
+                    toast.error('Sign in failed', {
+                        description: 'Invalid credentials. Please check your email and password.',
+                    });
+                } else {
+                    toast.error('Sign in failed', {
+                        description: 'An error occurred during sign in. Please try again.',
+                    });
+                }
+            } else if (result?.ok) {
+                toast.success('Welcome back!', {
+                    description: 'You have successfully signed in.',
+                });
+                router.push(callbackUrl);
+                router.refresh();
+            }
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
+            toast.error('Something went wrong', {
+                description: errorMessage,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     return (
         <div className="flex flex-col h-full p-8 mx-auto items-center justify-center">
             <Card className="w-full h-fit max-w-md">
                 <CardHeader className="text-center">
                     <CardTitle className="text-xl">Welcome back</CardTitle>
-                    <CardDescription>Login with your Apple or Google account</CardDescription>
+                    <CardDescription>Sign in to your account to continue</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form>
+                    <form id="sign-in-form" onSubmit={form.handleSubmit(onSubmit)}>
                         <FieldGroup>
-                            <Field>
-                                <Button variant="outline" type="button">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                        <path
-                                            d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
-                                            fill="currentColor"
+                            <Controller
+                                name="email"
+                                control={form.control}
+                                render={({
+                                    field,
+                                    fieldState,
+                                }: {
+                                    field: ControllerRenderProps<FormSchema, 'email'>;
+                                    fieldState: { invalid: boolean; error?: RHFFieldError };
+                                }) => (
+                                    <Field data-invalid={fieldState.invalid}>
+                                        <FieldLabel htmlFor="sign-in-email">Email</FieldLabel>
+                                        <Input
+                                            {...field}
+                                            id="sign-in-email"
+                                            type="email"
+                                            aria-invalid={fieldState.invalid}
+                                            placeholder="m@example.com"
+                                            autoComplete="email"
+                                            disabled={isLoading}
                                         />
-                                    </svg>
-                                    Login with Apple
-                                </Button>
-                                <Button variant="outline" type="button">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                        <path
-                                            d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
-                                            fill="currentColor"
+                                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                                    </Field>
+                                )}
+                            />
+                            <Controller
+                                name="password"
+                                control={form.control}
+                                render={({
+                                    field,
+                                    fieldState,
+                                }: {
+                                    field: ControllerRenderProps<FormSchema, 'password'>;
+                                    fieldState: { invalid: boolean; error?: RHFFieldError };
+                                }) => (
+                                    <Field data-invalid={fieldState.invalid}>
+                                        <FieldLabel htmlFor="sign-in-password">Password</FieldLabel>
+                                        <Input
+                                            {...field}
+                                            id="sign-in-password"
+                                            type="password"
+                                            aria-invalid={fieldState.invalid}
+                                            placeholder="Enter your password"
+                                            autoComplete="current-password"
+                                            disabled={isLoading}
                                         />
-                                    </svg>
-                                    Login with Google
-                                </Button>
-                            </Field>
-                            <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
-                                Or continue with
-                            </FieldSeparator>
-                            <Field>
-                                <FieldLabel htmlFor="email">Email</FieldLabel>
-                                <Input id="email" type="email" placeholder="m@example.com" required />
-                            </Field>
-                            <Field>
-                                <div className="flex items-center">
-                                    <FieldLabel htmlFor="password">Password</FieldLabel>
-                                    <a href="#" className="ml-auto text-sm underline-offset-4 hover:underline">
-                                        Forgot your password?
-                                    </a>
-                                </div>
-                                <Input id="password" type="password" required />
-                            </Field>
-                            <Field>
-                                <Button type="submit">Login</Button>
-                                <FieldDescription className="text-center">
-                                    Don&apos;t have an account? <a href="#">Sign up</a>
-                                </FieldDescription>
-                            </Field>
+                                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                                    </Field>
+                                )}
+                            />
+                            <Controller
+                                name="name"
+                                control={form.control}
+                                render={({
+                                    field,
+                                    fieldState,
+                                }: {
+                                    field: ControllerRenderProps<FormSchema, 'name'>;
+                                    fieldState: { invalid: boolean; error?: RHFFieldError };
+                                }) => (
+                                    <Field data-invalid={fieldState.invalid}>
+                                        <FieldLabel htmlFor="sign-in-name">
+                                            Name <span className="text-muted-foreground text-xs">(optional)</span>
+                                        </FieldLabel>
+                                        <Input
+                                            {...field}
+                                            id="sign-in-name"
+                                            type="text"
+                                            aria-invalid={fieldState.invalid}
+                                            placeholder="Your name"
+                                            autoComplete="name"
+                                            disabled={isLoading}
+                                        />
+                                        <FieldDescription>
+                                            This field is optional and only used for display purposes.
+                                        </FieldDescription>
+                                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                                    </Field>
+                                )}
+                            />
                         </FieldGroup>
                     </form>
                 </CardContent>
+                <CardFooter>
+                    <Button type="submit" form="sign-in-form" disabled={isLoading} className="w-full">
+                        {isLoading ? 'Signing in...' : 'Sign In'}
+                    </Button>
+                </CardFooter>
             </Card>
-            <FieldDescription className="px-6 text-center">
-                By clicking continue, you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
-            </FieldDescription>
         </div>
     );
 }

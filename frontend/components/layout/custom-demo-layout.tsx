@@ -69,7 +69,7 @@ export default function IframeEmbed({
     };
 
     const defaultLoadingComponent = () => {
-        const currentTenant = getTenantCurrentByUrl();
+        const currentTenant = getTenantCurrentByUrl()?.toUpperCase();
         return (
             <div className="flex items-center justify-center h-full bg-gray-50">
                 <div className="text-center">
@@ -83,7 +83,7 @@ export default function IframeEmbed({
     };
 
     const defaultErrorComponent = () => {
-        const currentTenant = getTenantCurrentByUrl();
+        const currentTenant = getTenantCurrentByUrl()?.toUpperCase();
         return (
             <div className="flex items-center justify-center h-full bg-gray-50">
                 <div className="text-center max-w-md px-4">
