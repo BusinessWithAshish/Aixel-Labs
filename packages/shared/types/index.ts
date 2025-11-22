@@ -1,4 +1,3 @@
-// Export types
 export interface User {
   id: string;
   email: string;
@@ -8,5 +7,5 @@ export interface User {
 export type ApiResponse<T> = {
   success: boolean;
   data: T;
-}
+};
 
