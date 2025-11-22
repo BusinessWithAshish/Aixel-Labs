@@ -1,19 +1,15 @@
-"use client"
+'use client';
 
+import { useState } from 'react';
 import {
     BadgeCheck,
-    Bell,
+    // Bell,
     ChevronsUpDown,
-    CreditCard,
+    // CreditCard,
     LogOut,
-    Sparkles,
-} from "lucide-react"
+} from 'lucide-react';
 
-import {
-    Avatar,
-    AvatarFallback,
-    AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -22,50 +18,46 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
-    useSidebar,
-} from "@/components/ui/sidebar"
-import type { SidebarUser } from "@/config/sidebar.config"
+} from '@/components/ui/dropdown-menu';
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import type { SidebarUser } from '@/config/sidebar.config';
+import { handleSignOut } from '@/app/actions/auth-actions';
 
-export function NavUser({
-                            user,
-                        }: {
-    user: SidebarUser
-}) {
-    const { isMobile } = useSidebar()
+export function NavUser({ user }: { user: SidebarUser }) {
+    const { isMobile } = useSidebar();
+    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    const handleLogoutClick = () => {
+        setShowLogoutDialog(true);
+    };
+
+    const confirmLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await handleSignOut();
+        } catch (error) {
+            console.error('Logout error:', error);
+            setShowLogoutDialog(false);
+        }
+        finally {
+            setIsLoggingOut(false);
+        }
+    };
 
     return (
-        <SidebarMenu>
-            <SidebarMenuItem>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <SidebarMenuButton
-                            size="lg"
-                            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                        >
-                            <Avatar className="h-8 w-8 rounded-lg">
-                                <AvatarImage src={user.avatar} alt={user.name} />
-                                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-                            </Avatar>
-                            <div className="grid flex-1 text-left text-sm leading-tight">
-                                <span className="truncate font-medium">{user.name}</span>
-                                <span className="truncate text-xs">{user.email}</span>
-                            </div>
-                            <ChevronsUpDown className="ml-auto size-4" />
-                        </SidebarMenuButton>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                        className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-                        side={isMobile ? "bottom" : "right"}
-                        align="end"
-                        sideOffset={4}
-                    >
-                        <DropdownMenuLabel className="p-0 font-normal">
-                            <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+        <>
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <SidebarMenuButton
+                                size="lg"
+                                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                            >
                                 <Avatar className="h-8 w-8 rounded-lg">
                                     <AvatarImage src={user.avatar} alt={user.name} />
                                     <AvatarFallback className="rounded-lg">CN</AvatarFallback>
@@ -74,38 +66,78 @@ export function NavUser({
                                     <span className="truncate font-medium">{user.name}</span>
                                     <span className="truncate text-xs">{user.email}</span>
                                 </div>
-                            </div>
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                            <DropdownMenuItem>
-                                <Sparkles />
-                                Upgrade to Pro
+                                <ChevronsUpDown className="ml-auto size-4" />
+                            </SidebarMenuButton>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+                            side={isMobile ? 'bottom' : 'right'}
+                            align="end"
+                            sideOffset={4}
+                        >
+                            <DropdownMenuLabel className="p-0 font-normal">
+                                <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                                    <Avatar className="h-8 w-8 rounded-lg">
+                                        <AvatarImage src={user.avatar} alt={user.name} />
+                                        <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                                    </Avatar>
+                                    <div className="grid flex-1 text-left text-sm leading-tight">
+                                        <div className="flex items-center gap-2">
+                                            <span className="truncate font-medium">{user.name}</span>
+                                            <Badge
+                                                variant={user.isAdmin ? 'default' : 'secondary'}
+                                                className="text-[10px] px-1.5 py-0"
+                                            >
+                                                {user.isAdmin ? 'ADMIN' : 'USER'}
+                                            </Badge>
+                                        </div>
+                                        <span className="truncate text-xs">{user.email}</span>
+                                    </div>
+                                </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuGroup>
+                                <DropdownMenuItem>
+                                    <BadgeCheck />
+                                    Account
+                                </DropdownMenuItem>
+                                {/* <DropdownMenuItem>
+                                    <CreditCard />
+                                    Billing
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                    <Bell />
+                                    Notifications
+                                </DropdownMenuItem> */}
+                            </DropdownMenuGroup>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={handleLogoutClick}>
+                                <LogOut />
+                                Log out
                             </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                            <DropdownMenuItem>
-                                <BadgeCheck />
-                                Account
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <CreditCard />
-                                Billing
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <Bell />
-                                Notifications
-                            </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                            <LogOut />
-                            Log out
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </SidebarMenuItem>
-        </SidebarMenu>
-    )
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </SidebarMenuItem>
+            </SidebarMenu>
+
+            <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Logout</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to log out? You&#39;ll need to sign in again to access your account.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowLogoutDialog(false)} disabled={isLoggingOut}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={confirmLogout} disabled={isLoggingOut}>
+                            {isLoggingOut ? 'Logging out...' : 'Log out'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
 }

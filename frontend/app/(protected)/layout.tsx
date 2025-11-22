@@ -1,5 +1,7 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/layout/app-sidebar';
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
     const session = await auth();
@@ -8,5 +10,10 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         redirect('/sign-in');
     }
 
-    return <>{children}</>;
+    return (
+        <SidebarProvider>
+            <AppSidebar />
+            {children}
+        </SidebarProvider>
+    );
 }

@@ -6,7 +6,6 @@ export default async function Home() {
     const currentTenant = await getCurrentTenantFromHeaders();
     return (
         <PageLayout className="" title="Home">
-            I am inside the protected layout
             <Card>
                 <CardTitle>{currentTenant}</CardTitle>
                 <CardHeader>{currentTenant}</CardHeader>
