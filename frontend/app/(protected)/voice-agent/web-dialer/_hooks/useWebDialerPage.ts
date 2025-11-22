@@ -14,6 +14,7 @@ export interface UseWebDialerPageReturn {
   phoneNumber: string;
   isInCall: boolean;
   isCallDisabled: boolean;
+  isMuted: boolean;
 
   // Actions
   handleDialpadClick: (value: string) => void;
@@ -22,6 +23,7 @@ export interface UseWebDialerPageReturn {
   handlePhoneNumberChange: (value: string) => void;
   makeCall: () => Promise<void>;
   hangup: () => void;
+  toggleMute: () => void;
 }
 
 /**
@@ -40,6 +42,7 @@ export function useWebDialerPage(): UseWebDialerPageReturn {
   const [identity, setIdentity] = useState<string>("");
   const [status, setStatus] = useState<string>("offline");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [isMuted, setIsMuted] = useState<boolean>(false);
 
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -135,12 +138,16 @@ export function useWebDialerPage(): UseWebDialerPageReturn {
 
     try {
       setStatus("calling");
+      setIsMuted(false);
       const call = await deviceRef.current.connect({
         params: { To: rawNumber },
       });
       callRef.current = call;
       setStatus("in-call");
-      call.on("disconnect", () => setStatus("registered"));
+      call.on("disconnect", () => {
+        setStatus("registered");
+        setIsMuted(false);
+      });
     } catch (e) {
       console.error(e);
       setStatus("call-error");
@@ -153,6 +160,15 @@ export function useWebDialerPage(): UseWebDialerPageReturn {
     } else if (deviceRef.current) {
       deviceRef.current.disconnectAll();
     }
+    setIsMuted(false);
+  }
+
+  function toggleMute() {
+    if (callRef.current) {
+      const newMutedState = !isMuted;
+      callRef.current.mute(newMutedState);
+      setIsMuted(newMutedState);
+    }
   }
 
   const isInCall = status === "in-call" || status === "calling";
@@ -164,11 +180,13 @@ export function useWebDialerPage(): UseWebDialerPageReturn {
     phoneNumber,
     isInCall,
     isCallDisabled,
+    isMuted,
     handleDialpadClick,
     handleDialpadLongPress,
     handleBackspace,
     handlePhoneNumberChange,
     makeCall,
     hangup,
+    toggleMute,
   };
 }

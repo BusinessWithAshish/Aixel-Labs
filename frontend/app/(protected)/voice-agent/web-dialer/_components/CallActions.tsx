@@ -1,20 +1,24 @@
 import { Button } from "@/components/ui/button";
-import { Phone, PhoneOff } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CallActionsProps {
   onCall: () => void;
   onHangup: () => void;
+  onToggleMute: () => void;
   isCallDisabled: boolean;
   isInCall: boolean;
+  isMuted: boolean;
   className?: string;
 }
 
 export function CallActions({
   onCall,
   onHangup,
+  onToggleMute,
   isCallDisabled,
   isInCall,
+  isMuted,
   className,
 }: CallActionsProps) {
   return (
@@ -40,18 +44,38 @@ export function CallActions({
           <Phone className="h-6 w-6 sm:h-7 sm:w-7" />
         </Button>
       ) : (
-        <Button
-          onClick={onHangup}
-          size="lg"
-          className={cn(
-            "h-14 w-14 sm:h-16 sm:w-16 rounded-full",
-            "bg-red-600 hover:bg-red-700 text-white",
-            "flex items-center justify-center",
-            "shadow-lg"
-          )}
-        >
-          <PhoneOff className="h-6 w-6 sm:h-7 sm:w-7" />
-        </Button>
+        <>
+          <Button
+            onClick={onToggleMute}
+            size="lg"
+            className={cn(
+              "h-14 w-14 sm:h-16 sm:w-16 rounded-full",
+              "flex items-center justify-center",
+              "shadow-lg",
+              isMuted
+                ? "bg-gray-600 hover:bg-gray-700 text-white"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+            )}
+          >
+            {isMuted ? (
+              <MicOff className="h-6 w-6 sm:h-7 sm:w-7" />
+            ) : (
+              <Mic className="h-6 w-6 sm:h-7 sm:w-7" />
+            )}
+          </Button>
+          <Button
+            onClick={onHangup}
+            size="lg"
+            className={cn(
+              "h-14 w-14 sm:h-16 sm:w-16 rounded-full",
+              "bg-red-600 hover:bg-red-700 text-white",
+              "flex items-center justify-center",
+              "shadow-lg"
+            )}
+          >
+            <PhoneOff className="h-6 w-6 sm:h-7 sm:w-7" />
+          </Button>
+        </>
       )}
     </div>
   );

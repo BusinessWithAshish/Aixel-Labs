@@ -14,12 +14,14 @@ export function WebDialerContent() {
     phoneNumber,
     isInCall,
     isCallDisabled,
+    isMuted,
     handleDialpadClick,
     handleDialpadLongPress,
     handleBackspace,
     handlePhoneNumberChange,
     makeCall,
     hangup,
+    toggleMute,
   } = usePage<UseWebDialerPageReturn>();
 
   return (
@@ -63,8 +65,10 @@ export function WebDialerContent() {
             <CallActions
               onCall={makeCall}
               onHangup={hangup}
+              onToggleMute={toggleMute}
               isCallDisabled={isCallDisabled}
               isInCall={isInCall}
+              isMuted={isMuted}
               className="pt-4"
             />
           </CardContent>
