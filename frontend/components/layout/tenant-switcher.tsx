@@ -45,6 +45,8 @@ export function TenantSwitcher({
 
     const ActiveLogo = getIcon(activeTenant.logo);
 
+    const activeTenantName = activeTenant.name.toLocaleUpperCase();
+
     if (!isAdmin) {
         return (
             <SidebarMenu>
@@ -54,7 +56,7 @@ export function TenantSwitcher({
                             {ActiveLogo && <ActiveLogo className="size-4" />}
                         </div>
                         <div className="grid flex-1 text-left text-sm leading-tight">
-                            <span className="truncate font-medium">{activeTenant.name.toUpperCase()}</span>
+                            <span className="truncate font-medium">{activeTenantName}</span>
                         </div>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -75,7 +77,7 @@ export function TenantSwitcher({
                                 {ActiveLogo && <ActiveLogo className="size-4" />}
                             </div>
                             <div className="grid flex-1 text-left text-sm leading-tight">
-                                <span className="truncate font-medium">{activeTenant.name}</span>
+                                <span className="truncate font-medium">{activeTenantName}</span>
                             </div>
                             <ChevronsUpDown className="ml-auto" />
                         </SidebarMenuButton>
@@ -87,7 +89,8 @@ export function TenantSwitcher({
                         sideOffset={4}
                     >
                         <DropdownMenuLabel className="text-muted-foreground text-xs">Tenants</DropdownMenuLabel>
-                        {tenants.map((tenant, index) => {
+                        {tenants.map((tenant) => {
+                            const tenantName = tenant.name.toLocaleUpperCase();
                             const TenantLogo = getIcon(tenant.logo);
                             return (
                                 <DropdownMenuItem
@@ -98,8 +101,8 @@ export function TenantSwitcher({
                                     <div className="flex size-6 items-center justify-center rounded-md border">
                                         {TenantLogo && <TenantLogo className="size-3.5 shrink-0" />}
                                     </div>
-                                    {tenant.name}
-                                    <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
+                                    {tenant.name.toLocaleUpperCase()}
+                                    <DropdownMenuShortcut>⌘{tenantName.charCodeAt(0)}</DropdownMenuShortcut>
                                 </DropdownMenuItem>
                             );
                         })}
@@ -108,7 +111,7 @@ export function TenantSwitcher({
                             <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
                                 <Plus className="size-4" />
                             </div>
-                            <div className="text-muted-foreground font-medium">Manage tenants</div>
+                            <div className="text-muted-foreground font-medium">Manage Tenants</div>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
