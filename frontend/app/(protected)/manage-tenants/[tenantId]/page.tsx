@@ -3,23 +3,18 @@ import { PageProvider } from '@/contexts/PageStore';
 import { TenantUsersContent } from './_components';
 import { useTenantUsersPage } from './_hooks';
 import { withAdminOnly } from '@/components/hocs/with-admin';
-import { getAllTenants } from '@/helpers/tenant-operations';
+import { getUsersByTenantId } from '@/helpers/user-operations';
 
 const PAGE_TITLE = 'Tenant Users';
 
-type TenantUsersPageProps = {
-    params: Promise<{ tenantId: string }>;
-};
-
-async function TenantUsersPage({ params }: TenantUsersPageProps) {
+async function TenantUsersPage({ params }: { params: Promise<{ tenantId: string }> }) {
     const { tenantId } = await params;
 
-    const tenants = await getAllTenants();
-    const tenant = tenants.find((t) => t._id === tenantId);
-    const pageTitle = tenant ? `Users - ${tenant.name}` : PAGE_TITLE;
+    const users = await getUsersByTenantId(tenantId);
+    const pageTitle = `Users - ${tenantId.toLocaleUpperCase()}`;
 
     return (
-        <PageProvider usePageHook={() => useTenantUsersPage(tenantId)}>
+        <PageProvider data={users} usePageHook={useTenantUsersPage}>
             <PageLayout title={pageTitle}>
                 <TenantUsersContent />
             </PageLayout>

@@ -11,24 +11,19 @@ import { deleteTenant, type Tenant } from '@/helpers/tenant-operations';
 import { usePage } from '@/contexts/PageStore';
 import { toast } from 'sonner';
 import type { UseManageTenantsPageReturn } from '@/app/(protected)/manage-tenants/_hooks';
+import { useRouter } from 'next/navigation';
 
 export function ManageTenantsContent() {
-    const {
-        isCreateDialogOpen,
-        setIsCreateDialogOpen,
-        tenants,
-        isLoading,
-        editingTenant,
-        setEditingTenant,
-        refreshTenants,
-    } = usePage<UseManageTenantsPageReturn>();
+    const { isCreateDialogOpen, setIsCreateDialogOpen, tenants, editingTenant, setEditingTenant } =
+        usePage<UseManageTenantsPageReturn>();
+    const router = useRouter();
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
     const handleTenantClick = (tenant: (typeof tenants)[0]) => {
-        window.location.href = `/manage-tenants/${tenant._id}`;
+        router.push(`/manage-tenants/${tenant.name}`);
     };
 
     const handleEditTenant = (tenant: (typeof tenants)[0]) => {
@@ -50,7 +45,6 @@ export function ManageTenantsContent() {
             toast.success('Tenant deleted successfully');
             setDeleteDialogOpen(false);
             setTenantToDelete(null);
-            refreshTenants();
         } else {
             toast.error('Failed to delete tenant');
         }
@@ -61,10 +55,6 @@ export function ManageTenantsContent() {
         setIsCreateDialogOpen(false);
         setEditingTenant(null);
     };
-
-    if (isLoading) {
-        return <CommonLoader size="lg" text="Loading tenants..." />;
-    }
 
     return (
         <>
@@ -85,7 +75,7 @@ export function ManageTenantsContent() {
                 open={isCreateDialogOpen}
                 onOpenChange={handleDialogClose}
                 editingTenant={editingTenant}
-                onSuccess={refreshTenants}
+                onSuccess={() => {}}
             />
 
             <DeleteConfirmDialog

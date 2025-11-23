@@ -2,14 +2,12 @@
 
 import { UserCard } from '../../_components/UserCard';
 import { EditUserDialog } from '../../_components/EditUserDialog';
-import { CommonLoader } from '@/components/common/CommonLoader';
 import { usePage } from '@/contexts/PageStore';
 import type { UseTenantUsersPageReturn } from '../_hooks';
+import { NoDataFound } from '@/components/common/NoDataFound';
 
 export function TenantUsersContent() {
-    const { users, isLoading, error, editingUser, setEditingUser, refreshUsers } =
-        usePage<UseTenantUsersPageReturn>();
-
+    const { users, editingUser, setEditingUser } = usePage<UseTenantUsersPageReturn>();
     const handleEditUser = (user: (typeof users)[0]) => {
         setEditingUser(user);
     };
@@ -18,24 +16,8 @@ export function TenantUsersContent() {
         setEditingUser(null);
     };
 
-    if (isLoading) {
-        return <CommonLoader size="lg" text="Loading users..." />;
-    }
-
-    if (error) {
-        return (
-            <div className="flex items-center justify-center p-6">
-                <p className="text-destructive">{error}</p>
-            </div>
-        );
-    }
-
     if (users.length === 0) {
-        return (
-            <div className="flex items-center justify-center p-6">
-                <p className="text-muted-foreground">No users found for this tenant.</p>
-            </div>
-        );
+        return <NoDataFound />;
     }
 
     return (
@@ -46,12 +28,7 @@ export function TenantUsersContent() {
                 ))}
             </div>
 
-            <EditUserDialog
-                open={!!editingUser}
-                onOpenChange={handleDialogClose}
-                user={editingUser}
-                onSuccess={refreshUsers}
-            />
+            <EditUserDialog open={!!editingUser} onOpenChange={handleDialogClose} user={editingUser} onSuccess={() => {}} />
         </>
     );
 }
