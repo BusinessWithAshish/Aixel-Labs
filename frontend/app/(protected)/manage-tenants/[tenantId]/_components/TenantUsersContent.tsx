@@ -1,8 +1,8 @@
 'use client';
 
 import { useRouter, useParams } from 'next/navigation';
-import { UserCard } from '../../_components/UserCard';
-import { AddUserCard } from '../../_components/AddUserCard';
+import { UserCard } from './UserCard';
+import { AddUserCard } from './AddUserCard';
 import { UserDialog } from './EditUserDialog';
 import { usePage } from '@/contexts/PageStore';
 import type { UseTenantUsersPageReturn } from '../_hooks';
