@@ -11,6 +11,14 @@ export type User = {
     tenantId: string;
 };
 
+export type CreateUserInput = {
+    email: string;
+    password: string;
+    name?: string;
+    isAdmin?: boolean;
+    tenantId: string;
+};
+
 export type UpdateUserInput = {
     name?: string;
     isAdmin?: boolean;
@@ -41,6 +49,46 @@ export const getUsersByTenantId = async (tenantId: string): Promise<User[]> => {
         );
     } catch {
         return [];
+    }
+};
+
+export const createUser = async (input: CreateUserInput): Promise<User | null> => {
+    try {
+        if (!input.email || !input.password || !input.tenantId) return null;
+
+        const collection = await getCollection<Document>('users');
+
+        // Check if user already exists with this email and tenantId
+        const existingUser = await collection.findOne({
+            email: input.email.trim().toLowerCase(),
+            tenantId: input.tenantId,
+        });
+
+        if (existingUser) {
+            return null; // User already exists
+        }
+
+        const doc: UserDoc = {
+            email: input.email.trim().toLowerCase(),
+            password: input.password,
+            name: input.name?.trim(),
+            isAdmin: Boolean(input.isAdmin),
+            tenantId: input.tenantId,
+        };
+
+        const result = await collection.insertOne(doc);
+
+        return JSON.parse(
+            JSON.stringify({
+                _id: result.insertedId.toString(),
+                email: doc.email,
+                name: doc.name,
+                isAdmin: doc.isAdmin,
+                tenantId: doc.tenantId,
+            }),
+        );
+    } catch {
+        return null;
     }
 };
 

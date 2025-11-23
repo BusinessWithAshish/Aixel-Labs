@@ -1,24 +1,36 @@
 'use client';
 
+import { useRouter, useParams } from 'next/navigation';
 import { UserCard } from '../../_components/UserCard';
-import { EditUserDialog } from '../../_components/EditUserDialog';
+import { AddUserCard } from '../../_components/AddUserCard';
+import { UserDialog } from './EditUserDialog';
 import { usePage } from '@/contexts/PageStore';
 import type { UseTenantUsersPageReturn } from '../_hooks';
 import { NoDataFound } from '@/components/common/NoDataFound';
 
 export function TenantUsersContent() {
+    const router = useRouter();
+    const params = useParams();
+    const tenantId = params?.tenantId as string;
     const { users, editingUser, setEditingUser } = usePage<UseTenantUsersPageReturn>();
+
     const handleEditUser = (user: (typeof users)[0]) => {
         setEditingUser(user);
     };
 
-    const handleDialogClose = () => {
+    const handleAddUser = () => {
         setEditingUser(null);
     };
 
-    if (users.length === 0) {
-        return <NoDataFound />;
-    }
+    const handleDialogClose = () => {
+        setEditingUser(undefined);
+    };
+
+    const handleSuccess = () => {
+        router.refresh();
+    };
+
+    const isDialogOpen = editingUser !== undefined;
 
     return (
         <>
@@ -26,9 +38,16 @@ export function TenantUsersContent() {
                 {users.map((user) => (
                     <UserCard key={user._id} user={user} onEdit={() => handleEditUser(user)} />
                 ))}
+                <AddUserCard onClick={handleAddUser} />
             </div>
 
-            <EditUserDialog open={!!editingUser} onOpenChange={handleDialogClose} user={editingUser} onSuccess={() => {}} />
+            <UserDialog
+                open={isDialogOpen}
+                onOpenChange={handleDialogClose}
+                user={editingUser ?? null}
+                tenantId={tenantId}
+                onSuccess={handleSuccess}
+            />
         </>
     );
 }

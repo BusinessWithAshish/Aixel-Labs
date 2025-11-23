@@ -22,9 +22,9 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import type { SidebarUser } from '@/config/sidebar.config';
 import { handleSignOut } from '@/app/actions/auth-actions';
+import { UserRoleBadge } from '@/components/common/UserRoleBadge';
 
 export function NavUser({ user }: { user: SidebarUser }) {
     const { isMobile } = useSidebar();
@@ -42,8 +42,7 @@ export function NavUser({ user }: { user: SidebarUser }) {
         } catch (error) {
             console.error('Logout error:', error);
             setShowLogoutDialog(false);
-        }
-        finally {
+        } finally {
             setIsLoggingOut(false);
         }
     };
@@ -84,12 +83,7 @@ export function NavUser({ user }: { user: SidebarUser }) {
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <div className="flex items-center gap-2">
                                             <span className="truncate font-medium">{user.name}</span>
-                                            <Badge
-                                                variant={user.isAdmin ? 'default' : 'secondary'}
-                                                className="text-[10px] px-1.5 py-0"
-                                            >
-                                                {user.isAdmin ? 'ADMIN' : 'USER'}
-                                            </Badge>
+                                            <UserRoleBadge isAdmin={user.isAdmin} />
                                         </div>
                                         <span className="truncate text-xs">{user.email}</span>
                                     </div>
