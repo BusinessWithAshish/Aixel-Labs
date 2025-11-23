@@ -49,6 +49,11 @@ export default function IframeEmbed({
 }: IframeEmbedProps) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     useEffect(() => {
         // Reset states when src changes
@@ -69,13 +74,14 @@ export default function IframeEmbed({
     };
 
     const defaultLoadingComponent = () => {
-        const currentTenant = getTenantCurrentByUrl()?.toUpperCase();
+        // Only get tenant name after component has mounted to avoid hydration mismatch
+        const currentTenant = mounted ? getTenantCurrentByUrl()?.toUpperCase() : '';
         return (
             <div className="flex items-center justify-center h-full bg-gray-50">
                 <div className="text-center">
                     <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600 mb-4"></div>
                     <p className="text-gray-600 text-sm">
-                        {currentTenant} loading your demo... This may take a few seconds.
+                        {currentTenant && `${currentTenant} `}Loading your demo... This may take a few seconds.
                     </p>
                 </div>
             </div>
@@ -83,7 +89,8 @@ export default function IframeEmbed({
     };
 
     const defaultErrorComponent = () => {
-        const currentTenant = getTenantCurrentByUrl()?.toUpperCase();
+        // Only get tenant name after component has mounted to avoid hydration mismatch
+        const currentTenant = mounted ? getTenantCurrentByUrl()?.toUpperCase() : '';
         return (
             <div className="flex items-center justify-center h-full bg-gray-50">
                 <div className="text-center max-w-md px-4">
@@ -99,7 +106,7 @@ export default function IframeEmbed({
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Content</h3>
                     <p className="text-gray-600 text-sm mb-4">
-                        Unable to load the content for {currentTenant}. Please try again later.
+                        Unable to load the content{currentTenant && ` for ${currentTenant}`}. Please try again later.
                     </p>
                     <button
                         onClick={() => window.location.reload()}
@@ -147,6 +154,7 @@ export default function IframeEmbed({
 export function LovableEmbed({ src, showBranding = true }: { src: string; showBranding?: boolean }) {
     const appName = process.env.NEXT_PUBLIC_APP_NAME || 'AixelLabs';
     const sandboxRulesConfig = [
+        'allow-same-origin',
         'allow-scripts',
         'allow-forms',
         'allow-popups',
