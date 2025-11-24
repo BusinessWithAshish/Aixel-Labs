@@ -17,6 +17,7 @@ type TenantCardProps = {
 };
 
 export function TenantCard({ tenant, onClick, onEdit, onDelete, className }: TenantCardProps) {
+    const isDeployedTenant = !!tenant.redirect_url;
     const [isHovered, setIsHovered] = useState(false);
     const tenantUrl = getTenantRedirectUrl(tenant);
 
@@ -34,6 +35,7 @@ export function TenantCard({ tenant, onClick, onEdit, onDelete, className }: Ten
         <Card
             className={cn(
                 'relative flex flex-col items-center justify-center p-6 cursor-pointer transition-all hover:shadow-lg hover:scale-105',
+                isDeployedTenant && 'cursor-not-allowed bg-muted',
                 className,
             )}
             onClick={onClick}
