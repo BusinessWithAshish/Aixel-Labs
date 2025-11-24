@@ -6,7 +6,6 @@ import { AddUserCard } from './AddUserCard';
 import { UserDialog } from './EditUserDialog';
 import { usePage } from '@/contexts/PageStore';
 import type { UseTenantUsersPageReturn } from '../_hooks';
-import { NoDataFound } from '@/components/common/NoDataFound';
 
 export function TenantUsersContent() {
     const router = useRouter();

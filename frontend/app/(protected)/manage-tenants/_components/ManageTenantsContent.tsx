@@ -5,8 +5,6 @@ import { TenantCard } from './TenantCard';
 import { CreateTenantCard } from './CreateTenantCard';
 import { CreateTenantDialog } from './CreateTenantDialog';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
-import { CommonLoader } from '@/components/common/CommonLoader';
-import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
 import { deleteTenant, type Tenant } from '@/helpers/tenant-operations';
 import { usePage } from '@/contexts/PageStore';
 import { toast } from 'sonner';
@@ -17,6 +15,10 @@ export function ManageTenantsContent() {
     const { isCreateDialogOpen, setIsCreateDialogOpen, tenants, editingTenant, setEditingTenant } =
         usePage<UseManageTenantsPageReturn>();
     const router = useRouter();
+
+    const dontAllowClickOrEdit = (tenant: Tenant) => {
+        return !!tenant.redirect_url;
+    };
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
@@ -63,8 +65,8 @@ export function ManageTenantsContent() {
                     <TenantCard
                         key={tenant._id}
                         tenant={tenant}
-                        onClick={() => handleTenantClick(tenant)}
-                        onEdit={() => handleEditTenant(tenant)}
+                        onClick={dontAllowClickOrEdit(tenant) ? undefined : () => handleTenantClick(tenant)}
+                        onEdit={dontAllowClickOrEdit(tenant) ? undefined : () => handleEditTenant(tenant)}
                         onDelete={() => handleDeleteClick(tenant)}
                     />
                 ))}
