@@ -102,7 +102,7 @@ export function ManageTenantsContent() {
                 open={isCreateDialogOpen}
                 onOpenChange={handleDialogClose}
                 editingTenant={editingTenant}
-                onSuccess={() => {}}
+                onSuccess={() => router.refresh()}
             />
 
             <DeleteConfirmDialog

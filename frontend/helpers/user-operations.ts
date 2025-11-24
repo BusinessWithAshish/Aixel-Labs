@@ -108,15 +108,16 @@ export const updateUser = async (id: string, input: UpdateUserInput): Promise<Us
             { returnDocument: 'after' },
         );
 
-        if (!result) return null;
+        const updated = result?.value ?? null;
+        if (!updated) return null;
 
         return JSON.parse(
             JSON.stringify({
-                _id: result._id.toString(),
-                email: result.email,
-                name: result.name,
-                isAdmin: Boolean(result.isAdmin),
-                tenantId: result.tenantId,
+                _id: updated._id.toString(),
+                email: updated.email,
+                name: updated.name,
+                isAdmin: Boolean(updated.isAdmin),
+                tenantId: updated.tenantId,
             }),
         );
     } catch {
