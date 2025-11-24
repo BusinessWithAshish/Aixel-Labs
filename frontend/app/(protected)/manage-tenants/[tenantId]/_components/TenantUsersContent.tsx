@@ -51,28 +51,33 @@ export function TenantUsersContent() {
 
     return (
         <>
-            <div className="flex flex-col gap-4 p-6">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="max-w-md">
+            <div className="flex flex-col gap-4 p-4 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="w-full sm:max-w-md sm:flex-1">
                         <Input
-                            placeholder="Search users by name or email"
+                            placeholder="Search users..."
+                            className="w-full"
                             value={searchQuery}
                             onChange={(event) => setSearchQuery(event.target.value)}
                         />
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 sm:shrink-0">
                         <Checkbox
                             id="admins-only"
                             checked={showAdminsOnly}
                             onCheckedChange={(checked) => setShowAdminsOnly(checked === true)}
+                            className="shrink-0"
                         />
-                        <Label htmlFor="admins-only" className="text-sm text-muted-foreground">
+                        <Label
+                            htmlFor="admins-only"
+                            className="text-sm text-muted-foreground whitespace-nowrap cursor-pointer"
+                        >
                             Admins only
                         </Label>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {filteredUsers.map((user) => (
                         <UserCard key={user._id} user={user} onEdit={() => handleEditUser(user)} />
                     ))}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -36,12 +36,10 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
     const isEditMode = !!user;
 
     const {
-        register,
+        control,
         handleSubmit,
         formState: { errors, isSubmitting },
         reset,
-        setValue,
-        watch,
     } = useForm<UserFormData>({
         resolver: zodResolver(userSchema),
         defaultValues: {
@@ -52,23 +50,23 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
         },
     });
 
-    const isAdmin = watch('isAdmin');
-
     useEffect(() => {
-        if (isEditMode && user && open) {
-            reset({
-                email: user.email,
-                password: '', // Not used in edit mode
-                name: user.name || '',
-                isAdmin: user.isAdmin || false,
-            });
-        } else if (!isEditMode && open) {
-            reset({
-                email: '',
-                password: '',
-                name: '',
-                isAdmin: false,
-            });
+        if (open) {
+            if (isEditMode && user) {
+                reset({
+                    email: user.email || '',
+                    password: '', // Not used in edit mode
+                    name: user.name || '',
+                    isAdmin: user.isAdmin ?? false,
+                });
+            } else {
+                reset({
+                    email: '',
+                    password: '',
+                    name: '',
+                    isAdmin: false,
+                });
+            }
         }
     }, [user, open, isEditMode, reset]);
 
@@ -121,7 +119,12 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
 
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
-            reset();
+            reset({
+                email: '',
+                password: '',
+                name: '',
+                isAdmin: false,
+            });
         }
         onOpenChange(newOpen);
     };
@@ -155,12 +158,19 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                                     </>
                                 ) : (
                                     <>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            placeholder="Enter user email"
-                                            {...register('email')}
-                                            aria-invalid={errors.email ? 'true' : 'false'}
+                                        <Controller
+                                            name="email"
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Input
+                                                    id="email"
+                                                    type="email"
+                                                    placeholder="Enter user email"
+                                                    value={field.value || ''}
+                                                    onChange={(e) => field.onChange(e.target.value)}
+                                                    aria-invalid={errors.email ? 'true' : 'false'}
+                                                />
+                                            )}
                                         />
                                         <FieldError errors={errors.email ? [errors.email] : undefined} />
                                     </>
@@ -172,12 +182,19 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                             <Field>
                                 <FieldLabel htmlFor="password">Password</FieldLabel>
                                 <FieldContent>
-                                    <Input
-                                        id="password"
-                                        type="password"
-                                        placeholder="Enter password (min 6 characters)"
-                                        {...register('password')}
-                                        aria-invalid={errors.password ? 'true' : 'false'}
+                                    <Controller
+                                        name="password"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Input
+                                                id="password"
+                                                type="password"
+                                                placeholder="Enter password (min 6 characters)"
+                                                value={field.value || ''}
+                                                onChange={(e) => field.onChange(e.target.value)}
+                                                aria-invalid={errors.password ? 'true' : 'false'}
+                                            />
+                                        )}
                                     />
                                     <FieldError errors={errors.password ? [errors.password] : undefined} />
                                 </FieldContent>
@@ -187,12 +204,19 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                         <Field>
                             <FieldLabel htmlFor="name">Name</FieldLabel>
                             <FieldContent>
-                                <Input
-                                    id="name"
-                                    type="text"
-                                    placeholder="Enter user name"
-                                    {...register('name')}
-                                    aria-invalid={errors.name ? 'true' : 'false'}
+                                <Controller
+                                    name="name"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Input
+                                            id="name"
+                                            type="text"
+                                            placeholder="Enter user name"
+                                            value={field.value || ''}
+                                            onChange={(e) => field.onChange(e.target.value)}
+                                            aria-invalid={errors.name ? 'true' : 'false'}
+                                        />
+                                    )}
                                 />
                                 <FieldError errors={errors.name ? [errors.name] : undefined} />
                             </FieldContent>
@@ -200,18 +224,22 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
 
                         <Field orientation="horizontal">
                             <FieldContent>
-                                <div className="flex items-center gap-2">
-                                    <Checkbox
-                                        id="isAdmin"
-                                        checked={isAdmin}
-                                        onCheckedChange={(checked) =>
-                                            setValue('isAdmin', checked === true, { shouldValidate: true })
-                                        }
-                                    />
-                                    <FieldLabel htmlFor="isAdmin" className="cursor-pointer font-normal">
-                                        Admin privileges
-                                    </FieldLabel>
-                                </div>
+                                <Controller
+                                    name="isAdmin"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox
+                                                id="isAdmin"
+                                                checked={field.value}
+                                                onCheckedChange={(checked) => field.onChange(checked === true)}
+                                            />
+                                            <FieldLabel htmlFor="isAdmin" className="cursor-pointer font-normal">
+                                                Admin privileges
+                                            </FieldLabel>
+                                        </div>
+                                    )}
+                                />
                                 <FieldDescription>Grant administrative access to this user</FieldDescription>
                                 <FieldError errors={errors.isAdmin ? [errors.isAdmin] : undefined} />
                             </FieldContent>

@@ -25,7 +25,7 @@ export function UserCard({ user, onEdit, className }: UserCardProps) {
     return (
         <Card
             className={cn(
-                'relative flex items-start gap-4 p-4 transition-all hover:shadow-md max-w-sm',
+                'relative flex items-start gap-2 sm:gap-4 p-3 sm:p-4 transition-all hover:shadow-md w-full overflow-hidden',
                 className,
             )}
             onMouseEnter={() => setIsHovered(true)}
@@ -37,32 +37,36 @@ export function UserCard({ user, onEdit, className }: UserCardProps) {
                     size="icon"
                     variant="ghost"
                     className={cn(
-                        'absolute top-2 right-2 h-8 w-8 shadow-sm hover:bg-secondary cursor-pointer z-10',
+                        'absolute top-1.5 right-1.5 sm:top-2 sm:right-2 h-7 w-7 sm:h-8 sm:w-8 shadow-sm hover:bg-secondary cursor-pointer z-10',
                         'max-md:flex',
-                        !isHovered && 'md:hidden'
+                        !isHovered && 'md:hidden',
                     )}
                     onClick={handleEditClick}
                 >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
             )}
 
             {/* Admin badge - bottom right */}
-            <div className="absolute bottom-2 right-2 z-10">
+            <div className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 z-10">
                 <UserRoleBadge isAdmin={user.isAdmin} />
             </div>
 
             {/* User icon - left */}
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 flex-shrink-0">
-                <UserIcon className="w-6 h-6 text-primary" />
+            <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex-shrink-0">
+                <UserIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
             </div>
 
             {/* Content - left aligned */}
-            <div className="flex-1 min-w-0 pr-16">
-                <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-base font-semibold truncate">{user.name || 'No Name'}</h3>
+            <div className="flex-1 min-w-0 pr-12 sm:pr-16 md:pr-20 overflow-hidden">
+                <div className="flex items-center gap-2 mb-1 min-w-0">
+                    <h3 className="text-sm sm:text-base font-semibold truncate" title={user.name || 'No Name'}>
+                        {user.name || 'No Name'}
+                    </h3>
                 </div>
-                <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate" title={user.email}>
+                    {user.email}
+                </p>
             </div>
         </Card>
     );
