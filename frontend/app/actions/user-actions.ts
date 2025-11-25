@@ -1,6 +1,6 @@
 'use server';
 
-import { createUser, updateUser, type CreateUserInput, type UpdateUserInput } from '@/helpers/user-operations';
+import { createUser, updateUser, deleteUser, type CreateUserInput, type UpdateUserInput } from '@/helpers/user-operations';
 
 export type CreateUserResult = {
     success: boolean;
@@ -69,6 +69,41 @@ export async function updateUserAction(id: string, input: UpdateUserInput): Prom
         };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to update user';
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
+}
+
+export type DeleteUserResult = {
+    success: boolean;
+    error?: string;
+};
+
+export async function deleteUserAction(id: string): Promise<DeleteUserResult> {
+    try {
+        if (!id) {
+            return {
+                success: false,
+                error: 'User ID is required',
+            };
+        }
+
+        const deleted = await deleteUser(id);
+
+        if (!deleted) {
+            return {
+                success: false,
+                error: 'User not found or deletion failed',
+            };
+        }
+
+        return {
+            success: true,
+        };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
         return {
             success: false,
             error: errorMessage,

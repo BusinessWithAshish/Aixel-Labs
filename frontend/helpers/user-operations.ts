@@ -28,14 +28,24 @@ type UserDoc = {
     email: string;
     name?: string;
     isAdmin: boolean;
-    tenantId: string;
+    tenantId: ObjectId;
     password: string;
 };
 
 export const getUsersByTenantId = async (tenantId: string): Promise<User[]> => {
     try {
         const collection = await getCollection<Document>('users');
-        const users = await collection.find({ tenantId }).toArray();
+        const tenantsCollection = await getCollection<Document>('tenants');
+        
+        // Find the tenant by name to get its ObjectId
+        const tenant = await tenantsCollection.findOne({ name: tenantId });
+        
+        if (!tenant) {
+            return [];
+        }
+        
+        // Query users using the tenant's ObjectId
+        const users = await collection.find({ tenantId: tenant._id }).toArray();
         return JSON.parse(
             JSON.stringify(
                 users.map((user) => ({
@@ -43,7 +53,7 @@ export const getUsersByTenantId = async (tenantId: string): Promise<User[]> => {
                     email: user.email,
                     name: user.name,
                     isAdmin: Boolean(user.isAdmin),
-                    tenantId: user.tenantId,
+                    tenantId: tenantId, // Return the tenant name as string
                 })),
             ),
         );
@@ -57,11 +67,21 @@ export const createUser = async (input: CreateUserInput): Promise<User | null> =
         if (!input.email || !input.password || !input.tenantId) return null;
 
         const collection = await getCollection<Document>('users');
+        const tenantsCollection = await getCollection<Document>('tenants');
+
+        // Find the tenant by name to get its ObjectId
+        const tenant = await tenantsCollection.findOne({ name: input.tenantId });
+        
+        if (!tenant) {
+            return null; // Tenant doesn't exist
+        }
+        
+        const tenantObjectId = tenant._id;
 
         // Check if user already exists with this email and tenantId
         const existingUser = await collection.findOne({
             email: input.email.trim().toLowerCase(),
-            tenantId: input.tenantId,
+            tenantId: tenantObjectId,
         });
 
         if (existingUser) {
@@ -73,7 +93,7 @@ export const createUser = async (input: CreateUserInput): Promise<User | null> =
             password: input.password,
             name: input.name?.trim(),
             isAdmin: Boolean(input.isAdmin),
-            tenantId: input.tenantId,
+            tenantId: tenantObjectId,
         };
 
         const result = await collection.insertOne(doc);
@@ -84,7 +104,7 @@ export const createUser = async (input: CreateUserInput): Promise<User | null> =
                 email: doc.email,
                 name: doc.name,
                 isAdmin: doc.isAdmin,
-                tenantId: doc.tenantId,
+                tenantId: input.tenantId, // Return the tenant name as string
             }),
         );
     } catch {
@@ -97,6 +117,7 @@ export const updateUser = async (id: string, input: UpdateUserInput): Promise<Us
         if (!ObjectId.isValid(id)) return null;
 
         const collection = await getCollection<Document>('users');
+        const tenantsCollection = await getCollection<Document>('tenants');
 
         const updateFields: Partial<UserDoc> = {};
         if (input.name !== undefined) updateFields.name = input.name;
@@ -111,16 +132,33 @@ export const updateUser = async (id: string, input: UpdateUserInput): Promise<Us
         const updated = result?.value ?? null;
         if (!updated) return null;
 
+        // Find the tenant name from the ObjectId
+        const tenant = await tenantsCollection.findOne({ _id: updated.tenantId });
+        const tenantName = tenant?.name || '';
+
         return JSON.parse(
             JSON.stringify({
                 _id: updated._id.toString(),
                 email: updated.email,
                 name: updated.name,
                 isAdmin: Boolean(updated.isAdmin),
-                tenantId: updated.tenantId,
+                tenantId: tenantName, // Return the tenant name as string
             }),
         );
     } catch {
         return null;
+    }
+};
+
+export const deleteUser = async (id: string): Promise<boolean> => {
+    try {
+        if (!ObjectId.isValid(id)) return false;
+
+        const collection = await getCollection<Document>('users');
+        const result = await collection.deleteOne({ _id: new ObjectId(id) });
+
+        return result.deletedCount === 1;
+    } catch {
+        return false;
     }
 };

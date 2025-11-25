@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Pencil, User as UserIcon } from 'lucide-react';
+import { Pencil, Trash2, User as UserIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@/helpers/user-operations';
 import { UserRoleBadge } from '@/components/common/UserRoleBadge';
@@ -11,15 +11,21 @@ import { UserRoleBadge } from '@/components/common/UserRoleBadge';
 type UserCardProps = {
     user: User;
     onEdit?: () => void;
+    onDelete?: () => void;
     className?: string;
 };
 
-export function UserCard({ user, onEdit, className }: UserCardProps) {
+export function UserCard({ user, onEdit, onDelete, className }: UserCardProps) {
     const [isHovered, setIsHovered] = useState(false);
 
     const handleEditClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         onEdit?.();
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onDelete?.();
     };
 
     return (
@@ -31,21 +37,35 @@ export function UserCard({ user, onEdit, className }: UserCardProps) {
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            {/* Pencil icon - top right */}
-            {onEdit && (
-                <Button
-                    size="icon"
-                    variant="ghost"
-                    className={cn(
-                        'absolute top-1.5 right-1.5 sm:top-2 sm:right-2 h-7 w-7 sm:h-8 sm:w-8 shadow-sm hover:bg-secondary cursor-pointer z-10',
-                        'max-md:flex',
-                        !isHovered && 'md:hidden',
-                    )}
-                    onClick={handleEditClick}
-                >
-                    <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </Button>
-            )}
+            {/* Action buttons - top right */}
+            <div
+                className={cn(
+                    'absolute top-1.5 right-1.5 sm:top-2 sm:right-2 flex gap-1 z-10',
+                    'max-md:flex',
+                    !isHovered && 'md:hidden',
+                )}
+            >
+                {onEdit && (
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 sm:h-8 sm:w-8 shadow-sm hover:bg-secondary cursor-pointer"
+                        onClick={handleEditClick}
+                    >
+                        <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
+                )}
+                {onDelete && (
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 sm:h-8 sm:w-8 shadow-sm hover:bg-secondary hover:text-red-500 cursor-pointer"
+                        onClick={handleDeleteClick}
+                    >
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
+                )}
+            </div>
 
             {/* Admin badge - bottom right */}
             <div className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 z-10">

@@ -66,6 +66,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     const { email, password, tenantId } = await signInSchema.parseAsync(rawCreds);
 
                     const users = await getCollection('users');
+                    const tenants = await getCollection('tenants');
+
+                    // Find the tenant by name to get its ObjectId
+                    const tenant = await tenants.findOne({ name: tenantId });
+                    
+                    if (!tenant) {
+                        // Tenant doesn't exist
+                        throw new UserNotInTenantError();
+                    }
+
+                    const tenantObjectId = tenant._id;
 
                     // Check if user exists with this email (regardless of tenant)
                     const userByEmail = await users.findOne({ email });
@@ -75,8 +86,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         throw new UserNotFoundError();
                     }
 
-                    // Check if user exists with this email AND tenant
-                    const user = await users.findOne({ email, tenantId });
+                    // Check if user exists with this email AND tenant (tenantId is now ObjectId)
+                    const user = await users.findOne({ 
+                        email, 
+                        tenantId: tenantObjectId 
+                    });
 
                     if (!user) {
                         // User exists but not for this tenant
@@ -93,7 +107,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         email: user.email as string,
                         name: user.name as string | undefined,
                         isAdmin: Boolean(user.isAdmin),
-                        tenantId: user.tenantId as string,
+                        tenantId: tenantId, // Return the tenant name as string for the session
                     };
                 } catch (error) {
                     // Re-throw custom credential errors
