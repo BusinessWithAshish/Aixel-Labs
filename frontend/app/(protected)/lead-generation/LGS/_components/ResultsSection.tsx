@@ -16,19 +16,35 @@ import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared
 type SortKey = 'rating' | 'reviews';
 type SortDirection = 'asc' | 'desc';
 
-const extractNumericValue = (value: string): number => {
-    if (!value || value === 'N/A' || value === '') return 0;
-    const normalized = value.replace(/[^\d.]/g, '');
-    const numeric = parseFloat(normalized);
-    return Number.isFinite(numeric) ? numeric : 0;
+const extractNumericValue = (value: string, isRating: boolean): number => {
+    if (!value || value === 'N/A' || value === '' || value === null || value === undefined) {
+        return -1;
+    }
+    
+    const stringValue = String(value);
+    const normalized = stringValue.replace(/[^\d.]/g, '');
+    
+    if (!normalized || normalized === '') {
+        return -1;
+    }
+    
+    const numeric = isRating ? parseFloat(normalized) : parseInt(normalized, 10);
+    return Number.isFinite(numeric) && numeric >= 0 ? numeric : -1;
 };
 
 const sortLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[], sortKey: SortKey, sortDirection: SortDirection): GMAPS_SCRAPE_LEAD_INFO[] => {
+    const isRating = sortKey === 'rating';
+    
     return [...leads].sort((a, b) => {
-        const aValue = extractNumericValue(sortKey === 'rating' ? a.overAllRating : a.numberOfReviews);
-        const bValue = extractNumericValue(sortKey === 'rating' ? b.overAllRating : b.numberOfReviews);
+        const aValue = extractNumericValue(isRating ? a.overAllRating : a.numberOfReviews, isRating);
+        const bValue = extractNumericValue(isRating ? b.overAllRating : b.numberOfReviews, isRating);
         
-        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+        if (aValue === -1 && bValue === -1) return 0;
+        if (aValue === -1) return 1;
+        if (bValue === -1) return -1;
+        
+        const comparison = aValue - bValue;
+        return sortDirection === 'asc' ? comparison : -comparison;
     });
 };
 
@@ -59,7 +75,15 @@ export const ResultsSection = () => {
     const leads = useMemo(() => result?.allLeads ?? [], [result?.allLeads]);
 
     const sortedLeads = useMemo(() => {
-        return sortLeads(leads, sortKey, sortDirection);
+        const sorted = sortLeads(leads, sortKey, sortDirection);
+        console.log('Sorting:', { sortKey, sortDirection, totalLeads: sorted.length });
+        if (sorted.length > 0) {
+            const firstLead = sorted[0];
+            const lastLead = sorted[sorted.length - 1];
+            console.log('First lead:', sortKey === 'rating' ? firstLead.overAllRating : firstLead.numberOfReviews, firstLead.name);
+            console.log('Last lead:', sortKey === 'rating' ? lastLead.overAllRating : lastLead.numberOfReviews, lastLead.name);
+        }
+        return sorted;
     }, [leads, sortKey, sortDirection]);
 
     const leadGroups = useMemo(() => {
@@ -67,11 +91,19 @@ export const ResultsSection = () => {
     }, [sortedLeads]);
 
     const handleSortToggle = () => {
-        setSortKey((prev) => (prev === 'rating' ? 'reviews' : 'rating'));
+        setSortKey((prev) => {
+            const newKey = prev === 'rating' ? 'reviews' : 'rating';
+            console.log('Sort key changed to:', newKey);
+            return newKey;
+        });
     };
 
     const handleDirectionToggle = () => {
-        setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+        setSortDirection((prev) => {
+            const newDirection = prev === 'asc' ? 'desc' : 'asc';
+            console.log('Sort direction changed to:', newDirection);
+            return newDirection;
+        });
     };
 
     const renderTabContent = (leads: GMAPS_SCRAPE_LEAD_INFO[]) => (
@@ -113,13 +145,25 @@ export const ResultsSection = () => {
         return (
             <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <h2 className="text-lg font-semibold">Results ({leads.length} leads)</h2>
+                    <h2 className="text-lg font-semibold">
+                        Results ({leads.length} leads)
+                        <span className="text-sm text-gray-500 ml-2 font-normal">
+                            Sorted by {sortKey === 'rating' ? 'Rating' : 'Reviews'} ({sortDirection === 'asc' ? 'Low to High' : 'High to Low'})
+                        </span>
+                    </h2>
                     <div className="flex items-center gap-2 flex-wrap">
                         <Button variant="outline" size="sm" onClick={handleSortToggle} className="text-xs sm:text-sm">
                             Sort by: {sortKey === 'rating' ? '⭐ Rating' : '📝 Reviews'}
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={handleDirectionToggle} title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}>
-                            {sortDirection === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleDirectionToggle} 
+                            className="text-xs sm:text-sm"
+                            title={sortDirection === 'asc' ? 'Currently: Low to High' : 'Currently: High to Low'}
+                        >
+                            {sortDirection === 'asc' ? <SortAsc className="w-4 h-4 mr-1" /> : <SortDesc className="w-4 h-4 mr-1" />}
+                            {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
                         </Button>
                     </div>
                 </div>
