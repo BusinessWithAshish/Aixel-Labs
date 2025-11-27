@@ -75,8 +75,8 @@ export const ResultsSection = () => {
     };
 
     const renderTabContent = (leads: GMAPS_SCRAPE_LEAD_INFO[]) => (
-        <ScrollArea className="h-[500px]">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ScrollArea className="h-[500px] pr-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-4">
                 {leads.map((lead, index) => (
                     <LeadCard key={generateUniqueKey(lead, index)} lead={lead} />
                 ))}
@@ -112,13 +112,13 @@ export const ResultsSection = () => {
     if (submissionState.isSuccess && result && result.allLeads?.length) {
         return (
             <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <h2 className="text-lg font-semibold">Results ({leads.length} leads)</h2>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={handleSortToggle}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Button variant="outline" size="sm" onClick={handleSortToggle} className="text-xs sm:text-sm">
                             Sort by: {sortKey === 'rating' ? '⭐ Rating' : '📝 Reviews'}
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={handleDirectionToggle}>
+                        <Button variant="ghost" size="icon" onClick={handleDirectionToggle} title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}>
                             {sortDirection === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
                         </Button>
                     </div>
@@ -127,11 +127,19 @@ export const ResultsSection = () => {
                 <Separator />
 
                 <Tabs defaultValue="all" className="w-full space-y-4">
-                    <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full gap-2">
-                        <TabsTrigger value="all">All Leads ({leadGroups.all.length})</TabsTrigger>
-                        <TabsTrigger value="hotLeads">Hot Leads ({leadGroups.hotLeads.length})</TabsTrigger>
-                        <TabsTrigger value="warmLeads">Warm Leads ({leadGroups.warmLeads.length})</TabsTrigger>
-                        <TabsTrigger value="coldLeads">Cold Leads ({leadGroups.coldLeads.length})</TabsTrigger>
+                    <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full">
+                        <TabsTrigger value="all" className="text-xs sm:text-sm">
+                            All Leads ({leadGroups.all.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="hotLeads" className="text-xs sm:text-sm">
+                            Hot Leads ({leadGroups.hotLeads.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="warmLeads" className="text-xs sm:text-sm">
+                            Warm Leads ({leadGroups.warmLeads.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="coldLeads" className="text-xs sm:text-sm">
+                            Cold Leads ({leadGroups.coldLeads.length})
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="all" className="mt-4">

@@ -31,14 +31,14 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
     };
 
     return (
-        <Card className={cn('transition-all duration-200 hover:shadow-md h-full flex flex-col', leadType.color)}>
-            <CardHeader className="pb-3">
+        <Card className={cn('transition-all duration-200 hover:shadow-md h-full flex flex-col overflow-hidden', leadType.color)}>
+            <CardHeader className="pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base sm:text-lg font-semibold truncate" title={lead.name}>
+                        <CardTitle className="text-base sm:text-lg font-semibold line-clamp-2 break-words" title={lead.name}>
                             {lead.name}
                         </CardTitle>
-                        <CardDescription className="flex items-center gap-1.5 sm:gap-2 mt-1 text-xs sm:text-sm flex-wrap">
+                        <CardDescription className="flex items-center gap-1.5 sm:gap-2 mt-1.5 text-xs sm:text-sm flex-wrap">
                             <div className="flex items-center gap-1 shrink-0">
                                 <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-500 fill-current" />
                                 <span className="font-medium">{lead.overAllRating}</span>
@@ -50,16 +50,16 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
                             </div>
                         </CardDescription>
                     </div>
-                    <Badge variant="secondary" className="shrink-0 text-xs px-2 py-0.5 sm:py-1 whitespace-nowrap">
+                    <Badge variant="secondary" className="shrink-0 text-xs px-2 py-0.5 sm:py-1 whitespace-nowrap self-start">
                         {leadType.type}
                     </Badge>
                 </div>
             </CardHeader>
 
-            <CardContent className="pt-0 space-y-2.5 sm:space-y-3 flex-1">
+            <CardContent className="pt-0 px-4 sm:px-6 pb-4 sm:pb-6 space-y-2.5 sm:space-y-3 flex-1">
                 <div className="flex items-start gap-2 sm:gap-3">
                     <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 overflow-hidden">
                         {lead.website && lead.website !== 'N/A' ? (
                             <button
                                 onClick={handleWebsiteClick}
@@ -76,7 +76,7 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
 
                 <div className="flex items-start gap-2 sm:gap-3">
                     <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 overflow-hidden">
                         {lead.phoneNumber && lead.phoneNumber !== 'N/A' ? (
                             <a
                                 href={`tel:${lead.phoneNumber}`}
