@@ -16,6 +16,39 @@ import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared
 type SortKey = 'rating' | 'reviews';
 type SortDirection = 'asc' | 'desc';
 
+const extractNumericValue = (value: string): number => {
+    if (!value || value === 'N/A' || value === '') return 0;
+    const normalized = value.replace(/[^\d.]/g, '');
+    const numeric = parseFloat(normalized);
+    return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const sortLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[], sortKey: SortKey, sortDirection: SortDirection): GMAPS_SCRAPE_LEAD_INFO[] => {
+    return [...leads].sort((a, b) => {
+        const aValue = extractNumericValue(sortKey === 'rating' ? a.overAllRating : a.numberOfReviews);
+        const bValue = extractNumericValue(sortKey === 'rating' ? b.overAllRating : b.numberOfReviews);
+        
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+    });
+};
+
+const categorizeLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[]) => {
+    const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.website && lead.website !== 'N/A';
+    const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.phoneNumber && lead.phoneNumber !== 'N/A';
+
+    return {
+        all: leads,
+        hotLeads: leads.filter((lead) => !hasWebsite(lead) && hasPhone(lead)),
+        warmLeads: leads.filter((lead) => hasWebsite(lead) && hasPhone(lead)),
+        coldLeads: leads.filter((lead) => !hasWebsite(lead) && !hasPhone(lead)),
+    };
+};
+
+const generateUniqueKey = (lead: GMAPS_SCRAPE_LEAD_INFO, index: number): string => {
+    const baseKey = lead.gmapsUrl || `${lead.name}-${lead.phoneNumber || 'no-phone'}-${lead.website || 'no-website'}`;
+    return `${baseKey}-${index}`;
+};
+
 export const ResultsSection = () => {
     const { submissionState } = useSubmission();
     const [sortKey, setSortKey] = useState<SortKey>('rating');
@@ -26,38 +59,11 @@ export const ResultsSection = () => {
     const leads = useMemo(() => result?.allLeads ?? [], [result?.allLeads]);
 
     const sortedLeads = useMemo(() => {
-        return [...leads].sort((a, b) => {
-            const getNumericValue = (lead: GMAPS_SCRAPE_LEAD_INFO, key: SortKey) => {
-                const value = key === 'rating' ? lead.overAllRating : lead.numberOfReviews;
-                if (value === 'N/A' || value === '') return 0;
-                if (key === 'rating') {
-                    const normalizedRating = value.replace(/[^\d.]/g, '') || '0';
-                    const rating = parseFloat(normalizedRating);
-                    return Number.isFinite(rating) ? rating : 0;
-                }
-
-                const normalizedReviews = value.replace(/\D/g, '') || '0';
-                const reviews = parseInt(normalizedReviews, 10);
-                return Number.isFinite(reviews) ? reviews : 0;
-            };
-
-            const aVal = getNumericValue(a, sortKey);
-            const bVal = getNumericValue(b, sortKey);
-
-            return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-        });
+        return sortLeads(leads, sortKey, sortDirection);
     }, [leads, sortKey, sortDirection]);
 
     const leadGroups = useMemo(() => {
-        const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.website && lead.website !== 'N/A';
-        const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.phoneNumber && lead.phoneNumber !== 'N/A';
-
-        return {
-            all: sortedLeads,
-            hotLeads: sortedLeads.filter((lead) => !hasWebsite(lead) && hasPhone(lead)),
-            warmLeads: sortedLeads.filter((lead) => hasWebsite(lead) && hasPhone(lead)),
-            coldLeads: sortedLeads.filter((lead) => !hasWebsite(lead) && !hasPhone(lead)),
-        };
+        return categorizeLeads(sortedLeads);
     }, [sortedLeads]);
 
     const handleSortToggle = () => {
@@ -68,11 +74,11 @@ export const ResultsSection = () => {
         setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     };
 
-    const renderTabContent = (leads: typeof sortedLeads) => (
+    const renderTabContent = (leads: GMAPS_SCRAPE_LEAD_INFO[]) => (
         <ScrollArea className="h-[500px]">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {leads.map((lead, index) => (
-                    <LeadCard key={lead.gmapsUrl || `${lead.name}-${index}`} lead={lead} />
+                    <LeadCard key={generateUniqueKey(lead, index)} lead={lead} />
                 ))}
             </div>
             {leads.length === 0 && (
