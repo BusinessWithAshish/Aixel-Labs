@@ -311,7 +311,7 @@ type StreamMessage = {
   timestamp: string;
 };
 
-// Utility to serialize data for streaming
+// Utility to serialize data for streaming (includes SSE format with data: prefix and \n\n delimiter)
 const serializeStreamData = (message: StreamMessage): string => {
   return `data: ${JSON.stringify(message)}\n\n`;
 };

@@ -37,16 +37,18 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   });
 
-  // Helper to send stream messages
+  // Helper to serialize and send stream messages
+  const serializeMessage = (type: string, message: string, data?: Record<string, unknown>): string => {
+    return `data: ${JSON.stringify({
+      type,
+      message,
+      data,
+      timestamp: new Date().toISOString(),
+    })}\n\n`;
+  };
+
   const sendMessage = (type: string, message: string, data?: Record<string, unknown>) => {
-    res.write(
-      `data: ${JSON.stringify({
-        type,
-        message,
-        data,
-        timestamp: new Date().toISOString(),
-      })}\n\n`
-    );
+    res.write(serializeMessage(type, message, data));
   };
 
   sendMessage("status", `Starting Google Maps scraping for "${parsedBody.data.query}" in ${parsedBody.data.states.length} states`, {
