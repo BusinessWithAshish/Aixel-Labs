@@ -12,7 +12,7 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
         const hasPhone = lead.phoneNumber && lead.phoneNumber !== 'N/A';
 
         if (!hasWebsite && hasPhone) return { type: 'Hot Lead', color: 'bg-green-50 border-green-200' };
-        if (hasWebsite && hasPhone) return { type: 'Warm Lead', color: 'bg-amber-50 border-amber-200' };
+        if ((hasWebsite && hasPhone) || (hasWebsite && !hasPhone)) return { type: 'Warm Lead', color: 'bg-amber-50 border-amber-200' };
         if (!hasWebsite && !hasPhone) return { type: 'Cold Lead', color: 'bg-gray-50 border-gray-200' };
         return { type: 'Unknown', color: 'bg-white border-gray-200' };
     };
@@ -28,9 +28,9 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
     return (
         <Card className={cn('transition-all duration-200 hover:shadow-md', leadType.color)}>
             <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg font-semibold truncate" title={lead.name}>
+                <div className="flex items-start overflow-hidden justify-between gap-2">
+                    <div className="w-3/5 truncate text-ellipsis">
+                        <CardTitle className="text-lg font-semibold" title={lead.name}>
                             {lead.name}
                         </CardTitle>
                         <CardDescription className="flex items-center gap-2 mt-1 text-sm">
@@ -41,7 +41,7 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
                             <span className="truncate">{lead.numberOfReviews} reviews</span>
                         </CardDescription>
                     </div>
-                    <Badge variant="secondary" className="shrink-0 text-xs px-2 py-1">
+                    <Badge variant="secondary" className="shrink-0 text-xs px-2 py-1 w-2/5">
                         {leadType.type}
                     </Badge>
                 </div>
