@@ -75,15 +75,7 @@ export const ResultsSection = () => {
     const leads = useMemo(() => result?.allLeads ?? [], [result?.allLeads]);
 
     const sortedLeads = useMemo(() => {
-        const sorted = sortLeads(leads, sortKey, sortDirection);
-        console.log('Sorting:', { sortKey, sortDirection, totalLeads: sorted.length });
-        if (sorted.length > 0) {
-            const firstLead = sorted[0];
-            const lastLead = sorted[sorted.length - 1];
-            console.log('First lead:', sortKey === 'rating' ? firstLead.overAllRating : firstLead.numberOfReviews, firstLead.name);
-            console.log('Last lead:', sortKey === 'rating' ? lastLead.overAllRating : lastLead.numberOfReviews, lastLead.name);
-        }
-        return sorted;
+        return sortLeads(leads, sortKey, sortDirection);
     }, [leads, sortKey, sortDirection]);
 
     const leadGroups = useMemo(() => {
@@ -91,19 +83,11 @@ export const ResultsSection = () => {
     }, [sortedLeads]);
 
     const handleSortToggle = () => {
-        setSortKey((prev) => {
-            const newKey = prev === 'rating' ? 'reviews' : 'rating';
-            console.log('Sort key changed to:', newKey);
-            return newKey;
-        });
+        setSortKey((prev) => (prev === 'rating' ? 'reviews' : 'rating'));
     };
 
     const handleDirectionToggle = () => {
-        setSortDirection((prev) => {
-            const newDirection = prev === 'asc' ? 'desc' : 'asc';
-            console.log('Sort direction changed to:', newDirection);
-            return newDirection;
-        });
+        setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     };
 
     const renderTabContent = (leads: GMAPS_SCRAPE_LEAD_INFO[]) => (
