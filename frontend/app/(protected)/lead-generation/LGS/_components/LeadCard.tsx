@@ -15,11 +15,11 @@ const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
     const hasWebsite = lead.website && lead.website !== 'N/A';
     const hasPhone = lead.phoneNumber && lead.phoneNumber !== 'N/A';
 
-    if (!hasWebsite && hasPhone) return { type: 'Hot Lead', color: 'bg-green-50 border-green-200' };
-    if (hasWebsite && hasPhone) return { type: 'Warm Lead', color: 'bg-amber-50 border-amber-200' };
-    if (!hasWebsite && !hasPhone) return { type: 'Cold Lead', color: 'bg-gray-50 border-gray-200' };
-    return { type: 'Unknown', color: 'bg-white border-gray-200' };
-};
+        if (!hasWebsite && hasPhone) return { type: 'Hot Lead', color: 'bg-green-50 border-green-200' };
+        if ((hasWebsite && hasPhone) || (hasWebsite && !hasPhone)) return { type: 'Warm Lead', color: 'bg-amber-50 border-amber-200' };
+        if (!hasWebsite && !hasPhone) return { type: 'Cold Lead', color: 'bg-gray-50 border-gray-200' };
+        return { type: 'Unknown', color: 'bg-white border-gray-200' };
+    };
 
 export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
     const leadType = getLeadType(lead);
@@ -31,11 +31,11 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
     };
 
     return (
-        <Card className={cn('transition-all duration-200 hover:shadow-md h-full flex flex-col overflow-hidden', leadType.color)}>
-            <CardHeader className="pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
-                <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base sm:text-lg font-semibold line-clamp-2 break-words" title={lead.name}>
+        <Card className={cn('transition-all duration-200 hover:shadow-md', leadType.color)}>
+            <CardHeader className="pb-3">
+                <div className="flex items-start overflow-hidden justify-between gap-2">
+                    <div className="w-3/5 truncate text-ellipsis">
+                        <CardTitle className="text-lg font-semibold" title={lead.name}>
                             {lead.name}
                         </CardTitle>
                         <CardDescription className="flex items-center gap-1.5 sm:gap-2 mt-1.5 text-xs sm:text-sm flex-wrap">
@@ -50,7 +50,7 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
                             </div>
                         </CardDescription>
                     </div>
-                    <Badge variant="secondary" className="shrink-0 text-xs px-2 py-0.5 sm:py-1 whitespace-nowrap self-start">
+                    <Badge variant="secondary" className="shrink-0 text-xs px-2 py-1 w-2/5">
                         {leadType.type}
                     </Badge>
                 </div>

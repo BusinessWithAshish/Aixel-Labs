@@ -16,20 +16,21 @@ export const GMAPS_SCRAPE_REQUEST_SCHEMA = z.object({
 });
 export type GMAPS_SCRAPE_REQUEST = z.infer<typeof GMAPS_SCRAPE_REQUEST_SCHEMA>;
 
-export type GMAPS_SCRAPE_RESPONSE = {
-  founded: string[];
-  foundedLeadsCount: number;
-  allLeads: GMAPS_SCRAPE_LEAD_INFO[];
-  allLeadsCount: number;
-};
-
 export type GMAPS_SCRAPE_LEAD_INFO = {
+  id?: string;
   website: string;
   phoneNumber: string;
   name: string;
   gmapsUrl: string;
   overAllRating: string;
   numberOfReviews: string;
+};
+
+export type GMAPS_SCRAPE_RESPONSE = {
+  founded: string[];
+  foundedLeadsCount: number;
+  allLeads: GMAPS_SCRAPE_LEAD_INFO[];
+  allLeadsCount: number;
 };
 
 // Streaming message types

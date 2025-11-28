@@ -126,7 +126,7 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
       `data: ${JSON.stringify({
         type: "complete",
         message: "Scraping completed successfully!",
-        data: response,
+        data: JSON.stringify(response, null, 2),
         timestamp: new Date().toISOString(),
       })}\n\n`
     );

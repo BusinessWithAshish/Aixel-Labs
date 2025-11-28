@@ -12,6 +12,7 @@ const TOTAL_CONCURRENT_URLS = MAX_BROWSER_SESSIONS * MAX_PAGES_PER_BROWSER;
 
 type EachPageResult<T> = {
   success: boolean;
+  url: string;         
   data?: T;
   error?: string;
 };
@@ -52,7 +53,7 @@ const processSingleBrowser = async <T>(
       });
       return {
         results: [],
-        error: `Browser launch failed - browser is null`,
+        error: `Browser launch failed for browser ${browserIndex}`,
         browserIndex,
       };
     }
@@ -82,8 +83,8 @@ const processSingleBrowser = async <T>(
           pages.push(page);
 
           // Set page timeout and other configurations
-          page.setDefaultTimeout(60000);
-          page.setDefaultNavigationTimeout(60000);
+          page.setDefaultTimeout(30000);
+          page.setDefaultNavigationTimeout(30000);
 
           const scrapeData = await scrapingFunction(url, page);
 
@@ -102,7 +103,7 @@ const processSingleBrowser = async <T>(
             timestamp: new Date().toISOString(),
           });
 
-          return { success: true, data: scrapeData };
+          return { success: true, data: scrapeData, url };
         } catch (pageScrapeError) {
           const errorMessage =
             pageScrapeError instanceof Error
@@ -125,6 +126,7 @@ const processSingleBrowser = async <T>(
 
           return {
             success: false,
+            url,
             error: `Page had error for this url ${url} at Browser ${browserIndex} for page ${
               pageIndex + 1
             } : ${errorMessage}`,
@@ -169,7 +171,11 @@ const processSingleBrowser = async <T>(
     });
 
     return {
-      results: [],
+        results: urlItems.map((u) => ({
+            success: false,
+            url: u,
+            error: `Browser ${browserIndex} failed before processing url ${u}: ${errorMessage}`,
+        })),
       error: errorMessage,
       browserIndex,
     };
@@ -286,7 +292,7 @@ const processBatchOfBrowsers = async <T>(
     timestamp: new Date().toISOString(),
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await new Promise((resolve) => setTimeout(resolve, 10000));
 
   // Check for device temperature here, if greater than certain threshold then sleep for 10 minutes and then
   // continue further
