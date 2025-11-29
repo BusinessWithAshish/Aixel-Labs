@@ -7,6 +7,11 @@ import {
 import { BrowserBatchHandler } from "../functions/common/browser-batch-handler.js";
 import { scrapeLinks } from "../functions/scrape-links.js";
 import { GmapsDetailsLeadInfoExtractor } from "../functions/gmap-details-lead-extractor.js";
+import {
+  sendStatusMessage,
+  sendCompleteMessage,
+  sendErrorMessage,
+} from "../utils/stream-helpers.js";
 
 export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
   const requestBody = req.body;
@@ -37,27 +42,13 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   });
 
-  // Helper to serialize and send stream messages
-  const serializeMessage = (type: string, message: string, data?: Record<string, unknown>): string => {
-    return `data: ${JSON.stringify({
-      type,
-      message,
-      data,
-      timestamp: new Date().toISOString(),
-    })}\n\n`;
-  };
-
-  const sendMessage = (type: string, message: string, data?: Record<string, unknown>) => {
-    res.write(serializeMessage(type, message, data));
-  };
-
-  sendMessage("status", `Starting Google Maps scraping for "${parsedBody.data.query}" in ${parsedBody.data.states.length} states`, {
+  sendStatusMessage(res, `Starting Google Maps scraping for "${parsedBody.data.query}" in ${parsedBody.data.states.length} states`, {
     total: finalScrappingUrls.length,
     stage: "api_start",
   });
 
   try {
-    sendMessage("status", "Phase 1: Searching for business listings...", {
+    sendStatusMessage(res, "Phase 1: Searching for business listings...", {
       stage: "phase_1_start",
       phase: 1,
     });
@@ -78,12 +69,12 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
         allLeadsCount: 0,
       };
 
-      sendMessage("complete", "No business listings found", response);
+      sendCompleteMessage(res, "No business listings found", response);
       res.end();
       return;
     }
 
-    sendMessage("status", `Phase 2: Extracting details from ${foundedLeadsResults.length} business listings...`, {
+    sendStatusMessage(res, `Phase 2: Extracting details from ${foundedLeadsResults.length} business listings...`, {
       stage: "phase_2_start",
       phase: 2,
       total: foundedLeadsResults.length,
@@ -103,10 +94,10 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
       allLeadsCount: allLeadsResults.length,
     };
 
-    sendMessage("complete", "Scraping completed successfully!", response);
+    sendCompleteMessage(res, "Scraping completed successfully!", response);
     res.end();
   } catch (error) {
-    sendMessage("error", "Scraping failed due to system error", {
+    sendErrorMessage(res, "Scraping failed due to system error", {
       stage: "api_error",
       error: error instanceof Error ? error.message : String(error),
     });
