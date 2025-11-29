@@ -16,6 +16,55 @@ import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared
 type SortKey = 'rating' | 'reviews';
 type SortDirection = 'asc' | 'desc';
 
+const extractNumericValue = (value: string, isRating: boolean): number => {
+    if (!value || value === 'N/A' || value === '' || value === null || value === undefined) {
+        return -1;
+    }
+    
+    const stringValue = String(value);
+    const normalized = stringValue.replace(/[^\d.]/g, '');
+    
+    if (!normalized || normalized === '') {
+        return -1;
+    }
+    
+    const numeric = isRating ? parseFloat(normalized) : parseInt(normalized, 10);
+    return Number.isFinite(numeric) && numeric >= 0 ? numeric : -1;
+};
+
+const sortLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[], sortKey: SortKey, sortDirection: SortDirection): GMAPS_SCRAPE_LEAD_INFO[] => {
+    const isRating = sortKey === 'rating';
+    
+    return [...leads].sort((a, b) => {
+        const aValue = extractNumericValue(isRating ? a.overAllRating : a.numberOfReviews, isRating);
+        const bValue = extractNumericValue(isRating ? b.overAllRating : b.numberOfReviews, isRating);
+        
+        if (aValue === -1 && bValue === -1) return 0;
+        if (aValue === -1) return 1;
+        if (bValue === -1) return -1;
+        
+        const comparison = aValue - bValue;
+        return sortDirection === 'asc' ? comparison : -comparison;
+    });
+};
+
+const categorizeLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[]) => {
+    const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.website && lead.website !== 'N/A';
+    const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.phoneNumber && lead.phoneNumber !== 'N/A';
+
+    return {
+        all: leads,
+        hotLeads: leads.filter((lead) => !hasWebsite(lead) && hasPhone(lead)),
+        warmLeads: leads.filter((lead) => hasWebsite(lead) && hasPhone(lead)),
+        coldLeads: leads.filter((lead) => !hasWebsite(lead) && !hasPhone(lead)),
+    };
+};
+
+const generateUniqueKey = (lead: GMAPS_SCRAPE_LEAD_INFO, index: number): string => {
+    const baseKey = lead.gmapsUrl || `${lead.name}-${lead.phoneNumber || 'no-phone'}-${lead.website || 'no-website'}`;
+    return `${baseKey}-${index}`;
+};
+
 export const ResultsSection = () => {
     const { submissionState } = useSubmission();
     const [sortKey, setSortKey] = useState<SortKey>('rating');
@@ -26,38 +75,11 @@ export const ResultsSection = () => {
     const leads = useMemo(() => result?.allLeads ?? [], [result?.allLeads]);
 
     const sortedLeads = useMemo(() => {
-        return [...leads].sort((a, b) => {
-            const getNumericValue = (lead: GMAPS_SCRAPE_LEAD_INFO, key: SortKey) => {
-                const value = key === 'rating' ? lead.overAllRating : lead.numberOfReviews;
-                if (value === 'N/A' || value === '') return 0;
-                if (key === 'rating') {
-                    const normalizedRating = value.replace(/[^\d.]/g, '') || '0';
-                    const rating = parseFloat(normalizedRating);
-                    return Number.isFinite(rating) ? rating : 0;
-                }
-
-                const normalizedReviews = value.replace(/\D/g, '') || '0';
-                const reviews = parseInt(normalizedReviews, 10);
-                return Number.isFinite(reviews) ? reviews : 0;
-            };
-
-            const aVal = getNumericValue(a, sortKey);
-            const bVal = getNumericValue(b, sortKey);
-
-            return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-        });
+        return sortLeads(leads, sortKey, sortDirection);
     }, [leads, sortKey, sortDirection]);
 
     const leadGroups = useMemo(() => {
-        const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.website && lead.website !== 'N/A';
-        const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.phoneNumber && lead.phoneNumber !== 'N/A';
-
-        return {
-            all: sortedLeads,
-            hotLeads: sortedLeads.filter((lead) => !hasWebsite(lead) && hasPhone(lead)),
-            warmLeads: sortedLeads.filter((lead) => hasWebsite(lead) && hasPhone(lead)),
-            coldLeads: sortedLeads.filter((lead) => !hasWebsite(lead) && !hasPhone(lead)),
-        };
+        return categorizeLeads(sortedLeads);
     }, [sortedLeads]);
 
     const handleSortToggle = () => {
@@ -68,11 +90,11 @@ export const ResultsSection = () => {
         setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     };
 
-    const renderTabContent = (leads: typeof sortedLeads) => (
-        <ScrollArea className="h-[500px]">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    const renderTabContent = (leads: GMAPS_SCRAPE_LEAD_INFO[]) => (
+        <ScrollArea className="h-[500px] pr-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-4">
                 {leads.map((lead, index) => (
-                    <LeadCard key={lead.gmapsUrl || `${lead.name}-${index}`} lead={lead} />
+                    <LeadCard key={generateUniqueKey(lead, index)} lead={lead} />
                 ))}
             </div>
             {leads.length === 0 && (
@@ -106,14 +128,26 @@ export const ResultsSection = () => {
     if (submissionState.isSuccess && result && result.allLeads?.length) {
         return (
             <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">Results ({leads.length} leads)</h2>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={handleSortToggle}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <h2 className="text-lg font-semibold">
+                        Results ({leads.length} leads)
+                        <span className="text-sm text-gray-500 ml-2 font-normal">
+                            Sorted by {sortKey === 'rating' ? 'Rating' : 'Reviews'} ({sortDirection === 'asc' ? 'Low to High' : 'High to Low'})
+                        </span>
+                    </h2>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Button variant="outline" size="sm" onClick={handleSortToggle} className="text-xs sm:text-sm">
                             Sort by: {sortKey === 'rating' ? '⭐ Rating' : '📝 Reviews'}
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={handleDirectionToggle}>
-                            {sortDirection === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleDirectionToggle} 
+                            className="text-xs sm:text-sm"
+                            title={sortDirection === 'asc' ? 'Currently: Low to High' : 'Currently: High to Low'}
+                        >
+                            {sortDirection === 'asc' ? <SortAsc className="w-4 h-4 mr-1" /> : <SortDesc className="w-4 h-4 mr-1" />}
+                            {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
                         </Button>
                     </div>
                 </div>
@@ -121,11 +155,19 @@ export const ResultsSection = () => {
                 <Separator />
 
                 <Tabs defaultValue="all" className="w-full space-y-4">
-                    <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full gap-2">
-                        <TabsTrigger value="all">All Leads ({leadGroups.all.length})</TabsTrigger>
-                        <TabsTrigger value="hotLeads">Hot Leads ({leadGroups.hotLeads.length})</TabsTrigger>
-                        <TabsTrigger value="warmLeads">Warm Leads ({leadGroups.warmLeads.length})</TabsTrigger>
-                        <TabsTrigger value="coldLeads">Cold Leads ({leadGroups.coldLeads.length})</TabsTrigger>
+                    <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full">
+                        <TabsTrigger value="all" className="text-xs sm:text-sm">
+                            All Leads ({leadGroups.all.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="hotLeads" className="text-xs sm:text-sm">
+                            Hot Leads ({leadGroups.hotLeads.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="warmLeads" className="text-xs sm:text-sm">
+                            Warm Leads ({leadGroups.warmLeads.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="coldLeads" className="text-xs sm:text-sm">
+                            Cold Leads ({leadGroups.coldLeads.length})
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="all" className="mt-4">
