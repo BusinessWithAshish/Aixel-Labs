@@ -7,6 +7,11 @@ import {
 import { BrowserBatchHandler } from "../functions/common/browser-batch-handler.js";
 import { scrapeLinks } from "../functions/scrape-links.js";
 import { GmapsDetailsLeadInfoExtractor } from "../functions/gmap-details-lead-extractor.js";
+import {
+  sendStatusMessage,
+  sendCompleteMessage,
+  sendErrorMessage,
+} from "../utils/stream-helpers.js";
 
 export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
   const requestBody = req.body;
@@ -37,32 +42,16 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   });
 
-  // Send initial message
-  res.write(
-    `data: ${JSON.stringify({
-      type: "status",
-      message: `Starting Google Maps scraping for "${parsedBody.data.query}" in ${parsedBody.data.states.length} states`,
-      data: {
-        total: finalScrappingUrls.length,
-        stage: "api_start",
-      },
-      timestamp: new Date().toISOString(),
-    })}\n\n`
-  );
+  sendStatusMessage(res, `Starting Google Maps scraping for "${parsedBody.data.query}" in ${parsedBody.data.states.length} states`, {
+    total: finalScrappingUrls.length,
+    stage: "api_start",
+  });
 
   try {
-    // Phase 1: Scrape business listing URLs
-    res.write(
-      `data: ${JSON.stringify({
-        type: "status",
-        message: "Phase 1: Searching for business listings...",
-        data: {
-          stage: "phase_1_start",
-          phase: 1,
-        },
-        timestamp: new Date().toISOString(),
-      })}\n\n`
-    );
+    sendStatusMessage(res, "Phase 1: Searching for business listings...", {
+      stage: "phase_1_start",
+      phase: 1,
+    });
 
     const foundedLeads = await BrowserBatchHandler(
       finalScrappingUrls,
@@ -72,7 +61,6 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
 
     const foundedLeadsResults = foundedLeads.results.flat();
 
-    // If no business listings found, send final message and end the response
     if (foundedLeadsResults.length === 0) {
       const response: GMAPS_SCRAPE_RESPONSE = {
         founded: [],
@@ -81,31 +69,16 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
         allLeadsCount: 0,
       };
 
-      res.write(
-        `data: ${JSON.stringify({
-          type: "complete",
-          message: "No business listings found",
-          data: response,
-          timestamp: new Date().toISOString(),
-        })}\n\n`
-      );
+      sendCompleteMessage(res, "No business listings found", response);
       res.end();
       return;
     }
 
-    // Phase 2: Extract detailed business information from the business listings
-    res.write(
-      `data: ${JSON.stringify({
-        type: "status",
-        message: `Phase 2: Extracting details from ${foundedLeadsResults.length} business listings...`,
-        data: {
-          stage: "phase_2_start",
-          phase: 2,
-          total: foundedLeadsResults.length,
-        },
-        timestamp: new Date().toISOString(),
-      })}\n\n`
-    );
+    sendStatusMessage(res, `Phase 2: Extracting details from ${foundedLeadsResults.length} business listings...`, {
+      stage: "phase_2_start",
+      phase: 2,
+      total: foundedLeadsResults.length,
+    });
 
     const allLeads = await BrowserBatchHandler(
       foundedLeadsResults,
@@ -121,29 +94,13 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
       allLeadsCount: allLeadsResults.length,
     };
 
-    // Send final results
-    res.write(
-      `data: ${JSON.stringify({
-        type: "complete",
-        message: "Scraping completed successfully!",
-        data: JSON.stringify(response, null, 2),
-        timestamp: new Date().toISOString(),
-      })}\n\n`
-    );
-
+    sendCompleteMessage(res, "Scraping completed successfully!", response);
     res.end();
   } catch (error) {
-    res.write(
-      `data: ${JSON.stringify({
-        type: "error",
-        message: "Scraping failed due to system error",
-        data: {
-          stage: "api_error",
-          error: error instanceof Error ? error.message : String(error),
-        },
-        timestamp: new Date().toISOString(),
-      })}\n\n`
-    );
+    sendErrorMessage(res, "Scraping failed due to system error", {
+      stage: "api_error",
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.end();
   }
 };

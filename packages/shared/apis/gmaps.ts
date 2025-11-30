@@ -33,9 +33,17 @@ export type GMAPS_SCRAPE_RESPONSE = {
   allLeadsCount: number;
 };
 
+// Stream message type enum
+export enum StreamMessageType {
+  PROGRESS = "progress",
+  STATUS = "status",
+  ERROR = "error",
+  COMPLETE = "complete",
+}
+
 // Streaming message types
 export type StreamMessage = {
-  type: "progress" | "status" | "error" | "complete";
+  type: StreamMessageType | "progress" | "status" | "error" | "complete";
   message: string;
   data?: {
     current?: number;
@@ -49,6 +57,7 @@ export type StreamMessage = {
     allLeadsCount?: number;
     founded?: string[];
     allLeads?: GMAPS_SCRAPE_LEAD_INFO[];
+    [key: string]: unknown;
   };
   timestamp: string;
 };
