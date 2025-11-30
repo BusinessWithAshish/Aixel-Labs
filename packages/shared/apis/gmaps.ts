@@ -33,6 +33,10 @@ export type GMAPS_SCRAPE_RESPONSE = {
   allLeadsCount: number;
 };
 
+// ============================================================================
+// Stream Messaging Types and Utilities
+// ============================================================================
+
 // Stream message type enum
 export enum StreamMessageType {
   PROGRESS = "progress",
@@ -41,9 +45,9 @@ export enum StreamMessageType {
   COMPLETE = "complete",
 }
 
-// Streaming message types
+// Stream message structure
 export type StreamMessage = {
-  type: StreamMessageType | "progress" | "status" | "error" | "complete";
+  type: StreamMessageType;
   message: string;
   data?: {
     current?: number;
@@ -53,13 +57,123 @@ export type StreamMessage = {
     batch?: number;
     browser?: number;
     phase?: number;
-    foundedLeadsCount?: number;
-    allLeadsCount?: number;
-    founded?: string[];
-    allLeads?: GMAPS_SCRAPE_LEAD_INFO[];
+    error?: string;
     [key: string]: unknown;
   };
   timestamp: string;
+};
+
+// Utility to serialize stream messages (includes SSE format with data: prefix and \n\n delimiter)
+export const serializeStreamMessage = (message: StreamMessage): string => {
+  return `data: ${JSON.stringify(message)}\n\n`;
+};
+
+// Helper to create stream messages with automatic timestamp
+export const createStreamMessage = (
+  type: StreamMessageType,
+  message: string,
+  data?: StreamMessage["data"]
+): StreamMessage => {
+  return {
+    type,
+    message,
+    data,
+    timestamp: new Date().toISOString(),
+  };
+};
+
+// SSE Parser for Frontend
+export class SSEParser {
+  private buffer: string = "";
+
+  /**
+   * Parse incoming SSE data chunks
+   * @param chunk - The raw string chunk from the stream
+   * @returns Array of parsed StreamMessage objects
+   */
+  parseChunk(chunk: string): StreamMessage[] {
+    this.buffer += chunk;
+    const messages: StreamMessage[] = [];
+
+    // Split by SSE message delimiter (\n\n)
+    const parts = this.buffer.split("\n\n");
+
+    // Keep the last incomplete part in the buffer
+    this.buffer = parts.pop() || "";
+
+    // Process complete messages
+    for (const part of parts) {
+      if (part.trim().startsWith("data: ")) {
+        try {
+          const jsonStr = part.trim().slice(6); // Remove 'data: ' prefix
+          const message: StreamMessage = JSON.parse(jsonStr);
+          messages.push(message);
+        } catch (error) {
+          // Silently skip invalid messages
+        }
+      }
+    }
+
+    return messages;
+  }
+
+  /**
+   * Flush any remaining buffer content (call when stream ends)
+   * @returns Array of parsed StreamMessage objects from remaining buffer
+   */
+  flush(): StreamMessage[] {
+    if (!this.buffer.trim()) {
+      return [];
+    }
+
+    const messages: StreamMessage[] = [];
+    const parts = this.buffer.split("\n\n").filter((msg) => msg.trim());
+
+    for (const part of parts) {
+      if (part.trim().startsWith("data: ")) {
+        try {
+          const jsonStr = part.trim().slice(6);
+          const message: StreamMessage = JSON.parse(jsonStr);
+          messages.push(message);
+        } catch (error) {
+          // Silently skip invalid messages
+        }
+      }
+    }
+
+    this.buffer = "";
+    return messages;
+  }
+
+  /**
+   * Reset the parser state
+   */
+  reset(): void {
+    this.buffer = "";
+  }
+}
+
+// Type guard functions
+export const isStreamMessageType = (
+  type: string
+): type is StreamMessageType => {
+  return Object.values(StreamMessageType).includes(type as StreamMessageType);
+};
+
+export const isCompleteMessage = (message: StreamMessage): boolean => {
+  return message.type === StreamMessageType.COMPLETE;
+};
+
+export const isErrorMessage = (message: StreamMessage): boolean => {
+  return message.type === StreamMessageType.ERROR;
+};
+
+export const isProgressMessage = (message: StreamMessage): boolean => {
+  return message.type === StreamMessageType.PROGRESS;
+};
+
+export const isStatusMessage = (message: StreamMessage): boolean => {
+  return message.type === StreamMessageType.STATUS;
 };
 
 // Utility functions

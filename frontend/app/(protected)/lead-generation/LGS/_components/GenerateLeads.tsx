@@ -6,6 +6,7 @@ import { useConfiguration, useForm, useSubmission } from "../_contexts";
 import { LocationForm } from "./LocationForm";
 import { ConfigurationForm } from "./ConfigurationForm";
 import { ResultsSection } from "./ResultsSection";
+import { StatusDisplay } from "./StatusDisplay";
 import { MapPin, Link } from "lucide-react";
 
 export const GenerateLeads = () => {
@@ -63,7 +64,15 @@ export const GenerateLeads = () => {
             </Button>
           </div>
         </Card>
-      ) : (
+      ) : null}
+
+      {/* Status Display - Show when processing or completed */}
+      {config.isConfigValid && (
+        <StatusDisplay />
+      )}
+
+      {/* Configuration Error Card */}
+      {!config.isConfigValid ? (
         <Card>
           <CardContent className="p-6 text-center">
             <p className="text-gray-600">
@@ -76,7 +85,7 @@ export const GenerateLeads = () => {
             )}
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* Results */}
       <ResultsSection />

@@ -31,21 +31,33 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
   }
 
   // Set up Server-Sent Events headers for streaming
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "Access-Control-Allow-Origin": req.headers.origin || "*",
-    "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, Cache-Control, X-Requested-With",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  });
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
+  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, Cache-Control, X-Requested-With"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
 
-  sendStatusMessage(res, `Starting Google Maps scraping for "${parsedBody.data.query}" in ${parsedBody.data.states.length} states`, {
-    total: finalScrappingUrls.length,
-    stage: "api_start",
-  });
+  res.status(200);
+  res.flushHeaders(); // Flush headers immediately
+
+  // Send initial connection message
+  sendStatusMessage(
+    res,
+    `Starting Google Maps scraping for "${parsedBody.data.query}" in ${parsedBody.data.states.length} states`,
+    {
+      total: finalScrappingUrls.length,
+      stage: "api_start",
+    }
+  );
 
   try {
     sendStatusMessage(res, "Phase 1: Searching for business listings...", {
@@ -74,11 +86,15 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
       return;
     }
 
-    sendStatusMessage(res, `Phase 2: Extracting details from ${foundedLeadsResults.length} business listings...`, {
-      stage: "phase_2_start",
-      phase: 2,
-      total: foundedLeadsResults.length,
-    });
+    sendStatusMessage(
+      res,
+      `Phase 2: Extracting details from ${foundedLeadsResults.length} business listings...`,
+      {
+        stage: "phase_2_start",
+        phase: 2,
+        total: foundedLeadsResults.length,
+      }
+    );
 
     const allLeads = await BrowserBatchHandler(
       foundedLeadsResults,
