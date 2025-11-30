@@ -6,10 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SortAsc, SortDesc } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSubmission } from '../_contexts';
-import { AlertCircle, Loader2 } from 'lucide-react';
 import { LeadCard } from './LeadCard';
 import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared/apis';
 
@@ -81,26 +78,14 @@ export const ResultsSection = () => {
         </ScrollArea>
     );
 
+    // Don't show anything while submitting - StatusDisplay handles this
     if (submissionState.isSubmitting) {
-        return (
-            <Card>
-                <CardContent className="p-6">
-                    <div className="flex items-center gap-3">
-                        <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                        <span className="text-gray-600">Processing your request...</span>
-                    </div>
-                </CardContent>
-            </Card>
-        );
+        return null;
     }
 
+    // Don't show error here - StatusDisplay handles this
     if (submissionState.error) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Error: {submissionState.error}</AlertDescription>
-            </Alert>
-        );
+        return null;
     }
 
     if (submissionState.isSuccess && result && result.allLeads?.length) {

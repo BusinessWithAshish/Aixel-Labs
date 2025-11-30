@@ -8,8 +8,9 @@ import { Loader2, CheckCircle2, XCircle, Info } from "lucide-react";
 export const StatusDisplay = () => {
   const { submissionState } = useSubmission();
 
-  // Don't show anything if not submitting and no error
-  if (!submissionState.isSubmitting && !submissionState.error && !submissionState.isSuccess) {
+  // Only show while submitting or if there's an error
+  // Hide on success to show results
+  if (!submissionState.isSubmitting && !submissionState.error) {
     return null;
   }
 

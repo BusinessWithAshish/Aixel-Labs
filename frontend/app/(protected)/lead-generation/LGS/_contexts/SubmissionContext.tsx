@@ -111,23 +111,19 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
                         // Process any remaining buffer
                         const finalMessages = parser.flush();
                         for (const message of finalMessages) {
-                            console.log(`[${message.type}] ${message.message}`, message.data);
-
-                            // Add message to history
-                            setSubmissionState((prev) => ({
-                                ...prev,
-                                messages: [...prev.messages, message],
-                            }));
+                            console.log(`[FINAL ${message.type}] ${message.message}`, message.data);
 
                             if (isStatusMessage(message)) {
                                 setSubmissionState((prev) => ({
                                     ...prev,
+                                    messages: [...prev.messages, message],
                                     currentStatus: message.message,
                                     currentPhase: message.data?.phase ?? prev.currentPhase,
                                 }));
                             } else if (isProgressMessage(message)) {
                                 setSubmissionState((prev) => ({
                                     ...prev,
+                                    messages: [...prev.messages, message],
                                     currentStatus: message.message,
                                     currentProgress: message.data?.percentage ?? 0,
                                     currentPhase: message.data?.phase ?? prev.currentPhase,
@@ -135,6 +131,7 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
                             } else if (isCompleteMessage(message)) {
                                 setSubmissionState((prev) => ({
                                     ...prev,
+                                    messages: [...prev.messages, message],
                                     isSubmitting: false,
                                     isSuccess: true,
                                     result: message.data,
@@ -154,21 +151,17 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
                     for (const message of messages) {
                         console.log(`[${message.type}] ${message.message}`, message.data);
 
-                        // Add message to history
-                        setSubmissionState((prev) => ({
-                            ...prev,
-                            messages: [...prev.messages, message],
-                        }));
-
                         if (isStatusMessage(message)) {
                             setSubmissionState((prev) => ({
                                 ...prev,
+                                messages: [...prev.messages, message],
                                 currentStatus: message.message,
                                 currentPhase: message.data?.phase ?? prev.currentPhase,
                             }));
                         } else if (isProgressMessage(message)) {
                             setSubmissionState((prev) => ({
                                 ...prev,
+                                messages: [...prev.messages, message],
                                 currentStatus: message.message,
                                 currentProgress: message.data?.percentage ?? 0,
                                 currentPhase: message.data?.phase ?? prev.currentPhase,
@@ -176,6 +169,7 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
                         } else if (isCompleteMessage(message)) {
                             setSubmissionState((prev) => ({
                                 ...prev,
+                                messages: [...prev.messages, message],
                                 isSubmitting: false,
                                 isSuccess: true,
                                 result: message.data,
@@ -185,6 +179,7 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
                         } else if (isErrorMessage(message)) {
                             setSubmissionState((prev) => ({
                                 ...prev,
+                                messages: [...prev.messages, message],
                                 isSubmitting: false,
                                 isSuccess: false,
                                 error: message.message || 'An error occurred',
