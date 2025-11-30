@@ -3,7 +3,12 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { useConfiguration } from './ConfigurationContext';
 import { useForm } from './FormContext';
-import { GMAPS_SCRAPE_REQUEST, StreamMessage } from '@aixellabs/shared/apis';
+import { 
+    GMAPS_SCRAPE_REQUEST,
+    SSEParser,
+    isCompleteMessage, 
+    isErrorMessage 
+} from '@aixellabs/shared/apis';
 import { API_ENDPOINTS } from '@aixellabs/shared/utils';
 
 type SubmissionState = {
@@ -81,7 +86,7 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let buffer = '';
+            const parser = new SSEParser();
 
             try {
                 while (true) {
@@ -89,61 +94,45 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
 
                     if (done) {
                         // Process any remaining buffer
-                        if (buffer.trim()) {
-                            const messages = buffer.split('\n\n').filter((msg) => msg.trim());
-                            for (const msg of messages) {
-                                if (msg.startsWith('data: ')) {
-                                    try {
-                                        const message: StreamMessage = JSON.parse(msg.slice(6));
-                                        if (message.type === 'complete') {
-                                            setSubmissionState((prev) => ({
-                                                ...prev,
-                                                isSubmitting: false,
-                                                isSuccess: true,
-                                                result: message.data,
-                                            }));
-                                        }
-                                    } catch (error) {
-                                        console.error('Error parsing final SSE message:', error);
-                                    }
-                                }
+                        const finalMessages = parser.flush();
+                        for (const message of finalMessages) {
+                            if (isCompleteMessage(message)) {
+                                setSubmissionState((prev) => ({
+                                    ...prev,
+                                    isSubmitting: false,
+                                    isSuccess: true,
+                                    result: message.data,
+                                }));
                             }
                         }
                         break;
                     }
 
-                    buffer += decoder.decode(value, { stream: true });
+                    // Decode chunk and parse messages
+                    const chunk = decoder.decode(value, { stream: true });
+                    const messages = parser.parseChunk(chunk);
 
-                    // Process complete SSE messages (separated by \n\n)
-                    const messages = buffer.split('\n\n');
-                    buffer = messages.pop() || ''; // Keep incomplete message in buffer
+                    // Process each message
+                    for (const message of messages) {
+                        console.log(`[${message.type}] ${message.message}`, message.data);
 
-                    for (const msg of messages) {
-                        if (msg.trim().startsWith('data: ')) {
-                            try {
-                                const message: StreamMessage = JSON.parse(msg.trim().slice(6));
-
-                                // Update state based on message type
-                                if (message.type === 'complete') {
-                                    setSubmissionState((prev) => ({
-                                        ...prev,
-                                        isSubmitting: false,
-                                        isSuccess: true,
-                                        result: message.data,
-                                    }));
-                                } else if (message.type === 'error') {
-                                    setSubmissionState((prev) => ({
-                                        ...prev,
-                                        isSubmitting: false,
-                                        isSuccess: false,
-                                        error: message.message || 'An error occurred',
-                                    }));
-                                }
-                                // For status/progress messages, you might want to emit events or update intermediate state
-                            } catch (error) {
-                                console.error('Error parsing SSE message:', error);
-                            }
+                        if (isCompleteMessage(message)) {
+                            setSubmissionState((prev) => ({
+                                ...prev,
+                                isSubmitting: false,
+                                isSuccess: true,
+                                result: message.data,
+                            }));
+                        } else if (isErrorMessage(message)) {
+                            setSubmissionState((prev) => ({
+                                ...prev,
+                                isSubmitting: false,
+                                isSuccess: false,
+                                error: message.message || 'An error occurred',
+                            }));
                         }
+                        // For status/progress messages, you can add custom handling here
+                        // e.g., emit events, update progress state, etc.
                     }
                 }
             } finally {
