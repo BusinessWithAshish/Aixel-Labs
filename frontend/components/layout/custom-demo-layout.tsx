@@ -150,8 +150,23 @@ export default function IframeEmbed({
     );
 }
 
-// Preset for Lovable embeds
-export function LovableEmbed({ src, showBranding = true }: { src: string; showBranding?: boolean }) {
+/**
+ * ExternalEmbed - A general-purpose component for embedding external URLs in an iframe.
+ * 
+ * This component can embed any external URL, including:
+ * - Lovable-hosted applications
+ * - n8n instances (requires server-side configuration)
+ * - Other web applications
+ * 
+ * Note: Some services (like n8n) may require server-side configuration to allow iframe embedding.
+ * For n8n, you need to set these environment variables:
+ * - N8N_DISABLE_UI_SECURITY=true
+ * - N8N_SAMESITE_COOKIE=none
+ * - N8N_SECURE_COOKIE=true
+ * 
+ * The X-Frame-Options header must allow embedding from your domain.
+ */
+export function ExternalEmbed({ src, showBranding = true }: { src: string; showBranding?: boolean }) {
     const appName = process.env.NEXT_PUBLIC_APP_NAME || 'AixelLabs';
     const sandboxRulesConfig = [
         'allow-same-origin',
@@ -165,7 +180,7 @@ export function LovableEmbed({ src, showBranding = true }: { src: string; showBr
     return (
         <IframeEmbed
             src={src}
-            title="Lovable App"
+            title="External Application"
             showHeader={showBranding}
             headerText={`Powered by ${appName}`}
             sandboxRules={sandboxRulesConfig}
