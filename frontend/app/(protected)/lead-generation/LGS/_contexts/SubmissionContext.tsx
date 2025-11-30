@@ -6,8 +6,11 @@ import { useForm } from './FormContext';
 import { 
     GMAPS_SCRAPE_REQUEST,
     SSEParser,
+    StreamMessage,
     isCompleteMessage, 
-    isErrorMessage 
+    isErrorMessage,
+    isProgressMessage,
+    isStatusMessage
 } from '@aixellabs/shared/apis';
 import { API_ENDPOINTS } from '@aixellabs/shared/utils';
 
@@ -16,6 +19,10 @@ type SubmissionState = {
     isSuccess: boolean;
     error: string | null;
     result: unknown;
+    currentStatus: string;
+    currentProgress: number;
+    currentPhase: number | null;
+    messages: StreamMessage[];
 };
 
 type SubmissionContextType = {
@@ -31,6 +38,10 @@ const initialSubmissionState: SubmissionState = {
     isSuccess: false,
     error: null,
     result: null,
+    currentStatus: '',
+    currentProgress: 0,
+    currentPhase: null,
+    messages: [],
 };
 
 export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
@@ -43,6 +54,10 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
             ...prev,
             isSubmitting: true,
             error: null,
+            currentStatus: 'Connecting to server...',
+            currentProgress: 0,
+            currentPhase: null,
+            messages: [],
         }));
 
         try {
@@ -96,12 +111,35 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
                         // Process any remaining buffer
                         const finalMessages = parser.flush();
                         for (const message of finalMessages) {
-                            if (isCompleteMessage(message)) {
+                            console.log(`[${message.type}] ${message.message}`, message.data);
+
+                            // Add message to history
+                            setSubmissionState((prev) => ({
+                                ...prev,
+                                messages: [...prev.messages, message],
+                            }));
+
+                            if (isStatusMessage(message)) {
+                                setSubmissionState((prev) => ({
+                                    ...prev,
+                                    currentStatus: message.message,
+                                    currentPhase: message.data?.phase ?? prev.currentPhase,
+                                }));
+                            } else if (isProgressMessage(message)) {
+                                setSubmissionState((prev) => ({
+                                    ...prev,
+                                    currentStatus: message.message,
+                                    currentProgress: message.data?.percentage ?? 0,
+                                    currentPhase: message.data?.phase ?? prev.currentPhase,
+                                }));
+                            } else if (isCompleteMessage(message)) {
                                 setSubmissionState((prev) => ({
                                     ...prev,
                                     isSubmitting: false,
                                     isSuccess: true,
                                     result: message.data,
+                                    currentStatus: message.message,
+                                    currentProgress: 100,
                                 }));
                             }
                         }
@@ -116,12 +154,33 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
                     for (const message of messages) {
                         console.log(`[${message.type}] ${message.message}`, message.data);
 
-                        if (isCompleteMessage(message)) {
+                        // Add message to history
+                        setSubmissionState((prev) => ({
+                            ...prev,
+                            messages: [...prev.messages, message],
+                        }));
+
+                        if (isStatusMessage(message)) {
+                            setSubmissionState((prev) => ({
+                                ...prev,
+                                currentStatus: message.message,
+                                currentPhase: message.data?.phase ?? prev.currentPhase,
+                            }));
+                        } else if (isProgressMessage(message)) {
+                            setSubmissionState((prev) => ({
+                                ...prev,
+                                currentStatus: message.message,
+                                currentProgress: message.data?.percentage ?? 0,
+                                currentPhase: message.data?.phase ?? prev.currentPhase,
+                            }));
+                        } else if (isCompleteMessage(message)) {
                             setSubmissionState((prev) => ({
                                 ...prev,
                                 isSubmitting: false,
                                 isSuccess: true,
                                 result: message.data,
+                                currentStatus: message.message,
+                                currentProgress: 100,
                             }));
                         } else if (isErrorMessage(message)) {
                             setSubmissionState((prev) => ({
@@ -129,10 +188,9 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
                                 isSubmitting: false,
                                 isSuccess: false,
                                 error: message.message || 'An error occurred',
+                                currentStatus: message.message,
                             }));
                         }
-                        // For status/progress messages, you can add custom handling here
-                        // e.g., emit events, update progress state, etc.
                     }
                 }
             } finally {
