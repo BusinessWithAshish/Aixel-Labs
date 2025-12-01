@@ -5,27 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ExternalLink, Phone, Star, MessageSquare } from 'lucide-react';
 import { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/apis';
-
-type LeadType = {
-    type: string;
-    color: string;
-};
-
-const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
-    const hasWebsite = lead.website && lead.website !== 'N/A';
-    const hasPhone = lead.phoneNumber && lead.phoneNumber !== 'N/A';
-
-        if (!hasWebsite && hasPhone) return { type: 'Hot Lead', color: 'bg-green-50 border-green-200' };
-        if ((hasWebsite && hasPhone) || (hasWebsite && !hasPhone)) return { type: 'Warm Lead', color: 'bg-amber-50 border-amber-200' };
-        if (!hasWebsite && !hasPhone) return { type: 'Cold Lead', color: 'bg-gray-50 border-gray-200' };
-        return { type: 'Unknown', color: 'bg-white border-gray-200' };
-    };
+import { getLeadType, hasWebsite, hasPhone } from '../_utils';
 
 export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
     const leadType = getLeadType(lead);
 
     const handleWebsiteClick = () => {
-        if (lead.website && lead.website !== 'N/A') {
+        if (hasWebsite(lead)) {
             window.open(lead.website, '_blank', 'noopener,noreferrer');
         }
     };
@@ -60,7 +46,7 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
                 <div className="flex items-start gap-2 sm:gap-3">
                     <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1 overflow-hidden">
-                        {lead.website && lead.website !== 'N/A' ? (
+                        {hasWebsite(lead) ? (
                             <button
                                 onClick={handleWebsiteClick}
                                 className="text-blue-600 hover:text-blue-800 hover:underline truncate block w-full text-left text-xs sm:text-sm"
@@ -77,7 +63,7 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
                 <div className="flex items-start gap-2 sm:gap-3">
                     <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1 overflow-hidden">
-                        {lead.phoneNumber && lead.phoneNumber !== 'N/A' ? (
+                        {hasPhone(lead) ? (
                             <a
                                 href={`tel:${lead.phoneNumber}`}
                                 className="text-gray-700 hover:text-gray-900 hover:underline truncate block text-xs sm:text-sm"

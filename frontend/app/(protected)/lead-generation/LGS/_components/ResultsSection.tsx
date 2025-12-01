@@ -9,58 +9,7 @@ import { SortAsc, SortDesc } from 'lucide-react';
 import { useSubmission } from '../_contexts';
 import { LeadCard } from './LeadCard';
 import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared/apis';
-
-type SortKey = 'rating' | 'reviews';
-type SortDirection = 'asc' | 'desc';
-
-const extractNumericValue = (value: string, isRating: boolean): number => {
-    if (!value || value === 'N/A' || value === '' || value === null || value === undefined) {
-        return -1;
-    }
-    
-    const stringValue = String(value);
-    const normalized = stringValue.replace(/[^\d.]/g, '');
-    
-    if (!normalized || normalized === '') {
-        return -1;
-    }
-    
-    const numeric = isRating ? parseFloat(normalized) : parseInt(normalized, 10);
-    return Number.isFinite(numeric) && numeric >= 0 ? numeric : -1;
-};
-
-const sortLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[], sortKey: SortKey, sortDirection: SortDirection): GMAPS_SCRAPE_LEAD_INFO[] => {
-    const isRating = sortKey === 'rating';
-    
-    return [...leads].sort((a, b) => {
-        const aValue = extractNumericValue(isRating ? a.overAllRating : a.numberOfReviews, isRating);
-        const bValue = extractNumericValue(isRating ? b.overAllRating : b.numberOfReviews, isRating);
-        
-        if (aValue === -1 && bValue === -1) return 0;
-        if (aValue === -1) return 1;
-        if (bValue === -1) return -1;
-        
-        const comparison = aValue - bValue;
-        return sortDirection === 'asc' ? comparison : -comparison;
-    });
-};
-
-const categorizeLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[]) => {
-    const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.website && lead.website !== 'N/A';
-    const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO) => lead.phoneNumber && lead.phoneNumber !== 'N/A';
-
-    return {
-        all: leads,
-        hotLeads: leads.filter((lead) => !hasWebsite(lead) && hasPhone(lead)),
-        warmLeads: leads.filter((lead) => hasWebsite(lead) && hasPhone(lead)),
-        coldLeads: leads.filter((lead) => !hasWebsite(lead) && !hasPhone(lead)),
-    };
-};
-
-const generateUniqueKey = (lead: GMAPS_SCRAPE_LEAD_INFO, index: number): string => {
-    const baseKey = lead.gmapsUrl || `${lead.name}-${lead.phoneNumber || 'no-phone'}-${lead.website || 'no-website'}`;
-    return `${baseKey}-${index}`;
-};
+import { sortLeads, categorizeLeads, generateUniqueKey, type SortKey, type SortDirection } from '../_utils';
 
 export const ResultsSection = () => {
     const { submissionState } = useSubmission();
