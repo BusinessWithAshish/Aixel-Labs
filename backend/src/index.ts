@@ -27,7 +27,11 @@ app.use(
 
       const allowedPatterns =
         process.env.NODE_ENV === "development"
-          ? [/^http:\/\/.*\.localhost:3003$/, /^http:\/\/localhost:3003$/]
+          ? [
+              /^http:\/\/.*\.localhost:3003$/,
+              /^http:\/\/localhost:3003$/,
+              /^https:\/\/.*\.aixellabs\.com$/,
+            ]
           : [/^https:\/\/.*\.aixellabs\.com$/];
 
       const isAllowed = allowedPatterns.some((pattern) => pattern.test(origin));
