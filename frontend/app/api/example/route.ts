@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCollection } from '@/lib/mongodb';
+import { getCollection, MongoObjectId } from '@aixellabs/shared/utils';
 
 /**
  * Example API route demonstrating MongoDB CRUD operations
@@ -107,10 +107,9 @@ export async function PUT(request: NextRequest) {
 
     // Replace 'your_collection' with your actual collection name
     const collection = await getCollection('tenants');
-    const { ObjectId } = await import('mongodb');
     
     const result = await collection.updateOne(
-      { _id: new ObjectId(id) },
+      { _id: new MongoObjectId(id) },
       {
         $set: {
           ...updateData,
@@ -168,10 +167,9 @@ export async function PATCH(request: NextRequest) {
 
     // Replace 'your_collection' with your actual collection name
     const collection = await getCollection('tenants');
-    const { ObjectId } = await import('mongodb');
     
     const result = await collection.updateOne(
-      { _id: new ObjectId(id) },
+      { _id: new MongoObjectId(id) },
       {
         $set: {
           ...updateData,
@@ -228,9 +226,8 @@ export async function DELETE(request: NextRequest) {
 
     // Replace 'your_collection' with your actual collection name
     const collection = await getCollection('tenants');
-    const { ObjectId } = await import('mongodb');
     
-    const result = await collection.deleteOne({ _id: new ObjectId(id) });
+    const result = await collection.deleteOne({ _id: new MongoObjectId(id) });
 
     if (result.deletedCount === 0) {
       return NextResponse.json(

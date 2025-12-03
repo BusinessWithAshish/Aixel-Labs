@@ -1,6 +1,6 @@
 import NextAuth, { DefaultSession, CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { getCollection } from '@/lib/mongodb';
+import { getCollection } from '@aixellabs/shared/utils';
 import { z } from 'zod';
 
 // Custom error classes for specific error types

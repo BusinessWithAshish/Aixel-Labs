@@ -1,7 +1,6 @@
 'use server';
 
-import { getCollection } from '@/lib/mongodb';
-import { ObjectId, type Document } from 'mongodb';
+import { getCollection, MongoObjectId, type Document, type ObjectId } from '@aixellabs/shared/utils';
 
 export type User = {
     _id: string;
@@ -93,7 +92,7 @@ export const createUser = async (input: CreateUserInput): Promise<User | null> =
             password: input.password,
             name: input.name?.trim(),
             isAdmin: Boolean(input.isAdmin),
-            tenantId: tenantObjectId,
+            tenantId: tenantObjectId as ObjectId,
         };
 
         const result = await collection.insertOne(doc);
@@ -114,7 +113,7 @@ export const createUser = async (input: CreateUserInput): Promise<User | null> =
 
 export const updateUser = async (id: string, input: UpdateUserInput): Promise<User | null> => {
     try {
-        if (!ObjectId.isValid(id)) return null;
+        if (!MongoObjectId.isValid(id)) return null;
 
         const collection = await getCollection<Document>('users');
         const tenantsCollection = await getCollection<Document>('tenants');
@@ -124,7 +123,7 @@ export const updateUser = async (id: string, input: UpdateUserInput): Promise<Us
         if (input.isAdmin !== undefined) updateFields.isAdmin = input.isAdmin;
 
         const result = await collection.findOneAndUpdate(
-            { _id: new ObjectId(id) },
+            { _id: new MongoObjectId(id) },
             { $set: updateFields },
             { returnDocument: 'after' },
         );
@@ -152,10 +151,10 @@ export const updateUser = async (id: string, input: UpdateUserInput): Promise<Us
 
 export const deleteUser = async (id: string): Promise<boolean> => {
     try {
-        if (!ObjectId.isValid(id)) return false;
+        if (!MongoObjectId.isValid(id)) return false;
 
         const collection = await getCollection<Document>('users');
-        const result = await collection.deleteOne({ _id: new ObjectId(id) });
+        const result = await collection.deleteOne({ _id: new MongoObjectId(id) });
 
         return result.deletedCount === 1;
     } catch {

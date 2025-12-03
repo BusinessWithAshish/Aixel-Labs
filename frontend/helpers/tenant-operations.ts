@@ -1,7 +1,6 @@
 'use server';
 
-import { getCollection } from '@/lib/mongodb';
-import { ObjectId, type Document } from 'mongodb';
+import { getCollection, MongoObjectId, type Document } from '@aixellabs/shared/utils';
 
 export type Tenant = {
     _id: string;
@@ -57,7 +56,7 @@ export const createTenant = async (input: CreateTenantInput): Promise<Tenant | n
 
 export const updateTenant = async (id: string, input: UpdateTenantInput): Promise<Tenant | null> => {
     try {
-        if (!ObjectId.isValid(id)) return null;
+        if (!MongoObjectId.isValid(id)) return null;
 
         const collection = await getCollection<Document>('tenants');
 
@@ -66,7 +65,7 @@ export const updateTenant = async (id: string, input: UpdateTenantInput): Promis
         if (input.redirect_url !== undefined) updateFields.redirect_url = input.redirect_url;
 
         const result = await collection.findOneAndUpdate(
-            { _id: new ObjectId(id) },
+            { _id: new MongoObjectId(id) },
             { $set: updateFields },
             { returnDocument: 'after' },
         );
@@ -87,10 +86,10 @@ export const updateTenant = async (id: string, input: UpdateTenantInput): Promis
 
 export const deleteTenant = async (id: string): Promise<boolean> => {
     try {
-        if (!ObjectId.isValid(id)) return false;
+        if (!MongoObjectId.isValid(id)) return false;
 
         const collection = await getCollection<Document>('tenants');
-        const result = await collection.deleteOne({ _id: new ObjectId(id) });
+        const result = await collection.deleteOne({ _id: new MongoObjectId(id) });
 
         return result.deletedCount === 1;
     } catch {

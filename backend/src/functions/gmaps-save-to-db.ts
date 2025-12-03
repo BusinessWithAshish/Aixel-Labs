@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { Db, Collection } from 'mongodb';
-import {TGoogleMapItem, TGoogleMapLeadInfo} from "./gmap-details-lead-extractor";
+import type { Db, Collection } from 'mongodb';
+import type {TGoogleMapItem, TGoogleMapLeadInfo} from "./gmap-details-lead-extractor";
 
 // Helper function to convert scraped data to your DB format
 const formatLeadsForDB = (scrapeData: TGoogleMapItem[]): TGoogleMapLeadInfo[] => {
