@@ -1,4 +1,4 @@
-import { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/apis';
+import { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common/apis';
 
 // ============================================================================
 // Type Definitions

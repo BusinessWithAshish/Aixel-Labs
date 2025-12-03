@@ -1,6 +1,6 @@
 'use server';
 
-import { getCollection, MongoObjectId, type Document } from '@aixellabs/shared/utils/server';
+import { getCollection, MongoObjectId, type Document } from '@aixellabs/shared/mongodb';
 
 export type Tenant = {
     _id: string;

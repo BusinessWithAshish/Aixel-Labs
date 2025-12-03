@@ -2,28 +2,30 @@
   "name": "@aixellabs/shared",
   "version": "1.0.0",
   "private": true,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+    "./common": {
+      "types": "./dist/common/index.d.ts",
+      "default": "./dist/common/index.js"
     },
-    "./apis": {
-      "types": "./dist/apis/index.d.ts",
-      "default": "./dist/apis/index.js"
+    "./common/apis": {
+      "types": "./dist/common/apis/index.d.ts",
+      "default": "./dist/common/apis/index.js"
     },
-    "./types": {
-      "types": "./dist/types/index.d.ts",
-      "default": "./dist/types/index.js"
+    "./common/types": {
+      "types": "./dist/common/types/index.d.ts",
+      "default": "./dist/common/types/index.js"
     },
-    "./utils": {
-      "types": "./dist/utils/index.d.ts",
-      "default": "./dist/utils/index.js"
+    "./common/utils": {
+      "types": "./dist/common/utils/index.d.ts",
+      "default": "./dist/common/utils/index.js"
     },
-    "./utils/server": {
-      "types": "./dist/utils/server.d.ts",
-      "default": "./dist/utils/server.js"
+    "./mongodb": {
+      "types": "./dist/mongodb/index.d.ts",
+      "default": "./dist/mongodb/index.js"
+    },
+    "./external": {
+      "types": "./dist/external/index.d.ts",
+      "default": "./dist/external/index.js"
     }
   },
   "scripts": {

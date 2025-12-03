@@ -1,7 +1,5 @@
-// GMAPS API Types and Utilities
 import z from "zod";
 
-// Constants
 export const GOOGLE_MAPS_BASE_URL = "https://www.google.com/maps/search/";
 
 export const GMAPS_SCRAPE_REQUEST_SCHEMA = z.object({
@@ -14,6 +12,7 @@ export const GMAPS_SCRAPE_REQUEST_SCHEMA = z.object({
     })
   ),
 });
+
 export type GMAPS_SCRAPE_REQUEST = z.infer<typeof GMAPS_SCRAPE_REQUEST_SCHEMA>;
 
 export type GMAPS_SCRAPE_LEAD_INFO = {
@@ -33,11 +32,6 @@ export type GMAPS_SCRAPE_RESPONSE = {
   allLeadsCount: number;
 };
 
-// ============================================================================
-// Stream Messaging Types and Utilities
-// ============================================================================
-
-// Stream message type enum
 export enum StreamMessageType {
   PROGRESS = "progress",
   STATUS = "status",
@@ -45,7 +39,6 @@ export enum StreamMessageType {
   COMPLETE = "complete",
 }
 
-// Stream message structure
 export type StreamMessage = {
   type: StreamMessageType;
   message: string;
@@ -63,12 +56,10 @@ export type StreamMessage = {
   timestamp: string;
 };
 
-// Utility to serialize stream messages (includes SSE format with data: prefix and \n\n delimiter)
 export const serializeStreamMessage = (message: StreamMessage): string => {
   return `data: ${JSON.stringify(message)}\n\n`;
 };
 
-// Helper to create stream messages with automatic timestamp
 export const createStreamMessage = (
   type: StreamMessageType,
   message: string,
@@ -82,78 +73,57 @@ export const createStreamMessage = (
   };
 };
 
-// SSE Parser for Frontend
-export class SSEParser {
-  private buffer: string = "";
+export const SSEParser = () => {
+  let buffer = "";
 
-  /**
-   * Parse incoming SSE data chunks
-   * @param chunk - The raw string chunk from the stream
-   * @returns Array of parsed StreamMessage objects
-   */
-  parseChunk(chunk: string): StreamMessage[] {
-    this.buffer += chunk;
-    const messages: StreamMessage[] = [];
+  return {
+    parseChunk: (chunk: string): StreamMessage[] => {
+      buffer += chunk;
+      const messages: StreamMessage[] = [];
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
 
-    // Split by SSE message delimiter (\n\n)
-    const parts = this.buffer.split("\n\n");
-
-    // Keep the last incomplete part in the buffer
-    this.buffer = parts.pop() || "";
-
-    // Process complete messages
-    for (const part of parts) {
-      if (part.trim().startsWith("data: ")) {
-        try {
-          const jsonStr = part.trim().slice(6); // Remove 'data: ' prefix
-          const message: StreamMessage = JSON.parse(jsonStr);
-          messages.push(message);
-        } catch (error) {
-          // Silently skip invalid messages
+      for (const part of parts) {
+        if (part.trim().startsWith("data: ")) {
+          try {
+            const jsonStr = part.trim().slice(6);
+            const message: StreamMessage = JSON.parse(jsonStr);
+            messages.push(message);
+          } catch (error) {}
         }
       }
-    }
 
-    return messages;
-  }
+      return messages;
+    },
 
-  /**
-   * Flush any remaining buffer content (call when stream ends)
-   * @returns Array of parsed StreamMessage objects from remaining buffer
-   */
-  flush(): StreamMessage[] {
-    if (!this.buffer.trim()) {
-      return [];
-    }
+    flush: (): StreamMessage[] => {
+      if (!buffer.trim()) {
+        return [];
+      }
 
-    const messages: StreamMessage[] = [];
-    const parts = this.buffer.split("\n\n").filter((msg) => msg.trim());
+      const messages: StreamMessage[] = [];
+      const parts = buffer.split("\n\n").filter((msg) => msg.trim());
 
-    for (const part of parts) {
-      if (part.trim().startsWith("data: ")) {
-        try {
-          const jsonStr = part.trim().slice(6);
-          const message: StreamMessage = JSON.parse(jsonStr);
-          messages.push(message);
-        } catch (error) {
-          // Silently skip invalid messages
+      for (const part of parts) {
+        if (part.trim().startsWith("data: ")) {
+          try {
+            const jsonStr = part.trim().slice(6);
+            const message: StreamMessage = JSON.parse(jsonStr);
+            messages.push(message);
+          } catch (error) {}
         }
       }
-    }
 
-    this.buffer = "";
-    return messages;
-  }
+      buffer = "";
+      return messages;
+    },
 
-  /**
-   * Reset the parser state
-   */
-  reset(): void {
-    this.buffer = "";
-  }
-}
+    reset: (): void => {
+      buffer = "";
+    },
+  };
+};
 
-// Type guard functions
 export const isStreamMessageType = (
   type: string
 ): type is StreamMessageType => {
@@ -176,38 +146,29 @@ export const isStatusMessage = (message: StreamMessage): boolean => {
   return message.type === StreamMessageType.STATUS;
 };
 
-// Utility functions
-export function generateGoogleMapsUrls(data: GMAPS_SCRAPE_REQUEST): string[] {
+export const generateGoogleMapsUrls = (data: GMAPS_SCRAPE_REQUEST): string[] => {
   const urls: string[] = [];
 
   data.states.forEach((state: { name: string; cities: string[] }) => {
     state.cities.forEach((city: string) => {
-      // Clean and format the query
       const formattedQuery = data.query
         .toLowerCase()
         .trim()
         .replace(/\s+/g, "+");
 
-      // Create location string: City, State, Country
       const location = `${city}, ${state.name}, ${data.country}`;
-      const formattedLocation = location
-        .replace(/\s+/g, "+")
-        .replace(/,/g, ",");
+      const formattedLocation = location.replace(/\s+/g, "+");
 
-      // Construct the final URL
       const searchTerm = `${formattedQuery}+in+${formattedLocation}`;
-
-      // URL encode the entire search term
       const encodedSearchTerm = encodeURIComponent(searchTerm).replace(
         /%2B/g,
         "+"
       );
 
       const finalUrl = `${GOOGLE_MAPS_BASE_URL}${encodedSearchTerm}`;
-
       urls.push(finalUrl);
     });
   });
 
   return urls;
-}
+};
