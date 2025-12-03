@@ -152,8 +152,8 @@ export const sortLeads = (
 /**
  * Categorizes leads into hot, warm, and cold based on website, social media, and phone availability
  * - Hot Leads: (No website but has phone) OR (Has social media and phone) - high priority for outreach
- * - Warm Leads: Has website and phone (good for follow-up)
- * - Cold Leads: No website/social media and no phone (low priority)
+ * - Warm Leads: Has proper website (with or without phone) - good for follow-up
+ * - Cold Leads: Everything else (no website, no social media, or social media without phone) - low priority
  * 
  * @param leads - Array of leads to categorize
  * @returns Object with categorized lead arrays
@@ -171,14 +171,34 @@ export const categorizeLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[]): CategorizedLea
             // 2. Have social media profile and phone (instead of proper website)
             return (!hasProperWebsite && hasPhoneNumber) || (hasSocialMediaProfile && hasPhoneNumber);
         }),
-        warmLeads: leads.filter((lead) => hasWebsite(lead) && hasPhone(lead)),
-        coldLeads: leads.filter((lead) => !hasWebsite(lead) && !hasSocialMedia(lead) && !hasPhone(lead)),
+        warmLeads: leads.filter((lead) => {
+            const hasProperWebsite = hasWebsite(lead);
+            
+            // Warm leads are those who have a proper website (regardless of phone)
+            return hasProperWebsite;
+        }),
+        coldLeads: leads.filter((lead) => {
+            const hasProperWebsite = hasWebsite(lead);
+            const hasSocialMediaProfile = hasSocialMedia(lead);
+            const hasPhoneNumber = hasPhone(lead);
+            
+            // Cold leads are those who:
+            // 1. Don't have a website, don't have social media, and don't have phone, OR
+            // 2. Have social media but no phone (can't reach them easily)
+            return (!hasProperWebsite && !hasSocialMediaProfile && !hasPhoneNumber) || 
+                   (hasSocialMediaProfile && !hasPhoneNumber);
+        }),
     };
 };
 
 /**
  * Determines the lead type for a single lead
  * This is consistent with the categorization logic used in categorizeLeads
+ * 
+ * Priority order:
+ * 1. Hot Lead: No website but has phone OR social media with phone
+ * 2. Warm Lead: Has proper website (regardless of phone)
+ * 3. Cold Lead: Everything else (no website/social, or social without phone)
  * 
  * @param lead - The lead to categorize
  * @returns Lead type information with display properties
@@ -197,8 +217,8 @@ export const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
         };
     }
     
-    // Warm Lead: Has proper website and phone
-    if (website && phone) {
+    // Warm Lead: Has proper website (with or without phone)
+    if (website) {
         return { 
             type: 'Warm Lead', 
             color: 'bg-amber-50 border-amber-200',
@@ -206,16 +226,7 @@ export const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
         };
     }
     
-    // Warm Lead: Has proper website but no phone
-    if (website && !phone) {
-        return { 
-            type: 'Warm Lead', 
-            color: 'bg-amber-50 border-amber-200',
-            category: 'warmLeads'
-        };
-    }
-    
-    // Cold Lead: No website, no social media, and no phone
+    // Cold Lead: Everything else (no website, no social media, or social media without phone)
     return { 
         type: 'Cold Lead', 
         color: 'bg-gray-50 border-gray-200',
