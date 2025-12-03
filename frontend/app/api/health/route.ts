@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkConnection } from '@aixellabs/shared/utils';
+import { checkConnection } from '@aixellabs/shared/utils/server';
 
 /**
  * Health check endpoint for MongoDB connection

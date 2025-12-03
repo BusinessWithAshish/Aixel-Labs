@@ -1,6 +1,6 @@
 'use server';
 
-import { getCollection, MongoObjectId, type Document, type ObjectId } from '@aixellabs/shared/utils';
+import { getCollection, MongoObjectId, type Document, type ObjectId } from '@aixellabs/shared/utils/server';
 
 export type User = {
     _id: string;

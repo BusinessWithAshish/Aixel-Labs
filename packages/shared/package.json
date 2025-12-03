@@ -20,6 +20,10 @@
     "./utils": {
       "types": "./dist/utils/index.d.ts",
       "default": "./dist/utils/index.js"
+    },
+    "./utils/server": {
+      "types": "./dist/utils/server.d.ts",
+      "default": "./dist/utils/server.js"
     }
   },
   "scripts": {

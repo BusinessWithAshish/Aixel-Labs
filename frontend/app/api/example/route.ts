@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCollection, MongoObjectId } from '@aixellabs/shared/utils';
+import { getCollection, MongoObjectId } from '@aixellabs/shared/utils/server';
 
 /**
  * Example API route demonstrating MongoDB CRUD operations
