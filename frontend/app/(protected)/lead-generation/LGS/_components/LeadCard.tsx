@@ -4,12 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ExternalLink, Phone, Star, MessageSquare, MapPin } from 'lucide-react';
+import { ExternalLink, Phone, Star, MessageSquare, MapPin, Copy } from 'lucide-react';
 import { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/apis';
 import { getLeadType, hasWebsite, hasPhone } from '../_utils';
+import { copyPhoneNumber } from '@/lib/clipboard';
+import { useState } from 'react';
 
 export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
     const leadType = getLeadType(lead);
+    const [isPhoneHovered, setIsPhoneHovered] = useState(false);
 
     const handleWebsiteClick = () => {
         if (hasWebsite(lead)) {
@@ -20,6 +23,12 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
     const handleMapsClick = () => {
         if (lead.gmapsUrl) {
             window.open(lead.gmapsUrl, '_blank', 'noopener,noreferrer');
+        }
+    };
+
+    const handleCopyPhone = async () => {
+        if (hasPhone(lead)) {
+            await copyPhoneNumber(lead.phoneNumber);
         }
     };
 
@@ -79,17 +88,38 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
                     </div>
                 </div>
 
-                <div className="flex items-start gap-2 sm:gap-3">
+                <div 
+                    className="flex items-start gap-2 sm:gap-3 group/phone"
+                    onMouseEnter={() => setIsPhoneHovered(true)}
+                    onMouseLeave={() => setIsPhoneHovered(false)}
+                >
                     <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1 overflow-hidden">
+                    <div className="min-w-0 flex-1 overflow-hidden flex items-center gap-2">
                         {hasPhone(lead) ? (
-                            <a
-                                href={`tel:${lead.phoneNumber}`}
-                                className="text-gray-700 hover:text-gray-900 hover:underline truncate block text-xs sm:text-sm"
-                                title={lead.phoneNumber}
-                            >
-                                {lead.phoneNumber}
-                            </a>
+                            <>
+                                <a
+                                    href={`tel:${lead.phoneNumber}`}
+                                    className="text-gray-700 hover:text-gray-900 hover:underline truncate block text-xs sm:text-sm"
+                                    title={lead.phoneNumber}
+                                >
+                                    {lead.phoneNumber}
+                                </a>
+                                <Button
+                                    onClick={handleCopyPhone}
+                                    variant="ghost"
+                                    size="icon"
+                                    className={cn(
+                                        "h-6 w-6 rounded-md hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 shrink-0",
+                                        // Always visible on mobile (sm and below), hover on desktop
+                                        "opacity-100 sm:opacity-0 sm:group-hover/phone:opacity-100",
+                                        isPhoneHovered && "sm:scale-110"
+                                    )}
+                                    title="Copy phone number"
+                                    aria-label="Copy phone number to clipboard"
+                                >
+                                    <Copy className="w-3.5 h-3.5 text-gray-600 hover:text-gray-900" />
+                                </Button>
+                            </>
                         ) : (
                             <span className="text-gray-500 italic text-xs sm:text-sm">No phone number</span>
                         )}
