@@ -157,9 +157,7 @@ export const generateGoogleMapsUrls = (data: GMAPS_SCRAPE_REQUEST): string[] => 
         .replace(/\s+/g, "+");
 
       const location = `${city}, ${state.name}, ${data.country}`;
-      const formattedLocation = location
-        .replace(/\s+/g, "+")
-        .replace(/,/g, ",");
+      const formattedLocation = location.replace(/\s+/g, "+");
 
       const searchTerm = `${formattedQuery}+in+${formattedLocation}`;
       const encodedSearchTerm = encodeURIComponent(searchTerm).replace(

@@ -2,8 +2,6 @@
   "name": "@aixellabs/shared",
   "version": "1.0.0",
   "private": true,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./common": {
       "types": "./dist/common/index.d.ts",
