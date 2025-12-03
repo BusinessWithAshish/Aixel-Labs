@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { SortAsc, SortDesc } from 'lucide-react';
 import { useSubmission } from '../_contexts';
 import { LeadCard } from './LeadCard';
-import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/common/apis';
+import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared/common/apis';
 import { sortLeads, categorizeLeads, generateUniqueKey, type SortKey, type SortDirection } from '../_utils';
 
 export const ResultsSection = () => {

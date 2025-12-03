@@ -10,12 +10,9 @@ importers:
 
   backend:
     dependencies:
-      '@aixellabs/common':
+      '@aixellabs/shared':
         specifier: workspace:*
-        version: link:../packages/common
-      '@aixellabs/mongodb':
-        specifier: workspace:*
-        version: link:../packages/mongodb
+        version: link:../packages/shared
       cors:
         specifier: ^2.8.5
         version: 2.8.5
@@ -77,12 +74,9 @@ importers:
 
   frontend:
     dependencies:
-      '@aixellabs/common':
+      '@aixellabs/shared':
         specifier: workspace:*
-        version: link:../packages/common
-      '@aixellabs/mongodb':
-        specifier: workspace:*
-        version: link:../packages/mongodb
+        version: link:../packages/shared
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.67.0(react@19.2.0))

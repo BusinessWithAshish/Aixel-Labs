@@ -3,7 +3,7 @@ import {
   GMAPS_SCRAPE_REQUEST_SCHEMA,
   GMAPS_SCRAPE_RESPONSE,
   generateGoogleMapsUrls,
-} from "@aixellabs/common/apis";
+} from "@aixellabs/shared/common/apis";
 import { BrowserBatchHandler } from "../functions/common/browser-batch-handler.js";
 import { scrapeLinks } from "../functions/scrape-links.js";
 import { GmapsDetailsLeadInfoExtractor } from "../functions/gmap-details-lead-extractor.js";

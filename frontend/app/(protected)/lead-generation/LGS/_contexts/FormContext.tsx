@@ -1,6 +1,6 @@
 'use client';
 
-import { GMAPS_SCRAPE_REQUEST } from '@aixellabs/common/apis';
+import { GMAPS_SCRAPE_REQUEST } from '@aixellabs/shared/common/apis';
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 type FormContextType = {

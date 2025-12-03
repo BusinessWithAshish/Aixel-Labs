@@ -11,8 +11,8 @@ import {
     isErrorMessage,
     isProgressMessage,
     isStatusMessage
-} from '@aixellabs/common/apis';
-import { API_ENDPOINTS } from '@aixellabs/common/utils';
+} from '@aixellabs/shared/common/apis';
+import { API_ENDPOINTS } from '@aixellabs/shared/common/utils';
 
 type SubmissionState = {
     isSubmitting: boolean;

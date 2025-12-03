@@ -73,7 +73,7 @@ export const createStreamMessage = (
   };
 };
 
-const createSSEParser = () => {
+export const SSEParser = () => {
   let buffer = "";
 
   return {
@@ -123,8 +123,6 @@ const createSSEParser = () => {
     },
   };
 };
-
-export const SSEParser = createSSEParser;
 
 export const isStreamMessageType = (
   type: string

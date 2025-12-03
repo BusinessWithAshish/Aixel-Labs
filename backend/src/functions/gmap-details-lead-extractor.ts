@@ -1,7 +1,7 @@
 import { Page } from "puppeteer";
 import { DEFAULT_PAGE_LOAD_TIMEOUT } from "../utils/constants.js";
 import { JSDOM } from "jsdom";
-import { GMAPS_SCRAPE_LEAD_INFO } from "@aixellabs/common/apis";
+import { GMAPS_SCRAPE_LEAD_INFO } from "@aixellabs/shared/common/apis";
 
 // === Universal Place ID Extractor ===
 const PLACE_ID_REGEX = /"place_id":"(ChI[0-9A-Za-z_-]{10,})"/;

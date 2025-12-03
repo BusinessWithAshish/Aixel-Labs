@@ -2,23 +2,25 @@
 
 ## Structure
 
-- **@aixellabs/common** - Shared types, utilities, and APIs used across frontend and backend
-- **@aixellabs/mongodb** - MongoDB client and database utilities
-- **@aixellabs/external** - External service integrations (Twilio, AI SDKs, etc.)
+Single `@aixellabs/shared` package with three organized spaces:
+
+- **common/** - Shared types, utilities, and APIs used across frontend and backend
+- **mongodb/** - MongoDB client and database utilities (server-side only)
+- **external/** - External service integrations (Twilio, AI SDKs, etc.)
 
 ## Usage
 
-### @aixellabs/common
+### Common (Frontend & Backend)
 ```typescript
-import { GMAPS_SCRAPE_REQUEST, StreamMessage } from '@aixellabs/common/apis';
-import { API_ENDPOINTS } from '@aixellabs/common/utils';
-import { User, ApiResponse } from '@aixellabs/common/types';
+import { GMAPS_SCRAPE_REQUEST, StreamMessage } from '@aixellabs/shared/common/apis';
+import { API_ENDPOINTS } from '@aixellabs/shared/common/utils';
+import { User, ApiResponse } from '@aixellabs/shared/common/types';
 ```
 
-### @aixellabs/mongodb
+### MongoDB (Server-side only)
 ```typescript
-import { getCollection, getDatabase, checkConnection, MongoObjectId } from '@aixellabs/mongodb';
+import { getCollection, getDatabase, checkConnection, MongoObjectId } from '@aixellabs/shared/mongodb';
 ```
 
-### @aixellabs/external
-Reserved for future external service integrations.
+### External (Future)
+Reserved for external service integrations.

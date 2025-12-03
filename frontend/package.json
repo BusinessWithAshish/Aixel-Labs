@@ -4,15 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port=3003",
-    "build": "pnpm --filter @aixellabs/common build && pnpm --filter @aixellabs/mongodb build && next build",
+    "build": "pnpm --filter @aixellabs/shared build && next build",
     "start": "next start",
     "lint": "next lint",
     "types": "tsc --noEmit",
     "prod": "rm -rf .next && next build && next start --port=3003"
   },
   "dependencies": {
-    "@aixellabs/common": "workspace:*",
-    "@aixellabs/mongodb": "workspace:*",
+    "@aixellabs/shared": "workspace:*",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-checkbox": "^1.2.3",
