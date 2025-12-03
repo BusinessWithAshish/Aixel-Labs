@@ -63,26 +63,31 @@ export const isSocialMediaUrl = (url: string): boolean => {
  * Checks if a lead has a valid website (excluding social media URLs)
  */
 export const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    const hasValidUrl = !!(lead.website && lead.website !== 'N/A' && lead.website.trim() !== '');
-    if (!hasValidUrl) {
+    const website = lead.website?.trim();
+    if (!website || website === 'N/A') {
         return false;
     }
     // If it's a social media URL, we don't consider it as having a website
-    return !isSocialMediaUrl(lead.website);
+    return !isSocialMediaUrl(website);
 };
 
 /**
  * Checks if a lead has a social media profile
  */
 export const hasSocialMedia = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    return !!(lead.website && lead.website !== 'N/A' && lead.website.trim() !== '' && isSocialMediaUrl(lead.website));
+    const website = lead.website?.trim();
+    if (!website || website === 'N/A') {
+        return false;
+    }
+    return isSocialMediaUrl(website);
 };
 
 /**
  * Checks if a lead has a valid phone number
  */
 export const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    return !!(lead.phoneNumber && lead.phoneNumber !== 'N/A' && lead.phoneNumber.trim() !== '');
+    const phoneNumber = lead.phoneNumber?.trim();
+    return !!(phoneNumber && phoneNumber !== 'N/A');
 };
 
 /**
