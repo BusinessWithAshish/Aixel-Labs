@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ExternalLink, Phone, Star, MessageSquare, MapPin, Copy } from 'lucide-react';
-import { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/apis';
+import { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/common/apis';
 import { getLeadType, hasWebsite, hasPhone } from '../_utils';
 import { copyPhoneNumber } from '@/lib/clipboard';
 import { useState } from 'react';

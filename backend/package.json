@@ -4,7 +4,7 @@
   "description": "Internal Google Maps scraping API server",
   "main": "dist/index.js",
   "scripts": {
-    "build": "pnpm --filter @aixellabs/shared build && tsc",
+    "build": "pnpm --filter @aixellabs/common build && pnpm --filter @aixellabs/mongodb build && tsc",
     "build:watch": "tsc --watch",
     "start": "tsx src/index.ts",
     "start:prod": "pnpm run build && node dist/index.js"
@@ -14,7 +14,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@aixellabs/shared": "workspace:*",
+    "@aixellabs/common": "workspace:*",
+    "@aixellabs/mongodb": "workspace:*",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",

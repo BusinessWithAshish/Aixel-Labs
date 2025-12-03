@@ -1,0 +1,22 @@
+{
+  "name": "@aixellabs/external",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.8.3"
+  }
+}

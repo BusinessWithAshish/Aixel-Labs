@@ -1,6 +1,6 @@
 'use server';
 
-import { getCollection } from '@aixellabs/shared/utils/server';
+import { getCollection } from '@aixellabs/mongodb';
 import { extractSubdomain } from '@/middleware';
 import { headers } from 'next/headers';
 

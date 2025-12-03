@@ -11,8 +11,8 @@ import {
     isErrorMessage,
     isProgressMessage,
     isStatusMessage
-} from '@aixellabs/shared/apis';
-import { API_ENDPOINTS } from '@aixellabs/shared/utils';
+} from '@aixellabs/common/apis';
+import { API_ENDPOINTS } from '@aixellabs/common/utils';
 
 type SubmissionState = {
     isSubmitting: boolean;
@@ -101,7 +101,7 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            const parser = new SSEParser();
+            const parser = SSEParser();
 
             try {
                 while (true) {

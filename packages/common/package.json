@@ -1,5 +1,5 @@
 {
-  "name": "@aixellabs/shared",
+  "name": "@aixellabs/common",
   "version": "1.0.0",
   "private": true,
   "main": "./dist/index.js",
@@ -20,10 +20,6 @@
     "./utils": {
       "types": "./dist/utils/index.d.ts",
       "default": "./dist/utils/index.js"
-    },
-    "./utils/server": {
-      "types": "./dist/utils/server.d.ts",
-      "default": "./dist/utils/server.js"
     }
   },
   "scripts": {
@@ -32,7 +28,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "mongodb": "^6.11.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {

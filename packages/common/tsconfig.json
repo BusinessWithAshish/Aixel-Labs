@@ -14,12 +14,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": [
-    "apis/**/*",
-    "types/**/*",
-    "utils/**/*",
-    "index.ts"
-  ],
+  "include": ["apis/**/*", "types/**/*", "utils/**/*", "index.ts"],
   "exclude": ["node_modules", "dist"]
 }
-

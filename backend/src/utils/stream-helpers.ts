@@ -4,7 +4,7 @@ import {
   StreamMessageType,
   serializeStreamMessage,
   createStreamMessage,
-} from "@aixellabs/shared/apis";
+} from "@aixellabs/common/apis";
 
 // Re-export types and utilities from shared package
 export {
