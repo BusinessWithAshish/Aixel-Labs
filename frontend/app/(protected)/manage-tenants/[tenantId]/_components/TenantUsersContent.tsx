@@ -8,7 +8,7 @@ import { UserDialog } from './EditUserDialog';
 import { DeleteUserConfirmDialog } from './DeleteUserConfirmDialog';
 import { usePage } from '@/contexts/PageStore';
 import type { UseTenantUsersPageReturn } from '../_hooks';
-import type { User } from '@/helpers/user-operations';
+import type { User } from '@aixellabs/shared/mongodb';
 import { deleteUserAction } from '@/app/actions/user-actions';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';

@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { toast } from 'sonner';
-import type { User } from '@/helpers/user-operations';
+import type { User } from '@aixellabs/shared/mongodb';
 import { createUserAction, updateUserAction } from '@/app/actions/user-actions';
 
 // Unified schema with optional fields

@@ -1,35 +1,8 @@
 'use server';
 
-import { getCollection, MongoObjectId, type Document, type ObjectId } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoObjectId, type Document, type ObjectId, type User, type CreateUserInput, type UpdateUserInput, type UserDoc } from '@aixellabs/shared/mongodb';
 
-export type User = {
-    _id: string;
-    email: string;
-    name?: string;
-    isAdmin: boolean;
-    tenantId: string;
-};
-
-export type CreateUserInput = {
-    email: string;
-    password: string;
-    name?: string;
-    isAdmin?: boolean;
-    tenantId: string;
-};
-
-export type UpdateUserInput = {
-    name?: string;
-    isAdmin?: boolean;
-};
-
-type UserDoc = {
-    email: string;
-    name?: string;
-    isAdmin: boolean;
-    tenantId: ObjectId;
-    password: string;
-};
+export type { User, CreateUserInput, UpdateUserInput };
 
 export const getUsersByTenantId = async (tenantId: string): Promise<User[]> => {
     try {

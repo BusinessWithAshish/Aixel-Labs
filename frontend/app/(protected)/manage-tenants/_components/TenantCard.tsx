@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Pencil, Building2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
-import type { Tenant } from '@/helpers/tenant-operations';
+import type { Tenant } from '@aixellabs/shared/mongodb';
 
 type TenantCardProps = {
     tenant: Tenant;

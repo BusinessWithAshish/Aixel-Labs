@@ -1,4 +1,4 @@
-import type { Tenant } from './tenant-operations';
+import type { Tenant } from '@aixellabs/shared/mongodb';
 
 export const getTenantRedirectUrl = (tenant: Tenant): string => {
     if (tenant.redirect_url) return tenant.redirect_url;

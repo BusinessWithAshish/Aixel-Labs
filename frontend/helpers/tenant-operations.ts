@@ -1,17 +1,8 @@
 'use server';
 
-import { getCollection, MongoObjectId, type Document } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoObjectId, type Document, type Tenant, type CreateTenantInput, type UpdateTenantInput, type TenantDoc } from '@aixellabs/shared/mongodb';
 
-export type Tenant = {
-    _id: string;
-    name: string;
-    redirect_url?: string;
-};
-
-export type CreateTenantInput = Omit<Tenant, '_id'>;
-export type UpdateTenantInput = Partial<CreateTenantInput>;
-
-type TenantDoc = Omit<Tenant, '_id'>;
+export type { Tenant, CreateTenantInput, UpdateTenantInput };
 
 export const getAllTenants = async (): Promise<Tenant[]> => {
     try {
