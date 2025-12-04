@@ -4,7 +4,7 @@ import { getCollection, type Tenant, type TenantDoc } from '@aixellabs/shared/mo
 import { extractSubdomain } from '@/middleware';
 import { headers } from 'next/headers';
 
-const getCurrentTenantFromHeaders = async (): Promise<string | null> => {
+export const getCurrentTenantFromHeaders = async (): Promise<string | null> => {
     const currentHeaders = await headers();
     const { subdomain } = extractSubdomain(currentHeaders);
     return subdomain;
