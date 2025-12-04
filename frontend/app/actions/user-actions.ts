@@ -1,7 +1,6 @@
 'use server';
 
-import { createUser, updateUser, deleteUser } from '@/helpers/user-operations';
-import type { CreateUserInput, UpdateUserInput } from '@aixellabs/shared/mongodb';
+import { createUser, updateUser, deleteUser, type CreateUserInput, type UpdateUserInput } from '@/helpers/user-operations';
 
 export type CreateUserResult = {
     success: boolean;

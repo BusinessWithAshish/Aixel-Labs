@@ -1,13 +1,37 @@
 'use server';
 
-import { getCollection, MongoObjectId, type Document, type ObjectId, type User, type CreateUserInput, type UpdateUserInput, type UserDoc } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoObjectId, type User, type UserDoc, type TenantDoc } from '@aixellabs/shared/mongodb';
 
-export type { User, CreateUserInput, UpdateUserInput };
+// ============================================================================
+// USER INPUT TYPES (Frontend/Forms)
+// ============================================================================
+
+/**
+ * Input for creating a new user (used in forms/API).
+ * tenantId is the tenant name (string) from the frontend.
+ */
+export type CreateUserInput = {
+    email: string;
+    password: string;
+    name?: string;
+    isAdmin?: boolean;
+    tenantId: string; // Tenant name as string
+};
+
+/**
+ * Input for updating a user (used in forms/API).
+ */
+export type UpdateUserInput = {
+    name?: string;
+    isAdmin?: boolean;
+};
+
+export type { User };
 
 export const getUsersByTenantId = async (tenantId: string): Promise<User[]> => {
     try {
-        const collection = await getCollection<Document>('users');
-        const tenantsCollection = await getCollection<Document>('tenants');
+        const usersCollection = await getCollection<UserDoc>('users');
+        const tenantsCollection = await getCollection<TenantDoc>('tenants');
         
         // Find the tenant by name to get its ObjectId
         const tenant = await tenantsCollection.findOne({ name: tenantId });
@@ -17,18 +41,16 @@ export const getUsersByTenantId = async (tenantId: string): Promise<User[]> => {
         }
         
         // Query users using the tenant's ObjectId
-        const users = await collection.find({ tenantId: tenant._id }).toArray();
-        return JSON.parse(
-            JSON.stringify(
-                users.map((user) => ({
-                    _id: user._id.toString(),
-                    email: user.email,
-                    name: user.name,
-                    isAdmin: Boolean(user.isAdmin),
-                    tenantId: tenantId, // Return the tenant name as string
-                })),
-            ),
-        );
+        const users = await usersCollection.find({ tenantId: tenant._id }).toArray();
+        
+        // Convert MongoDB documents to frontend-friendly format
+        return users.map((user) => ({
+            _id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+            isAdmin: user.isAdmin,
+            tenantId: tenantId, // Return the tenant name as string
+        }));
     } catch {
         return [];
     }
@@ -38,8 +60,8 @@ export const createUser = async (input: CreateUserInput): Promise<User | null> =
     try {
         if (!input.email || !input.password || !input.tenantId) return null;
 
-        const collection = await getCollection<Document>('users');
-        const tenantsCollection = await getCollection<Document>('tenants');
+        const usersCollection = await getCollection<UserDoc>('users');
+        const tenantsCollection = await getCollection<TenantDoc>('tenants');
 
         // Find the tenant by name to get its ObjectId
         const tenant = await tenantsCollection.findOne({ name: input.tenantId });
@@ -47,38 +69,36 @@ export const createUser = async (input: CreateUserInput): Promise<User | null> =
         if (!tenant) {
             return null; // Tenant doesn't exist
         }
-        
-        const tenantObjectId = tenant._id;
 
         // Check if user already exists with this email and tenantId
-        const existingUser = await collection.findOne({
+        const existingUser = await usersCollection.findOne({
             email: input.email.trim().toLowerCase(),
-            tenantId: tenantObjectId,
+            tenantId: tenant._id,
         });
 
         if (existingUser) {
             return null; // User already exists
         }
 
-        const doc: UserDoc = {
+        // Prepare document for insertion (without _id, MongoDB will generate it)
+        const docToInsert: Omit<UserDoc, '_id'> = {
             email: input.email.trim().toLowerCase(),
             password: input.password,
             name: input.name?.trim(),
-            isAdmin: Boolean(input.isAdmin),
-            tenantId: tenantObjectId as ObjectId,
+            isAdmin: input.isAdmin ?? false,
+            tenantId: tenant._id,
         };
 
-        const result = await collection.insertOne(doc);
+        const result = await usersCollection.insertOne(docToInsert as UserDoc);
 
-        return JSON.parse(
-            JSON.stringify({
-                _id: result.insertedId.toString(),
-                email: doc.email,
-                name: doc.name,
-                isAdmin: doc.isAdmin,
-                tenantId: input.tenantId, // Return the tenant name as string
-            }),
-        );
+        // Return frontend-friendly format
+        return {
+            _id: result.insertedId.toString(),
+            email: docToInsert.email,
+            name: docToInsert.name,
+            isAdmin: docToInsert.isAdmin,
+            tenantId: input.tenantId, // Return the tenant name as string
+        };
     } catch {
         return null;
     }
@@ -88,35 +108,33 @@ export const updateUser = async (id: string, input: UpdateUserInput): Promise<Us
     try {
         if (!MongoObjectId.isValid(id)) return null;
 
-        const collection = await getCollection<Document>('users');
-        const tenantsCollection = await getCollection<Document>('tenants');
+        const usersCollection = await getCollection<UserDoc>('users');
+        const tenantsCollection = await getCollection<TenantDoc>('tenants');
 
-        const updateFields: Partial<UserDoc> = {};
+        const updateFields: Partial<Pick<UserDoc, 'name' | 'isAdmin'>> = {};
         if (input.name !== undefined) updateFields.name = input.name;
         if (input.isAdmin !== undefined) updateFields.isAdmin = input.isAdmin;
 
-        const result = await collection.findOneAndUpdate(
+        const result = await usersCollection.findOneAndUpdate(
             { _id: new MongoObjectId(id) },
             { $set: updateFields },
             { returnDocument: 'after' },
         );
 
-        const updated = result?.value ?? null;
-        if (!updated) return null;
+        if (!result) return null;
 
         // Find the tenant name from the ObjectId
-        const tenant = await tenantsCollection.findOne({ _id: updated.tenantId });
+        const tenant = await tenantsCollection.findOne({ _id: result.tenantId });
         const tenantName = tenant?.name || '';
 
-        return JSON.parse(
-            JSON.stringify({
-                _id: updated._id.toString(),
-                email: updated.email,
-                name: updated.name,
-                isAdmin: Boolean(updated.isAdmin),
-                tenantId: tenantName, // Return the tenant name as string
-            }),
-        );
+        // Return frontend-friendly format
+        return {
+            _id: result._id.toString(),
+            email: result.email,
+            name: result.name,
+            isAdmin: result.isAdmin,
+            tenantId: tenantName, // Return the tenant name as string
+        };
     } catch {
         return null;
     }
@@ -126,8 +144,8 @@ export const deleteUser = async (id: string): Promise<boolean> => {
     try {
         if (!MongoObjectId.isValid(id)) return false;
 
-        const collection = await getCollection<Document>('users');
-        const result = await collection.deleteOne({ _id: new MongoObjectId(id) });
+        const usersCollection = await getCollection<UserDoc>('users');
+        const result = await usersCollection.deleteOne({ _id: new MongoObjectId(id) });
 
         return result.deletedCount === 1;
     } catch {

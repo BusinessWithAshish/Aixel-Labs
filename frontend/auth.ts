@@ -1,6 +1,6 @@
 import NextAuth, { DefaultSession, CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { getCollection } from '@aixellabs/shared/mongodb';
+import { getCollection, type UserDoc, type TenantDoc } from '@aixellabs/shared/mongodb';
 import { z } from 'zod';
 
 // Custom error classes for specific error types
@@ -65,31 +65,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 try {
                     const { email, password, tenantId } = await signInSchema.parseAsync(rawCreds);
 
-                    const users = await getCollection('users');
-                    const tenants = await getCollection('tenants');
+                    const usersCollection = await getCollection<UserDoc>('users');
+                    const tenantsCollection = await getCollection<TenantDoc>('tenants');
 
                     // Find the tenant by name to get its ObjectId
-                    const tenant = await tenants.findOne({ name: tenantId });
+                    const tenant = await tenantsCollection.findOne({ name: tenantId });
                     
                     if (!tenant) {
                         // Tenant doesn't exist
                         throw new UserNotInTenantError();
                     }
 
-                    const tenantObjectId = tenant._id;
-
                     // Check if user exists with this email (regardless of tenant)
-                    const userByEmail = await users.findOne({ email });
+                    const userByEmail = await usersCollection.findOne({ email });
 
                     if (!userByEmail) {
                         // User doesn't exist at all
                         throw new UserNotFoundError();
                     }
 
-                    // Check if user exists with this email AND tenant (tenantId is now ObjectId)
-                    const user = await users.findOne({ 
+                    // Check if user exists with this email AND tenant
+                    const user = await usersCollection.findOne({ 
                         email, 
-                        tenantId: tenantObjectId 
+                        tenantId: tenant._id 
                     });
 
                     if (!user) {
@@ -104,9 +102,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                     return {
                         id: user._id.toString(),
-                        email: user.email as string,
-                        name: user.name as string | undefined,
-                        isAdmin: Boolean(user.isAdmin),
+                        email: user.email,
+                        name: user.name,
+                        isAdmin: user.isAdmin,
                         tenantId: tenantId, // Return the tenant name as string for the session
                     };
                 } catch (error) {

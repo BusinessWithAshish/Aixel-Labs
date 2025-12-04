@@ -1,22 +1,37 @@
 'use server';
 
-import { getCollection, MongoObjectId, type Document, type Tenant, type CreateTenantInput, type UpdateTenantInput, type TenantDoc } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoObjectId, type Tenant, type TenantDoc } from '@aixellabs/shared/mongodb';
 
-export type { Tenant, CreateTenantInput, UpdateTenantInput };
+// ============================================================================
+// TENANT INPUT TYPES (Frontend/Forms)
+// ============================================================================
+
+/**
+ * Input for creating a new tenant (used in forms/API).
+ */
+export type CreateTenantInput = {
+    name: string;
+    redirect_url?: string;
+};
+
+/**
+ * Input for updating a tenant (used in forms/API).
+ */
+export type UpdateTenantInput = Partial<CreateTenantInput>;
+
+export type { Tenant };
 
 export const getAllTenants = async (): Promise<Tenant[]> => {
     try {
-        const collection = await getCollection<Document>('tenants');
-        const tenants = await collection.find({}).toArray();
-        return JSON.parse(
-            JSON.stringify(
-                tenants.map((tenant) => ({
-                    _id: tenant._id.toString(),
-                    name: tenant.name,
-                    redirect_url: tenant.redirect_url,
-                })),
-            ),
-        );
+        const tenantsCollection = await getCollection<TenantDoc>('tenants');
+        const tenants = await tenantsCollection.find({}).toArray();
+        
+        // Convert MongoDB documents to frontend-friendly format
+        return tenants.map((tenant) => ({
+            _id: tenant._id.toString(),
+            name: tenant.name,
+            redirect_url: tenant.redirect_url,
+        }));
     } catch {
         return [];
     }
@@ -26,20 +41,22 @@ export const createTenant = async (input: CreateTenantInput): Promise<Tenant | n
     try {
         if (!input.name) return null;
 
-        const collection = await getCollection<TenantDoc>('tenants');
-        const doc: TenantDoc = {
+        const tenantsCollection = await getCollection<TenantDoc>('tenants');
+        
+        // Prepare document for insertion (without _id, MongoDB will generate it)
+        const docToInsert: Omit<TenantDoc, '_id'> = {
             name: input.name,
             redirect_url: input.redirect_url,
         };
-        const result = await collection.insertOne(doc);
+        
+        const result = await tenantsCollection.insertOne(docToInsert as TenantDoc);
 
-        return JSON.parse(
-            JSON.stringify({
-                _id: result.insertedId.toString(),
-                name: doc.name,
-                redirect_url: doc.redirect_url,
-            }),
-        );
+        // Return frontend-friendly format
+        return {
+            _id: result.insertedId.toString(),
+            name: docToInsert.name,
+            redirect_url: docToInsert.redirect_url,
+        };
     } catch {
         return null;
     }
@@ -49,13 +66,13 @@ export const updateTenant = async (id: string, input: UpdateTenantInput): Promis
     try {
         if (!MongoObjectId.isValid(id)) return null;
 
-        const collection = await getCollection<Document>('tenants');
+        const tenantsCollection = await getCollection<TenantDoc>('tenants');
 
-        const updateFields: Partial<TenantDoc> = {};
+        const updateFields: Partial<Pick<TenantDoc, 'name' | 'redirect_url'>> = {};
         if (input.name !== undefined) updateFields.name = input.name;
         if (input.redirect_url !== undefined) updateFields.redirect_url = input.redirect_url;
 
-        const result = await collection.findOneAndUpdate(
+        const result = await tenantsCollection.findOneAndUpdate(
             { _id: new MongoObjectId(id) },
             { $set: updateFields },
             { returnDocument: 'after' },
@@ -63,13 +80,12 @@ export const updateTenant = async (id: string, input: UpdateTenantInput): Promis
 
         if (!result) return null;
 
-        return JSON.parse(
-            JSON.stringify({
-                _id: result._id.toString(),
-                name: result.name,
-                redirect_url: result.redirect_url,
-            }),
-        );
+        // Return frontend-friendly format
+        return {
+            _id: result._id.toString(),
+            name: result.name,
+            redirect_url: result.redirect_url,
+        };
     } catch {
         return null;
     }
@@ -79,8 +95,8 @@ export const deleteTenant = async (id: string): Promise<boolean> => {
     try {
         if (!MongoObjectId.isValid(id)) return false;
 
-        const collection = await getCollection<Document>('tenants');
-        const result = await collection.deleteOne({ _id: new MongoObjectId(id) });
+        const tenantsCollection = await getCollection<TenantDoc>('tenants');
+        const result = await tenantsCollection.deleteOne({ _id: new MongoObjectId(id) });
 
         return result.deletedCount === 1;
     } catch {
