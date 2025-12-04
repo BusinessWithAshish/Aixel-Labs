@@ -1,6 +1,6 @@
 'use server';
 
-import { getCollection } from '@aixellabs/shared/mongodb';
+import { getCollection, type Tenant, type TenantDoc } from '@aixellabs/shared/mongodb';
 import { extractSubdomain } from '@/middleware';
 import { headers } from 'next/headers';
 
@@ -10,10 +10,10 @@ export const getCurrentTenantFromHeaders = async (): Promise<string | null> => {
     return subdomain;
 };
 
-export const validateTenant = async (tenant: string): Promise<boolean> => {
+const validateTenant = async (tenant: string): Promise<boolean> => {
     try {
-        const collection = await getCollection('tenants');
-        const tenantData = await collection.findOne({ name: tenant });
+        const tenantsCollection = await getCollection<TenantDoc>('tenants');
+        const tenantData = await tenantsCollection.findOne({ name: tenant });
         return !!tenantData;
     } catch (error) {
         console.error('Error validating tenant:', error);
@@ -21,10 +21,19 @@ export const validateTenant = async (tenant: string): Promise<boolean> => {
     }
 };
 
-export const getCurrentTenantData = async (tenant: string): Promise<Record<string, unknown> | null> => {
+const getCurrentTenantData = async (tenant: string): Promise<Tenant | null> => {
     try {
-        const collection = await getCollection('tenants');
-        return await collection.findOne({ name: tenant });
+        const tenantsCollection = await getCollection<TenantDoc>('tenants');
+        const tenantDoc = await tenantsCollection.findOne({ name: tenant });
+        
+        if (!tenantDoc) return null;
+        
+        // Convert to frontend-friendly format
+        return {
+            _id: tenantDoc._id.toString(),
+            name: tenantDoc.name,
+            redirect_url: tenantDoc.redirect_url,
+        };
     } catch (error) {
         console.error('Error getting tenant data:', error);
         return null;
@@ -36,10 +45,7 @@ export const getCurrentTenantData = async (tenant: string): Promise<Record<strin
  * Returns null if tenant is invalid or not found.
  * This is a convenience function that combines tenant extraction, validation, and data retrieval.
  */
-export const validateAndGetTenant = async (): Promise<{
-    tenant: string;
-    tenantData: Record<string, unknown>;
-} | null> => {
+export const validateAndGetTenant = async (): Promise<Tenant | null> => {
     const currentTenant = await getCurrentTenantFromHeaders();
     if (!currentTenant) {
         return null;
@@ -55,8 +61,5 @@ export const validateAndGetTenant = async (): Promise<{
         return null;
     }
 
-    return {
-        tenant: currentTenant,
-        tenantData,
-    };
+    return { ...tenantData}
 };

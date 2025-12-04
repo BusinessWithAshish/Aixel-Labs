@@ -2,6 +2,7 @@ import { MongoClient, Db } from "mongodb";
 
 export type { ObjectId, Document, Collection, Db, MongoClient } from "mongodb";
 export { ObjectId as MongoObjectId } from "mongodb";
+export * from "./types";
 
 type GlobalWithMongo = typeof globalThis & {
   _mongoClientPromise?: Promise<MongoClient>;

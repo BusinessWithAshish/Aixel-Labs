@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { createTenant, updateTenant, type Tenant, type CreateTenantInput } from '@/helpers/tenant-operations';
+import { createTenant, updateTenant, type CreateTenantInput } from '@/helpers/tenant-operations';
+import type { Tenant } from '@aixellabs/shared/mongodb';
 import { toast } from 'sonner';
 
 type CreateTenantDialogProps = {

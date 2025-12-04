@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2, User as UserIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { User } from '@/helpers/user-operations';
+import type { User } from '@aixellabs/shared/mongodb';
 import { UserRoleBadge } from '@/components/common/UserRoleBadge';
 
 type UserCardProps = {

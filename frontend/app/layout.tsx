@@ -11,14 +11,13 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-    const tenantResult = await validateAndGetTenant();
+    const currentTenantData = await validateAndGetTenant();
 
-    if (!tenantResult) {
+    if (!currentTenantData) {
         return <NotFound />;
     }
 
-    const { tenantData } = tenantResult;
-    const redirectUrl = tenantData?.redirect_url as string | undefined;
+    const redirectUrl = currentTenantData?.redirect_url as string | undefined;
 
     if (redirectUrl) {
         return <ExternalEmbed src={redirectUrl} />;
