@@ -1,4 +1,6 @@
 import type { ObjectId } from "mongodb";
+import type { GMAPS_SCRAPE_LEAD_INFO } from "../common";
+import type { INSTAGRAM_SCRAPE_LEAD_INFO } from "../common/apis/instagram";
 
 // ============================================================================
 // TENANT TYPES
@@ -53,5 +55,40 @@ export type User = {
   email: string;
   name?: string;
   isAdmin: boolean;
-  tenantId: string; // Tenant name as string for frontend
+  tenantId: string;
+};
+
+export enum LeadSource {
+  GOOGLE_MAPS = "GOOGLE_MAPS",
+  INSTAGRAM = "INSTAGRAM",
+}
+
+export type LeadDoc = {
+  _id: ObjectId;
+  source: LeadSource;
+  sourceId: string;
+  data: GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SCRAPE_LEAD_INFO;
+};
+
+export type Lead = {
+  _id: string;
+  source: LeadSource;
+  sourceId: string;
+  data: GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SCRAPE_LEAD_INFO;
+};
+
+export type UserLeadDoc = {
+  _id: ObjectId;
+  userId: ObjectId;
+  leadId: ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type UserLead = {
+  _id: string;
+  userId: string;
+  leadId: string;
+  createdAt: string;
+  updatedAt: string;
 };
