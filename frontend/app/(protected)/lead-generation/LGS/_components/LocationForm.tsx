@@ -29,10 +29,12 @@ export const LocationForm = () => {
     const handleCountryChange = (value: string) => {
         updateFormData({
             country: value,
-            states: [{
-                name: '',
-                cities: []
-            }],
+            states: [
+                {
+                    name: '',
+                    cities: [],
+                },
+            ],
         });
     };
 
@@ -123,7 +125,7 @@ export const LocationForm = () => {
                 )}
 
                 {allCitiesOfState.length > 0 && (
-                    <ScrollArea className="h-56">
+                    <ScrollArea className="h-56 py-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {allCitiesOfState.map((city) => (
                                 <CityCheckBox

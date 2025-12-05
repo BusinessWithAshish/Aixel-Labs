@@ -3,40 +3,42 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { DirectUrlForm } from "./DirectUrlForm";
 import { useConfiguration, useForm, useSubmission } from "../_contexts";
 import { LocationForm } from "./LocationForm";
-import { DirectUrlForm } from "./DirectUrlForm";
 import { ConfigurationForm } from "./ConfigurationForm";
 import { ResultsSection } from "./ResultsSection";
 import { StatusDisplay } from "./StatusDisplay";
 import { MapPin, Link2 } from "lucide-react";
+import Image from 'next/image';
 
 export const GenerateLeads = () => {
-  const { config } = useConfiguration();
-  const { canSubmit, formMode, setFormMode, directUrls, setDirectUrls } = useForm();
-  const { submissionState, submitForm } = useSubmission();
+    const { config } = useConfiguration();
+    const { canSubmit, formMode, setFormMode, directUrls, setDirectUrls } = useForm();
+    const { submissionState, submitForm } = useSubmission();
 
-  const handleSubmit = async () => {
-    if (!canSubmit) return;
-    await submitForm();
-  };
+    const handleSubmit = async () => {
+        if (!canSubmit) return;
+        await submitForm();
+    };
 
-  return (
-    <div className="space-y-6">
-      <ConfigurationForm />
+    return (
+        <div className="space-y-6">
+            <ConfigurationForm />
 
+      {/* Main Form - Only show if config is valid */}
       {config.isConfigValid ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <MapPin className="w-5 h-5" />
+                <Image src="/google-maps.svg" alt="Google Maps" width={20} height={20} />
               Generate Google Map Leads
             </CardTitle>
           </CardHeader>
 
           <CardContent className="p-4 md:p-6">
-            <Tabs 
-              value={formMode} 
+            <Tabs
+              value={formMode}
               onValueChange={(value) => setFormMode(value as 'location' | 'direct-url')}
               className="w-full"
             >
@@ -62,15 +64,14 @@ export const GenerateLeads = () => {
               </TabsContent>
             </Tabs>
 
-            <div className="mt-6">
+
               <Button
-                onClick={handleSubmit}
-                disabled={!canSubmit || submissionState.isSubmitting}
-                className="w-full"
+                  className="m-2 w-fit self-end"
+                  onClick={handleSubmit}
+                  disabled={!canSubmit || submissionState.isSubmitting}
               >
-                {submissionState.isSubmitting ? "Processing..." : "Start Scraping"}
+                  {submissionState.isSubmitting ? 'Processing...' : 'Start Scraping'}
               </Button>
-            </div>
           </CardContent>
         </Card>
       ) : (
@@ -88,9 +89,9 @@ export const GenerateLeads = () => {
         </Card>
       )}
 
-      {config.isConfigValid && <StatusDisplay />}
+            {config.isConfigValid && <StatusDisplay />}
 
-      <ResultsSection />
-    </div>
-  );
+            <ResultsSection />
+        </div>
+    );
 };
