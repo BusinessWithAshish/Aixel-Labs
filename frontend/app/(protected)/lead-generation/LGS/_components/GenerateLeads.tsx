@@ -2,16 +2,18 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useConfiguration, useForm, useSubmission } from "../_contexts";
 import { LocationForm } from "./LocationForm";
+import { DirectUrlForm } from "./DirectUrlForm";
 import { ConfigurationForm } from "./ConfigurationForm";
 import { ResultsSection } from "./ResultsSection";
 import { StatusDisplay } from "./StatusDisplay";
-import { MapPin, Link } from "lucide-react";
+import { MapPin, Link2 } from "lucide-react";
 
 export const GenerateLeads = () => {
   const { config } = useConfiguration();
-  const { canSubmit } = useForm();
+  const { canSubmit, formMode, setFormMode, directUrls, setDirectUrls } = useForm();
   const { submissionState, submitForm } = useSubmission();
 
   const handleSubmit = async () => {
@@ -21,10 +23,8 @@ export const GenerateLeads = () => {
 
   return (
     <div className="space-y-6">
-      {/* Configuration Setup */}
       <ConfigurationForm />
 
-      {/* Main Form - Only show if config is valid */}
       {config.isConfigValid ? (
         <Card>
           <CardHeader>
@@ -34,45 +34,46 @@ export const GenerateLeads = () => {
             </CardTitle>
           </CardHeader>
 
-          <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
-            {/* Location Form */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-blue-500" />
-                <h3 className="font-medium">Location-Based Search</h3>
-              </div>
-              <LocationForm />
-            </div>
-
-            {/* ID/URL Form */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Link className="w-4 h-4 text-green-500" />
-                <h3 className="font-medium">Direct ID/URL Search</h3>
-              </div>
-            </div>
-          </CardContent>
-
-          {/* Submit Button */}
-          <div className="px-6 pb-6">
-            <Button
-              onClick={handleSubmit}
-              disabled={!canSubmit || submissionState.isSubmitting}
+          <CardContent className="p-4 md:p-6">
+            <Tabs 
+              value={formMode} 
+              onValueChange={(value) => setFormMode(value as 'location' | 'direct-url')}
               className="w-full"
             >
-              {submissionState.isSubmitting ? "Processing..." : "Start Scraping"}
-            </Button>
-          </div>
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="location" className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  <span className="hidden sm:inline">Location-Based</span>
+                  <span className="sm:hidden">Location</span>
+                </TabsTrigger>
+                <TabsTrigger value="direct-url" className="flex items-center gap-2">
+                  <Link2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Direct URL</span>
+                  <span className="sm:hidden">URL</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="location" className="mt-0">
+                <LocationForm />
+              </TabsContent>
+
+              <TabsContent value="direct-url" className="mt-0">
+                <DirectUrlForm urls={directUrls} onUrlsChange={setDirectUrls} />
+              </TabsContent>
+            </Tabs>
+
+            <div className="mt-6">
+              <Button
+                onClick={handleSubmit}
+                disabled={!canSubmit || submissionState.isSubmitting}
+                className="w-full"
+              >
+                {submissionState.isSubmitting ? "Processing..." : "Start Scraping"}
+              </Button>
+            </div>
+          </CardContent>
         </Card>
-      ) : null}
-
-      {/* Status Display - Show when processing or completed */}
-      {config.isConfigValid && (
-        <StatusDisplay />
-      )}
-
-      {/* Configuration Error Card */}
-      {!config.isConfigValid ? (
+      ) : (
         <Card>
           <CardContent className="p-6 text-center">
             <p className="text-gray-600">
@@ -85,9 +86,10 @@ export const GenerateLeads = () => {
             )}
           </CardContent>
         </Card>
-      ) : null}
+      )}
 
-      {/* Results */}
+      {config.isConfigValid && <StatusDisplay />}
+
       <ResultsSection />
     </div>
   );
