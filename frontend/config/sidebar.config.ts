@@ -36,8 +36,8 @@ export const sidebarConfig: SidebarConfig = {
             url: '/lead-generation',
             icon: 'UsersRound',
             items: [
-                { title: 'All in 1 scraper', url: '/lead-generation/AI1' },
-                { title: 'Google Maps Scraper', url: '/lead-generation/LGS' },
+                { title: 'All Leads', url: '/lead-generation/all-leads' },
+                { title: 'Google Maps Scraper', url: '/lead-generation/google-maps-scraper' },
                 { title: 'Google Advanced Search', url: '/lead-generation' },
                 { title: 'LinkedIn', url: '/lead-generation' },
                 { title: 'Instagram', url: '/lead-generation' },

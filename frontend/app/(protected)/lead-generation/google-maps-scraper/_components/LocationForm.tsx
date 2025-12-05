@@ -29,10 +29,12 @@ export const LocationForm = () => {
     const handleCountryChange = (value: string) => {
         updateFormData({
             country: value,
-            states: [{
-                name: '',
-                cities: []
-            }],
+            states: [
+                {
+                    name: '',
+                    cities: [],
+                },
+            ],
         });
     };
 
@@ -54,7 +56,6 @@ export const LocationForm = () => {
     return (
         <ScrollArea className="h-full">
             <div className="space-y-4 p-3 flex flex-col">
-                {/* Query Input */}
                 <InputWithLabel
                     label={{ text: 'Query' }}
                     forId="Query"
@@ -65,7 +66,6 @@ export const LocationForm = () => {
                     }}
                 />
 
-                {/* Country Selection */}
                 <SearchableSelect
                     placeholder="Search by country"
                     value={formData.country}
@@ -76,7 +76,6 @@ export const LocationForm = () => {
                     }))}
                 />
 
-                {/* State Selection */}
                 <SearchableSelect
                     value={formData.states[0].name}
                     placeholder="Select a state/province/region/county"
@@ -88,21 +87,19 @@ export const LocationForm = () => {
                     }))}
                 />
 
-                {/* Cities Header */}
                 {allCitiesOfState.length > 0 && (
-                    <div className="flex items-center justify-between">
-                        <span className="font-medium">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <span className="font-medium text-sm sm:text-base">
                             Cities of{' '}
                             {State.getStateByCodeAndCountry(formData.states[0].name || '', formData.country || '')?.name}
                         </span>
-                        <Badge variant="secondary" className="gap-1">
+                        <Badge variant="secondary" className="gap-1 w-fit">
                             <MapPin className="w-4 h-4" />
                             <span>{allCitiesOfState.length} locations</span>
                         </Badge>
                     </div>
                 )}
 
-                {/* City Search */}
                 <Input
                     onChange={(e) => setCityQuery(e.target.value)}
                     placeholder="Search for cities..."
@@ -110,9 +107,8 @@ export const LocationForm = () => {
                     value={cityQuery}
                 />
 
-                {/* Selected Cities */}
                 {(formData.states[0].cities?.length ?? 0) > 0 && (
-                    <ScrollArea className="h-fit">
+                    <ScrollArea className="h-fit max-h-32">
                         <div className="flex flex-wrap gap-2">
                             {(formData.states[0].cities || []).map((city: string) => (
                                 <Badge
@@ -128,10 +124,9 @@ export const LocationForm = () => {
                     </ScrollArea>
                 )}
 
-                {/* Cities List */}
                 {allCitiesOfState.length > 0 && (
-                    <ScrollArea className="h-56">
-                        <div className="grid grid-cols-2 gap-2">
+                    <ScrollArea className="h-56 py-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {allCitiesOfState.map((city) => (
                                 <CityCheckBox
                                     key={city.name}
@@ -144,7 +139,6 @@ export const LocationForm = () => {
                     </ScrollArea>
                 )}
 
-                {/* Form Status */}
                 {formData.states.length > 0 && formData.states[0].cities.length > 0 && (
                     <div className="text-sm text-green-600 font-medium">✓ Location form is ready to submit</div>
                 )}

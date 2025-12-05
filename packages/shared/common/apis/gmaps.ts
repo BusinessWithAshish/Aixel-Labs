@@ -16,13 +16,13 @@ export const GMAPS_SCRAPE_REQUEST_SCHEMA = z.object({
 export type GMAPS_SCRAPE_REQUEST = z.infer<typeof GMAPS_SCRAPE_REQUEST_SCHEMA>;
 
 export type GMAPS_SCRAPE_LEAD_INFO = {
-  id?: string;
-  website: string;
-  phoneNumber: string;
-  name: string;
-  gmapsUrl: string;
-  overAllRating: string;
-  numberOfReviews: string;
+  placeId: string | null;
+  website: string | null;
+  phoneNumber: string | null;
+  name: string | null;
+  gmapsUrl: string | null;
+  overAllRating: string | null;
+  numberOfReviews: string | null;
 };
 
 export type GMAPS_SCRAPE_RESPONSE = {
@@ -146,7 +146,9 @@ export const isStatusMessage = (message: StreamMessage): boolean => {
   return message.type === StreamMessageType.STATUS;
 };
 
-export const generateGoogleMapsUrls = (data: GMAPS_SCRAPE_REQUEST): string[] => {
+export const generateGoogleMapsUrls = (
+  data: GMAPS_SCRAPE_REQUEST
+): string[] => {
   const urls: string[] = [];
 
   data.states.forEach((state: { name: string; cities: string[] }) => {

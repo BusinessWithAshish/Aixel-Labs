@@ -61,14 +61,7 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
         }));
 
         try {
-            // Determine backend URL
-            let backendUrl: string;
-
-            if (config.useAWS) {
-                backendUrl = 'http://aws-instance:8100'; // Placeholder for AWS
-            } else {
-                backendUrl = config.backendUrl;
-            }
+            const backendUrl = config.backendUrl;
 
             // Transform form data to API format
             const requestData: GMAPS_SCRAPE_REQUEST = {

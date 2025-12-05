@@ -94,7 +94,7 @@ export const GmapsDetailsLeadInfoExtractor = async (
   const document = dom.window.document;
 
     // === UNIVERSAL PLACE ID EXTRACTION ===
-    const id = extractUniversalPlaceId(gmapsUrl, fullPageHTML) ?? "N/A";
+    const placeId = extractUniversalPlaceId(gmapsUrl, fullPageHTML) ?? "N/A";
 
     // Check if place is temporarily closed
     const isPlaceTemporarilyClosed = document.querySelector(
@@ -102,7 +102,7 @@ export const GmapsDetailsLeadInfoExtractor = async (
     );
     if (isPlaceTemporarilyClosed) {
         return {
-            id,
+            placeId,
             website: "N/A",
             phoneNumber: "N/A",
             name: "N/A",
@@ -144,7 +144,7 @@ export const GmapsDetailsLeadInfoExtractor = async (
             ?.replace("Information for ", "") ?? "N/A";
 
     return {
-        id,
+        placeId,
         website,
         phoneNumber,
         name,
