@@ -9,10 +9,10 @@ import { RefreshCw, Database } from 'lucide-react';
 import { getUserLeadsAction } from '@/app/actions/lead-actions';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
-import { LeadCard } from '../../LGS/_components/LeadCard';
+import { LeadCard } from '@/app/(protected)/lead-generation/google-maps-scraper/_components/LeadCard';
 import { toast } from 'sonner';
 
-export const SavedLeadsContent = () => {
+export const AllUserLeads = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedSource, setSelectedSource] = useState<'all' | LeadSource>('all');

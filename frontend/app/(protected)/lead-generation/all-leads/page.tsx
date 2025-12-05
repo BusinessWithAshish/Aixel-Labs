@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { SavedLeadsContent } from './_components/SavedLeadsContent';
+import { AllUserLeads } from './_components/AllUserLeads';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default function SavedLeadsPage() {
@@ -22,7 +22,7 @@ export default function SavedLeadsPage() {
                     </Card>
                 }
             >
-                <SavedLeadsContent />
+                <AllUserLeads />
             </Suspense>
         </div>
     );
