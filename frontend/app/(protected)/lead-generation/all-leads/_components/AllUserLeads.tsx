@@ -8,18 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Database, Search, ArrowUpDown, X, Trash2, StickyNote } from 'lucide-react';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
-import { LeadCard } from '@/components/common/LeadCard';
+import { CommonLeadCard } from '@/components/common/CommonLeadCard';
 import { usePage } from '@/contexts/PageStore';
 import type { UseAllLeadsPageReturn } from '../_hooks';
 import type { SortKey } from '@/components/common/lead-utils';
 import { DeleteAllLeadsDialog } from './DeleteAllLeadsDialog';
 import { AddNotesDialog } from './AddNotesDialog';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
-    deleteLeadAction,
     deleteLeadsAction,
     deleteLeadsBySourceAction,
-    updateLeadNotesAction,
     updateLeadsNotesAction,
 } from '@/app/actions/lead-actions';
 import { toast } from 'sonner';
@@ -175,7 +173,7 @@ export const AllUserLeads = () => {
                     {leadsToRender.map((lead) => {
                         const leadData = lead.data as GMAPS_SCRAPE_LEAD_INFO;
                         return (
-                            <LeadCard
+                            <CommonLeadCard
                                 key={lead._id}
                                 lead={leadData}
                                 showCheckbox={true}

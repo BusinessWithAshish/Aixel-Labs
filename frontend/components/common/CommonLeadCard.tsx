@@ -106,7 +106,7 @@ const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
     };
 };
 
-export const LeadCard = ({
+export const CommonLeadCard = ({
     lead,
     leadType,
     actions,
