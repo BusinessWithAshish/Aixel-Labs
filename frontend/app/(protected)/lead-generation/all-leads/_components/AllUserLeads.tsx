@@ -12,11 +12,16 @@ import { LeadCard } from '@/components/common/LeadCard';
 import { usePage } from '@/contexts/PageStore';
 import type { UseAllLeadsPageReturn } from '../_hooks';
 import type { SortKey } from '../../google-maps-scraper/_utils/lead-operations';
-import { DeleteLeadDialog } from './DeleteLeadDialog';
 import { DeleteAllLeadsDialog } from './DeleteAllLeadsDialog';
 import { AddNotesDialog } from './AddNotesDialog';
-import { useState } from 'react';
-import { deleteLeadAction, deleteLeadsBySourceAction, updateLeadNotesAction } from '@/app/actions/lead-actions';
+import { useState, useMemo } from 'react';
+import {
+    deleteLeadAction,
+    deleteLeadsAction,
+    deleteLeadsBySourceAction,
+    updateLeadNotesAction,
+    updateLeadsNotesAction,
+} from '@/app/actions/lead-actions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
@@ -37,12 +42,14 @@ export const AllUserLeads = () => {
         instagramLeads,
     } = usePage<UseAllLeadsPageReturn>();
 
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+    const [deleteBulkDialogOpen, setDeleteBulkDialogOpen] = useState(false);
     const [notesDialogOpen, setNotesDialogOpen] = useState(false);
-    const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+    const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
     const [isDeleting, setIsDeleting] = useState(false);
     const [isSavingNotes, setIsSavingNotes] = useState(false);
+
+    const hasSelectedLeads = selectedLeadIds.size > 0;
 
     const handleSortChange = (value: string) => {
         if (value === 'none') {
@@ -60,26 +67,25 @@ export const AllUserLeads = () => {
         setSearchQuery('');
     };
 
-    const handleDeleteLead = (lead: Lead) => {
-        setSelectedLead(lead);
-        setDeleteDialogOpen(true);
+    const handleSelectLead = (leadId: string, selected: boolean) => {
+        setSelectedLeadIds((prev) => {
+            const newSet = new Set(prev);
+            if (selected) {
+                newSet.add(leadId);
+            } else {
+                newSet.delete(leadId);
+            }
+            return newSet;
+        });
     };
 
-    const handleConfirmDelete = async () => {
-        if (!selectedLead) return;
+    const handleSelectAll = (leadsToSelect: Lead[]) => {
+        const allIds = new Set(leadsToSelect.map((lead) => lead._id));
+        setSelectedLeadIds(allIds);
+    };
 
-        setIsDeleting(true);
-        const result = await deleteLeadAction(selectedLead._id);
-
-        if (result.success) {
-            toast.success('Lead deleted successfully');
-            setDeleteDialogOpen(false);
-            setSelectedLead(null);
-            router.refresh();
-        } else {
-            toast.error(result.error || 'Failed to delete lead');
-        }
-        setIsDeleting(false);
+    const handleDeselectAll = () => {
+        setSelectedLeadIds(new Set());
     };
 
     const handleDeleteAll = () => {
@@ -101,21 +107,39 @@ export const AllUserLeads = () => {
         setIsDeleting(false);
     };
 
-    const handleAddNotes = (lead: Lead) => {
-        setSelectedLead(lead);
+    const handleDeleteSelected = () => {
+        setDeleteBulkDialogOpen(true);
+    };
+
+    const handleConfirmDeleteSelected = async () => {
+        setIsDeleting(true);
+        const result = await deleteLeadsAction(Array.from(selectedLeadIds));
+
+        if (result.success) {
+            toast.success(`${selectedLeadIds.size} lead(s) deleted successfully`);
+            setDeleteBulkDialogOpen(false);
+            setSelectedLeadIds(new Set());
+            router.refresh();
+        } else {
+            toast.error(result.error || 'Failed to delete leads');
+        }
+        setIsDeleting(false);
+    };
+
+    const handleAddNotesSelected = () => {
         setNotesDialogOpen(true);
     };
 
     const handleConfirmNotes = async (notes: string) => {
-        if (!selectedLead) return;
+        if (selectedLeadIds.size === 0) return;
 
         setIsSavingNotes(true);
-        const result = await updateLeadNotesAction(selectedLead._id, notes);
+        const result = await updateLeadsNotesAction(Array.from(selectedLeadIds), notes);
 
         if (result.success) {
-            toast.success('Notes saved successfully');
+            toast.success(`Notes saved for ${selectedLeadIds.size} lead(s)`);
             setNotesDialogOpen(false);
-            setSelectedLead(null);
+            setSelectedLeadIds(new Set());
             router.refresh();
         } else {
             toast.error(result.error || 'Failed to save notes');
@@ -154,28 +178,9 @@ export const AllUserLeads = () => {
                             <LeadCard
                                 key={lead._id}
                                 lead={leadData}
-                                actions={
-                                    <>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleAddNotes(lead)}
-                                            className="flex-1"
-                                        >
-                                            <StickyNote className="w-4 h-4 mr-1" />
-                                            Notes
-                                        </Button>
-                                        <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => handleDeleteLead(lead)}
-                                            className="flex-1"
-                                        >
-                                            <Trash2 className="w-4 h-4 mr-1" />
-                                            Delete
-                                        </Button>
-                                    </>
-                                }
+                                showCheckbox={true}
+                                isSelected={selectedLeadIds.has(lead._id)}
+                                onSelect={(selected) => handleSelectLead(lead._id, selected)}
                             />
                         );
                     })}
@@ -196,9 +201,31 @@ export const AllUserLeads = () => {
     };
 
     const currentLeadsCount = getLeadsForTab().length;
+    const currentLeads = getLeadsForTab();
 
     return (
         <div className="h-full w-full flex flex-col gap-4 p-2">
+            {hasSelectedLeads && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-900">
+                        {selectedLeadIds.size} lead(s) selected
+                    </span>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleAddNotesSelected}>
+                            <StickyNote className="w-4 h-4 mr-1" />
+                            Add Notes
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={handleDeleteSelected}>
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete Selected
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleDeselectAll}>
+                            Clear
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             <div className="flex py-2 flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -220,7 +247,21 @@ export const AllUserLeads = () => {
                     )}
                 </div>
 
-                <div className="flex justify-start items-center gap-2">
+                <div className="flex justify-start items-center gap-2 flex-wrap">
+                    {currentLeadsCount > 0 && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                                selectedLeadIds.size === currentLeadsCount
+                                    ? handleDeselectAll()
+                                    : handleSelectAll(currentLeads)
+                            }
+                        >
+                            {selectedLeadIds.size === currentLeadsCount ? 'Deselect All' : 'Select All'}
+                        </Button>
+                    )}
+
                     <Select value={sortKey || 'none'} onValueChange={handleSortChange}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Sort by..." />
@@ -277,23 +318,12 @@ export const AllUserLeads = () => {
                 </TabsContent>
             </Tabs>
 
-            {selectedLead && (
-                <>
-                    <DeleteLeadDialog
-                        open={deleteDialogOpen}
-                        onOpenChange={setDeleteDialogOpen}
-                        leadName={(selectedLead.data as GMAPS_SCRAPE_LEAD_INFO).name || 'this lead'}
-                        onConfirm={handleConfirmDelete}
-                        isDeleting={isDeleting}
-                    />
-                    <AddNotesDialog
-                        open={notesDialogOpen}
-                        onOpenChange={setNotesDialogOpen}
-                        onConfirm={handleConfirmNotes}
-                        isLoading={isSavingNotes}
-                    />
-                </>
-            )}
+            <AddNotesDialog
+                open={notesDialogOpen}
+                onOpenChange={setNotesDialogOpen}
+                onConfirm={handleConfirmNotes}
+                isLoading={isSavingNotes}
+            />
 
             <DeleteAllLeadsDialog
                 open={deleteAllDialogOpen}
@@ -301,6 +331,15 @@ export const AllUserLeads = () => {
                 category={getCategoryName()}
                 count={currentLeadsCount}
                 onConfirm={handleConfirmDeleteAll}
+                isDeleting={isDeleting}
+            />
+
+            <DeleteAllLeadsDialog
+                open={deleteBulkDialogOpen}
+                onOpenChange={setDeleteBulkDialogOpen}
+                category="Selected"
+                count={selectedLeadIds.size}
+                onConfirm={handleConfirmDeleteSelected}
                 isDeleting={isDeleting}
             />
         </div>

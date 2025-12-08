@@ -21,18 +21,28 @@ export const ResultsSection = () => {
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
     const [isSaving, setIsSaving] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
+    const [displayedLeads, setDisplayedLeads] = useState<GMAPS_SCRAPE_LEAD_INFO[]>([]);
 
     const result = submissionState.result as GMAPS_SCRAPE_RESPONSE | null;
 
-    const leads = useMemo(() => result?.allLeads ?? [], [result?.allLeads]);
+    const leads = useMemo(() => {
+        const allLeads = result?.allLeads ?? [];
+        setDisplayedLeads(allLeads);
+        return allLeads;
+    }, [result?.allLeads]);
 
     const sortedLeads = useMemo(() => {
-        return sortLeads(leads, sortKey, sortDirection);
-    }, [leads, sortKey, sortDirection]);
+        return sortLeads(displayedLeads, sortKey, sortDirection);
+    }, [displayedLeads, sortKey, sortDirection]);
 
     const leadGroups = useMemo(() => {
         return categorizeLeads(sortedLeads);
     }, [sortedLeads]);
+
+    const handleDeleteLead = (leadToDelete: GMAPS_SCRAPE_LEAD_INFO) => {
+        setDisplayedLeads((prev) => prev.filter((lead) => lead.placeId !== leadToDelete.placeId));
+        toast.success('Lead removed from results');
+    };
 
     const handleSortToggle = () => {
         setSortKey((prev) => (prev === 'rating' ? 'reviews' : 'rating'));
@@ -53,7 +63,7 @@ export const ResultsSection = () => {
         setIsSaving(true);
 
         try {
-            const saveResult = await saveLeadsAction(leads, LeadSource.GOOGLE_MAPS);
+            const saveResult = await saveLeadsAction(displayedLeads, LeadSource.GOOGLE_MAPS);
 
             if (saveResult.success && saveResult.data) {
                 setIsSaved(true);
@@ -79,14 +89,14 @@ export const ResultsSection = () => {
         }
     };
 
-    const renderTabContent = (leads: GMAPS_SCRAPE_LEAD_INFO[]) => (
+    const renderTabContent = (leadsToRender: GMAPS_SCRAPE_LEAD_INFO[]) => (
         <ScrollArea className="h-[500px] pr-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-4">
-                {leads.map((lead, index) => (
-                    <LeadCard key={generateUniqueKey(lead, index)} lead={lead} />
+                {leadsToRender.map((lead, index) => (
+                    <LeadCard key={generateUniqueKey(lead, index)} lead={lead} onDelete={() => handleDeleteLead(lead)} />
                 ))}
             </div>
-            {leads.length === 0 && (
+            {leadsToRender.length === 0 && (
                 <div className="flex items-center justify-center h-32 text-gray-500">No leads found in this category</div>
             )}
         </ScrollArea>
@@ -107,7 +117,7 @@ export const ResultsSection = () => {
             <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <h2 className="text-lg font-semibold">
-                        Results ({leads.length} leads)
+                        Results ({displayedLeads.length} leads)
                         <span className="text-sm text-gray-500 ml-2 font-normal">
                             Sorted by {sortKey === 'rating' ? 'Rating' : 'Reviews'} (
                             {sortDirection === 'asc' ? 'Low to High' : 'High to Low'})

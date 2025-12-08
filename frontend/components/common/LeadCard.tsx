@@ -3,8 +3,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import { ExternalLink, Phone, Star, MessageSquare, MapPin, Copy } from 'lucide-react';
+import { ExternalLink, Phone, Star, MessageSquare, MapPin, Copy, Trash2 } from 'lucide-react';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common/apis';
 import { copyPhoneNumber } from '@/lib/clipboard';
 import { useState } from 'react';
@@ -22,6 +23,10 @@ type LeadCardProps = {
     leadType?: LeadType;
     actions?: ReactNode;
     className?: string;
+    onDelete?: () => void;
+    showCheckbox?: boolean;
+    isSelected?: boolean;
+    onSelect?: (selected: boolean) => void;
 };
 
 const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
@@ -45,7 +50,16 @@ const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO) => {
     return lead.phoneNumber !== null && lead.phoneNumber !== undefined && lead.phoneNumber !== '';
 };
 
-export const LeadCard = ({ lead, leadType, actions, className }: LeadCardProps) => {
+export const LeadCard = ({
+    lead,
+    leadType,
+    actions,
+    className,
+    onDelete,
+    showCheckbox,
+    isSelected,
+    onSelect,
+}: LeadCardProps) => {
     const computedLeadType = leadType || getLeadType(lead);
     const [isPhoneHovered, setIsPhoneHovered] = useState(false);
 
@@ -68,8 +82,33 @@ export const LeadCard = ({ lead, leadType, actions, className }: LeadCardProps) 
     };
 
     return (
-        <Card className={cn('transition-all duration-200 hover:shadow-md', computedLeadType.color, className)}>
-            <CardHeader className="pb-3">
+        <Card
+            className={cn(
+                'transition-all duration-200 hover:shadow-md relative',
+                computedLeadType.color,
+                isSelected && 'ring-2 ring-blue-500',
+                className
+            )}
+        >
+            {showCheckbox && onSelect && (
+                <div className="absolute top-3 left-3 z-10">
+                    <Checkbox checked={isSelected} onCheckedChange={onSelect} />
+                </div>
+            )}
+            {onDelete && (
+                <div className="absolute top-3 right-3 z-10">
+                    <Button
+                        onClick={onDelete}
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full hover:bg-red-100 hover:text-red-600"
+                        title="Delete lead"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </Button>
+                </div>
+            )}
+            <CardHeader className={cn('pb-3', showCheckbox && 'pl-10', onDelete && 'pr-12')}>
                 <div className="flex items-start overflow-hidden justify-between gap-2">
                     <div className="w-3/5 truncate text-ellipsis">
                         <CardTitle className="text-lg font-semibold" title={lead.name ?? DEFAULT_DISPLAY_VALUE}>
