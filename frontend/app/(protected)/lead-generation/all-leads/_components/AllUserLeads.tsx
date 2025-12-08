@@ -14,7 +14,7 @@ import type { UseAllLeadsPageReturn } from '../_hooks';
 import type { SortKey } from '@/components/common/lead-utils';
 import { DeleteAllLeadsDialog } from './DeleteAllLeadsDialog';
 import { AddNotesDialog } from './AddNotesDialog';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { deleteLeadsAction, deleteLeadsBySourceAction, updateLeadsNotesAction } from '@/app/actions/lead-actions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -44,6 +44,10 @@ export const AllUserLeads = () => {
     const [isSavingNotes, setIsSavingNotes] = useState(false);
 
     const hasSelectedLeads = selectedLeadIds.size > 0;
+
+    useEffect(() => {
+        setSelectedLeadIds(new Set());
+    }, [selectedSource]);
 
     const handleSortChange = (value: string) => {
         if (value === 'none') {
