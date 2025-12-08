@@ -1,6 +1,6 @@
 import type { ObjectId } from "mongodb";
 import type { GMAPS_SCRAPE_LEAD_INFO } from "../common";
-import type { INSTAGRAM_SCRAPE_LEAD_INFO } from "../common/apis/instagram";
+import type { INSTAGRAM_SCRAPE_LEAD_INFO } from "../common";
 
 export enum MongoCollection {
   TENANTS = "tenants",

@@ -25,9 +25,9 @@ const getCurrentTenantData = async (tenant: string): Promise<Tenant | null> => {
     try {
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
         const tenantDoc = await tenantsCollection.findOne({ name: tenant });
-        
+
         if (!tenantDoc) return null;
-        
+
         // Convert to frontend-friendly format
         return {
             _id: tenantDoc._id.toString(),
@@ -61,5 +61,5 @@ export const validateAndGetTenant = async (): Promise<Tenant | null> => {
         return null;
     }
 
-    return { ...tenantData}
+    return { ...tenantData };
 };
