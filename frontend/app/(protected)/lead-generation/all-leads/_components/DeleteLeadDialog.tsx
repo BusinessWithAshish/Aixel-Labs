@@ -2,31 +2,25 @@
 
 import { ConfirmDialog } from '@/components/ui/wrappers/ConfirmDialog';
 
-type DeleteUserConfirmDialogProps = {
+type DeleteLeadDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    userEmail: string;
+    leadName: string;
     onConfirm: () => void;
     isDeleting?: boolean;
 };
 
-export function DeleteUserConfirmDialog({
-    open,
-    onOpenChange,
-    userEmail,
-    onConfirm,
-    isDeleting,
-}: DeleteUserConfirmDialogProps) {
+export const DeleteLeadDialog = ({ open, onOpenChange, leadName, onConfirm, isDeleting }: DeleteLeadDialogProps) => {
     return (
         <ConfirmDialog
             open={open}
             onOpenChange={onOpenChange}
-            title="Delete User"
+            title="Delete Lead"
             description="This action cannot be undone."
             alertMessage={
                 <>
-                    You are about to delete user <strong>{userEmail}</strong>. This will permanently remove the user
-                    from this tenant.
+                    You are about to delete <strong>{leadName}</strong>. This will permanently remove this lead from
+                    your saved leads.
                 </>
             }
             onConfirm={onConfirm}
@@ -35,5 +29,4 @@ export function DeleteUserConfirmDialog({
             variant="destructive"
         />
     );
-}
-
+};

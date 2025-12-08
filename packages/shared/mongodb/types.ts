@@ -88,6 +88,7 @@ export type UserLeadDoc = {
   _id: ObjectId;
   userId: ObjectId;
   leadId: ObjectId;
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -96,6 +97,7 @@ export type UserLead = {
   _id: string;
   userId: string;
   leadId: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 };

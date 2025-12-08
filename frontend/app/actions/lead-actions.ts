@@ -132,3 +132,138 @@ export async function getUserLeadsAction(source?: LeadSource): Promise<GetUserLe
         };
     }
 }
+
+export type DeleteLeadResult = {
+    success: boolean;
+    error?: string;
+};
+
+export async function deleteLeadAction(leadId: string): Promise<DeleteLeadResult> {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return {
+                success: false,
+                error: 'You must be logged in to delete leads',
+            };
+        }
+
+        const userId = new MongoObjectId(session.user.id);
+        const leadObjectId = new MongoObjectId(leadId);
+
+        const { deleteUserLead } = await import('@aixellabs/shared/mongodb');
+        const deleted = await deleteUserLead(userId, leadObjectId);
+
+        if (!deleted) {
+            return {
+                success: false,
+                error: 'Lead not found or already deleted',
+            };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting lead:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete lead';
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
+}
+
+export async function deleteLeadsBySourceAction(source?: LeadSource): Promise<DeleteLeadResult> {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return {
+                success: false,
+                error: 'You must be logged in to delete leads',
+            };
+        }
+
+        const userId = new MongoObjectId(session.user.id);
+
+        const { deleteUserLeadsBySource } = await import('@aixellabs/shared/mongodb');
+        await deleteUserLeadsBySource(userId, source);
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting leads:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete leads';
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
+}
+
+export type UpdateLeadNotesResult = {
+    success: boolean;
+    error?: string;
+};
+
+export async function updateLeadNotesAction(leadId: string, notes: string): Promise<UpdateLeadNotesResult> {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return {
+                success: false,
+                error: 'You must be logged in to update notes',
+            };
+        }
+
+        const userId = new MongoObjectId(session.user.id);
+        const leadObjectId = new MongoObjectId(leadId);
+
+        const { updateUserLeadNotes } = await import('@aixellabs/shared/mongodb');
+        const updated = await updateUserLeadNotes(userId, leadObjectId, notes);
+
+        if (!updated) {
+            return {
+                success: false,
+                error: 'Lead not found',
+            };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating notes:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to update notes';
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
+}
+
+export async function updateLeadsNotesAction(leadIds: string[], notes: string): Promise<UpdateLeadNotesResult> {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return {
+                success: false,
+                error: 'You must be logged in to update notes',
+            };
+        }
+
+        const userId = new MongoObjectId(session.user.id);
+        const leadObjectIds = leadIds.map((id) => new MongoObjectId(id));
+
+        const { updateUserLeadsNotes } = await import('@aixellabs/shared/mongodb');
+        await updateUserLeadsNotes(userId, leadObjectIds, notes);
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating notes:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to update notes';
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
+}
