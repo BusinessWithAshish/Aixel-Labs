@@ -7,9 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SortAsc, SortDesc, Save, CheckCircle2 } from 'lucide-react';
 import { useSubmission } from '../_contexts';
-import { LeadCard } from './LeadCard';
+import { CommonLeadCard } from '@/components/common/CommonLeadCard';
 import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared/common/apis';
-import { sortLeads, categorizeLeads, generateUniqueKey, type SortKey, type SortDirection } from '@/components/common/lead-utils';
+import {
+    sortLeads,
+    categorizeLeads,
+    generateUniqueKey,
+    type SortKey,
+    type SortDirection,
+} from '@/components/common/lead-utils';
 import { saveLeadsAction } from '@/app/actions/lead-actions';
 import { LeadSource } from '@aixellabs/shared/mongodb';
 import { formatLeadStats } from '@/helpers/lead-operations';
@@ -90,10 +96,14 @@ export const ResultsSection = () => {
     };
 
     const renderTabContent = (leadsToRender: GMAPS_SCRAPE_LEAD_INFO[]) => (
-        <ScrollArea className="h-[500px] pr-4">
+        <ScrollArea className="h-[500px] p-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-4">
                 {leadsToRender.map((lead, index) => (
-                    <LeadCard key={generateUniqueKey(lead, index)} lead={lead} onDelete={() => handleDeleteLead(lead)} />
+                    <CommonLeadCard
+                        key={generateUniqueKey(lead, index)}
+                        lead={lead}
+                        onDelete={() => handleDeleteLead(lead)}
+                    />
                 ))}
             </div>
             {leadsToRender.length === 0 && (

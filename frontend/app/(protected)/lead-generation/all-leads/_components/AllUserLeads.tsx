@@ -15,11 +15,7 @@ import type { SortKey } from '@/components/common/lead-utils';
 import { DeleteAllLeadsDialog } from './DeleteAllLeadsDialog';
 import { AddNotesDialog } from './AddNotesDialog';
 import { useState } from 'react';
-import {
-    deleteLeadsAction,
-    deleteLeadsBySourceAction,
-    updateLeadsNotesAction,
-} from '@/app/actions/lead-actions';
+import { deleteLeadsAction, deleteLeadsBySourceAction, updateLeadsNotesAction } from '@/app/actions/lead-actions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
@@ -205,9 +201,7 @@ export const AllUserLeads = () => {
         <div className="h-full w-full flex flex-col gap-4 p-2">
             {hasSelectedLeads && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
-                    <span className="text-sm font-medium text-blue-900">
-                        {selectedLeadIds.size} lead(s) selected
-                    </span>
+                    <span className="text-sm font-medium text-blue-900">{selectedLeadIds.size} lead(s) selected</span>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={handleAddNotesSelected}>
                             <StickyNote className="w-4 h-4 mr-1" />
@@ -279,9 +273,7 @@ export const AllUserLeads = () => {
                             title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
                         >
                             <ArrowUpDown className="w-4 h-4" />
-                            <span className="sr-only">
-                                {sortDirection === 'asc' ? 'Sort Ascending' : 'Sort Descending'}
-                            </span>
+                            <span className="sr-only">{sortDirection === 'asc' ? 'Sort Ascending' : 'Sort Descending'}</span>
                         </Button>
                     )}
 
@@ -303,11 +295,11 @@ export const AllUserLeads = () => {
                     <TabsTrigger value={LeadSource.INSTAGRAM}>Instagram ({instagramLeads.length})</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="all" className="h-full">
+                <TabsContent value="all" className="h-full w-full">
                     {renderLeadsList(getLeadsForTab())}
                 </TabsContent>
 
-                <TabsContent value={LeadSource.GOOGLE_MAPS} className="">
+                <TabsContent value={LeadSource.GOOGLE_MAPS} className="h-full w-full">
                     {renderLeadsList(getLeadsForTab())}
                 </TabsContent>
 

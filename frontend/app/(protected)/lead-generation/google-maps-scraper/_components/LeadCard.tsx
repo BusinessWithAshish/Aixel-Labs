@@ -1,1 +1,1 @@
-export { LeadCard } from '@/components/common/LeadCard';
+export { CommonLeadCard } from '@/components/common/CommonLeadCard';
