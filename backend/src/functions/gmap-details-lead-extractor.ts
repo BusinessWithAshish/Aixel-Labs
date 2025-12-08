@@ -8,7 +8,9 @@ const PLACE_ID_REGEX = /"place_id":"(ChI[0-9A-Za-z_-]{10,})"/;
 const URL_PLACE_ID_REGEX = /(ChI[0-9A-Za-z_-]{10,})/;
 const CID_REGEX = /(0x[0-9a-f]+:0x[0-9a-f]+)/i;
 
-export function extractUniversalPlaceId(url: string, html: string) {
+export function extractUniversalPlaceId(url: string | null, html: string) {
+    if (!url) return null;
+
     const fromURL = url.match(URL_PLACE_ID_REGEX);
     if (fromURL) return fromURL[1];
 
@@ -32,33 +34,33 @@ export const gmapsSetupRequestInterception = async (page: Page) => {
         const resourceType = req.resourceType();
         const url = req.url();
 
-    // Block unnecessary resources
-    if (
-      resourceType === "stylesheet" ||
-      resourceType === "font" ||
-      resourceType === "image" ||
-      resourceType === "media" ||
-      url.includes(".css") ||
-      url.includes(".eot") ||
-      url.includes("analytics") ||
-      url.includes("google-analytics") ||
-      url.includes("googletagmanager") ||
-      url.includes("doubleclick") ||
-      url.includes("facebook.com") ||
-      url.includes("twitter.com") ||
-      url.includes(".jpg") ||
-      url.includes(".jpeg") ||
-      url.includes(".png") ||
-      url.includes(".gif") ||
-      url.includes(".webp") ||
-      url.includes(".svg") ||
-      url.includes(".ico")
-    ) {
-      req.abort();
-    } else {
-      req.continue();
-    }
-  });
+        // Block unnecessary resources
+        if (
+            resourceType === "stylesheet" ||
+            resourceType === "font" ||
+            resourceType === "image" ||
+            resourceType === "media" ||
+            url.includes(".css") ||
+            url.includes(".eot") ||
+            url.includes("analytics") ||
+            url.includes("google-analytics") ||
+            url.includes("googletagmanager") ||
+            url.includes("doubleclick") ||
+            url.includes("facebook.com") ||
+            url.includes("twitter.com") ||
+            url.includes(".jpg") ||
+            url.includes(".jpeg") ||
+            url.includes(".png") ||
+            url.includes(".gif") ||
+            url.includes(".webp") ||
+            url.includes(".svg") ||
+            url.includes(".ico")
+        ) {
+            req.abort();
+        } else {
+            req.continue();
+        }
+    });
 };
 
 // === Main Scraper ===
@@ -74,7 +76,9 @@ export const GmapsDetailsLeadInfoExtractor = async (
 
     // Full HTML
     let fullPageHTML = await page.content();
-    const gmapsUrl = page.url() ?? "N/A";
+
+    let gmapsUrl = null;
+    gmapsUrl = page.url();
 
     // Close early for speed
     await page.close();
@@ -85,16 +89,16 @@ export const GmapsDetailsLeadInfoExtractor = async (
         .replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, "")
         .replace(/style=["'][^"']*["']/gi, "");
 
-  const dom = new JSDOM(fullPageHTML, {
-    resources: "usable",
-    runScripts: "outside-only",
-    pretendToBeVisual: false,
-  });
+    const dom = new JSDOM(fullPageHTML, {
+        resources: "usable",
+        runScripts: "outside-only",
+        pretendToBeVisual: false,
+    });
 
-  const document = dom.window.document;
+    const document = dom.window.document;
 
     // === UNIVERSAL PLACE ID EXTRACTION ===
-    const id = extractUniversalPlaceId(gmapsUrl, fullPageHTML) ?? "N/A";
+    const placeId = extractUniversalPlaceId(gmapsUrl, fullPageHTML);
 
     // Check if place is temporarily closed
     const isPlaceTemporarilyClosed = document.querySelector(
@@ -102,49 +106,49 @@ export const GmapsDetailsLeadInfoExtractor = async (
     );
     if (isPlaceTemporarilyClosed) {
         return {
-            id,
-            website: "N/A",
-            phoneNumber: "N/A",
-            name: "N/A",
+            placeId,
+            website: null,
+            phoneNumber: null,
+            name: null,
             gmapsUrl,
-            overAllRating: "N/A",
-            numberOfReviews: "N/A",
+            overAllRating: null,
+            numberOfReviews: null,
         };
     }
 
     // Extract other fields
     const website =
         document.querySelector('a[aria-label^="Website:"]')?.getAttribute("href") ??
-        "N/A";
+        null;
 
     const phoneNumber =
         document
             .querySelector('button[aria-label^="Phone:"]')
             ?.getAttribute("aria-label")
             ?.replace("Phone: ", "")
-            ?.replace(/\s/g, "") ?? "N/A";
+            ?.replace(/\s/g, "") ?? null;
 
     const overAllRating =
         document
             .getElementsByClassName("ceNzKf")?.[0]
             ?.getAttribute("aria-label")
             ?.split(" ")?.[0]
-            ?.trim() ?? "N/A";
+            ?.trim() ?? null;
 
     const numberOfReviews =
         document
             .querySelector('span[aria-label*="reviews"]')
             ?.getAttribute("aria-label")
-            ?.split(" ")[0] ?? "N/A";
+            ?.split(" ")[0] ?? null;
 
     const name =
         document
             .querySelector('div[aria-label^="Information for"]')
             ?.getAttribute("aria-label")
-            ?.replace("Information for ", "") ?? "N/A";
+            ?.replace("Information for ", "") ?? null;
 
     return {
-        id,
+        placeId,
         website,
         phoneNumber,
         name,

@@ -31,10 +31,10 @@ export type CategorizedLeads = {
  * Supports: Instagram, Facebook, Twitter/X, LinkedIn, TikTok, YouTube, Pinterest, Snapchat
  */
 export const isSocialMediaUrl = (url: string): boolean => {
-    if (!url || url === 'N/A' || url.trim() === '') {
+    if (!url || url.trim() === '') {
         return false;
     }
-    
+
     const socialMediaDomains = [
         'instagram.com',
         'facebook.com',
@@ -48,12 +48,10 @@ export const isSocialMediaUrl = (url: string): boolean => {
         'pinterest.com',
         'snapchat.com',
     ];
-    
+
     try {
         const urlLower = url.toLowerCase();
-        return socialMediaDomains.some(domain => 
-            urlLower.includes(domain)
-        );
+        return socialMediaDomains.some((domain) => urlLower.includes(domain));
     } catch {
         return false;
     }
@@ -64,7 +62,7 @@ export const isSocialMediaUrl = (url: string): boolean => {
  */
 export const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
     const website = lead.website?.trim();
-    if (!website || website === 'N/A') {
+    if (!website) {
         return false;
     }
     // If it's a social media URL, we don't consider it as having a website
@@ -76,7 +74,7 @@ export const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
  */
 export const hasSocialMedia = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
     const website = lead.website?.trim();
-    if (!website || website === 'N/A') {
+    if (!website) {
         return false;
     }
     return isSocialMediaUrl(website);
@@ -87,7 +85,7 @@ export const hasSocialMedia = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
  */
 export const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
     const phoneNumber = lead.phoneNumber?.trim();
-    return !!(phoneNumber && phoneNumber !== 'N/A');
+    return !!phoneNumber;
 };
 
 /**
@@ -96,18 +94,18 @@ export const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
  * @param isRating - Whether this is a rating (float) or count (integer)
  * @returns The numeric value, or -1 if invalid/missing
  */
-export const extractNumericValue = (value: string, isRating: boolean): number => {
-    if (!value || value === 'N/A' || value === '' || value === null || value === undefined) {
+export const extractNumericValue = (value: string | null, isRating: boolean): number => {
+    if (!value) {
         return -1;
     }
-    
+
     const stringValue = String(value);
     const normalized = stringValue.replace(/[^\d.]/g, '');
-    
+
     if (!normalized || normalized === '') {
         return -1;
     }
-    
+
     const numeric = isRating ? parseFloat(normalized) : parseInt(normalized, 10);
     return Number.isFinite(numeric) && numeric >= 0 ? numeric : -1;
 };
@@ -124,27 +122,21 @@ export const extractNumericValue = (value: string, isRating: boolean): number =>
  * @returns Sorted array of leads
  */
 export const sortLeads = (
-    leads: GMAPS_SCRAPE_LEAD_INFO[], 
-    sortKey: SortKey, 
-    sortDirection: SortDirection
+    leads: GMAPS_SCRAPE_LEAD_INFO[],
+    sortKey: SortKey,
+    sortDirection: SortDirection,
 ): GMAPS_SCRAPE_LEAD_INFO[] => {
     const isRating = sortKey === 'rating';
-    
+
     return [...leads].sort((a, b) => {
-        const aValue = extractNumericValue(
-            isRating ? a.overAllRating : a.numberOfReviews, 
-            isRating
-        );
-        const bValue = extractNumericValue(
-            isRating ? b.overAllRating : b.numberOfReviews, 
-            isRating
-        );
-        
+        const aValue = extractNumericValue(isRating ? a.overAllRating : a.numberOfReviews, isRating);
+        const bValue = extractNumericValue(isRating ? b.overAllRating : b.numberOfReviews, isRating);
+
         // Handle invalid/missing values - put them at the end
         if (aValue === -1 && bValue === -1) return 0;
         if (aValue === -1) return 1;
         if (bValue === -1) return -1;
-        
+
         const comparison = aValue - bValue;
         return sortDirection === 'asc' ? comparison : -comparison;
     });
@@ -159,7 +151,7 @@ export const sortLeads = (
  * - Hot Leads: (No website but has phone) OR (Has social media and phone) - high priority for outreach
  * - Warm Leads: Has proper website (with or without phone) - good for follow-up
  * - Cold Leads: Everything else (no website, no social media, or social media without phone) - low priority
- * 
+ *
  * @param leads - Array of leads to categorize
  * @returns Object with categorized lead arrays
  */
@@ -170,7 +162,7 @@ export const categorizeLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[]): CategorizedLea
             const hasProperWebsite = hasWebsite(lead);
             const hasSocialMediaProfile = hasSocialMedia(lead);
             const hasPhoneNumber = hasPhone(lead);
-            
+
             // Hot leads are those who:
             // 1. Don't have a website but have a phone, OR
             // 2. Have social media profile and phone (instead of proper website)
@@ -178,7 +170,7 @@ export const categorizeLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[]): CategorizedLea
         }),
         warmLeads: leads.filter((lead) => {
             const hasProperWebsite = hasWebsite(lead);
-            
+
             // Warm leads are those who have a proper website (regardless of phone)
             return hasProperWebsite;
         }),
@@ -186,12 +178,14 @@ export const categorizeLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[]): CategorizedLea
             const hasProperWebsite = hasWebsite(lead);
             const hasSocialMediaProfile = hasSocialMedia(lead);
             const hasPhoneNumber = hasPhone(lead);
-            
+
             // Cold leads are those who:
             // 1. Don't have a website, don't have social media, and don't have phone, OR
             // 2. Have social media but no phone (can't reach them easily)
-            return (!hasProperWebsite && !hasSocialMediaProfile && !hasPhoneNumber) || 
-                   (hasSocialMediaProfile && !hasPhoneNumber);
+            return (
+                (!hasProperWebsite && !hasSocialMediaProfile && !hasPhoneNumber) ||
+                (hasSocialMediaProfile && !hasPhoneNumber)
+            );
         }),
     };
 };
@@ -199,12 +193,12 @@ export const categorizeLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[]): CategorizedLea
 /**
  * Determines the lead type for a single lead
  * This is consistent with the categorization logic used in categorizeLeads
- * 
+ *
  * Priority order:
  * 1. Hot Lead: No website but has phone OR social media with phone
  * 2. Warm Lead: Has proper website (regardless of phone)
  * 3. Cold Lead: Everything else (no website/social, or social without phone)
- * 
+ *
  * @param lead - The lead to categorize
  * @returns Lead type information with display properties
  */
@@ -215,27 +209,27 @@ export const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
 
     // Hot Lead: No proper website but has phone OR has social media and phone
     if ((!website && phone) || (socialMedia && phone)) {
-        return { 
-            type: 'Hot Lead', 
+        return {
+            type: 'Hot Lead',
             color: 'bg-green-50 border-green-200',
-            category: 'hotLeads'
+            category: 'hotLeads',
         };
     }
-    
+
     // Warm Lead: Has proper website (with or without phone)
     if (website) {
-        return { 
-            type: 'Warm Lead', 
+        return {
+            type: 'Warm Lead',
             color: 'bg-amber-50 border-amber-200',
-            category: 'warmLeads'
+            category: 'warmLeads',
         };
     }
-    
+
     // Cold Lead: Everything else (no website, no social media, or social media without phone)
-    return { 
-        type: 'Cold Lead', 
+    return {
+        type: 'Cold Lead',
         color: 'bg-gray-50 border-gray-200',
-        category: 'coldLeads'
+        category: 'coldLeads',
     };
 };
 
@@ -249,4 +243,3 @@ export const generateUniqueKey = (lead: GMAPS_SCRAPE_LEAD_INFO, index: number): 
     const baseKey = lead.gmapsUrl || `${lead.name}-${lead.phoneNumber || 'no-phone'}-${lead.website || 'no-website'}`;
     return `${baseKey}-${index}`;
 };
-

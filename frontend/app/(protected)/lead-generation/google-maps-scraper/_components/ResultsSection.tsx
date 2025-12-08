@@ -5,16 +5,22 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { SortAsc, SortDesc } from 'lucide-react';
+import { SortAsc, SortDesc, Save, CheckCircle2 } from 'lucide-react';
 import { useSubmission } from '../_contexts';
 import { LeadCard } from './LeadCard';
 import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared/common/apis';
 import { sortLeads, categorizeLeads, generateUniqueKey, type SortKey, type SortDirection } from '../_utils';
+import { saveLeadsAction } from '@/app/actions/lead-actions';
+import { LeadSource } from '@aixellabs/shared/mongodb';
+import { formatLeadStats } from '@/helpers/lead-operations';
+import { toast } from 'sonner';
 
 export const ResultsSection = () => {
     const { submissionState } = useSubmission();
     const [sortKey, setSortKey] = useState<SortKey>('rating');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+    const [isSaving, setIsSaving] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
 
     const result = submissionState.result as GMAPS_SCRAPE_RESPONSE | null;
 
@@ -34,6 +40,43 @@ export const ResultsSection = () => {
 
     const handleDirectionToggle = () => {
         setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    };
+
+    const handleSaveLeads = async () => {
+        if (!leads || leads.length === 0) {
+            toast.error('No leads to save', {
+                description: 'There are no leads available to save.',
+            });
+            return;
+        }
+
+        setIsSaving(true);
+
+        try {
+            const saveResult = await saveLeadsAction(leads, LeadSource.GOOGLE_MAPS);
+
+            if (saveResult.success && saveResult.data) {
+                setIsSaved(true);
+                const statsMessage = formatLeadStats(saveResult.data);
+
+                toast.success('Leads saved successfully!', {
+                    description: statsMessage,
+                });
+
+                // Reset saved state after 3 seconds
+                setTimeout(() => setIsSaved(false), 3000);
+            } else {
+                toast.error('Failed to save leads', {
+                    description: saveResult.error || 'An error occurred while saving leads.',
+                });
+            }
+        } catch (error) {
+            toast.error('Error', {
+                description: error instanceof Error ? error.message : 'Failed to save leads',
+            });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const renderTabContent = (leads: GMAPS_SCRAPE_LEAD_INFO[]) => (
@@ -66,21 +109,45 @@ export const ResultsSection = () => {
                     <h2 className="text-lg font-semibold">
                         Results ({leads.length} leads)
                         <span className="text-sm text-gray-500 ml-2 font-normal">
-                            Sorted by {sortKey === 'rating' ? 'Rating' : 'Reviews'} ({sortDirection === 'asc' ? 'Low to High' : 'High to Low'})
+                            Sorted by {sortKey === 'rating' ? 'Rating' : 'Reviews'} (
+                            {sortDirection === 'asc' ? 'Low to High' : 'High to Low'})
                         </span>
                     </h2>
                     <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                            variant={isSaved ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={handleSaveLeads}
+                            disabled={isSaving || isSaved}
+                            className="text-xs sm:text-sm"
+                        >
+                            {isSaved ? (
+                                <>
+                                    <CheckCircle2 className="w-4 h-4 mr-1" />
+                                    Saved
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4 mr-1" />
+                                    {isSaving ? 'Saving...' : 'Save Leads'}
+                                </>
+                            )}
+                        </Button>
                         <Button variant="outline" size="sm" onClick={handleSortToggle} className="text-xs sm:text-sm">
                             Sort by: {sortKey === 'rating' ? '⭐ Rating' : '📝 Reviews'}
                         </Button>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={handleDirectionToggle} 
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleDirectionToggle}
                             className="text-xs sm:text-sm"
                             title={sortDirection === 'asc' ? 'Currently: Low to High' : 'Currently: High to Low'}
                         >
-                            {sortDirection === 'asc' ? <SortAsc className="w-4 h-4 mr-1" /> : <SortDesc className="w-4 h-4 mr-1" />}
+                            {sortDirection === 'asc' ? (
+                                <SortAsc className="w-4 h-4 mr-1" />
+                            ) : (
+                                <SortDesc className="w-4 h-4 mr-1" />
+                            )}
                             {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
                         </Button>
                     </div>

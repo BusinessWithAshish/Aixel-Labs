@@ -10,13 +10,14 @@ import { getLeadType, hasWebsite, hasPhone } from '../_utils';
 import { copyPhoneNumber } from '@/lib/clipboard';
 import { useState } from 'react';
 
+const DEFAULT_DISPLAY_VALUE = 'N/A';
 export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
     const leadType = getLeadType(lead);
     const [isPhoneHovered, setIsPhoneHovered] = useState(false);
 
     const handleWebsiteClick = () => {
         if (hasWebsite(lead)) {
-            window.open(lead.website, '_blank', 'noopener,noreferrer');
+            window.open(lead.website ?? '', '_blank', 'noopener,noreferrer');
         }
     };
 
@@ -28,7 +29,7 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
 
     const handleCopyPhone = async () => {
         if (hasPhone(lead)) {
-            await copyPhoneNumber(lead.phoneNumber);
+            await copyPhoneNumber(lead.phoneNumber ?? '');
         }
     };
 
@@ -37,18 +38,22 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
             <CardHeader className="pb-3">
                 <div className="flex items-start overflow-hidden justify-between gap-2">
                     <div className="w-3/5 truncate text-ellipsis">
-                        <CardTitle className="text-lg font-semibold" title={lead.name}>
-                            {lead.name}
+                        <CardTitle className="text-lg font-semibold" title={lead.name ?? DEFAULT_DISPLAY_VALUE}>
+                            {lead.name ?? DEFAULT_DISPLAY_VALUE}
                         </CardTitle>
                         <CardDescription className="flex items-center gap-1.5 sm:gap-2 mt-1.5 text-xs sm:text-sm flex-wrap">
                             <div className="flex items-center gap-1 shrink-0">
                                 <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-500 fill-current" />
-                                <span className="font-medium">{lead.overAllRating}</span>
+                                <span title={lead.overAllRating ?? DEFAULT_DISPLAY_VALUE} className="font-medium">
+                                    {lead.overAllRating ?? DEFAULT_DISPLAY_VALUE}
+                                </span>
                             </div>
                             <span className="text-gray-400 shrink-0">•</span>
                             <div className="flex items-center gap-1 min-w-0">
                                 <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 shrink-0" />
-                                <span className="truncate">{lead.numberOfReviews} reviews</span>
+                                <span title={lead.numberOfReviews ?? DEFAULT_DISPLAY_VALUE} className="truncate">
+                                    {lead.numberOfReviews ?? DEFAULT_DISPLAY_VALUE} reviews
+                                </span>
                             </div>
                         </CardDescription>
                     </div>
@@ -78,9 +83,9 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
                             <button
                                 onClick={handleWebsiteClick}
                                 className="text-blue-600 hover:text-blue-800 hover:underline truncate block w-full text-left text-xs sm:text-sm"
-                                title={lead.website}
+                                title={lead.website ?? DEFAULT_DISPLAY_VALUE}
                             >
-                                {lead.website}
+                                {lead.website ?? DEFAULT_DISPLAY_VALUE}
                             </button>
                         ) : (
                             <span className="text-gray-500 italic text-xs sm:text-sm">No website</span>
@@ -88,7 +93,7 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
                     </div>
                 </div>
 
-                <div 
+                <div
                     className="flex items-start gap-2 sm:gap-3 group/phone"
                     onMouseEnter={() => setIsPhoneHovered(true)}
                     onMouseLeave={() => setIsPhoneHovered(false)}
@@ -100,19 +105,19 @@ export const LeadCard = ({ lead }: { lead: GMAPS_SCRAPE_LEAD_INFO }) => {
                                 <a
                                     href={`tel:${lead.phoneNumber}`}
                                     className="text-gray-700 hover:text-gray-900 hover:underline truncate block text-xs sm:text-sm"
-                                    title={lead.phoneNumber}
+                                    title={lead.phoneNumber ?? DEFAULT_DISPLAY_VALUE}
                                 >
-                                    {lead.phoneNumber}
+                                    {lead.phoneNumber ?? DEFAULT_DISPLAY_VALUE}
                                 </a>
                                 <Button
                                     onClick={handleCopyPhone}
                                     variant="ghost"
                                     size="icon"
                                     className={cn(
-                                        "h-6 w-6 rounded-md hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 shrink-0",
+                                        'h-6 w-6 rounded-md hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 shrink-0',
                                         // Always visible on mobile (sm and below), hover on desktop
-                                        "opacity-100 sm:opacity-0 sm:group-hover/phone:opacity-100",
-                                        isPhoneHovered && "sm:scale-110"
+                                        'opacity-100 sm:opacity-0 sm:group-hover/phone:opacity-100',
+                                        isPhoneHovered && 'sm:scale-110',
                                     )}
                                     title="Copy phone number"
                                     aria-label="Copy phone number to clipboard"
