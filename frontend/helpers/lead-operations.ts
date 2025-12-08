@@ -1,5 +1,5 @@
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
-import type { Lead, LeadSource } from '@aixellabs/shared/mongodb';
+import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 
 /**
  * Format lead statistics for display
@@ -38,7 +38,7 @@ export const extractLeadData = (lead: Lead): GMAPS_SCRAPE_LEAD_INFO | any => {
  * Check if a lead has minimum required information
  */
 export const isValidLead = (lead: GMAPS_SCRAPE_LEAD_INFO, source: LeadSource): boolean => {
-    if (source === 'GOOGLE_MAPS') {
+    if (source === LeadSource.GOOGLE_MAPS) {
         return !!(lead.placeId && (lead.name || lead.phoneNumber || lead.website));
     }
     // Add validation for other sources
