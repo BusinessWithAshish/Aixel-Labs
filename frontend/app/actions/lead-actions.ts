@@ -1,7 +1,7 @@
 'use server';
 
 import { auth } from '@/auth';
-import { saveLeadsForUser, getUserLeads, MongoObjectId, LeadSource, type Lead } from '@aixellabs/shared/mongodb';
+import { saveLeadsForUser, getUserLeads, MongoObjectId, LeadSource, type Lead, type UserLeadDoc, type LeadDoc } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
 
 export type SaveLeadsResult = {
@@ -225,20 +225,20 @@ export async function deleteLeadsBySourceAction(source?: LeadSource): Promise<De
         const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
         const leadsCollection = await getCollection(MongoCollection.LEADS);
 
-        const userLeads = await userLeadsCollection.find({ userId }).toArray();
-        const leadIds = userLeads.map((ul: any) => ul.leadId);
+        const userLeads = (await userLeadsCollection.find({ userId }).toArray()) as UserLeadDoc[];
+        const leadIds = userLeads.map((ul) => ul.leadId);
 
         if (leadIds.length === 0) {
             return { success: true };
         }
 
-        const query: any = { _id: { $in: leadIds } };
+        const query: { _id: { $in: typeof leadIds }; source?: LeadSource } = { _id: { $in: leadIds } };
         if (source) {
             query.source = source;
         }
 
-        const leadsToDelete = await leadsCollection.find(query).toArray();
-        const leadIdsToDelete = leadsToDelete.map((lead: any) => lead._id);
+        const leadsToDelete = (await leadsCollection.find(query).toArray()) as LeadDoc[];
+        const leadIdsToDelete = leadsToDelete.map((lead) => lead._id);
 
         if (leadIdsToDelete.length === 0) {
             return { success: true };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -25,11 +25,11 @@ export const ResultsSection = () => {
 
     const result = submissionState.result as GMAPS_SCRAPE_RESPONSE | null;
 
-    const leads = useMemo(() => {
-        const allLeads = result?.allLeads ?? [];
-        setDisplayedLeads(allLeads);
-        return allLeads;
-    }, [result?.allLeads]);
+    const leads = useMemo(() => result?.allLeads ?? [], [result?.allLeads]);
+
+    useEffect(() => {
+        setDisplayedLeads(leads);
+    }, [leads]);
 
     const sortedLeads = useMemo(() => {
         return sortLeads(displayedLeads, sortKey, sortDirection);
