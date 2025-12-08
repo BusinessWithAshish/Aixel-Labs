@@ -11,7 +11,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     }
 
     return (
-        <SidebarProvider>
+        <SidebarProvider className='h-full w-full'>
             <AppSidebar />
             {children}
         </SidebarProvider>

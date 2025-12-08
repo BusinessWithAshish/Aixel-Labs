@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
 
 type CommonLoaderProps = {
     size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -15,11 +14,19 @@ const sizeClasses = {
     xl: 'h-16 w-16',
 };
 
+const textSizeClasses = {
+    sm: 'text-sm',
+    md: 'text-base',
+    lg: 'text-lg',
+    xl: 'text-xl',
+    '2xl': 'text-2xl',
+};
+
 export function CommonLoader({ size = 'md', text, fullScreen = false, className }: CommonLoaderProps) {
     const content = (
-        <div className={cn('flex flex-col items-center justify-center gap-3 h-full', className)}>
-            <Loader2 className={cn('animate-spin text-primary', sizeClasses[size])} />
-            {text && <p className="text-sm text-muted-foreground animate-pulse">{text}</p>}
+        <div className={cn('flex flex-col w-full items-center justify-center gap-3 h-full', className)}>
+            <div className={cn('animate-spin rounded-full border-b-2 border-primary', sizeClasses[size])} />
+            {text && <p className={cn("text-sm text-muted-foreground animate-pulse", textSizeClasses[size])}>{text}</p>}
         </div>
     );
 

@@ -1,6 +1,7 @@
 'use client';
 
 import PageLayout from '@/components/common/PageLayout';
+import { withPageHandler } from '@/components/hocs/with-page-handler';
 import { PageProvider, usePage } from '@/contexts/PageStore';
 import { useWhatsAppPage, type UseWhatsAppPageReturn } from './_hooks';
 import { ChatList } from './_components/ChatList';
@@ -35,7 +36,6 @@ function WhatsAppPageContent() {
             className="grid grid-cols-6 gap-3 h-full overflow-hidden"
             title={`WhatsApp - Business Number: ${twilioWhatsAppNumber}`}
         >
-
             <ChatList
                 chats={chats}
                 selectedId={selectedId}
@@ -66,10 +66,12 @@ function WhatsAppPageContent() {
     );
 }
 
-export default function WhatsAppPage() {
+function WhatsAppPage() {
     return (
         <PageProvider usePageHook={useWhatsAppPage}>
             <WhatsAppPageContent />
         </PageProvider>
     );
 }
+
+export default withPageHandler(WhatsAppPage);
