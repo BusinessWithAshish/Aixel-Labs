@@ -1,6 +1,6 @@
 'use server';
 
-import { getCollection, type Tenant, type TenantDoc } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoCollection, type Tenant, type TenantDoc } from '@aixellabs/shared/mongodb';
 import { extractSubdomain } from '@/middleware';
 import { headers } from 'next/headers';
 
@@ -12,7 +12,7 @@ export const getCurrentTenantFromHeaders = async (): Promise<string | null> => {
 
 const validateTenant = async (tenant: string): Promise<boolean> => {
     try {
-        const tenantsCollection = await getCollection<TenantDoc>('tenants');
+        const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
         const tenantData = await tenantsCollection.findOne({ name: tenant });
         return !!tenantData;
     } catch (error) {
@@ -23,11 +23,11 @@ const validateTenant = async (tenant: string): Promise<boolean> => {
 
 const getCurrentTenantData = async (tenant: string): Promise<Tenant | null> => {
     try {
-        const tenantsCollection = await getCollection<TenantDoc>('tenants');
+        const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
         const tenantDoc = await tenantsCollection.findOne({ name: tenant });
-        
+
         if (!tenantDoc) return null;
-        
+
         // Convert to frontend-friendly format
         return {
             _id: tenantDoc._id.toString(),
@@ -61,5 +61,5 @@ export const validateAndGetTenant = async (): Promise<Tenant | null> => {
         return null;
     }
 
-    return { ...tenantData}
+    return { ...tenantData };
 };
