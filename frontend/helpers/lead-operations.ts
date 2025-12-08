@@ -72,7 +72,6 @@ export const searchLead = (lead: Lead, query: string): boolean => {
             data.name,
             data.website,
             data.phoneNumber,
-            data.address,
         ];
         return searchableFields.some((field) => field?.toLowerCase().includes(lowerQuery));
     }

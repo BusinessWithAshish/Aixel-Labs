@@ -1,6 +1,6 @@
 'use client';
 
-import { ConfirmDialog } from '@/components/ui/wrappers/ConfirmDialog';
+import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 
 type DeleteUserConfirmDialogProps = {
     open: boolean;
