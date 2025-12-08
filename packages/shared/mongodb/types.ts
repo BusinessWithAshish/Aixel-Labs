@@ -6,7 +6,7 @@ export enum MongoCollection {
   TENANTS = "tenants",
   USERS = "users",
   LEADS = "Leads",
-  USER_LEADS = "UserLeads",
+  USER_LEADS = "user_leads",
 }
 
 // ============================================================================
