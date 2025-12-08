@@ -8,29 +8,31 @@ const PLACE_ID_REGEX = /"place_id":"(ChI[0-9A-Za-z_-]{10,})"/;
 const URL_PLACE_ID_REGEX = /(ChI[0-9A-Za-z_-]{10,})/;
 const CID_REGEX = /(0x[0-9a-f]+:0x[0-9a-f]+)/i;
 
-export function extractUniversalPlaceId(url: string, html: string) {
-    const fromURL = url.match(URL_PLACE_ID_REGEX);
-    if (fromURL) return fromURL[1];
+export function extractUniversalPlaceId(url: string | null, html: string) {
+  if (!url) return null;
 
-    const queryMatch = url.match(/query_place_id=(ChI[0-9A-Za-z_-]{10,})/);
-    if (queryMatch) return queryMatch[1];
+  const fromURL = url.match(URL_PLACE_ID_REGEX);
+  if (fromURL) return fromURL[1];
 
-    const fromHTML = html.match(PLACE_ID_REGEX);
-    if (fromHTML) return fromHTML[1];
+  const queryMatch = url.match(/query_place_id=(ChI[0-9A-Za-z_-]{10,})/);
+  if (queryMatch) return queryMatch[1];
 
-    const cidMatch = url.match(CID_REGEX);
-    if (cidMatch) return cidMatch[1]; // fallback (still useful)
+  const fromHTML = html.match(PLACE_ID_REGEX);
+  if (fromHTML) return fromHTML[1];
 
-    return null;
+  const cidMatch = url.match(CID_REGEX);
+  if (cidMatch) return cidMatch[1]; // fallback (still useful)
+
+  return null;
 }
 
 // === Request Interception ===
 export const gmapsSetupRequestInterception = async (page: Page) => {
-    await page.setRequestInterception(true);
+  await page.setRequestInterception(true);
 
-    page.on("request", (req) => {
-        const resourceType = req.resourceType();
-        const url = req.url();
+  page.on("request", (req) => {
+    const resourceType = req.resourceType();
+    const url = req.url();
 
     // Block unnecessary resources
     if (
@@ -63,27 +65,29 @@ export const gmapsSetupRequestInterception = async (page: Page) => {
 
 // === Main Scraper ===
 export const GmapsDetailsLeadInfoExtractor = async (
-    url: string,
-    page: Page
+  url: string,
+  page: Page
 ): Promise<GMAPS_SCRAPE_LEAD_INFO> => {
-    await gmapsSetupRequestInterception(page);
-    await page.goto(url, {
-        waitUntil: "networkidle2",
-        timeout: DEFAULT_PAGE_LOAD_TIMEOUT,
-    });
+  await gmapsSetupRequestInterception(page);
+  await page.goto(url, {
+    waitUntil: "networkidle2",
+    timeout: DEFAULT_PAGE_LOAD_TIMEOUT,
+  });
 
-    // Full HTML
-    let fullPageHTML = await page.content();
-    const gmapsUrl = page.url() ?? "N/A";
+  // Full HTML
+  let fullPageHTML = await page.content();
 
-    // Close early for speed
-    await page.close();
+  let gmapsUrl = null;
+  gmapsUrl = page.url();
 
-    // Clean & parse HTML
-    fullPageHTML = fullPageHTML
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-        .replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, "")
-        .replace(/style=["'][^"']*["']/gi, "");
+  // Close early for speed
+  await page.close();
+
+  // Clean & parse HTML
+  fullPageHTML = fullPageHTML
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, "")
+    .replace(/style=["'][^"']*["']/gi, "");
 
   const dom = new JSDOM(fullPageHTML, {
     resources: "usable",
@@ -92,64 +96,65 @@ export const GmapsDetailsLeadInfoExtractor = async (
   });
 
   const document = dom.window.document;
+  gmapsUrl = gmapsUrl ? dom.window.location.href : null;
 
-    // === UNIVERSAL PLACE ID EXTRACTION ===
-    const placeId = extractUniversalPlaceId(gmapsUrl, fullPageHTML) ?? "N/A";
+  // === UNIVERSAL PLACE ID EXTRACTION ===
+  const placeId = extractUniversalPlaceId(gmapsUrl, fullPageHTML);
 
-    // Check if place is temporarily closed
-    const isPlaceTemporarilyClosed = document.querySelector(
-        'div[aria-label="Notice"]'
-    );
-    if (isPlaceTemporarilyClosed) {
-        return {
-            placeId,
-            website: "N/A",
-            phoneNumber: "N/A",
-            name: "N/A",
-            gmapsUrl,
-            overAllRating: "N/A",
-            numberOfReviews: "N/A",
-        };
-    }
-
-    // Extract other fields
-    const website =
-        document.querySelector('a[aria-label^="Website:"]')?.getAttribute("href") ??
-        "N/A";
-
-    const phoneNumber =
-        document
-            .querySelector('button[aria-label^="Phone:"]')
-            ?.getAttribute("aria-label")
-            ?.replace("Phone: ", "")
-            ?.replace(/\s/g, "") ?? "N/A";
-
-    const overAllRating =
-        document
-            .getElementsByClassName("ceNzKf")?.[0]
-            ?.getAttribute("aria-label")
-            ?.split(" ")?.[0]
-            ?.trim() ?? "N/A";
-
-    const numberOfReviews =
-        document
-            .querySelector('span[aria-label*="reviews"]')
-            ?.getAttribute("aria-label")
-            ?.split(" ")[0] ?? "N/A";
-
-    const name =
-        document
-            .querySelector('div[aria-label^="Information for"]')
-            ?.getAttribute("aria-label")
-            ?.replace("Information for ", "") ?? "N/A";
-
+  // Check if place is temporarily closed
+  const isPlaceTemporarilyClosed = document.querySelector(
+    'div[aria-label="Notice"]'
+  );
+  if (isPlaceTemporarilyClosed) {
     return {
-        placeId,
-        website,
-        phoneNumber,
-        name,
-        gmapsUrl,
-        overAllRating,
-        numberOfReviews,
+      placeId,
+      website: null,
+      phoneNumber: null,
+      name: null,
+      gmapsUrl,
+      overAllRating: null,
+      numberOfReviews: null,
     };
+  }
+
+  // Extract other fields
+  const website =
+    document.querySelector('a[aria-label^="Website:"]')?.getAttribute("href") ??
+    null;
+
+  const phoneNumber =
+    document
+      .querySelector('button[aria-label^="Phone:"]')
+      ?.getAttribute("aria-label")
+      ?.replace("Phone: ", "")
+      ?.replace(/\s/g, "") ?? null;
+
+  const overAllRating =
+    document
+      .getElementsByClassName("ceNzKf")?.[0]
+      ?.getAttribute("aria-label")
+      ?.split(" ")?.[0]
+      ?.trim() ?? null;
+
+  const numberOfReviews =
+    document
+      .querySelector('span[aria-label*="reviews"]')
+      ?.getAttribute("aria-label")
+      ?.split(" ")[0] ?? null;
+
+  const name =
+    document
+      .querySelector('div[aria-label^="Information for"]')
+      ?.getAttribute("aria-label")
+      ?.replace("Information for ", "") ?? null;
+
+  return {
+    placeId,
+    website,
+    phoneNumber,
+    name,
+    gmapsUrl,
+    overAllRating,
+    numberOfReviews,
+  };
 };
