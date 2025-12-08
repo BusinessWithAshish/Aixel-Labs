@@ -1,73 +1,68 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Database } from 'lucide-react';
-import { getUserLeadsAction } from '@/app/actions/lead-actions';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Database, Search, ArrowUpDown, X } from 'lucide-react';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
 import { LeadCard } from '@/app/(protected)/lead-generation/google-maps-scraper/_components/LeadCard';
-import { toast } from 'sonner';
+import { usePage } from '@/contexts/PageStore';
+import type { UseAllLeadsPageReturn } from '../_hooks';
+import type { SortKey } from '../../google-maps-scraper/_utils/lead-operations';
 
 export const AllUserLeads = () => {
-    const [leads, setLeads] = useState<Lead[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [selectedSource, setSelectedSource] = useState<'all' | LeadSource>('all');
+    const {
+        leads,
+        filteredLeads,
+        selectedSource,
+        setSelectedSource,
+        searchQuery,
+        setSearchQuery,
+        sortKey,
+        setSortKey,
+        sortDirection,
+        setSortDirection,
+        gmapsLeads,
+        instagramLeads,
+    } = usePage<UseAllLeadsPageReturn>();
 
-    const fetchLeads = async () => {
-        setIsLoading(true);
-        try {
-            const result = await getUserLeadsAction(selectedSource === 'all' ? undefined : selectedSource);
-
-            if (result.success && result.data) {
-                setLeads(result.data);
-            } else {
-                toast.error('Error', {
-                    description: result.error || 'Failed to fetch saved leads',
-                });
-            }
-        } catch (error) {
-            toast.error('Error', {
-                description: error instanceof Error ? error.message : 'Failed to fetch saved leads',
-            });
-        } finally {
-            setIsLoading(false);
+    const handleSortChange = (value: string) => {
+        if (value === 'none') {
+            setSortKey(null);
+        } else {
+            setSortKey(value as SortKey);
         }
     };
 
-    useEffect(() => {
-        fetchLeads();
-    }, [selectedSource]);
+    const toggleSortDirection = () => {
+        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    };
 
-    const gmapsLeads = leads.filter((lead) => lead.source === LeadSource.GOOGLE_MAPS);
-    const instagramLeads = leads.filter((lead) => lead.source === LeadSource.INSTAGRAM);
+    const clearSearch = () => {
+        setSearchQuery('');
+    };
 
     const renderLeadsList = (leadsToRender: Lead[]) => {
-        if (isLoading) {
-            return (
-                <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    <span className="ml-3">Loading leads...</span>
-                </div>
-            );
-        }
-
         if (leadsToRender.length === 0) {
             return (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                <div className="flex flex-col items-center justify-center h-full text-gray-500">
                     <Database className="w-12 h-12 mb-3 opacity-50" />
                     <p className="text-lg font-medium">No saved leads found</p>
-                    <p className="text-sm mt-1">Start scraping and save leads to see them here</p>
+                    <p className="text-sm mt-1">
+                        {searchQuery
+                            ? 'Try adjusting your search or filters'
+                            : 'Start scraping and save leads to see them here'}
+                    </p>
                 </div>
             );
         }
 
         return (
-            <ScrollArea className="h-[600px] pr-4">
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-4">
+            <ScrollArea className="h-full">
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     {leadsToRender.map((lead) => {
                         // Extract the lead data based on source
                         const leadData = lead.data as GMAPS_SCRAPE_LEAD_INFO;
@@ -78,43 +73,95 @@ export const AllUserLeads = () => {
         );
     };
 
+    // Get the appropriate leads based on selected source
+    const getLeadsForTab = () => {
+        if (selectedSource === 'all') return filteredLeads;
+        if (selectedSource === LeadSource.GOOGLE_MAPS) {
+            return filteredLeads.filter((lead) => lead.source === LeadSource.GOOGLE_MAPS);
+        }
+        if (selectedSource === LeadSource.INSTAGRAM) {
+            return filteredLeads.filter((lead) => lead.source === LeadSource.INSTAGRAM);
+        }
+        return filteredLeads;
+    };
+
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <CardTitle>Your Saved Leads</CardTitle>
-                    <Button variant="outline" size="sm" onClick={fetchLeads} disabled={isLoading}>
-                        <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                        Refresh
-                    </Button>
+        <div className='h-full w-full flex flex-col gap-4 p-2'>
+            <div className="flex py-2 flex-col sm:flex-row gap-3">
+                {/* Search Input */}
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                        placeholder="Search leads by name, website, or phone..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 pr-10"
+                    />
+                    {searchQuery && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearSearch}
+                            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                        >
+                            <X className="w-4 h-4" />
+                        </Button>
+                    )}
                 </div>
-            </CardHeader>
 
-            <CardContent>
-                <Tabs
-                    value={selectedSource}
-                    onValueChange={(value) => setSelectedSource(value as 'all' | LeadSource)}
-                    className="w-full"
-                >
-                    <TabsList className="grid w-full grid-cols-3 mb-6">
-                        <TabsTrigger value="all">All Leads ({leads.length})</TabsTrigger>
-                        <TabsTrigger value={LeadSource.GOOGLE_MAPS}>Google Maps ({gmapsLeads.length})</TabsTrigger>
-                        <TabsTrigger value={LeadSource.INSTAGRAM}>Instagram ({instagramLeads.length})</TabsTrigger>
-                    </TabsList>
+                {/* Sort Select */}
+                <div className="flex justify-start items-center gap-2">
+                    <Select value={sortKey || 'none'} onValueChange={handleSortChange}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Sort by..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none">No sorting</SelectItem>
+                            <SelectItem value="rating">Rating</SelectItem>
+                            <SelectItem value="reviews">Reviews</SelectItem>
+                        </SelectContent>
+                    </Select>
 
-                    <TabsContent value="all" className="mt-0">
-                        {renderLeadsList(leads)}
-                    </TabsContent>
+                    {/* Sort Direction Toggle */}
+                    {sortKey && (
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={toggleSortDirection}
+                            title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                        >
+                            <ArrowUpDown className="w-4 h-4" />
+                            <span className="sr-only">
+                                    {sortDirection === 'asc' ? 'Sort Ascending' : 'Sort Descending'}
+                                </span>
+                        </Button>
+                    )}
+                </div>
+            </div>
 
-                    <TabsContent value={LeadSource.GOOGLE_MAPS} className="mt-0">
-                        {renderLeadsList(gmapsLeads)}
-                    </TabsContent>
+            <Tabs
+                value={selectedSource}
+                onValueChange={(value) => setSelectedSource(value as 'all' | LeadSource)}
+                className="w-full h-full"
+            >
+                <TabsList className="grid w-full min-h-fit grid-cols-1 md:grid-cols-3">
+                    <TabsTrigger value="all">All Leads ({leads.length})</TabsTrigger>
+                    <TabsTrigger value={LeadSource.GOOGLE_MAPS}>Google Maps ({gmapsLeads.length})</TabsTrigger>
+                    <TabsTrigger value={LeadSource.INSTAGRAM}>Instagram ({instagramLeads.length})</TabsTrigger>
+                </TabsList>
 
-                    <TabsContent value={LeadSource.INSTAGRAM} className="mt-0">
-                        {renderLeadsList(instagramLeads)}
-                    </TabsContent>
-                </Tabs>
-            </CardContent>
-        </Card>
+                <TabsContent value="all" className="h-full">
+                    {renderLeadsList(getLeadsForTab())}
+                </TabsContent>
+
+                <TabsContent value={LeadSource.GOOGLE_MAPS} className="">
+                    {renderLeadsList(getLeadsForTab())}
+                </TabsContent>
+
+                <TabsContent value={LeadSource.INSTAGRAM} className="h-full w-full">
+                    {renderLeadsList(getLeadsForTab())}
+                </TabsContent>
+            </Tabs>
+        </div>
     );
 };

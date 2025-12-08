@@ -1,29 +1,23 @@
-import { Suspense } from 'react';
+import PageLayout from '@/components/common/PageLayout';
+import { PageProvider } from '@/contexts/PageStore';
 import { AllUserLeads } from './_components/AllUserLeads';
-import { Card, CardContent } from '@/components/ui/card';
+import { useAllLeadsPage } from './_hooks';
+import { getUserLeadsAction } from '@/app/actions/lead-actions';
+import type { Lead } from '@aixellabs/shared/mongodb';
 
-export default function SavedLeadsPage() {
+const PAGE_TITLE = 'Saved Leads';
+
+async function SavedLeadsPage() {
+    const result = await getUserLeadsAction();
+    const leads: Lead[] = result.success && result.data ? result.data : [];
+
     return (
-        <div className="container mx-auto p-4 md:p-6 space-y-6">
-            <div>
-                <h1 className="text-2xl md:text-3xl font-bold">Saved Leads</h1>
-                <p className="text-gray-600 mt-1">View and manage all your saved leads from various sources</p>
-            </div>
-
-            <Suspense
-                fallback={
-                    <Card>
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-center">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                                <span className="ml-3">Loading your saved leads...</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-                }
-            >
+        <PageProvider data={leads} usePageHook={useAllLeadsPage}>
+            <PageLayout title={PAGE_TITLE}>
                 <AllUserLeads />
-            </Suspense>
-        </div>
+            </PageLayout>
+        </PageProvider>
     );
 }
+
+export default SavedLeadsPage;
