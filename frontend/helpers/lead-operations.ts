@@ -1,4 +1,4 @@
-import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
+import type { GMAPS_SCRAPE_LEAD_INFO, INSTAGRAM_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 
 /**
@@ -30,7 +30,7 @@ export const formatLeadStats = (stats: {
 /**
  * Extract source-specific data from a Lead
  */
-export const extractLeadData = (lead: Lead): GMAPS_SCRAPE_LEAD_INFO | any => {
+export const extractLeadData = (lead: Lead): GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SCRAPE_LEAD_INFO => {
     return lead.data;
 };
 
@@ -57,4 +57,45 @@ export const filterValidLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[], source: LeadSo
  */
 export const getLeadDisplayName = (lead: GMAPS_SCRAPE_LEAD_INFO): string => {
     return lead.name || lead.phoneNumber || lead.website || 'Unknown Lead';
+};
+
+/**
+ * Search leads by query string based on their source type
+ * Returns true if the lead matches the search query
+ */
+export const searchLead = (lead: Lead, query: string): boolean => {
+    const lowerQuery = query.toLowerCase().trim();
+    
+    if (lead.source === LeadSource.GOOGLE_MAPS) {
+        const data = lead.data as GMAPS_SCRAPE_LEAD_INFO;
+        const searchableFields = [
+            data.name,
+            data.website,
+            data.phoneNumber,
+            data.address,
+        ];
+        return searchableFields.some((field) => field?.toLowerCase().includes(lowerQuery));
+    }
+    
+    if (lead.source === LeadSource.INSTAGRAM) {
+        const data = lead.data as INSTAGRAM_SCRAPE_LEAD_INFO;
+        const searchableFields = [
+            data.username,
+            data.bio,
+            data.email,
+            data.phoneNumber,
+            data.website,
+        ];
+        return searchableFields.some((field) => field?.toLowerCase().includes(lowerQuery));
+    }
+    
+    return false;
+};
+
+/**
+ * Filter leads by search query
+ */
+export const filterLeadsBySearch = (leads: Lead[], query: string): Lead[] => {
+    if (!query.trim()) return leads;
+    return leads.filter((lead) => searchLead(lead, query));
 };
