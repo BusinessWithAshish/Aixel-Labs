@@ -1,6 +1,6 @@
 import NextAuth, { DefaultSession, CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { getCollection, type UserDoc, type TenantDoc } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoCollection, type UserDoc, type TenantDoc } from '@aixellabs/shared/mongodb';
 import { z } from 'zod';
 
 // Custom error classes for specific error types
@@ -65,8 +65,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 try {
                     const { email, password, tenantId } = await signInSchema.parseAsync(rawCreds);
 
-                    const usersCollection = await getCollection<UserDoc>('users');
-                    const tenantsCollection = await getCollection<TenantDoc>('tenants');
+                    const usersCollection = await getCollection<UserDoc>(MongoCollection.USERS);
+                    const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
 
                     // Find the tenant by name to get its ObjectId
                     const tenant = await tenantsCollection.findOne({ name: tenantId });

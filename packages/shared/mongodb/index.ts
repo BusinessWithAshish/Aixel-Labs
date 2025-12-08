@@ -1,13 +1,13 @@
 import { MongoClient, Db, ObjectId } from "mongodb";
 import type { LeadDoc, UserLeadDoc } from "./types";
-import { LeadSource } from "./types";
+import { LeadSource, MongoCollection } from "./types";
 import type { GMAPS_SCRAPE_LEAD_INFO } from "../common";
 import type { INSTAGRAM_SCRAPE_LEAD_INFO } from "../common/apis/instagram";
 
 export type { ObjectId, Document, Collection, Db, MongoClient } from "mongodb";
 export { ObjectId as MongoObjectId } from "mongodb";
 export * from "./types";
-export { LeadSource };
+export { LeadSource, MongoCollection };
 
 type GlobalWithMongo = typeof globalThis & {
   _mongoClientPromise?: Promise<MongoClient>;
@@ -91,9 +91,9 @@ export const saveLeadsForUser = async (
 ): Promise<
   Array<{ leadId: ObjectId; isNewLead: boolean; isNewUserLead: boolean }>
 > => {
-  const leadsCollection = await getCollection<LeadDoc>("Leads", dbName);
+  const leadsCollection = await getCollection<LeadDoc>(MongoCollection.LEADS, dbName);
   const userLeadsCollection = await getCollection<UserLeadDoc>(
-    "UserLeads",
+    MongoCollection.USER_LEADS,
     dbName
   );
 
@@ -159,10 +159,10 @@ export const getUserLeads = async (
   dbName?: string
 ): Promise<LeadDoc[]> => {
   const userLeadsCollection = await getCollection<UserLeadDoc>(
-    "UserLeads",
+    MongoCollection.USER_LEADS,
     dbName
   );
-  const leadsCollection = await getCollection<LeadDoc>("Leads", dbName);
+  const leadsCollection = await getCollection<LeadDoc>(MongoCollection.LEADS, dbName);
 
   // Get all UserLead entries for this user
   const userLeads = await userLeadsCollection.find({ userId }).toArray();
@@ -194,7 +194,7 @@ export const checkLeadExists = async (
   sourceId: string,
   dbName?: string
 ): Promise<boolean> => {
-  const leadsCollection = await getCollection<LeadDoc>("Leads", dbName);
+  const leadsCollection = await getCollection<LeadDoc>(MongoCollection.LEADS, dbName);
   const count = await leadsCollection.countDocuments({ source, sourceId });
   return count > 0;
 };

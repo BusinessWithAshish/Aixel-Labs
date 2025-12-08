@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCollection, MongoObjectId } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoObjectId, MongoCollection } from '@aixellabs/shared/mongodb';
 
 /**
  * Example API route demonstrating MongoDB CRUD operations
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const skip = parseInt(searchParams.get('skip') || '0');
 
     // Replace 'your_collection' with your actual collection name
-    const collection = await getCollection('tenants');
+    const collection = await getCollection(MongoCollection.TENANTS);
 
     
     const documents = await collection
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as Record<string, unknown>;
 
     // Replace 'your_collection' with your actual collection name
-    const collection = await getCollection('tenants');
+    const collection = await getCollection(MongoCollection.TENANTS);
     
     const result = await collection.insertOne({
       ...body,
@@ -106,7 +106,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Replace 'your_collection' with your actual collection name
-    const collection = await getCollection('tenants');
+    const collection = await getCollection(MongoCollection.TENANTS);
     
     const result = await collection.updateOne(
       { _id: new MongoObjectId(id) },
@@ -166,7 +166,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Replace 'your_collection' with your actual collection name
-    const collection = await getCollection('tenants');
+    const collection = await getCollection(MongoCollection.TENANTS);
     
     const result = await collection.updateOne(
       { _id: new MongoObjectId(id) },
@@ -225,7 +225,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Replace 'your_collection' with your actual collection name
-    const collection = await getCollection('tenants');
+    const collection = await getCollection(MongoCollection.TENANTS);
     
     const result = await collection.deleteOne({ _id: new MongoObjectId(id) });
 
