@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
 import { sortLeads, type SortKey, type SortDirection } from '../../google-maps-scraper/_utils/lead-operations';
+import { filterLeadsBySearch } from '@/helpers/lead-operations';
 
 export type UseAllLeadsPageReturn = {
     leads: Lead[];
@@ -42,38 +43,35 @@ export const useAllLeadsPage = (leads: Lead[]): UseAllLeadsPageReturn => {
         return leads;
     }, [selectedSource, leads, gmapsLeads, instagramLeads]);
 
-    // Apply search filter
+    // Apply search filter using reusable helper
     const searchFilteredLeads = useMemo(() => {
-        if (!searchQuery.trim()) return sourceFilteredLeads;
-
-        const query = searchQuery.toLowerCase().trim();
-        return sourceFilteredLeads.filter((lead) => {
-            const leadData = lead.data as GMAPS_SCRAPE_LEAD_INFO;
-            const name = leadData.name?.toLowerCase() || '';
-            const website = leadData.website?.toLowerCase() || '';
-            const phoneNumber = leadData.phoneNumber?.toLowerCase() || '';
-
-            return name.includes(query) || website.includes(query) || phoneNumber.includes(query);
-        });
+        return filterLeadsBySearch(sourceFilteredLeads, searchQuery);
     }, [sourceFilteredLeads, searchQuery]);
 
-    // Apply sorting
+    // Apply sorting (only for Google Maps leads, as sorting is specific to GMAPS fields)
     const filteredLeads = useMemo(() => {
         if (!sortKey) return searchFilteredLeads;
 
-        // Extract GMAPS_SCRAPE_LEAD_INFO from Lead objects
-        const leadsData = searchFilteredLeads.map((lead) => lead.data as GMAPS_SCRAPE_LEAD_INFO);
+        // Separate GMAPS leads from other sources
+        const gmapsOnlyLeads = searchFilteredLeads.filter((lead) => lead.source === LeadSource.GOOGLE_MAPS);
+        const nonGmapsLeads = searchFilteredLeads.filter((lead) => lead.source !== LeadSource.GOOGLE_MAPS);
 
-        // Sort the data
+        // Sort only GMAPS leads
+        const leadsData = gmapsOnlyLeads.map((lead) => lead.data as GMAPS_SCRAPE_LEAD_INFO);
         const sortedData = sortLeads(leadsData, sortKey, sortDirection);
 
-        // Map back to Lead objects maintaining the original structure
-        return sortedData.map((data) => {
-            const originalLead = searchFilteredLeads.find(
-                (lead) => (lead.data as GMAPS_SCRAPE_LEAD_INFO).placeId === data.placeId,
-            );
-            return originalLead!;
-        });
+        // Map back to Lead objects with safe lookup
+        const sortedLeads = sortedData
+            .map((data) => {
+                const originalLead = gmapsOnlyLeads.find(
+                    (lead) => (lead.data as GMAPS_SCRAPE_LEAD_INFO).placeId === data.placeId,
+                );
+                return originalLead;
+            })
+            .filter((lead): lead is Lead => lead !== undefined);
+
+        // Return sorted GMAPS leads followed by unsorted non-GMAPS leads
+        return [...sortedLeads, ...nonGmapsLeads];
     }, [searchFilteredLeads, sortKey, sortDirection]);
 
     return {

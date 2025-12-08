@@ -90,13 +90,14 @@ export const GmapsDetailsLeadInfoExtractor = async (
     .replace(/style=["'][^"']*["']/gi, "");
 
   const dom = new JSDOM(fullPageHTML, {
+    url: gmapsUrl ?? undefined,
     resources: "usable",
     runScripts: "outside-only",
     pretendToBeVisual: false,
   });
 
   const document = dom.window.document;
-  gmapsUrl = gmapsUrl ? dom.window.location.href : null;
+  // gmapsUrl is already set from page.url(), no need to overwrite
 
   // === UNIVERSAL PLACE ID EXTRACTION ===
   const placeId = extractUniversalPlaceId(gmapsUrl, fullPageHTML);
