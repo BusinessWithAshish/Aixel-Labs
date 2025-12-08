@@ -1,8 +1,9 @@
 import PageLayout from '@/components/common/PageLayout';
-import { PageProvider } from '@/contexts/PageStore';
+import { withPageHandler } from '@/components/hocs/with-page-handler';
 import { AllUserLeads } from './_components/AllUserLeads';
 import { useAllLeadsPage } from './_hooks';
 import { getUserLeadsAction } from '@/app/actions/lead-actions';
+import { PageProvider } from '@/contexts/PageStore';
 import type { Lead } from '@aixellabs/shared/mongodb';
 
 const PAGE_TITLE = 'Saved Leads';
@@ -20,4 +21,4 @@ async function SavedLeadsPage() {
     );
 }
 
-export default SavedLeadsPage;
+export default withPageHandler(SavedLeadsPage);

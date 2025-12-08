@@ -1,9 +1,10 @@
 import PageLayout from '@/components/common/PageLayout';
-import { PageProvider } from '@/contexts/PageStore';
+import { withPageHandler } from '@/components/hocs/with-page-handler';
 import { ManageTenantsContent } from './_components';
 import { useManageTenantsPage } from './_hooks';
 import { withAdminOnly } from '@/components/hocs/with-admin';
 import { getAllTenants } from '@/helpers/tenant-operations';
+import { PageProvider } from '@/contexts/PageStore';
 
 const PAGE_TITLE = 'Manage Tenants';
 
@@ -19,4 +20,4 @@ async function ManageTenantsPage() {
     );
 }
 
-export default withAdminOnly(ManageTenantsPage, { pageTitle: PAGE_TITLE });
+export default withAdminOnly(withPageHandler(ManageTenantsPage), { pageTitle: PAGE_TITLE });
