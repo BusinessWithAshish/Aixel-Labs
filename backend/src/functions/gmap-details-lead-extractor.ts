@@ -9,153 +9,151 @@ const URL_PLACE_ID_REGEX = /(ChI[0-9A-Za-z_-]{10,})/;
 const CID_REGEX = /(0x[0-9a-f]+:0x[0-9a-f]+)/i;
 
 export function extractUniversalPlaceId(url: string | null, html: string) {
-  if (!url) return null;
+    if (!url) return null;
 
-  const fromURL = url.match(URL_PLACE_ID_REGEX);
-  if (fromURL) return fromURL[1];
+    const fromURL = url.match(URL_PLACE_ID_REGEX);
+    if (fromURL) return fromURL[1];
 
-  const queryMatch = url.match(/query_place_id=(ChI[0-9A-Za-z_-]{10,})/);
-  if (queryMatch) return queryMatch[1];
+    const queryMatch = url.match(/query_place_id=(ChI[0-9A-Za-z_-]{10,})/);
+    if (queryMatch) return queryMatch[1];
 
-  const fromHTML = html.match(PLACE_ID_REGEX);
-  if (fromHTML) return fromHTML[1];
+    const fromHTML = html.match(PLACE_ID_REGEX);
+    if (fromHTML) return fromHTML[1];
 
-  const cidMatch = url.match(CID_REGEX);
-  if (cidMatch) return cidMatch[1]; // fallback (still useful)
+    const cidMatch = url.match(CID_REGEX);
+    if (cidMatch) return cidMatch[1]; // fallback (still useful)
 
-  return null;
+    return null;
 }
 
 // === Request Interception ===
 export const gmapsSetupRequestInterception = async (page: Page) => {
-  await page.setRequestInterception(true);
+    await page.setRequestInterception(true);
 
-  page.on("request", (req) => {
-    const resourceType = req.resourceType();
-    const url = req.url();
+    page.on("request", (req) => {
+        const resourceType = req.resourceType();
+        const url = req.url();
 
-    // Block unnecessary resources
-    if (
-      resourceType === "stylesheet" ||
-      resourceType === "font" ||
-      resourceType === "image" ||
-      resourceType === "media" ||
-      url.includes(".css") ||
-      url.includes(".eot") ||
-      url.includes("analytics") ||
-      url.includes("google-analytics") ||
-      url.includes("googletagmanager") ||
-      url.includes("doubleclick") ||
-      url.includes("facebook.com") ||
-      url.includes("twitter.com") ||
-      url.includes(".jpg") ||
-      url.includes(".jpeg") ||
-      url.includes(".png") ||
-      url.includes(".gif") ||
-      url.includes(".webp") ||
-      url.includes(".svg") ||
-      url.includes(".ico")
-    ) {
-      req.abort();
-    } else {
-      req.continue();
-    }
-  });
+        // Block unnecessary resources
+        if (
+            resourceType === "stylesheet" ||
+            resourceType === "font" ||
+            resourceType === "image" ||
+            resourceType === "media" ||
+            url.includes(".css") ||
+            url.includes(".eot") ||
+            url.includes("analytics") ||
+            url.includes("google-analytics") ||
+            url.includes("googletagmanager") ||
+            url.includes("doubleclick") ||
+            url.includes("facebook.com") ||
+            url.includes("twitter.com") ||
+            url.includes(".jpg") ||
+            url.includes(".jpeg") ||
+            url.includes(".png") ||
+            url.includes(".gif") ||
+            url.includes(".webp") ||
+            url.includes(".svg") ||
+            url.includes(".ico")
+        ) {
+            req.abort();
+        } else {
+            req.continue();
+        }
+    });
 };
 
 // === Main Scraper ===
 export const GmapsDetailsLeadInfoExtractor = async (
-  url: string,
-  page: Page
+    url: string,
+    page: Page
 ): Promise<GMAPS_SCRAPE_LEAD_INFO> => {
-  await gmapsSetupRequestInterception(page);
-  await page.goto(url, {
-    waitUntil: "networkidle2",
-    timeout: DEFAULT_PAGE_LOAD_TIMEOUT,
-  });
+    await gmapsSetupRequestInterception(page);
+    await page.goto(url, {
+        waitUntil: "networkidle2",
+        timeout: DEFAULT_PAGE_LOAD_TIMEOUT,
+    });
 
-  // Full HTML
-  let fullPageHTML = await page.content();
+    // Full HTML
+    let fullPageHTML = await page.content();
 
-  let gmapsUrl = null;
-  gmapsUrl = page.url();
+    let gmapsUrl = null;
+    gmapsUrl = page.url();
 
-  // Close early for speed
-  await page.close();
+    // Close early for speed
+    await page.close();
 
-  // Clean & parse HTML
-  fullPageHTML = fullPageHTML
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, "")
-    .replace(/style=["'][^"']*["']/gi, "");
+    // Clean & parse HTML
+    fullPageHTML = fullPageHTML
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+        .replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, "")
+        .replace(/style=["'][^"']*["']/gi, "");
 
-  const dom = new JSDOM(fullPageHTML, {
-    url: gmapsUrl ?? undefined,
-    resources: "usable",
-    runScripts: "outside-only",
-    pretendToBeVisual: false,
-  });
+    const dom = new JSDOM(fullPageHTML, {
+        resources: "usable",
+        runScripts: "outside-only",
+        pretendToBeVisual: false,
+    });
 
-  const document = dom.window.document;
-  // gmapsUrl is already set from page.url(), no need to overwrite
+    const document = dom.window.document;
 
-  // === UNIVERSAL PLACE ID EXTRACTION ===
-  const placeId = extractUniversalPlaceId(gmapsUrl, fullPageHTML);
+    // === UNIVERSAL PLACE ID EXTRACTION ===
+    const placeId = extractUniversalPlaceId(gmapsUrl, fullPageHTML);
 
-  // Check if place is temporarily closed
-  const isPlaceTemporarilyClosed = document.querySelector(
-    'div[aria-label="Notice"]'
-  );
-  if (isPlaceTemporarilyClosed) {
+    // Check if place is temporarily closed
+    const isPlaceTemporarilyClosed = document.querySelector(
+        'div[aria-label="Notice"]'
+    );
+    if (isPlaceTemporarilyClosed) {
+        return {
+            placeId,
+            website: null,
+            phoneNumber: null,
+            name: null,
+            gmapsUrl,
+            overAllRating: null,
+            numberOfReviews: null,
+        };
+    }
+
+    // Extract other fields
+    const website =
+        document.querySelector('a[aria-label^="Website:"]')?.getAttribute("href") ??
+        null;
+
+    const phoneNumber =
+        document
+            .querySelector('button[aria-label^="Phone:"]')
+            ?.getAttribute("aria-label")
+            ?.replace("Phone: ", "")
+            ?.replace(/\s/g, "") ?? null;
+
+    const overAllRating =
+        document
+            .getElementsByClassName("ceNzKf")?.[0]
+            ?.getAttribute("aria-label")
+            ?.split(" ")?.[0]
+            ?.trim() ?? null;
+
+    const numberOfReviews =
+        document
+            .querySelector('span[aria-label*="reviews"]')
+            ?.getAttribute("aria-label")
+            ?.split(" ")[0] ?? null;
+
+    const name =
+        document
+            .querySelector('div[aria-label^="Information for"]')
+            ?.getAttribute("aria-label")
+            ?.replace("Information for ", "") ?? null;
+
     return {
-      placeId,
-      website: null,
-      phoneNumber: null,
-      name: null,
-      gmapsUrl,
-      overAllRating: null,
-      numberOfReviews: null,
+        placeId,
+        website,
+        phoneNumber,
+        name,
+        gmapsUrl,
+        overAllRating,
+        numberOfReviews,
     };
-  }
-
-  // Extract other fields
-  const website =
-    document.querySelector('a[aria-label^="Website:"]')?.getAttribute("href") ??
-    null;
-
-  const phoneNumber =
-    document
-      .querySelector('button[aria-label^="Phone:"]')
-      ?.getAttribute("aria-label")
-      ?.replace("Phone: ", "")
-      ?.replace(/\s/g, "") ?? null;
-
-  const overAllRating =
-    document
-      .getElementsByClassName("ceNzKf")?.[0]
-      ?.getAttribute("aria-label")
-      ?.split(" ")?.[0]
-      ?.trim() ?? null;
-
-  const numberOfReviews =
-    document
-      .querySelector('span[aria-label*="reviews"]')
-      ?.getAttribute("aria-label")
-      ?.split(" ")[0] ?? null;
-
-  const name =
-    document
-      .querySelector('div[aria-label^="Information for"]')
-      ?.getAttribute("aria-label")
-      ?.replace("Information for ", "") ?? null;
-
-  return {
-    placeId,
-    website,
-    phoneNumber,
-    name,
-    gmapsUrl,
-    overAllRating,
-    numberOfReviews,
-  };
 };
