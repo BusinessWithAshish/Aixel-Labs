@@ -1,24 +1,22 @@
 import PageLayout from '@/components/common/PageLayout';
-import { withPageData } from '@/contexts/PageStore';
+import { PageProvider } from '@/contexts/PageStore';
 import { AllUserLeads } from './_components/AllUserLeads';
 import { useAllLeadsPage } from './_hooks';
 import { getUserLeadsAction } from '@/app/actions/lead-actions';
+import type { Lead } from '@aixellabs/shared/mongodb';
 
 const PAGE_TITLE = 'Saved Leads';
 
 async function SavedLeadsPage() {
     const result = await getUserLeadsAction();
+    const leads: Lead[] = result.success && result.data ? result.data : [];
 
     return (
-        <PageLayout title={PAGE_TITLE}>
-            {withPageData({
-                dataFetchResult: result,
-                usePageHook: useAllLeadsPage,
-                loadingText: 'Loading leads...',
-                emptyMessage: 'No leads found.',
-                children: <AllUserLeads />,
-            })}
-        </PageLayout>
+        <PageProvider data={leads} usePageHook={useAllLeadsPage}>
+            <PageLayout title={PAGE_TITLE}>
+                <AllUserLeads />
+            </PageLayout>
+        </PageProvider>
     );
 }
 

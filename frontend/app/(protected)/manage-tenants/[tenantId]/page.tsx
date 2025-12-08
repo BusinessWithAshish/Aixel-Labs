@@ -1,5 +1,5 @@
 import PageLayout from '@/components/common/PageLayout';
-import { withPageData } from '@/contexts/PageStore';
+import { PageProvider } from '@/contexts/PageStore';
 import { TenantUsersContent } from './_components';
 import { useTenantUsersPage } from './_hooks';
 import { withAdminOnly } from '@/components/hocs/with-admin';
@@ -14,15 +14,11 @@ async function TenantUsersPage({ params }: { params: Promise<{ tenantId: string 
     const pageTitle = `Users - ${tenantId.toLocaleUpperCase()}`;
 
     return (
-        <PageLayout title={pageTitle}>
-            {withPageData({
-                dataFetchResult: users,
-                usePageHook: useTenantUsersPage,
-                loadingText: 'Loading users...',
-                emptyMessage: 'No users found.',
-                children: <TenantUsersContent />,
-            })}
-        </PageLayout>
+        <PageProvider data={users} usePageHook={useTenantUsersPage}>
+            <PageLayout title={pageTitle}>
+                <TenantUsersContent />
+            </PageLayout>
+        </PageProvider>
     );
 }
 
