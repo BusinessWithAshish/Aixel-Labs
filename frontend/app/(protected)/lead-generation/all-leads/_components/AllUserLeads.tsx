@@ -11,7 +11,7 @@ import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
 import { LeadCard } from '@/components/common/LeadCard';
 import { usePage } from '@/contexts/PageStore';
 import type { UseAllLeadsPageReturn } from '../_hooks';
-import type { SortKey } from '../../google-maps-scraper/_utils/lead-operations';
+import type { SortKey } from '@/components/common/lead-utils';
 import { DeleteAllLeadsDialog } from './DeleteAllLeadsDialog';
 import { AddNotesDialog } from './AddNotesDialog';
 import { useState, useMemo } from 'react';

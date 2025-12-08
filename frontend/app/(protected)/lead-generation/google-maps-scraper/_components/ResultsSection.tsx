@@ -9,7 +9,7 @@ import { SortAsc, SortDesc, Save, CheckCircle2 } from 'lucide-react';
 import { useSubmission } from '../_contexts';
 import { LeadCard } from './LeadCard';
 import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared/common/apis';
-import { sortLeads, categorizeLeads, generateUniqueKey, type SortKey, type SortDirection } from '../_utils';
+import { sortLeads, categorizeLeads, generateUniqueKey, type SortKey, type SortDirection } from '@/components/common/lead-utils';
 import { saveLeadsAction } from '@/app/actions/lead-actions';
 import { LeadSource } from '@aixellabs/shared/mongodb';
 import { formatLeadStats } from '@/helpers/lead-operations';

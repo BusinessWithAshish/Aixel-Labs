@@ -13,9 +13,10 @@ import type { ReactNode } from 'react';
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
 
-type LeadType = {
-    type: string;
+export type LeadType = {
+    type: 'Hot Lead' | 'Warm Lead' | 'Cold Lead' | 'Unknown';
     color: string;
+    category: 'hotLeads' | 'warmLeads' | 'coldLeads';
 };
 
 type LeadCardProps = {
@@ -29,25 +30,80 @@ type LeadCardProps = {
     onSelect?: (selected: boolean) => void;
 };
 
+const isSocialMediaUrl = (url: string): boolean => {
+    if (!url || url.trim() === '') {
+        return false;
+    }
+
+    const socialMediaDomains = [
+        'instagram.com',
+        'facebook.com',
+        'fb.com',
+        'twitter.com',
+        'x.com',
+        'linkedin.com',
+        'tiktok.com',
+        'youtube.com',
+        'youtu.be',
+        'pinterest.com',
+        'snapchat.com',
+    ];
+
+    try {
+        const urlLower = url.toLowerCase();
+        return socialMediaDomains.some((domain) => urlLower.includes(domain));
+    } catch {
+        return false;
+    }
+};
+
+const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
+    const website = lead.website?.trim();
+    if (!website) {
+        return false;
+    }
+    return !isSocialMediaUrl(website);
+};
+
+const hasSocialMedia = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
+    const website = lead.website?.trim();
+    if (!website) {
+        return false;
+    }
+    return isSocialMediaUrl(website);
+};
+
+const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
+    const phoneNumber = lead.phoneNumber?.trim();
+    return !!phoneNumber;
+};
+
 const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
-    const hasWebsite = lead.website !== null && lead.website !== undefined && lead.website !== '';
-    const hasPhone = lead.phoneNumber !== null && lead.phoneNumber !== undefined && lead.phoneNumber !== '';
+    const website = hasWebsite(lead);
+    const socialMedia = hasSocialMedia(lead);
+    const phone = hasPhone(lead);
 
-    if (hasWebsite && hasPhone) {
-        return { type: 'Premium', color: 'border-l-4 border-l-green-500' };
+    if ((!website && phone) || (socialMedia && phone)) {
+        return {
+            type: 'Hot Lead',
+            color: 'bg-green-50 border-green-200',
+            category: 'hotLeads',
+        };
     }
-    if (hasWebsite || hasPhone) {
-        return { type: 'Standard', color: 'border-l-4 border-l-blue-500' };
+
+    if (website) {
+        return {
+            type: 'Warm Lead',
+            color: 'bg-amber-50 border-amber-200',
+            category: 'warmLeads',
+        };
     }
-    return { type: 'Basic', color: 'border-l-4 border-l-gray-400' };
-};
 
-const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO) => {
-    return lead.website !== null && lead.website !== undefined && lead.website !== '';
-};
-
-const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO) => {
-    return lead.phoneNumber !== null && lead.phoneNumber !== undefined && lead.phoneNumber !== '';
+    return {
+        type: 'Cold Lead',
+        color: 'bg-gray-50 border-gray-200',
+        category: 'coldLeads',
+    };
 };
 
 export const LeadCard = ({
