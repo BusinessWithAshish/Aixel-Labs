@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 
 type CommonLoaderProps = {
-    size?: 'sm' | 'md' | 'lg' | 'xl';
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
     text?: string;
     fullScreen?: boolean;
     className?: string;
@@ -12,6 +12,7 @@ const sizeClasses = {
     md: 'h-8 w-8',
     lg: 'h-12 w-12',
     xl: 'h-16 w-16',
+    '2xl': 'h-20 w-20',
 };
 
 const textSizeClasses = {
@@ -26,7 +27,7 @@ export function CommonLoader({ size = 'md', text, fullScreen = false, className 
     const content = (
         <div className={cn('flex flex-col w-full items-center justify-center gap-3 h-full', className)}>
             <div className={cn('animate-spin rounded-full border-b-2 border-primary', sizeClasses[size])} />
-            {text && <p className={cn("text-sm text-muted-foreground animate-pulse", textSizeClasses[size])}>{text}</p>}
+            {text && <p className={cn('text-muted-foreground animate-pulse', textSizeClasses[size])}>{text}</p>}
         </div>
     );
 
