@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
-import { sortLeads, type SortKey, type SortDirection } from '../../google-maps-scraper/_utils/lead-operations';
+import { sortLeads, type SortKey, type SortDirection } from '@/components/common/lead-utils';
 import { filterLeadsBySearch } from '@/helpers/lead-operations';
 
 export type UseAllLeadsPageReturn = {

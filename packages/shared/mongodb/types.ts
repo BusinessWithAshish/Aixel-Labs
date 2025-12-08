@@ -5,7 +5,7 @@ import type { INSTAGRAM_SCRAPE_LEAD_INFO } from "../common";
 export enum MongoCollection {
   TENANTS = "tenants",
   USERS = "users",
-  LEADS = "Leads",
+  LEADS = "leads",
   USER_LEADS = "user_leads",
 }
 
@@ -88,6 +88,7 @@ export type UserLeadDoc = {
   _id: ObjectId;
   userId: ObjectId;
   leadId: ObjectId;
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -96,6 +97,7 @@ export type UserLead = {
   _id: string;
   userId: string;
   leadId: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 };

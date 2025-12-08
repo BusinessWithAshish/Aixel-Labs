@@ -1,7 +1,7 @@
 'use server';
 
 import { auth } from '@/auth';
-import { saveLeadsForUser, getUserLeads, MongoObjectId, LeadSource, type Lead } from '@aixellabs/shared/mongodb';
+import { saveLeadsForUser, getUserLeads, MongoObjectId, LeadSource, type Lead, type UserLeadDoc, type LeadDoc } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
 
 export type SaveLeadsResult = {
@@ -126,6 +126,211 @@ export async function getUserLeadsAction(source?: LeadSource): Promise<GetUserLe
     } catch (error) {
         console.error('Error fetching user leads:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to fetch leads';
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
+}
+
+export type DeleteLeadResult = {
+    success: boolean;
+    error?: string;
+};
+
+export async function deleteLeadAction(leadId: string): Promise<DeleteLeadResult> {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return {
+                success: false,
+                error: 'You must be logged in to delete leads',
+            };
+        }
+
+        const userId = new MongoObjectId(session.user.id);
+        const leadObjectId = new MongoObjectId(leadId);
+
+        const { getCollection, MongoCollection } = await import('@aixellabs/shared/mongodb');
+        const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
+
+        const result = await userLeadsCollection.deleteOne({ userId, leadId: leadObjectId });
+
+        if (result.deletedCount === 0) {
+            return {
+                success: false,
+                error: 'Lead not found or already deleted',
+            };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting lead:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete lead';
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
+}
+
+export async function deleteLeadsAction(leadIds: string[]): Promise<DeleteLeadResult> {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return {
+                success: false,
+                error: 'You must be logged in to delete leads',
+            };
+        }
+
+        const userId = new MongoObjectId(session.user.id);
+        const leadObjectIds = leadIds.map((id) => new MongoObjectId(id));
+
+        const { getCollection, MongoCollection } = await import('@aixellabs/shared/mongodb');
+        const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
+
+        await userLeadsCollection.deleteMany({
+            userId,
+            leadId: { $in: leadObjectIds },
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting leads:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete leads';
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
+}
+
+export async function deleteLeadsBySourceAction(source?: LeadSource): Promise<DeleteLeadResult> {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return {
+                success: false,
+                error: 'You must be logged in to delete leads',
+            };
+        }
+
+        const userId = new MongoObjectId(session.user.id);
+
+        const { getCollection, MongoCollection } = await import('@aixellabs/shared/mongodb');
+        const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
+        const leadsCollection = await getCollection(MongoCollection.LEADS);
+
+        const userLeads = (await userLeadsCollection.find({ userId }).toArray()) as UserLeadDoc[];
+        const leadIds = userLeads.map((ul) => ul.leadId);
+
+        if (leadIds.length === 0) {
+            return { success: true };
+        }
+
+        const query: { _id: { $in: typeof leadIds }; source?: LeadSource } = { _id: { $in: leadIds } };
+        if (source) {
+            query.source = source;
+        }
+
+        const leadsToDelete = (await leadsCollection.find(query).toArray()) as LeadDoc[];
+        const leadIdsToDelete = leadsToDelete.map((lead) => lead._id);
+
+        if (leadIdsToDelete.length === 0) {
+            return { success: true };
+        }
+
+        await userLeadsCollection.deleteMany({
+            userId,
+            leadId: { $in: leadIdsToDelete },
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting leads:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete leads';
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
+}
+
+export type UpdateLeadNotesResult = {
+    success: boolean;
+    error?: string;
+};
+
+export async function updateLeadNotesAction(leadId: string, notes: string): Promise<UpdateLeadNotesResult> {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return {
+                success: false,
+                error: 'You must be logged in to update notes',
+            };
+        }
+
+        const userId = new MongoObjectId(session.user.id);
+        const leadObjectId = new MongoObjectId(leadId);
+
+        const { getCollection, MongoCollection } = await import('@aixellabs/shared/mongodb');
+        const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
+
+        const result = await userLeadsCollection.updateOne(
+            { userId, leadId: leadObjectId },
+            { $set: { notes, updatedAt: new Date() } }
+        );
+
+        if (result.modifiedCount === 0) {
+            return {
+                success: false,
+                error: 'Lead not found',
+            };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating notes:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to update notes';
+        return {
+            success: false,
+            error: errorMessage,
+        };
+    }
+}
+
+export async function updateLeadsNotesAction(leadIds: string[], notes: string): Promise<UpdateLeadNotesResult> {
+    try {
+        const session = await auth();
+
+        if (!session?.user?.id) {
+            return {
+                success: false,
+                error: 'You must be logged in to update notes',
+            };
+        }
+
+        const userId = new MongoObjectId(session.user.id);
+        const leadObjectIds = leadIds.map((id) => new MongoObjectId(id));
+
+        const { getCollection, MongoCollection } = await import('@aixellabs/shared/mongodb');
+        const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
+
+        await userLeadsCollection.updateMany(
+            { userId, leadId: { $in: leadObjectIds } },
+            { $set: { notes, updatedAt: new Date() } }
+        );
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating notes:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to update notes';
         return {
             success: false,
             error: errorMessage,

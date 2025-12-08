@@ -5,15 +5,22 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Database, Search, ArrowUpDown, X } from 'lucide-react';
+import { Database, Search, ArrowUpDown, X, Trash2, StickyNote } from 'lucide-react';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
-import { LeadCard } from '@/app/(protected)/lead-generation/google-maps-scraper/_components/LeadCard';
+import { CommonLeadCard } from '@/components/common/CommonLeadCard';
 import { usePage } from '@/contexts/PageStore';
 import type { UseAllLeadsPageReturn } from '../_hooks';
-import type { SortKey } from '../../google-maps-scraper/_utils/lead-operations';
+import type { SortKey } from '@/components/common/lead-utils';
+import { DeleteAllLeadsDialog } from './DeleteAllLeadsDialog';
+import { AddNotesDialog } from './AddNotesDialog';
+import { useState, useEffect } from 'react';
+import { deleteLeadsAction, deleteLeadsBySourceAction, updateLeadsNotesAction } from '@/app/actions/lead-actions';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 export const AllUserLeads = () => {
+    const router = useRouter();
     const {
         leads,
         filteredLeads,
@@ -29,6 +36,19 @@ export const AllUserLeads = () => {
         instagramLeads,
     } = usePage<UseAllLeadsPageReturn>();
 
+    const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+    const [deleteBulkDialogOpen, setDeleteBulkDialogOpen] = useState(false);
+    const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+    const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isSavingNotes, setIsSavingNotes] = useState(false);
+
+    const hasSelectedLeads = selectedLeadIds.size > 0;
+
+    useEffect(() => {
+        setSelectedLeadIds(new Set());
+    }, [selectedSource]);
+
     const handleSortChange = (value: string) => {
         if (value === 'none') {
             setSortKey(null);
@@ -43,6 +63,106 @@ export const AllUserLeads = () => {
 
     const clearSearch = () => {
         setSearchQuery('');
+    };
+
+    const handleSelectLead = (leadId: string, selected: boolean) => {
+        setSelectedLeadIds((prev) => {
+            const newSet = new Set(prev);
+            if (selected) {
+                newSet.add(leadId);
+            } else {
+                newSet.delete(leadId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = (leadsToSelect: Lead[]) => {
+        const allIds = new Set(leadsToSelect.map((lead) => lead._id));
+        setSelectedLeadIds(allIds);
+    };
+
+    const handleDeselectAll = () => {
+        setSelectedLeadIds(new Set());
+    };
+
+    const handleDeleteAll = () => {
+        setDeleteAllDialogOpen(true);
+    };
+
+    const handleConfirmDeleteAll = async () => {
+        setIsDeleting(true);
+        const sourceToDelete = selectedSource === 'all' ? undefined : selectedSource;
+
+        try {
+            const result = await deleteLeadsBySourceAction(sourceToDelete);
+
+            if (result.success) {
+                toast.success('Leads deleted successfully');
+                setSelectedLeadIds(new Set());
+                setDeleteAllDialogOpen(false);
+                router.refresh();
+            } else {
+                toast.error(result.error || 'Failed to delete leads');
+            }
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleDeleteSelected = () => {
+        setDeleteBulkDialogOpen(true);
+    };
+
+    const handleConfirmDeleteSelected = async () => {
+        setIsDeleting(true);
+
+        try {
+            const result = await deleteLeadsAction(Array.from(selectedLeadIds));
+
+            if (result.success) {
+                toast.success(`${selectedLeadIds.size} lead(s) deleted successfully`);
+                setDeleteBulkDialogOpen(false);
+                setSelectedLeadIds(new Set());
+                router.refresh();
+            } else {
+                toast.error(result.error || 'Failed to delete leads');
+            }
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleAddNotesSelected = () => {
+        setNotesDialogOpen(true);
+    };
+
+    const handleConfirmNotes = async (notes: string) => {
+        if (selectedLeadIds.size === 0) return;
+
+        setIsSavingNotes(true);
+
+        try {
+            const result = await updateLeadsNotesAction(Array.from(selectedLeadIds), notes);
+
+            if (result.success) {
+                toast.success(`Notes saved for ${selectedLeadIds.size} lead(s)`);
+                setNotesDialogOpen(false);
+                setSelectedLeadIds(new Set());
+                router.refresh();
+            } else {
+                toast.error(result.error || 'Failed to save notes');
+            }
+        } finally {
+            setIsSavingNotes(false);
+        }
+    };
+
+    const getCategoryName = () => {
+        if (selectedSource === 'all') return 'All';
+        if (selectedSource === LeadSource.GOOGLE_MAPS) return 'Google Maps';
+        if (selectedSource === LeadSource.INSTAGRAM) return 'Instagram';
+        return 'All';
     };
 
     const renderLeadsList = (leadsToRender: Lead[]) => {
@@ -64,16 +184,22 @@ export const AllUserLeads = () => {
             <ScrollArea className="h-full">
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     {leadsToRender.map((lead) => {
-                        // Extract the lead data based on source
                         const leadData = lead.data as GMAPS_SCRAPE_LEAD_INFO;
-                        return <LeadCard key={lead._id} lead={leadData} />;
+                        return (
+                            <CommonLeadCard
+                                key={lead._id}
+                                lead={leadData}
+                                showCheckbox={true}
+                                isSelected={selectedLeadIds.has(lead._id)}
+                                onSelect={(selected) => handleSelectLead(lead._id, selected)}
+                            />
+                        );
                     })}
                 </div>
             </ScrollArea>
         );
     };
 
-    // Get the appropriate leads based on selected source
     const getLeadsForTab = () => {
         if (selectedSource === 'all') return filteredLeads;
         if (selectedSource === LeadSource.GOOGLE_MAPS) {
@@ -85,10 +211,31 @@ export const AllUserLeads = () => {
         return filteredLeads;
     };
 
+    const currentLeadsCount = getLeadsForTab().length;
+    const currentLeads = getLeadsForTab();
+
     return (
-        <div className='h-full w-full flex flex-col gap-4 p-2'>
+        <div className="h-full w-full flex flex-col gap-4 p-2">
+            {hasSelectedLeads && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-900">{selectedLeadIds.size} lead(s) selected</span>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleAddNotesSelected}>
+                            <StickyNote className="w-4 h-4 mr-1" />
+                            Add Notes
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={handleDeleteSelected}>
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete Selected
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={handleDeselectAll}>
+                            Clear
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             <div className="flex py-2 flex-col sm:flex-row gap-3">
-                {/* Search Input */}
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <Input
@@ -109,8 +256,21 @@ export const AllUserLeads = () => {
                     )}
                 </div>
 
-                {/* Sort Select */}
-                <div className="flex justify-start items-center gap-2">
+                <div className="flex justify-start items-center gap-2 flex-wrap">
+                    {currentLeadsCount > 0 && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                                selectedLeadIds.size === currentLeadsCount
+                                    ? handleDeselectAll()
+                                    : handleSelectAll(currentLeads)
+                            }
+                        >
+                            {selectedLeadIds.size === currentLeadsCount ? 'Deselect All' : 'Select All'}
+                        </Button>
+                    )}
+
                     <Select value={sortKey || 'none'} onValueChange={handleSortChange}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Sort by..." />
@@ -122,7 +282,6 @@ export const AllUserLeads = () => {
                         </SelectContent>
                     </Select>
 
-                    {/* Sort Direction Toggle */}
                     {sortKey && (
                         <Button
                             variant="outline"
@@ -131,11 +290,14 @@ export const AllUserLeads = () => {
                             title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
                         >
                             <ArrowUpDown className="w-4 h-4" />
-                            <span className="sr-only">
-                                    {sortDirection === 'asc' ? 'Sort Ascending' : 'Sort Descending'}
-                                </span>
+                            <span className="sr-only">{sortDirection === 'asc' ? 'Sort Ascending' : 'Sort Descending'}</span>
                         </Button>
                     )}
+
+                    <Button variant="destructive" size="sm" onClick={handleDeleteAll} disabled={currentLeadsCount === 0}>
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete All
+                    </Button>
                 </div>
             </div>
 
@@ -150,11 +312,11 @@ export const AllUserLeads = () => {
                     <TabsTrigger value={LeadSource.INSTAGRAM}>Instagram ({instagramLeads.length})</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="all" className="h-full">
+                <TabsContent value="all" className="h-full w-full">
                     {renderLeadsList(getLeadsForTab())}
                 </TabsContent>
 
-                <TabsContent value={LeadSource.GOOGLE_MAPS} className="">
+                <TabsContent value={LeadSource.GOOGLE_MAPS} className="h-full w-full">
                     {renderLeadsList(getLeadsForTab())}
                 </TabsContent>
 
@@ -162,6 +324,31 @@ export const AllUserLeads = () => {
                     {renderLeadsList(getLeadsForTab())}
                 </TabsContent>
             </Tabs>
+
+            <AddNotesDialog
+                open={notesDialogOpen}
+                onOpenChange={setNotesDialogOpen}
+                onConfirm={handleConfirmNotes}
+                isLoading={isSavingNotes}
+            />
+
+            <DeleteAllLeadsDialog
+                open={deleteAllDialogOpen}
+                onOpenChange={setDeleteAllDialogOpen}
+                category={getCategoryName()}
+                count={currentLeadsCount}
+                onConfirm={handleConfirmDeleteAll}
+                isDeleting={isDeleting}
+            />
+
+            <DeleteAllLeadsDialog
+                open={deleteBulkDialogOpen}
+                onOpenChange={setDeleteBulkDialogOpen}
+                category="Selected"
+                count={selectedLeadIds.size}
+                onConfirm={handleConfirmDeleteSelected}
+                isDeleting={isDeleting}
+            />
         </div>
     );
 };
