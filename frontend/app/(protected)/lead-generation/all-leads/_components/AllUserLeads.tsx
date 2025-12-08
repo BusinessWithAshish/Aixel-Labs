@@ -93,16 +93,21 @@ export const AllUserLeads = () => {
     const handleConfirmDeleteAll = async () => {
         setIsDeleting(true);
         const sourceToDelete = selectedSource === 'all' ? undefined : selectedSource;
-        const result = await deleteLeadsBySourceAction(sourceToDelete);
 
-        if (result.success) {
-            toast.success('Leads deleted successfully');
-            setDeleteAllDialogOpen(false);
-            router.refresh();
-        } else {
-            toast.error(result.error || 'Failed to delete leads');
+        try {
+            const result = await deleteLeadsBySourceAction(sourceToDelete);
+
+            if (result.success) {
+                toast.success('Leads deleted successfully');
+                setSelectedLeadIds(new Set());
+                setDeleteAllDialogOpen(false);
+                router.refresh();
+            } else {
+                toast.error(result.error || 'Failed to delete leads');
+            }
+        } finally {
+            setIsDeleting(false);
         }
-        setIsDeleting(false);
     };
 
     const handleDeleteSelected = () => {
@@ -111,17 +116,21 @@ export const AllUserLeads = () => {
 
     const handleConfirmDeleteSelected = async () => {
         setIsDeleting(true);
-        const result = await deleteLeadsAction(Array.from(selectedLeadIds));
 
-        if (result.success) {
-            toast.success(`${selectedLeadIds.size} lead(s) deleted successfully`);
-            setDeleteBulkDialogOpen(false);
-            setSelectedLeadIds(new Set());
-            router.refresh();
-        } else {
-            toast.error(result.error || 'Failed to delete leads');
+        try {
+            const result = await deleteLeadsAction(Array.from(selectedLeadIds));
+
+            if (result.success) {
+                toast.success(`${selectedLeadIds.size} lead(s) deleted successfully`);
+                setDeleteBulkDialogOpen(false);
+                setSelectedLeadIds(new Set());
+                router.refresh();
+            } else {
+                toast.error(result.error || 'Failed to delete leads');
+            }
+        } finally {
+            setIsDeleting(false);
         }
-        setIsDeleting(false);
     };
 
     const handleAddNotesSelected = () => {
@@ -132,17 +141,21 @@ export const AllUserLeads = () => {
         if (selectedLeadIds.size === 0) return;
 
         setIsSavingNotes(true);
-        const result = await updateLeadsNotesAction(Array.from(selectedLeadIds), notes);
 
-        if (result.success) {
-            toast.success(`Notes saved for ${selectedLeadIds.size} lead(s)`);
-            setNotesDialogOpen(false);
-            setSelectedLeadIds(new Set());
-            router.refresh();
-        } else {
-            toast.error(result.error || 'Failed to save notes');
+        try {
+            const result = await updateLeadsNotesAction(Array.from(selectedLeadIds), notes);
+
+            if (result.success) {
+                toast.success(`Notes saved for ${selectedLeadIds.size} lead(s)`);
+                setNotesDialogOpen(false);
+                setSelectedLeadIds(new Set());
+                router.refresh();
+            } else {
+                toast.error(result.error || 'Failed to save notes');
+            }
+        } finally {
+            setIsSavingNotes(false);
         }
-        setIsSavingNotes(false);
     };
 
     const getCategoryName = () => {
