@@ -152,8 +152,8 @@ export async function deleteLeadAction(leadId: string): Promise<DeleteLeadResult
         const userId = new MongoObjectId(session.user.id);
         const leadObjectId = new MongoObjectId(leadId);
 
-        const { getCollection, MongoCollection } = await import('@aixellabs/shared/mongodb');
-        const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
+        const { getCollection, MongoCollections } = await import('@aixellabs/shared/mongodb');
+        const userLeadsCollection = await getCollection(MongoCollections.USER_LEADS);
 
         const result = await userLeadsCollection.deleteOne({ userId, leadId: leadObjectId });
 
@@ -189,8 +189,8 @@ export async function deleteLeadsAction(leadIds: string[]): Promise<DeleteLeadRe
         const userId = new MongoObjectId(session.user.id);
         const leadObjectIds = leadIds.map((id) => new MongoObjectId(id));
 
-        const { getCollection, MongoCollection } = await import('@aixellabs/shared/mongodb');
-        const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
+        const { getCollection, MongoCollections } = await import('@aixellabs/shared/mongodb');
+        const userLeadsCollection = await getCollection(MongoCollections.USER_LEADS);
 
         await userLeadsCollection.deleteMany({
             userId,
@@ -221,9 +221,9 @@ export async function deleteLeadsBySourceAction(source?: LeadSource): Promise<De
 
         const userId = new MongoObjectId(session.user.id);
 
-        const { getCollection, MongoCollection } = await import('@aixellabs/shared/mongodb');
-        const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
-        const leadsCollection = await getCollection(MongoCollection.LEADS);
+        const { getCollection, MongoCollections } = await import('@aixellabs/shared/mongodb');
+        const userLeadsCollection = await getCollection(MongoCollections.USER_LEADS);
+        const leadsCollection = await getCollection(MongoCollections.LEADS);
 
         const userLeads = (await userLeadsCollection.find({ userId }).toArray()) as UserLeadDoc[];
         const leadIds = userLeads.map((ul) => ul.leadId);
@@ -279,8 +279,8 @@ export async function updateLeadNotesAction(leadId: string, notes: string): Prom
         const userId = new MongoObjectId(session.user.id);
         const leadObjectId = new MongoObjectId(leadId);
 
-        const { getCollection, MongoCollection } = await import('@aixellabs/shared/mongodb');
-        const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
+        const { getCollection, MongoCollections } = await import('@aixellabs/shared/mongodb');
+        const userLeadsCollection = await getCollection(MongoCollections.USER_LEADS);
 
         const result = await userLeadsCollection.updateOne(
             { userId, leadId: leadObjectId },
@@ -319,8 +319,8 @@ export async function updateLeadsNotesAction(leadIds: string[], notes: string): 
         const userId = new MongoObjectId(session.user.id);
         const leadObjectIds = leadIds.map((id) => new MongoObjectId(id));
 
-        const { getCollection, MongoCollection } = await import('@aixellabs/shared/mongodb');
-        const userLeadsCollection = await getCollection(MongoCollection.USER_LEADS);
+        const { getCollection, MongoCollections } = await import('@aixellabs/shared/mongodb');
+        const userLeadsCollection = await getCollection(MongoCollections.USER_LEADS);
 
         await userLeadsCollection.updateMany(
             { userId, leadId: { $in: leadObjectIds } },

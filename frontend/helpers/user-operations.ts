@@ -1,6 +1,6 @@
 'use server';
 
-import { getCollection, MongoObjectId, MongoCollection, type User, type UserDoc, type TenantDoc } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoObjectId, MongoCollections, type User, type UserDoc, type TenantDoc } from '@aixellabs/shared/mongodb';
 
 // ============================================================================
 // USER INPUT TYPES (Frontend/Forms)
@@ -30,8 +30,8 @@ export type { User };
 
 export const getUsersByTenantId = async (tenantId: string): Promise<User[]> => {
     try {
-        const usersCollection = await getCollection<UserDoc>(MongoCollection.USERS);
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
+        const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
+        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
         
         // Find the tenant by name to get its ObjectId
         const tenant = await tenantsCollection.findOne({ name: tenantId });
@@ -60,8 +60,8 @@ export const createUser = async (input: CreateUserInput): Promise<User | null> =
     try {
         if (!input.email || !input.password || !input.tenantId) return null;
 
-        const usersCollection = await getCollection<UserDoc>(MongoCollection.USERS);
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
+        const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
+        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
 
         // Find the tenant by name to get its ObjectId
         const tenant = await tenantsCollection.findOne({ name: input.tenantId });
@@ -108,8 +108,8 @@ export const updateUser = async (id: string, input: UpdateUserInput): Promise<Us
     try {
         if (!MongoObjectId.isValid(id)) return null;
 
-        const usersCollection = await getCollection<UserDoc>(MongoCollection.USERS);
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
+        const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
+        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
 
         const updateFields: Partial<Pick<UserDoc, 'name' | 'isAdmin'>> = {};
         if (input.name !== undefined) updateFields.name = input.name;
@@ -144,7 +144,7 @@ export const deleteUser = async (id: string): Promise<boolean> => {
     try {
         if (!MongoObjectId.isValid(id)) return false;
 
-        const usersCollection = await getCollection<UserDoc>(MongoCollection.USERS);
+        const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
         const result = await usersCollection.deleteOne({ _id: new MongoObjectId(id) });
 
         return result.deletedCount === 1;

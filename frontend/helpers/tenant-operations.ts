@@ -1,6 +1,6 @@
 'use server';
 
-import { getCollection, MongoObjectId, MongoCollection, type Tenant, type TenantDoc } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoObjectId, MongoCollections, type Tenant, type TenantDoc } from '@aixellabs/shared/mongodb';
 
 // ============================================================================
 // TENANT INPUT TYPES (Frontend/Forms)
@@ -23,7 +23,7 @@ export type { Tenant };
 
 export const getAllTenants = async (): Promise<Tenant[]> => {
     try {
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
+        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
         const tenants = await tenantsCollection.find({}).toArray();
         
         // Convert MongoDB documents to frontend-friendly format
@@ -41,7 +41,7 @@ export const createTenant = async (input: CreateTenantInput): Promise<Tenant | n
     try {
         if (!input.name) return null;
 
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
+        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
         
         // Prepare document for insertion (without _id, MongoDB will generate it)
         const docToInsert: Omit<TenantDoc, '_id'> = {
@@ -66,7 +66,7 @@ export const updateTenant = async (id: string, input: UpdateTenantInput): Promis
     try {
         if (!MongoObjectId.isValid(id)) return null;
 
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
+        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
 
         const updateFields: Partial<Pick<TenantDoc, 'name' | 'redirect_url'>> = {};
         if (input.name !== undefined) updateFields.name = input.name;
@@ -95,7 +95,7 @@ export const deleteTenant = async (id: string): Promise<boolean> => {
     try {
         if (!MongoObjectId.isValid(id)) return false;
 
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollection.TENANTS);
+        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
         const result = await tenantsCollection.deleteOne({ _id: new MongoObjectId(id) });
 
         return result.deletedCount === 1;
