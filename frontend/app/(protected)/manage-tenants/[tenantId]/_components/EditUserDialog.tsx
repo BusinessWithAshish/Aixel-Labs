@@ -17,7 +17,7 @@ import { createUserAction, updateUserAction } from '@/app/actions/user-actions';
 // Email and password are optional in the schema but validated in the component for create mode
 const userSchema = z.object({
     email: z.string().email('Invalid email address').optional().or(z.literal('')),
-    password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
+    password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
     name: z.string().max(100, 'Name must be less than 100 characters').optional().or(z.literal('')),
     isAdmin: z.boolean(),
 });

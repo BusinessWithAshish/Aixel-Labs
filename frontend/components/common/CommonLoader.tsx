@@ -5,6 +5,10 @@ type CommonLoaderProps = {
     text?: string;
     fullScreen?: boolean;
     className?: string;
+    classNames?: {
+        icon?: string;
+        text?: string;
+    };
 };
 
 const sizeClasses = {
@@ -23,11 +27,15 @@ const textSizeClasses = {
     '2xl': 'text-2xl',
 };
 
-export function CommonLoader({ size = 'md', text, fullScreen = false, className }: CommonLoaderProps) {
+export function CommonLoader({ size = 'md', text, fullScreen = false, className, classNames }: CommonLoaderProps) {
     const content = (
         <div className={cn('flex flex-col w-full items-center justify-center gap-3 h-full', className)}>
-            <div className={cn('animate-spin rounded-full border-b-2 border-primary', sizeClasses[size])} />
-            {text && <p className={cn('text-muted-foreground animate-pulse', textSizeClasses[size])}>{text}</p>}
+            <div
+                className={cn('animate-spin rounded-full border-b-2 border-primary', sizeClasses[size], classNames?.icon)}
+            />
+            {text && (
+                <p className={cn('text-muted-foreground animate-pulse', textSizeClasses[size], classNames?.text)}>{text}</p>
+            )}
         </div>
     );
 
