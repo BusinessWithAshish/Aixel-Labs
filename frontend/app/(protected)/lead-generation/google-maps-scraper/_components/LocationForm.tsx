@@ -54,7 +54,7 @@ export const LocationForm = () => {
     };
 
     return (
-        <ScrollArea className="h-full">
+        <ScrollArea className="h-full w-full">
             <div className="space-y-4 p-3 flex flex-col">
                 <InputWithLabel
                     label={{ text: 'Query' }}

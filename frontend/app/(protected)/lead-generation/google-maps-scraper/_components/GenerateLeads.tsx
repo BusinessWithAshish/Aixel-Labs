@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { DirectUrlForm } from './DirectUrlForm';
@@ -21,22 +21,31 @@ export const GenerateLeads = () => {
     };
 
     return (
-        <div className="space-y-6">
-            <Card>
+        <div className="space-y-3 h-full w-full">
+            <Card className='h-full w-full'>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Image src="/google-maps.svg" alt="Google Maps" width={20} height={20} />
                         Generate Google Map Leads
                     </CardTitle>
+                    <CardAction>
+                        <Button
+                            className="w-fit"
+                            onClick={handleSubmit}
+                            disabled={!canSubmit || submissionState.isSubmitting}
+                        >
+                            {submissionState.isSubmitting ? 'Processing...' : 'Start Scraping'}
+                        </Button>
+                    </CardAction>
                 </CardHeader>
 
-                <CardContent className="p-4 md:p-6">
+                <CardContent className="h-full w-full">
                     <Tabs
                         value={formMode}
                         onValueChange={(value) => setFormMode(value as 'location' | 'direct-url')}
-                        className="w-full"
+                        className="h-full w-full"
                     >
-                        <TabsList className="grid w-full grid-cols-2 mb-6">
+                        <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="location" className="flex items-center gap-2">
                                 <MapPin className="w-4 h-4" />
                                 <span className="hidden sm:inline">Location-Based</span>
@@ -49,24 +58,15 @@ export const GenerateLeads = () => {
                             </TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="location" className="mt-0">
+                        <TabsContent className='h-full w-full' value="location">
                             <LocationForm />
                         </TabsContent>
 
-                        <TabsContent value="direct-url" className="mt-0">
+                        <TabsContent className='h-full w-full' value="direct-url">
                             <DirectUrlForm urls={directUrls} onUrlsChange={setDirectUrls} />
                         </TabsContent>
                     </Tabs>
 
-                    <CardFooter className="flex justify-end">
-                        <Button
-                            className="m-2 w-fit"
-                            onClick={handleSubmit}
-                            disabled={!canSubmit || submissionState.isSubmitting}
-                        >
-                            {submissionState.isSubmitting ? 'Processing...' : 'Start Scraping'}
-                        </Button>
-                    </CardFooter>
                 </CardContent>
             </Card>
 

@@ -31,7 +31,7 @@ function GoogleMapsScraperContent() {
                     <GoogleMapsScraperChat />
                 </TabsContent>
 
-                <TabsContent value="form" className="mt-6">
+                <TabsContent value="form" className="h-full w-full">
                     <GenerateLeads />
                 </TabsContent>
             </Tabs>
