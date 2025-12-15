@@ -33,7 +33,7 @@ export const FormProvider = ({ children }: { children: ReactNode }) => {
     const [formMode, setFormMode] = useState<FormMode>('location');
 
     const updateFormData = (updates: Partial<GMAPS_SCRAPE_REQUEST>) => {
-        setFormData((prev) => ({ ...prev, ...updates }));
+        setFormData((prev: GMAPS_SCRAPE_REQUEST) => ({ ...prev, ...updates }));
     };
 
     const resetForm = () => {

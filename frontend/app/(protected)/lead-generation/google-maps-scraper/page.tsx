@@ -5,22 +5,10 @@ import PageLayout from '@/components/common/PageLayout';
 import {
     GenerateLeads,
     LeadGenerationProvider,
-    ConfigurationForm,
 } from '@/app/(protected)/lead-generation/google-maps-scraper/_components';
 import { GoogleMapsScraperChat } from '@/components/common/GoogleMapsScraperChat';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, FormInput } from 'lucide-react';
-import { useConfiguration } from './_contexts';
-
-function ChatModeContent() {
-    const { config } = useConfiguration();
-
-    if (!config.isConfigValid) {
-        return <ConfigurationForm />;
-    }
-
-    return <GoogleMapsScraperChat />;
-}
 
 function GoogleMapsScraperContent() {
     const [mode, setMode] = useState<'chat' | 'form'>('chat');
@@ -39,12 +27,11 @@ function GoogleMapsScraperContent() {
                     </TabsTrigger>
                 </TabsList>
 
-                {/* AI Chat Mode */}
                 <TabsContent className="h-full w-full" value="chat">
-                    <ChatModeContent />
+                    <GoogleMapsScraperChat />
                 </TabsContent>
 
-                <TabsContent value="form" className="mt-6">
+                <TabsContent value="form" className="h-full w-full">
                     <GenerateLeads />
                 </TabsContent>
             </Tabs>

@@ -3,7 +3,7 @@
 import type React from 'react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
@@ -381,48 +381,51 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
     };
 
     return (
-        <Card className={cn('flex flex-col h-full w-full border-border bg-card', className)}>
+        <Card className={cn('flex flex-col h-full w-full', className)}>
             <ChatHeader assistantName={assistantName} isComplete={isComplete} onReset={handleReset} />
 
-            <ScrollArea ref={scrollRef} className="flex-1 p-4">
-                <div className="space-y-4">
-                    {messages.length === 0 && <EmptyState assistantName={assistantName} message={emptyStateMessage} />}
+            <CardContent className='flex flex-col h-full'>
+                <ScrollArea ref={scrollRef} className="flex-1 p-4">
+                    <div className="space-y-4">
+                        {messages.length === 0 && <EmptyState assistantName={assistantName} message={emptyStateMessage} />}
 
-                    {messages.map((message, index) => (
-                        <ChatMessage
-                            key={message.id}
-                            role={message.role}
-                            content={message.content}
-                            isLatest={index === messages.length - 1}
-                        />
-                    ))}
+                        {messages.map((message, index) => (
+                            <ChatMessage
+                                key={message.id}
+                                role={message.role}
+                                content={message.content}
+                                isLatest={index === messages.length - 1}
+                            />
+                        ))}
 
-                    {isLoading && <LoadingIndicator />}
+                        {isLoading && <LoadingIndicator />}
 
-                    {/* Confirmation prompt when data collection is complete */}
-                    {isComplete && !isLoading && onConfirm && (
-                        <ConfirmationPrompt extractedData={extractedData} onConfirm={handleConfirm} onReset={handleReset} />
-                    )}
+                        {/* Confirmation prompt when data collection is complete */}
+                        {isComplete && !isLoading && onConfirm && (
+                            <ConfirmationPrompt extractedData={extractedData} onConfirm={handleConfirm} onReset={handleReset} />
+                        )}
 
-                    {/* Error display */}
-                    {error && (
-                        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                            <p className="text-sm text-destructive">{error}</p>
-                        </div>
-                    )}
-                </div>
-            </ScrollArea>
+                        {/* Error display */}
+                        {error && (
+                            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                                <p className="text-sm text-destructive">{error}</p>
+                            </div>
+                        )}
+                    </div>
+                </ScrollArea>
 
-            <ChatInputArea
-                inputRef={inputRef}
-                inputValue={inputValue}
-                setInputValue={setInputValue}
-                handleSubmit={handleSubmit}
-                handleKeyDown={handleKeyDown}
-                placeholder={placeholder}
-                isLoading={isLoading}
-                disabled={isLoading}
-            />
+                <ChatInputArea
+                    inputRef={inputRef}
+                    inputValue={inputValue}
+                    setInputValue={setInputValue}
+                    handleSubmit={handleSubmit}
+                    handleKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                    isLoading={isLoading}
+                    disabled={isLoading}
+                />
+            </CardContent>
+
         </Card>
     );
 }
@@ -439,8 +442,8 @@ function ChatHeader({
     onReset: () => void;
 }) {
     return (
-        <div className="px-4 py-3 border-b border-border bg-muted/30">
-            <div className="flex items-center gap-3">
+        <CardHeader>
+            <CardTitle className='flex items-center gap-3'>
                 <AixelLabsBotIcon />
                 <div className="flex-1">
                     <h3 className="font-semibold text-foreground">{assistantName}</h3>
@@ -451,11 +454,14 @@ function ChatHeader({
                         <span className="text-xs font-medium">Ready</span>
                     </div>
                 )}
+            </CardTitle>
+            <CardAction>
                 <Button variant="ghost" size="icon" onClick={onReset} title="Start over">
                     <RotateCcw className="w-4 h-4" />
                 </Button>
-            </div>
-        </div>
+            </CardAction>
+
+        </CardHeader>
     );
 }
 

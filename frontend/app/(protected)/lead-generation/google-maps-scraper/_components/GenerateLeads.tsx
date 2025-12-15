@@ -1,19 +1,17 @@
 'use client';
 
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { DirectUrlForm } from './DirectUrlForm';
-import { useConfiguration, useForm, useSubmission } from '../_contexts';
+import { useForm, useSubmission } from '../_contexts';
 import { LocationForm } from './LocationForm';
-import { ConfigurationForm } from './ConfigurationForm';
 import { ResultsSection } from './ResultsSection';
 import { StatusDisplay } from './StatusDisplay';
 import { MapPin, Link2 } from 'lucide-react';
 import Image from 'next/image';
 
 export const GenerateLeads = () => {
-    const { config } = useConfiguration();
     const { canSubmit, formMode, setFormMode, directUrls, setDirectUrls } = useForm();
     const { submissionState, submitForm } = useSubmission();
 
@@ -23,70 +21,56 @@ export const GenerateLeads = () => {
     };
 
     return (
-        <div className="space-y-6">
-            <ConfigurationForm />
-
-            {/* Main Form - Only show if config is valid */}
-            {config.isConfigValid ? (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Image src="/google-maps.svg" alt="Google Maps" width={20} height={20} />
-                            Generate Google Map Leads
-                        </CardTitle>
-                    </CardHeader>
-
-                    <CardContent className="p-4 md:p-6">
-                        <Tabs
-                            value={formMode}
-                            onValueChange={(value) => setFormMode(value as 'location' | 'direct-url')}
-                            className="w-full"
+        <div className="space-y-3 h-full w-full">
+            <Card className='h-full w-full'>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Image src="/google-maps.svg" alt="Google Maps" width={20} height={20} />
+                        Generate Google Map Leads
+                    </CardTitle>
+                    <CardAction>
+                        <Button
+                            className="w-fit"
+                            onClick={handleSubmit}
+                            disabled={!canSubmit || submissionState.isSubmitting}
                         >
-                            <TabsList className="grid w-full grid-cols-2 mb-6">
-                                <TabsTrigger value="location" className="flex items-center gap-2">
-                                    <MapPin className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Location-Based</span>
-                                    <span className="sm:hidden">Location</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="direct-url" className="flex items-center gap-2">
-                                    <Link2 className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Direct URL</span>
-                                    <span className="sm:hidden">URL</span>
-                                </TabsTrigger>
-                            </TabsList>
+                            {submissionState.isSubmitting ? 'Processing...' : 'Start Scraping'}
+                        </Button>
+                    </CardAction>
+                </CardHeader>
 
-                            <TabsContent value="location" className="mt-0">
-                                <LocationForm />
-                            </TabsContent>
+                <CardContent className="h-full w-full">
+                    <Tabs
+                        value={formMode}
+                        onValueChange={(value) => setFormMode(value as 'location' | 'direct-url')}
+                        className="h-full w-full"
+                    >
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="location" className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4" />
+                                <span className="hidden sm:inline">Location-Based</span>
+                                <span className="sm:hidden">Location</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="direct-url" className="flex items-center gap-2">
+                                <Link2 className="w-4 h-4" />
+                                <span className="hidden sm:inline">Direct URL</span>
+                                <span className="sm:hidden">URL</span>
+                            </TabsTrigger>
+                        </TabsList>
 
-                            <TabsContent value="direct-url" className="mt-0">
-                                <DirectUrlForm urls={directUrls} onUrlsChange={setDirectUrls} />
-                            </TabsContent>
-                        </Tabs>
+                        <TabsContent className='h-full w-full' value="location">
+                            <LocationForm />
+                        </TabsContent>
 
-                        <CardFooter className="flex justify-end">
-                            <Button
-                                className="m-2 w-fit"
-                                onClick={handleSubmit}
-                                disabled={!canSubmit || submissionState.isSubmitting}
-                            >
-                                {submissionState.isSubmitting ? 'Processing...' : 'Start Scraping'}
-                            </Button>
-                        </CardFooter>
-                    </CardContent>
-                </Card>
-            ) : (
-                <Card>
-                    <CardContent className="p-6 text-center">
-                        <p className="text-gray-600">Please complete the configuration setup above to access the forms.</p>
-                        {config.validationError && (
-                            <p className="text-red-600 mt-2 text-sm">Error: {config.validationError}</p>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
+                        <TabsContent className='h-full w-full' value="direct-url">
+                            <DirectUrlForm urls={directUrls} onUrlsChange={setDirectUrls} />
+                        </TabsContent>
+                    </Tabs>
 
-            {config.isConfigValid && <StatusDisplay />}
+                </CardContent>
+            </Card>
+
+            <StatusDisplay />
 
             <ResultsSection />
         </div>
