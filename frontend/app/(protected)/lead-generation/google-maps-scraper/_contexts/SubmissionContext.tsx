@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { useConfiguration } from './ConfigurationContext';
 import { useForm } from './FormContext';
 import { 
     GMAPS_SCRAPE_REQUEST,
@@ -46,10 +45,21 @@ const initialSubmissionState: SubmissionState = {
 
 export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
     const [submissionState, setSubmissionState] = useState<SubmissionState>(initialSubmissionState);
-    const { config } = useConfiguration();
     const { formData } = useForm();
 
     const submitForm = async () => {
+        const backendUrl = process.env.NEXT_PUBLIC_BE_API;
+
+        if (!backendUrl) {
+            setSubmissionState((prev) => ({
+                ...prev,
+                isSubmitting: false,
+                isSuccess: false,
+                error: 'Backend API URL not configured. Please set NEXT_PUBLIC_BE_API environment variable.',
+            }));
+            return;
+        }
+
         setSubmissionState((prev) => ({
             ...prev,
             isSubmitting: true,
@@ -61,13 +71,12 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
         }));
 
         try {
-            const backendUrl = config.backendUrl;
 
             // Transform form data to API format
             const requestData: GMAPS_SCRAPE_REQUEST = {
                 query: formData.query,
                 country: formData.country,
-                states: formData.states.map((state) => ({
+                states: formData.states.map((state: { name: string; cities: string[] }) => ({
                     name: state.name,
                     cities: state.cities,
                 })),

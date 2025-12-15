@@ -1,7 +1,6 @@
 "use client";
 
 import { ReactNode } from "react";
-import { ConfigurationProvider } from "../_contexts/ConfigurationContext";
 import { FormProvider } from "../_contexts/FormContext";
 import { SubmissionProvider } from "../_contexts/SubmissionContext";
 
@@ -11,12 +10,10 @@ type LeadGenerationProviderProps = {
 
 export const LeadGenerationProvider = ({ children }: LeadGenerationProviderProps) => {
   return (
-    <ConfigurationProvider>
-      <FormProvider>
-        <SubmissionProvider>
-          {children}
-        </SubmissionProvider>
-      </FormProvider>
-    </ConfigurationProvider>
+    <FormProvider>
+      <SubmissionProvider>
+        {children}
+      </SubmissionProvider>
+    </FormProvider>
   );
 };
