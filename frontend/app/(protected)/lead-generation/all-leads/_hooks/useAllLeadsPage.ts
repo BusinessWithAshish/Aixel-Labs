@@ -1,91 +1,172 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
 import { sortLeads, type SortKey, type SortDirection } from '@/components/common/lead-utils';
 import { filterLeadsBySearch } from '@/helpers/lead-operations';
+import { useNLQuery } from '@/hooks/use-nl-query';
 
-export type UseAllLeadsPageReturn = {
-    leads: Lead[];
-    filteredLeads: Lead[];
-    selectedSource: 'all' | LeadSource;
-    setSelectedSource: (source: 'all' | LeadSource) => void;
-    searchQuery: string;
-    setSearchQuery: (query: string) => void;
-    sortKey: SortKey | null;
-    setSortKey: (key: SortKey | null) => void;
-    sortDirection: SortDirection;
-    setSortDirection: (direction: SortDirection) => void;
-    gmapsLeads: Lead[];
-    instagramLeads: Lead[];
-};
+const NL_QUERY_SCHEMA_DESCRIPTION = `Array of Lead objects with:
+- _id: string (unique identifier)
+- source: string (LeadSource.GOOGLE_MAPS or LeadSource.INSTAGRAM)
+- data: object containing lead information
+- notes: string (optional user notes)
+- createdAt: Date
+- updatedAt: Date
+
+For Google Maps leads, data contains:
+- placeId: string
+- title: string (business name)
+- website: string (null if not available)
+- phone: string (null if not available)
+- address: string
+- category: string
+- overAllRating: string (rating value, null if not available)
+- reviewsCount: string (null if not available)
+- latitude: string
+- longitude: string
+
+For Instagram leads, data contains:
+- username: string
+- fullName: string
+- biography: string
+- followersCount: number
+- followingCount: number
+- postsCount: number
+- isVerified: boolean
+- isPrivate: boolean
+`;
+
+export type FilterMode = 'manual' | 'ai';
 
 /**
  * Hook for managing all leads page state and interactions
- * Accepts server-fetched leads as initial data
+ * Supports two filter modes: manual (traditional) and AI (natural language)
  */
-export const useAllLeadsPage = (leads: Lead[]): UseAllLeadsPageReturn => {
+export const useAllLeadsPage = (leads: Lead[]) => {
+    // Filter mode - determines which filtering logic to use
+    const [filterMode, setFilterMode] = useState<FilterMode>('manual');
+
+    // Source filter (applies to both modes)
     const [selectedSource, setSelectedSource] = useState<'all' | LeadSource>('all');
+
+    // Manual filter state
     const [searchQuery, setSearchQuery] = useState('');
     const [sortKey, setSortKey] = useState<SortKey | null>(null);
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-    // Filter leads by source
-    const gmapsLeads = useMemo(() => leads.filter((lead) => lead.source === LeadSource.GOOGLE_MAPS), [leads]);
-    const instagramLeads = useMemo(() => leads.filter((lead) => lead.source === LeadSource.INSTAGRAM), [leads]);
+    // Clean leads data (replace N/A with null)
+    const cleanedLeads = useMemo(() => {
+        return leads.map((lead) => ({
+            ...lead,
+            data: Object.fromEntries(Object.entries(lead.data).map(([key, value]) => [key, value === 'N/A' ? null : value])),
+        })) as Lead[];
+    }, [leads]);
 
-    // Get leads based on selected source
+    // Source filtered leads (base for both manual and AI filtering)
     const sourceFilteredLeads = useMemo(() => {
-        if (selectedSource === 'all') return leads;
-        if (selectedSource === LeadSource.GOOGLE_MAPS) return gmapsLeads;
-        if (selectedSource === LeadSource.INSTAGRAM) return instagramLeads;
-        return leads;
-    }, [selectedSource, leads, gmapsLeads, instagramLeads]);
+        if (selectedSource === 'all') return cleanedLeads;
+        return cleanedLeads.filter((lead) => lead.source === selectedSource);
+    }, [selectedSource, cleanedLeads]);
 
-    // Apply search filter using reusable helper
-    const searchFilteredLeads = useMemo(() => {
-        return filterLeadsBySearch(sourceFilteredLeads, searchQuery);
-    }, [sourceFilteredLeads, searchQuery]);
+    // AI Query hook - always initialized with source-filtered leads
+    const nlQuery = useNLQuery({
+        data: sourceFilteredLeads,
+        schemaDescription: NL_QUERY_SCHEMA_DESCRIPTION,
+        enableCache: true,
+        debug: false,
+    });
 
-    // Apply sorting (only for Google Maps leads, as sorting is specific to GMAPS fields)
+    // Manual filtered leads (search + sort)
+    const manualFilteredLeads = useMemo(() => {
+        // Apply search filter
+        let result = filterLeadsBySearch(sourceFilteredLeads, searchQuery);
+
+        // Apply sorting (only for Google Maps leads)
+        if (sortKey) {
+            const gmapsLeads = result.filter((lead) => lead.source === LeadSource.GOOGLE_MAPS);
+            const otherLeads = result.filter((lead) => lead.source !== LeadSource.GOOGLE_MAPS);
+
+            const leadsData = gmapsLeads.map((lead) => lead.data as GMAPS_SCRAPE_LEAD_INFO);
+            const sortedData = sortLeads(leadsData, sortKey, sortDirection);
+
+            const sortedGmapsLeads = sortedData
+                .map((data) => gmapsLeads.find((l) => (l.data as GMAPS_SCRAPE_LEAD_INFO).placeId === data.placeId))
+                .filter((lead): lead is Lead => lead !== undefined);
+
+            result = [...sortedGmapsLeads, ...otherLeads];
+        }
+
+        return result;
+    }, [sourceFilteredLeads, searchQuery, sortKey, sortDirection]);
+
+    // Get filtered leads based on the current mode
     const filteredLeads = useMemo(() => {
-        if (!sortKey) return searchFilteredLeads;
+        if (filterMode === 'ai') {
+            return nlQuery.filteredData as Lead[];
+        }
+        return manualFilteredLeads;
+    }, [filterMode, nlQuery.filteredData, manualFilteredLeads]);
 
-        // Separate GMAPS leads from other sources
-        const gmapsOnlyLeads = searchFilteredLeads.filter((lead) => lead.source === LeadSource.GOOGLE_MAPS);
-        const nonGmapsLeads = searchFilteredLeads.filter((lead) => lead.source !== LeadSource.GOOGLE_MAPS);
+    // Switch filter mode with reset
+    const switchFilterMode = useCallback(
+        (mode: FilterMode) => {
+            if (mode === filterMode) return;
 
-        // Sort only GMAPS leads
-        const leadsData = gmapsOnlyLeads.map((lead) => lead.data as GMAPS_SCRAPE_LEAD_INFO);
-        const sortedData = sortLeads(leadsData, sortKey, sortDirection);
+            // Reset the other mode's state when switching
+            if (mode === 'manual') {
+                nlQuery.clear();
+            } else {
+                setSearchQuery('');
+                setSortKey(null);
+            }
 
-        // Map back to Lead objects with safe lookup
-        const sortedLeads = sortedData
-            .map((data) => {
-                const originalLead = gmapsOnlyLeads.find(
-                    (lead) => (lead.data as GMAPS_SCRAPE_LEAD_INFO).placeId === data.placeId,
-                );
-                return originalLead;
-            })
-            .filter((lead): lead is Lead => lead !== undefined);
+            setFilterMode(mode);
+        },
+        [filterMode, nlQuery],
+    );
 
-        // Return sorted GMAPS leads followed by unsorted non-GMAPS leads
-        return [...sortedLeads, ...nonGmapsLeads];
-    }, [searchFilteredLeads, sortKey, sortDirection]);
+    // Reset all filters
+    const resetFilters = useCallback(() => {
+        setSearchQuery('');
+        setSortKey(null);
+        nlQuery.clear();
+    }, [nlQuery]);
 
     return {
-        leads,
+        // Data
+        leads: cleanedLeads,
         filteredLeads,
+        sourceFilteredLeads,
+
+        // Filter mode
+        filterMode,
+        switchFilterMode,
+
+        // Source filter
         selectedSource,
         setSelectedSource,
+
+        // Manual filter controls
         searchQuery,
         setSearchQuery,
         sortKey,
         setSortKey,
         sortDirection,
         setSortDirection,
-        gmapsLeads,
-        instagramLeads,
+
+        // AI filter controls (exposed from nlQuery hook)
+        nlQuery: nlQuery.query,
+        setNlQuery: nlQuery.setQuery,
+        executeNlSearch: nlQuery.executeSearch,
+        isNlQueryLoading: nlQuery.isLoading,
+        nlQueryError: nlQuery.error,
+        clearNlQuery: nlQuery.clear,
+
+        // Utilities
+        resetFilters,
     };
 };
+
+export type TUseAllLeadsPageReturn = ReturnType<typeof useAllLeadsPage>;
