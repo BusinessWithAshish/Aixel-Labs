@@ -58,24 +58,33 @@ const isSocialMediaUrl = (url: string): boolean => {
 };
 
 const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    const website = lead.website?.trim();
-    if (!website) {
+    if (!lead.website) {
+        return false;
+    }
+    const website = lead.website.trim();
+    if (!website || website === '') {
         return false;
     }
     return !isSocialMediaUrl(website);
 };
 
 const hasSocialMedia = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    const website = lead.website?.trim();
-    if (!website) {
+    if (!lead.website) {
+        return false;
+    }
+    const website = lead.website.trim();
+    if (!website || website === '') {
         return false;
     }
     return isSocialMediaUrl(website);
 };
 
 const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    const phoneNumber = lead.phoneNumber?.trim();
-    return !!phoneNumber;
+    if (!lead.phoneNumber) {
+        return false;
+    }
+    const phoneNumber = lead.phoneNumber.trim();
+    return phoneNumber !== '';
 };
 
 const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
@@ -143,7 +152,7 @@ export const CommonLeadCard = ({
                 'transition-all duration-200 hover:shadow-md relative',
                 computedLeadType.color,
                 isSelected && 'ring-2 ring-blue-500',
-                className
+                className,
             )}
         >
             {showCheckbox && onSelect && (

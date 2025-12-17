@@ -7,37 +7,6 @@ import { sortLeads, type SortKey, type SortDirection } from '@/components/common
 import { filterLeadsBySearch } from '@/helpers/lead-operations';
 import { useNLQuery } from '@/hooks/use-nl-query';
 
-const NL_QUERY_SCHEMA_DESCRIPTION = `Array of Lead objects with:
-- _id: string (unique identifier)
-- source: string (LeadSource.GOOGLE_MAPS or LeadSource.INSTAGRAM)
-- data: object containing lead information
-- notes: string (optional user notes)
-- createdAt: Date
-- updatedAt: Date
-
-For Google Maps leads, data contains:
-- placeId: string
-- title: string (business name)
-- website: string (null if not available)
-- phone: string (null if not available)
-- address: string
-- category: string
-- overAllRating: string (rating value, null if not available)
-- reviewsCount: string (null if not available)
-- latitude: string
-- longitude: string
-
-For Instagram leads, data contains:
-- username: string
-- fullName: string
-- biography: string
-- followersCount: number
-- followingCount: number
-- postsCount: number
-- isVerified: boolean
-- isPrivate: boolean
-`;
-
 export type FilterMode = 'manual' | 'ai';
 
 /**
@@ -73,7 +42,6 @@ export const useAllLeadsPage = (leads: Lead[]) => {
     // AI Query hook - always initialized with source-filtered leads
     const nlQuery = useNLQuery({
         data: sourceFilteredLeads,
-        schemaDescription: NL_QUERY_SCHEMA_DESCRIPTION,
         enableCache: true,
         debug: false,
     });
