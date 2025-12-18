@@ -62,10 +62,7 @@ const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
         return false;
     }
     const website = lead.website.trim();
-    if (!website || website === '') {
-        return false;
-    }
-    return !isSocialMediaUrl(website);
+    return website !== '';
 };
 
 const hasSocialMedia = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
@@ -73,9 +70,6 @@ const hasSocialMedia = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
         return false;
     }
     const website = lead.website.trim();
-    if (!website || website === '') {
-        return false;
-    }
     return isSocialMediaUrl(website);
 };
 
@@ -92,7 +86,7 @@ const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
     const socialMedia = hasSocialMedia(lead);
     const phone = hasPhone(lead);
 
-    if ((!website && phone) || (socialMedia && phone)) {
+    if ((!website && phone)) {
         return {
             type: 'Hot Lead',
             color: 'bg-green-50 border-green-200',
@@ -100,7 +94,7 @@ const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
         };
     }
 
-    if (website) {
+    if (website || socialMedia) {
         return {
             type: 'Warm Lead',
             color: 'bg-amber-50 border-amber-200',
