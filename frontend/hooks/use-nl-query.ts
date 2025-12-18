@@ -37,6 +37,8 @@ export type UseNLQueryReturn<T> = {
     error: string | null;
     /** Clear the current query and reset to original data */
     clear: () => void;
+    /** Reset all state and return to original unfiltered data */
+    reset: () => void;
     /** Whether the result came from cache */
     isCached: boolean;
     /** Explanation of how the data was filtered */
@@ -169,7 +171,10 @@ function inferSchema<T>(data: T[]): string {
  */
 function buildSystemPrompt<T>(data: T[]): string {
     const schemaDescription = inferSchema(data);
-    const sampleData = data.slice(0, 2).map(item => JSON.stringify(item, null, 2)).join('\n\n');
+    const sampleData = data
+        .slice(0, 2)
+        .map((item) => JSON.stringify(item, null, 2))
+        .join('\n\n');
 
     return `
 You are a SECURITY-HARDENED, DETERMINISTIC JavaScript data-filter generator.
@@ -484,6 +489,20 @@ function validateFilterFunction(code: string): { valid: boolean; error?: string 
         /\bnew\s+\w+/,
         /\(a\+\)\+/,
         /\(a\*\)\*/, // catastrophic backtracking patterns
+        /\blocalStorage\b/,
+        /\bsessionStorage\b/,
+        /\bindexedDB\b/,
+        /\blocation\b/,
+        /\bhistory\b/,
+        /\bnavigator\b/,
+        /\bpostMessage\b/,
+        /\bWorker\b/,
+        /\bSharedWorker\b/,
+        /\bcrypto\b/,
+        /=>\s*\(item\s*=>/, // Recursive arrow functions
+        /\$\{/, // Template literal expressions
+        /\btry\s*\{/, // As mentioned in your prompt
+        /\bcatch\s*\(/,
     ];
 
     for (const pattern of forbidden) {
@@ -494,6 +513,11 @@ function validateFilterFunction(code: string): { valid: boolean; error?: string 
 
     if (code.length > 500) {
         return { valid: false, error: 'Generated filter function is too long (max 500 characters)' };
+    }
+
+    // Ensure it's a proper arrow function
+    if (!code.trim().match(/^\s*\(item\s*=>/)) {
+        return { valid: false, error: 'Generated code must be an arrow function' };
     }
 
     return { valid: true };
@@ -540,12 +564,15 @@ function hashData<T>(data: T[]): string {
  *   setQuery,
  *   executeSearch,
  *   isLoading,
- *   clear
+ *   clear,
+ *   reset,
+ *   isPending
  * } = useNLQuery({ data: leads });
  *
  * // In your component:
  * <input value={query} onChange={(e) => setQuery(e.target.value)} />
  * <button onClick={executeSearch}>Search</button>
+ * <button onClick={reset}>Reset All</button>
  * ```
  */
 export function useNLQuery<T>({
@@ -555,7 +582,7 @@ export function useNLQuery<T>({
     debug = false,
 }: UseNLQueryConfig<T>): UseNLQueryReturn<T> {
     // State - query is instant, no debouncing
-    const [query, setQuery] = useState('');
+    const [query, setQueryState] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isCached, setIsCached] = useState(false);
@@ -567,6 +594,12 @@ export function useNLQuery<T>({
     // Refs
     const cacheRef = useRef(new QueryCache(cacheTTL));
     const abortControllerRef = useRef<AbortController | null>(null);
+
+    // Optimized setQuery that doesn't block input
+    const setQuery = useCallback((newQuery: string) => {
+        // Update query state immediately without transition for instant feedback
+        setQueryState(newQuery);
+    }, []);
 
     // Memoize system prompt (only recalculate when data structure changes)
     const systemPrompt = useMemo(() => buildSystemPrompt(data), [data]);
@@ -716,9 +749,9 @@ export function useNLQuery<T>({
         }
     }, [data, activeFilterFunction, debug]);
 
-    // Clear function
+    // Clear function - clears query but maintains other state
     const clear = useCallback(() => {
-        setQuery('');
+        setQueryState('');
         setError(null);
         setExplanation(null);
         setIsCached(false);
@@ -729,6 +762,26 @@ export function useNLQuery<T>({
             abortControllerRef.current.abort();
         }
     }, []);
+
+    // Reset function - complete reset to initial state and original data
+    const reset = useCallback(() => {
+        setQueryState('');
+        setError(null);
+        setExplanation(null);
+        setIsCached(false);
+        setGeneratedCode(null);
+        setActiveFilterFunction(null);
+        setIsLoading(false);
+        setQueryHistory([]);
+
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        if (debug) {
+            console.log('[useNLQuery] Complete reset - returning to original data');
+        }
+    }, [debug]);
 
     // Clear cache function
     const clearCache = useCallback(() => {
@@ -754,6 +807,7 @@ export function useNLQuery<T>({
         isLoading,
         error,
         clear,
+        reset,
         isCached,
         explanation,
         clearCache,

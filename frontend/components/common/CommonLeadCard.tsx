@@ -86,7 +86,7 @@ const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
     const socialMedia = hasSocialMedia(lead);
     const phone = hasPhone(lead);
 
-    if ((!website && phone)) {
+    if (!website && phone) {
         return {
             type: 'Hot Lead',
             color: 'bg-green-50 border-green-200',
