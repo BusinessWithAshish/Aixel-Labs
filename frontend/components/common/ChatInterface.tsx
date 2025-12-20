@@ -3,12 +3,12 @@
 import type React from 'react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Textarea } from '@/components/ui/textarea';
+import { AIInput } from '@/components/ui/ai-input';
 import { cn } from '@/lib/utils';
-import { Send, User, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { User, RotateCcw, CheckCircle2 } from 'lucide-react';
 import { ShimmeringText } from '../ui/shimmering-text';
 import Image from 'next/image';
 import { GoogleGenAI } from '@google/genai';
@@ -207,7 +207,6 @@ export function ChatInterface<T extends Record<string, unknown>>({
     const [error, setError] = useState<string | null>(null);
 
     const scrollRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLTextAreaElement>(null);
 
     // Auto-scroll to bottom when messages change
     useEffect(() => {
@@ -215,14 +214,6 @@ export function ChatInterface<T extends Record<string, unknown>>({
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages]);
-
-    // Auto-resize textarea
-    useEffect(() => {
-        if (inputRef.current) {
-            inputRef.current.style.height = 'auto';
-            inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 120)}px`;
-        }
-    }, [inputValue]);
 
     // Add a message to the chat
     const addMessage = useCallback((role: Message['role'], content: string) => {
@@ -305,18 +296,14 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
     );
 
     // Handle message submission
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e?: React.FormEvent) => {
+        e?.preventDefault();
         if (!inputValue.trim() || isLoading) return;
 
         const userMessageContent = inputValue.trim();
         setInputValue('');
         setError(null);
         setIsLoading(true);
-
-        if (inputRef.current) {
-            inputRef.current.style.height = 'auto';
-        }
 
         // Add user message
         addMessage('user', userMessageContent);
@@ -356,14 +343,6 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
         }
     };
 
-    // Handle keyboard shortcuts
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSubmit(e);
-        }
-    };
-
     // Reset the chat
     const handleReset = () => {
         setMessages([]);
@@ -384,7 +363,7 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
         <Card className={cn('flex flex-col h-full w-full', className)}>
             <ChatHeader assistantName={assistantName} isComplete={isComplete} onReset={handleReset} />
 
-            <CardContent className='flex flex-col h-full'>
+            <CardContent className="flex flex-col h-full">
                 <ScrollArea ref={scrollRef} className="flex-1 p-4">
                     <div className="space-y-4">
                         {messages.length === 0 && <EmptyState assistantName={assistantName} message={emptyStateMessage} />}
@@ -402,7 +381,11 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
 
                         {/* Confirmation prompt when data collection is complete */}
                         {isComplete && !isLoading && onConfirm && (
-                            <ConfirmationPrompt extractedData={extractedData} onConfirm={handleConfirm} onReset={handleReset} />
+                            <ConfirmationPrompt
+                                extractedData={extractedData}
+                                onConfirm={handleConfirm}
+                                onReset={handleReset}
+                            />
                         )}
 
                         {/* Error display */}
@@ -415,17 +398,14 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
                 </ScrollArea>
 
                 <ChatInputArea
-                    inputRef={inputRef}
                     inputValue={inputValue}
                     setInputValue={setInputValue}
                     handleSubmit={handleSubmit}
-                    handleKeyDown={handleKeyDown}
                     placeholder={placeholder}
                     isLoading={isLoading}
                     disabled={isLoading}
                 />
             </CardContent>
-
         </Card>
     );
 }
@@ -443,7 +423,7 @@ function ChatHeader({
 }) {
     return (
         <CardHeader>
-            <CardTitle className='flex items-center gap-3'>
+            <CardTitle className="flex items-center gap-3">
                 <AixelLabsBotIcon />
                 <div className="flex-1">
                     <h3 className="font-semibold text-foreground">{assistantName}</h3>
@@ -460,7 +440,6 @@ function ChatHeader({
                     <RotateCcw className="w-4 h-4" />
                 </Button>
             </CardAction>
-
         </CardHeader>
     );
 }
@@ -525,46 +504,28 @@ function ConfirmationPrompt<T>({
 }
 
 type ChatInputAreaProps = {
-    inputRef: React.RefObject<HTMLTextAreaElement | null>;
     inputValue: string;
     setInputValue: (value: string) => void;
-    handleSubmit: (e: React.FormEvent) => void;
-    handleKeyDown: (e: React.KeyboardEvent) => void;
+    handleSubmit: () => void;
     placeholder: string;
     isLoading: boolean;
     disabled: boolean;
 };
 
-function ChatInputArea({
-    inputRef,
-    inputValue,
-    setInputValue,
-    handleSubmit,
-    handleKeyDown,
-    placeholder,
-    isLoading,
-    disabled,
-}: ChatInputAreaProps) {
+function ChatInputArea({ inputValue, setInputValue, handleSubmit, placeholder, isLoading, disabled }: ChatInputAreaProps) {
     return (
-        <form onSubmit={handleSubmit} className="p-4 border-t border-border bg-muted/20">
-            <div className="flex items-end gap-2">
-                <div className="flex-1 relative">
-                    <Textarea
-                        ref={inputRef}
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder={disabled ? 'Please wait...' : placeholder}
-                        disabled={disabled}
-                        rows={1}
-                    />
-                </div>
-                <Button type="submit" size="icon" disabled={!inputValue.trim() || isLoading}>
-                    <Send className="w-5 h-5" />
-                </Button>
-            </div>
-            <p className="text-xs text-muted-foreground text-center mt-2">Press Enter to send, Shift+Enter for new line</p>
-        </form>
+        <div className="p-4 border-t border-border bg-muted/20">
+            <AIInput
+                variant="textarea"
+                value={inputValue}
+                onChange={setInputValue}
+                onSubmit={handleSubmit}
+                placeholder={placeholder}
+                disabled={disabled}
+                isLoading={isLoading}
+                helperText="Press ⌘/Ctrl + Enter to send"
+            />
+        </div>
     );
 }
 

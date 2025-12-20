@@ -124,3 +124,45 @@
     height: 100% !important;
   }
 }
+
+/* AI Input animations */
+@keyframes ai-rainbow-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 300% 50%;
+  }
+}
+
+@keyframes ai-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@keyframes ai-pulse-glow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .animate-ai-rainbow-flow {
+    animation: ai-rainbow-flow 6s linear infinite;
+  }
+
+  .animate-ai-shimmer {
+    animation: ai-shimmer 2s ease-in-out infinite;
+  }
+
+  .animate-ai-pulse-glow {
+    animation: ai-pulse-glow 2s ease-in-out infinite;
+  }
+}
