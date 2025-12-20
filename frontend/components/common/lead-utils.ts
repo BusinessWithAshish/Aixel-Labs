@@ -117,7 +117,7 @@ export const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
     const hasSocialMediaProfile = hasSocialMedia(lead);
     const hasPhoneNumber = hasPhone(lead);
 
-    // Hot Lead: No website but has phone, OR has social media and phone
+    // Hot Lead: No website but has a phone
     if (!hasProperWebsite && hasPhoneNumber) {
         return {
             type: 'Hot Lead',

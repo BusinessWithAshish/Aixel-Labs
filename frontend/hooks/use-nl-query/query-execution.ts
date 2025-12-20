@@ -74,8 +74,7 @@ export function parseJsonResponse(text: string): QueryResult {
     try {
         const parsed = JSON.parse(jsonMatch[0]);
 
-        // Support both old "filterFunction" and new "transformFunction" for compatibility
-        const transformFunction = parsed.transformFunction || parsed.filterFunction;
+        const transformFunction = parsed.transformFunction;
 
         if (!transformFunction || typeof transformFunction !== 'string') {
             throw new Error('Response missing valid "transformFunction" field');

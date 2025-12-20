@@ -2,6 +2,7 @@ export function toNumber(value: string | number | null) {
     if (typeof value !== 'string') return value;
 
     const cleaned = value.replace(/,/g, '').trim();
+    if (cleaned === '') return value;
     const num = Number(cleaned);
 
     return Number.isNaN(num) ? value : num;
