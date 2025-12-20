@@ -10,14 +10,9 @@ import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common/apis';
 import { copyPhoneNumber } from '@/lib/clipboard';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { hasWebsite, hasPhone, getLeadType, type LeadType } from './lead-utils';
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
-
-export type LeadType = {
-    type: 'Hot Lead' | 'Warm Lead' | 'Cold Lead' | 'Unknown';
-    color: string;
-    category: 'hotLeads' | 'warmLeads' | 'coldLeads';
-};
 
 type LeadCardProps = {
     lead: GMAPS_SCRAPE_LEAD_INFO;
@@ -28,85 +23,6 @@ type LeadCardProps = {
     showCheckbox?: boolean;
     isSelected?: boolean;
     onSelect?: (selected: boolean) => void;
-};
-
-const isSocialMediaUrl = (url: string): boolean => {
-    if (!url || url.trim() === '') {
-        return false;
-    }
-
-    const socialMediaDomains = [
-        'instagram.com',
-        'facebook.com',
-        'fb.com',
-        'twitter.com',
-        'x.com',
-        'linkedin.com',
-        'tiktok.com',
-        'youtube.com',
-        'youtu.be',
-        'pinterest.com',
-        'snapchat.com',
-    ];
-
-    try {
-        const urlLower = url.toLowerCase();
-        return socialMediaDomains.some((domain) => urlLower.includes(domain));
-    } catch {
-        return false;
-    }
-};
-
-const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    if (!lead.website) {
-        return false;
-    }
-    const website = lead.website.trim();
-    return website !== '';
-};
-
-const hasSocialMedia = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    if (!lead.website) {
-        return false;
-    }
-    const website = lead.website.trim();
-    return isSocialMediaUrl(website);
-};
-
-const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    if (!lead.phoneNumber) {
-        return false;
-    }
-    const phoneNumber = lead.phoneNumber.trim();
-    return phoneNumber !== '';
-};
-
-const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
-    const website = hasWebsite(lead);
-    const socialMedia = hasSocialMedia(lead);
-    const phone = hasPhone(lead);
-
-    if (!website && phone) {
-        return {
-            type: 'Hot Lead',
-            color: 'bg-green-50 border-green-200',
-            category: 'hotLeads',
-        };
-    }
-
-    if (website || socialMedia) {
-        return {
-            type: 'Warm Lead',
-            color: 'bg-amber-50 border-amber-200',
-            category: 'warmLeads',
-        };
-    }
-
-    return {
-        type: 'Cold Lead',
-        color: 'bg-gray-50 border-gray-200',
-        category: 'coldLeads',
-    };
 };
 
 export const CommonLeadCard = ({
