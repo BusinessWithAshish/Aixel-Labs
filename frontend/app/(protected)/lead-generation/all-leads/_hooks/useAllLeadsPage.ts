@@ -6,6 +6,7 @@ import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
 import { sortLeads, type SortKey, type SortDirection } from '@/components/common/lead-utils';
 import { filterLeadsBySearch } from '@/helpers/lead-operations';
 import { useNLQuery } from '@/hooks/use-nl-query';
+import { toNumber } from '@/helpers/normalize-helpers';
 
 export type FilterMode = 'manual' | 'ai';
 
@@ -40,8 +41,20 @@ export const useAllLeadsPage = (leads: Lead[]) => {
     }, [selectedSource, cleanedLeads]);
 
     // AI Query hook - always initialized with source-filtered leads
+
+    const normalizedLeads = useMemo(() => {
+        return sourceFilteredLeads.map((lead) => ({
+            ...lead,
+            data: {
+                ...lead.data,
+                numberOfReviews: toNumber((lead.data as GMAPS_SCRAPE_LEAD_INFO).numberOfReviews),
+                overAllRating: toNumber((lead.data as GMAPS_SCRAPE_LEAD_INFO).overAllRating),
+            } 
+        }));
+    }, [sourceFilteredLeads]);
+
     const nlQuery = useNLQuery({
-        data: sourceFilteredLeads,
+        data: normalizedLeads,
         enableCache: true,
         debug: false,
     });

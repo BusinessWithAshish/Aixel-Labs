@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, Loader2, X, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { memo } from 'react';
 
 /**
  * NLQueryInput Component
@@ -61,7 +62,7 @@ export type NLQueryInputProps = {
     showExamples?: boolean;
 };
 
-export function NLQueryInput({
+export const NLQueryInput = memo(function NLQueryInput({
     query,
     setQuery,
     executeSearch,
@@ -177,4 +178,6 @@ export function NLQueryInput({
             )}
         </div>
     );
-}
+});
+
+NLQueryInput.displayName = 'NLQueryInput';
