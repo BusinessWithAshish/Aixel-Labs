@@ -523,7 +523,7 @@ function ChatInputArea({ inputValue, setInputValue, handleSubmit, placeholder, i
                 placeholder={placeholder}
                 disabled={disabled}
                 isLoading={isLoading}
-                helperText="Press Enter to send, Shift+Enter for new line"
+                helperText="Press ⌘/Ctrl + Enter to send"
             />
         </div>
     );
