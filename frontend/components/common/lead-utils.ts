@@ -1,4 +1,4 @@
-import type {GMAPS_SCRAPE_LEAD_INFO} from '@aixellabs/shared/common/apis';
+import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common/apis';
 
 export type SortKey = 'rating' | 'reviews';
 export type SortDirection = 'asc' | 'desc';
@@ -150,7 +150,7 @@ export const categorizeLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[]): CategorizedLea
     return {
         all: leads,
         hotLeads: leads.filter((lead) => {
-            return (!hasWebsite(lead) && hasPhone(lead));
+            return !hasWebsite(lead) && hasPhone(lead);
         }),
         warmLeads: leads.filter((lead) => {
             return hasWebsite(lead) || hasSocialMedia(lead);

@@ -1,9 +1,9 @@
 'use client';
 
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, X, Sparkles } from 'lucide-react';
+import { AIInput } from '@/components/ui/ai-input';
+import { Search, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { memo } from 'react';
 
@@ -79,12 +79,6 @@ export const NLQueryInput = memo(function NLQueryInput({
     showStatus = true,
     showExamples = true,
 }: NLQueryInputProps) {
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' && !isLoading) {
-            executeSearch();
-        }
-    };
-
     const handleClear = () => {
         clear?.();
     };
@@ -99,31 +93,45 @@ export const NLQueryInput = memo(function NLQueryInput({
     return (
         <div className={cn('space-y-3', className)}>
             {/* Search Input */}
-            <div className="flex gap-2">
-                <div className="relative flex-1">
-                    <Sparkles className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-primary" />
-                    <Input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder={placeholder}
-                        className="pl-10 pr-3"
-                    />
-                </div>
+            <AIInput
+                variant="input"
+                value={query}
+                onChange={setQuery}
+                onSubmit={executeSearch}
+                placeholder={placeholder}
+                disabled={isLoading}
+                isLoading={isLoading}
+                showSendButton={false}
+                showHelperText={false}
+                actionButtons={
+                    <>
+                        {/* Search Button */}
+                        <Button
+                            onClick={executeSearch}
+                            disabled={isLoading || !query.trim()}
+                            size="sm"
+                            className="h-9 rounded-lg"
+                        >
+                            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                            <span className="ml-2 hidden sm:inline">Search</span>
+                        </Button>
 
-                {/* Search Button */}
-                <Button onClick={executeSearch} disabled={isLoading || !query.trim()} className="shrink-0">
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    <span className="ml-2 hidden sm:inline">Search</span>
-                </Button>
-
-                {/* Clear Button */}
-                {(query || hasActiveFilter) && (
-                    <Button variant="outline" size="icon" onClick={handleClear} disabled={isLoading} title="Clear query">
-                        <X className="w-4 h-4" />
-                    </Button>
-                )}
-            </div>
+                        {/* Clear Button */}
+                        {(query || hasActiveFilter) && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleClear}
+                                disabled={isLoading}
+                                title="Clear query"
+                                className="w-9 h-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200"
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        )}
+                    </>
+                }
+            />
 
             {/* Status Bar */}
             {showStatus && (hasActiveFilter || error) && (
