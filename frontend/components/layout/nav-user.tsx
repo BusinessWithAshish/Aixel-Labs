@@ -25,7 +25,6 @@ import { Button } from '@/components/ui/button';
 import type { SidebarUser } from '@/config/sidebar.config';
 import { handleSignOut } from '@/app/actions/auth-actions';
 import { UserRoleBadge } from '@/components/common/UserRoleBadge';
-import { ThemeToggle } from '@/components/common/ThemeToggle';
 
 export function NavUser({ user }: { user: SidebarUser }) {
     const { isMobile } = useSidebar();
@@ -105,13 +104,6 @@ export function NavUser({ user }: { user: SidebarUser }) {
                                     Notifications
                                 </DropdownMenuItem> */}
                             </DropdownMenuGroup>
-                            <DropdownMenuSeparator />
-                            <div className="px-2 py-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">Theme</span>
-                                    <ThemeToggle />
-                                </div>
-                            </div>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={handleLogoutClick}>
                                 <LogOut />
