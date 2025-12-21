@@ -161,23 +161,7 @@ export const AllUserLeads = () => {
     };
 
     return (
-        <div className="h-full w-full flex flex-col gap-3 p-2 sm:p-4">
-            {/* AI Filter */}
-            <div className="w-full">
-                <NLQueryInput
-                    query={nlQuery}
-                    setQuery={setNlQuery}
-                    executeSearch={executeNlSearch}
-                    isLoading={isNlQueryLoading}
-                    error={nlQueryError}
-                    clear={clearNlQuery}
-                    placeholder="Describe what you're looking for..."
-                    resultCount={filteredLeads.length}
-                    totalCount={leads.length}
-                    showStatus={true}
-                />
-            </div>
-
+        <div className="h-full w-full flex flex-col gap-3 p-2 sm:p-4 pb-32 relative">
             {/* Action Bar */}
             <div className="flex items-center gap-2 flex-wrap">
                 {currentLeadsCount > 0 && (
@@ -268,6 +252,24 @@ export const AllUserLeads = () => {
                     {renderLeadsList(getLeadsForSource(LeadSource.INSTAGRAM))}
                 </TabsContent>
             </Tabs>
+
+            {/* Floating AI Filter */}
+            <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] max-w-3xl z-50 px-2 sm:px-0">
+                <div className="bg-background/95 backdrop-blur-sm border rounded-lg shadow-lg p-3">
+                    <NLQueryInput
+                        query={nlQuery}
+                        setQuery={setNlQuery}
+                        executeSearch={executeNlSearch}
+                        isLoading={isNlQueryLoading}
+                        error={nlQueryError}
+                        clear={clearNlQuery}
+                        placeholder="Describe what you're looking for..."
+                        resultCount={filteredLeads.length}
+                        totalCount={leads.length}
+                        showStatus={true}
+                    />
+                </div>
+            </div>
 
             {/* Dialogs */}
             <AddNotesDialog
