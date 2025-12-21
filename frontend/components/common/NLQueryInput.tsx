@@ -6,6 +6,7 @@ import { AIInput } from '@/components/ui/ai-input';
 import { Search, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { memo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 
 /**
  * NLQueryInput Component
@@ -91,7 +92,13 @@ export const NLQueryInput = memo(function NLQueryInput({
     const hasActiveFilter = !!(explanation && query.trim());
 
     return (
-        <div className={cn('space-y-3', className)}>
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className={cn('space-y-3', className)}
+        >
             {/* Search Input */}
             <AIInput
                 variant="input"
@@ -117,74 +124,97 @@ export const NLQueryInput = memo(function NLQueryInput({
                         </Button>
 
                         {/* Clear Button */}
-                        {(query || hasActiveFilter) && (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleClear}
-                                disabled={isLoading}
-                                title="Clear query"
-                                className="w-9 h-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200"
-                            >
-                                <X className="w-4 h-4" />
-                            </Button>
-                        )}
+                        <AnimatePresence mode="wait">
+                            {(query || hasActiveFilter) && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.8 }}
+                                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                                >
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={handleClear}
+                                        disabled={isLoading}
+                                        title="Clear query"
+                                        className="w-9 h-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </Button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </>
                 }
             />
 
             {/* Status Bar */}
-            {showStatus && (hasActiveFilter || error) && (
-                <div
-                    className={cn(
-                        'flex items-center gap-2 p-2 rounded-md text-sm',
-                        error ? 'bg-destructive/10 text-destructive' : 'bg-muted',
-                    )}
-                >
-                    {error ? (
-                        <>
-                            <X className="w-4 h-4 shrink-0" />
-                            <span>{error}</span>
-                        </>
-                    ) : (
-                        <div className="flex items-center gap-2 flex-wrap flex-1">
-                            {explanation && <span className="text-muted-foreground text-xs">{explanation}</span>}
-                            {isCached && (
-                                <Badge variant="secondary" className="text-xs">
-                                    ⚡ Cached
-                                </Badge>
-                            )}
-                            {resultCount !== undefined && totalCount !== undefined && (
-                                <Badge variant="outline" className="text-xs">
-                                    {resultCount} / {totalCount} results
-                                </Badge>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
+            <AnimatePresence mode="wait">
+                {showStatus && (hasActiveFilter || error) && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className={cn(
+                            'flex items-center gap-2 p-2 rounded-md text-sm overflow-hidden',
+                            error ? 'bg-destructive/10 text-destructive' : 'bg-muted',
+                        )}
+                    >
+                        {error ? (
+                            <>
+                                <X className="w-4 h-4 shrink-0" />
+                                <span>{error}</span>
+                            </>
+                        ) : (
+                            <div className="flex items-center gap-2 flex-wrap flex-1">
+                                {explanation && <span className="text-muted-foreground text-xs">{explanation}</span>}
+                                {isCached && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        ⚡ Cached
+                                    </Badge>
+                                )}
+                                {resultCount !== undefined && totalCount !== undefined && (
+                                    <Badge variant="outline" className="text-xs">
+                                        {resultCount} / {totalCount} results
+                                    </Badge>
+                                )}
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Example Queries */}
-            {showExamples && examples.length > 0 && !query && (
-                <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium">Try these examples:</p>
-                    <div className="flex flex-wrap gap-2">
-                        {examples.map((example, index) => (
-                            <Button
-                                key={index}
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleExampleClick(example)}
-                                disabled={isLoading}
-                                className="text-xs h-7"
-                            >
-                                {example}
-                            </Button>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
+            <AnimatePresence mode="wait">
+                {showExamples && examples.length > 0 && !query && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className="space-y-2 overflow-hidden"
+                    >
+                        <p className="text-xs text-muted-foreground font-medium">Try these examples:</p>
+                        <div className="flex flex-wrap gap-2">
+                            {examples.map((example, index) => (
+                                <Button
+                                    key={index}
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleExampleClick(example)}
+                                    disabled={isLoading}
+                                    className="text-xs h-7"
+                                >
+                                    {example}
+                                </Button>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </motion.div>
     );
 });
 
