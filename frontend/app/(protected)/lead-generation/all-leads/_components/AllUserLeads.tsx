@@ -134,7 +134,7 @@ export const AllUserLeads = () => {
     const renderLeadsList = (leadsToRender: Lead[]) => {
         if (leadsToRender.length === 0) {
             return (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <div className="flex h-full flex-col items-center justify-center py-12 text-gray-500">
                     <Database className="w-12 h-12 mb-3 opacity-50" />
                     <p className="text-lg font-medium">No leads found</p>
                     <p className="text-sm mt-1 text-center px-4">
@@ -162,7 +162,7 @@ export const AllUserLeads = () => {
     };
 
     return (
-        <div className="h-full w-full flex flex-col gap-3 p-2 sm:p-4 pb-32 relative">
+        <div className="h-full w-full flex flex-col gap-3 p-2 relative">
             {/* Action Bar */}
             <div className="flex items-center gap-2 flex-wrap">
                 {currentLeadsCount > 0 && (
@@ -258,10 +258,9 @@ export const AllUserLeads = () => {
             <motion.div
                 initial={{ opacity: 0, y: 100 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: 'easeOut', delay: 0.2 }}
-                className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] max-w-3xl z-50 px-2 sm:px-0"
+                transition={{ duration: 0.4, ease: 'easeOut', delay: 0.1 }}
+                className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-[80%] z-50 p-2"
             >
-                <div className="bg-background/95 backdrop-blur-sm border rounded-lg shadow-lg p-3">
                     <NLQueryInput
                         query={nlQuery}
                         setQuery={setNlQuery}
@@ -274,7 +273,6 @@ export const AllUserLeads = () => {
                         totalCount={leads.length}
                         showStatus={true}
                     />
-                </div>
             </motion.div>
 
             {/* Dialogs */}
