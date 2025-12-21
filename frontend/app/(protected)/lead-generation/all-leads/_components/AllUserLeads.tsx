@@ -16,6 +16,7 @@ import { useState, useEffect } from 'react';
 import { deleteLeadsAction, deleteLeadsBySourceAction, updateLeadsNotesAction } from '@/app/actions/lead-actions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { motion } from 'motion/react';
 
 export const AllUserLeads = () => {
     const router = useRouter();
@@ -254,7 +255,12 @@ export const AllUserLeads = () => {
             </Tabs>
 
             {/* Floating AI Filter */}
-            <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] max-w-3xl z-50 px-2 sm:px-0">
+            <motion.div
+                initial={{ opacity: 0, y: 100 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut', delay: 0.2 }}
+                className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] max-w-3xl z-50 px-2 sm:px-0"
+            >
                 <div className="bg-background/95 backdrop-blur-sm border rounded-lg shadow-lg p-3">
                     <NLQueryInput
                         query={nlQuery}
@@ -269,7 +275,7 @@ export const AllUserLeads = () => {
                         showStatus={true}
                     />
                 </div>
-            </div>
+            </motion.div>
 
             {/* Dialogs */}
             <AddNotesDialog
