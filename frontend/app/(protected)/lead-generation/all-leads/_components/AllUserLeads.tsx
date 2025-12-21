@@ -2,16 +2,13 @@
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Database, Search, ArrowUpDown, X, Trash2, StickyNote, Sparkles, Filter } from 'lucide-react';
+import { Database, Trash2, StickyNote, CheckSquare, Square } from 'lucide-react';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
 import { CommonLeadCard } from '@/components/common/CommonLeadCard';
 import { usePage } from '@/contexts/PageStore';
-import type { TUseAllLeadsPageReturn, FilterMode } from '../_hooks';
-import type { SortKey } from '@/components/common/lead-utils';
+import type { TUseAllLeadsPageReturn } from '../_hooks';
 import { DeleteAllLeadsDialog } from './DeleteAllLeadsDialog';
 import { AddNotesDialog } from './AddNotesDialog';
 import { NLQueryInput } from '@/components/common/NLQueryInput';
@@ -25,18 +22,8 @@ export const AllUserLeads = () => {
     const {
         leads,
         filteredLeads,
-        filterMode,
-        switchFilterMode,
         selectedSource,
         setSelectedSource,
-        // Manual filter
-        searchQuery,
-        setSearchQuery,
-        sortKey,
-        setSortKey,
-        sortDirection,
-        setSortDirection,
-        // AI filter
         nlQuery,
         setNlQuery,
         executeNlSearch,
@@ -54,19 +41,9 @@ export const AllUserLeads = () => {
 
     const hasSelectedLeads = selectedLeadIds.size > 0;
 
-    // Reset selection when source changes
     useEffect(() => {
         setSelectedLeadIds(new Set());
-    }, [selectedSource, filterMode]);
-
-    // Handlers
-    const handleSortChange = (value: string) => {
-        setSortKey(value === 'none' ? null : (value as SortKey));
-    };
-
-    const toggleSortDirection = () => {
-        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    };
+    }, [selectedSource]);
 
     const handleSelectLead = (leadId: string, selected: boolean) => {
         setSelectedLeadIds((prev) => {
@@ -160,11 +137,7 @@ export const AllUserLeads = () => {
                     <Database className="w-12 h-12 mb-3 opacity-50" />
                     <p className="text-lg font-medium">No leads found</p>
                     <p className="text-sm mt-1 text-center px-4">
-                        {filterMode === 'manual' && searchQuery
-                            ? 'Try adjusting your search query'
-                            : filterMode === 'ai' && nlQuery
-                            ? 'Try a different AI query'
-                            : 'Start scraping and save leads to see them here'}
+                        {nlQuery ? 'Try a different AI query' : 'Start scraping and save leads to see them here'}
                     </p>
                 </div>
             );
@@ -189,125 +162,76 @@ export const AllUserLeads = () => {
 
     return (
         <div className="h-full w-full flex flex-col gap-3 p-2 sm:p-4">
-            {/* Selection Bar */}
-            {hasSelectedLeads && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-blue-900">{selectedLeadIds.size} lead(s) selected</span>
-                    <div className="flex gap-2 flex-wrap">
-                        <Button variant="outline" size="sm" onClick={() => setNotesDialogOpen(true)}>
-                            <StickyNote className="w-4 h-4 mr-1" />
-                            Add Notes
-                        </Button>
-                        <Button variant="destructive" size="sm" onClick={() => setDeleteBulkDialogOpen(true)}>
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Delete
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={handleDeselectAll}>
-                            Clear
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            {/* Filter Mode Tabs */}
-            <Tabs value={filterMode} onValueChange={(value) => switchFilterMode(value as FilterMode)} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-3">
-                    <TabsTrigger value="manual" className="gap-2">
-                        <Filter className="w-4 h-4" />
-                        <span className="hidden sm:inline">Manual Filters</span>
-                        <span className="sm:hidden">Manual</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="ai" className="gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        <span className="hidden sm:inline">AI Filters</span>
-                        <span className="sm:hidden">AI</span>
-                    </TabsTrigger>
-                </TabsList>
-
-                {/* Manual Filter Content */}
-                <TabsContent value="manual" className="space-y-3 mt-0">
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        {/* Search Input */}
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <Input
-                                placeholder="Search by name, website, or phone..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 pr-10"
-                            />
-                            {searchQuery && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
-                                >
-                                    <X className="w-4 h-4" />
-                                </Button>
-                            )}
-                        </div>
-
-                        {/* Sort Controls */}
-                        <div className="flex gap-2">
-                            <Select value={sortKey || 'none'} onValueChange={handleSortChange}>
-                                <SelectTrigger className="w-full sm:w-[140px]">
-                                    <SelectValue placeholder="Sort by..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">No sorting</SelectItem>
-                                    <SelectItem value="rating">Rating</SelectItem>
-                                    <SelectItem value="reviews">Reviews</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {sortKey && (
-                                <Button variant="outline" size="icon" onClick={toggleSortDirection}>
-                                    <ArrowUpDown className="w-4 h-4" />
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </TabsContent>
-
-                {/* AI Filter Content */}
-                <TabsContent value="ai" className="space-y-3 mt-0">
-                    <NLQueryInput
-                        query={nlQuery}
-                        setQuery={setNlQuery}
-                        executeSearch={executeNlSearch}
-                        isLoading={isNlQueryLoading}
-                        error={nlQueryError}
-                        clear={clearNlQuery}
-                        placeholder="Describe what you're looking for..."
-                        resultCount={filteredLeads.length}
-                        totalCount={leads.length}
-                        showStatus={true}
-                    />
-                </TabsContent>
-            </Tabs>
+            {/* AI Filter */}
+            <div className="w-full">
+                <NLQueryInput
+                    query={nlQuery}
+                    setQuery={setNlQuery}
+                    executeSearch={executeNlSearch}
+                    isLoading={isNlQueryLoading}
+                    error={nlQueryError}
+                    clear={clearNlQuery}
+                    placeholder="Describe what you're looking for..."
+                    resultCount={filteredLeads.length}
+                    totalCount={leads.length}
+                    showStatus={true}
+                />
+            </div>
 
             {/* Action Bar */}
             <div className="flex items-center gap-2 flex-wrap">
                 {currentLeadsCount > 0 && (
                     <Button
-                        variant="outline"
+                        variant={selectedLeadIds.size === currentLeadsCount ? 'default' : 'outline'}
                         size="sm"
                         onClick={selectedLeadIds.size === currentLeadsCount ? handleDeselectAll : handleSelectAll}
+                        className="gap-2"
                     >
-                        {selectedLeadIds.size === currentLeadsCount ? 'Deselect All' : 'Select All'}
+                        {selectedLeadIds.size === currentLeadsCount ? (
+                            <CheckSquare className="w-4 h-4" />
+                        ) : (
+                            <Square className="w-4 h-4" />
+                        )}
+                        <span className="hidden sm:inline">
+                            {selectedLeadIds.size === currentLeadsCount ? 'Deselect All' : 'Select All'}
+                        </span>
+                        <span className="sm:hidden">{selectedLeadIds.size === currentLeadsCount ? 'None' : 'All'}</span>
+                        {hasSelectedLeads && <span className="font-semibold">({selectedLeadIds.size})</span>}
                     </Button>
                 )}
+                {hasSelectedLeads && (
+                    <>
+                        <Button variant="outline" size="sm" onClick={() => setNotesDialogOpen(true)} className="gap-2">
+                            <StickyNote className="w-4 h-4" />
+                            <span className="hidden sm:inline">Add Notes</span>
+                            <span className="sm:hidden">Notes</span>
+                            <span className="font-semibold">({selectedLeadIds.size})</span>
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setDeleteBulkDialogOpen(true)}
+                            className="gap-2"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="hidden sm:inline">Delete Selected</span>
+                            <span className="sm:hidden">Delete</span>
+                            <span className="font-semibold">({selectedLeadIds.size})</span>
+                        </Button>
+                    </>
+                )}
                 <Button
-                    variant="destructive"
+                    variant="outline"
                     size="sm"
                     onClick={() => setDeleteAllDialogOpen(true)}
                     disabled={currentLeadsCount === 0}
+                    className="gap-2 ml-auto"
                 >
-                    <Trash2 className="w-4 h-4 mr-1" />
+                    <Trash2 className="w-4 h-4" />
                     <span className="hidden sm:inline">Delete All</span>
-                    <span className="sm:hidden">Delete</span>
+                    <span className="sm:hidden">All</span>
                 </Button>
-                <span className="text-sm text-muted-foreground ml-auto">
+                <span className="text-sm text-muted-foreground">
                     {currentLeadsCount} {currentLeadsCount === 1 ? 'lead' : 'leads'}
                 </span>
             </div>
