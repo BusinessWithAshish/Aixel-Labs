@@ -171,6 +171,11 @@ export const AllUserLeads = () => {
                         size="sm"
                         onClick={selectedLeadIds.size === currentLeadsCount ? handleDeselectAll : handleSelectAll}
                         className="gap-2"
+                        aria-label={
+                            selectedLeadIds.size === currentLeadsCount
+                                ? `Deselect all ${currentLeadsCount} leads`
+                                : `Select all ${currentLeadsCount} leads`
+                        }
                     >
                         {selectedLeadIds.size === currentLeadsCount ? (
                             <CheckSquare className="w-4 h-4" />
@@ -180,8 +185,12 @@ export const AllUserLeads = () => {
                         <span className="hidden sm:inline">
                             {selectedLeadIds.size === currentLeadsCount ? 'Deselect All' : 'Select All'}
                         </span>
-                        <span className="sm:hidden">{selectedLeadIds.size === currentLeadsCount ? 'None' : 'All'}</span>
-                        {hasSelectedLeads && <span className="font-semibold">({selectedLeadIds.size})</span>}
+                        <span className="sm:hidden">
+                            {selectedLeadIds.size === currentLeadsCount ? 'None selected' : 'Select all'}
+                        </span>
+                        <span className="font-semibold">
+                            ({selectedLeadIds.size}/{currentLeadsCount})
+                        </span>
                     </Button>
                 )}
                 {hasSelectedLeads && (
