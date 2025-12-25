@@ -27,11 +27,7 @@ app.use(
 
       const allowedPatterns =
         process.env.NODE_ENV === "development"
-          ? [
-              /^http:\/\/.*\.localhost:3003$/,
-              /^http:\/\/localhost:3003$/,
-              /^https:\/\/.*\.aixellabs\.com$/,
-            ]
+          ? [/^http:\/\/.*\.localhost:3003$/, /^https:\/\/.*\.aixellabs\.com$/]
           : [/^https:\/\/.*\.aixellabs\.com$/];
 
       const isAllowed = allowedPatterns.some((pattern) => pattern.test(origin));
@@ -88,14 +84,18 @@ app.get(API_ENDPOINTS.PING, (_, res) => {
 // ===================
 import { GMAPS_SCRAPE } from "./apis/GMAPS_SCRAPE.js";
 import { GMAPS_SEARCH_API_SCRAPE } from "./apis/GMAPS_SEARCH_API_SCRAPE.js";
+import { INSTAGRAM_SCRAPE } from "./apis/INSTAGRAM_SCRAPE.js";
 
 app.post(API_ENDPOINTS.GMAPS_SCRAPE, GMAPS_SCRAPE);
 app.post(API_ENDPOINTS.GMAPS_SEARCH_API_SCRAPE, GMAPS_SEARCH_API_SCRAPE);
-
+app.post(API_ENDPOINTS.INSTAGRAM_SCRAPE, INSTAGRAM_SCRAPE);
 // ===================
 // 9️⃣ Start Server
 // ===================
 const PORT = process.env.PORT || 8100;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT} [${process.env.NODE_ENV}]`);
+  const timestamp = new Date().toLocaleTimeString();
+  console.log(
+    `🚀 Server running on port ${PORT} [${process.env.NODE_ENV}] - Started at ${timestamp}`
+  );
 });

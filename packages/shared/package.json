@@ -2,6 +2,7 @@
   "name": "@aixellabs/shared",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "exports": {
     "./common": {
       "types": "./dist/common/index.d.ts",

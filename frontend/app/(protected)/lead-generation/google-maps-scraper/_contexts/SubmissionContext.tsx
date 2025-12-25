@@ -12,6 +12,7 @@ import {
     isStatusMessage
 } from '@aixellabs/shared/common/apis';
 import { API_ENDPOINTS } from '@aixellabs/shared/common/utils';
+import { BACKEND_URL } from '@/config/app-config';
 
 type SubmissionState = {
     isSubmitting: boolean;
@@ -48,9 +49,8 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
     const { formData } = useForm();
 
     const submitForm = async () => {
-        const backendUrl = process.env.NEXT_PUBLIC_BE_API;
 
-        if (!backendUrl) {
+        if (!BACKEND_URL) {
             setSubmissionState((prev) => ({
                 ...prev,
                 isSubmitting: false,
@@ -82,8 +82,8 @@ export const SubmissionProvider = ({ children }: { children: ReactNode }) => {
                 })),
             };
 
-            // Make API request with SSE
-            const response = await fetch(`${backendUrl}${API_ENDPOINTS.GMAPS_SCRAPE}`, {
+            // Make an API request with SSE
+            const response = await fetch(`${BACKEND_URL}${API_ENDPOINTS.GMAPS_SCRAPE}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
