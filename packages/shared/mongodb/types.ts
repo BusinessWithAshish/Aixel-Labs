@@ -1,6 +1,6 @@
 import type { ObjectId } from "mongodb";
-import type { GMAPS_SCRAPE_LEAD_INFO } from "../common";
-import type { INSTAGRAM_SCRAPE_LEAD_INFO } from "../common";
+import type { GMAPS_SCRAPE_LEAD_INFO } from "../common/index.js";
+import type { INSTAGRAM_SEARCH_SCRAPE_LEAD_INFO } from "../common/index.js";
 
 export enum MongoCollections {
   TENANTS = "tenants",
@@ -74,14 +74,14 @@ export type LeadDoc = {
   _id: ObjectId;
   source: LeadSource;
   sourceId: string;
-  data: GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SCRAPE_LEAD_INFO;
+  data: GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SEARCH_SCRAPE_LEAD_INFO;
 };
 
 export type Lead = {
   _id: string;
   source: LeadSource;
   sourceId: string;
-  data: GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SCRAPE_LEAD_INFO;
+  data: GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SEARCH_SCRAPE_LEAD_INFO;
 };
 
 export type UserLeadDoc = {

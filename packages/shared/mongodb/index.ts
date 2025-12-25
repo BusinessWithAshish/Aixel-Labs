@@ -1,12 +1,12 @@
 import { MongoClient, Db, ObjectId } from "mongodb";
-import type { LeadDoc, UserLeadDoc } from "./types";
-import { LeadSource, MongoCollections } from "./types";
-import type { GMAPS_SCRAPE_LEAD_INFO } from "../common";
-import type { INSTAGRAM_SCRAPE_LEAD_INFO } from "../common/apis/instagram";
+import type { LeadDoc, UserLeadDoc } from "./types.js";
+import { LeadSource, MongoCollections } from "./types.js";
+import type { GMAPS_SCRAPE_LEAD_INFO } from "../common/index.js";
+import type { INSTAGRAM_SEARCH_SCRAPE_LEAD_INFO } from "../common/index.js";
 
 export type { ObjectId, Document, Collection, Db, MongoClient } from "mongodb";
 export { ObjectId as MongoObjectId } from "mongodb";
-export * from "./types";
+export * from "./types.js";
 export { LeadSource, MongoCollections };
 
 type GlobalWithMongo = typeof globalThis & {
@@ -85,13 +85,16 @@ export const saveLeadsForUser = async (
   leads: Array<{
     source: LeadSource;
     sourceId: string;
-    data: GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SCRAPE_LEAD_INFO;
+    data: GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SEARCH_SCRAPE_LEAD_INFO;
   }>,
   dbName?: string
 ): Promise<
   Array<{ leadId: ObjectId; isNewLead: boolean; isNewUserLead: boolean }>
 > => {
-  const leadsCollection = await getCollection<LeadDoc>(MongoCollections.LEADS, dbName);
+  const leadsCollection = await getCollection<LeadDoc>(
+    MongoCollections.LEADS,
+    dbName
+  );
   const userLeadsCollection = await getCollection<UserLeadDoc>(
     MongoCollections.USER_LEADS,
     dbName
@@ -162,7 +165,10 @@ export const getUserLeads = async (
     MongoCollections.USER_LEADS,
     dbName
   );
-  const leadsCollection = await getCollection<LeadDoc>(MongoCollections.LEADS, dbName);
+  const leadsCollection = await getCollection<LeadDoc>(
+    MongoCollections.LEADS,
+    dbName
+  );
 
   // Get all UserLead entries for this user
   const userLeads = await userLeadsCollection.find({ userId }).toArray();
@@ -194,7 +200,10 @@ export const checkLeadExists = async (
   sourceId: string,
   dbName?: string
 ): Promise<boolean> => {
-  const leadsCollection = await getCollection<LeadDoc>(MongoCollections.LEADS, dbName);
+  const leadsCollection = await getCollection<LeadDoc>(
+    MongoCollections.LEADS,
+    dbName
+  );
   const count = await leadsCollection.countDocuments({ source, sourceId });
   return count > 0;
 };

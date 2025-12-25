@@ -1,2 +1,2 @@
-export * from "./gmaps";
-export * from "./instagram"
+export * from "./gmaps.js";
+export * from "./instagram.js";

@@ -1,18 +1,14 @@
 import { Response } from "express";
 import {
-  StreamMessage,
+  type StreamMessage,
   StreamMessageType,
   serializeStreamMessage,
   createStreamMessage,
 } from "@aixellabs/shared/common/apis";
 
-// Re-export types and utilities from shared package
-export {
-  StreamMessage,
-  StreamMessageType,
-  serializeStreamMessage,
-  createStreamMessage,
-};
+// Re-export types and utilities from a shared package
+export type { StreamMessage };
+export { StreamMessageType, serializeStreamMessage, createStreamMessage };
 
 // Helper to send streaming messages (Backend-specific with Express Response)
 export const sendStreamMessage = (
