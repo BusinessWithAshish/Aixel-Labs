@@ -1,9 +1,11 @@
+import { LEAD_GENERATION_SUB_MODULE_URLS, LEAD_GENERATION_SUB_MODULES, Modules, ModuleUrls } from './app-config';
+
 // Icon names as strings for serialization
 export type IconName = 'UsersRound' | 'AudioWaveform' | 'MessageCircleMore' | 'Mail' | 'Settings2' | 'GalleryVerticalEnd';
 
 export type SidebarNavItem = {
-    title: string;
-    url: string;
+    title: Modules;
+    url: (typeof ModuleUrls)[Modules];
     icon?: IconName;
     items?: {
         title: string;
@@ -32,21 +34,30 @@ export type SidebarConfig = {
 export const sidebarConfig: SidebarConfig = {
     navMain: [
         {
-            title: 'Lead Generation',
-            url: '/lead-generation',
+            title: Modules.LEAD_GENERATION,
+            url: ModuleUrls.LEAD_GENERATION,
             icon: 'UsersRound',
             items: [
-                { title: 'All Leads', url: '/lead-generation/all-leads' },
-                { title: 'Google Maps Scraper', url: '/lead-generation/google-maps-scraper' },
-                { title: 'Google Advanced Search', url: '/lead-generation' },
-                { title: 'LinkedIn', url: '/lead-generation' },
-                { title: 'Instagram', url: '/lead-generation/instagram' },
-                { title: 'Facebook', url: '/lead-generation' },
+                { title: LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS, url: LEAD_GENERATION_SUB_MODULE_URLS.GOOGLE_MAPS },
+                {
+                    title: LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH,
+                    url: LEAD_GENERATION_SUB_MODULE_URLS.GOOGLE_ADVANCED_SEARCH,
+                },
+                {
+                    title: LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH,
+                    url: LEAD_GENERATION_SUB_MODULE_URLS.INSTAGRAM_SEARCH,
+                },
+                {
+                    title: LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH,
+                    url: LEAD_GENERATION_SUB_MODULE_URLS.INSTAGRAM_ADVANCED_SEARCH,
+                },
+                { title: LEAD_GENERATION_SUB_MODULES.FACEBOOK, url: LEAD_GENERATION_SUB_MODULE_URLS.FACEBOOK },
+                { title: LEAD_GENERATION_SUB_MODULES.LINKEDIN, url: LEAD_GENERATION_SUB_MODULE_URLS.LINKEDIN },
             ],
         },
         {
-            title: 'Voice Agent',
-            url: '/voice-agent',
+            title: Modules.VOICE_AGENT,
+            url: ModuleUrls.VOICE_AGENT,
             icon: 'AudioWaveform',
             items: [
                 { title: 'Web dialer', url: '/voice-agent/web-dialer' },
@@ -55,7 +66,7 @@ export const sidebarConfig: SidebarConfig = {
             ],
         },
         {
-            title: 'Messaging',
+            title: Modules.MESSAGING,
             url: '/messaging',
             icon: 'MessageCircleMore',
             items: [
@@ -65,7 +76,7 @@ export const sidebarConfig: SidebarConfig = {
             ],
         },
         {
-            title: 'Email Module',
+            title: Modules.EMAIL,
             url: '/mail',
             icon: 'Mail',
             items: [
@@ -74,15 +85,6 @@ export const sidebarConfig: SidebarConfig = {
                 { title: 'Templates', url: '/mail' },
                 { title: 'AI Replies', url: '/mail' },
                 { title: 'Analytics', url: '/mail' },
-            ],
-        },
-        {
-            title: 'Client Management',
-            url: '/settings',
-            icon: 'Settings2',
-            items: [
-                { title: 'Enabled Modules', url: '/settings/enabled-modules' },
-                { title: 'Multi-tenant Accounts', url: '/settings/multi-tenant-accounts' },
             ],
         },
     ],

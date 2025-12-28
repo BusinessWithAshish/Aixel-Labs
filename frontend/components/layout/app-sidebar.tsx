@@ -12,12 +12,13 @@ import {
     SidebarMenu,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { sidebarConfig } from '@/config/sidebar.config';
 import { getAllTenants } from '@/helpers/tenant-operations';
 import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
+import { useSidebar } from '@/hooks/use-sidebar';
 
 export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+    const sidebarConfig = useSidebar();
     const session = await auth();
 
     const tenants = session?.user?.isAdmin ? await getAllTenants() : [];

@@ -5,7 +5,7 @@ import PageLayout from '@/components/common/PageLayout';
 import {
     GenerateLeads,
     LeadGenerationProvider,
-} from '@/app/(protected)/lead-generation/google-maps-scraper/_components';
+} from '@/app/(protected)/lead-generation/google-maps/_components';
 import { GoogleMapsScraperChat } from '@/components/common/GoogleMapsScraperChat';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, FormInput } from 'lucide-react';
