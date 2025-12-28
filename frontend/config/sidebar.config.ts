@@ -40,7 +40,7 @@ export const sidebarConfig: SidebarConfig = {
                 { title: 'Google Maps Scraper', url: '/lead-generation/google-maps-scraper' },
                 { title: 'Google Advanced Search', url: '/lead-generation' },
                 { title: 'LinkedIn', url: '/lead-generation' },
-                { title: 'Instagram', url: '/lead-generation' },
+                { title: 'Instagram', url: '/lead-generation/instagram' },
                 { title: 'Facebook', url: '/lead-generation' },
             ],
         },

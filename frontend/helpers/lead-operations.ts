@@ -1,4 +1,4 @@
-import type { GMAPS_SCRAPE_LEAD_INFO, INSTAGRAM_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
+import type { GMAPS_SCRAPE_LEAD_INFO, INSTAGRAM_SEARCH_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 
 /**
@@ -30,7 +30,7 @@ export const formatLeadStats = (stats: {
 /**
  * Extract source-specific data from a Lead
  */
-export const extractLeadData = (lead: Lead): GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SCRAPE_LEAD_INFO => {
+export const extractLeadData = (lead: Lead): GMAPS_SCRAPE_LEAD_INFO | INSTAGRAM_SEARCH_SCRAPE_LEAD_INFO => {
     return lead.data;
 };
 
@@ -77,7 +77,7 @@ export const searchLead = (lead: Lead, query: string): boolean => {
     }
     
     if (lead.source === LeadSource.INSTAGRAM) {
-        const data = lead.data as INSTAGRAM_SCRAPE_LEAD_INFO;
+        const data = lead.data as INSTAGRAM_SEARCH_SCRAPE_LEAD_INFO;
         const searchableFields = [
             data.username,
             data.bio,

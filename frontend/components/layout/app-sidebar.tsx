@@ -3,7 +3,15 @@ import { auth } from '@/auth';
 import { NavMain } from '@/components/layout/nav-main';
 import { NavUser } from '@/components/layout/nav-user';
 import { TenantSwitcher } from '@/components/layout/tenant-switcher';
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail, SidebarMenu, SidebarMenuItem } from '@/components/ui/sidebar';
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
+    SidebarRail,
+    SidebarMenu,
+    SidebarMenuItem,
+} from '@/components/ui/sidebar';
 import { sidebarConfig } from '@/config/sidebar.config';
 import { getAllTenants } from '@/helpers/tenant-operations';
 import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
@@ -38,7 +46,7 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
             </SidebarContent>
             <SidebarFooter>
                 <SidebarMenu>
-                    <SidebarMenuItem className="flex items-center justify-center py-2">
+                    <SidebarMenuItem className="flex w-full items-center py-2">
                         <ThemeToggle />
                     </SidebarMenuItem>
                 </SidebarMenu>
