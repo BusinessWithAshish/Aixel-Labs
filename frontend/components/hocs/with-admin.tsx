@@ -1,11 +1,9 @@
 import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
-import PageLayout from '@/components/common/PageLayout';
-import NotFound from '@/components/layout/not-found';
+import { redirect, notFound } from 'next/navigation';
 
 /**
  * Higher-Order Component (HOC) that wraps a page component and ensures
- * only admin users can access it. Non-admin users will see a 403 error.
+ * only admin users can access it. Non-admin users will see a 404 error.
  *
  * @example
  * ```tsx
@@ -14,7 +12,7 @@ import NotFound from '@/components/layout/not-found';
  * })
  * ```
  */
-export function withAdminOnly<P extends object>(Component: React.ComponentType<P>, options?: { pageTitle?: string }) {
+export function withAdminOnly<P extends object>(Component: React.ComponentType<P>) {
     return async function AdminProtectedPage(props: P) {
         const session = await auth();
 
@@ -23,11 +21,7 @@ export function withAdminOnly<P extends object>(Component: React.ComponentType<P
         }
 
         if (!session.user.isAdmin) {
-            return (
-                <PageLayout title={options?.pageTitle || 'Page Not Found'}>
-                    <NotFound />
-                </PageLayout>
-            );
+            notFound();
         }
 
         return <Component {...props} />;
