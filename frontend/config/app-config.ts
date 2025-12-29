@@ -32,4 +32,6 @@ export const SubModuleUrls: Record<SubModule, string> = {
     [EMAIL_SUB_MODULES.AI_REPLIES]: '/email',
 };
 
+export const DEFAULT_HOME_PAGE_ROUTE = '/';
+
 export const BACKEND_URL = process.env.NEXT_PUBLIC_BE_API;

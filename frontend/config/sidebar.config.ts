@@ -19,7 +19,6 @@ export type SidebarNavItem = {
 
 export type SidebarTenant = {
     name: string;
-    logo: string;
     url: string;
 };
 

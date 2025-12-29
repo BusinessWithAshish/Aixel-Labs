@@ -5,6 +5,7 @@ import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { ChevronLeft } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
+import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
 
 type PageLayoutProps = {
     children: ReactNode;
@@ -21,7 +22,7 @@ export default function PageLayout(props: PageLayoutProps) {
     }, [router]);
 
     const isBackButtonVisible = useMemo(() => {
-        return pathname !== '/';
+        return pathname !== DEFAULT_HOME_PAGE_ROUTE;
     }, [pathname]);
 
     return (

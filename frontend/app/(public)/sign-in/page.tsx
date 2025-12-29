@@ -12,6 +12,7 @@ import { FieldGroup, Field, FieldLabel, FieldDescription, FieldError } from '@/c
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getTenantCurrentByUrl } from '@/helpers/get-current-tenant-by-url';
+import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
 
 const formSchema = z.object({
     email: z
@@ -31,7 +32,7 @@ type FormSchema = z.infer<typeof formSchema>;
 export default function SignInPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const callbackUrl = searchParams.get('callbackUrl') || '/';
+    const callbackUrl = searchParams.get('callbackUrl') || DEFAULT_HOME_PAGE_ROUTE;
     const [isLoading, setIsLoading] = React.useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({

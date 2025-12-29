@@ -30,7 +30,6 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
 
     const tenantsForSwitcher = tenants.map((tenant) => ({
         name: tenant.name,
-        logo: 'GalleryVerticalEnd' as const,
         url: getTenantRedirectUrl(tenant),
     }));
 

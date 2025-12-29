@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, HomeIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 
@@ -20,6 +20,7 @@ import { useCallback } from 'react';
 import { Modules } from '@aixellabs/shared/mongodb';
 import { modulesIconMap } from '@/config/sidebar.config';
 import { enumToTitleCase } from '@/helpers/string-helpers';
+import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
 
 export function NavMain({ items }: { items: SidebarNavItem[] }) {
     const pathname = usePathname();
@@ -46,6 +47,12 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
 
     return (
         <SidebarGroup>
+            <SidebarMenuButton asChild isActive={pathname === DEFAULT_HOME_PAGE_ROUTE}>
+                <Link href={DEFAULT_HOME_PAGE_ROUTE}>
+                    <HomeIcon className="size-4 shrink-0" />
+                    <span>Home</span>
+                </Link>
+            </SidebarMenuButton>
             <SidebarGroupLabel>Platform</SidebarGroupLabel>
             <SidebarMenu>
                 {items.map((item) => {

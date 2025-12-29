@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import type { SidebarTenant } from '@/config/sidebar.config';
+import {DEFAULT_HOME_PAGE_ROUTE} from "@/config/app-config";
 
 export function TenantSwitcher({
     tenants,
@@ -28,7 +29,7 @@ export function TenantSwitcher({
     const { isMobile } = useSidebar();
     const router = useRouter();
     const [activeTenant, setActiveTenant] = React.useState<SidebarTenant>(
-        tenants[0] || { name: currentTenantName, logo: 'GalleryVerticalEnd', url: '' },
+        tenants[0] || { name: currentTenantName, url: DEFAULT_HOME_PAGE_ROUTE },
     );
 
     const handleTenantClick = (e: React.MouseEvent, tenant: SidebarTenant) => {
