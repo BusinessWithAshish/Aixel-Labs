@@ -29,7 +29,8 @@ export function getIcon(iconName?: IconName): LucideIcon | undefined {
  * Get the icon name for a module from the sidebar configuration
  */
 export function getModuleIconName(module: Modules): IconName | undefined {
-    const navItem = sidebarConfig.navMain.find((item) => item.title === module);
+    const navItems = sidebarConfig?.navMain ?? [];
+    const navItem = navItems.find((item) => item.title === module);
     return navItem?.icon;
 }
 

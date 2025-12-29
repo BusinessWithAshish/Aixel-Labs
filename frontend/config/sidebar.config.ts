@@ -6,7 +6,7 @@ import {
     Modules,
     VOICE_AGENT_SUB_MODULES,
 } from '@aixellabs/shared/mongodb';
-import { enumToPascalCase } from '@/helpers/string-helpers';
+import { enumToTitleCase } from '@/helpers/string-helpers';
 
 // Icon names as strings for serialization
 export type IconName = 'UsersRound' | 'AudioWaveform' | 'MessageCircleMore' | 'Mail' | 'Settings2' | 'GalleryVerticalEnd';
@@ -42,70 +42,70 @@ export type SidebarConfig = {
 export const sidebarConfig: SidebarConfig = {
     navMain: [
         {
-            title: Modules.LEAD_GENERATION,
+            title: enumToTitleCase(Modules.LEAD_GENERATION),
             url: ModuleUrls.LEAD_GENERATION,
             icon: 'UsersRound',
             items: [
                 {
-                    title: enumToPascalCase(LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS),
+                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS),
                     url: SubModuleUrls.GOOGLE_MAPS,
                 },
                 {
-                    title: enumToPascalCase(LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH),
+                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH),
                     url: SubModuleUrls.GOOGLE_ADVANCED_SEARCH,
                 },
                 {
-                    title: enumToPascalCase(LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH),
+                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH),
                     url: SubModuleUrls.INSTAGRAM_SEARCH,
                 },
                 {
-                    title: enumToPascalCase(LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH),
+                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH),
                     url: SubModuleUrls.INSTAGRAM_ADVANCED_SEARCH,
                 },
                 {
-                    title: enumToPascalCase(LEAD_GENERATION_SUB_MODULES.FACEBOOK),
+                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.FACEBOOK),
                     url: SubModuleUrls.FACEBOOK,
                 },
                 {
-                    title: enumToPascalCase(LEAD_GENERATION_SUB_MODULES.LINKEDIN),
+                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.LINKEDIN),
                     url: SubModuleUrls.LINKEDIN,
                 },
             ],
         },
         {
-            title: Modules.VOICE_AGENT,
+            title: enumToTitleCase(Modules.VOICE_AGENT),
             url: ModuleUrls.VOICE_AGENT,
             icon: 'AudioWaveform',
             items: [
-                { title: enumToPascalCase(VOICE_AGENT_SUB_MODULES.WEB_DIALER), url: VOICE_AGENT_SUB_MODULES.WEB_DIALER },
+                { title: enumToTitleCase(VOICE_AGENT_SUB_MODULES.WEB_DIALER), url: VOICE_AGENT_SUB_MODULES.WEB_DIALER },
                 {
-                    title: enumToPascalCase(VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS),
+                    title: enumToTitleCase(VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS),
                     url: VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS,
                 },
                 {
-                    title: enumToPascalCase(VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS),
+                    title: enumToTitleCase(VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS),
                     url: VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS,
                 },
             ],
         },
         {
-            title: Modules.MESSAGING,
+            title: enumToTitleCase(Modules.MESSAGING),
             url: ModuleUrls.MESSAGING,
             icon: 'MessageCircleMore',
             items: [
-                { title: enumToPascalCase(MESSAGING_SUB_MODULES.WHATSAPP), url: MESSAGING_SUB_MODULES.WHATSAPP },
-                { title: enumToPascalCase(MESSAGING_SUB_MODULES.SMS), url: MESSAGING_SUB_MODULES.SMS },
+                { title: enumToTitleCase(MESSAGING_SUB_MODULES.WHATSAPP), url: MESSAGING_SUB_MODULES.WHATSAPP },
+                { title: enumToTitleCase(MESSAGING_SUB_MODULES.SMS), url: MESSAGING_SUB_MODULES.SMS },
             ],
         },
         {
-            title: Modules.EMAIL,
+            title: enumToTitleCase(Modules.EMAIL),
             url: ModuleUrls.EMAIL,
             icon: 'Mail',
             items: [
-                { title: enumToPascalCase(EMAIL_SUB_MODULES.COLD_OUTREACH), url: EMAIL_SUB_MODULES.COLD_OUTREACH },
-                { title: enumToPascalCase(EMAIL_SUB_MODULES.WARM_OUTREACH), url: EMAIL_SUB_MODULES.WARM_OUTREACH },
-                { title: enumToPascalCase(EMAIL_SUB_MODULES.TEMPLATES), url: EMAIL_SUB_MODULES.TEMPLATES },
-                { title: enumToPascalCase(EMAIL_SUB_MODULES.AI_REPLIES), url: EMAIL_SUB_MODULES.AI_REPLIES },
+                { title: enumToTitleCase(EMAIL_SUB_MODULES.COLD_OUTREACH), url: EMAIL_SUB_MODULES.COLD_OUTREACH },
+                { title: enumToTitleCase(EMAIL_SUB_MODULES.WARM_OUTREACH), url: EMAIL_SUB_MODULES.WARM_OUTREACH },
+                { title: enumToTitleCase(EMAIL_SUB_MODULES.TEMPLATES), url: EMAIL_SUB_MODULES.TEMPLATES },
+                { title: enumToTitleCase(EMAIL_SUB_MODULES.AI_REPLIES), url: EMAIL_SUB_MODULES.AI_REPLIES },
             ],
         },
     ],

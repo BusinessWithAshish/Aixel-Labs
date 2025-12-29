@@ -1,16 +1,8 @@
 import { type ModuleAccess, Modules } from '@aixellabs/shared/mongodb';
 import { SubModuleUrls, ModuleUrls } from '@/config/app-config';
 import { sidebarConfig, SidebarConfig, SidebarNavItem } from '@/config/sidebar.config';
-import { enumToPascalCase } from '@/helpers/string-helpers';
-/**
- * Maps modules to their icon names
- */
-const MODULE_ICONS: Record<Modules, 'UsersRound' | 'AudioWaveform' | 'MessageCircleMore' | 'Mail'> = {
-    [Modules.LEAD_GENERATION]: 'UsersRound',
-    [Modules.VOICE_AGENT]: 'AudioWaveform',
-    [Modules.MESSAGING]: 'MessageCircleMore',
-    [Modules.EMAIL]: 'Mail',
-};
+import { enumToTitleCase } from '@/helpers/string-helpers';
+import { getModuleIconName } from '@/lib/icon-map';
 
 /**
  * Generate sidebar config based on user's module access
@@ -41,14 +33,14 @@ export function generateSidebarConfig(isAdmin: boolean, moduleAccess?: ModuleAcc
 
         // Build submodule items
         const items = subModules.map((subModule) => ({
-            title: enumToPascalCase(subModule),
+            title: enumToTitleCase(subModule),
             url: SubModuleUrls[subModule],
         }));
 
         navMain.push({
-            title: enumToPascalCase(module),
+            title: enumToTitleCase(module),
             url: ModuleUrls[module],
-            icon: MODULE_ICONS[module],
+            icon: getModuleIconName(module),
             items,
         });
     }

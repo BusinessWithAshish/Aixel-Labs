@@ -13,23 +13,29 @@ import {
     toggleSubModule,
 } from '@/helpers/module-access-helpers';
 import { cn } from '@/lib/utils';
-import { enumToPascalCase } from '@/helpers/string-helpers';
+import { enumToTitleCase } from '@/helpers/string-helpers';
 import { getModuleIcon } from '@/lib/icon-map';
 
 type ModuleAccessCardProps = {
-    moduleAccess: ModuleAccess;
+    /**
+     * Full module access map for the user.
+     * Can be undefined/null when the user has no module access configured yet.
+     */
+    moduleAccess?: ModuleAccess | null;
     onChange: (moduleAccess: ModuleAccess) => void;
     className?: string;
 };
 
 export function ModuleAccessCard({ moduleAccess, onChange, className }: ModuleAccessCardProps) {
+    const effectiveModuleAccess = (moduleAccess ?? {}) as ModuleAccess;
+
     const handleToggleSubModule = (module: Modules, subModule: SubModule) => {
-        const newAccess = toggleSubModule(moduleAccess, module, subModule);
+        const newAccess = toggleSubModule(effectiveModuleAccess, module, subModule);
         onChange(newAccess);
     };
 
     const handleToggleAllSubModules = (module: Modules, enabled: boolean) => {
-        const newAccess = toggleAllSubModules(moduleAccess, module, enabled);
+        const newAccess = toggleAllSubModules(effectiveModuleAccess, module, enabled);
         onChange(newAccess);
     };
 
@@ -43,10 +49,10 @@ export function ModuleAccessCard({ moduleAccess, onChange, className }: ModuleAc
                 <div className="space-y-6">
                     {Object.values(Modules).map((module) => {
                         const Icon = getModuleIcon(module);
-                        const allEnabled = areAllSubModulesEnabled(moduleAccess, module);
-                        const someEnabled = areSomeSubModulesEnabled(moduleAccess, module);
+                        const allEnabled = areAllSubModulesEnabled(effectiveModuleAccess, module);
+                        const someEnabled = areSomeSubModulesEnabled(effectiveModuleAccess, module);
                         const subModules = getSubModulesForModule(module);
-                        const enabledSubModules = moduleAccess[module] || [];
+                        const enabledSubModules = effectiveModuleAccess[module] || [];
 
                         return (
                             <div key={module} className="space-y-3">
@@ -54,9 +60,15 @@ export function ModuleAccessCard({ moduleAccess, onChange, className }: ModuleAc
                                 <div className="flex flex-wrap items-center justify-between pb-2 border-b">
                                     <div className="flex items-center gap-2">
                                         {Icon && <Icon className="h-5 w-5 text-primary" />}
-                                        <h3 className="font-semibold text-base">{enumToPascalCase(module)}</h3>
+                                        <h3 className="font-semibold text-base">{enumToTitleCase(module)}</h3>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                        <Label
+                                            htmlFor={`${module}-all`}
+                                            className="text-sm text-muted-foreground cursor-pointer"
+                                        >
+                                            {allEnabled ? 'Deselect All' : 'Select All'}
+                                        </Label>
                                         <Checkbox
                                             id={`${module}-all`}
                                             checked={allEnabled}
@@ -69,12 +81,6 @@ export function ModuleAccessCard({ moduleAccess, onChange, className }: ModuleAc
                                                 handleToggleAllSubModules(module, checked === true);
                                             }}
                                         />
-                                        <Label
-                                            htmlFor={`${module}-all`}
-                                            className="text-sm text-muted-foreground cursor-pointer"
-                                        >
-                                            {allEnabled ? 'Deselect All' : 'Select All'}
-                                        </Label>
                                     </div>
                                 </div>
 
@@ -93,7 +99,7 @@ export function ModuleAccessCard({ moduleAccess, onChange, className }: ModuleAc
                                                     isEnabled && 'bg-primary/10 border-primary',
                                                 )}
                                             >
-                                                <span className="text-sm truncate">{enumToPascalCase(subModule)}</span>
+                                                <span className="text-sm truncate">{enumToTitleCase(subModule)}</span>
                                             </Toggle>
                                         );
                                     })}
