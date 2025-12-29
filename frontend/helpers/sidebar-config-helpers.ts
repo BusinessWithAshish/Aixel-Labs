@@ -1,8 +1,6 @@
 import { type ModuleAccess, Modules } from '@aixellabs/shared/mongodb';
 import { SubModuleUrls, ModuleUrls } from '@/config/app-config';
 import { sidebarConfig, SidebarConfig, SidebarNavItem } from '@/config/sidebar.config';
-import { enumToTitleCase } from '@/helpers/string-helpers';
-import { getModuleIconName } from '@/lib/icon-map';
 
 /**
  * Generate sidebar config based on user's module access
@@ -33,14 +31,13 @@ export function generateSidebarConfig(isAdmin: boolean, moduleAccess?: ModuleAcc
 
         // Build submodule items
         const items = subModules.map((subModule) => ({
-            title: enumToTitleCase(subModule),
+            title: subModule,
             url: SubModuleUrls[subModule],
         }));
 
         navMain.push({
-            title: enumToTitleCase(module),
+            title: module,
             url: ModuleUrls[module],
-            icon: getModuleIconName(module),
             items,
         });
     }

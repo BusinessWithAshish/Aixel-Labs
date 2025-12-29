@@ -6,15 +6,11 @@ import {
     Modules,
     VOICE_AGENT_SUB_MODULES,
 } from '@aixellabs/shared/mongodb';
-import { enumToTitleCase } from '@/helpers/string-helpers';
-
-// Icon names as strings for serialization
-export type IconName = 'UsersRound' | 'AudioWaveform' | 'MessageCircleMore' | 'Mail' | 'Settings2' | 'GalleryVerticalEnd';
+import {AudioWaveform, LucideIcon, Mail, MessageCircleMore, UsersRound} from "lucide-react";
 
 export type SidebarNavItem = {
     title: string;
-    url: (typeof ModuleUrls)[keyof typeof ModuleUrls];
-    icon?: IconName;
+    url: string;
     items?: {
         title: string;
         url: string;
@@ -23,7 +19,7 @@ export type SidebarNavItem = {
 
 export type SidebarTenant = {
     name: string;
-    logo: IconName;
+    logo: string;
     url: string;
 };
 
@@ -39,73 +35,76 @@ export type SidebarConfig = {
     navMain: SidebarNavItem[];
 };
 
+export const modulesIconMap: Record<Modules, LucideIcon> = {
+    [Modules.LEAD_GENERATION]: UsersRound,
+    [Modules.VOICE_AGENT]: AudioWaveform,
+    [Modules.MESSAGING]: MessageCircleMore,
+    [Modules.EMAIL]: Mail,
+};
+
 export const sidebarConfig: SidebarConfig = {
     navMain: [
         {
-            title: enumToTitleCase(Modules.LEAD_GENERATION),
+            title: Modules.LEAD_GENERATION,
             url: ModuleUrls.LEAD_GENERATION,
-            icon: 'UsersRound',
             items: [
                 {
-                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS),
+                    title: LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS,
                     url: SubModuleUrls.GOOGLE_MAPS,
                 },
                 {
-                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH),
+                    title: LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH,
                     url: SubModuleUrls.GOOGLE_ADVANCED_SEARCH,
                 },
                 {
-                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH),
+                    title: LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH,
                     url: SubModuleUrls.INSTAGRAM_SEARCH,
                 },
                 {
-                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH),
+                    title: LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH,
                     url: SubModuleUrls.INSTAGRAM_ADVANCED_SEARCH,
                 },
                 {
-                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.FACEBOOK),
+                    title: LEAD_GENERATION_SUB_MODULES.FACEBOOK,
                     url: SubModuleUrls.FACEBOOK,
                 },
                 {
-                    title: enumToTitleCase(LEAD_GENERATION_SUB_MODULES.LINKEDIN),
+                    title: LEAD_GENERATION_SUB_MODULES.LINKEDIN,
                     url: SubModuleUrls.LINKEDIN,
                 },
             ],
         },
         {
-            title: enumToTitleCase(Modules.VOICE_AGENT),
+            title: Modules.VOICE_AGENT,
             url: ModuleUrls.VOICE_AGENT,
-            icon: 'AudioWaveform',
             items: [
-                { title: enumToTitleCase(VOICE_AGENT_SUB_MODULES.WEB_DIALER), url: VOICE_AGENT_SUB_MODULES.WEB_DIALER },
+                { title: VOICE_AGENT_SUB_MODULES.WEB_DIALER, url: VOICE_AGENT_SUB_MODULES.WEB_DIALER },
                 {
-                    title: enumToTitleCase(VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS),
+                    title: VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS,
                     url: VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS,
                 },
                 {
-                    title: enumToTitleCase(VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS),
+                    title: VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS,
                     url: VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS,
                 },
             ],
         },
         {
-            title: enumToTitleCase(Modules.MESSAGING),
+            title: Modules.MESSAGING,
             url: ModuleUrls.MESSAGING,
-            icon: 'MessageCircleMore',
             items: [
-                { title: enumToTitleCase(MESSAGING_SUB_MODULES.WHATSAPP), url: MESSAGING_SUB_MODULES.WHATSAPP },
-                { title: enumToTitleCase(MESSAGING_SUB_MODULES.SMS), url: MESSAGING_SUB_MODULES.SMS },
+                { title: MESSAGING_SUB_MODULES.WHATSAPP, url: MESSAGING_SUB_MODULES.WHATSAPP },
+                { title: MESSAGING_SUB_MODULES.SMS, url: MESSAGING_SUB_MODULES.SMS },
             ],
         },
         {
-            title: enumToTitleCase(Modules.EMAIL),
+            title: Modules.EMAIL,
             url: ModuleUrls.EMAIL,
-            icon: 'Mail',
             items: [
-                { title: enumToTitleCase(EMAIL_SUB_MODULES.COLD_OUTREACH), url: EMAIL_SUB_MODULES.COLD_OUTREACH },
-                { title: enumToTitleCase(EMAIL_SUB_MODULES.WARM_OUTREACH), url: EMAIL_SUB_MODULES.WARM_OUTREACH },
-                { title: enumToTitleCase(EMAIL_SUB_MODULES.TEMPLATES), url: EMAIL_SUB_MODULES.TEMPLATES },
-                { title: enumToTitleCase(EMAIL_SUB_MODULES.AI_REPLIES), url: EMAIL_SUB_MODULES.AI_REPLIES },
+                { title: EMAIL_SUB_MODULES.COLD_OUTREACH, url: EMAIL_SUB_MODULES.COLD_OUTREACH },
+                { title: EMAIL_SUB_MODULES.WARM_OUTREACH, url: EMAIL_SUB_MODULES.WARM_OUTREACH },
+                { title: EMAIL_SUB_MODULES.TEMPLATES, url: EMAIL_SUB_MODULES.TEMPLATES },
+                { title: EMAIL_SUB_MODULES.AI_REPLIES, url: EMAIL_SUB_MODULES.AI_REPLIES },
             ],
         },
     ],

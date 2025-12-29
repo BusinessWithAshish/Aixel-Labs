@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronsUpDown, Plus } from 'lucide-react';
+import { ChevronsUpDown, GalleryVerticalEnd, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import type { SidebarTenant } from '@/config/sidebar.config';
-import { getIcon } from '@/lib/icon-map';
 
 export function TenantSwitcher({
     tenants,
@@ -43,8 +42,6 @@ export function TenantSwitcher({
         router.push('/manage-tenants');
     };
 
-    const ActiveLogo = getIcon(activeTenant.logo);
-
     const activeTenantName = activeTenant.name.toLocaleUpperCase();
 
     if (!isAdmin) {
@@ -53,7 +50,7 @@ export function TenantSwitcher({
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" className="cursor-default">
                         <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                            {ActiveLogo && <ActiveLogo className="size-4" />}
+                            <GalleryVerticalEnd className="size-4 shrink-0" />
                         </div>
                         <div className="grid flex-1 text-left text-sm leading-tight">
                             <span className="truncate font-medium">{activeTenantName}</span>
@@ -74,7 +71,7 @@ export function TenantSwitcher({
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
                             <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                                {ActiveLogo && <ActiveLogo className="size-4" />}
+                                <GalleryVerticalEnd className="size-4" />
                             </div>
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-medium">{activeTenantName}</span>
@@ -91,7 +88,7 @@ export function TenantSwitcher({
                         <DropdownMenuLabel className="text-muted-foreground text-xs">Tenants</DropdownMenuLabel>
                         {tenants.map((tenant) => {
                             const tenantName = tenant.name.toLocaleUpperCase();
-                            const TenantLogo = getIcon(tenant.logo);
+
                             return (
                                 <DropdownMenuItem
                                     key={tenant.name}
@@ -99,7 +96,7 @@ export function TenantSwitcher({
                                     className="gap-2 p-2"
                                 >
                                     <div className="flex size-6 items-center justify-center rounded-md border">
-                                        {TenantLogo && <TenantLogo className="size-3.5 shrink-0" />}
+                                        <GalleryVerticalEnd className="size-4 shrink-0" />
                                     </div>
                                     {tenant.name.toLocaleUpperCase()}
                                     <DropdownMenuShortcut>⌘{tenantName.charCodeAt(0)}</DropdownMenuShortcut>

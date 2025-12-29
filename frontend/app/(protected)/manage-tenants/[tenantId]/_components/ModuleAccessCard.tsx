@@ -14,7 +14,7 @@ import {
 } from '@/helpers/module-access-helpers';
 import { cn } from '@/lib/utils';
 import { enumToTitleCase } from '@/helpers/string-helpers';
-import { getModuleIcon } from '@/lib/icon-map';
+import { modulesIconMap } from '@/config/sidebar.config';
 
 type ModuleAccessCardProps = {
     /**
@@ -48,7 +48,7 @@ export function ModuleAccessCard({ moduleAccess, onChange, className }: ModuleAc
             <CardContent>
                 <div className="space-y-6">
                     {Object.values(Modules).map((module) => {
-                        const Icon = getModuleIcon(module);
+                        const Icon = modulesIconMap[module as Modules];
                         const allEnabled = areAllSubModulesEnabled(effectiveModuleAccess, module);
                         const someEnabled = areSomeSubModulesEnabled(effectiveModuleAccess, module);
                         const subModules = getSubModulesForModule(module);
