@@ -1,6 +1,6 @@
 'use server';
 
-import { getCollection, MongoObjectId, MongoCollections, type User, type UserDoc, type TenantDoc } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoObjectId, MongoCollections, type User, type UserDoc, type TenantDoc, type ModuleAccess } from '@aixellabs/shared/mongodb';
 
 // ============================================================================
 // USER INPUT TYPES (Frontend/Forms)
@@ -16,6 +16,7 @@ export type CreateUserInput = {
     name?: string;
     isAdmin?: boolean;
     tenantId: string; // Tenant name as string
+    moduleAccess?: ModuleAccess;
 };
 
 /**
@@ -24,6 +25,7 @@ export type CreateUserInput = {
 export type UpdateUserInput = {
     name?: string;
     isAdmin?: boolean;
+    moduleAccess?: ModuleAccess;
 };
 
 export type { User };
@@ -50,6 +52,7 @@ export const getUsersByTenantId = async (tenantId: string): Promise<User[]> => {
             name: user.name,
             isAdmin: user.isAdmin,
             tenantId: tenantId, // Return the tenant name as string
+            moduleAccess: user.moduleAccess,
         }));
     } catch {
         return [];
@@ -87,6 +90,7 @@ export const createUser = async (input: CreateUserInput): Promise<User | null> =
             name: input.name?.trim(),
             isAdmin: input.isAdmin ?? false,
             tenantId: tenant._id,
+            moduleAccess: input.moduleAccess,
         };
 
         const result = await usersCollection.insertOne(docToInsert as UserDoc);
@@ -98,6 +102,7 @@ export const createUser = async (input: CreateUserInput): Promise<User | null> =
             name: docToInsert.name,
             isAdmin: docToInsert.isAdmin,
             tenantId: input.tenantId, // Return the tenant name as string
+            moduleAccess: docToInsert.moduleAccess,
         };
     } catch {
         return null;
@@ -111,9 +116,10 @@ export const updateUser = async (id: string, input: UpdateUserInput): Promise<Us
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
 
-        const updateFields: Partial<Pick<UserDoc, 'name' | 'isAdmin'>> = {};
+        const updateFields: Partial<Pick<UserDoc, 'name' | 'isAdmin' | 'moduleAccess'>> = {};
         if (input.name !== undefined) updateFields.name = input.name;
         if (input.isAdmin !== undefined) updateFields.isAdmin = input.isAdmin;
+        if (input.moduleAccess !== undefined) updateFields.moduleAccess = input.moduleAccess;
 
         const result = await usersCollection.findOneAndUpdate(
             { _id: new MongoObjectId(id) },
@@ -134,6 +140,7 @@ export const updateUser = async (id: string, input: UpdateUserInput): Promise<Us
             name: result.name,
             isAdmin: result.isAdmin,
             tenantId: tenantName, // Return the tenant name as string
+            moduleAccess: result.moduleAccess,
         };
     } catch {
         return null;

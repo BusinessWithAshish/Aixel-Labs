@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -10,8 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { toast } from 'sonner';
-import type { User } from '@aixellabs/shared/mongodb';
+import type { User, ModuleAccess } from '@aixellabs/shared/mongodb';
 import { createUserAction, updateUserAction } from '@/app/actions/user-actions';
+import { ModuleAccessCard } from './ModuleAccessCard';
+import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Unified schema with optional fields
 // Email and password are optional in the schema but validated in the component for create mode
@@ -34,6 +37,7 @@ type UserDialogProps = {
 
 export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: UserDialogProps) {
     const isEditMode = !!user;
+    const [moduleAccess, setModuleAccess] = useState<ModuleAccess>(getDefaultModuleAccess());
 
     const {
         control,
@@ -59,6 +63,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                     name: user.name || '',
                     isAdmin: user.isAdmin ?? false,
                 });
+                setModuleAccess(user.moduleAccess || getDefaultModuleAccess());
             } else {
                 reset({
                     email: '',
@@ -66,6 +71,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                     name: '',
                     isAdmin: false,
                 });
+                setModuleAccess(getDefaultModuleAccess());
             }
         }
     }, [user, open, isEditMode, reset]);
@@ -77,6 +83,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                 const result = await updateUserAction(user._id, {
                     name: data.name?.trim() || undefined,
                     isAdmin: data.isAdmin,
+                    moduleAccess,
                 });
 
                 if (!result.success) {
@@ -96,6 +103,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                     name: data.name?.trim(),
                     isAdmin: data.isAdmin,
                     tenantId,
+                    moduleAccess,
                 });
 
                 if (!result.success) {
@@ -125,13 +133,14 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                 name: '',
                 isAdmin: false,
             });
+            setModuleAccess(getDefaultModuleAccess());
         }
         onOpenChange(newOpen);
     };
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-2xl max-h-fit">
                 <DialogHeader>
                     <DialogTitle>{isEditMode ? 'Edit User' : 'Add User'}</DialogTitle>
                     <DialogDescription>
@@ -140,131 +149,131 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                             : 'Create a new user for this tenant. Click create when you&#39;re done.'}
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className="grid gap-4 py-4">
-                        <Field>
-                            <FieldLabel htmlFor="email">Email</FieldLabel>
-                            <FieldContent>
-                                {isEditMode ? (
-                                    <>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            value={user?.email || ''}
-                                            disabled
-                                            className="bg-muted"
-                                        />
-                                        <FieldDescription>User email cannot be changed</FieldDescription>
-                                    </>
-                                ) : (
-                                    <>
+                <ScrollArea className="h-full pr-4">
+                    <form onSubmit={handleSubmit(onSubmit)}>
+                        <div className="grid gap-4 py-4">
+                            <Field>
+                                <FieldLabel htmlFor="email">Email</FieldLabel>
+                                <FieldContent>
+                                    {isEditMode ? (
+                                        <>
+                                            <Input
+                                                id="email"
+                                                type="email"
+                                                value={user?.email || ''}
+                                                disabled
+                                                className="bg-muted"
+                                            />
+                                            <FieldDescription>User email cannot be changed</FieldDescription>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Controller
+                                                name="email"
+                                                control={control}
+                                                render={({ field }) => (
+                                                    <Input
+                                                        id="email"
+                                                        type="email"
+                                                        placeholder="Enter user email"
+                                                        value={field.value || ''}
+                                                        onChange={(e) => field.onChange(e.target.value)}
+                                                        aria-invalid={errors.email ? 'true' : 'false'}
+                                                    />
+                                                )}
+                                            />
+                                            <FieldError errors={errors.email ? [errors.email] : undefined} />
+                                        </>
+                                    )}
+                                </FieldContent>
+                            </Field>
+
+                            {!isEditMode && (
+                                <Field>
+                                    <FieldLabel htmlFor="password">Password</FieldLabel>
+                                    <FieldContent>
                                         <Controller
-                                            name="email"
+                                            name="password"
                                             control={control}
                                             render={({ field }) => (
                                                 <Input
-                                                    id="email"
-                                                    type="email"
-                                                    placeholder="Enter user email"
+                                                    id="password"
+                                                    type="password"
+                                                    placeholder="Enter password (min 6 characters)"
                                                     value={field.value || ''}
                                                     onChange={(e) => field.onChange(e.target.value)}
-                                                    aria-invalid={errors.email ? 'true' : 'false'}
+                                                    aria-invalid={errors.password ? 'true' : 'false'}
                                                 />
                                             )}
                                         />
-                                        <FieldError errors={errors.email ? [errors.email] : undefined} />
-                                    </>
-                                )}
-                            </FieldContent>
-                        </Field>
+                                        <FieldError errors={errors.password ? [errors.password] : undefined} />
+                                    </FieldContent>
+                                </Field>
+                            )}
 
-                        {!isEditMode && (
                             <Field>
-                                <FieldLabel htmlFor="password">Password</FieldLabel>
+                                <FieldLabel htmlFor="name">Name</FieldLabel>
                                 <FieldContent>
                                     <Controller
-                                        name="password"
+                                        name="name"
                                         control={control}
                                         render={({ field }) => (
                                             <Input
-                                                id="password"
-                                                type="password"
-                                                placeholder="Enter password (min 6 characters)"
+                                                id="name"
+                                                type="text"
+                                                placeholder="Enter user name"
                                                 value={field.value || ''}
                                                 onChange={(e) => field.onChange(e.target.value)}
-                                                aria-invalid={errors.password ? 'true' : 'false'}
+                                                aria-invalid={errors.name ? 'true' : 'false'}
                                             />
                                         )}
                                     />
-                                    <FieldError errors={errors.password ? [errors.password] : undefined} />
+                                    <FieldError errors={errors.name ? [errors.name] : undefined} />
                                 </FieldContent>
                             </Field>
-                        )}
 
-                        <Field>
-                            <FieldLabel htmlFor="name">Name</FieldLabel>
-                            <FieldContent>
-                                <Controller
-                                    name="name"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <Input
-                                            id="name"
-                                            type="text"
-                                            placeholder="Enter user name"
-                                            value={field.value || ''}
-                                            onChange={(e) => field.onChange(e.target.value)}
-                                            aria-invalid={errors.name ? 'true' : 'false'}
-                                        />
-                                    )}
-                                />
-                                <FieldError errors={errors.name ? [errors.name] : undefined} />
-                            </FieldContent>
-                        </Field>
+                            <Field orientation="horizontal">
+                                <FieldContent>
+                                    <Controller
+                                        name="isAdmin"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox
+                                                    id="isAdmin"
+                                                    checked={field.value}
+                                                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                                                />
+                                                <FieldLabel htmlFor="isAdmin" className="cursor-pointer font-normal">
+                                                    Admin privileges
+                                                </FieldLabel>
+                                            </div>
+                                        )}
+                                    />
+                                    <FieldDescription>Grant administrative access to this user</FieldDescription>
+                                    <FieldError errors={errors.isAdmin ? [errors.isAdmin] : undefined} />
+                                </FieldContent>
+                            </Field>
 
-                        <Field orientation="horizontal">
-                            <FieldContent>
-                                <Controller
-                                    name="isAdmin"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <div className="flex items-center gap-2">
-                                            <Checkbox
-                                                id="isAdmin"
-                                                checked={field.value}
-                                                onCheckedChange={(checked) => field.onChange(checked === true)}
-                                            />
-                                            <FieldLabel htmlFor="isAdmin" className="cursor-pointer font-normal">
-                                                Admin privileges
-                                            </FieldLabel>
-                                        </div>
-                                    )}
-                                />
-                                <FieldDescription>Grant administrative access to this user</FieldDescription>
-                                <FieldError errors={errors.isAdmin ? [errors.isAdmin] : undefined} />
-                            </FieldContent>
-                        </Field>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => handleOpenChange(false)}
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting}>
-                            {isSubmitting
-                                ? isEditMode
-                                    ? 'Saving...'
-                                    : 'Creating...'
-                                : isEditMode
-                                ? 'Save changes'
-                                : 'Create user'}
-                        </Button>
-                    </DialogFooter>
-                </form>
+                            {/* Module Access Section */}
+                            <ModuleAccessCard moduleAccess={moduleAccess} onChange={setModuleAccess} />
+                        </div>
+                    </form>
+                </ScrollArea>
+                <DialogFooter className="mt-4">
+                    <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting} onClick={handleSubmit(onSubmit)}>
+                        {isSubmitting
+                            ? isEditMode
+                                ? 'Saving...'
+                                : 'Creating...'
+                            : isEditMode
+                            ? 'Save changes'
+                            : 'Create user'}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

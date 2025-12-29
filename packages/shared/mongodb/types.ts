@@ -10,6 +10,79 @@ export enum MongoCollections {
 }
 
 // ============================================================================
+// MODULE ACCESS TYPES
+// ============================================================================
+
+/**
+ * Enum for all available modules in the application
+ */
+export enum Modules {
+  LEAD_GENERATION = "LEAD_GENERATION",
+  VOICE_AGENT = "VOICE_AGENT",
+  MESSAGING = "MESSAGING",
+  EMAIL = "EMAIL",
+}
+
+/**
+ * Enum for Lead Generation submodules
+ */
+export enum LEAD_GENERATION_SUB_MODULES {
+  GOOGLE_MAPS = "GOOGLE_MAPS",
+  GOOGLE_ADVANCED_SEARCH = "GOOGLE_ADVANCED_SEARCH",
+  INSTAGRAM_SEARCH = "INSTAGRAM_SEARCH",
+  INSTAGRAM_ADVANCED_SEARCH = "INSTAGRAM_ADVANCED_SEARCH",
+  FACEBOOK = "FACEBOOK",
+  LINKEDIN = "LINKEDIN",
+}
+
+/**
+ * Enum for Voice Agent submodules
+ */
+export enum VOICE_AGENT_SUB_MODULES {
+  WEB_DIALER = "WEB_DIALER",
+  INQUIRY_BOOKINGS = "INQUIRY_BOOKINGS",
+  CUSTOM_AGENT_ANALYTICS = "CUSTOM_AGENT_ANALYTICS",
+}
+
+/**
+ * Enum for Messaging submodules
+ */
+export enum MESSAGING_SUB_MODULES {
+  WHATSAPP = "WHATSAPP",
+  SMS = "SMS",
+}
+
+/**
+ * Enum for Email submodules
+ */
+export enum EMAIL_SUB_MODULES {
+  COLD_OUTREACH = "COLD_OUTREACH",
+  WARM_OUTREACH = "WARM_OUTREACH",
+  TEMPLATES = "TEMPLATES",
+  AI_REPLIES = "AI_REPLIES",
+}
+
+/**
+ * Union type of all submodule enums
+ */
+export type SubModule =
+  | LEAD_GENERATION_SUB_MODULES
+  | VOICE_AGENT_SUB_MODULES
+  | MESSAGING_SUB_MODULES
+  | EMAIL_SUB_MODULES;
+
+/**
+ * Module access configuration for a user
+ * Maps module to its enabled submodules
+ */
+export type ModuleAccess = {
+  [Modules.LEAD_GENERATION]?: LEAD_GENERATION_SUB_MODULES[];
+  [Modules.VOICE_AGENT]?: VOICE_AGENT_SUB_MODULES[];
+  [Modules.MESSAGING]?: MESSAGING_SUB_MODULES[];
+  [Modules.EMAIL]?: EMAIL_SUB_MODULES[];
+};
+
+// ============================================================================
 // TENANT TYPES
 // ============================================================================
 
@@ -42,6 +115,7 @@ export type Tenant = {
  * Used when inserting/querying MongoDB directly.
  * - tenantId is ObjectId in the database
  * - password is stored (plain text for now, should be hashed in production)
+ * - moduleAccess defines which modules and submodules the user can access
  */
 export type UserDoc = {
   _id: ObjectId;
@@ -50,6 +124,7 @@ export type UserDoc = {
   isAdmin: boolean;
   tenantId: ObjectId;
   password: string;
+  moduleAccess?: ModuleAccess;
 };
 
 /**
@@ -63,6 +138,7 @@ export type User = {
   name?: string;
   isAdmin: boolean;
   tenantId: string;
+  moduleAccess?: ModuleAccess;
 };
 
 export enum LeadSource {
