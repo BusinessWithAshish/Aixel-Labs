@@ -50,7 +50,7 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
             <SidebarMenuButton asChild isActive={pathname === DEFAULT_HOME_PAGE_ROUTE}>
                 <Link href={DEFAULT_HOME_PAGE_ROUTE}>
                     <HomeIcon className="size-4 shrink-0" />
-                    <span>Home</span>
+                    <span className="group-data-[collapsible=icon]:hidden">Home</span>
                 </Link>
             </SidebarMenuButton>
             <SidebarGroupLabel>Platform</SidebarGroupLabel>

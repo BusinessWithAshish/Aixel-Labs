@@ -3,8 +3,8 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { SidebarMenuButton } from '@/components/ui/sidebar';
 
 export const ThemeToggle = () => {
     const { theme, setTheme } = useTheme();
@@ -16,9 +16,9 @@ export const ThemeToggle = () => {
 
     if (!mounted) {
         return (
-            <Button variant="ghost" size="icon" className="h-9 w-9">
+            <SidebarMenuButton tooltip="Toggle theme">
                 <Sun className="h-4 w-4" />
-            </Button>
+            </SidebarMenuButton>
         );
     }
 
@@ -31,16 +31,10 @@ export const ThemeToggle = () => {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-full p-2 w-full cursor-pointer flex items-center justify-start
-                 gap-2"
-                >
+                <SidebarMenuButton tooltip="Toggle theme">
                     {getIcon()}
-                    <span className="hidden sm:inline">Toggle theme</span>
-                    <span className="sm:hidden">Theme</span>
-                </Button>
+                    <span className="group-data-[collapsible=icon]:hidden">Toggle theme</span>
+                </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setTheme('light')}>
