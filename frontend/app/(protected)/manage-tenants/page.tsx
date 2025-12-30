@@ -20,4 +20,4 @@ async function ManageTenantsPage() {
     );
 }
 
-export default withAdminOnly(withPageHandler(ManageTenantsPage), { pageTitle: PAGE_TITLE });
+export default withAdminOnly(withPageHandler(ManageTenantsPage));

@@ -3,7 +3,7 @@ import '@/app/globals.css';
 import { validateAndGetTenant } from '@/helpers/validate-tenant';
 import { ExternalEmbed } from '@/components/layout/custom-demo-layout';
 import { RootLayoutUI } from '@/components/common/RootLayout';
-import { notFound } from 'next/navigation';
+import NotFound from "@/app/not-found";
 
 export const metadata: Metadata = {
     title: process.env.NEXT_PUBLIC_APP_NAME || 'AixelLabs',
@@ -14,7 +14,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     const currentTenantData = await validateAndGetTenant();
 
     if (!currentTenantData) {
-        return notFound();
+        return <NotFound />;
     }
 
     const redirectUrl = currentTenantData?.redirect_url as string | undefined;
