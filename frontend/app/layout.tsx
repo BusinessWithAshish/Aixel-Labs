@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import '@/app/globals.css';
 import { validateAndGetTenant } from '@/helpers/validate-tenant';
-import NotFound from '@/components/layout/not-found';
 import { ExternalEmbed } from '@/components/layout/custom-demo-layout';
 import { RootLayoutUI } from '@/components/common/RootLayout';
+import NotFound from "@/app/not-found";
 
 export const metadata: Metadata = {
     title: process.env.NEXT_PUBLIC_APP_NAME || 'AixelLabs',

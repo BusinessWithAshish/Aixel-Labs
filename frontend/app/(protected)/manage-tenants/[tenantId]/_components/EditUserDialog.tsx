@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -10,8 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { toast } from 'sonner';
-import type { User } from '@aixellabs/shared/mongodb';
+import type { User, ModuleAccess } from '@aixellabs/shared/mongodb';
 import { createUserAction, updateUserAction } from '@/app/actions/user-actions';
+import { ModuleAccessCard } from './ModuleAccessCard';
+import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 
 // Unified schema with optional fields
 // Email and password are optional in the schema but validated in the component for create mode
@@ -34,6 +36,7 @@ type UserDialogProps = {
 
 export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: UserDialogProps) {
     const isEditMode = !!user;
+    const [moduleAccess, setModuleAccess] = useState<ModuleAccess>(getDefaultModuleAccess());
 
     const {
         control,
@@ -59,6 +62,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                     name: user.name || '',
                     isAdmin: user.isAdmin ?? false,
                 });
+                setModuleAccess(user.moduleAccess || getDefaultModuleAccess());
             } else {
                 reset({
                     email: '',
@@ -66,6 +70,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                     name: '',
                     isAdmin: false,
                 });
+                setModuleAccess(getDefaultModuleAccess());
             }
         }
     }, [user, open, isEditMode, reset]);
@@ -77,6 +82,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                 const result = await updateUserAction(user._id, {
                     name: data.name?.trim() || undefined,
                     isAdmin: data.isAdmin,
+                    moduleAccess,
                 });
 
                 if (!result.success) {
@@ -96,6 +102,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                     name: data.name?.trim(),
                     isAdmin: data.isAdmin,
                     tenantId,
+                    moduleAccess,
                 });
 
                 if (!result.success) {
@@ -125,13 +132,14 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                 name: '',
                 isAdmin: false,
             });
+            setModuleAccess(getDefaultModuleAccess());
         }
         onOpenChange(newOpen);
     };
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-2xl max-h-fit">
                 <DialogHeader>
                     <DialogTitle>{isEditMode ? 'Edit User' : 'Add User'}</DialogTitle>
                     <DialogDescription>
@@ -140,7 +148,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                             : 'Create a new user for this tenant. Click create when you&#39;re done.'}
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit(onSubmit)}>
+                <form className="max-h-[50dvh] overflow-y-auto p-2" onSubmit={handleSubmit(onSubmit)}>
                     <div className="grid gap-4 py-4">
                         <Field>
                             <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -244,27 +252,26 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                                 <FieldError errors={errors.isAdmin ? [errors.isAdmin] : undefined} />
                             </FieldContent>
                         </Field>
+
+                        {/* Module Access Section */}
+                        <ModuleAccessCard moduleAccess={moduleAccess} onChange={setModuleAccess} />
                     </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => handleOpenChange(false)}
-                            disabled={isSubmitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting}>
-                            {isSubmitting
-                                ? isEditMode
-                                    ? 'Saving...'
-                                    : 'Creating...'
-                                : isEditMode
-                                ? 'Save changes'
-                                : 'Create user'}
-                        </Button>
-                    </DialogFooter>
                 </form>
+
+                <DialogFooter className="mt-4">
+                    <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting} onClick={handleSubmit(onSubmit)}>
+                        {isSubmitting
+                            ? isEditMode
+                                ? 'Saving...'
+                                : 'Creating...'
+                            : isEditMode
+                            ? 'Save changes'
+                            : 'Create user'}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

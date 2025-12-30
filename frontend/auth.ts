@@ -1,6 +1,6 @@
 import NextAuth, { DefaultSession, CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { getCollection, MongoCollections, type UserDoc, type TenantDoc } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoCollections, type UserDoc, type TenantDoc, type ModuleAccess } from '@aixellabs/shared/mongodb';
 import { z } from 'zod';
 
 // Custom error classes for specific error types
@@ -27,6 +27,7 @@ declare module 'next-auth' {
         name?: string;
         isAdmin: boolean;
         tenantId: string;
+        moduleAccess?: ModuleAccess;
     }
 
     interface Session {
@@ -36,6 +37,7 @@ declare module 'next-auth' {
             name?: string;
             isAdmin: boolean;
             tenantId: string;
+            moduleAccess?: ModuleAccess;
         } & DefaultSession['user'];
     }
 }
@@ -106,6 +108,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         name: user.name,
                         isAdmin: user.isAdmin,
                         tenantId: tenantId, // Return the tenant name as string for the session
+                        moduleAccess: user.moduleAccess,
                     };
                 } catch (error) {
                     // Re-throw custom credential errors
@@ -136,6 +139,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.name = user.name;
                 token.isAdmin = user.isAdmin;
                 token.tenantId = user.tenantId;
+                token.moduleAccess = user.moduleAccess;
             }
             return token;
         },
@@ -147,6 +151,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 session.user.name = token.name as string | undefined;
                 session.user.isAdmin = token.isAdmin as boolean;
                 session.user.tenantId = token.tenantId as string;
+                session.user.moduleAccess = token.moduleAccess as ModuleAccess | undefined;
             }
             return session;
         },

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, HomeIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 
@@ -16,10 +16,13 @@ import {
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import type { SidebarNavItem } from '@/config/sidebar.config';
-import { getIcon } from '@/lib/icon-map';
 import { useCallback } from 'react';
+import { Modules } from '@aixellabs/shared/mongodb';
+import { modulesIconMap } from '@/config/sidebar.config';
+import { enumToTitleCase } from '@/helpers/string-helpers';
+import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
 
-export function NavMain({ items }: { items: SidebarNavItem[];}) {
+export function NavMain({ items }: { items: SidebarNavItem[] }) {
     const pathname = usePathname();
 
     // Memoize isItemActive to recalculate only when pathname or items change
@@ -44,20 +47,28 @@ export function NavMain({ items }: { items: SidebarNavItem[];}) {
 
     return (
         <SidebarGroup>
+            <SidebarMenuButton asChild isActive={pathname === DEFAULT_HOME_PAGE_ROUTE}>
+                <Link href={DEFAULT_HOME_PAGE_ROUTE}>
+                    <HomeIcon className="size-4 shrink-0" />
+                    <span className="group-data-[collapsible=icon]:hidden">Home</span>
+                </Link>
+            </SidebarMenuButton>
             <SidebarGroupLabel>Platform</SidebarGroupLabel>
             <SidebarMenu>
                 {items.map((item) => {
                     const itemActive = isItemActive(item);
-                    const Icon = item.icon ? getIcon(item.icon) : null;
+                    const Icon = modulesIconMap[item.title as Modules];
 
                     return (
                         <Collapsible key={item.title} asChild defaultOpen={itemActive} className="group/collapsible">
                             <SidebarMenuItem>
                                 <CollapsibleTrigger asChild>
-                                    <SidebarMenuButton tooltip={item.title} isActive={itemActive}>
-                                        {Icon && <Icon />}
-                                        <span>{item.title}</span>
-                                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                                    <SidebarMenuButton tooltip={enumToTitleCase(item.title)} isActive={itemActive}>
+                                        {Icon && <Icon className="size-4 shrink-0" />}
+                                        <Link href={item.url}>
+                                            <span>{enumToTitleCase(item.title)}</span>
+                                        </Link>
+                                        <ChevronRight className="ml-auto cursor-pointer transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[state=open]/collapsible:text-primary" />
                                     </SidebarMenuButton>
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
@@ -66,7 +77,7 @@ export function NavMain({ items }: { items: SidebarNavItem[];}) {
                                             <SidebarMenuSubItem key={subItem.title}>
                                                 <SidebarMenuSubButton asChild isActive={isSubItemActive(subItem.url)}>
                                                     <Link href={subItem.url}>
-                                                        <span>{subItem.title}</span>
+                                                        <span>{enumToTitleCase(subItem.title)}</span>
                                                     </Link>
                                                 </SidebarMenuSubButton>
                                             </SidebarMenuSubItem>

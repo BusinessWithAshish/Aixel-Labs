@@ -12,19 +12,24 @@ import {
     SidebarMenu,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { sidebarConfig } from '@/config/sidebar.config';
 import { getAllTenants } from '@/helpers/tenant-operations';
 import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
+import { generateSidebarConfig } from '@/helpers/sidebar-config-helpers';
 
 export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const session = await auth();
 
-    const tenants = session?.user?.isAdmin ? await getAllTenants() : [];
+    const isAdmin = session?.user?.isAdmin ?? false;
+    const moduleAccess = session?.user?.moduleAccess;
+
+    // Generate sidebar config based on user's access
+    const sidebarConfig = generateSidebarConfig(isAdmin, moduleAccess);
+
+    const tenants = isAdmin ? await getAllTenants() : [];
 
     const tenantsForSwitcher = tenants.map((tenant) => ({
         name: tenant.name,
-        logo: 'GalleryVerticalEnd' as const,
         url: getTenantRedirectUrl(tenant),
     }));
 
@@ -32,7 +37,7 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
         name: session?.user?.name || 'User',
         email: session?.user?.email || 'user@example.com',
         avatar: 'https://github.com/shadcn.png',
-        isAdmin: session?.user?.isAdmin ?? false,
+        isAdmin: isAdmin,
         tenantId: session?.user?.tenantId || '',
     };
 
