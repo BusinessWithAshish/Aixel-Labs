@@ -80,11 +80,11 @@ export const sidebarConfig: SidebarConfig = {
                 { title: VOICE_AGENT_SUB_MODULES.WEB_DIALER, url: VOICE_AGENT_SUB_MODULES.WEB_DIALER },
                 {
                     title: VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS,
-                    url: VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS,
+                    url: SubModuleUrls.INQUIRY_BOOKINGS,
                 },
                 {
                     title: VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS,
-                    url: VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS,
+                    url: SubModuleUrls.CUSTOM_AGENT_ANALYTICS,
                 },
             ],
         },
@@ -92,18 +92,18 @@ export const sidebarConfig: SidebarConfig = {
             title: Modules.MESSAGING,
             url: ModuleUrls.MESSAGING,
             items: [
-                { title: MESSAGING_SUB_MODULES.WHATSAPP, url: MESSAGING_SUB_MODULES.WHATSAPP },
-                { title: MESSAGING_SUB_MODULES.SMS, url: MESSAGING_SUB_MODULES.SMS },
+                { title: MESSAGING_SUB_MODULES.WHATSAPP, url: SubModuleUrls.WHATSAPP },
+                { title: MESSAGING_SUB_MODULES.SMS, url: SubModuleUrls.SMS },
             ],
         },
         {
             title: Modules.EMAIL,
             url: ModuleUrls.EMAIL,
             items: [
-                { title: EMAIL_SUB_MODULES.COLD_OUTREACH, url: EMAIL_SUB_MODULES.COLD_OUTREACH },
-                { title: EMAIL_SUB_MODULES.WARM_OUTREACH, url: EMAIL_SUB_MODULES.WARM_OUTREACH },
-                { title: EMAIL_SUB_MODULES.TEMPLATES, url: EMAIL_SUB_MODULES.TEMPLATES },
-                { title: EMAIL_SUB_MODULES.AI_REPLIES, url: EMAIL_SUB_MODULES.AI_REPLIES },
+                { title: EMAIL_SUB_MODULES.COLD_OUTREACH, url: SubModuleUrls.COLD_OUTREACH },
+                { title: EMAIL_SUB_MODULES.WARM_OUTREACH, url: SubModuleUrls.WARM_OUTREACH },
+                { title: EMAIL_SUB_MODULES.TEMPLATES, url: SubModuleUrls.TEMPLATES },
+                { title: EMAIL_SUB_MODULES.AI_REPLIES, url: SubModuleUrls.AI_REPLIES },
             ],
         },
     ],
