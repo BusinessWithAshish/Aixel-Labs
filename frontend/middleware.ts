@@ -31,10 +31,14 @@ export async function middleware(req: NextRequest) {
         }
     }
 
+    // Set the pathname header for use in server components
+    const response = NextResponse.next();
+    response.headers.set('x-pathname', req.nextUrl.pathname);
+
     // Has subdomain - continue (validation happens in layout)
     // Just pass the request through, don't rewrite
     // The layout will handle tenant validation
-    return NextResponse.next();
+    return response;
 }
 
 export const config = {

@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
 import '@/app/globals.css';
-import { validateAndGetTenant } from '@/helpers/validate-tenant';
-import { ExternalEmbed } from '@/components/layout/custom-demo-layout';
 import { RootLayoutUI } from '@/components/common/RootLayout';
-import NotFound from "@/app/not-found";
+import { ExternalEmbed } from '@/components/layout/custom-demo-layout';
+import { validateAndGetTenant } from '@/helpers/validate-tenant';
 
 export const metadata: Metadata = {
     title: process.env.NEXT_PUBLIC_APP_NAME || 'AixelLabs',
@@ -12,11 +11,6 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
     const currentTenantData = await validateAndGetTenant();
-
-    if (!currentTenantData) {
-        return <NotFound />;
-    }
-
     const redirectUrl = currentTenantData?.redirect_url as string | undefined;
 
     if (redirectUrl) {

@@ -8,6 +8,10 @@ type RootLayoutUIProps = {
     className?: string;
 };
 
+/**
+ * RootLayoutUI - Only for root layout (app/layout.tsx)
+ * Includes <html> and <body> tags
+ */
 export const RootLayoutUI = ({ children, className }: RootLayoutUIProps) => {
     return (
         <html lang="en" suppressHydrationWarning>
@@ -25,4 +29,12 @@ export const RootLayoutUI = ({ children, className }: RootLayoutUIProps) => {
             </body>
         </html>
     );
+};
+
+/**
+ * NestedLayoutWrapper - For nested layouts (public, protected, etc.)
+ * Does NOT include <html> and <body> tags to avoid hydration errors
+ */
+export const NestedLayoutWrapper = ({ children }: { children: React.ReactNode }) => {
+    return <>{children}</>;
 };
