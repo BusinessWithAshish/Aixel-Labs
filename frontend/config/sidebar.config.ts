@@ -6,7 +6,7 @@ import {
     Modules,
     VOICE_AGENT_SUB_MODULES,
 } from '@aixellabs/shared/mongodb';
-import {AudioWaveform, LucideIcon, Mail, MessageCircleMore, UsersRound} from "lucide-react";
+import { AudioWaveform, LucideIcon, Mail, MessageCircleMore, UsersRound } from 'lucide-react';
 
 export type SidebarNavItem = {
     title: string;
@@ -77,7 +77,10 @@ export const sidebarConfig: SidebarConfig = {
             title: Modules.VOICE_AGENT,
             url: ModuleUrls.VOICE_AGENT,
             items: [
-                { title: VOICE_AGENT_SUB_MODULES.WEB_DIALER, url: VOICE_AGENT_SUB_MODULES.WEB_DIALER },
+                {
+                    title: VOICE_AGENT_SUB_MODULES.WEB_DIALER,
+                    url: SubModuleUrls.WEB_DIALER,
+                },
                 {
                     title: VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS,
                     url: SubModuleUrls.INQUIRY_BOOKINGS,
