@@ -23,7 +23,7 @@ import {
     FieldLegend,
     FieldSet,
 } from '../../ui/field';
-import { enumToTitleCase, caseConverter } from '@/helpers/string-helpers';
+import { enumToTitleCase, getFieldSingularLabel } from '@/helpers/string-helpers';
 import { Textarea } from '../../ui/textarea';
 import { cn } from '@/lib/utils';
 import { ZodCheckboxField, ZodSelectField, ZodSwitchField, ZodSearchableMultiSelectField } from './ZodFieldComponents';
@@ -81,13 +81,19 @@ const getDefaultValue = (schema: ZodTypeAny): any => {
         );
     }
 
+    // Handle ZodArray - check if it has a default, otherwise return empty array
+    if (typeName === 'ZodArray') {
+        // For arrays, we want to return an empty array by default
+        // The user can add items using the "Add" button
+        return [];
+    }
+
     // Primitive defaults
     const defaultValueMap: Record<string, any> = {
         ZodString: '',
         ZodNumber: 0,
         ZodBoolean: false,
         ZodEnum: schema._def.values?.[0],
-        ZodArray: [],
     };
 
     return defaultValueMap[typeName] ?? '';
@@ -124,8 +130,14 @@ const ZodArrayField = ({ name, fieldInfo, description }: ZodFormFieldProps) => {
     const { control } = useFormContext();
     const { fields, append, remove } = useFieldArray({ control, name });
 
+    // Unwrap ZodDefault if present
+    let unwrappedFieldInfo = fieldInfo;
+    if (fieldInfo?._def?.typeName === 'ZodDefault') {
+        unwrappedFieldInfo = fieldInfo._def.innerType;
+    }
+
     const isRequired = !fieldInfo?.isOptional();
-    const elementSchema = fieldInfo?._def?.type;
+    const elementSchema = unwrappedFieldInfo?._def?.type;
     const elementTypeName = elementSchema?._def?.typeName;
     const { cleanDescription, metadata } = extractMetadata(description);
 
@@ -157,6 +169,19 @@ const ZodArrayField = ({ name, fieldInfo, description }: ZodFormFieldProps) => {
 
     // Handle array of objects
     if (elementTypeName === 'ZodObject') {
+        // Unwrap the element schema if it's wrapped in ZodDefault
+        let unwrappedElementSchema = elementSchema;
+        if (elementSchema?._def?.typeName === 'ZodDefault') {
+            unwrappedElementSchema = elementSchema._def.innerType;
+        }
+
+        const objectShape = unwrappedElementSchema?.shape;
+
+        // Safety check: ensure shape exists
+        if (!objectShape || Object.keys(objectShape).length === 0) {
+            return null;
+        }
+
         return (
             <FieldSet className="gap-4">
                 <FieldLegend variant="label">{generateFieldLabel(name)}</FieldLegend>
@@ -176,13 +201,18 @@ const ZodArrayField = ({ name, fieldInfo, description }: ZodFormFieldProps) => {
                             </CardHeader>
                             <CardContent>
                                 <FieldGroup className="gap-4">
-                                    {Object.entries(elementSchema.shape).map(([key, value]) => (
-                                        <ZodFormField
-                                            key={key}
-                                            name={`${name}.${index}.${key}`}
-                                            fieldInfo={value as ZodTypeAny}
-                                        />
-                                    ))}
+                                    {Object.entries(objectShape).map(([key, value]) => {
+                                        const fieldInfo = value as ZodTypeAny;
+                                        const fieldDescription = fieldInfo?.description;
+                                        return (
+                                            <ZodFormField
+                                                key={key}
+                                                name={`${name}.${index}.${key}`}
+                                                fieldInfo={fieldInfo}
+                                                description={fieldDescription}
+                                            />
+                                        );
+                                    })}
                                 </FieldGroup>
                             </CardContent>
                         </Card>
@@ -190,10 +220,10 @@ const ZodArrayField = ({ name, fieldInfo, description }: ZodFormFieldProps) => {
                     <Button
                         type="button"
                         variant="secondary"
-                        onClick={() => append(getDefaultValue(elementSchema))}
+                        onClick={() => append(getDefaultValue(unwrappedElementSchema))}
                         className="w-full"
                     >
-                        + Add {caseConverter(name.replace(/s$/, ''))}
+                        + Add {getFieldSingularLabel(name)}
                     </Button>
                 </FieldContent>
             </FieldSet>
@@ -260,13 +290,15 @@ const ZodDefaultField = ({ name, fieldInfo, description }: ZodFormFieldProps) =>
             return <ZodArrayField name={name} fieldInfo={fieldInfo} description={description} />;
 
         default:
-            return null;
+            // For other types (ZodString, ZodNumber, etc.), delegate to ZodFormField
+            // This ensures that fields with defaults still render correctly
+            return <ZodFormField name={name} fieldInfo={fieldInfo} description={description} isRequired={isRequired} />;
     }
 };
 
-const ZodFormField = ({ name, fieldInfo, isRequired: isRequiredProp }: ZodFormFieldProps) => {
+const ZodFormField = ({ name, fieldInfo, description, isRequired: isRequiredProp }: ZodFormFieldProps) => {
     const fieldType = fieldInfo?._def?.typeName;
-    const fieldDescription = fieldInfo?.description;
+    const fieldDescription = description ?? fieldInfo?.description;
     const innerType = fieldInfo?._def?.innerType;
     const { cleanDescription, metadata } = extractMetadata(fieldDescription);
     const isRequired = isRequiredProp ?? !fieldInfo?.isOptional();

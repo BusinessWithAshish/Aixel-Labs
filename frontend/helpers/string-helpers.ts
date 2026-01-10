@@ -42,7 +42,21 @@ const splitByCasing = (str: string): string[] => {
 // Convert any casing format to Title Case
 export const caseConverter = (str: string): string => {
     const words = splitByCasing(str);
-    return words
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ');
+    return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+};
+
+/**
+ * Extract the last part of a dotted field path and convert to singular title case
+ * Useful for generating "Add" button labels from field paths
+ *
+ * @example
+ * getFieldSingularLabel('socialAccounts') => 'Social Account'
+ * getFieldSingularLabel('users.0.posts') => 'Post'
+ * getFieldSingularLabel('items.5.subItems') => 'Sub Item'
+ */
+export const getFieldSingularLabel = (fieldPath: string): string => {
+    const parts = fieldPath.split('.');
+    const lastPart = parts[parts.length - 1];
+    const singular = lastPart.replace(/s$/, '');
+    return caseConverter(singular);
 };
