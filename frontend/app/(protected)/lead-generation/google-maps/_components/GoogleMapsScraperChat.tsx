@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { ChatInterface } from './ChatInterface';
+import { ChatInterface } from '@/components/common/ChatInterface';
 import { cn } from '@/lib/utils';
 import { GMAPS_SCRAPE_REQUEST_SCHEMA, type GMAPS_SCRAPE_REQUEST } from '@aixellabs/shared/common/apis';
 

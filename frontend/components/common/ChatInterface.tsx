@@ -3,7 +3,7 @@
 import type React from 'react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { AIInput } from '@/components/ui/ai-input';
@@ -364,7 +364,7 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
             <ChatHeader assistantName={assistantName} isComplete={isComplete} onReset={handleReset} />
 
             <CardContent className="flex flex-col h-full">
-                <ScrollArea ref={scrollRef} className="flex-1 p-4">
+                <ScrollArea ref={scrollRef} className="flex-1">
                     <div className="space-y-4">
                         {messages.length === 0 && <EmptyState assistantName={assistantName} message={emptyStateMessage} />}
 
@@ -396,7 +396,9 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
                         )}
                     </div>
                 </ScrollArea>
+            </CardContent>
 
+            <CardFooter>
                 <ChatInputArea
                     inputValue={inputValue}
                     setInputValue={setInputValue}
@@ -405,7 +407,7 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
                     isLoading={isLoading}
                     disabled={isLoading}
                 />
-            </CardContent>
+            </CardFooter>
         </Card>
     );
 }
@@ -514,18 +516,16 @@ type ChatInputAreaProps = {
 
 function ChatInputArea({ inputValue, setInputValue, handleSubmit, placeholder, isLoading, disabled }: ChatInputAreaProps) {
     return (
-        <div className="p-4 border-t border-border bg-muted/20">
-            <AIInput
-                variant="textarea"
-                value={inputValue}
-                onChange={setInputValue}
-                onSubmit={handleSubmit}
-                placeholder={placeholder}
-                disabled={disabled}
-                isLoading={isLoading}
-                helperText="Press ⌘/Ctrl + Enter to send"
-            />
-        </div>
+        <AIInput
+            variant="textarea"
+            value={inputValue}
+            onChange={setInputValue}
+            onSubmit={handleSubmit}
+            placeholder={placeholder}
+            disabled={disabled}
+            isLoading={isLoading}
+            helperText="Press ⌘/Ctrl + Enter to send"
+        />
     );
 }
 

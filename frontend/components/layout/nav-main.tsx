@@ -65,7 +65,7 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                                 <CollapsibleTrigger asChild>
                                     <SidebarMenuButton tooltip={enumToTitleCase(item.title)} isActive={itemActive}>
                                         {Icon && <Icon className="size-4 shrink-0" />}
-                                        <Link href={item.url}>
+                                        <Link className="hover:text-primary transition-colors duration-200" href={item.url}>
                                             <span>{enumToTitleCase(item.title)}</span>
                                         </Link>
                                         <ChevronRight className="ml-auto cursor-pointer transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[state=open]/collapsible:text-primary" />
@@ -77,7 +77,9 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                                             <SidebarMenuSubItem key={subItem.title}>
                                                 <SidebarMenuSubButton asChild isActive={isSubItemActive(subItem.url)}>
                                                     <Link href={subItem.url}>
-                                                        <span>{enumToTitleCase(subItem.title)}</span>
+                                                        <span className="hover:text-primary transition-colors duration-200">
+                                                            {enumToTitleCase(subItem.title)}
+                                                        </span>
                                                     </Link>
                                                 </SidebarMenuSubButton>
                                             </SidebarMenuSubItem>
