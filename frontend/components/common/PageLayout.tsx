@@ -26,7 +26,7 @@ export default function PageLayout(props: PageLayoutProps) {
     }, [pathname]);
 
     return (
-        <SidebarInset className="p-2 rounded-md space-y-2 h-dvh">
+        <SidebarInset className="p-2 rounded-md gap-4 overflow-hidden">
             <header className="z-10 sticky p-3 backdrop-blur-lg rounded-md flex justify-start items-center border shadow-md drop-shadow-md w-full top-2 h-12 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 shrink-0">
                 <SidebarTrigger />
                 {isBackButtonVisible && <ChevronLeft className="w-4 mx-2 cursor-pointer h-4" onClick={handleGoBack} />}
