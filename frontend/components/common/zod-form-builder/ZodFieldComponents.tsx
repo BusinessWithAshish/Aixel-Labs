@@ -20,42 +20,44 @@ type ZodCheckboxFieldProps = BaseZodFieldProps & {
     onChange?: (value: boolean) => void;
 };
 
-export const ZodCheckboxField = (props: ZodCheckboxFieldProps) => {
-    const { name, description, value, invalid, errors, onChange, required } = props;
-    return (
-        <Field orientation="horizontal" data-invalid={invalid}>
-            <FieldContent>
-                <FieldLabel required={required} htmlFor={name}>
-                    {generateFieldLabel(name)}
-                </FieldLabel>
-                {description && <FieldDescription>{description}</FieldDescription>}
-            </FieldContent>
-            <Checkbox id={name} name={name} checked={value as boolean} onCheckedChange={onChange} />
-            {invalid && errors && <FieldError errors={[errors]} />}
-        </Field>
-    );
-};
+export const ZodCheckboxField = ({
+    name,
+    description,
+    value,
+    invalid,
+    errors,
+    onChange,
+    required,
+}: ZodCheckboxFieldProps) => (
+    <Field orientation="horizontal" data-invalid={invalid}>
+        <FieldContent>
+            <FieldLabel required={required} htmlFor={name}>
+                {generateFieldLabel(name)}
+            </FieldLabel>
+            {description && <FieldDescription>{description}</FieldDescription>}
+        </FieldContent>
+        <Checkbox id={name} name={name} checked={value} onCheckedChange={onChange} />
+        {invalid && errors && <FieldError errors={[errors]} />}
+    </Field>
+);
 
 type ZodSwitchFieldProps = BaseZodFieldProps & {
     value?: boolean;
     onChange?: (value: boolean) => void;
 };
 
-export const ZodSwitchField = (props: ZodSwitchFieldProps) => {
-    const { name, description, value, invalid, errors, onChange, required } = props;
-    return (
-        <Field orientation="horizontal" data-invalid={invalid}>
-            <FieldContent>
-                <FieldLabel required={required} htmlFor={name}>
-                    {generateFieldLabel(name)}
-                </FieldLabel>
-                {description && <FieldDescription>{description}</FieldDescription>}
-            </FieldContent>
-            <Switch id={name} name={name} checked={value as boolean} onCheckedChange={onChange} />
-            {invalid && errors && <FieldError errors={[errors]} />}
-        </Field>
-    );
-};
+export const ZodSwitchField = ({ name, description, value, invalid, errors, onChange, required }: ZodSwitchFieldProps) => (
+    <Field orientation="horizontal" data-invalid={invalid}>
+        <FieldContent>
+            <FieldLabel required={required} htmlFor={name}>
+                {generateFieldLabel(name)}
+            </FieldLabel>
+            {description && <FieldDescription>{description}</FieldDescription>}
+        </FieldContent>
+        <Switch id={name} name={name} checked={value} onCheckedChange={onChange} />
+        {invalid && errors && <FieldError errors={[errors]} />}
+    </Field>
+);
 
 type ZodSelectFieldProps = BaseZodFieldProps & {
     value?: string;
@@ -63,8 +65,16 @@ type ZodSelectFieldProps = BaseZodFieldProps & {
     options: string[];
 };
 
-export const ZodSelectField = (props: ZodSelectFieldProps) => {
-    const { name, description, value, invalid, errors, onChange, options, required } = props;
+export const ZodSelectField = ({
+    name,
+    description,
+    value,
+    invalid,
+    errors,
+    onChange,
+    options,
+    required,
+}: ZodSelectFieldProps) => {
     const fieldLabel = generateFieldLabel(name);
     return (
         <Field orientation="horizontal" data-invalid={invalid}>
@@ -74,12 +84,12 @@ export const ZodSelectField = (props: ZodSelectFieldProps) => {
                 </FieldLabel>
                 {description && <FieldDescription>{description}</FieldDescription>}
             </FieldContent>
-            <Select name={name} value={value as string} onValueChange={onChange}>
+            <Select name={name} value={value} onValueChange={onChange}>
                 <SelectTrigger>
                     <SelectValue placeholder={`Select ${fieldLabel.toLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent>
-                    {options.map((option: string) => (
+                    {options.map((option) => (
                         <SelectItem key={option} value={option.toLowerCase()}>
                             {option}
                         </SelectItem>
@@ -97,18 +107,24 @@ type ZodSearchableMultiSelectFieldProps = BaseZodFieldProps & {
     options: OptionType[];
 };
 
-export const ZodSearchableMultiSelectField = (props: ZodSearchableMultiSelectFieldProps) => {
-    const { name, description, values, invalid, errors, onChange, options, required } = props;
-    return (
-        <Field orientation="horizontal" data-invalid={invalid}>
-            <FieldContent>
-                <FieldLabel required={required} htmlFor={name}>
-                    {generateFieldLabel(name)}
-                </FieldLabel>
-                {description && <FieldDescription>{description}</FieldDescription>}
-            </FieldContent>
-            <SearchableMultiSelect options={options} values={values} onChange={onChange} />
-            {invalid && errors && <FieldError errors={[errors]} />}
-        </Field>
-    );
-};
+export const ZodSearchableMultiSelectField = ({
+    name,
+    description,
+    values,
+    invalid,
+    errors,
+    onChange,
+    options,
+    required,
+}: ZodSearchableMultiSelectFieldProps) => (
+    <Field orientation="horizontal" data-invalid={invalid}>
+        <FieldContent>
+            <FieldLabel required={required} htmlFor={name}>
+                {generateFieldLabel(name)}
+            </FieldLabel>
+            {description && <FieldDescription>{description}</FieldDescription>}
+        </FieldContent>
+        <SearchableMultiSelect options={options} values={values} onChange={onChange} />
+        {invalid && errors && <FieldError errors={[errors]} />}
+    </Field>
+);
