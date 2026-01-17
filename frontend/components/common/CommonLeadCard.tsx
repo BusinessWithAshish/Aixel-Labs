@@ -1,16 +1,18 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import { ExternalLink, Phone, Star, MessageSquare, MapPin, Copy, Trash2 } from 'lucide-react';
+import { Phone, Star, MessageSquare, Copy, Trash2, Globe } from 'lucide-react';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common/apis';
 import { copyPhoneNumber } from '@/lib/clipboard';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import { hasWebsite, hasPhone, getLeadType, type LeadType } from './lead-utils';
+import ConditionalRendering from './ConditionalRendering';
+import { Else, If } from './ConditionalRendering';
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
 
@@ -38,12 +40,6 @@ export const CommonLeadCard = ({
     const computedLeadType = leadType || getLeadType(lead);
     const [isPhoneHovered, setIsPhoneHovered] = useState(false);
 
-    const handleWebsiteClick = () => {
-        if (hasWebsite(lead)) {
-            window.open(lead.website ?? '', '_blank', 'noopener,noreferrer');
-        }
-    };
-
     const handleMapsClick = () => {
         if (lead.gmapsUrl) {
             window.open(lead.gmapsUrl, '_blank', 'noopener,noreferrer');
@@ -59,100 +55,93 @@ export const CommonLeadCard = ({
     return (
         <Card
             className={cn(
-                'transition-all duration-200 hover:shadow-md relative',
+                'transition-shadow hover:shadow-lg relative',
+                isSelected && 'ring-2 ring-primary',
                 computedLeadType.color,
-                isSelected && 'ring-2 ring-blue-500',
                 className,
             )}
         >
-            {showCheckbox && onSelect && (
-                <div className="absolute top-3 left-3 z-10">
-                    <Checkbox checked={isSelected} onCheckedChange={onSelect} />
-                </div>
-            )}
             {onDelete && (
-                <div className="absolute top-3 right-3 z-10">
+                <div className="absolute top-4 right-4 z-10">
                     <Button
                         onClick={onDelete}
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 rounded-full hover:bg-red-100 hover:text-red-600"
+                        className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive"
                         title="Delete lead"
                     >
                         <Trash2 className="w-4 h-4" />
                     </Button>
                 </div>
             )}
-            <CardHeader className={cn('pb-3', showCheckbox && 'pl-10', onDelete && 'pr-12')}>
-                <div className="flex items-start overflow-hidden justify-between gap-2">
-                    <div className="w-3/5 truncate text-ellipsis">
-                        <CardTitle className="text-lg font-semibold" title={lead.name ?? DEFAULT_DISPLAY_VALUE}>
-                            {lead.name ?? DEFAULT_DISPLAY_VALUE}
-                        </CardTitle>
-                        <CardDescription className="flex items-center gap-1.5 sm:gap-2 mt-1.5 text-xs sm:text-sm flex-wrap">
-                            <div className="flex items-center gap-1 shrink-0">
-                                <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-500 fill-current" />
-                                <span title={lead.overAllRating ?? DEFAULT_DISPLAY_VALUE} className="font-medium">
-                                    {lead.overAllRating ?? DEFAULT_DISPLAY_VALUE}
-                                </span>
-                            </div>
-                            <span className="text-gray-400 shrink-0">•</span>
-                            <div className="flex items-center gap-1 min-w-0">
-                                <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 shrink-0" />
-                                <span title={lead.numberOfReviews ?? DEFAULT_DISPLAY_VALUE} className="truncate">
-                                    {lead.numberOfReviews ?? DEFAULT_DISPLAY_VALUE} reviews
-                                </span>
-                            </div>
-                        </CardDescription>
+
+            <CardHeader className="space-y-2 overflow-hidden">
+                <CardTitle
+                    className="flex w-full items-center gap-2 text-wrap wrap-break-word"
+                    title={lead.name ?? DEFAULT_DISPLAY_VALUE}
+                >
+                    {showCheckbox && onSelect && <Checkbox checked={isSelected} onCheckedChange={onSelect} />}
+                    <span className="text-lg text-foreground font-semibold" title={lead.name ?? DEFAULT_DISPLAY_VALUE}>
+                        {lead.name ?? DEFAULT_DISPLAY_VALUE}
+                    </span>
+                </CardTitle>
+                <CardDescription className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 dark:text-yellow-400 dark:fill-yellow-400" />
+                        <span className="font-medium">{lead.overAllRating ?? DEFAULT_DISPLAY_VALUE}/5.0</span>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                            onClick={handleMapsClick}
-                            variant="ghost"
-                            size="icon"
-                            className="group h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-all duration-300 ease-in-out hover:scale-110 active:scale-95 border border-blue-200 hover:border-blue-300 hover:shadow-md"
-                            title="Open in Google Maps"
-                            aria-label="Open location in Google Maps"
-                        >
-                            <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 group-hover:text-blue-700 transition-colors duration-300" />
-                        </Button>
-                        <Badge variant="secondary" className="text-xs px-2 py-1">
-                            {computedLeadType.type}
-                        </Badge>
+                    <div className="flex items-center gap-1">
+                        <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                        <span>{lead.numberOfReviews ?? DEFAULT_DISPLAY_VALUE} reviews</span>
                     </div>
-                </div>
+                </CardDescription>
+
+                <CardAction className="flex items-center gap-2">
+                    <Button
+                        onClick={handleMapsClick}
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full"
+                        title="Open in Google Maps"
+                        aria-label="Open location in Google Maps"
+                    >
+                        <Image src="/google-maps.svg" alt="Google Maps" width={20} height={20} />
+                    </Button>
+                </CardAction>
             </CardHeader>
 
-            <CardContent className="pt-0 px-4 sm:px-6 pb-4 sm:pb-6 space-y-2.5 sm:space-y-3 flex-1">
-                <div className="flex items-start gap-2 sm:gap-3">
-                    <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1 overflow-hidden">
-                        {hasWebsite(lead) ? (
-                            <button
-                                onClick={handleWebsiteClick}
-                                className="text-blue-600 hover:text-blue-800 hover:underline truncate block w-full text-left text-xs sm:text-sm"
-                                title={lead.website ?? DEFAULT_DISPLAY_VALUE}
+            <CardContent className="space-y-3 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <ConditionalRendering>
+                        <If condition={hasWebsite(lead)}>
+                            <a
+                                href={lead.website ?? ''}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-foreground truncate text-sm hover:text-primary hover:underline"
                             >
-                                {lead.website ?? DEFAULT_DISPLAY_VALUE}
-                            </button>
-                        ) : (
-                            <span className="text-gray-500 italic text-xs sm:text-sm">No website</span>
-                        )}
-                    </div>
+                                {lead.website ?? ''}
+                            </a>
+                        </If>
+                        <Else>
+                            <span className="text-muted-foreground italic text-sm">No website</span>
+                        </Else>
+                    </ConditionalRendering>
                 </div>
 
                 <div
-                    className="flex items-start gap-2 sm:gap-3 group/phone"
+                    className="flex items-center gap-3 group/phone"
                     onMouseEnter={() => setIsPhoneHovered(true)}
                     onMouseLeave={() => setIsPhoneHovered(false)}
                 >
-                    <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1 overflow-hidden flex items-center gap-2">
-                        {hasPhone(lead) ? (
-                            <>
+                    <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div className="min-w-0 flex-1 flex items-center gap-2">
+                        <ConditionalRendering>
+                            <If condition={hasPhone(lead)}>
                                 <a
                                     href={`tel:${lead.phoneNumber}`}
-                                    className="text-gray-700 hover:text-gray-900 hover:underline truncate block text-xs sm:text-sm"
+                                    className="text-foreground hover:text-primary hover:underline truncate text-sm"
                                     title={lead.phoneNumber ?? DEFAULT_DISPLAY_VALUE}
                                 >
                                     {lead.phoneNumber ?? DEFAULT_DISPLAY_VALUE}
@@ -162,23 +151,24 @@ export const CommonLeadCard = ({
                                     variant="ghost"
                                     size="icon"
                                     className={cn(
-                                        'h-6 w-6 rounded-md hover:bg-gray-100 active:bg-gray-200 transition-all duration-200 shrink-0',
+                                        'h-6 w-6 rounded-md hover:bg-muted transition-all shrink-0',
                                         'opacity-100 sm:opacity-0 sm:group-hover/phone:opacity-100',
                                         isPhoneHovered && 'sm:scale-110',
                                     )}
                                     title="Copy phone number"
                                     aria-label="Copy phone number to clipboard"
                                 >
-                                    <Copy className="w-3.5 h-3.5 text-gray-600 hover:text-gray-900" />
+                                    <Copy className="w-3.5 h-3.5" />
                                 </Button>
-                            </>
-                        ) : (
-                            <span className="text-gray-500 italic text-xs sm:text-sm">No phone number</span>
-                        )}
+                            </If>
+                            <Else>
+                                <span className="text-muted-foreground italic text-sm">No phone number</span>
+                            </Else>
+                        </ConditionalRendering>
                     </div>
                 </div>
 
-                {actions && <div className="pt-2 border-t flex gap-2">{actions}</div>}
+                {actions && <div className="border-t">{actions}</div>}
             </CardContent>
         </Card>
     );

@@ -7,9 +7,9 @@ export function NoDataFound() {
     const router = useRouter();
 
     return (
-        <div className="flex items-center justify-center p-6">
+        <div className="flex h-full w-full flex-col gap-2 items-center justify-center">
             <p className="text-muted-foreground">No data found.</p>
-            <Button variant="outline" onClick={() => router.back()}>
+            <Button onClick={() => router.back()}>
                 Go back
             </Button>
         </div>

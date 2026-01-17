@@ -47,7 +47,7 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
 
     return (
         <SidebarGroup>
-            <SidebarMenuButton asChild isActive={pathname === DEFAULT_HOME_PAGE_ROUTE}>
+            <SidebarMenuButton className='cursor-pointer hover:text-primary' asChild isActive={pathname === DEFAULT_HOME_PAGE_ROUTE}>
                 <Link href={DEFAULT_HOME_PAGE_ROUTE}>
                     <HomeIcon className="size-4 shrink-0" />
                     <span className="group-data-[collapsible=icon]:hidden">Home</span>
@@ -63,7 +63,7 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                         <Collapsible key={item.title} asChild defaultOpen={itemActive} className="group/collapsible">
                             <SidebarMenuItem>
                                 <CollapsibleTrigger asChild>
-                                    <SidebarMenuButton tooltip={enumToTitleCase(item.title)} isActive={itemActive}>
+                                    <SidebarMenuButton className='cursor-pointer' tooltip={enumToTitleCase(item.title)} isActive={itemActive}>
                                         {Icon && <Icon className="size-4 shrink-0" />}
                                         <Link className="hover:text-primary transition-colors duration-200" href={item.url}>
                                             <span>{enumToTitleCase(item.title)}</span>

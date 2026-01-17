@@ -1,4 +1,5 @@
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common/apis';
+import { LeadSource } from '@aixellabs/shared/mongodb';
 
 export type SortKey = 'rating' | 'reviews';
 export type SortDirection = 'asc' | 'desc';
@@ -12,8 +13,25 @@ export type CategorizedLeads = {
 
 export type LeadType = {
     type: 'Hot Lead' | 'Warm Lead' | 'Cold Lead' | 'Unknown';
+    badgeColor: string;
     color: string;
     category: 'hotLeads' | 'warmLeads' | 'coldLeads';
+};
+
+export type LeadSourceType = {
+    color: string;
+    iconUrl: string;
+};
+
+export const LEAD_SOURCE_TYPES: Record<LeadSource, LeadSourceType> = {
+    [LeadSource.GOOGLE_MAPS]: {
+        color: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-700/80',
+        iconUrl: '/google-maps-icon.svg' 
+    },
+    [LeadSource.INSTAGRAM]: {
+        color: 'bg-pink-50 dark:bg-pink-950/30 border-pink-200 dark:border-pink-700/80',
+        iconUrl: '/instagram-icon.svg' 
+    },
 };
 
 const extractNumericValue = (value: string | null, isRating: boolean): number => {
@@ -121,7 +139,8 @@ export const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
     if (!hasProperWebsite && hasPhoneNumber) {
         return {
             type: 'Hot Lead',
-            color: 'bg-green-50 border-green-200',
+            color: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-700/80',
+            badgeColor: 'bg-green-50 dark:bg-green-950/30 dark:text-green-200 border-green-200 text-green-950',
             category: 'hotLeads',
         };
     }
@@ -130,7 +149,8 @@ export const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
     if (hasProperWebsite || hasSocialMediaProfile) {
         return {
             type: 'Warm Lead',
-            color: 'bg-amber-50 border-amber-200',
+            color: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-700/80',
+            badgeColor: 'bg-amber-50 dark:bg-amber-950/30 dark:text-amber-200 border-amber-200 text-amber-950',
             category: 'warmLeads',
         };
     }
@@ -138,7 +158,8 @@ export const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
     // Cold Lead: Everything else (no website, no social media, no phone OR social media but no phone)
     return {
         type: 'Cold Lead',
-        color: 'bg-gray-50 border-gray-200',
+        color: 'bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-700/80',
+        badgeColor: 'bg-slate-50 dark:bg-slate-950/30 dark:text-slate-200 border-slate-200 text-slate-950',
         category: 'coldLeads',
     };
 };

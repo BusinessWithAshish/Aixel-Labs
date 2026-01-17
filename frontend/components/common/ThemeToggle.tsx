@@ -31,7 +31,7 @@ export const ThemeToggle = () => {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <SidebarMenuButton tooltip="Toggle theme">
+                <SidebarMenuButton className='cursor-pointer hover:text-primary' tooltip="Toggle theme">
                     {getIcon()}
                     <span className="group-data-[collapsible=icon]:hidden">Toggle theme</span>
                 </SidebarMenuButton>
