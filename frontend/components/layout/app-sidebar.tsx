@@ -38,13 +38,14 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
         email: session?.user?.email || 'user@example.com',
         avatar: 'https://github.com/shadcn.png',
         isAdmin: isAdmin,
+        tenantName: session?.user?.tenantName || '',
         tenantId: session?.user?.tenantId || '',
     };
 
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
-                <TenantSwitcher tenants={tenantsForSwitcher} isAdmin={user.isAdmin} currentTenantName={user.tenantId} />
+                <TenantSwitcher tenants={tenantsForSwitcher} isAdmin={user.isAdmin} currentTenantName={user.tenantName.toUpperCase().trim()} />
             </SidebarHeader>
             <SidebarContent>
                 <NavMain items={sidebarConfig.navMain} />

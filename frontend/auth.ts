@@ -27,6 +27,7 @@ declare module 'next-auth' {
         name?: string;
         isAdmin: boolean;
         tenantId: string;
+        tenantName: string;
         moduleAccess?: ModuleAccess;
     }
 
@@ -37,6 +38,7 @@ declare module 'next-auth' {
             name?: string;
             isAdmin: boolean;
             tenantId: string;
+            tenantName: string;
             moduleAccess?: ModuleAccess;
         } & DefaultSession['user'];
     }
@@ -108,6 +110,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         name: user.name,
                         isAdmin: user.isAdmin,
                         tenantId: tenantId, // Return the tenant name as string for the session
+                        tenantName: tenant.name,
                         moduleAccess: user.moduleAccess,
                     };
                 } catch (error) {
@@ -137,10 +140,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             if (user) {
               token.id = user.id;
               token.tenantId = user.tenantId;
+              token.tenantName = user.tenantName;
             }
         
             // IMPORTANT PART: Re-fetch the latest user from DB
             const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
+            const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
         
             const freshUser = await usersCollection.findOne({
               _id: new MongoObjectId(token.id as string),
@@ -151,7 +156,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               token.name = freshUser.name;
               token.isAdmin = freshUser.isAdmin;
               token.moduleAccess = freshUser.moduleAccess;
-              token.tenantId = freshUser.tenantId.toString();
+              
+              // Fetch the tenant to get the tenant name
+              const tenant = await tenantsCollection.findOne({
+                _id: freshUser.tenantId,
+              });
+              
+              if (tenant) {
+                token.tenantId = tenant.name; // Store tenant name as tenantId for consistency
+                token.tenantName = tenant.name;
+              }
             }
         
             return token;
@@ -164,6 +178,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 session.user.name = token.name as string | undefined;
                 session.user.isAdmin = token.isAdmin as boolean;
                 session.user.tenantId = token.tenantId as string;
+                session.user.tenantName = token.tenantName as string
                 session.user.moduleAccess = token.moduleAccess as ModuleAccess | undefined;
             }
             return session;
