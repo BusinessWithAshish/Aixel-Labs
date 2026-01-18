@@ -1,7 +1,7 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { SearchableMultiSelect } from '@/components/ui/searchable-multi-select';
-import { OptionType } from '@/components/ui/searchable-select';
+import { SearchableSelect, OptionType } from '@/components/ui/searchable-select';
 import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { FieldError as ReactHookFormFieldError } from 'react-hook-form';
@@ -96,6 +96,42 @@ export const ZodSelectField = ({
                     ))}
                 </SelectContent>
             </Select>
+            {invalid && errors && <FieldError errors={[errors]} />}
+        </Field>
+    );
+};
+
+type ZodSearchableSelectFieldProps = BaseZodFieldProps & {
+    value?: string;
+    onChange?: (value: string) => void;
+    options: OptionType[];
+};
+
+export const ZodSearchableSelectField = ({
+    name,
+    description,
+    value,
+    invalid,
+    errors,
+    onChange,
+    options,
+    required,
+}: ZodSearchableSelectFieldProps) => {
+    const fieldLabel = generateFieldLabel(name);
+    return (
+        <Field orientation="horizontal" data-invalid={invalid}>
+            <FieldContent>
+                <FieldLabel required={required} htmlFor={name}>
+                    {fieldLabel}
+                </FieldLabel>
+                {description && <FieldDescription>{description}</FieldDescription>}
+            </FieldContent>
+            <SearchableSelect
+                options={options}
+                value={value}
+                onChange={onChange}
+                placeholder={`Select ${fieldLabel.toLowerCase()}`}
+            />
             {invalid && errors && <FieldError errors={[errors]} />}
         </Field>
     );

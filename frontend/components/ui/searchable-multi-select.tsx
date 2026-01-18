@@ -34,7 +34,7 @@ export function SearchableMultiSelect({
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger className="sm:min-w-xs cursor-pointer max-w-md" asChild>
+            <PopoverTrigger className="cursor-pointer w-md" asChild>
                 <Button
                     variant="outline"
                     disabled={disabled}
@@ -54,7 +54,6 @@ export function SearchableMultiSelect({
                                                 e.stopPropagation();
                                                 onChange?.((values || []).filter((v) => v !== option.value));
                                             }}
-                                            variant="outline"
                                             className="cursor-pointer "
                                             key={option.value}
                                         >
