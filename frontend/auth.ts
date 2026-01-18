@@ -1,6 +1,6 @@
 import NextAuth, { DefaultSession, CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { getCollection, MongoCollections, type UserDoc, type TenantDoc, type ModuleAccess } from '@aixellabs/shared/mongodb';
+import { getCollection, MongoCollections, type UserDoc, type TenantDoc, type ModuleAccess, MongoObjectId } from '@aixellabs/shared/mongodb';
 import { z } from 'zod';
 
 // Custom error classes for specific error types
@@ -133,14 +133,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
     callbacks: {
         async jwt({ token, user }) {
+            // On first sign-in, store data
             if (user) {
-                token.id = user.id;
-                token.email = user.email;
-                token.name = user.name;
-                token.isAdmin = user.isAdmin;
-                token.tenantId = user.tenantId;
-                token.moduleAccess = user.moduleAccess;
+              token.id = user.id;
+              token.tenantId = user.tenantId;
             }
+        
+            // IMPORTANT PART: Re-fetch the latest user from DB
+            const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
+        
+            const freshUser = await usersCollection.findOne({
+              _id: new MongoObjectId(user.id),
+            });
+        
+            if (freshUser) {
+              token.email = freshUser.email;
+              token.name = freshUser.name;
+              token.isAdmin = freshUser.isAdmin;
+              token.moduleAccess = freshUser.moduleAccess;
+              token.tenantId = freshUser.tenantId.toString();
+            }
+        
             return token;
         },
 
