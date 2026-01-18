@@ -143,7 +143,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
         
             const freshUser = await usersCollection.findOne({
-              _id: new MongoObjectId(user.id),
+              _id: new MongoObjectId(token.id as string),
             });
         
             if (freshUser) {
