@@ -26,7 +26,6 @@ type SingleBrowserResult<T> = {
 const processSingleBrowser = async <T>(
   urlItems: string[],
   browserIndex: number,
-  batchNumber: number,
   scrapingFunction: (url: string, page: Page) => Promise<T>,
   res: Response | null = null
 ): Promise<SingleBrowserResult<T>> => {
@@ -37,6 +36,7 @@ const processSingleBrowser = async <T>(
 
     const browserOptions = await getBrowserOptions();
     browser = await puppeteer.launch(browserOptions);
+    console.log(`\t\t\t Launching browser ${browserIndex} with ${urlItems.length} URLs`);
 
     if (!browser) {
       return {
@@ -61,19 +61,27 @@ const processSingleBrowser = async <T>(
 
           const scrapeData = await scrapingFunction(url, page);
 
-          return { success: true, data: scrapeData, url };
+          console.log(`\t\t\t\t [Browser ${browserIndex} Page ${pageIndex + 1}] scraped successfully`);
+
+          return { 
+            success: true, 
+            data: scrapeData, 
+            url 
+          };
         } catch (pageScrapeError) {
           const errorMessage =
             pageScrapeError instanceof Error
               ? pageScrapeError.message
               : String(pageScrapeError);
 
+              console.log(`\t\t\t\t [Browser ${browserIndex} Page ${pageIndex + 1}] had error: ${errorMessage}`);
+
+              const finalErrorMessage = `Page had error for this url ${url} at Browser ${browserIndex} for page ${pageIndex + 1} : ${errorMessage}`;
+
           return {
             success: false,
             url,
-            error: `Page had error for this url ${url} at Browser ${browserIndex} for page ${
-              pageIndex + 1
-            } : ${errorMessage}`,
+            error: finalErrorMessage,
           };
         }
       }
@@ -92,11 +100,7 @@ const processSingleBrowser = async <T>(
         : String(browserScrapeError);
 
     return {
-      results: urlItems.map((u) => ({
-        success: false,
-        url: u,
-        error: `Browser ${browserIndex} failed before processing url ${u}: ${errorMessage}`,
-      })),
+      results: [],
       error: errorMessage,
       browserIndex,
     };
@@ -136,6 +140,9 @@ const processBatchOfBrowsers = async <T>(
   res: Response | null = null
 ): Promise<SingleBrowserResult<T>[]> => {
 
+
+  console.log(`\t\t Starting Batch ${batchNumber} with ${urlItems.length} URLs`);
+
   const browserPagesBatches: string[][] = [];
   for (let i = 0; i < urlItems.length; i += MAX_PAGES_PER_BROWSER) {
     browserPagesBatches.push(urlItems.slice(i, i + MAX_PAGES_PER_BROWSER));
@@ -145,18 +152,19 @@ const processBatchOfBrowsers = async <T>(
     processSingleBrowser(
       batchUrls,
       index + 1,
-      batchNumber,
       scrapingFunction,
       res
     )
   );
 
   const browserResults = await Promise.all(browserPromises);
-  const flattenedBrowserResults = browserResults.flat();
+  const flattenedBrowserBatchResults = browserResults.flat();
 
+  console.log('\n\t\t🟠 Waiting for 10 seconds before starting the next batch to avoid rate limiting...');
   await new Promise((resolve) => setTimeout(resolve, 10000));
+  console.log('\t\t🟠 10 seconds passed, starting the next batch...');
 
-  return flattenedBrowserResults;
+  return flattenedBrowserBatchResults;
 };
 
 type TBrowserBatchHandlerReturn<T> = {
@@ -176,12 +184,17 @@ export const BrowserBatchHandler = async <T>(
   res: Response | null = null
 ): Promise<TBrowserBatchHandlerReturn<T>> => {
   const startTime = Date.now();
+  console.log('\n\n----- STARTING SCRAPING PROCESS -----', new Date(startTime).toISOString());
 
   try {
+    console.log(`\t🟡 Starting to scrape ${urlItems.length} URLs`);
     const batches: string[][] = [];
     for (let i = 0; i < urlItems.length; i += TOTAL_CONCURRENT_URLS) {
-      batches.push(urlItems.slice(i, i + TOTAL_CONCURRENT_URLS));
+      const singleBatch = urlItems.slice(i, i + TOTAL_CONCURRENT_URLS);
+      console.log(`\t\t Batch ${batches.length + 1}: ${singleBatch.length} URLs`);
+      batches.push(singleBatch);
     }
+    console.log(`\t🟡 Total ${batches.length} batches`);
 
     const aggregatedResults: T[] = [];
     const aggregatedErrors: string[] = [];
@@ -190,6 +203,7 @@ export const BrowserBatchHandler = async <T>(
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       try {
+        console.log('\n\t🟡 Processing browser batch:', batchIndex + 1, '/', batches.length);
         const currentBatchResults = await processBatchOfBrowsers(
           batches[batchIndex],
           batchIndex + 1,
@@ -213,17 +227,27 @@ export const BrowserBatchHandler = async <T>(
           });
         });
       } catch (batchError) {
-        const batchErrorMessage = `Batch ${batchIndex + 1} processing failed: ${
+        
+        const batchErrorMessage = `Browser Batch failed: ${batchIndex + 1}/${batches.length} : ${
           batchError instanceof Error ? batchError.message : String(batchError)
         }`;
+
+        console.log(`\t🔴 ${batchErrorMessage}`);
 
         aggregatedErrors.push(batchErrorMessage);
         errorCount += batches[batchIndex].length;
       }
     }
 
+    console.log('\n\t 🟢 No new batch is starting');
+
     const endTime = Date.now();
     const duration = Math.round((endTime - startTime) / 1000);
+
+    const infoMessage = `\t🟢 Finished processing all batches with success count: ${successCount} and error count: ${errorCount} in ${duration} seconds`;
+    console.log(infoMessage);
+
+    console.log(`----- ENDING BROWSER BATCH HANDLER ----- ${new Date(endTime).toISOString()}`);
 
     return {
       success: errorCount < urlItems.length,
@@ -239,14 +263,19 @@ export const BrowserBatchHandler = async <T>(
     const endTime = Date.now();
     const duration = Math.round((endTime - startTime) / 1000);
 
+    const errorMessage = `Critical error: ${error instanceof Error ? error.message : String(error)}`;
+
+    console.log(`\t🔴 ${errorMessage}`);
+    console.log('\n\n----- ENDING BROWSER BATCH HANDLER -----', new Date(endTime).toISOString());
+
     return {
       duration,
       success: false,
       results: [],
-      errors: [error instanceof Error ? error.message : String(error)],
+      errors: [errorMessage],
       batches: 0,
       successCount: 0,
-      errorCount: urlItems.length,
+      errorCount: 1,
       totalUrls: urlItems.length,
     };
   }
