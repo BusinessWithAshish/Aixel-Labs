@@ -8,7 +8,11 @@ config();
 // Configuration constants
 const MAX_BROWSER_SESSIONS = Number(process.env.MAX_BROWSER_SESSIONS) || 10;
 const MAX_PAGES_PER_BROWSER = Number(process.env.MAX_PAGES_PER_BROWSER) || 5;
+const MAX_RETRIES = Number(process.env.MAX_RETRIES) || 3;
+const RETRY_DELAY = Number(process.env.RETRY_DELAY) || 3000;
 const TOTAL_CONCURRENT_URLS = MAX_BROWSER_SESSIONS * MAX_PAGES_PER_BROWSER;
+
+type ScrapingFunction<T> = (url: string, page: Page) => Promise<T>;
 
 type EachPageResult<T> = {
   success: boolean;
@@ -26,7 +30,8 @@ type SingleBrowserResult<T> = {
 const processSingleBrowser = async <T>(
   urlItems: string[],
   browserIndex: number,
-  scrapingFunction: (url: string, page: Page) => Promise<T>,
+  batchNumber: number,
+  scrapingFunction: ScrapingFunction<T>,
   res: Response | null = null
 ): Promise<SingleBrowserResult<T>> => {
   let browser: Browser | null = null;
@@ -39,14 +44,15 @@ const processSingleBrowser = async <T>(
     console.log(`\t\t\t Launching browser ${browserIndex} with ${urlItems.length} URLs`);
 
     if (!browser) {
+      const finalErrorMessage = `[Browser ${browserIndex} of batch ${batchNumber}]: Browser launch failed`;
+      console.log(`\t\t\t ${finalErrorMessage}`);
       return {
         results: [],
-        error: `Browser launch failed for browser ${browserIndex}`,
+        error: finalErrorMessage,
         browserIndex,
       };
     }
 
-    // Process each URL with its own page
     const pagePromises = urlItems.map(
       async (url, pageIndex): Promise<EachPageResult<T>> => {
         let page: Page | null = null;
@@ -58,15 +64,55 @@ const processSingleBrowser = async <T>(
 
           page.setDefaultTimeout(30000);
           page.setDefaultNavigationTimeout(30000);
-
-          const scrapeData = await scrapingFunction(url, page);
-
-          console.log(`\t\t\t\t [Browser ${browserIndex} Page ${pageIndex + 1}] scraped successfully`);
-
-          return { 
-            success: true, 
-            data: scrapeData, 
-            url 
+    
+          // Retry the scraping function if it fails
+          // Reload the page and retry the scraping function on each retry
+          let lastError: Error | null = null;
+          
+          for (let retryAttempt = 0; retryAttempt < MAX_RETRIES; retryAttempt++) {
+            try {
+              // Reload page on retry attempts (but not on the first attempt)
+              if (retryAttempt > 0) {
+                console.log(`\t\t\t\t ⟳ [Page ${pageIndex + 1} of Browser ${browserIndex}] retry ${retryAttempt}/${MAX_RETRIES - 1}`);
+                
+                // Add a small delay before retry to avoid hammering the server
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * retryAttempt));
+                
+                // Reload the page
+                await page.reload({ waitUntil: 'networkidle2' });
+              }
+    
+              const scrapeData = await scrapingFunction(url, page);
+              
+              // Success - return immediately
+              if (retryAttempt > 0) {
+                console.log(`\t\t\t\t ✓ [Page ${pageIndex + 1} of Browser ${browserIndex}] succeeded on retry ${retryAttempt}`);
+              }
+              
+              return {
+                success: true,
+                data: scrapeData,
+                url
+              };
+            } catch (error) {
+              lastError = error instanceof Error ? error : new Error(String(error));
+              
+              // Only log if this is the last attempt
+              if (retryAttempt === MAX_RETRIES - 1) {
+                console.log(`\t\t\t\t ✗ [Page ${pageIndex + 1} of Browser ${browserIndex}] failed: ${lastError.message}`);
+              }
+              
+              // Continue to the next retry attempt (unless this was the last one)
+            }
+          }
+    
+          // All retries exhausted - return error
+          const finalErrorMessage = `[Page ${pageIndex + 1} of Browser ${browserIndex} of batch ${batchNumber}] Failed after ${MAX_RETRIES} attempts: ${lastError?.message || 'Unknown error'}`;
+          
+          return {
+            success: false,
+            url,
+            error: finalErrorMessage,
           };
         } catch (pageScrapeError) {
           const errorMessage =
@@ -74,9 +120,8 @@ const processSingleBrowser = async <T>(
               ? pageScrapeError.message
               : String(pageScrapeError);
 
-              console.log(`\t\t\t\t [Browser ${browserIndex} Page ${pageIndex + 1}] had error: ${errorMessage}`);
-
-              const finalErrorMessage = `Page had error for this url ${url} at Browser ${browserIndex} for page ${pageIndex + 1} : ${errorMessage}`;
+          const finalErrorMessage = `[Page ${pageIndex + 1} of Browser ${browserIndex} of batch ${batchNumber}] Page had fatal error for ${url}: ${errorMessage}`;
+          console.log(`\t\t\t\t ${finalErrorMessage}`);
 
           return {
             success: false,
@@ -99,9 +144,13 @@ const processSingleBrowser = async <T>(
         ? browserScrapeError.message
         : String(browserScrapeError);
 
+    const finalErrorMessage = `[Browser ${browserIndex} of batch ${batchNumber}] Browser had error: ${errorMessage}`;
+
+    console.log(`\t\t\t ${finalErrorMessage}`);
+
     return {
       results: [],
-      error: errorMessage,
+      error: finalErrorMessage,
       browserIndex,
     };
   } finally {
@@ -136,7 +185,7 @@ const processSingleBrowser = async <T>(
 const processBatchOfBrowsers = async <T>(
   urlItems: string[],
   batchNumber: number,
-  scrapingFunction: (url: string, page: Page) => Promise<T>,
+  scrapingFunction: ScrapingFunction<T>,
   res: Response | null = null
 ): Promise<SingleBrowserResult<T>[]> => {
 
@@ -152,6 +201,7 @@ const processBatchOfBrowsers = async <T>(
     processSingleBrowser(
       batchUrls,
       index + 1,
+      batchNumber,
       scrapingFunction,
       res
     )
@@ -180,7 +230,7 @@ type TBrowserBatchHandlerReturn<T> = {
 
 export const BrowserBatchHandler = async <T>(
   urlItems: string[],
-  scrapingFunction: (url: string, page: Page) => Promise<T>,
+  scrapingFunction: ScrapingFunction<T>,
   res: Response | null = null
 ): Promise<TBrowserBatchHandlerReturn<T>> => {
   const startTime = Date.now();
