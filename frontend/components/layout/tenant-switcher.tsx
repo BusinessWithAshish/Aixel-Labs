@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import type { SidebarTenant } from '@/config/sidebar.config';
-import {DEFAULT_HOME_PAGE_ROUTE} from "@/config/app-config";
+import { DEFAULT_HOME_PAGE_ROUTE } from "@/config/app-config";
+import { AppLogo } from '../common/AppLogo';
 
 export function TenantSwitcher({
     tenants,
@@ -50,9 +51,7 @@ export function TenantSwitcher({
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" className="cursor-default">
-                        <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                            <GalleryVerticalEnd className="size-4 shrink-0" />
-                        </div>
+                        <AppLogo />
                         <div className="grid flex-1 text-left text-sm leading-tight">
                             <span className="truncate font-medium">{activeTenantName}</span>
                         </div>
@@ -71,9 +70,7 @@ export function TenantSwitcher({
                             size="lg"
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
-                            <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                                <GalleryVerticalEnd className="size-4" />
-                            </div>
+                            <AppLogo />
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-medium">{activeTenantName}</span>
                             </div>
@@ -96,9 +93,7 @@ export function TenantSwitcher({
                                     onClick={(e) => handleTenantClick(e, tenant)}
                                     className="gap-2 p-2"
                                 >
-                                    <div className="flex size-6 items-center justify-center rounded-md border">
-                                        <GalleryVerticalEnd className="size-4 shrink-0" />
-                                    </div>
+                                    <AppLogo />
                                     {tenant.name.toLocaleUpperCase()}
                                     <DropdownMenuShortcut>⌘{tenantName.charCodeAt(0)}</DropdownMenuShortcut>
                                 </DropdownMenuItem>

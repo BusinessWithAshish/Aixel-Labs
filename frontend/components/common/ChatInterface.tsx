@@ -10,8 +10,8 @@ import { AIInput } from '@/components/ui/ai-input';
 import { cn } from '@/lib/utils';
 import { User, RotateCcw, CheckCircle2 } from 'lucide-react';
 import { ShimmeringText } from '../ui/shimmering-text';
-import Image from 'next/image';
 import { GoogleGenAI } from '@google/genai';
+import { AppLogo } from './AppLogo';
 
 // Message type for the chat
 type Message = {
@@ -174,19 +174,6 @@ function checkCompletion<T>(schema: ZodSchema, data: Partial<T>): { isComplete: 
         missingFields,
     };
 }
-
-const AixelLabsBotIcon = () => {
-    return (
-        <Image
-            src="/aixellabs.svg"
-            alt="Aixel Labs Bot Icon"
-            width={32}
-            height={32}
-            className="border border-ring rounded-full p-1 bg-background text-foreground shrink-0"
-            priority={true}
-        />
-    );
-};
 
 export function ChatInterface<T extends Record<string, unknown>>({
     assistantName = 'AI Assistant',
@@ -426,7 +413,7 @@ function ChatHeader({
     return (
         <CardHeader>
             <CardTitle className="flex items-center gap-3">
-                <AixelLabsBotIcon />
+                <AppLogo />
                 <div className="flex-1">
                     <h3 className="font-semibold text-foreground">{assistantName}</h3>
                 </div>
@@ -449,7 +436,7 @@ function ChatHeader({
 function EmptyState({ assistantName, message }: { assistantName: string; message: string }) {
     return (
         <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center animate-in fade-in duration-500">
-            <AixelLabsBotIcon />
+            <AppLogo />
             <h4 className="font-medium text-foreground mt-2">{assistantName}</h4>
             <p className="text-sm text-muted-foreground mt-1 max-w-xs">{message}</p>
         </div>
@@ -459,7 +446,7 @@ function EmptyState({ assistantName, message }: { assistantName: string; message
 function LoadingIndicator() {
     return (
         <div className="flex items-center gap-3 animate-in slide-in-from-bottom-2 fade-in duration-300">
-            <AixelLabsBotIcon />
+            <AppLogo />
             <ShimmeringText text="Thinking..." className="text-sm" duration={0.6} repeatDelay={1} />
         </div>
     );
@@ -565,7 +552,7 @@ function ChatMessage({ role, content, isLatest }: ChatMessageProps) {
                     </AvatarFallback>
                 </Avatar>
             ) : (
-                <AixelLabsBotIcon />
+                <AppLogo />
             )}
 
             <div

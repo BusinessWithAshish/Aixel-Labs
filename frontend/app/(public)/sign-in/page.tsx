@@ -1,11 +1,11 @@
-import Image from 'next/image';
 import { LoginForm } from '@/app/(public)/_components/LoginForm';
+import { AppLogo } from "@/components/common/AppLogo";
 
 const LogoWithText = () => {
     return (
         <div className="flex items-center gap-2">
             <div className="bg-white border border-primary text-primary-foreground flex size-8 items-center justify-center rounded-full">
-                <Image src="/aixellabs.svg" alt="Aixel Labs" width={24} height={24} className="size-full object-cover" />
+                <AppLogo />
             </div>
             <span className="text-lg">Aixel Labs</span>
         </div>
