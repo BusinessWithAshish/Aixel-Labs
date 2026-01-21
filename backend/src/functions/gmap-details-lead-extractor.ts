@@ -1,8 +1,8 @@
 import { Page } from "puppeteer";
 import { DEFAULT_PAGE_LOAD_TIMEOUT } from "../utils/constants.js";
-import { JSDOM } from "jsdom";
 import { GMAPS_SCRAPE_LEAD_INFO } from "@aixellabs/shared/common/apis";
 import { setupRequestInterception } from "./common/stealth-handlers.js";
+import { browserDebugger } from "./common/browser-batch-handler.js";
 
 // === Universal Place ID Extractor ===
 const PLACE_ID_REGEX = /"place_id":"(ChI[0-9A-Za-z_-]{10,})"/;
@@ -27,7 +27,6 @@ export function extractUniversalPlaceId(url: string | null, html: string) {
     return null;
 }
 
-// === Main Scraper ===
 export const GmapsDetailsLeadInfoExtractor = async (
     url: string,
     page: Page
@@ -38,37 +37,69 @@ export const GmapsDetailsLeadInfoExtractor = async (
         timeout: DEFAULT_PAGE_LOAD_TIMEOUT,
     });
 
-    // Full HTML
-    let fullPageHTML = await page.content();
+    const gmapsUrl = page.url();
+    await browserDebugger(2);
 
-    let gmapsUrl = null;
-    gmapsUrl = page.url();
+    const extractedData = await page.evaluate(() => {
+        // Check if temporarily closed
+        if (document.querySelector('div[aria-label="Notice"]')) {
+            return { isTemporarilyClosed: true, website: null, phoneNumber: null, overAllRating: null, numberOfReviews: null, name: null };
+        }
 
-    // Close early for speed
-    await page.close();
+        // Website
+        const websiteEl = document.querySelector('a[aria-label^="Website:"]');
+        const website = websiteEl?.getAttribute("href") ?? null;
 
-    // Clean & parse HTML
-    fullPageHTML = fullPageHTML
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-        .replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, "")
-        .replace(/style=["'][^"']*["']/gi, "");
+        // Phone
+        const phoneEl = document.querySelector('button[aria-label^="Phone:"]');
+        const phoneLabel = phoneEl?.getAttribute("aria-label");
+        const phoneNumber = phoneLabel?.replace("Phone: ", "").replace(/\s/g, "") ?? null;
 
-    const dom = new JSDOM(fullPageHTML, {
-        resources: "usable",
-        runScripts: "outside-only",
-        pretendToBeVisual: false,
+        // Rating
+        const ratingEl = document.getElementsByClassName("ceNzKf")?.[0];
+        const ratingLabel = ratingEl?.getAttribute("aria-label");
+        const overAllRating = ratingLabel?.split(" ")?.[0]?.trim() ?? null;
+
+        // Reviews - multiple fallback selectors
+        let numberOfReviews: string | null = null;
+        let reviewsEl: Element | null = document.querySelector('span[aria-label*="reviews"]');
+        
+        if (!reviewsEl) {
+            reviewsEl = document.querySelector('button[aria-label*="reviews"]');
+        }
+        
+        if (!reviewsEl) {
+            const allSpans = Array.from(document.querySelectorAll('span'));
+            reviewsEl = allSpans.find(span => /^\d+\s*reviews?$/i.test((span.textContent || '').trim())) || null;
+        }
+        
+        if (reviewsEl) {
+            const reviewLabel = reviewsEl.getAttribute("aria-label");
+            if (reviewLabel) {
+                numberOfReviews = reviewLabel.split(" ")[0] ?? null;
+            } else {
+                const match = (reviewsEl.textContent || '').match(/^(\d+)/);
+                numberOfReviews = match ? match[1] : null;
+            }
+        }
+
+        // Name - primary and fallback selector
+        let name: string | null = null;
+        const nameEl = document.querySelector('div[aria-label^="Information for"]');
+        if (nameEl) {
+            name = nameEl.getAttribute("aria-label")?.replace("Information for ", "") ?? null;
+        } else {
+            name = document.querySelector('h1')?.textContent?.trim() ?? null;
+        }
+
+        return { isTemporarilyClosed: false, website, phoneNumber, overAllRating, numberOfReviews, name };
     });
 
-    const document = dom.window.document;
-
-    // === UNIVERSAL PLACE ID EXTRACTION ===
+    const fullPageHTML = await page.content();
     const placeId = extractUniversalPlaceId(gmapsUrl, fullPageHTML);
+    await page.close();
 
-    // Check if the place is temporarily closed
-    const isPlaceTemporarilyClosed = document.querySelector(
-        'div[aria-label="Notice"]'
-    );
-    if (isPlaceTemporarilyClosed) {
+    if (extractedData.isTemporarilyClosed) {
         return {
             placeId,
             website: null,
@@ -80,44 +111,13 @@ export const GmapsDetailsLeadInfoExtractor = async (
         };
     }
 
-    // Extract other fields
-    const website =
-        document.querySelector('a[aria-label^="Website:"]')?.getAttribute("href") ??
-        null;
-
-    const phoneNumber =
-        document
-            .querySelector('button[aria-label^="Phone:"]')
-            ?.getAttribute("aria-label")
-            ?.replace("Phone: ", "")
-            ?.replace(/\s/g, "") ?? null;
-
-    const overAllRating =
-        document
-            .getElementsByClassName("ceNzKf")?.[0]
-            ?.getAttribute("aria-label")
-            ?.split(" ")?.[0]
-            ?.trim() ?? null;
-
-    const numberOfReviews =
-        document
-            .querySelector('span[aria-label*="reviews"]')
-            ?.getAttribute("aria-label")
-            ?.split(" ")[0] ?? null;
-
-    const name =
-        document
-            .querySelector('div[aria-label^="Information for"]')
-            ?.getAttribute("aria-label")
-            ?.replace("Information for ", "") ?? null;
-
     return {
         placeId,
-        website,
-        phoneNumber,
-        name,
+        website: extractedData.website,
+        phoneNumber: extractedData.phoneNumber,
+        name: extractedData.name,
         gmapsUrl,
-        overAllRating,
-        numberOfReviews,
+        overAllRating: extractedData.overAllRating,
+        numberOfReviews: extractedData.numberOfReviews,
     };
 };

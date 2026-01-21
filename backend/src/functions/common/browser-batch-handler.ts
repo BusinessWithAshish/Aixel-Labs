@@ -71,15 +71,15 @@ const processSingleBrowser = async <T>(
           
           for (let retryAttempt = 0; retryAttempt < MAX_RETRIES; retryAttempt++) {
             try {
-              // Reload page on retry attempts (but not on the first attempt)
+              // Add delay on retry attempts (but not on the first attempt)
               if (retryAttempt > 0) {
                 console.log(`\t\t\t\t ⟳ [Page ${pageIndex + 1} of Browser ${browserIndex}] retry ${retryAttempt}/${MAX_RETRIES - 1}`);
                 
                 // Add a small delay before retry to avoid hammering the server
                 await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * retryAttempt));
                 
-                // Reload the page
-                await page.reload({ waitUntil: 'networkidle2' });
+                // Don't reload - let the scraping function handle navigation
+                // This avoids conflicts when the scraping function does its own page.goto()
               }
     
               const scrapeData = await scrapingFunction(url, page);
@@ -332,5 +332,7 @@ export const BrowserBatchHandler = async <T>(
 };
 
 export const browserDebugger = async (seconds: number) => {
+  console.log(`[🟡 Browser Debugger] Waiting for ${seconds} seconds...`);
   await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+  console.log(`[🟡 Browser Debugger] ${seconds} seconds passed, continuing...`);
 };

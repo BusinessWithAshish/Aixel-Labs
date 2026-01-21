@@ -270,18 +270,18 @@ export const AllUserLeads = () => {
                 transition={{ duration: 0.4, ease: 'easeOut', delay: 0.1 }}
                 className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-[80%] z-50 p-2"
             >
-                    <NLQueryInput
-                        query={nlQuery}
-                        setQuery={setNlQuery}
-                        executeSearch={executeNlSearch}
-                        isLoading={isNlQueryLoading}
-                        error={nlQueryError}
-                        clear={clearNlQuery}
-                        placeholder="Describe what you're looking for..."
-                        resultCount={filteredLeads.length}
-                        totalCount={leads.length}
-                        showStatus={true}
-                    />
+                <NLQueryInput
+                    query={nlQuery}
+                    setQuery={setNlQuery}
+                    executeSearch={executeNlSearch}
+                    isLoading={isNlQueryLoading}
+                    error={nlQueryError}
+                    clear={clearNlQuery}
+                    placeholder="Talk to your leads... (e.g. 'What are the best restaurants in Mumbai?')"
+                    resultCount={filteredLeads.length}
+                    totalCount={leads.length}
+                    showStatus={true}
+                />
             </motion.div>
 
             {/* Dialogs */}
