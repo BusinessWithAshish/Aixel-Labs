@@ -18,7 +18,7 @@ export function ManageTenantsContent() {
         usePage<UseManageTenantsPageReturn>();
     const router = useRouter();
 
-    const dontAllowClickOrEdit = (tenant: Tenant) => {
+    const dontAllowClick = (tenant: Tenant) => {
         return !!tenant.redirect_url;
     };
 
@@ -84,8 +84,8 @@ export function ManageTenantsContent() {
                         <TenantCard
                             key={tenant._id}
                             tenant={tenant}
-                            onClick={dontAllowClickOrEdit(tenant) ? undefined : () => handleTenantClick(tenant)}
-                            onEdit={dontAllowClickOrEdit(tenant) ? undefined : () => handleEditTenant(tenant)}
+                            onClick={dontAllowClick(tenant) ? undefined : () => handleTenantClick(tenant)}
+                            onEdit={() => handleEditTenant(tenant)}
                             onDelete={() => handleDeleteClick(tenant)}
                         />
                     ))}

@@ -109,9 +109,12 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
                                 placeholder="https://example.com"
                                 value={formData.redirect_url}
                                 onChange={handleChange('redirect_url')}
+                                disabled={!!(editingTenant && editingTenant.redirect_url)}
                             />
                             <p className="text-xs text-muted-foreground">
-                                Leave empty to auto-generate based on tenant name
+                                {editingTenant && editingTenant.redirect_url
+                                    ? 'Redirect URL cannot be changed once set'
+                                    : 'Leave empty to auto-generate based on tenant name'}
                             </p>
                         </div>
                     </div>
