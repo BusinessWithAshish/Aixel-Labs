@@ -3,14 +3,11 @@ import z from "zod";
 export const GOOGLE_MAPS_BASE_URL = "https://www.google.com/maps/search/";
 
 export const GMAPS_SCRAPE_REQUEST_SCHEMA = z.object({
-  query: z.string(),
-  country: z.string(),
-  states: z.array(
-    z.object({
-      name: z.string(),
-      cities: z.array(z.string()),
-    })
-  ),
+  query: z.string().optional(),
+  country: z.string().optional(),
+  state: z.string().optional(),
+  cities: z.array(z.string()).optional(),
+  urls: z.array(z.string()).optional(),
 });
 
 export type GMAPS_SCRAPE_REQUEST = z.infer<typeof GMAPS_SCRAPE_REQUEST_SCHEMA>;
@@ -63,7 +60,7 @@ export const serializeStreamMessage = (message: StreamMessage): string => {
 export const createStreamMessage = (
   type: StreamMessageType,
   message: string,
-  data?: StreamMessage["data"]
+  data?: StreamMessage["data"],
 ): StreamMessage => {
   return {
     type,
@@ -125,7 +122,7 @@ export const SSEParser = () => {
 };
 
 export const isStreamMessageType = (
-  type: string
+  type: string,
 ): type is StreamMessageType => {
   return Object.values(StreamMessageType).includes(type as StreamMessageType);
 };
@@ -147,29 +144,28 @@ export const isStatusMessage = (message: StreamMessage): boolean => {
 };
 
 export const generateGoogleMapsUrls = (
-  data: GMAPS_SCRAPE_REQUEST
+  data: GMAPS_SCRAPE_REQUEST,
 ): string[] => {
   const urls: string[] = [];
 
-  data.states.forEach((state: { name: string; cities: string[] }) => {
-    state.cities.forEach((city: string) => {
-      const formattedQuery = data.query
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, "+");
+  data.cities?.forEach((city: string) => {
+    if (!city) return;
+    const formattedQuery = data.query
+      ?.toLowerCase()
+      .trim()
+      .replace(/\s+/g, "+");
 
-      const location = `${city}, ${state.name}, ${data.country}`;
-      const formattedLocation = location.replace(/\s+/g, "+");
+    const location = `${city}, ${data.state ?? ""}, ${data.country ?? ""}`;
+    const formattedLocation = location.replace(/\s+/g, "+");
 
-      const searchTerm = `${formattedQuery}+in+${formattedLocation}`;
-      const encodedSearchTerm = encodeURIComponent(searchTerm).replace(
-        /%2B/g,
-        "+"
-      );
+    const searchTerm = `${formattedQuery}+in+${formattedLocation}`;
+    const encodedSearchTerm = encodeURIComponent(searchTerm).replace(
+      /%2B/g,
+      "+",
+    );
 
-      const finalUrl = `${GOOGLE_MAPS_BASE_URL}${encodedSearchTerm}`;
-      urls.push(finalUrl);
-    });
+    const finalUrl = `${GOOGLE_MAPS_BASE_URL}${encodedSearchTerm}`;
+    urls.push(finalUrl);
   });
 
   return urls;
