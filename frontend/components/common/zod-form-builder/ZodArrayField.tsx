@@ -7,7 +7,7 @@ import { generateFieldLabel } from './helpers';
 import { getFieldSingularLabel } from '@/helpers/string-helpers';
 import { extractMetadata, parseOptionsFromDescription, enumToOptions, unwrapDefault, getDefaultValue } from './schema-utils';
 import { ZodMetaType } from './zod-meta-types';
-import { renderSearchableMultiSelectField } from './field-renderers';
+import { SearchableMultiSelectControlledField } from './ZodControlledFields';
 
 type ZodArrayFieldProps = {
     name: string;
@@ -35,14 +35,14 @@ export const ZodArrayField = ({ name, fieldInfo, description }: ZodArrayFieldPro
     // Handle array of enums with searchable multi-select
     if (elementTypeName === 'ZodEnum' && metadata === ZodMetaType.SEARCHABLE_MULTI_SELECT) {
         const options = enumToOptions(elementSchema._def.values);
-        return renderSearchableMultiSelectField({ name, fieldInfo, cleanDescription, metadata, isRequired, options });
+        return <SearchableMultiSelectControlledField name={name} description={cleanDescription} required={isRequired} metadata={metadata} options={options} />;
     }
 
     // Handle array of strings with searchable multi-select
     if (elementTypeName === 'ZodString' && metadata === ZodMetaType.SEARCHABLE_MULTI_SELECT) {
         const options = parseOptionsFromDescription(description);
         if (options) {
-            return renderSearchableMultiSelectField({ name, fieldInfo, cleanDescription, metadata, isRequired, options });
+            return <SearchableMultiSelectControlledField name={name} description={cleanDescription} required={isRequired} metadata={metadata} options={options} />;
         }
     }
 

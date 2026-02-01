@@ -12,16 +12,18 @@ import { z, ZodTypeAny } from 'zod';
 import { FormProvider, useForm } from 'react-hook-form';
 import { Button } from '../../ui/button';
 import { cn } from '@/lib/utils';
-import { extractMetadata, parseOptionsFromDescription, getObjectDefaults } from './schema-utils';
+import { extractMetadata, parseOptionsFromDescription, getObjectDefaults, unwrapDefault } from './schema-utils';
 import { ZodMetaType } from './zod-meta-types';
 import {
-    renderStringField,
-    renderNumberField,
-    renderBooleanField,
-    renderEnumField,
-    renderSearchableSelectField,
-} from './field-renderers';
+    SearchableSelectControlledField,
+    StringControlledField,
+    NumberControlledField,
+    BooleanControlledField,
+    EnumControlledField,
+    StringArrayControlledField,
+} from './ZodControlledFields';
 import { ZodArrayField } from './ZodArrayField';
+import { enumToTitleCase } from '@/helpers/string-helpers';
 
 type ZodFormFieldProps = {
     name: string;
@@ -43,10 +45,11 @@ const ZodDefaultField = ({ name, fieldInfo, description }: ZodFormFieldProps) =>
 
     switch (fieldType) {
         case 'ZodEnum':
-            return renderEnumField(renderProps);
+            const options = fieldInfo._def.values.map((value: string) => enumToTitleCase(value));
+            return <EnumControlledField {...renderProps} options={options} metadata={metadata} />;
 
         case 'ZodBoolean':
-            return renderBooleanField(renderProps);
+            return <BooleanControlledField {...renderProps} />;
 
         case 'ZodArray':
             return <ZodArrayField name={name} fieldInfo={fieldInfo} description={description} />;
@@ -72,24 +75,22 @@ export const ZodFormField = ({ name, fieldInfo, description, isRequired: isRequi
 
     switch (fieldType) {
         case 'ZodString': {
-            // Handle searchable select for string fields with options
             if (metadata === ZodMetaType.SEARCHABLE_SELECT) {
                 const options = parseOptionsFromDescription(fieldDescription);
-                if (options) {
-                    return renderSearchableSelectField({ ...renderProps, options });
-                }
+                if (options) return <SearchableSelectControlledField {...renderProps} options={options} />;
             }
-            return renderStringField(renderProps);
+            return <StringControlledField {...renderProps} />;
         }
 
         case 'ZodNumber':
-            return renderNumberField(renderProps);
+            return <NumberControlledField {...renderProps} />;
 
         case 'ZodBoolean':
-            return renderBooleanField(renderProps);
+            return <BooleanControlledField {...renderProps} />;
 
         case 'ZodEnum':
-            return renderEnumField(renderProps);
+            const options = fieldInfo._def.values.map((value: string) => enumToTitleCase(value));
+            return <EnumControlledField {...renderProps} options={options} metadata={metadata} />;
 
         case 'ZodDefault':
             return <ZodDefaultField name={name} fieldInfo={innerType} description={fieldDescription} />;
@@ -97,8 +98,19 @@ export const ZodFormField = ({ name, fieldInfo, description, isRequired: isRequi
         case 'ZodOptional':
             return <ZodFormField name={name} fieldInfo={innerType} isRequired={false} />;
 
-        case 'ZodArray':
+        case 'ZodArray': {
+            const unwrappedFieldInfo = unwrapDefault(fieldInfo);
+            const elementSchema = unwrappedFieldInfo?._def?.type;
+            const elementTypeName = elementSchema?._def?.typeName;
+
+            // Use StringArrayControlledField for arrays of strings
+            if (elementTypeName === 'ZodString') {
+                return <StringArrayControlledField {...renderProps} />;
+            }
+
+            // Fall back to ZodArrayField for other array types (objects, enums with multi-select, etc.)
             return <ZodArrayField name={name} fieldInfo={fieldInfo} description={fieldDescription} />;
+        }
 
         default:
             return null;

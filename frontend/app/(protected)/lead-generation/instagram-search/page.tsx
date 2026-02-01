@@ -1,34 +1,16 @@
-'use client';
-
 import PageLayout from '@/components/common/PageLayout';
-import { Button } from '@/components/ui/button';
+import { useInstagramForm } from './_hooks/use-instagram-form';
+import { PageProvider } from '@/contexts/PageStore';
+import { InstagramSearchFormWrapper } from './_components/InstagramSearchFormWrapper';
 
-import { BACKEND_URL } from '@/config/app-config';
-import { INSTAGRAM_SCRAPE_REQUEST, INSTAGRAM_SCRAPE_SEARCH_FOR } from '@aixellabs/shared/common';
-import { API_ENDPOINTS } from '@aixellabs/shared/common/utils';
-
-export default function InstagramPage() {
+export default function InstagramSearchPage() {
     return (
-        <PageLayout title="Instagram">
-            <Button
-                onClick={async () => {
-                    const requestData: INSTAGRAM_SCRAPE_REQUEST = {
-                        searchFor: INSTAGRAM_SCRAPE_SEARCH_FOR.QUERY,
-                    };
+        <PageProvider usePageHook={useInstagramForm}>
+            <PageLayout title="Instagram Search">
+                <InstagramSearchFormWrapper />
+            </PageLayout>
+        </PageProvider>
 
-                    await fetch(`${BACKEND_URL}${API_ENDPOINTS.INSTAGRAM_SCRAPE}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(requestData),
-                        credentials: 'include',
-                    });
-                }}
-            >
-                Scrape sample v1
-            </Button>
-        </PageLayout>
     );
 }
 

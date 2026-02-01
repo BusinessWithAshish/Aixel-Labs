@@ -1,8 +1,7 @@
 'use client';
 
-import * as React from 'react';
+import { useState } from 'react';
 import { CheckIcon, ChevronsUpDownIcon } from 'lucide-react';
-
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -24,13 +23,13 @@ type SearchableSelectProps = {
 
 export function SearchableSelect({
     options,
-    placeholder = 'Select option...',
+    placeholder = 'Select or search for an option...',
     value,
     disabled = false,
     onChange,
     className,
 }: SearchableSelectProps) {
-    const [open, setOpen] = React.useState(false);
+    const [open, setOpen] = useState(false);
 
     const selectedLabel = options.find((o) => o.value === value)?.label;
 
@@ -62,7 +61,8 @@ export function SearchableSelect({
                             {options.map((option) => (
                                 <CommandItem
                                     key={option.value}
-                                    value={option.value}
+                                    value={option.label}
+                                    keywords={[option.value]}
                                     onSelect={() => {
                                         onChange?.(option.value);
                                         setOpen(false);

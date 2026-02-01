@@ -55,7 +55,7 @@ export const CommonLeadCard = ({
     return (
         <Card
             className={cn(
-                'transition-shadow hover:shadow-lg relative',
+                'transition-shadow min-h-[250px] hover:shadow-lg relative',
                 isSelected && 'ring-2 ring-primary',
                 computedLeadType.color,
                 className,

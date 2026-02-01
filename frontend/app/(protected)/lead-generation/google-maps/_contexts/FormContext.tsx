@@ -3,7 +3,10 @@
 import { GMAPS_SCRAPE_REQUEST } from '@aixellabs/shared/common/apis';
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-type FormMode = 'location' | 'direct-url';
+export enum FormMode {
+    LOCATION = 'location',
+    DIRECT_URL = 'direct-url',
+}
 
 type FormContextType = {
     formData: GMAPS_SCRAPE_REQUEST;
@@ -30,7 +33,7 @@ const initialFormData: GMAPS_SCRAPE_REQUEST = {
 export const FormProvider = ({ children }: { children: ReactNode }) => {
     const [formData, setFormData] = useState<GMAPS_SCRAPE_REQUEST>(initialFormData);
     const [directUrls, setDirectUrls] = useState<string[]>([]);
-    const [formMode, setFormMode] = useState<FormMode>('location');
+    const [formMode, setFormMode] = useState<FormMode>(FormMode.LOCATION);
 
     const updateFormData = (updates: Partial<GMAPS_SCRAPE_REQUEST>) => {
         setFormData((prev: GMAPS_SCRAPE_REQUEST) => ({ ...prev, ...updates }));
@@ -41,7 +44,7 @@ export const FormProvider = ({ children }: { children: ReactNode }) => {
         setDirectUrls([]);
     };
 
-    const canSubmit = formMode === 'location'
+    const canSubmit = formMode === FormMode.LOCATION
         ? formData.query.trim().length > 0 && formData.country.trim().length > 0 && formData.states.length > 0
         : directUrls.length > 0;
 

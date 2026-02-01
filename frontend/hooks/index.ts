@@ -10,3 +10,6 @@ export type { UseNLQueryConfig, UseNLQueryReturn } from './use-nl-query';
 
 // Module Access Hook - check user's module and submodule access permissions
 export { useModuleAccess } from './use-module-access';
+
+// Theme Color Hook - manages theme color synced with theme mode (light/dark/system)
+export { useThemeColor, ThemeColor } from './use-theme-color';

@@ -1,21 +1,119 @@
+import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { SearchableMultiSelect } from '@/components/ui/searchable-multi-select';
 import { SearchableSelect, OptionType } from '@/components/ui/searchable-select';
 import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { FieldError as ReactHookFormFieldError } from 'react-hook-form';
 import { generateFieldLabel } from './helpers';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 
-type BaseZodFieldProps = {
+export type BaseZodFieldProps = {
     name: string;
+    label?: string;
     description?: string;
     invalid?: boolean;
     errors?: ReactHookFormFieldError;
     required?: boolean;
+    disabled?: boolean;
+    className?: string;
+    classNames?: {
+        label?: string;
+        input?: string;
+        description?: string;
+        error?: string;
+    };
 };
 
-type ZodCheckboxFieldProps = BaseZodFieldProps & {
+export type ZodStringFieldProps = BaseZodFieldProps & {
+    value?: string;
+    onChange?: (value: string) => void;
+};
+
+export const ZodStringField = ({ name, label, description, value, invalid, errors, onChange, required, disabled, className, classNames }: ZodStringFieldProps) => {
+
+    return (
+        <Field data-invalid={invalid} className={className} data-disabled={disabled}>
+            <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                {label ?? generateFieldLabel(name)}
+            </FieldLabel>
+            {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
+            <Input
+                value={value}
+                onChange={(e) => onChange?.(e.target.value)}
+                id={name}
+                aria-invalid={invalid}
+                placeholder={`Type ${label?.toLowerCase()}`}
+                required={required}
+                className={classNames?.input}
+                disabled={disabled}
+                aria-disabled={disabled}
+            />
+            {invalid && <FieldError errors={[errors]} className={classNames?.error} />}
+        </Field>
+    );
+};
+
+export type ZodTextAreaFieldProps = BaseZodFieldProps & {
+    value?: string;
+    onChange?: (value: string) => void;
+};
+
+export const ZodTextAreaField = ({ name, label, description, value, invalid, errors, onChange, required, disabled, className, classNames }: ZodTextAreaFieldProps) => {
+    return (
+        <Field data-invalid={invalid} className={className} data-disabled={disabled}>
+            <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                {label ?? generateFieldLabel(name)}
+            </FieldLabel>
+            {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
+            <Textarea
+                value={value}
+                onChange={(e) => onChange?.(e.target.value)}
+                id={name}
+                aria-invalid={invalid}
+                placeholder={`Type ${label?.toLowerCase()}`}
+                required={required}
+                className="min-h-10"
+                disabled={disabled}
+                aria-disabled={disabled}
+            />
+            {invalid && <FieldError errors={[errors]} className={classNames?.error} />}
+        </Field>
+    );
+};
+
+export type ZodNumberFieldProps = BaseZodFieldProps & {
+    value?: number;
+    onChange?: (value: number) => void;
+};
+
+export const ZodNumberField = ({ name, label, description, value, invalid, errors, onChange, required, disabled, className, classNames }: ZodNumberFieldProps) => {
+    return (
+        <Field data-invalid={invalid} className={className} data-disabled={disabled}>
+            <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                {label ?? generateFieldLabel(name)}
+            </FieldLabel>
+            {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
+            <Input
+                value={value}
+                onChange={(e) => onChange?.(e.target.valueAsNumber)}
+                type="number"
+                id={name}
+                aria-invalid={invalid}
+                placeholder={`Type ${label?.toLowerCase()}`}
+                required={required}
+                disabled={disabled}
+                aria-disabled={disabled}
+            />
+            {invalid && <FieldError errors={[errors]} className={classNames?.error} />}
+        </Field>
+    );
+};
+
+export type ZodCheckboxFieldProps = BaseZodFieldProps & {
     value?: boolean;
     onChange?: (value: boolean) => void;
 };
@@ -28,41 +126,44 @@ export const ZodCheckboxField = ({
     errors,
     onChange,
     required,
+    disabled,
+    className,
+    classNames,
 }: ZodCheckboxFieldProps) => (
-    <Field orientation="horizontal" data-invalid={invalid}>
+    <Field orientation="horizontal" data-invalid={invalid} className={className} data-disabled={disabled}>
         <FieldContent>
-            <FieldLabel required={required} htmlFor={name}>
+            <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
                 {generateFieldLabel(name)}
             </FieldLabel>
-            {description && <FieldDescription>{description}</FieldDescription>}
+            {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
         </FieldContent>
         <Checkbox id={name} name={name} checked={value} onCheckedChange={onChange} />
-        {invalid && errors && <FieldError errors={[errors]} />}
+        {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
     </Field>
 );
 
-type ZodSwitchFieldProps = BaseZodFieldProps & {
+export type ZodSwitchFieldProps = BaseZodFieldProps & {
     value?: boolean;
     onChange?: (value: boolean) => void;
 };
 
-export const ZodSwitchField = ({ name, description, value, invalid, errors, onChange, required }: ZodSwitchFieldProps) => (
-    <Field orientation="horizontal" data-invalid={invalid}>
+export const ZodSwitchField = ({ name, description, value, invalid, errors, onChange, required, disabled, className, classNames }: ZodSwitchFieldProps) => (
+    <Field orientation="horizontal" data-invalid={invalid} className={className} data-disabled={disabled}>
         <FieldContent>
-            <FieldLabel required={required} htmlFor={name}>
+            <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
                 {generateFieldLabel(name)}
             </FieldLabel>
-            {description && <FieldDescription>{description}</FieldDescription>}
+            {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
         </FieldContent>
         <Switch id={name} name={name} checked={value} onCheckedChange={onChange} />
-        {invalid && errors && <FieldError errors={[errors]} />}
+        {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
     </Field>
 );
 
-type ZodSelectFieldProps = BaseZodFieldProps & {
+export type ZodSelectFieldProps = BaseZodFieldProps & {
     value?: string;
     onChange?: (value: string) => void;
-    options: string[];
+    options: OptionType[];
 };
 
 export const ZodSelectField = ({
@@ -71,37 +172,41 @@ export const ZodSelectField = ({
     value,
     invalid,
     errors,
+    label,
     onChange,
     options,
     required,
+    disabled,
+    className,
+    classNames,
 }: ZodSelectFieldProps) => {
-    const fieldLabel = generateFieldLabel(name);
+    const fieldLabel = label ?? generateFieldLabel(name);
     return (
-        <Field orientation="horizontal" data-invalid={invalid}>
+        <Field data-invalid={invalid} className={className} data-disabled={disabled}>
             <FieldContent>
-                <FieldLabel required={required} htmlFor={name}>
+                <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
                     {fieldLabel}
                 </FieldLabel>
-                {description && <FieldDescription>{description}</FieldDescription>}
+                {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
             </FieldContent>
-            <Select name={name} value={value} onValueChange={onChange}>
-                <SelectTrigger>
+            <Select name={name} value={value} onValueChange={onChange} disabled={disabled} aria-disabled={disabled}>
+                <SelectTrigger className={classNames?.input}>
                     <SelectValue placeholder={`Select ${fieldLabel.toLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent>
                     {options.map((option) => (
-                        <SelectItem key={option} value={option.toLowerCase()}>
-                            {option}
+                        <SelectItem key={option.value} value={option.value}>
+                            {option.label}
                         </SelectItem>
                     ))}
                 </SelectContent>
             </Select>
-            {invalid && errors && <FieldError errors={[errors]} />}
+            {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
         </Field>
     );
 };
 
-type ZodSearchableSelectFieldProps = BaseZodFieldProps & {
+export type ZodSearchableSelectFieldProps = BaseZodFieldProps & {
     value?: string;
     onChange?: (value: string) => void;
     options: OptionType[];
@@ -113,31 +218,37 @@ export const ZodSearchableSelectField = ({
     value,
     invalid,
     errors,
+    label,
     onChange,
     options,
     required,
+    disabled,
+    className,
+    classNames,
 }: ZodSearchableSelectFieldProps) => {
-    const fieldLabel = generateFieldLabel(name);
+    const fieldLabel = label ?? generateFieldLabel(name);
     return (
-        <Field orientation="horizontal" data-invalid={invalid}>
+        <Field data-invalid={invalid} className={className} data-disabled={disabled}>
             <FieldContent>
-                <FieldLabel required={required} htmlFor={name}>
+                <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
                     {fieldLabel}
                 </FieldLabel>
-                {description && <FieldDescription>{description}</FieldDescription>}
+                {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
             </FieldContent>
             <SearchableSelect
                 options={options}
                 value={value}
                 onChange={onChange}
                 placeholder={`Select ${fieldLabel.toLowerCase()}`}
+                disabled={disabled}
+                aria-disabled={disabled}
             />
-            {invalid && errors && <FieldError errors={[errors]} />}
+            {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
         </Field>
     );
 };
 
-type ZodSearchableMultiSelectFieldProps = BaseZodFieldProps & {
+export type ZodSearchableMultiSelectFieldProps = BaseZodFieldProps & {
     values?: string[];
     onChange?: (value: string[]) => void;
     options: OptionType[];
@@ -149,18 +260,168 @@ export const ZodSearchableMultiSelectField = ({
     values,
     invalid,
     errors,
+    label,
     onChange,
     options,
     required,
-}: ZodSearchableMultiSelectFieldProps) => (
-    <Field orientation="horizontal" data-invalid={invalid}>
-        <FieldContent>
-            <FieldLabel required={required} htmlFor={name}>
-                {generateFieldLabel(name)}
-            </FieldLabel>
-            {description && <FieldDescription>{description}</FieldDescription>}
-        </FieldContent>
-        <SearchableMultiSelect options={options} values={values} onChange={onChange} />
-        {invalid && errors && <FieldError errors={[errors]} />}
-    </Field>
-);
+    disabled,
+    className,
+    classNames,
+}: ZodSearchableMultiSelectFieldProps) => {
+    const fieldLabel = label ?? generateFieldLabel(name);
+    return (
+        <Field data-invalid={invalid} className={className} data-disabled={disabled}>
+            <FieldContent>
+                <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                    {fieldLabel}
+                </FieldLabel>
+                {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
+            </FieldContent>
+            <SearchableMultiSelect
+                options={options}
+                values={values}
+                onChange={onChange}
+                placeholder={`Select ${fieldLabel.toLowerCase()}`}
+                disabled={disabled}
+                aria-disabled={disabled}
+                className={classNames?.input}
+            />
+            {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
+        </Field>
+    );
+};
+
+export type ZodStringArrayFieldProps = BaseZodFieldProps & {
+    values?: string[];
+    onChange?: (values: string[]) => void;
+    renderItem?: (props: {
+        index: number;
+        itemName: string;
+        value: string;
+        placeholder: string;
+        disabled?: boolean;
+        onRemove: () => void;
+    }) => React.ReactNode;
+    onAdd?: () => void;
+    onRemove?: (index: number) => void;
+    // For controlled usage with useFieldArray - provides stable keys
+    fieldKeys?: Array<string | number>;
+};
+
+export const ZodStringArrayField = ({
+    name,
+    description,
+    label,
+    required,
+    values = [],
+    onChange,
+    invalid,
+    errors,
+    disabled,
+    className,
+    classNames,
+    renderItem,
+    onAdd,
+    onRemove: onRemoveProp,
+    fieldKeys,
+}: ZodStringArrayFieldProps) => {
+    const fieldLabel = label ?? generateFieldLabel(name);
+
+    const handleItemChange = (index: number, newValue: string) => {
+        if (!onChange) return;
+        const newValues = [...values];
+        newValues[index] = newValue;
+        onChange(newValues);
+    };
+
+    const handleAdd = () => {
+        if (onAdd) {
+            onAdd();
+        } else if (onChange) {
+            onChange([...values, '']);
+        }
+    };
+
+    const handleRemove = (index: number) => {
+        if (onRemoveProp) {
+            onRemoveProp(index);
+        } else if (onChange) {
+            const newValues = values.filter((_, i) => i !== index);
+            onChange(newValues);
+        }
+    };
+
+    // Validation: Check if last item is empty
+    const lastItem = values.length > 0 ? values[values.length - 1] : null;
+    const isLastItemEmpty = lastItem !== null && lastItem.trim().length === 0;
+    
+    // Disable "Add Item" button if:
+    // 1. The whole field is disabled, OR
+    // 2. The last item is empty (has 0 chars)
+    const isAddButtonDisabled = disabled || isLastItemEmpty;
+
+    return (
+        <FieldSet className={className} data-invalid={invalid} data-disabled={disabled}>
+            <FieldLegend variant="label">
+                {fieldLabel}
+                {required && <span className="text-destructive ml-1">*</span>}
+            </FieldLegend>
+            {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
+            <FieldContent className="space-y-3">
+                {values.map((value, index) => {
+                    const itemName = `${name}.${index}`;
+                    const placeholder = `Enter ${fieldLabel.toLowerCase()} item`;
+                    // Use fieldKeys if provided (for stable React keys with useFieldArray), otherwise use index
+                    const key = fieldKeys?.[index] ?? index;
+
+                    return (
+                        <div key={key} className="flex gap-2 items-end">
+                            {renderItem ? (
+                                // Custom render for controlled fields
+                                renderItem({
+                                    index,
+                                    itemName,
+                                    value,
+                                    placeholder,
+                                    disabled,
+                                    onRemove: () => handleRemove(index),
+                                })
+                            ) : (
+                                // Default plain input
+                                <>
+                                    <Input
+                                        value={value}
+                                        onChange={(e) => handleItemChange(index, e.target.value)}
+                                        placeholder={placeholder}
+                                        disabled={disabled}
+                                        aria-disabled={disabled}
+                                        className={classNames?.input}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => handleRemove(index)}
+                                        disabled={!value.length}
+                                    >
+                                        Remove
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    );
+                })}
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleAdd}
+                    className="w-full"
+                    disabled={isAddButtonDisabled}
+                >
+                    + Add Item
+                </Button>
+            </FieldContent>
+            {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
+        </FieldSet>
+    );
+};

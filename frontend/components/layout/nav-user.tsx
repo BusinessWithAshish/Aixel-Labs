@@ -25,9 +25,11 @@ import { Button } from '@/components/ui/button';
 import type { SidebarUser } from '@/config/sidebar.config';
 import { handleSignOut } from '@/app/actions/auth-actions';
 import { UserRoleBadge } from '@/components/common/UserRoleBadge';
+import {useRouter} from "next/navigation";
 
 export function NavUser({ user }: { user: SidebarUser }) {
     const { isMobile } = useSidebar();
+    const router = useRouter();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -95,7 +97,7 @@ export function NavUser({ user }: { user: SidebarUser }) {
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuGroup>
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => router.push('/account-settings')}>
                                     <BadgeCheck />
                                     Account
                                 </DropdownMenuItem>

@@ -1,48 +1,50 @@
-'use client';
-
-import { useState } from 'react';
 import PageLayout from '@/components/common/PageLayout';
-import {
-    GenerateLeads,
-    LeadGenerationProvider,
-} from '@/app/(protected)/lead-generation/google-maps/_components';
-import { GoogleMapsScraperChat } from '@/app/(protected)/lead-generation/google-maps/_components/GoogleMapsScraperChat';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, FormInput } from 'lucide-react';
+import { MessageSquare, FormInput, List } from 'lucide-react';
+import { PageProvider } from '@/contexts/PageStore';
+import { useGoogleMapsForm } from './_hooks/use-google-maps-form';
+import { GoogleMapsFormWrapper, GoogleMapsScraperChat, ResultsSection } from './_components';
 
-function GoogleMapsScraperContent() {
-    const [mode, setMode] = useState<'chat' | 'form'>('chat');
-
-    return (
-        <PageLayout className="space-y-4" title="Google Maps Scraper">
-            <Tabs value={mode} onValueChange={(v) => setMode(v as 'chat' | 'form')} className="h-full w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="chat" className="flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4" />
-                        AI Chat
-                    </TabsTrigger>
-                    <TabsTrigger value="form" className="flex items-center gap-2">
-                        <FormInput className="w-4 h-4" />
-                        Manual Form
-                    </TabsTrigger>
-                </TabsList>
-
-                <TabsContent className="h-full w-full" value="chat">
-                    <GoogleMapsScraperChat />
-                </TabsContent>
-
-                <TabsContent value="form" className="h-full w-full">
-                    <GenerateLeads />
-                </TabsContent>
-            </Tabs>
-        </PageLayout>
-    );
+enum GoogleMapsTabs {
+    CHAT = 'AI Chat',
+    FORM = 'Manual Form',
+    RESULTS = 'Results',
 }
 
-export default function GoogleMapsScraperPage() {
+export default function GoogleMapsPage() {
     return (
-        <LeadGenerationProvider>
-            <GoogleMapsScraperContent />
-        </LeadGenerationProvider>
+        <PageProvider usePageHook={useGoogleMapsForm}>
+            <PageLayout className="space-y-4" title="Google Maps Scraper">
+                <Tabs defaultValue={GoogleMapsTabs.CHAT} className="h-full w-full">
+                    <TabsList className="w-full">
+                        <TabsTrigger value={GoogleMapsTabs.CHAT} className="flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4" />
+                            {GoogleMapsTabs.CHAT}
+                        </TabsTrigger>
+                        <TabsTrigger value={GoogleMapsTabs.FORM} className="flex items-center gap-2">
+                            <FormInput className="w-4 h-4" />
+                            {GoogleMapsTabs.FORM}
+                        </TabsTrigger>
+                        <TabsTrigger value={GoogleMapsTabs.RESULTS} className="flex items-center gap-2">
+                            <List className="w-4 h-4" />
+                            {GoogleMapsTabs.RESULTS}
+                        </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent className="h-full w-full" value={GoogleMapsTabs.CHAT}>
+                        <GoogleMapsScraperChat />
+                    </TabsContent>
+
+                    <TabsContent className="h-full w-full" value={GoogleMapsTabs.FORM}>
+                        <GoogleMapsFormWrapper />
+                    </TabsContent>
+
+                    <TabsContent className="h-full w-full" value={GoogleMapsTabs.RESULTS}>
+                        <ResultsSection />
+                    </TabsContent>
+
+                </Tabs>
+            </PageLayout>
+        </PageProvider>
     );
 }

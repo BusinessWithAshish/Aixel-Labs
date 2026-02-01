@@ -72,7 +72,7 @@ export function SearchableMultiSelect({
                 <Command
                     filter={(value, search) => {
                         if (!search) return 1;
-                        return options.some((o) => o.label.toLowerCase().includes(search.toLowerCase())) ? 1 : 0;
+                        return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
                     }}
                 >
                     <CommandInput className="cursor-pointer" disabled={disabled} placeholder="Search options..." />
@@ -83,7 +83,8 @@ export function SearchableMultiSelect({
                                 <CommandItem
                                     className="cursor-pointer"
                                     key={option.value}
-                                    value={option.value}
+                                    value={option.label}
+                                    keywords={[option.value]}
                                     onSelect={() => {
                                         const isSelected = values?.includes(option.value);
                                         if (isSelected) {

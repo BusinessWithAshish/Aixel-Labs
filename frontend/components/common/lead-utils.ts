@@ -1,37 +1,26 @@
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common/apis';
-import { LeadSource } from '@aixellabs/shared/mongodb';
 
 export type SortKey = 'rating' | 'reviews';
 export type SortDirection = 'asc' | 'desc';
 
+export enum LeadCategory {
+    ALL = 'All',
+    HOT = 'Hot Leads',
+    WARM = 'Warm Leads',
+    COLD = 'Cold Leads',
+}
+
 export type CategorizedLeads = {
-    all: GMAPS_SCRAPE_LEAD_INFO[];
-    hotLeads: GMAPS_SCRAPE_LEAD_INFO[];
-    warmLeads: GMAPS_SCRAPE_LEAD_INFO[];
-    coldLeads: GMAPS_SCRAPE_LEAD_INFO[];
+    [LeadCategory.ALL]: GMAPS_SCRAPE_LEAD_INFO[];
+    [LeadCategory.HOT]: GMAPS_SCRAPE_LEAD_INFO[];
+    [LeadCategory.WARM]: GMAPS_SCRAPE_LEAD_INFO[];
+    [LeadCategory.COLD]: GMAPS_SCRAPE_LEAD_INFO[];
 };
 
 export type LeadType = {
-    type: 'Hot Lead' | 'Warm Lead' | 'Cold Lead' | 'Unknown';
     badgeColor: string;
     color: string;
-    category: 'hotLeads' | 'warmLeads' | 'coldLeads';
-};
-
-export type LeadSourceType = {
-    color: string;
-    iconUrl: string;
-};
-
-export const LEAD_SOURCE_TYPES: Record<LeadSource, LeadSourceType> = {
-    [LeadSource.GOOGLE_MAPS]: {
-        color: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-700/80',
-        iconUrl: '/google-maps-icon.svg' 
-    },
-    [LeadSource.INSTAGRAM]: {
-        color: 'bg-pink-50 dark:bg-pink-950/30 border-pink-200 dark:border-pink-700/80',
-        iconUrl: '/instagram-icon.svg' 
-    },
+    category: LeadCategory;
 };
 
 const extractNumericValue = (value: string | null, isRating: boolean): number => {
@@ -138,29 +127,26 @@ export const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
     // Hot Lead: No website but has a phone
     if (!hasProperWebsite && hasPhoneNumber) {
         return {
-            type: 'Hot Lead',
             color: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-700/80',
             badgeColor: 'bg-green-50 dark:bg-green-950/30 dark:text-green-200 border-green-200 text-green-950',
-            category: 'hotLeads',
+            category: LeadCategory.HOT,
         };
     }
 
     // Warm Lead: Has a proper website
     if (hasProperWebsite || hasSocialMediaProfile) {
         return {
-            type: 'Warm Lead',
             color: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-700/80',
             badgeColor: 'bg-amber-50 dark:bg-amber-950/30 dark:text-amber-200 border-amber-200 text-amber-950',
-            category: 'warmLeads',
+            category: LeadCategory.WARM,
         };
     }
 
     // Cold Lead: Everything else (no website, no social media, no phone OR social media but no phone)
     return {
-        type: 'Cold Lead',
         color: 'bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-700/80',
         badgeColor: 'bg-slate-50 dark:bg-slate-950/30 dark:text-slate-200 border-slate-200 text-slate-950',
-        category: 'coldLeads',
+        category: LeadCategory.COLD,
     };
 };
 
@@ -169,14 +155,14 @@ export const getLeadType = (lead: GMAPS_SCRAPE_LEAD_INFO): LeadType => {
  */
 export const categorizeLeads = (leads: GMAPS_SCRAPE_LEAD_INFO[]): CategorizedLeads => {
     return {
-        all: leads,
-        hotLeads: leads.filter((lead) => {
+        [LeadCategory.ALL]: leads,
+        [LeadCategory.HOT]: leads.filter((lead) => {
             return !hasWebsite(lead) && hasPhone(lead);
         }),
-        warmLeads: leads.filter((lead) => {
+        [LeadCategory.WARM]: leads.filter((lead) => {
             return hasWebsite(lead) || hasSocialMedia(lead);
         }),
-        coldLeads: leads.filter((lead) => {
+        [LeadCategory.COLD]: leads.filter((lead) => {
             const hasProperWebsite = hasWebsite(lead);
             const hasSocialMediaProfile = hasSocialMedia(lead);
             const hasPhoneNumber = hasPhone(lead);

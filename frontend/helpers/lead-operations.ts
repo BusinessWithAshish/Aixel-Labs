@@ -68,26 +68,16 @@ export const searchLead = (lead: Lead, query: string): boolean => {
     
     if (lead.source === LeadSource.GOOGLE_MAPS) {
         const data = lead.data as GMAPS_SCRAPE_LEAD_INFO;
-        const searchableFields = [
-            data.name,
-            data.website,
-            data.phoneNumber,
-        ];
+        const searchableFields = [data.name, data.website, data.phoneNumber];
         return searchableFields.some((field) => field?.toLowerCase().includes(lowerQuery));
     }
-    
+
     if (lead.source === LeadSource.INSTAGRAM) {
         const data = lead.data as INSTAGRAM_SEARCH_SCRAPE_LEAD_INFO;
-        const searchableFields = [
-            data.username,
-            data.bio,
-            data.email,
-            data.phoneNumber,
-            data.website,
-        ];
-        return searchableFields.some((field) => field?.toLowerCase().includes(lowerQuery));
+        const searchableFields = [data.username, data.bio, data.email, data.businessPhoneNumber, data.websites];
+        return searchableFields.some((field) => field?.toString()?.toLowerCase()?.includes(lowerQuery));
     }
-    
+
     return false;
 };
 

@@ -1,4 +1,4 @@
-import { ReactElement } from 'react';
+import { cloneElement, ReactElement } from 'react';
 import { Controller, useFormContext, FieldError as ReactHookFormFieldError } from 'react-hook-form';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -25,14 +25,15 @@ export const FieldController = ({ name, render }: FieldControllerProps) => {
         <Controller
             name={name}
             control={control}
-            render={({ field, fieldState }) =>
-                render({
+            render={({ field, fieldState }) => {
+                const FieldComponent = render({
                     value: field.value,
                     invalid: fieldState.invalid,
                     errors: fieldState.error,
                     onChange: field.onChange,
-                })
-            }
+                });
+                return cloneElement(FieldComponent, { key: name });
+            }}
         />
     );
 };
