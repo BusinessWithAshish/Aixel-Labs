@@ -1,0 +1,1192 @@
+{
+  "success": true,
+  "message": "Scraping completed successfully!",
+  "data": {
+    "founded": [
+      "https://www.google.com/maps/place/Enlighten+cafe/data=!4m7!3m6!1s0x3bc2b9e7511dadf3:0x64e30fb5776ca2a8!8m2!3d18.5878095!4d73.7799505!16s%2Fg%2F11lc9x_cl5!19sChIJ860dUee5wjsRqKJsd7UP42Q?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Soundtrack+Cafe/data=!4m7!3m6!1s0x3bc2b97f3d267e2f:0x124e7b5863c91db8!8m2!3d18.5823768!4d73.7837174!16s%2Fg%2F11h4zmv3x5!19sChIJL34mPX-5wjsRuB3JY1h7ThI?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Destination/data=!4m7!3m6!1s0x3bc2b9e8aec6d82b:0x5611115b31038f0a!8m2!3d18.6481816!4d73.7660303!16s%2Fg%2F124s_yc5l!19sChIJK9jGrui5wjsRCo8DMVsREVY?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Meraki/data=!4m7!3m6!1s0x3bc2b9620e4edf7d:0xc02ff20d6dcbe790!8m2!3d18.5786405!4d73.8157248!16s%2Fg%2F11j8t1m513!19sChIJfd9ODmK5wjsRkOfLbQ3yL8A?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Cafe+Club/data=!4m7!3m6!1s0x3bc2b98b87ecdb47:0xd5369703af6eda7a!8m2!3d18.6054086!4d73.784252!16s%2Fg%2F11t5_0sbdz!19sChIJR9vsh4u5wjsRetpurwOXNtU?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Panino+Cafe/data=!4m7!3m6!1s0x3bc2b9aea200b01b:0x206fe9d85b0b6ca3!8m2!3d18.6327525!4d73.7865756!16s%2Fg%2F11sfdkd_w0!19sChIJG7AAoq65wjsRo2wLW9jpbyA?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Brewing+Partners+-+Pimpri/data=!4m7!3m6!1s0x3bc2b9982cc31fa9:0xa47d4c94b9b21cbc!8m2!3d18.6248102!4d73.8196719!16s%2Fg%2F11nxnwzn8r!19sChIJqR_DLJi5wjsRvByyuZRMfaQ?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Dot+Com+krishna+chowk./data=!4m7!3m6!1s0x3bc2b9bfa5885e1f:0x9c27d65e6801aa66!8m2!3d18.5817116!4d73.8164881!16s%2Fg%2F11q48pz4bz!19sChIJH16Ipb-5wjsRZqoBaF7WJ5w?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Inhale+Cafe+%26+Smoke/data=!4m7!3m6!1s0x3bc2b9f6250e4b49:0xc1786d356565d4a!8m2!3d18.5787186!4d73.8157439!16s%2Fg%2F11ptpknx9x!19sChIJSUsOJfa5wjsRSl1WVtOGFww?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Crush+-+New+Sangvi,+PCMC/data=!4m7!3m6!1s0x3bc2b9676c021201:0x9f9e4548e23326d9!8m2!3d18.5791004!4d73.8134245!16s%2Fg%2F11q842fm3f!19sChIJARICbGe5wjsR2SYz4khFnp8?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cheesy+Appetite/data=!4m7!3m6!1s0x3bc2b94d64d9fa95:0xb9ca8ae1bc277bb9!8m2!3d18.6195751!4d73.8036683!16s%2Fg%2F11tr_z4gml!19sChIJlfrZZE25wjsRuXsnvOGKyrk?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+coffee+hutt/data=!4m7!3m6!1s0x3bc2b97516de4243:0xed619cb498da812f!8m2!3d18.5926878!4d73.803724!16s%2Fg%2F11rttjh1x_!19sChIJQ0LeFnW5wjsRL4HamLScYe0?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cheesy+Crazy+Cafe/data=!4m7!3m6!1s0x3bc2b900214bbbd1:0x831da639c05803d3!8m2!3d18.5789342!4d73.8160356!16s%2Fg%2F11lf45hy6d!19sChIJ0btLIQC5wjsR0wNYwDmmHYM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Chocolicious/data=!4m7!3m6!1s0x3bc2b9f04e76466f:0x67efdad8ce46a340!8m2!3d18.6168318!4d73.8017368!16s%2Fg%2F11g0l43_r8!19sChIJb0Z2TvC5wjsRQKNGztja72c?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Kafesaa/data=!4m7!3m6!1s0x3bc2b93e934fba29:0xe3c658d5917d8198!8m2!3d18.5793312!4d73.7856342!16s%2Fg%2F11t6q8zjf5!19sChIJKbpPkz65wjsRmIF9kdVYxuM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/THE+DREAMS+CAFE/data=!4m7!3m6!1s0x3bc2b971b40f88c9:0xf396c23e7c128c25!8m2!3d18.6206894!4d73.8210399!16s%2Fg%2F11thj__379!19sChIJyYgPtHG5wjsRJYwSfD7ClvM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Snapchat/data=!4m7!3m6!1s0x3bc2b963cd02d539:0x78c622fffab1cbfc!8m2!3d18.6293877!4d73.8196264!16s%2Fg%2F11sf31c10t!19sChIJOdUCzWO5wjsR_Mux-v8ixng?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Caf%C3%A9+Day+Dreamer/data=!4m7!3m6!1s0x3bc2b900606d52a3:0x71dae3cecd02b234!8m2!3d18.6334414!4d73.8037714!16s%2Fg%2F11lcm0vw2k!19sChIJo1JtYAC5wjsRNLICzc7j2nE?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/It%E2%80%99s+Street+Coffee,+Chinchwad/data=!4m7!3m6!1s0x3bc2b9bdbbca126b:0x5cbdf4a28f84a393!8m2!3d18.6327846!4d73.7864043!16s%2Fg%2F11mrmh1431!19sChIJaxLKu725wjsRk6OEj6L0vVw?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Pokket+Cafe+Chinchwadgaon+%28LOVE+THEME%29-+Tawde+Enterprises/data=!4m7!3m6!1s0x3bc2b9a6e0a9467f:0xad1e615ad17002b0!8m2!3d18.6273296!4d73.7826431!16s%2Fg%2F11h16025j3!19sChIJf0ap4Ka5wjsRsAJw0VphHq0?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Deccan+Brews+Best+Cafe+In+PCMC/data=!4m7!3m6!1s0x3bc2b97824e35663:0x962221ccaba3dfe!8m2!3d18.6462981!4d73.7684713!16s%2Fg%2F11ybxycjqq!19sChIJY1bjJHi5wjsR_j26yhwiYgk?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Famous+Katta/data=!4m7!3m6!1s0x3bc2b8cec982d4c7:0x2de14393657b7e77!8m2!3d18.5794822!4d73.8120362!16s%2Fg%2F11f75yxly6!19sChIJx9SCyc64wjsRd357ZZND4S0?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Famous+Katta+Branch+2/data=!4m7!3m6!1s0x3bc2b9a2828ee3f7:0x2ac5be69edb9257d!8m2!3d18.5811874!4d73.8219683!16s%2Fg%2F11s7_6_tnk!19sChIJ9-OOgqK5wjsRfSW57Wm-xSo?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Of+Dreams/data=!4m7!3m6!1s0x3bc2b9b8c912120b:0xe54ed1d4374239dc!8m2!3d18.6304855!4d73.7788681!16s%2Fg%2F11rcmp1ryk!19sChIJCxISybi5wjsR3DlCN9TRTuU?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Signature+Moment/data=!4m7!3m6!1s0x3bc2b9faf8ccfd31:0x8a787c917ed3d02!8m2!3d18.6339253!4d73.7878014!16s%2Fg%2F11xl0gz_8p!19sChIJMf3M-Pq5wjsRAj3tF8mHpwg?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+bonding+brews+%26+Mini+Theater/data=!4m7!3m6!1s0x3bc2b92474a1394d:0xd3c751211c899f82!8m2!3d18.6150484!4d73.8036562!16s%2Fg%2F11w9137c3_!19sChIJTTmhdCS5wjsRgp-JHCFRx9M?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Caffeine/data=!4m7!3m6!1s0x3bc2b91d8ce27dad:0xa641b7ba8078f7e!8m2!3d18.5869331!4d73.8232932!16s%2Fg%2F11vsd0dqkw!19sChIJrX3ijB25wjsRfo8HqHsbZAo?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Pokket+Cafe+Thermax+Chowk/data=!4m7!3m6!1s0x3bdba3df123c5753:0xd09203fac57bdf7!8m2!3d18.6605439!4d73.79439!16s%2Fg%2F11scmkk1y4!19sChIJU1c8Et-j2zsR971XrD8gCQ0?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Soda+Pop+Cafe/data=!4m7!3m6!1s0x3bc2b950eb3fb857:0x493df84e28eea5ad!8m2!3d18.6078051!4d73.8022462!16s%2Fg%2F11vkh6d_tw!19sChIJV7g_61C5wjsRraXuKE74PUk?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Urban+Crust+%7C+Best+Cafe+in+Pimpri+%7C+Best+Cafe+in+Nehru+Nagar+%7C+Best+Pizza+in+Pimpri+%7C+Fresh+Dough+Pizza+in+Pimpri/data=!4m7!3m6!1s0x3bc2b9068fc2f8cf:0xfc034f3e3eaadb56!8m2!3d18.6295108!4d73.8195804!16s%2Fg%2F11xlm5lryn!19sChIJz_jCjwa5wjsRVtuqPj5PA_w?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Brew+Coffee/data=!4m7!3m6!1s0x3bc2b97c29f14fdd:0x9872bbd3f1da9414!8m2!3d18.5815696!4d73.8173088!16s%2Fg%2F11t77wtnzk!19sChIJ3U_xKXy5wjsRFJTa8dO7cpg?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/KAF%C3%88+ESPRESS/data=!4m7!3m6!1s0x3bc2b9b943a13b49:0x87a930a53313615!8m2!3d18.6277216!4d73.7815137!16s%2Fg%2F11g4ddcy7z!19sChIJSTuhQ7m5wjsRFTYxUwqTegg?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Cloud+9/data=!4m7!3m6!1s0x3bc2b9d29a105a6f:0xfeeccc9c8ada85de!8m2!3d18.6232955!4d73.8174961!16s%2Fg%2F11q571xknr!19sChIJb1oQmtK5wjsR3oXaipzM7P4?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/55+CAFE/data=!4m7!3m6!1s0x3bc2b979f9c75621:0xa391b3548d7d7122!8m2!3d18.6169595!4d73.8194832!16s%2Fg%2F11mct364pw!19sChIJIVbH-Xm5wjsRInF9jVSzkaM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Caffix+Cafe/data=!4m7!3m6!1s0x3bc2b9c8fa356e49:0xb74b44aa6a0a14a8!8m2!3d18.6150806!4d73.8046524!16s%2Fg%2F11qqvd_s95!19sChIJSW41-si5wjsRqBQKaqpES7c?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Peter+-+Aundh/data=!4m7!3m6!1s0x3bc2bf250ec2d3e7:0xa8dc1278c814a918!8m2!3d18.5579082!4d73.8042105!16s%2Fg%2F1v2kvx4s!19sChIJ59PCDiW_wjsRGKkUyHgS3Kg?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Durga/data=!4m7!3m6!1s0x3bc2b9005b5cf65f:0xef2a3a61eb22da99!8m2!3d18.6248888!4d73.819896!16s%2Fg%2F11w2gtqh43!19sChIJX_ZcWwC5wjsRmdoi62E6Ku8?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Leona%27s+Cafe/data=!4m7!3m6!1s0x3bc2b91a46e8f19b:0xd72ca7eb07150092!8m2!3d18.5891453!4d73.8189206!16s%2Fg%2F11qh448w7x!19sChIJm_HoRhq5wjsRkgAVB-unLNc?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Bluetail+Cafe/data=!4m7!3m6!1s0x3bc2b957c0c162d9:0x19fe46995f4a7f0f!8m2!3d18.6359649!4d73.8211119!16s%2Fg%2F11x84t5bb_!19sChIJ2WLBwFe5wjsRD39KX5lG_hk?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Orange,+Art+and+Book+Cafe/data=!4m7!3m6!1s0x3bc2bfba5782b485:0x6c925888ea900e7!8m2!3d18.5574161!4d73.8044961!16s%2Fg%2F11krmq6snp!19sChIJhbSCV7q_wjsR5wCpjoglyQY?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Jamna%27s+Sandwich+%26+Coffee+Shop/data=!4m7!3m6!1s0x3bc2b994eec987b1:0x4555e5513b25badc!8m2!3d18.6153399!4d73.8045306!16s%2Fg%2F11q3drkf3_!19sChIJsYfJ7pS5wjsR3LolO1HlVUU?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Durga+Cafe+Pimpri/data=!4m7!3m6!1s0x3bc2b995237640f9:0x6179d4bf3cdc7599!8m2!3d18.6165196!4d73.8031137!16s%2Fg%2F11yfr_z3r6!19sChIJ-UB2I5W5wjsRmXXcPL_UeWE?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Monk+%26+Mongoose+Cafe/data=!4m7!3m6!1s0x3bc2b97ae21c3643:0x8dbfbc9e999a17d9!8m2!3d18.6166777!4d73.7863764!16s%2Fg%2F11l4zyh107!19sChIJQzYc4nq5wjsR2ReamZ68v40?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Love+Bites+Cafe+and+Mini+Theatre/data=!4m7!3m6!1s0x3bc2b8f53b8d9d47:0xa6163da9fc1c3f9b!8m2!3d18.6140075!4d73.8169123!16s%2Fg%2F11dxkyp1c9!19sChIJR52NO_W4wjsRmz8c_Kk9FqY?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Buddy%E2%80%99s+Espresso+Pimpri/data=!4m7!3m6!1s0x3bc2b90ada15c1d5:0x4ea8cfee948176c1!8m2!3d18.6348928!4d73.8203976!16s%2Fg%2F11k9f6mm4x!19sChIJ1cEV2gq5wjsRwXaBlO7PqE4?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Baithack-+Taste+of+Kulhad+%28New+Telco+Road%29/data=!4m7!3m6!1s0x3bc2b9006c6f0c8d:0x421e3197375325cf!8m2!3d18.6352649!4d73.8205983!16s%2Fg%2F11xlt4qs7m!19sChIJjQxvbAC5wjsRzyVTN5cxHkI?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+cues+and+cushions/data=!4m7!3m6!1s0x3bc2b94d03c4ae63:0x31ff5ee57c6e8ea3!8m2!3d18.6148781!4d73.7653239!16s%2Fg%2F11fmyvk76n!19sChIJY67EA025wjsRo45ufOVe_zE?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/SOUTHWAY+COFFEE+-+TASTE+OF+BANGALORE/data=!4m7!3m6!1s0x3bc2b900708392a1:0xa9a61712f057786d!8m2!3d18.606363!4d73.791131!16s%2Fg%2F11wy76w0w3!19sChIJoZKDcAC5wjsRbXhX8BIXpqk?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Katta/data=!4m7!3m6!1s0x3bc2b9a46fb52e59:0x7cf9bb07598d4b0b!8m2!3d18.6108458!4d73.800786!16s%2Fg%2F11y3lwmzp6!19sChIJWS61b6S5wjsRC0uNWQe7-Xw?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+love+birds+%EF%B8%8F/data=!4m7!3m6!1s0x3bc2b79d6fe20887:0xcf8208e93e4564fd!8m2!3d18.6643896!4d73.7990794!16s%2Fg%2F11j9dq0bly!19sChIJhwjib523wjsR_WRFPukIgs8?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Round+The+Clock+Craving%27s/data=!4m7!3m6!1s0x3bc2b97b216bd091:0xe362b4a2dc742d6a!8m2!3d18.5791254!4d73.8129487!16s%2Fg%2F11mq6n7m5m!19sChIJkdBrIXu5wjsRai103KK0YuM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/PUNJABI+ROADHOUSE+EATAWAY+CAFE/data=!4m7!3m6!1s0x3bc2b93d78b01b31:0x77ec93d5a76bf69c!8m2!3d18.6258786!4d73.8206829!16s%2Fg%2F11td45_y6t!19sChIJMRuweD25wjsRnPZrp9WT7Hc?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Buddy%27s+Espresso+-+Best+Cafe+In+Wakad/data=!4m7!3m6!1s0x3bc2b9b4a7720009:0x4d8697834e064587!8m2!3d18.6016074!4d73.7562279!16s%2Fg%2F11fkvr5ffr!19sChIJCQByp7S5wjsRh0UGToOXhk0?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Durga+Cafe/data=!4m7!3m6!1s0x3bc2b96d033204a5:0x4e39b48ed760b97a!8m2!3d18.5879335!4d73.7798921!16s%2Fg%2F11t9ctxpkv!19sChIJpQQyA225wjsRerlg1460OU4?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+moonlight/data=!4m7!3m6!1s0x3bc2b9d0cdba4dbb:0x9e78d1bc4ffedd82!8m2!3d18.6462672!4d73.7685763!16s%2Fg%2F11fmzs2dtw!19sChIJu026zdC5wjsRgt3-T7zReJ4?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafenirvana/data=!4m7!3m6!1s0x3bc2b954fee09619:0xae6631dfec61e660!8m2!3d18.6140242!4d73.775783!16s%2Fg%2F11sc9j6ggg!19sChIJGZbg_lS5wjsRYOZh7N8xZq4?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Daily+Toast/data=!4m7!3m6!1s0x3bc2b965f301bc5f:0xf5c396da67339a77!8m2!3d18.6131017!4d73.8008264!16s%2Fg%2F11vxpf_jm2!19sChIJX7wB82W5wjsRd5ozZ9qWw_U?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Love+Lock+pimpri/data=!4m7!3m6!1s0x3bc2b9d38eeb899b:0x9fe8fa2d18a7eed0!8m2!3d18.6114183!4d73.8028907!16s%2Fg%2F11vxw8w_1c!19sChIJm4nrjtO5wjsR0O6nGC366J8?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/cue+8+cafe/data=!4m7!3m6!1s0x3bc2b9a76e709423:0xf10a031d1517c68c!8m2!3d18.621599!4d73.7904029!16s%2Fg%2F11p14pql3f!19sChIJI5Rwbqe5wjsRjMYXFR0DCvE?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Brew+nation/data=!4m7!3m6!1s0x3bc2b90907083469:0xf15f12e419146ae4!8m2!3d18.6282546!4d73.7848593!16s%2Fg%2F11sx6z3xkk!19sChIJaTQIBwm5wjsR5GoUGeQSX_E?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Coffee+Beans/data=!4m7!3m6!1s0x3bc2b97ff64464b7:0xf07626f5792689ea!8m2!3d18.6115722!4d73.7929495!16s%2Fg%2F11svsb22gn!19sChIJt2RE9n-5wjsR6okmefUmdvA?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Abby%27s+Cafe+Bun+%26+Bean/data=!4m7!3m6!1s0x3bc2b9ca359b2243:0x5a07031c4b541ccf!8m2!3d18.5822585!4d73.8305007!16s%2Fg%2F11xrkzbbp7!19sChIJQyKbNcq5wjsRzxxUSxwDB1o?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Munchies+Coffee/data=!4m7!3m6!1s0x3bc2b916839461b7:0x9186af28d3a41c0b!8m2!3d18.629998!4d73.7882705!16s%2Fg%2F11w2mv_t10!19sChIJt2GUgxa5wjsRCxyk0yivhpE?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Brew+Coffee/data=!4m7!3m6!1s0x3bc2b9006addc121:0x398e44db870cb18d!8m2!3d18.6213936!4d73.8180833!16s%2Fg%2F11y3rgmxr9!19sChIJIcHdagC5wjsRjbEMh9tEjjk?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Cherish/data=!4m7!3m6!1s0x3bc2b9edd26a4603:0xb513934731b12e89!8m2!3d18.6548553!4d73.7740806!16s%2Fg%2F11y3d34m3z!19sChIJA0Zq0u25wjsRiS6xMUeTE7U?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/CAFE+18+%26+RS+CHALTA+BOLTA+CHAHA+BRANCH+NO.3/data=!4m7!3m6!1s0x3bc2b9e7c66c779d:0x70e308e03fab9f4c!8m2!3d18.6315534!4d73.8045315!16s%2Fg%2F11y7qpq54l!19sChIJnXdsxue5wjsRTJ-rP-AI43A?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Couple+Friendly+B2/data=!4m7!3m6!1s0x3bc2b91d0320e64f:0x5f52c277f3232f22!8m2!3d18.6207049!4d73.8222983!16s%2Fg%2F11sx3vpt1f!19sChIJT-YgAx25wjsRIi8j83fCUl8?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Kismi/data=!4m7!3m6!1s0x3bc2b96ad52244eb:0x912e61c5b24629ac!8m2!3d18.6421401!4d73.7561697!16s%2Fg%2F11sbx04gg3!19sChIJ60Qi1Wq5wjsRrClGssVhLpE?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Believer+street+cafe/data=!4m7!3m6!1s0x3bc2bf7be3c5d23b:0x32894d868bd9bc4c!8m2!3d18.5712611!4d73.8170884!16s%2Fg%2F11t9pghftx!19sChIJO9LF43u_wjsRTLzZi4ZNiTI?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Fables+caf%C3%A9/data=!4m7!3m6!1s0x3bc2b7ac8feb692d:0xe0a4e2a72237b9d1!8m2!3d18.6834087!4d73.8355407!16s%2Fg%2F11spjgm484!19sChIJLWnrj6y3wjsR0bk3IqfipOA?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Day+%26+Night/data=!4m7!3m6!1s0x3bc2b9bf985398e1:0x3537741b41f9077a!8m2!3d18.6618589!4d73.8012617!16s%2Fg%2F11jvvphnpg!19sChIJ4ZhTmL-5wjsRegf5QRt0NzU?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/URBAN+KHAUBOY+PUNE/data=!4m7!3m6!1s0x3bc2b9006afe55fd:0xbf6e3c1735f52cb1!8m2!3d18.6159789!4d73.8025783!16s%2Fg%2F11m59qpp31!19sChIJ_VX-agC5wjsRsSz1NRc8br8?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cheesy+Land+Cafe/data=!4m7!3m6!1s0x3bc2b948ac21f685:0x513786aabecb344c!8m2!3d18.6333541!4d73.7981954!16s%2Fg%2F11fm4jh1zp!19sChIJhfYhrEi5wjsRTDTLvqqGN1E?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Sharu%27s+cafe+and+Diet+Food/data=!4m7!3m6!1s0x3bc2bf07f8d07ecd:0x59c13337681fde27!8m2!3d18.560598!4d73.804458!16s%2Fg%2F11qz4tw5cj!19sChIJzX7Q-Ae_wjsRJ94faDczwVk?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Malgudi+Cafe/data=!4m7!3m6!1s0x3bc2b97005e8813d:0xd79ca87b5a9000e3!8m2!3d18.6269417!4d73.8045213!16s%2Fg%2F11ylv4xf3_!19sChIJPYHoBXC5wjsR4wCQWnuonNc?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Heaven+of+cafe/data=!4m7!3m6!1s0x3bc2b900637030c1:0x7d38cddc022e6763!8m2!3d18.597889!4d73.7993309!16s%2Fg%2F11m5rbw0c6!19sChIJwTBwYwC5wjsRY2cuAtzNOH0?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Pavilion+Cafe/data=!4m7!3m6!1s0x3bc2b9002034f729:0x6fe763be878ff4ab!8m2!3d18.6204196!4d73.7822904!16s%2Fg%2F11ybb2d_bx!19sChIJKfc0IAC5wjsRq_SPh75j528?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/BREAD+BASH+PIMPRI/data=!4m7!3m6!1s0x3bc2b9ce76f9f577:0x5bc8e26cb3eb4e6f!8m2!3d18.618547!4d73.8036619!16s%2Fg%2F11n5d57l_d!19sChIJd_X5ds65wjsRb07rs2ziyFs?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Soda+Shop+And+Cafe/data=!4m7!3m6!1s0x3bc2b93970e2a571:0x4d5bfcbe9e99a7c7!8m2!3d18.6250621!4d73.8182997!16s%2Fg%2F11vd0vdbyz!19sChIJcaXicDm5wjsRx6eZnr78W00?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+coffee+space/data=!4m7!3m6!1s0x3bc2b70045d1a90d:0xc8a4e52b74920f69!8m2!3d18.6649873!4d73.8084849!16s%2Fg%2F11lzt6t05g!19sChIJDanRRQC3wjsRaQ-SdCvlpMg?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/THE+BEAN+CAFE+AND+PIZZA+HOUSE/data=!4m7!3m6!1s0x3bc2b93b08c6d205:0x3f192400c196136b!8m2!3d18.6334545!4d73.8051228!16s%2Fg%2F11ls4tgm70!19sChIJBdLGCDu5wjsRaxOWwQAkGT8?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Unique+Table/data=!4m7!3m6!1s0x3bc2b809a2a437ef:0x71a977cd64f92d6d!8m2!3d18.6509281!4d73.8396123!16s%2Fg%2F11f4pd4myj!19sChIJ7zekogm4wjsRbS35ZM13qXE?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/cafe+fusion9+%28Ukadiche%2FSteam+Modak%29/data=!4m7!3m6!1s0x3bc2b9c7d9fe02eb:0xc51a21e9c40e361f!8m2!3d18.6611662!4d73.8044307!16s%2Fg%2F11rb_kjkmc!19sChIJ6wL-2ce5wjsRHzYOxOkhGsU?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Coffee+%26+More+-+Wakad/data=!4m7!3m6!1s0x3bc2b900381698a3:0xde3aa633112173cc!8m2!3d18.6006822!4d73.7565714!16s%2Fg%2F11y2g33qgz!19sChIJo5gWOAC5wjsRzHMhETOmOt4?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Blackbuck+cafe/data=!4m7!3m6!1s0x3bc2b940620090d1:0x51cca6ac19cf115!8m2!3d18.6466984!4d73.7890603!16s%2Fg%2F11jt7p21tl!19sChIJ0ZAAYkC5wjsRFfGcwWrKHAU?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+cafe+Divine/data=!4m7!3m6!1s0x3bc2b9a242662f43:0x23f92157181e113b!8m2!3d18.6196691!4d73.8043723!16s%2Fg%2F11v5c0ms8p!19sChIJQy9mQqK5wjsROxEeGFch-SM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/CAFE+CREAM/data=!4m7!3m6!1s0x3bc2b990bbbd32db:0x313c16b496a5a59!8m2!3d18.6238745!4d73.8197402!16s%2Fg%2F11h4mtjltm!19sChIJ2zK9u5C5wjsRWVpqSWvBEwM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Cilantro/data=!4m7!3m6!1s0x3bc2b827f8b90e9f:0x2e5ee922846e3008!8m2!3d18.663627!4d73.8070459!16s%2Fg%2F11h9y62f30!19sChIJnw65-Ce4wjsRCDBuhCLpXi4?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/U+%26+Me+Cafe/data=!4m7!3m6!1s0x3bc2b9dfde0333f9:0xfbf6e412ebc4b717!8m2!3d18.6442648!4d73.7965419!16s%2Fg%2F11vb_g_cq8!19sChIJ-TMD3t-5wjsRF7fE6xLk9vs?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Love+Town+Cafe/data=!4m7!3m6!1s0x3bc2b809990783d1:0x3ed76206066e05a0!8m2!3d18.6524188!4d73.83589!16s%2Fg%2F11gfjrdw9d!19sChIJ0YMHmQm4wjsRoAVuBgZi1z4?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Ashapura+Tea+Garden/data=!4m7!3m6!1s0x3bc2b99f2667f367:0xec0a680fcee7a387!8m2!3d18.6328186!4d73.820023!16s%2Fg%2F11ry2yn6_r!19sChIJZ_NnJp-5wjsRh6Pnzg9oCuw?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Golden+Jazz+Cafe/data=!4m7!3m6!1s0x3bc2b9025e4589ff:0xc37d648202f3e354!8m2!3d18.6189528!4d73.791263!16s%2Fg%2F11rv3077vz!19sChIJ_4lFXgK5wjsRVOPzAoJkfcM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Close+2+Sky/data=!4m7!3m6!1s0x3bc2b922fb28ba35:0xeff9921d4167bc0c!8m2!3d18.6050141!4d73.7501279!16s%2Fg%2F11q9fnx9gy!19sChIJNboo-yK5wjsRDLxnQR2S-e8?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Love+Town+Cafe/data=!4m7!3m6!1s0x3bc2b93203be245d:0x5a8c4c8ce12861a9!8m2!3d18.6463655!4d73.7683978!16s%2Fg%2F11fr1ljc8w!19sChIJXSS-AzK5wjsRqWEo4YxMjFo?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+tik+tok/data=!4m7!3m6!1s0x3bc2b990953b9e8d:0x45ad9f3dd5b1b543!8m2!3d18.5891721!4d73.8177784!16s%2Fg%2F11fqp1pycv!19sChIJjZ47lZC5wjsRQ7Wx1T2frUU?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Hash+Cafe+%26+Chinese+Corner/data=!4m7!3m6!1s0x3bc2b980c1afea43:0x18a28a6d342c517a!8m2!3d18.6634275!4d73.8069577!16s%2Fg%2F11kk5ff8x3!19sChIJQ-qvwYC5wjsRelEsNG2Kohg?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Coffee+Landewadi/data=!4m7!3m6!1s0x3bc2b9fa9fa4f877:0xc316b466409a859d!8m2!3d18.6198489!4d73.8418809!16s%2Fg%2F11fqq13nzp!19sChIJd_ikn_q5wjsRnYWaQGa0FsM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+delicious+25/data=!4m7!3m6!1s0x3bc2b9941dd990b9:0x1338ad6d1dae638c!8m2!3d18.614432!4d73.7783161!16s%2Fg%2F11q9md309d!19sChIJuZDZHZS5wjsRjGOuHW2tOBM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Kannu+Ki+Chai+Pimpri/data=!4m7!3m6!1s0x3bc2b9784dc07495:0x631e1cd75a548130!8m2!3d18.6159126!4d73.8002679!16s%2Fg%2F11s1y2xj16!19sChIJlXTATXi5wjsRMIFUWtccHmM?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Trinity+Cafe+%26+Roll+House/data=!4m7!3m6!1s0x3bc2b91760e79011:0xe4fc74fbf5a3ad25!8m2!3d18.5814726!4d73.8164736!16s%2Fg%2F11rxqd38vk!19sChIJEZDnYBe5wjsRJa2j9ft0_OQ?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Coffee+Club/data=!4m7!3m6!1s0x3bc2c76cbc7290ad:0x345f51319d4aba40!8m2!3d18.6367385!4d73.8452546!16s%2Fg%2F11sy3j1qjb!19sChIJrZByvGzHwjsRQLpKnTFRXzQ?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Dropout+katta/data=!4m7!3m6!1s0x3bc2b945b84da66f:0x5cb50c209e64489f!8m2!3d18.622268!4d73.816912!16s%2Fg%2F11h3mth10h!19sChIJb6ZNuEW5wjsRn0hkniAMtVw?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Plus+-+Coffee+Bar+%26+Fast+Food/data=!4m7!3m6!1s0x3bc2bbd7b0a0d86b:0xae4a71cd9759ce3a!8m2!3d18.6028343!4d73.7459202!16s%2Fg%2F11f57dd2yh!19sChIJa9igsNe7wjsROs5Zl81xSq4?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+KAFFEE+D/data=!4m7!3m6!1s0x3bc2b9f92bd269e5:0x82bdd7cf1bc00c8d!8m2!3d18.5849361!4d73.8219161!16s%2Fg%2F11mwypkqyh!19sChIJ5WnSK_m5wjsRjQzAG8_XvYI?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/F.R.I.E.N.D.S+House+Cafe/data=!4m7!3m6!1s0x3bc2b99ab4f0dec3:0x6b38d9c30a026e0a!8m2!3d18.6277121!4d73.7841301!16s%2Fg%2F11fp826lq7!19sChIJw97wtJq5wjsRCm4CCsPZOGs?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Love+Town+Cafe/data=!4m7!3m6!1s0x3bc2b7e2312fc4dd:0xd0128453baeba85c!8m2!3d18.665281!4d73.7974595!16s%2Fg%2F11v3g92w82!19sChIJ3cQvMeK3wjsRXKjrulOEEtA?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Bliss+Cafe/data=!4m7!3m6!1s0x3bc2b937d84ace4b:0x1f95858fa7fc8fff!8m2!3d18.6140492!4d73.7768506!16s%2Fg%2F11h4clyl8_!19sChIJS85K2De5wjsR_4_8p4-FlR8?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Justins+cafe/data=!4m7!3m6!1s0x3bc2b997bf322215:0x74734ca3cb150d49!8m2!3d18.6331647!4d73.8149392!16s%2Fg%2F11h93_z7t_!19sChIJFSIyv5e5wjsRSQ0Vy6NMc3Q?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/The+Grand+Cafe/data=!4m7!3m6!1s0x3bc2b905fa487b05:0xf2c92a4719bf94ce!8m2!3d18.6614767!4d73.7942709!16s%2Fg%2F11gsk601h6!19sChIJBXtI-gW5wjsRzpS_GUcqyfI?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Golden+Cafe/data=!4m7!3m6!1s0x3bc2b8099899b93f:0x1862d6008ae788a8!8m2!3d18.650732!4d73.8394317!16s%2Fg%2F11gg4k3qjf!19sChIJP7mZmAm4wjsRqIjnigDWYhg?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+4th+Lane/data=!4m7!3m6!1s0x3bc2c12e265954ef:0x3bba8c9c9fad923a!8m2!3d18.6282118!4d73.7832023!16s%2Fg%2F11stxlqtn3!19sChIJ71RZJi7BwjsROpKtn5yMujs?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Maccha+Restaurant/data=!4m7!3m6!1s0x3bc2bff1c2f13725:0x2bcee2755340e5f4!8m2!3d18.5601197!4d73.8031031!16s%2Fg%2F11mkkv_dpf!19sChIJJTfxwvG_wjsR9OVAU3Xizis?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Starbucks/data=!4m7!3m6!1s0x3bc2b9ebf719afeb:0x50cdd1d780491757!8m2!3d18.6338314!4d73.7996808!16s%2Fg%2F11w81sqy9f!19sChIJ668Z9-u5wjsRVxdJgNfRzVA?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Goodluck+Cafe+-+Elpro+Mall/data=!4m7!3m6!1s0x3bc2b94119ece7f9:0x703bae73ae374266!8m2!3d18.6287442!4d73.7842302!16s%2Fg%2F11vcmvwmjy!19sChIJ-efsGUG5wjsRZkI3rnOuO3A?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+moonlight/data=!4m7!3m6!1s0x3bc2b9d4e89cee09:0xf5be9ccbbfd4ec07!8m2!3d18.6328043!4d73.786218!16s%2Fg%2F11hz_kc5lf!19sChIJCe6c6NS5wjsRB-zUv8ucvvU?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Expresso/data=!4m7!3m6!1s0x3bc2b929323e4f97:0x5cef42a6c25ab897!8m2!3d18.6152061!4d73.8034181!16s%2Fg%2F11fj2rdh0y!19sChIJl08-Mim5wjsRl7hawqZC71w?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/Cafe+Creme+Moshi/data=!4m7!3m6!1s0x3bc2b7b32e5ab279:0x5746250cef844d0!8m2!3d18.6784179!4d73.8334704!16s%2Fg%2F11tn56rzj5!19sChIJebJaLrO3wjsR0ET4zlBidAU?authuser=0&hl=en&rclk=1",
+      "https://www.google.com/maps/place/cafe+chocolate+mania/data=!4m7!3m6!1s0x3bc2b9e57f60d8cd:0xb003ef5292eaaee7!8m2!3d18.6208791!4d73.8194196!16s%2Fg%2F11h5s459sd!19sChIJzdhgf-W5wjsR567qklLvA7A?authuser=0&hl=en&rclk=1"
+    ],
+    "foundedLeadsCount": 118,
+    "allLeads": [
+      {
+        "placeId": "ChIJ860dUee5wjsRqKJsd7UP42Q",
+        "website": null,
+        "phoneNumber": "08554057977",
+        "name": "Enlighten cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Enlighten+cafe/data=!4m7!3m6!1s0x3bc2b9e7511dadf3:0x64e30fb5776ca2a8!8m2!3d18.5878095!4d73.7799505!16s%2Fg%2F11lc9x_cl5!19sChIJ860dUee5wjsRqKJsd7UP42Q?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": "585"
+      },
+      {
+        "placeId": "ChIJL34mPX-5wjsRuB3JY1h7ThI",
+        "website": "https://www.soundtrack.cafe/",
+        "phoneNumber": "08263867575",
+        "name": "The Soundtrack Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Soundtrack+Cafe/data=!4m7!3m6!1s0x3bc2b97f3d267e2f:0x124e7b5863c91db8!8m2!3d18.5823768!4d73.7837174!16s%2Fg%2F11h4zmv3x5!19sChIJL34mPX-5wjsRuB3JY1h7ThI?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJK9jGrui5wjsRCo8DMVsREVY",
+        "website": null,
+        "phoneNumber": "07741951166",
+        "name": "Cafe Destination",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Destination/data=!4m7!3m6!1s0x3bc2b9e8aec6d82b:0x5611115b31038f0a!8m2!3d18.6481816!4d73.7660303!16s%2Fg%2F124s_yc5l!19sChIJK9jGrui5wjsRCo8DMVsREVY?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.3",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJfd9ODmK5wjsRkOfLbQ3yL8A",
+        "website": null,
+        "phoneNumber": "09096053554",
+        "name": "Cafe Meraki",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Meraki/data=!4m7!3m6!1s0x3bc2b9620e4edf7d:0xc02ff20d6dcbe790!8m2!3d18.5786405!4d73.8157248!16s%2Fg%2F11j8t1m513!19sChIJfd9ODmK5wjsRkOfLbQ3yL8A?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJR9vsh4u5wjsRetpurwOXNtU",
+        "website": null,
+        "phoneNumber": "09850345354",
+        "name": "The Cafe Club",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Cafe+Club/data=!4m7!3m6!1s0x3bc2b98b87ecdb47:0xd5369703af6eda7a!8m2!3d18.6054086!4d73.784252!16s%2Fg%2F11t5_0sbdz!19sChIJR9vsh4u5wjsRetpurwOXNtU?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJG7AAoq65wjsRo2wLW9jpbyA",
+        "website": null,
+        "phoneNumber": "09075450526",
+        "name": "Panino Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Panino+Cafe/data=!4m7!3m6!1s0x3bc2b9aea200b01b:0x206fe9d85b0b6ca3!8m2!3d18.6327525!4d73.7865756!16s%2Fg%2F11sfdkd_w0!19sChIJG7AAoq65wjsRo2wLW9jpbyA?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJqR_DLJi5wjsRvByyuZRMfaQ",
+        "website": null,
+        "phoneNumber": "09156396776",
+        "name": "Brewing Partners - Pimpri",
+        "gmapsUrl": "https://www.google.com/maps/place/Brewing+Partners+-+Pimpri/data=!4m7!3m6!1s0x3bc2b9982cc31fa9:0xa47d4c94b9b21cbc!8m2!3d18.6248102!4d73.8196719!16s%2Fg%2F11nxnwzn8r!19sChIJqR_DLJi5wjsRvByyuZRMfaQ?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJH16Ipb-5wjsRZqoBaF7WJ5w",
+        "website": null,
+        "phoneNumber": "09595959803",
+        "name": "Cafe Dot Com krishna chowk.",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Dot+Com+krishna+chowk./data=!4m7!3m6!1s0x3bc2b9bfa5885e1f:0x9c27d65e6801aa66!8m2!3d18.5817116!4d73.8164881!16s%2Fg%2F11q48pz4bz!19sChIJH16Ipb-5wjsRZqoBaF7WJ5w?authuser=0&hl=en&rclk=1",
+        "overAllRating": "3.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJSUsOJfa5wjsRSl1WVtOGFww",
+        "website": null,
+        "phoneNumber": "08087809230",
+        "name": "Inhale Cafe & Smoke",
+        "gmapsUrl": "https://www.google.com/maps/place/Inhale+Cafe+%26+Smoke/data=!4m7!3m6!1s0x3bc2b9f6250e4b49:0xc1786d356565d4a!8m2!3d18.5787186!4d73.8157439!16s%2Fg%2F11ptpknx9x!19sChIJSUsOJfa5wjsRSl1WVtOGFww?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.5",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJARICbGe5wjsR2SYz4khFnp8",
+        "website": "https://www.zomato.com/pune/cafe-crush-pimple-gurav",
+        "phoneNumber": "08796870666",
+        "name": "Cafe Crush - New Sangvi, PCMC",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Crush+-+New+Sangvi,+PCMC/data=!4m7!3m6!1s0x3bc2b9676c021201:0x9f9e4548e23326d9!8m2!3d18.5791004!4d73.8134245!16s%2Fg%2F11q842fm3f!19sChIJARICbGe5wjsR2SYz4khFnp8?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJlfrZZE25wjsRuXsnvOGKyrk",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Cheesy Appetite",
+        "gmapsUrl": "https://www.google.com/maps/place/Cheesy+Appetite/data=!4m7!3m6!1s0x3bc2b94d64d9fa95:0xb9ca8ae1bc277bb9!8m2!3d18.6195751!4d73.8036683!16s%2Fg%2F11tr_z4gml!19sChIJlfrZZE25wjsRuXsnvOGKyrk?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.8",
+        "numberOfReviews": "73"
+      },
+      {
+        "placeId": "ChIJQ0LeFnW5wjsRL4HamLScYe0",
+        "website": null,
+        "phoneNumber": "08962562502",
+        "name": "Cafe coffee hutt",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+coffee+hutt/data=!4m7!3m6!1s0x3bc2b97516de4243:0xed619cb498da812f!8m2!3d18.5926878!4d73.803724!16s%2Fg%2F11rttjh1x_!19sChIJQ0LeFnW5wjsRL4HamLScYe0?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ0btLIQC5wjsR0wNYwDmmHYM",
+        "website": null,
+        "phoneNumber": "08329171727",
+        "name": "Cheesy Crazy Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Cheesy+Crazy+Cafe/data=!4m7!3m6!1s0x3bc2b900214bbbd1:0x831da639c05803d3!8m2!3d18.5789342!4d73.8160356!16s%2Fg%2F11lf45hy6d!19sChIJ0btLIQC5wjsR0wNYwDmmHYM?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "0x3bc2b9f04e76466f:0x67efdad8ce46a340",
+        "website": "https://www.facebook.com/Caf%C3%A9-Chocolicious-687343708283941/",
+        "phoneNumber": null,
+        "name": "Cafe Chocolicious",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Chocolicious,+Shop,+Shastri+Nagar,+Pimpri+Colony,+Pune,+Pimpri-Chinchwad,+Maharashtra+411017/@18.6168318,73.8017368,15z/data=!4m6!3m5!1s0x3bc2b9f04e76466f:0x67efdad8ce46a340!8m2!3d18.6168318!4d73.8017368!16s%2Fg%2F11g0l43_r8?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAQ%3D%3D",
+        "overAllRating": "4.1",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJKbpPkz65wjsRmIF9kdVYxuM",
+        "website": null,
+        "phoneNumber": "07798449126",
+        "name": "Kafesaa",
+        "gmapsUrl": "https://www.google.com/maps/place/Kafesaa/data=!4m7!3m6!1s0x3bc2b93e934fba29:0xe3c658d5917d8198!8m2!3d18.5793312!4d73.7856342!16s%2Fg%2F11t6q8zjf5!19sChIJKbpPkz65wjsRmIF9kdVYxuM?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJyYgPtHG5wjsRJYwSfD7ClvM",
+        "website": null,
+        "phoneNumber": "09307378215",
+        "name": "THE DREAMS CAFE",
+        "gmapsUrl": "https://www.google.com/maps/place/THE+DREAMS+CAFE/data=!4m7!3m6!1s0x3bc2b971b40f88c9:0xf396c23e7c128c25!8m2!3d18.6206894!4d73.8210399!16s%2Fg%2F11thj__379!19sChIJyYgPtHG5wjsRJYwSfD7ClvM?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJOdUCzWO5wjsR_Mux-v8ixng",
+        "website": "https://linktr.ee/cafe_snapchat",
+        "phoneNumber": "07776943098",
+        "name": "Cafe Snapchat",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Snapchat/data=!4m7!3m6!1s0x3bc2b963cd02d539:0x78c622fffab1cbfc!8m2!3d18.6293877!4d73.8196264!16s%2Fg%2F11sf31c10t!19sChIJOdUCzWO5wjsR_Mux-v8ixng?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJo1JtYAC5wjsRNLICzc7j2nE",
+        "website": "http://cafedaydreamer.in/",
+        "phoneNumber": "08308890844",
+        "name": "Café Day Dreamer",
+        "gmapsUrl": "https://www.google.com/maps/place/Caf%C3%A9+Day+Dreamer/data=!4m7!3m6!1s0x3bc2b900606d52a3:0x71dae3cecd02b234!8m2!3d18.6334414!4d73.8037714!16s%2Fg%2F11lcm0vw2k!19sChIJo1JtYAC5wjsRNLICzc7j2nE?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJaxLKu725wjsRk6OEj6L0vVw",
+        "website": null,
+        "phoneNumber": "08380888181",
+        "name": "It’s Street Coffee, Chinchwad",
+        "gmapsUrl": "https://www.google.com/maps/place/It%E2%80%99s+Street+Coffee,+Chinchwad/data=!4m7!3m6!1s0x3bc2b9bdbbca126b:0x5cbdf4a28f84a393!8m2!3d18.6327846!4d73.7864043!16s%2Fg%2F11mrmh1431!19sChIJaxLKu725wjsRk6OEj6L0vVw?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.9",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJf0ap4Ka5wjsRsAJw0VphHq0",
+        "website": "http://www.pokketcafe.com/",
+        "phoneNumber": "09975551206",
+        "name": "Pokket Cafe Chinchwadgaon (LOVE THEME)- Tawde Enterprises",
+        "gmapsUrl": "https://www.google.com/maps/place/Pokket+Cafe+Chinchwadgaon+%28LOVE+THEME%29-+Tawde+Enterprises/data=!4m7!3m6!1s0x3bc2b9a6e0a9467f:0xad1e615ad17002b0!8m2!3d18.6273296!4d73.7826431!16s%2Fg%2F11h16025j3!19sChIJf0ap4Ka5wjsRsAJw0VphHq0?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJY1bjJHi5wjsR_j26yhwiYgk",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Cafe Deccan Brews Best Cafe In PCMC",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Deccan+Brews+Best+Cafe+In+PCMC/data=!4m7!3m6!1s0x3bc2b97824e35663:0x962221ccaba3dfe!8m2!3d18.6462981!4d73.7684713!16s%2Fg%2F11ybxycjqq!19sChIJY1bjJHi5wjsR_j26yhwiYgk?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "0x3bc2b8cec982d4c7:0x2de14393657b7e77",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Famous Katta",
+        "gmapsUrl": "https://www.google.com/maps/place/Famous+Katta,+Famous+Chawk,Shitole+Empire,+New+Sangavi,+Pimpri-Chinchwad,+Maharashtra+411061/@18.5794822,73.8120362,15z/data=!4m6!3m5!1s0x3bc2b8cec982d4c7:0x2de14393657b7e77!8m2!3d18.5794822!4d73.8120362!16s%2Fg%2F11f75yxly6?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAQ%3D%3D",
+        "overAllRating": "4.1",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ9-OOgqK5wjsRfSW57Wm-xSo",
+        "website": null,
+        "phoneNumber": "09763406100",
+        "name": "Famous Katta Branch 2",
+        "gmapsUrl": "https://www.google.com/maps/place/Famous+Katta+Branch+2/data=!4m7!3m6!1s0x3bc2b9a2828ee3f7:0x2ac5be69edb9257d!8m2!3d18.5811874!4d73.8219683!16s%2Fg%2F11s7_6_tnk!19sChIJ9-OOgqK5wjsRfSW57Wm-xSo?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": "382"
+      },
+      {
+        "placeId": "0x3bc2b9b8c912120b:0xe54ed1d4374239dc",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Cafe Of Dreams",
+        "gmapsUrl": "https://www.google.com/maps/place/Shop+No-09,+Cafe+Of+Dreams,+B-Building,+Gokhale,Vrindavan+Society,+near+PNG+Jwellers,+Chinchwad+Gaon,+Pune,+Maharashtra+411033/@18.6304855,73.7788681,15z/data=!4m6!3m5!1s0x3bc2b9b8c912120b:0xe54ed1d4374239dc!8m2!3d18.6304855!4d73.7788681!16s%2Fg%2F11rcmp1ryk?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAg%3D%3D",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJMf3M-Pq5wjsRAj3tF8mHpwg",
+        "website": null,
+        "phoneNumber": "09665251411",
+        "name": "Cafe Signature Moment",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Signature+Moment/data=!4m7!3m6!1s0x3bc2b9faf8ccfd31:0x8a787c917ed3d02!8m2!3d18.6339253!4d73.7878014!16s%2Fg%2F11xl0gz_8p!19sChIJMf3M-Pq5wjsRAj3tF8mHpwg?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": "23"
+      },
+      {
+        "placeId": "ChIJTTmhdCS5wjsRgp-JHCFRx9M",
+        "website": null,
+        "phoneNumber": "07770039924",
+        "name": "Cafe bonding brews & Mini Theater",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+bonding+brews+%26+Mini+Theater/data=!4m7!3m6!1s0x3bc2b92474a1394d:0xd3c751211c899f82!8m2!3d18.6150484!4d73.8036562!16s%2Fg%2F11w9137c3_!19sChIJTTmhdCS5wjsRgp-JHCFRx9M?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.9",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJrX3ijB25wjsRfo8HqHsbZAo",
+        "website": null,
+        "phoneNumber": "07875937659",
+        "name": "Cafe Caffeine",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Caffeine/data=!4m7!3m6!1s0x3bc2b91d8ce27dad:0xa641b7ba8078f7e!8m2!3d18.5869331!4d73.8232932!16s%2Fg%2F11vsd0dqkw!19sChIJrX3ijB25wjsRfo8HqHsbZAo?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJU1c8Et-j2zsR971XrD8gCQ0",
+        "website": "http://pokketcafe.com/",
+        "phoneNumber": "07741004400",
+        "name": "Pokket Cafe Thermax Chowk",
+        "gmapsUrl": "https://www.google.com/maps/place/Pokket+Cafe+Thermax+Chowk/data=!4m7!3m6!1s0x3bdba3df123c5753:0xd09203fac57bdf7!8m2!3d18.6605439!4d73.79439!16s%2Fg%2F11scmkk1y4!19sChIJU1c8Et-j2zsR971XrD8gCQ0?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.5",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJV7g_61C5wjsRraXuKE74PUk",
+        "website": null,
+        "phoneNumber": "09145427327",
+        "name": "Soda Pop Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Soda+Pop+Cafe/data=!4m7!3m6!1s0x3bc2b950eb3fb857:0x493df84e28eea5ad!8m2!3d18.6078051!4d73.8022462!16s%2Fg%2F11vkh6d_tw!19sChIJV7g_61C5wjsRraXuKE74PUk?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJz_jCjwa5wjsRVtuqPj5PA_w",
+        "website": "https://www.instagram.com/the.urbancrust/",
+        "phoneNumber": "08484875342",
+        "name": "The Urban Crust | Best Cafe in Pimpri | Best Cafe in Nehru Nagar | Best Pizza in Pimpri | Fresh Dough Pizza in Pimpri",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Urban+Crust+%7C+Best+Cafe+in+Pimpri+%7C+Best+Cafe+in+Nehru+Nagar+%7C+Best+Pizza+in+Pimpri+%7C+Fresh+Dough+Pizza+in+Pimpri/data=!4m7!3m6!1s0x3bc2b9068fc2f8cf:0xfc034f3e3eaadb56!8m2!3d18.6295108!4d73.8195804!16s%2Fg%2F11xlm5lryn!19sChIJz_jCjwa5wjsRVtuqPj5PA_w?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.9",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "0x3bc2b97c29f14fdd:0x9872bbd3f1da9414",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Brew Coffee",
+        "gmapsUrl": "https://www.google.com/maps/place/Brew+Coffee,+MH+14+Food+Court+,+Krushna+Chowk,+New+Sangavi,+Pune,+Maharashtra+411061/@18.5815696,73.8173088,15z/data=!4m6!3m5!1s0x3bc2b97c29f14fdd:0x9872bbd3f1da9414!8m2!3d18.5815696!4d73.8173088!16s%2Fg%2F11t77wtnzk?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAg%3D%3D",
+        "overAllRating": "4.5",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJSTuhQ7m5wjsRFTYxUwqTegg",
+        "website": null,
+        "phoneNumber": "08600002240",
+        "name": "KAFÈ ESPRESS",
+        "gmapsUrl": "https://www.google.com/maps/place/KAF%C3%88+ESPRESS/data=!4m7!3m6!1s0x3bc2b9b943a13b49:0x87a930a53313615!8m2!3d18.6277216!4d73.7815137!16s%2Fg%2F11g4ddcy7z!19sChIJSTuhQ7m5wjsRFTYxUwqTegg?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": "1,275"
+      },
+      {
+        "placeId": "ChIJb1oQmtK5wjsR3oXaipzM7P4",
+        "website": null,
+        "phoneNumber": "09028043043",
+        "name": "Cafe Cloud 9",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Cloud+9/data=!4m7!3m6!1s0x3bc2b9d29a105a6f:0xfeeccc9c8ada85de!8m2!3d18.6232955!4d73.8174961!16s%2Fg%2F11q571xknr!19sChIJb1oQmtK5wjsR3oXaipzM7P4?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.5",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJIVbH-Xm5wjsRInF9jVSzkaM",
+        "website": "https://www.instagram.com/55_cafe_darbar/",
+        "phoneNumber": "08856809173",
+        "name": "55 CAFE",
+        "gmapsUrl": "https://www.google.com/maps/place/55+CAFE/data=!4m7!3m6!1s0x3bc2b979f9c75621:0xa391b3548d7d7122!8m2!3d18.6169595!4d73.8194832!16s%2Fg%2F11mct364pw!19sChIJIVbH-Xm5wjsRInF9jVSzkaM?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJSW41-si5wjsRqBQKaqpES7c",
+        "website": null,
+        "phoneNumber": "09146986181",
+        "name": "Caffix Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Caffix+Cafe/data=!4m7!3m6!1s0x3bc2b9c8fa356e49:0xb74b44aa6a0a14a8!8m2!3d18.6150806!4d73.8046524!16s%2Fg%2F11qqvd_s95!19sChIJSW41-si5wjsRqBQKaqpES7c?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": "37"
+      },
+      {
+        "placeId": "ChIJ59PCDiW_wjsRGKkUyHgS3Kg",
+        "website": null,
+        "phoneNumber": "07888272992",
+        "name": "Cafe Peter - Aundh",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Peter+-+Aundh/data=!4m7!3m6!1s0x3bc2bf250ec2d3e7:0xa8dc1278c814a918!8m2!3d18.5579082!4d73.8042105!16s%2Fg%2F1v2kvx4s!19sChIJ59PCDiW_wjsRGKkUyHgS3Kg?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.1",
+        "numberOfReviews": "3,453"
+      },
+      {
+        "placeId": "ChIJX_ZcWwC5wjsRmdoi62E6Ku8",
+        "website": "https://www.cafedurga.com/",
+        "phoneNumber": "09175136960",
+        "name": "Cafe Durga",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Durga/data=!4m7!3m6!1s0x3bc2b9005b5cf65f:0xef2a3a61eb22da99!8m2!3d18.6248888!4d73.819896!16s%2Fg%2F11w2gtqh43!19sChIJX_ZcWwC5wjsRmdoi62E6Ku8?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.2",
+        "numberOfReviews": "68"
+      },
+      {
+        "placeId": "ChIJm_HoRhq5wjsRkgAVB-unLNc",
+        "website": null,
+        "phoneNumber": "08208733766",
+        "name": "Leona's Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Leona%27s+Cafe/data=!4m7!3m6!1s0x3bc2b91a46e8f19b:0xd72ca7eb07150092!8m2!3d18.5891453!4d73.8189206!16s%2Fg%2F11qh448w7x!19sChIJm_HoRhq5wjsRkgAVB-unLNc?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": "23"
+      },
+      {
+        "placeId": "0x3bc2b957c0c162d9:0x19fe46995f4a7f0f",
+        "website": null,
+        "phoneNumber": null,
+        "name": "The Bluetail Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Bluetail+Cafe,+Shop+No.+6,+Rajveer+Imperia,+Annasaheb+Magar+Stadium,+7,+Loves+Chowk,+Pimpri-Chinchwad,+Maharashtra+411018/@18.6359649,73.8211119,15z/data=!4m6!3m5!1s0x3bc2b957c0c162d9:0x19fe46995f4a7f0f!8m2!3d18.6359649!4d73.8211119!16s%2Fg%2F11x84t5bb_?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAg%3D%3D",
+        "overAllRating": "5.0",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJhbSCV7q_wjsR5wCpjoglyQY",
+        "website": "https://www.instagram.com/theorange_pune?igsh=MTd2ZXU4cXFid3Fv",
+        "phoneNumber": "09766750428",
+        "name": "The Orange, Art and Book Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Orange,+Art+and+Book+Cafe/data=!4m7!3m6!1s0x3bc2bfba5782b485:0x6c925888ea900e7!8m2!3d18.5574161!4d73.8044961!16s%2Fg%2F11krmq6snp!19sChIJhbSCV7q_wjsR5wCpjoglyQY?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": "158"
+      },
+      {
+        "placeId": "ChIJsYfJ7pS5wjsR3LolO1HlVUU",
+        "website": null,
+        "phoneNumber": "09021826756",
+        "name": "Jamna's Sandwich & Coffee Shop",
+        "gmapsUrl": "https://www.google.com/maps/place/Jamna%27s+Sandwich+%26+Coffee+Shop/data=!4m7!3m6!1s0x3bc2b994eec987b1:0x4555e5513b25badc!8m2!3d18.6153399!4d73.8045306!16s%2Fg%2F11q3drkf3_!19sChIJsYfJ7pS5wjsR3LolO1HlVUU?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.9",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ-UB2I5W5wjsRmXXcPL_UeWE",
+        "website": null,
+        "phoneNumber": "07057111816",
+        "name": "Durga Cafe Pimpri",
+        "gmapsUrl": "https://www.google.com/maps/place/Durga+Cafe+Pimpri/data=!4m7!3m6!1s0x3bc2b995237640f9:0x6179d4bf3cdc7599!8m2!3d18.6165196!4d73.8031137!16s%2Fg%2F11yfr_z3r6!19sChIJ-UB2I5W5wjsRmXXcPL_UeWE?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": "25"
+      },
+      {
+        "placeId": "ChIJQzYc4nq5wjsR2ReamZ68v40",
+        "website": null,
+        "phoneNumber": "08308289101",
+        "name": "Monk & Mongoose Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Monk+%26+Mongoose+Cafe/data=!4m7!3m6!1s0x3bc2b97ae21c3643:0x8dbfbc9e999a17d9!8m2!3d18.6166777!4d73.7863764!16s%2Fg%2F11l4zyh107!19sChIJQzYc4nq5wjsR2ReamZ68v40?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJR52NO_W4wjsRmz8c_Kk9FqY",
+        "website": null,
+        "phoneNumber": "09975150994",
+        "name": "Love Bites Cafe and Mini Theatre",
+        "gmapsUrl": "https://www.google.com/maps/place/Love+Bites+Cafe+and+Mini+Theatre/data=!4m7!3m6!1s0x3bc2b8f53b8d9d47:0xa6163da9fc1c3f9b!8m2!3d18.6140075!4d73.8169123!16s%2Fg%2F11dxkyp1c9!19sChIJR52NO_W4wjsRmz8c_Kk9FqY?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.2",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ1cEV2gq5wjsRwXaBlO7PqE4",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Cafe Buddy’s Espresso Pimpri",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Buddy%E2%80%99s+Espresso+Pimpri/data=!4m7!3m6!1s0x3bc2b90ada15c1d5:0x4ea8cfee948176c1!8m2!3d18.6348928!4d73.8203976!16s%2Fg%2F11k9f6mm4x!19sChIJ1cEV2gq5wjsRwXaBlO7PqE4?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": "67"
+      },
+      {
+        "placeId": "ChIJjQxvbAC5wjsRzyVTN5cxHkI",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Baithack- Taste of Kulhad (New Telco Road)",
+        "gmapsUrl": "https://www.google.com/maps/place/Baithack-+Taste+of+Kulhad+%28New+Telco+Road%29/data=!4m7!3m6!1s0x3bc2b9006c6f0c8d:0x421e3197375325cf!8m2!3d18.6352649!4d73.8205983!16s%2Fg%2F11xlt4qs7m!19sChIJjQxvbAC5wjsRzyVTN5cxHkI?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.9",
+        "numberOfReviews": "31"
+      },
+      {
+        "placeId": "ChIJY67EA025wjsRo45ufOVe_zE",
+        "website": null,
+        "phoneNumber": "08149677077",
+        "name": "Cafe cues and cushions",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+cues+and+cushions/data=!4m7!3m6!1s0x3bc2b94d03c4ae63:0x31ff5ee57c6e8ea3!8m2!3d18.6148781!4d73.7653239!16s%2Fg%2F11fmyvk76n!19sChIJY67EA025wjsRo45ufOVe_zE?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": "383"
+      },
+      {
+        "placeId": "0x3bc2b900708392a1:0xa9a61712f057786d",
+        "website": "https://www.instagram.com/southwaycoffee/",
+        "phoneNumber": null,
+        "name": "SOUTHWAY COFFEE - TASTE OF BANGALORE",
+        "gmapsUrl": "https://www.google.com/maps/place/SOUTHWAY+COFFEE+-+TASTE+OF+BANGALORE,+Shop+No.+5,+6,+7,+Ground+and+Mezzanine+Floor,+Rahatani+Central,+Survey+No+50%2F1B,+Next+to+Nayara+Energy+Petrol+Pump,+,+PUNE+PCMC+ward+No-27,+Pune,+Maharashtra+411017/@18.606363,73.791131,15z/data=!4m6!3m5!1s0x3bc2b900708392a1:0xa9a61712f057786d!8m2!3d18.606363!4d73.791131!16s%2Fg%2F11wy76w0w3?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAg%3D%3D",
+        "overAllRating": "4.8",
+        "numberOfReviews": "834"
+      },
+      {
+        "placeId": "ChIJWS61b6S5wjsRC0uNWQe7-Xw",
+        "website": null,
+        "phoneNumber": "07875168925",
+        "name": "Cafe Katta",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Katta/data=!4m7!3m6!1s0x3bc2b9a46fb52e59:0x7cf9bb07598d4b0b!8m2!3d18.6108458!4d73.800786!16s%2Fg%2F11y3lwmzp6!19sChIJWS61b6S5wjsRC0uNWQe7-Xw?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": "25"
+      },
+      {
+        "placeId": "ChIJhwjib523wjsR_WRFPukIgs8",
+        "website": null,
+        "phoneNumber": "08380835653",
+        "name": "Cafe love birds ️",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+love+birds+%EF%B8%8F/data=!4m7!3m6!1s0x3bc2b79d6fe20887:0xcf8208e93e4564fd!8m2!3d18.6643896!4d73.7990794!16s%2Fg%2F11j9dq0bly!19sChIJhwjib523wjsR_WRFPukIgs8?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": "315"
+      },
+      {
+        "placeId": "0x3bc2b97b216bd091:0xe362b4a2dc742d6a",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Round The Clock Craving's",
+        "gmapsUrl": "https://www.google.com/maps/place/Round+The+Clock+Craving's,+Round+The+Clock+Cravings+Chaitraban,+Lane+No+2,+Chaitraban,+Society,+New+Sangavi,+Pimpri-Chinchwad,+Maharashtra+411061/@18.5791254,73.8129487,15z/data=!4m6!3m5!1s0x3bc2b97b216bd091:0xe362b4a2dc742d6a!8m2!3d18.5791254!4d73.8129487!16s%2Fg%2F11mq6n7m5m?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAQ%3D%3D",
+        "overAllRating": "4.5",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJMRuweD25wjsRnPZrp9WT7Hc",
+        "website": null,
+        "phoneNumber": "09881976791",
+        "name": "PUNJABI ROADHOUSE EATAWAY CAFE",
+        "gmapsUrl": "https://www.google.com/maps/place/PUNJABI+ROADHOUSE+EATAWAY+CAFE/data=!4m7!3m6!1s0x3bc2b93d78b01b31:0x77ec93d5a76bf69c!8m2!3d18.6258786!4d73.8206829!16s%2Fg%2F11td45_y6t!19sChIJMRuweD25wjsRnPZrp9WT7Hc?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.5",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJCQByp7S5wjsRh0UGToOXhk0",
+        "website": "http://www.cafebuddysespresso.com/",
+        "phoneNumber": "09028510285",
+        "name": "Cafe Buddy's Espresso - Best Cafe In Wakad",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Buddy%27s+Espresso+-+Best+Cafe+In+Wakad/data=!4m7!3m6!1s0x3bc2b9b4a7720009:0x4d8697834e064587!8m2!3d18.6016074!4d73.7562279!16s%2Fg%2F11fkvr5ffr!19sChIJCQByp7S5wjsRh0UGToOXhk0?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJpQQyA225wjsRerlg1460OU4",
+        "website": "https://instagram.com/durga_cafe_vishalnagar?igshid=MzNlNGNkZWQ4Mg==",
+        "phoneNumber": null,
+        "name": "Durga Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Durga+Cafe/data=!4m7!3m6!1s0x3bc2b96d033204a5:0x4e39b48ed760b97a!8m2!3d18.5879335!4d73.7798921!16s%2Fg%2F11t9ctxpkv!19sChIJpQQyA225wjsRerlg1460OU4?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.1",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "0x3bc2b9d0cdba4dbb:0x9e78d1bc4ffedd82",
+        "website": "http://www.cafemoonlight.com/",
+        "phoneNumber": null,
+        "name": "Cafe moonlight",
+        "gmapsUrl": "https://www.google.com/maps/place/JQW9%2BGC4+Cafe+moonlight,+Ganga+Nagar+Rd,+Sector+No.+28,+Pradhikaran,+Nigdi,+Pimpri-Chinchwad,+Maharashtra+411044/@18.6462672,73.7685763,15z/data=!4m6!3m5!1s0x3bc2b9d0cdba4dbb:0x9e78d1bc4ffedd82!8m2!3d18.6462672!4d73.7685763!16s%2Fg%2F11fmzs2dtw?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAg%3D%3D",
+        "overAllRating": "4.3",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJGZbg_lS5wjsRYOZh7N8xZq4",
+        "website": null,
+        "phoneNumber": "09136373477",
+        "name": "Cafenirvana",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafenirvana/data=!4m7!3m6!1s0x3bc2b954fee09619:0xae6631dfec61e660!8m2!3d18.6140242!4d73.775783!16s%2Fg%2F11sc9j6ggg!19sChIJGZbg_lS5wjsRYOZh7N8xZq4?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": "68"
+      },
+      {
+        "placeId": "ChIJX7wB82W5wjsRd5ozZ9qWw_U",
+        "website": null,
+        "phoneNumber": null,
+        "name": "The Daily Toast",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Daily+Toast/data=!4m7!3m6!1s0x3bc2b965f301bc5f:0xf5c396da67339a77!8m2!3d18.6131017!4d73.8008264!16s%2Fg%2F11vxpf_jm2!19sChIJX7wB82W5wjsRd5ozZ9qWw_U?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJm4nrjtO5wjsR0O6nGC366J8",
+        "website": null,
+        "phoneNumber": "09146495352",
+        "name": "Cafe Love Lock pimpri",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Love+Lock+pimpri/data=!4m7!3m6!1s0x3bc2b9d38eeb899b:0x9fe8fa2d18a7eed0!8m2!3d18.6114183!4d73.8028907!16s%2Fg%2F11vxw8w_1c!19sChIJm4nrjtO5wjsR0O6nGC366J8?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": "18"
+      },
+      {
+        "placeId": "0x3bc2b9a76e709423:0xf10a031d1517c68c",
+        "website": null,
+        "phoneNumber": null,
+        "name": "cue 8 cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/cue+8+cafe/@18.5597952,73.8033664,11z/data=!4m3!3m2!1s0x3bc2b9a76e709423:0xf10a031d1517c68c!16s%2Fg%2F11p14pql3f?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAQ%3D%3D",
+        "overAllRating": "4.2",
+        "numberOfReviews": "54"
+      },
+      {
+        "placeId": "ChIJaTQIBwm5wjsR5GoUGeQSX_E",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Brew nation",
+        "gmapsUrl": "https://www.google.com/maps/place/Brew+nation/data=!4m7!3m6!1s0x3bc2b90907083469:0xf15f12e419146ae4!8m2!3d18.6282546!4d73.7848593!16s%2Fg%2F11sx6z3xkk!19sChIJaTQIBwm5wjsR5GoUGeQSX_E?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": "164"
+      },
+      {
+        "placeId": "ChIJt2RE9n-5wjsR6okmefUmdvA",
+        "website": null,
+        "phoneNumber": "09881730706",
+        "name": "Cafe Coffee Beans",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Coffee+Beans/data=!4m7!3m6!1s0x3bc2b97ff64464b7:0xf07626f5792689ea!8m2!3d18.6115722!4d73.7929495!16s%2Fg%2F11svsb22gn!19sChIJt2RE9n-5wjsR6okmefUmdvA?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "0x3bc2b9ca359b2243:0x5a07031c4b541ccf",
+        "website": "https://www.instagram.com/abbyscafe__/",
+        "phoneNumber": null,
+        "name": "Abby's Cafe Bun & Bean",
+        "gmapsUrl": "https://www.google.com/maps/place/Shop+no+10,+Abby's+Cafe+Bun+%26+Bean,+Siddhi+Towers,+Ganesh+Nagar,+Dapodi,+Pune,+Pimpri-Chinchwad,+Maharashtra+411012/@18.5822585,73.8305007,15z/data=!4m6!3m5!1s0x3bc2b9ca359b2243:0x5a07031c4b541ccf!8m2!3d18.5822585!4d73.8305007!16s%2Fg%2F11xrkzbbp7?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAg%3D%3D",
+        "overAllRating": "4.9",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJt2GUgxa5wjsRCxyk0yivhpE",
+        "website": null,
+        "phoneNumber": "08847712708",
+        "name": "Munchies Coffee",
+        "gmapsUrl": "https://www.google.com/maps/place/Munchies+Coffee/data=!4m7!3m6!1s0x3bc2b916839461b7:0x9186af28d3a41c0b!8m2!3d18.629998!4d73.7882705!16s%2Fg%2F11w2mv_t10!19sChIJt2GUgxa5wjsRCxyk0yivhpE?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJIcHdagC5wjsRjbEMh9tEjjk",
+        "website": null,
+        "phoneNumber": "07385345734",
+        "name": "Brew Coffee",
+        "gmapsUrl": "https://www.google.com/maps/place/Brew+Coffee/data=!4m7!3m6!1s0x3bc2b9006addc121:0x398e44db870cb18d!8m2!3d18.6213936!4d73.8180833!16s%2Fg%2F11y3rgmxr9!19sChIJIcHdagC5wjsRjbEMh9tEjjk?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJA0Zq0u25wjsRiS6xMUeTE7U",
+        "website": null,
+        "phoneNumber": "09356646016",
+        "name": "Cafe Cherish",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Cherish/data=!4m7!3m6!1s0x3bc2b9edd26a4603:0xb513934731b12e89!8m2!3d18.6548553!4d73.7740806!16s%2Fg%2F11y3d34m3z!19sChIJA0Zq0u25wjsRiS6xMUeTE7U?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJnXdsxue5wjsRTJ-rP-AI43A",
+        "website": null,
+        "phoneNumber": "08788362825",
+        "name": "CAFE 18 & RS CHALTA BOLTA CHAHA BRANCH NO.3",
+        "gmapsUrl": "https://www.google.com/maps/place/CAFE+18+%26+RS+CHALTA+BOLTA+CHAHA+BRANCH+NO.3/data=!4m7!3m6!1s0x3bc2b9e7c66c779d:0x70e308e03fab9f4c!8m2!3d18.6315534!4d73.8045315!16s%2Fg%2F11y7qpq54l!19sChIJnXdsxue5wjsRTJ-rP-AI43A?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": "27"
+      },
+      {
+        "placeId": "ChIJT-YgAx25wjsRIi8j83fCUl8",
+        "website": null,
+        "phoneNumber": "09960438109",
+        "name": "Cafe Couple Friendly B2",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Couple+Friendly+B2/data=!4m7!3m6!1s0x3bc2b91d0320e64f:0x5f52c277f3232f22!8m2!3d18.6207049!4d73.8222983!16s%2Fg%2F11sx3vpt1f!19sChIJT-YgAx25wjsRIi8j83fCUl8?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": "2"
+      },
+      {
+        "placeId": "ChIJ60Qi1Wq5wjsRrClGssVhLpE",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Cafe Kismi",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Kismi/data=!4m7!3m6!1s0x3bc2b96ad52244eb:0x912e61c5b24629ac!8m2!3d18.6421401!4d73.7561697!16s%2Fg%2F11sbx04gg3!19sChIJ60Qi1Wq5wjsRrClGssVhLpE?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": "37"
+      },
+      {
+        "placeId": "0x3bc2bf7be3c5d23b:0x32894d868bd9bc4c",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Believer street cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/HRC8%2BGR4+Believer+street+cafe,+Shitole+Nagar+Rd,+Madhuban+Colony,+Old+Sangvi,+Pune,+Pimpri-Chinchwad,+Maharashtra+411027/@18.5712611,73.8170884,15z/data=!4m6!3m5!1s0x3bc2bf7be3c5d23b:0x32894d868bd9bc4c!8m2!3d18.5712611!4d73.8170884!16s%2Fg%2F11t9pghftx?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAQ%3D%3D",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJLWnrj6y3wjsR0bk3IqfipOA",
+        "website": null,
+        "phoneNumber": "07758071734",
+        "name": "Fables café",
+        "gmapsUrl": "https://www.google.com/maps/place/Fables+caf%C3%A9/data=!4m7!3m6!1s0x3bc2b7ac8feb692d:0xe0a4e2a72237b9d1!8m2!3d18.6834087!4d73.8355407!16s%2Fg%2F11spjgm484!19sChIJLWnrj6y3wjsR0bk3IqfipOA?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": "248"
+      },
+      {
+        "placeId": "ChIJ4ZhTmL-5wjsRegf5QRt0NzU",
+        "website": null,
+        "phoneNumber": "09595199906",
+        "name": "Cafe Day & Night",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Day+%26+Night/data=!4m7!3m6!1s0x3bc2b9bf985398e1:0x3537741b41f9077a!8m2!3d18.6618589!4d73.8012617!16s%2Fg%2F11jvvphnpg!19sChIJ4ZhTmL-5wjsRegf5QRt0NzU?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ_VX-agC5wjsRsSz1NRc8br8",
+        "website": null,
+        "phoneNumber": null,
+        "name": "URBAN KHAUBOY PUNE",
+        "gmapsUrl": "https://www.google.com/maps/place/URBAN+KHAUBOY+PUNE/data=!4m7!3m6!1s0x3bc2b9006afe55fd:0xbf6e3c1735f52cb1!8m2!3d18.6159789!4d73.8025783!16s%2Fg%2F11m59qpp31!19sChIJ_VX-agC5wjsRsSz1NRc8br8?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "0x3bc2b948ac21f685:0x513786aabecb344c",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Cheesy Land Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Cheesy+Land+Cafe,+Shop+No+J-13,S+No+4510,Empire+Estate,Old+Pune+Mumbai+Highway,Pimpri+Chinchwad,+Pune,+Maharashtra+411019/@18.6333541,73.7981954,15z/data=!4m6!3m5!1s0x3bc2b948ac21f685:0x513786aabecb344c!8m2!3d18.6333541!4d73.7981954!16s%2Fg%2F11fm4jh1zp?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAQ%3D%3D",
+        "overAllRating": "4.1",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJzX7Q-Ae_wjsRJ94faDczwVk",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Sharu's cafe and Diet Food",
+        "gmapsUrl": "https://www.google.com/maps/place/Sharu%27s+cafe+and+Diet+Food/data=!4m7!3m6!1s0x3bc2bf07f8d07ecd:0x59c13337681fde27!8m2!3d18.560598!4d73.804458!16s%2Fg%2F11qz4tw5cj!19sChIJzX7Q-Ae_wjsRJ94faDczwVk?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJPYHoBXC5wjsR4wCQWnuonNc",
+        "website": null,
+        "phoneNumber": "07293010111",
+        "name": "Malgudi Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Malgudi+Cafe/data=!4m7!3m6!1s0x3bc2b97005e8813d:0xd79ca87b5a9000e3!8m2!3d18.6269417!4d73.8045213!16s%2Fg%2F11ylv4xf3_!19sChIJPYHoBXC5wjsR4wCQWnuonNc?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": "2"
+      },
+      {
+        "placeId": "ChIJwTBwYwC5wjsRY2cuAtzNOH0",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Heaven of cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Heaven+of+cafe/data=!4m7!3m6!1s0x3bc2b900637030c1:0x7d38cddc022e6763!8m2!3d18.597889!4d73.7993309!16s%2Fg%2F11m5rbw0c6!19sChIJwTBwYwC5wjsRY2cuAtzNOH0?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.3",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJKfc0IAC5wjsRq_SPh75j528",
+        "website": null,
+        "phoneNumber": "07972005340",
+        "name": "The Pavilion Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Pavilion+Cafe/data=!4m7!3m6!1s0x3bc2b9002034f729:0x6fe763be878ff4ab!8m2!3d18.6204196!4d73.7822904!16s%2Fg%2F11ybb2d_bx!19sChIJKfc0IAC5wjsRq_SPh75j528?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJd_X5ds65wjsRb07rs2ziyFs",
+        "website": "https://breadbashpimpri.inmyarea.in/",
+        "phoneNumber": "08888428868",
+        "name": "BREAD BASH PIMPRI",
+        "gmapsUrl": "https://www.google.com/maps/place/BREAD+BASH+PIMPRI/data=!4m7!3m6!1s0x3bc2b9ce76f9f577:0x5bc8e26cb3eb4e6f!8m2!3d18.618547!4d73.8036619!16s%2Fg%2F11n5d57l_d!19sChIJd_X5ds65wjsRb07rs2ziyFs?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.2",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJcaXicDm5wjsRx6eZnr78W00",
+        "website": null,
+        "phoneNumber": null,
+        "name": "The Soda Shop And Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Soda+Shop+And+Cafe/data=!4m7!3m6!1s0x3bc2b93970e2a571:0x4d5bfcbe9e99a7c7!8m2!3d18.6250621!4d73.8182997!16s%2Fg%2F11vd0vdbyz!19sChIJcaXicDm5wjsRx6eZnr78W00?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJDanRRQC3wjsRaQ-SdCvlpMg",
+        "website": null,
+        "phoneNumber": null,
+        "name": "The coffee space",
+        "gmapsUrl": "https://www.google.com/maps/place/The+coffee+space/data=!4m7!3m6!1s0x3bc2b70045d1a90d:0xc8a4e52b74920f69!8m2!3d18.6649873!4d73.8084849!16s%2Fg%2F11lzt6t05g!19sChIJDanRRQC3wjsRaQ-SdCvlpMg?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJBdLGCDu5wjsRaxOWwQAkGT8",
+        "website": null,
+        "phoneNumber": "07972222945",
+        "name": "THE BEAN CAFE AND PIZZA HOUSE",
+        "gmapsUrl": "https://www.google.com/maps/place/THE+BEAN+CAFE+AND+PIZZA+HOUSE/data=!4m7!3m6!1s0x3bc2b93b08c6d205:0x3f192400c196136b!8m2!3d18.6334545!4d73.8051228!16s%2Fg%2F11ls4tgm70!19sChIJBdLGCDu5wjsRaxOWwQAkGT8?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.9",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ7zekogm4wjsRbS35ZM13qXE",
+        "website": null,
+        "phoneNumber": "09730897248",
+        "name": "Cafe Unique Table",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Unique+Table/data=!4m7!3m6!1s0x3bc2b809a2a437ef:0x71a977cd64f92d6d!8m2!3d18.6509281!4d73.8396123!16s%2Fg%2F11f4pd4myj!19sChIJ7zekogm4wjsRbS35ZM13qXE?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.2",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ6wL-2ce5wjsRHzYOxOkhGsU",
+        "website": null,
+        "phoneNumber": "09970399320",
+        "name": "cafe fusion9 (Ukadiche/Steam Modak)",
+        "gmapsUrl": "https://www.google.com/maps/place/cafe+fusion9+%28Ukadiche%2FSteam+Modak%29/data=!4m7!3m6!1s0x3bc2b9c7d9fe02eb:0xc51a21e9c40e361f!8m2!3d18.6611662!4d73.8044307!16s%2Fg%2F11rb_kjkmc!19sChIJ6wL-2ce5wjsRHzYOxOkhGsU?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJo5gWOAC5wjsRzHMhETOmOt4",
+        "website": "https://www.thecoffeeandmore.com/",
+        "phoneNumber": null,
+        "name": "Coffee & More - Wakad",
+        "gmapsUrl": "https://www.google.com/maps/place/Coffee+%26+More+-+Wakad/data=!4m7!3m6!1s0x3bc2b900381698a3:0xde3aa633112173cc!8m2!3d18.6006822!4d73.7565714!16s%2Fg%2F11y2g33qgz!19sChIJo5gWOAC5wjsRzHMhETOmOt4?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ0ZAAYkC5wjsRFfGcwWrKHAU",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Blackbuck cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Blackbuck+cafe/data=!4m7!3m6!1s0x3bc2b940620090d1:0x51cca6ac19cf115!8m2!3d18.6466984!4d73.7890603!16s%2Fg%2F11jt7p21tl!19sChIJ0ZAAYkC5wjsRFfGcwWrKHAU?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.3",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJQy9mQqK5wjsROxEeGFch-SM",
+        "website": null,
+        "phoneNumber": "08551070577",
+        "name": "The cafe Divine",
+        "gmapsUrl": "https://www.google.com/maps/place/The+cafe+Divine/data=!4m7!3m6!1s0x3bc2b9a242662f43:0x23f92157181e113b!8m2!3d18.6196691!4d73.8043723!16s%2Fg%2F11v5c0ms8p!19sChIJQy9mQqK5wjsROxEeGFch-SM?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ2zK9u5C5wjsRWVpqSWvBEwM",
+        "website": null,
+        "phoneNumber": "09766885588",
+        "name": "CAFE CREAM",
+        "gmapsUrl": "https://www.google.com/maps/place/CAFE+CREAM/data=!4m7!3m6!1s0x3bc2b990bbbd32db:0x313c16b496a5a59!8m2!3d18.6238745!4d73.8197402!16s%2Fg%2F11h4mtjltm!19sChIJ2zK9u5C5wjsRWVpqSWvBEwM?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.2",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJnw65-Ce4wjsRCDBuhCLpXi4",
+        "website": null,
+        "phoneNumber": "09822980533",
+        "name": "Cafe Cilantro",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Cilantro/data=!4m7!3m6!1s0x3bc2b827f8b90e9f:0x2e5ee922846e3008!8m2!3d18.663627!4d73.8070459!16s%2Fg%2F11h9y62f30!19sChIJnw65-Ce4wjsRCDBuhCLpXi4?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.0",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ-TMD3t-5wjsRF7fE6xLk9vs",
+        "website": "https://instagram.com/uandmecafe2?igshid=M2hmYndvdDlzeDBh",
+        "phoneNumber": "08007901818",
+        "name": "U & Me Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/U+%26+Me+Cafe/data=!4m7!3m6!1s0x3bc2b9dfde0333f9:0xfbf6e412ebc4b717!8m2!3d18.6442648!4d73.7965419!16s%2Fg%2F11vb_g_cq8!19sChIJ-TMD3t-5wjsRF7fE6xLk9vs?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.5",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ0YMHmQm4wjsRoAVuBgZi1z4",
+        "website": null,
+        "phoneNumber": "08888956767",
+        "name": "Love Town Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Love+Town+Cafe/data=!4m7!3m6!1s0x3bc2b809990783d1:0x3ed76206066e05a0!8m2!3d18.6524188!4d73.83589!16s%2Fg%2F11gfjrdw9d!19sChIJ0YMHmQm4wjsRoAVuBgZi1z4?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.1",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJZ_NnJp-5wjsRh6Pnzg9oCuw",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Ashapura Tea Garden",
+        "gmapsUrl": "https://www.google.com/maps/place/Ashapura+Tea+Garden/data=!4m7!3m6!1s0x3bc2b99f2667f367:0xec0a680fcee7a387!8m2!3d18.6328186!4d73.820023!16s%2Fg%2F11ry2yn6_r!19sChIJZ_NnJp-5wjsRh6Pnzg9oCuw?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.5",
+        "numberOfReviews": "54"
+      },
+      {
+        "placeId": "0x3bc2b9025e4589ff:0xc37d648202f3e354",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Golden Jazz Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Golden+Jazz+Cafe,+Near,+Alphonsa+School+Rd,+Vijay+Nagar,+Kalewadi,+Pune,+Pimpri-Chinchwad,+Maharashtra+411017/@18.6189528,73.791263,15z/data=!4m6!3m5!1s0x3bc2b9025e4589ff:0xc37d648202f3e354!8m2!3d18.6189528!4d73.791263!16s%2Fg%2F11rv3077vz?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAQ%3D%3D",
+        "overAllRating": "4.8",
+        "numberOfReviews": "26"
+      },
+      {
+        "placeId": "ChIJNboo-yK5wjsRDLxnQR2S-e8",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Cafe Close 2 Sky",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Close+2+Sky/data=!4m7!3m6!1s0x3bc2b922fb28ba35:0xeff9921d4167bc0c!8m2!3d18.6050141!4d73.7501279!16s%2Fg%2F11q9fnx9gy!19sChIJNboo-yK5wjsRDLxnQR2S-e8?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJXSS-AzK5wjsRqWEo4YxMjFo",
+        "website": null,
+        "phoneNumber": "07066026263",
+        "name": "Love Town Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Love+Town+Cafe/data=!4m7!3m6!1s0x3bc2b93203be245d:0x5a8c4c8ce12861a9!8m2!3d18.6463655!4d73.7683978!16s%2Fg%2F11fr1ljc8w!19sChIJXSS-AzK5wjsRqWEo4YxMjFo?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.5",
+        "numberOfReviews": "36"
+      },
+      {
+        "placeId": "ChIJjZ47lZC5wjsRQ7Wx1T2frUU",
+        "website": null,
+        "phoneNumber": "07820977291",
+        "name": "Cafe tik tok",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+tik+tok/data=!4m7!3m6!1s0x3bc2b990953b9e8d:0x45ad9f3dd5b1b543!8m2!3d18.5891721!4d73.8177784!16s%2Fg%2F11fqp1pycv!19sChIJjZ47lZC5wjsRQ7Wx1T2frUU?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.5",
+        "numberOfReviews": "64"
+      },
+      {
+        "placeId": "ChIJQ-qvwYC5wjsRelEsNG2Kohg",
+        "website": null,
+        "phoneNumber": "09766896969",
+        "name": "The Hash Cafe & Chinese Corner",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Hash+Cafe+%26+Chinese+Corner/data=!4m7!3m6!1s0x3bc2b980c1afea43:0x18a28a6d342c517a!8m2!3d18.6634275!4d73.8069577!16s%2Fg%2F11kk5ff8x3!19sChIJQ-qvwYC5wjsRelEsNG2Kohg?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJd_ikn_q5wjsRnYWaQGa0FsM",
+        "website": null,
+        "phoneNumber": "09766640089",
+        "name": "Cafe Coffee Landewadi",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Coffee+Landewadi/data=!4m7!3m6!1s0x3bc2b9fa9fa4f877:0xc316b466409a859d!8m2!3d18.6198489!4d73.8418809!16s%2Fg%2F11fqq13nzp!19sChIJd_ikn_q5wjsRnYWaQGa0FsM?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJuZDZHZS5wjsRjGOuHW2tOBM",
+        "website": null,
+        "phoneNumber": "09527547577",
+        "name": "Cafe delicious 25",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+delicious+25/data=!4m7!3m6!1s0x3bc2b9941dd990b9:0x1338ad6d1dae638c!8m2!3d18.614432!4d73.7783161!16s%2Fg%2F11q9md309d!19sChIJuZDZHZS5wjsRjGOuHW2tOBM?authuser=0&hl=en&rclk=1",
+        "overAllRating": "5.0",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJlXTATXi5wjsRMIFUWtccHmM",
+        "website": "http://www.kannukichai.com/",
+        "phoneNumber": "08554988988",
+        "name": "Kannu Ki Chai Pimpri",
+        "gmapsUrl": "https://www.google.com/maps/place/Kannu+Ki+Chai+Pimpri/data=!4m7!3m6!1s0x3bc2b9784dc07495:0x631e1cd75a548130!8m2!3d18.6159126!4d73.8002679!16s%2Fg%2F11s1y2xj16!19sChIJlXTATXi5wjsRMIFUWtccHmM?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.1",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "0x3bc2b91760e79011:0xe4fc74fbf5a3ad25",
+        "website": "https://www.instagram.com/invites/contact/?i=12nsdrj1ipnec&utm_content=kzdajxk",
+        "phoneNumber": null,
+        "name": "Trinity Cafe & Roll House",
+        "gmapsUrl": "https://www.google.com/maps/place/Trinity+Cafe+%26+Roll+House,+Khau+Gali,+Krishna+Nagar,+Dyanesh+Park,+New+Sangavi,+Pimpri-Chinchwad,+Maharashtra+411061/@18.5814726,73.8164736,15z/data=!4m6!3m5!1s0x3bc2b91760e79011:0xe4fc74fbf5a3ad25!8m2!3d18.5814726!4d73.8164736!16s%2Fg%2F11rxqd38vk?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAg%3D%3D",
+        "overAllRating": "5.0",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJrZByvGzHwjsRQLpKnTFRXzQ",
+        "website": null,
+        "phoneNumber": "09373270074",
+        "name": "Cafe Coffee Club",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Coffee+Club/data=!4m7!3m6!1s0x3bc2c76cbc7290ad:0x345f51319d4aba40!8m2!3d18.6367385!4d73.8452546!16s%2Fg%2F11sy3j1qjb!19sChIJrZByvGzHwjsRQLpKnTFRXzQ?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJb6ZNuEW5wjsRn0hkniAMtVw",
+        "website": null,
+        "phoneNumber": "09561881161",
+        "name": "Dropout katta",
+        "gmapsUrl": "https://www.google.com/maps/place/Dropout+katta/data=!4m7!3m6!1s0x3bc2b945b84da66f:0x5cb50c209e64489f!8m2!3d18.622268!4d73.816912!16s%2Fg%2F11h3mth10h!19sChIJb6ZNuEW5wjsRn0hkniAMtVw?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.7",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJa9igsNe7wjsROs5Zl81xSq4",
+        "website": null,
+        "phoneNumber": "08698084679",
+        "name": "Cafe Plus - Coffee Bar & Fast Food",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Plus+-+Coffee+Bar+%26+Fast+Food/data=!4m7!3m6!1s0x3bc2bbd7b0a0d86b:0xae4a71cd9759ce3a!8m2!3d18.6028343!4d73.7459202!16s%2Fg%2F11f57dd2yh!19sChIJa9igsNe7wjsROs5Zl81xSq4?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ5WnSK_m5wjsRjQzAG8_XvYI",
+        "website": null,
+        "phoneNumber": "08806089525",
+        "name": "The KAFFEE D",
+        "gmapsUrl": "https://www.google.com/maps/place/The+KAFFEE+D/data=!4m7!3m6!1s0x3bc2b9f92bd269e5:0x82bdd7cf1bc00c8d!8m2!3d18.5849361!4d73.8219161!16s%2Fg%2F11mwypkqyh!19sChIJ5WnSK_m5wjsRjQzAG8_XvYI?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.3",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJw97wtJq5wjsRCm4CCsPZOGs",
+        "website": "https://instagram.com/friendshousecafe?igshid=1iora040swv1d",
+        "phoneNumber": "08390558249",
+        "name": "F.R.I.E.N.D.S House Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/F.R.I.E.N.D.S+House+Cafe/data=!4m7!3m6!1s0x3bc2b99ab4f0dec3:0x6b38d9c30a026e0a!8m2!3d18.6277121!4d73.7841301!16s%2Fg%2F11fp826lq7!19sChIJw97wtJq5wjsRCm4CCsPZOGs?authuser=0&hl=en&rclk=1",
+        "overAllRating": "3.9",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "0x3bc2b7e2312fc4dd:0xd0128453baeba85c",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Love Town Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Love+Town+Cafe,+Mahatma+Phule+nagar,+near+Mathura+Sweets,+M+Phulenagar,+Jijamata+Park,+Chinchwad,+Pune,+Pimpri-Chinchwad,+Maharashtra+411019/@18.665281,73.7974595,15z/data=!4m6!3m5!1s0x3bc2b7e2312fc4dd:0xd0128453baeba85c!8m2!3d18.665281!4d73.7974595!16s%2Fg%2F11v3g92w82?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAQ%3D%3D",
+        "overAllRating": "4.8",
+        "numberOfReviews": "33"
+      },
+      {
+        "placeId": "0x3bc2b937d84ace4b:0x1f95858fa7fc8fff",
+        "website": null,
+        "phoneNumber": "09158669701",
+        "name": "The Bliss Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Bliss+Cafe,+SWISS+COUNTY+HOUSING+SOCIETY,+Bharat+Ratna+Dr.+Babasaheb+Ambedkar+Marg,+Sector+No.+34,+Thergaon,+Pimpri-Chinchwad,+Pune,+Maharashtra+411033/@18.6140492,73.7768506,15z/data=!4m6!3m5!1s0x3bc2b937d84ace4b:0x1f95858fa7fc8fff!8m2!3d18.6140492!4d73.7768506!16s%2Fg%2F11h4clyl8_?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyMV8wIJvbDyoASAJQAQ%3D%3D",
+        "overAllRating": "4.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJFSIyv5e5wjsRSQ0Vy6NMc3Q",
+        "website": null,
+        "phoneNumber": "09970858010",
+        "name": "Justins cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Justins+cafe/data=!4m7!3m6!1s0x3bc2b997bf322215:0x74734ca3cb150d49!8m2!3d18.6331647!4d73.8149392!16s%2Fg%2F11h93_z7t_!19sChIJFSIyv5e5wjsRSQ0Vy6NMc3Q?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.2",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJBXtI-gW5wjsRzpS_GUcqyfI",
+        "website": null,
+        "phoneNumber": "09921371400",
+        "name": "The Grand Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/The+Grand+Cafe/data=!4m7!3m6!1s0x3bc2b905fa487b05:0xf2c92a4719bf94ce!8m2!3d18.6614767!4d73.7942709!16s%2Fg%2F11gsk601h6!19sChIJBXtI-gW5wjsRzpS_GUcqyfI?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.2",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "0x3bc2b8099899b93f:0x1862d6008ae788a8",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Golden Cafe",
+        "gmapsUrl": "https://www.google.com/maps/place/Golden+Cafe,+Spine+Rd,+Sector+No.+9,+Moshi,+Pune,+Pimpri-Chinchwad,+Maharashtra+411070/@18.650732,73.8394317,15z/data=!4m6!3m5!1s0x3bc2b8099899b93f:0x1862d6008ae788a8!8m2!3d18.650732!4d73.8394317!16s%2Fg%2F11gg4k3qjf?authuser=0&hl=en&g_ep=Eg1tbF8yMDI2MDEyOF8xIJvbDyoASAJQAQ%3D%3D",
+        "overAllRating": "3.9",
+        "numberOfReviews": "343"
+      },
+      {
+        "placeId": "ChIJ71RZJi7BwjsROpKtn5yMujs",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Cafe 4th Lane",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+4th+Lane/data=!4m7!3m6!1s0x3bc2c12e265954ef:0x3bba8c9c9fad923a!8m2!3d18.6282118!4d73.7832023!16s%2Fg%2F11stxlqtn3!19sChIJ71RZJi7BwjsROpKtn5yMujs?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.5",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJJTfxwvG_wjsR9OVAU3Xizis",
+        "website": null,
+        "phoneNumber": "08857881990",
+        "name": "Maccha Restaurant",
+        "gmapsUrl": "https://www.google.com/maps/place/Maccha+Restaurant/data=!4m7!3m6!1s0x3bc2bff1c2f13725:0x2bcee2755340e5f4!8m2!3d18.5601197!4d73.8031031!16s%2Fg%2F11mkkv_dpf!19sChIJJTfxwvG_wjsR9OVAU3Xizis?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.9",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ668Z9-u5wjsRVxdJgNfRzVA",
+        "website": "https://stores.starbucks.in/store-pages/starbucks-pune-23/",
+        "phoneNumber": "18602660010",
+        "name": "Starbucks",
+        "gmapsUrl": "https://www.google.com/maps/place/Starbucks/data=!4m7!3m6!1s0x3bc2b9ebf719afeb:0x50cdd1d780491757!8m2!3d18.6338314!4d73.7996808!16s%2Fg%2F11w81sqy9f!19sChIJ668Z9-u5wjsRVxdJgNfRzVA?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJ-efsGUG5wjsRZkI3rnOuO3A",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Goodluck Cafe - Elpro Mall",
+        "gmapsUrl": "https://www.google.com/maps/place/Goodluck+Cafe+-+Elpro+Mall/data=!4m7!3m6!1s0x3bc2b94119ece7f9:0x703bae73ae374266!8m2!3d18.6287442!4d73.7842302!16s%2Fg%2F11vcmvwmjy!19sChIJ-efsGUG5wjsRZkI3rnOuO3A?authuser=0&hl=en&rclk=1",
+        "overAllRating": "3.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJCe6c6NS5wjsRB-zUv8ucvvU",
+        "website": null,
+        "phoneNumber": "09637301807",
+        "name": "Cafe moonlight",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+moonlight/data=!4m7!3m6!1s0x3bc2b9d4e89cee09:0xf5be9ccbbfd4ec07!8m2!3d18.6328043!4d73.786218!16s%2Fg%2F11hz_kc5lf!19sChIJCe6c6NS5wjsRB-zUv8ucvvU?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJl08-Mim5wjsRl7hawqZC71w",
+        "website": null,
+        "phoneNumber": "07719860607",
+        "name": "Cafe Expresso",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Expresso/data=!4m7!3m6!1s0x3bc2b929323e4f97:0x5cef42a6c25ab897!8m2!3d18.6152061!4d73.8034181!16s%2Fg%2F11fj2rdh0y!19sChIJl08-Mim5wjsRl7hawqZC71w?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.6",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJebJaLrO3wjsR0ET4zlBidAU",
+        "website": null,
+        "phoneNumber": null,
+        "name": "Cafe Creme Moshi",
+        "gmapsUrl": "https://www.google.com/maps/place/Cafe+Creme+Moshi/data=!4m7!3m6!1s0x3bc2b7b32e5ab279:0x5746250cef844d0!8m2!3d18.6784179!4d73.8334704!16s%2Fg%2F11tn56rzj5!19sChIJebJaLrO3wjsR0ET4zlBidAU?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.8",
+        "numberOfReviews": null
+      },
+      {
+        "placeId": "ChIJzdhgf-W5wjsR567qklLvA7A",
+        "website": "https://www.cafechocolatemania.com/",
+        "phoneNumber": "09763906095",
+        "name": "cafe chocolate mania",
+        "gmapsUrl": "https://www.google.com/maps/place/cafe+chocolate+mania/data=!4m7!3m6!1s0x3bc2b9e57f60d8cd:0xb003ef5292eaaee7!8m2!3d18.6208791!4d73.8194196!16s%2Fg%2F11h5s459sd!19sChIJzdhgf-W5wjsR567qklLvA7A?authuser=0&hl=en&rclk=1",
+        "overAllRating": "4.4",
+        "numberOfReviews": null
+      }
+    ],
+    "allLeadsCount": 118
+  }
+}
