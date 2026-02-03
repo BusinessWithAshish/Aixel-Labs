@@ -2,33 +2,14 @@
 
 import PageLayout from "@/components/common/PageLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ZodSelectField } from "@/components/common/zod-form-builder";
-import { useThemeColor, ThemeColor } from "@/hooks/use-theme-color";
+import { ZodColorPicker, ZodSelectField } from "@/components/common/zod-form-builder";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import { useTheme } from "next-themes";
 import { Monitor, Moon, Sun } from "lucide-react";
 
 export default function AccountSettingsPage() {
-    const { themeColor, setThemeColor, mounted } = useThemeColor();
+    const { customColor, setCustomColor, mounted } = useThemeColor();
     const { theme, setTheme } = useTheme();
-
-    const themeColorOptions = [
-        {
-            label: 'Default (Purple)',
-            value: ThemeColor.DEFAULT
-        },
-        {
-            label: 'Blue',
-            value: ThemeColor.BLUE
-        },
-        {
-            label: 'Rose',
-            value: ThemeColor.ROSE
-        },
-        {
-            label: 'Green',
-            value: ThemeColor.GREEN
-        }
-    ];
 
     const themeModeOptions = [
         {
@@ -47,10 +28,6 @@ export default function AccountSettingsPage() {
             icon: Monitor
         },
     ];
-
-    const handleThemeColorChange = (color: string) => {
-        setThemeColor(color as ThemeColor);
-    };
 
     const handleThemeModeChange = (mode: string) => {
         setTheme(mode);
@@ -75,13 +52,12 @@ export default function AccountSettingsPage() {
                     </div>
 
                     <div className="space-y-4">
-                        <ZodSelectField
-                            name='theme-color'
-                            label='Theme Color'
-                            description="Select your preferred color theme"
-                            options={themeColorOptions}
-                            value={themeColor}
-                            onChange={handleThemeColorChange}
+                        <ZodColorPicker
+                            name="theme-color"
+                            label="Theme Color"
+                            description="Pick a custom accent color for buttons, focus rings, and the sidebar."
+                            value={customColor ?? '#4f46e5'}
+                            onChange={setCustomColor}
                         />
 
                         <ZodSelectField

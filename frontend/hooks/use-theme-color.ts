@@ -1,39 +1,76 @@
 'use client';
 
-import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 
 /**
- * Theme Color Enum
- * 
- * To add a new color theme:
- * 1. Add the color to this enum (e.g., GREEN = 'green')
- * 2. Add CSS variables in globals.css:
- *    - .green { --primary: ...; --ring: ...; etc. } for light mode
- *    - .green-dark { --primary: ...; --ring: ...; etc. } for dark mode
- * 3. Add the option in account-settings/page.tsx themeColorOptions array
- * 
- * The hook will automatically handle applying the correct variant based on the current theme mode.
+ * The theme system also supports a fully custom color that is applied by directly updating the CSS variables for `--primary`, `--primary-foreground`, `--ring`, `--sidebar-primary`, and `--sidebar-ring` on the document root.
  */
-export enum ThemeColor {
-    DEFAULT = 'default',
-    BLUE = 'blue',
-    ROSE = 'rose',
-    GREEN = 'green',
-}
 
 const THEME_COLOR_STORAGE_KEY = 'theme-color';
 
+type RGB = { r: number; g: number; b: number };
+
+function hexToRgb(hex: string): RGB | null {
+    const match = hex.trim().match(/^#([0-9a-fA-F]{6})$/);
+    if (!match) return null;
+    const intVal = parseInt(match[1], 16);
+    const r = (intVal >> 16) & 255;
+    const g = (intVal >> 8) & 255;
+    const b = intVal & 255;
+    return { r, g, b };
+}
+
+function rgbToString({ r, g, b }: RGB): string {
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+function getRelativeLuminance({ r, g, b }: RGB): number {
+    // Convert sRGB to linear RGB
+    const srgb = [r, g, b].map((v) => {
+        const c = v / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+
+    const [R, G, B] = srgb;
+    // Standard relative luminance formula
+    return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+}
+
+function getContrastingForeground(rgb: RGB): string {
+    const luminance = getRelativeLuminance(rgb);
+    // Simple threshold: light colors get dark text, dark colors get light text
+    return luminance > 0.5 ? 'rgb(15, 23, 42)' : 'rgb(248, 250, 252)';
+}
+
+function applyCustomColorVariables(root: HTMLElement, colorHex: string) {
+    const rgb = hexToRgb(colorHex);
+    if (!rgb) return;
+
+    const primary = rgbToString(rgb);
+    const foreground = getContrastingForeground(rgb);
+
+    // Primary surface + text
+    root.style.setProperty('--primary', primary);
+    root.style.setProperty('--primary-foreground', foreground);
+
+    // Accent borders / focus ring
+    root.style.setProperty('--ring', primary);
+
+    // Sidebar accents
+    root.style.setProperty('--sidebar-primary', primary);
+    root.style.setProperty('--sidebar-ring', primary);
+}
+
 export function useThemeColor() {
-    const { theme: mode, resolvedTheme } = useTheme();
-    const [themeColor, setThemeColorState] = useState<ThemeColor>(ThemeColor.DEFAULT);
+    const [themeColor, setThemeColorState] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
         // Load saved theme color from localStorage
-        const saved = localStorage.getItem(THEME_COLOR_STORAGE_KEY) as ThemeColor | null;
-        if (saved && Object.values(ThemeColor).includes(saved)) {
+        const saved = localStorage.getItem(THEME_COLOR_STORAGE_KEY) as string | null;
+
+        if (saved) {
             setThemeColorState(saved);
         }
     }, []);
@@ -42,37 +79,41 @@ export function useThemeColor() {
         if (!mounted) return;
 
         const root = document.documentElement;
-        
-        // Remove all theme color classes
-        Object.values(ThemeColor).forEach((color) => {
-            root.classList.remove(color);
-            root.classList.remove(`${color}-dark`);
+
+        // Clear any previous inline overrides for the dynamic color
+        ['--primary', '--primary-foreground', '--ring', '--sidebar-primary', '--sidebar-ring'].forEach((varName) => {
+            root.style.removeProperty(varName);
         });
 
         // Don't apply any theme color if it's default
-        if (themeColor === ThemeColor.DEFAULT) {
+        if (!themeColor) {
             return;
         }
 
-        // Determine if we're in dark mode
-        const isDark = resolvedTheme === 'dark';
+        applyCustomColorVariables(root, themeColor);
+    }, [themeColor, mounted]);
 
-        // Apply the appropriate theme color class
-        if (isDark) {
-            root.classList.add(`${themeColor}-dark`);
-        } else {
-            root.classList.add(themeColor);
+    const setThemeColor = (color: string) => {
+        setThemeColorState(color);
+        localStorage.setItem(THEME_COLOR_STORAGE_KEY, color);
+    };
+
+    const setCustomColor = (color: string | null) => {
+        if (!color) {
+            setThemeColorState(null);
+            localStorage.removeItem(THEME_COLOR_STORAGE_KEY);
+            return;
         }
-    }, [themeColor, resolvedTheme, mounted]);
-
-    const setThemeColor = (color: ThemeColor) => {
         setThemeColorState(color);
         localStorage.setItem(THEME_COLOR_STORAGE_KEY, color);
     };
 
     return {
+        // raw stored value; kept for backwards compatibility
         themeColor,
+        customColor: themeColor,
         setThemeColor,
+        setCustomColor,
         mounted,
     };
 }

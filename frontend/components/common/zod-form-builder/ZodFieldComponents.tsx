@@ -10,6 +10,7 @@ import { generateFieldLabel } from './helpers';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 export type BaseZodFieldProps = {
     name: string;
@@ -109,6 +110,173 @@ export const ZodNumberField = ({ name, label, description, value, invalid, error
                 aria-disabled={disabled}
             />
             {invalid && <FieldError errors={[errors]} className={classNames?.error} />}
+        </Field>
+    );
+};
+
+export type ZodColorPickerFieldProps = BaseZodFieldProps & {
+    value?: string;
+    onChange?: (value: string) => void;
+};
+
+const clampChannel = (value: number) => Math.min(255, Math.max(0, value));
+
+const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+    const match = hex.trim().match(/^#([0-9a-fA-F]{6})$/);
+    if (!match) return null;
+    const intVal = parseInt(match[1], 16);
+    const r = (intVal >> 16) & 255;
+    const g = (intVal >> 8) & 255;
+    const b = intVal & 255;
+    return { r, g, b };
+};
+
+const rgbToHex = (r: number, g: number, b: number): string => {
+    const toHex = (v: number) => v.toString(16).padStart(2, '0');
+    return `#${toHex(clampChannel(r))}${toHex(clampChannel(g))}${toHex(clampChannel(b))}`;
+};
+
+export const ZodColorPicker = ({
+    name,
+    label,
+    description,
+    value,
+    invalid,
+    errors,
+    onChange,
+    required,
+    disabled,
+    className,
+    classNames,
+}: ZodColorPickerFieldProps) => {
+    const fallbackHex = '#4f46e5'; // sensible default accent
+    const colorValue = value || fallbackHex;
+    const rgb = hexToRgb(colorValue) ?? hexToRgb(fallbackHex)!;
+
+    const handleHexChange = (next: string) => {
+        if (!onChange) return;
+        // Allow partial input while typing, but only commit valid 7-char hex
+        if (/^#([0-9a-fA-F]{0,6})$/.test(next)) {
+            if (next.length === 7) {
+                onChange(next);
+            } else {
+                onChange(next);
+            }
+        }
+    };
+
+    const handleChannelChange = (channel: 'r' | 'g' | 'b', nextValue: string) => {
+        if (!onChange) return;
+        const numeric = Number(nextValue);
+        if (Number.isNaN(numeric)) return;
+        const clamped = clampChannel(numeric);
+        const current = hexToRgb(colorValue) ?? rgb;
+        const updated = {
+            ...current,
+            [channel]: clamped,
+        };
+        onChange(rgbToHex(updated.r, updated.g, updated.b));
+    };
+
+    const fieldLabel = label ?? generateFieldLabel(name);
+
+    return (
+        <Field data-invalid={invalid} className={className} data-disabled={disabled}>
+            <FieldContent>
+                <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                    {fieldLabel}
+                </FieldLabel>
+                {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
+            </FieldContent>
+
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className={`w-full justify-between gap-3 ${classNames?.input ?? ''}`}
+                        disabled={disabled}
+                        aria-disabled={disabled}
+                    >
+                        <span className="flex items-center gap-3">
+                            <span
+                                className="h-6 w-6 rounded-md border border-border shadow-sm"
+                                style={{ backgroundColor: colorValue }}
+                            />
+                            <span className="font-mono text-xs text-muted-foreground uppercase">{colorValue}</span>
+                        </span>
+                        <span className="text-xs text-muted-foreground">Change</span>
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="space-y-4">
+                    <Input
+                        type="color"
+                        id={name}
+                        value={colorValue}
+                        onChange={(e) => onChange?.(e.target.value)}
+                        className="h-10 rounded-2xl w-16 cursor-pointer border-none bg-transparent p-0"
+                        disabled={disabled}
+                        aria-disabled={disabled}
+                    />
+
+                    <div className="grid grid-cols-[auto,1fr] items-center gap-2">
+                        <span className="text-xs text-muted-foreground">HEX</span>
+                        <Input
+                            value={colorValue}
+                            onChange={(e) => handleHexChange(e.target.value)}
+                            className="font-mono text-xs"
+                            disabled={disabled}
+                            aria-disabled={disabled}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-[auto,1fr] items-center gap-2">
+                        <span className="text-xs text-muted-foreground">R</span>
+                        <Input
+                            type="number"
+                            min={0}
+                            max={255}
+                            value={rgb.r}
+                            onChange={(e) => handleChannelChange('r', e.target.value)}
+                            className="font-mono text-xs"
+                            disabled={disabled}
+                            aria-disabled={disabled}
+                        />
+                    </div>
+                    <div className="grid grid-cols-[auto,1fr] items-center gap-2">
+                        <span className="text-xs text-muted-foreground">G</span>
+                        <Input
+                            type="number"
+                            min={0}
+                            max={255}
+                            value={rgb.g}
+                            onChange={(e) => handleChannelChange('g', e.target.value)}
+                            className="font-mono text-xs"
+                            disabled={disabled}
+                            aria-disabled={disabled}
+                        />
+                    </div>
+                    <div className="grid grid-cols-[auto,1fr] items-center gap-2">
+                        <span className="text-xs text-muted-foreground">B</span>
+                        <Input
+                            type="number"
+                            min={0}
+                            max={255}
+                            value={rgb.b}
+                            onChange={(e) => handleChannelChange('b', e.target.value)}
+                            className="font-mono text-xs"
+                            disabled={disabled}
+                            aria-disabled={disabled}
+                        />
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                        Use the picker or adjust the RGB values to fine-tune your brand color.
+                    </p>
+                </PopoverContent>
+            </Popover>
+
+            {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
         </Field>
     );
 };
