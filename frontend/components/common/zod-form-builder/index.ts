@@ -16,4 +16,5 @@ export {
     ZodSwitchField,
     ZodSearchableMultiSelectField,
     ZodSearchableSelectField,
+    ZodColorPicker,
 } from './ZodFieldComponents';
