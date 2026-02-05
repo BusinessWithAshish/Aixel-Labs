@@ -29,8 +29,13 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
     const tenants = isAdmin ? await getAllTenants() : [];
 
     const tenantsForSwitcher = tenants.map((tenant) => ({
+        _id: tenant._id,
         name: tenant.name,
-        url: getTenantRedirectUrl(tenant),
+        label: tenant.label,
+        app_logo_url: tenant.app_logo_url,
+        app_theme_color: tenant.app_theme_color,
+        app_description: tenant.app_description,
+        redirect_url: getTenantRedirectUrl(tenant),
     }));
 
     const user = {

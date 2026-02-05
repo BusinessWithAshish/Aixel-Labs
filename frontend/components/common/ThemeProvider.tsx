@@ -9,8 +9,11 @@ type ThemeProviderProps = {
     storageKey?: string;
 };
 
-export const ThemeProvider = ({ children, defaultTheme = 'light', storageKey = 'theme' }: ThemeProviderProps) => {
-
+export const ThemeProvider = ({
+    children,
+    defaultTheme = 'light',
+    storageKey = 'theme',
+}: ThemeProviderProps) => {
     const { mounted } = useThemeColor();
 
     if (!mounted) {
@@ -18,7 +21,14 @@ export const ThemeProvider = ({ children, defaultTheme = 'light', storageKey = '
     }
 
     return (
-        <NextThemesProvider attribute="class" themes={['light', 'dark']} disableTransitionOnChange={true} defaultTheme={defaultTheme} storageKey={storageKey} enableSystem>
+        <NextThemesProvider
+            attribute="class"
+            themes={['light', 'dark']}
+            disableTransitionOnChange={true}
+            defaultTheme={defaultTheme}
+            storageKey={storageKey}
+            enableSystem
+        >
             {children}
         </NextThemesProvider>
     );

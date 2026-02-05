@@ -2,30 +2,41 @@ import { poppinsFont } from '@/helpers/fonts';
 import { Toaster } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
+import { TenantBrandingProvider } from '@/contexts/TenantBranding';
 
 type RootLayoutUIProps = {
     children: React.ReactNode;
     className?: string;
+    tenantAppLogoUrl?: string;
+    tenantAppThemeColor?: string;
 };
 
 /**
  * RootLayoutUI - Only for root layout (app/layout.tsx)
  * Includes <html> and <body> tags
  */
-export const RootLayoutUI = ({ children, className }: RootLayoutUIProps) => {
+export const RootLayoutUI = ({ children, className, tenantAppLogoUrl, tenantAppThemeColor }: RootLayoutUIProps) => {
     return (
         <html lang="en" suppressHydrationWarning>
             <body className={cn(`${poppinsFont.variable} h-dvh w-full`, className)} suppressHydrationWarning>
-                <ThemeProvider>
-                    {children}
-                    <Toaster
-                        closeButton={true}
-                        position="top-right"
-                        duration={3000}
-                        richColors={true}
-                        swipeDirections={['right', 'top']}
-                    />
-                </ThemeProvider>
+
+                <TenantBrandingProvider appLogoUrl={tenantAppLogoUrl} appThemeColor={tenantAppThemeColor}>
+
+                    <ThemeProvider>
+
+                        {children}
+                        <Toaster
+                            closeButton={true}
+                            position="top-right"
+                            duration={3000}
+                            richColors={true}
+                            swipeDirections={['right', 'top']}
+                        />
+
+                    </ThemeProvider>
+
+                </TenantBrandingProvider>
+
             </body>
         </html>
     );

@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
     typescript: {
         ignoreBuildErrors: true,
     },
+    images: {
+        unoptimized: true,
+    },
     serverExternalPackages: ['mongodb'],
     webpack: (config, { isServer }) => {
         // Exclude MongoDB from client-side bundles

@@ -32,7 +32,11 @@ const getCurrentTenantData = async (tenant: string): Promise<Tenant | null> => {
         return {
             _id: tenantDoc._id.toString(),
             name: tenantDoc.name,
+            label: tenantDoc.label,
             redirect_url: tenantDoc.redirect_url,
+            app_description: tenantDoc.app_description,
+            app_logo_url: tenantDoc.app_logo_url,
+            app_theme_color: tenantDoc.app_theme_color,
         };
     } catch (error) {
         console.error('Error getting tenant data:', error);
@@ -61,5 +65,5 @@ export const validateAndGetTenant = async (): Promise<Tenant | null> => {
         return null;
     }
 
-    return { ...tenantData };
+    return tenantData;
 };

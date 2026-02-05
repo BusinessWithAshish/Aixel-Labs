@@ -7,6 +7,10 @@ import {
     VOICE_AGENT_SUB_MODULES,
 } from '@aixellabs/shared/mongodb';
 
+export const APP_NAME = 'Aixel Labs';
+
+export const APP_DESCRIPTION = 'Agentic Lead management system';
+
 export const ModuleUrls = {
     [Modules.LEAD_GENERATION]: '/lead-generation',
     [Modules.VOICE_AGENT]: '/voice-agent',
@@ -35,3 +39,7 @@ export const SubModuleUrls: Record<SubModule, string> = {
 export const DEFAULT_HOME_PAGE_ROUTE = '/';
 
 export const BACKEND_URL = process.env.NEXT_PUBLIC_BE_API;
+
+export const DEFAULT_LOGO_SRC = "/aixellabs.svg";
+
+export const DEFAULT_THEME_COLOR = "#4f46e5";

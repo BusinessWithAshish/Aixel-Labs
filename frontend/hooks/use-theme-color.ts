@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTenantBranding } from '@/contexts/TenantBranding';
 
 /**
  * The theme system also supports a fully custom color that is applied by directly updating the CSS variables for `--primary`, `--primary-foreground`, `--ring`, `--sidebar-primary`, and `--sidebar-ring` on the document root.
@@ -61,14 +62,23 @@ function applyCustomColorVariables(root: HTMLElement, colorHex: string) {
     root.style.setProperty('--sidebar-ring', primary);
 }
 
+/**
+ * Theme color hook.
+ *
+ * - Reads a user-specific custom color from localStorage (if set)
+ * - Falls back to an optional tenant-wide default color
+ * - Applies the effective color via CSS variables on the document root
+ */
 export function useThemeColor() {
-    const [themeColor, setThemeColorState] = useState<string | null>(null);
+    const { appThemeColor } = useTenantBranding();
+
+    const [themeColor, setThemeColorState] = useState<string | null>(appThemeColor);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
         // Load saved theme color from localStorage
-        const saved = localStorage.getItem(THEME_COLOR_STORAGE_KEY) as string | null;
+        const saved = localStorage.getItem(THEME_COLOR_STORAGE_KEY);
 
         if (saved) {
             setThemeColorState(saved);
@@ -85,20 +95,18 @@ export function useThemeColor() {
             root.style.removeProperty(varName);
         });
 
-        // Don't apply any theme color if it's default
-        if (!themeColor) {
+        // Determine effective color: user custom override first, then tenant default
+        const effectiveColor = themeColor;
+
+        // Don't apply any theme color if neither custom nor tenant default is set
+        if (!effectiveColor) {
             return;
         }
 
-        applyCustomColorVariables(root, themeColor);
+        applyCustomColorVariables(root, effectiveColor);
     }, [themeColor, mounted]);
 
     const setThemeColor = (color: string) => {
-        setThemeColorState(color);
-        localStorage.setItem(THEME_COLOR_STORAGE_KEY, color);
-    };
-
-    const setCustomColor = (color: string | null) => {
         if (!color) {
             setThemeColorState(null);
             localStorage.removeItem(THEME_COLOR_STORAGE_KEY);
@@ -109,11 +117,9 @@ export function useThemeColor() {
     };
 
     return {
-        // raw stored value; kept for backwards compatibility
+        // Effective color taking tenant default into account
         themeColor,
-        customColor: themeColor,
         setThemeColor,
-        setCustomColor,
         mounted,
     };
 }

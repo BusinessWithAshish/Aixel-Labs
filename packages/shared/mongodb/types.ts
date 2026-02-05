@@ -93,7 +93,11 @@ export type ModuleAccess = {
 export type TenantDoc = {
   _id: ObjectId;
   name: string;
+  label: string;
   redirect_url?: string;
+  app_logo_url?: string;
+  app_theme_color?: string;
+  app_description?: string;
 };
 
 /**
@@ -103,7 +107,11 @@ export type TenantDoc = {
 export type Tenant = {
   _id: string;
   name: string;
+  label: string;
   redirect_url?: string;
+  app_logo_url?: string;
+  app_theme_color?: string;
+  app_description?: string;
 };
 
 // ============================================================================

@@ -1,7 +1,7 @@
 'use client';
 
-import * as React from 'react';
-import { ChevronsUpDown, GalleryVerticalEnd, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronsUpDown, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -10,41 +10,44 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
-    DropdownMenuShortcut,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
-import type { SidebarTenant } from '@/config/sidebar.config';
 import { DEFAULT_HOME_PAGE_ROUTE } from "@/config/app-config";
 import { AppLogo } from '../common/AppLogo';
+import { Tenant } from '@aixellabs/shared/mongodb';
 
 export function TenantSwitcher({
     tenants,
     isAdmin,
     currentTenantName,
 }: {
-    tenants: SidebarTenant[];
+    tenants: Tenant[];
     isAdmin: boolean;
     currentTenantName: string;
 }) {
     const { isMobile } = useSidebar();
     const router = useRouter();
-    const [activeTenant, setActiveTenant] = React.useState<SidebarTenant>(
-        tenants[0] || { name: currentTenantName, url: DEFAULT_HOME_PAGE_ROUTE },
+    const [activeTenant, setActiveTenant] = useState<Tenant>(
+        tenants[0] || { name: currentTenantName, redirect_url: DEFAULT_HOME_PAGE_ROUTE },
     );
 
-    const handleTenantClick = (e: React.MouseEvent, tenant: SidebarTenant) => {
+    const handleTenantClick = (e: React.MouseEvent, tenant: Tenant) => {
         e.preventDefault();
         e.stopPropagation();
         setActiveTenant(tenant);
-        window.location.href = tenant.url;
+        window.location.href = tenant.redirect_url ?? DEFAULT_HOME_PAGE_ROUTE;
     };
 
     const handleManageTenantsClick = () => {
         router.push('/manage-tenants');
     };
 
-    const activeTenantName = activeTenant.name.toLocaleUpperCase();
+    const getTenantDisplayName = (tenant: Tenant) => {
+        return tenant.label ?? tenant.name.toLocaleUpperCase();
+    };
+
+    const activeTenantName = getTenantDisplayName(activeTenant);
 
     if (!isAdmin) {
         return (
@@ -85,17 +88,16 @@ export function TenantSwitcher({
                     >
                         <DropdownMenuLabel className="text-muted-foreground text-xs">Tenants</DropdownMenuLabel>
                         {tenants.map((tenant) => {
-                            const tenantName = tenant.name.toLocaleUpperCase();
+                            const tenantDisplayName = getTenantDisplayName(tenant);
 
                             return (
                                 <DropdownMenuItem
-                                    key={tenant.name}
+                                    key={tenant._id}
                                     onClick={(e) => handleTenantClick(e, tenant)}
                                     className="gap-2 p-2"
                                 >
-                                    <AppLogo />
-                                    {tenant.name.toLocaleUpperCase()}
-                                    <DropdownMenuShortcut>⌘{tenantName.charCodeAt(0)}</DropdownMenuShortcut>
+                                    <AppLogo src={tenant.app_logo_url} alt={tenantDisplayName} />
+                                    {tenantDisplayName}
                                 </DropdownMenuItem>
                             );
                         })}

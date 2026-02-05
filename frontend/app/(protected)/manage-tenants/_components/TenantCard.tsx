@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Pencil, Building2, Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
 import type { Tenant } from '@aixellabs/shared/mongodb';
+import { AppLogo } from "@/components/common/AppLogo";
 
 type TenantCardProps = {
     tenant: Tenant;
@@ -66,9 +67,10 @@ export function TenantCard({ tenant, onClick, onEdit, onDelete, className }: Ten
             </div>
 
             <div className="flex items-center justify-center w-16 h-16 rounded-lg bg-primary/10 mb-4">
-                <Building2 className="w-8 h-8 text-primary" />
+                <AppLogo title={tenant.label ?? tenant.name} src={tenant.app_logo_url} className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold text-center">{tenant.name}</h3>
+            <h1 className="text-2xl font-semibold text-center">{tenant.label || tenant.name}</h1>
+            <h3 className="text-sm text-muted-foreground text-center mt-1 break-all px-2">{tenant.app_description}</h3>
             <p className="text-sm text-muted-foreground text-center mt-1 break-all px-2">{tenantUrl}</p>
         </Card>
     );

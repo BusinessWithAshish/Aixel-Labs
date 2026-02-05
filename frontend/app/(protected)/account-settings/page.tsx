@@ -5,10 +5,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ZodColorPicker, ZodSelectField } from "@/components/common/zod-form-builder";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useTheme } from "next-themes";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, RotateCcw, Sun } from "lucide-react";
+import { useTenantBranding } from "@/contexts/TenantBranding";
+import { Button } from "@/components/ui/button";
 
 export default function AccountSettingsPage() {
-    const { customColor, setCustomColor, mounted } = useThemeColor();
+
+    const { appThemeColor } = useTenantBranding();
+
+    const { themeColor, setThemeColor, mounted } = useThemeColor();
+
     const { theme, setTheme } = useTheme();
 
     const themeModeOptions = [
@@ -52,13 +58,26 @@ export default function AccountSettingsPage() {
                     </div>
 
                     <div className="space-y-4">
-                        <ZodColorPicker
-                            name="theme-color"
-                            label="Theme Color"
-                            description="Pick a custom accent color for buttons, focus rings, and the sidebar."
-                            value={customColor ?? '#4f46e5'}
-                            onChange={setCustomColor}
-                        />
+
+                        <div className="flex items-end gap-2">
+
+                            <ZodColorPicker
+                                name="theme-color"
+                                label="Theme Color"
+                                description="Pick a custom accent color for buttons, focus rings, and the sidebar."
+                                value={themeColor ?? appThemeColor}
+                                onChange={setThemeColor}
+                            />
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                title="Reset to tenant default"
+                                onClick={() => setThemeColor(appThemeColor)}
+                                disabled={themeColor === appThemeColor}
+                            >
+                                <RotateCcw className="size-4" />
+                            </Button>
+                        </div>
 
                         <ZodSelectField
                             name='theme-mode'

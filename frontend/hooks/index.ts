@@ -12,4 +12,4 @@ export type { UseNLQueryConfig, UseNLQueryReturn } from './use-nl-query';
 export { useModuleAccess } from './use-module-access';
 
 // Theme Color Hook - manages theme color synced with theme mode (light/dark/system)
-export { useThemeColor, ThemeColor } from './use-theme-color';
+export { useThemeColor } from './use-theme-color';

@@ -7,7 +7,19 @@ import {
     SubModule,
     VOICE_AGENT_SUB_MODULES,
 } from '@aixellabs/shared/mongodb';
-import { AudioWaveform, Instagram, Linkedin, LucideIcon, Mail, MessageCircleMore, UsersRound, Phone, FacebookIcon, MapPinIcon, SearchIcon } from 'lucide-react';
+import {
+    AudioWaveform,
+    Instagram,
+    Linkedin,
+    LucideIcon,
+    Mail,
+    MessageCircleMore,
+    UsersRound,
+    Phone,
+    FacebookIcon,
+    MapPinIcon,
+    SearchIcon,
+} from 'lucide-react';
 
 export type SidebarNavItem = {
     title: string;
@@ -16,11 +28,6 @@ export type SidebarNavItem = {
         title: string;
         url: string;
     }[];
-};
-
-export type SidebarTenant = {
-    name: string;
-    url: string;
 };
 
 export type SidebarUser = {
@@ -42,7 +49,7 @@ export const modulesIconMap: Record<Modules, LucideIcon> = {
     [Modules.EMAIL]: Mail,
 };
 
-export const subModuleIconMap: Record<SubModule, { icon: LucideIcon, color: string }> = {
+export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: string }> = {
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS]: {
         icon: MapPinIcon,
         color: '!text-red-500',
