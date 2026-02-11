@@ -16,6 +16,8 @@ import { getAllTenants } from '@/helpers/tenant-operations';
 import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { generateSidebarConfig } from '@/helpers/sidebar-config-helpers';
+import { Tenant } from '@aixellabs/shared/mongodb';
+import { validateAndGetTenant } from '@/helpers/validate-tenant';
 
 export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const session = await auth();
@@ -28,13 +30,10 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
 
     const tenants = isAdmin ? await getAllTenants() : [];
 
-    const tenantsForSwitcher = tenants.map((tenant) => ({
-        _id: tenant._id,
-        name: tenant.name,
-        label: tenant.label,
-        app_logo_url: tenant.app_logo_url,
-        app_theme_color: tenant.app_theme_color,
-        app_description: tenant.app_description,
+    const currentTenant = await validateAndGetTenant();
+
+    const tenantsForSwitcher: Tenant[] = tenants.map((tenant) => ({
+        ...tenant,
         redirect_url: getTenantRedirectUrl(tenant),
     }));
 
@@ -50,7 +49,7 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
-                <TenantSwitcher tenants={tenantsForSwitcher} isAdmin={user.isAdmin} currentTenantName={user.tenantName.toUpperCase().trim()} />
+                <TenantSwitcher tenants={tenantsForSwitcher} isAdmin={user.isAdmin} currentTenant={currentTenant} />
             </SidebarHeader>
             <SidebarContent>
                 <NavMain items={sidebarConfig.navMain} />

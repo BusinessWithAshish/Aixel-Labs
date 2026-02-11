@@ -19,6 +19,8 @@ import {
     ZodTextAreaFieldProps,
     ZodStringArrayField,
     ZodStringArrayFieldProps,
+    ZodColorPicker,
+    ZodColorPickerFieldProps,
 } from './ZodFieldComponents';
 import { ZodMetaType } from './zod-meta-types';
 import { useFormContext, useFieldArray, FieldError as ReactHookFormFieldError } from 'react-hook-form';
@@ -297,3 +299,29 @@ export const StringArrayControlledField = ({
         />
     );
 };
+
+type ColorPickerControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodColorPickerFieldProps>
+
+export const ColorPickerControlledField = ({ name, description, required, label, disabled, className, classNames, metadata }: ColorPickerControlledFieldProps) => {
+    const fieldLabel = label ?? generateFieldLabel(name);
+    return (
+        <FieldController
+            name={name}
+            render={({ value, invalid, errors, onChange }) => (
+                <ZodColorPicker
+                    name={name}
+                    label={fieldLabel}
+                    description={description}
+                    value={value}
+                    invalid={invalid}
+                    errors={errors}
+                    onChange={onChange}
+                    required={required}
+                    disabled={disabled}
+                    className={className}
+                    classNames={classNames}
+                />
+            )}
+        />
+    );
+}

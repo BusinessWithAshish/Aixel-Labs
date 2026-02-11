@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DEFAULT_THEME_COLOR } from '@/config/app-config';
 
 export type BaseZodFieldProps = {
     name: string;
@@ -119,23 +120,6 @@ export type ZodColorPickerFieldProps = BaseZodFieldProps & {
     onChange?: (value: string) => void;
 };
 
-const clampChannel = (value: number) => Math.min(255, Math.max(0, value));
-
-const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
-    const match = hex.trim().match(/^#([0-9a-fA-F]{6})$/);
-    if (!match) return null;
-    const intVal = parseInt(match[1], 16);
-    const r = (intVal >> 16) & 255;
-    const g = (intVal >> 8) & 255;
-    const b = intVal & 255;
-    return { r, g, b };
-};
-
-const rgbToHex = (r: number, g: number, b: number): string => {
-    const toHex = (v: number) => v.toString(16).padStart(2, '0');
-    return `#${toHex(clampChannel(r))}${toHex(clampChannel(g))}${toHex(clampChannel(b))}`;
-};
-
 export const ZodColorPicker = ({
     name,
     label,
@@ -149,7 +133,25 @@ export const ZodColorPicker = ({
     className,
     classNames,
 }: ZodColorPickerFieldProps) => {
-    const fallbackHex = '#4f46e5'; // sensible default accent
+
+    const clampChannel = (value: number) => Math.min(255, Math.max(0, value));
+
+    const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+        const match = hex.trim().match(/^#([0-9a-fA-F]{6})$/);
+        if (!match) return null;
+        const intVal = parseInt(match[1], 16);
+        const r = (intVal >> 16) & 255;
+        const g = (intVal >> 8) & 255;
+        const b = intVal & 255;
+        return { r, g, b };
+    };
+
+    const rgbToHex = (r: number, g: number, b: number): string => {
+        const toHex = (v: number) => v.toString(16).padStart(2, '0');
+        return `#${toHex(clampChannel(r))}${toHex(clampChannel(g))}${toHex(clampChannel(b))}`;
+    };
+
+    const fallbackHex = DEFAULT_THEME_COLOR;
     const colorValue = value || fallbackHex;
     const rgb = hexToRgb(colorValue) ?? hexToRgb(fallbackHex)!;
 

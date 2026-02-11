@@ -13,29 +13,25 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
-import { DEFAULT_HOME_PAGE_ROUTE } from "@/config/app-config";
+import { APP_NAME, DEFAULT_HOME_PAGE_ROUTE } from "@/config/app-config";
 import { AppLogo } from '../common/AppLogo';
 import { Tenant } from '@aixellabs/shared/mongodb';
 
 export function TenantSwitcher({
     tenants,
     isAdmin,
-    currentTenantName,
+    currentTenant,
 }: {
     tenants: Tenant[];
     isAdmin: boolean;
-    currentTenantName: string;
+    currentTenant: Tenant | null;
 }) {
     const { isMobile } = useSidebar();
     const router = useRouter();
-    const [activeTenant, setActiveTenant] = useState<Tenant>(
-        tenants[0] || { name: currentTenantName, redirect_url: DEFAULT_HOME_PAGE_ROUTE },
-    );
 
     const handleTenantClick = (e: React.MouseEvent, tenant: Tenant) => {
         e.preventDefault();
         e.stopPropagation();
-        setActiveTenant(tenant);
         window.location.href = tenant.redirect_url ?? DEFAULT_HOME_PAGE_ROUTE;
     };
 
@@ -47,7 +43,22 @@ export function TenantSwitcher({
         return tenant.label ?? tenant.name.toLocaleUpperCase();
     };
 
-    const activeTenantName = getTenantDisplayName(activeTenant);
+    if (!currentTenant) {
+        return (
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <SidebarMenuButton size="lg" className="cursor-default">
+                        <AppLogo />
+                        <div className="grid flex-1 text-left text-sm leading-tight">
+                            <span className="truncate font-medium">{APP_NAME.toLocaleUpperCase()}</span>
+                        </div>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
+        );
+    }
+
+    const activeTenantName = getTenantDisplayName(currentTenant);
 
     if (!isAdmin) {
         return (
@@ -71,7 +82,7 @@ export function TenantSwitcher({
                     <DropdownMenuTrigger asChild>
                         <SidebarMenuButton
                             size="lg"
-                            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                            className="cursor-pointer data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
                             <AppLogo />
                             <div className="grid flex-1 text-left text-sm leading-tight">

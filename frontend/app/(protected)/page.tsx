@@ -1,15 +1,12 @@
 import PageLayout from '@/components/common/PageLayout';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { getCurrentTenantFromHeaders } from '@/helpers/validate-tenant';
+// import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+// import { getCurrentTenantFromHeaders } from '@/helpers/validate-tenant';
 
 export default async function Home() {
-    const currentTenant = await getCurrentTenantFromHeaders();
+    // const currentTenant = await getCurrentTenantFromHeaders();
     return (
-        <PageLayout className="" title="Home">
-            <Card>
-                <CardTitle>{currentTenant}</CardTitle>
-                <CardHeader>{currentTenant}</CardHeader>
-            </Card>
+        <PageLayout className="flex flex-col items-center justify-center h-full" title="Home">
+            <div className="text-2xl font-bold">Aixel Labs Home page</div>
         </PageLayout>
     );
 }

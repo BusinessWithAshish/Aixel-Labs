@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useForm, FormProvider } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import z from 'zod';
+import { ColorPickerControlledField, StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { ZodColorPicker } from '@/components/common/zod-form-builder';
 import { createTenant, updateTenant, type CreateTenantInput } from '@/helpers/tenant-operations';
 import type { Tenant } from '@aixellabs/shared/mongodb';
 import { toast } from 'sonner';
@@ -18,29 +18,47 @@ type CreateTenantDialogProps = {
     onSuccess?: () => void;
 };
 
+const tenantSchema = z.object({
+    name: z.string().min(1, 'Tenant name is required'),
+    redirect_url: z.string().optional(),
+    app_description: z.string().optional(),
+    label: z.string().optional(),
+    app_logo_url: z.string().optional(),
+    app_theme_color: z.string().optional(),
+});
+
+export const createTenantFormName = 'create-tenant-form';
+type TenantFormValues = z.infer<typeof tenantSchema>;
+
 export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSuccess }: CreateTenantDialogProps) {
-    const [formData, setFormData] = useState<CreateTenantInput>({
-        name: '',
-        redirect_url: '',
-        app_description: '',
-        label: '',
-        app_logo_url: '',
-        app_theme_color: '',
+    const form = useForm<TenantFormValues>({
+        resolver: zodResolver(tenantSchema),
+        defaultValues: {
+            name: '',
+            redirect_url: '',
+            app_description: '',
+            label: '',
+            app_logo_url: '',
+            app_theme_color: '',
+        },
     });
-    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const { handleSubmit, reset, formState: { isSubmitting } } = form;
 
     useEffect(() => {
+        if (!open) return;
+
         if (editingTenant) {
-            setFormData({
-                name: editingTenant.name,
-                redirect_url: editingTenant.redirect_url || '',
-                app_description: editingTenant.app_description || '',
-                label: editingTenant.label,
-                app_logo_url: editingTenant.app_logo_url || '',
-                app_theme_color: editingTenant.app_theme_color || '',
+            reset({
+                name: editingTenant.name ?? '',
+                redirect_url: editingTenant.redirect_url ?? '',
+                app_description: editingTenant.app_description ?? '',
+                label: editingTenant.label ?? '',
+                app_logo_url: editingTenant.app_logo_url ?? '',
+                app_theme_color: editingTenant.app_theme_color ?? '',
             });
         } else {
-            setFormData({
+            reset({
                 name: '',
                 redirect_url: '',
                 app_description: '',
@@ -49,15 +67,21 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
                 app_theme_color: '',
             });
         }
-    }, [editingTenant, open]);
+    }, [editingTenant, open, reset]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
+    const onSubmit = async (values: TenantFormValues) => {
+        const payload: CreateTenantInput = {
+            name: values.name.trim(),
+            label: values.label?.trim() ?? '',
+            redirect_url: values.redirect_url?.trim() || undefined,
+            app_description: values.app_description?.trim() || undefined,
+            app_logo_url: values.app_logo_url?.trim() || undefined,
+            app_theme_color: values.app_theme_color?.trim() || undefined,
+        };
 
         try {
             if (editingTenant) {
-                const result = await updateTenant(editingTenant._id, formData);
+                const result = await updateTenant(editingTenant._id, payload);
 
                 if (result) {
                     toast.success('Tenant updated successfully');
@@ -67,7 +91,7 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
                     toast.error('Failed to update tenant');
                 }
             } else {
-                const result = await createTenant(formData);
+                const result = await createTenant(payload);
 
                 if (result) {
                     toast.success('Tenant created successfully');
@@ -80,16 +104,7 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
         } catch (error) {
             console.error('Error submitting tenant:', error);
             toast.error('An unexpected error occurred');
-        } finally {
-            setIsSubmitting(false);
         }
-    };
-
-    const handleChange = (field: keyof CreateTenantInput) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setFormData((prev) => ({
-            ...prev,
-            [field]: e.target.value,
-        }));
     };
 
     return (
@@ -102,100 +117,60 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Name *</Label>
-                            <Input
-                                id="name"
-                                placeholder="Tenant name"
-                                value={formData.name}
-                                onChange={handleChange('name')}
-                                required
-                            />
-                        </div>
+                <FormProvider {...form}>
+                    <form id={createTenantFormName} onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
 
-                        <div className="space-y-2">
-                            <Label htmlFor="redirect_url">Redirect URL (Optional)</Label>
-                            <Input
-                                id="redirect_url"
-                                type="url"
-                                placeholder="https://example.com"
-                                value={formData.redirect_url}
-                                onChange={handleChange('redirect_url')}
-                                disabled={!!(editingTenant && editingTenant.redirect_url)}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                {editingTenant && editingTenant.redirect_url
-                                    ? 'Redirect URL cannot be changed once set'
-                                    : 'Leave empty to auto-generate based on tenant name'}
-                            </p>
-                        </div>
+                        <StringControlledField
+                            name="name"
+                            disabled={true}
+                            label="Tenant name"
+                            description="Tip: This is the name of the tenant that will be used to identify the tenant in the system."
+                            required
+                        />
 
-                        <div className="space-y-2">
-                            <Label htmlFor="label">Label (Optional)</Label>
-                            <Input
-                                id="label"
-                                type="text"
-                                placeholder="Enter label for your app"
-                                value={formData.label}
-                                onChange={handleChange('label')}
-                            />
-                        </div>
+                        {/* NOTE: Never allow to change the redirect URL */}
+                        {/* <StringControlledField
+                            name="redirect_url"
+                            label="Redirect URL"
+                            disabled={true}
+                            description="Tenant's redirect URL. Leave empty to auto-generate from tenant name. Cannot be changed once set."
+                            required
+                        /> */}
 
-                        <div className="space-y-2">
-                            <Label htmlFor="app_logo_url">Tenant app logo URL (Optional)</Label>
-                            <Input
-                                id="app_logo_url"
-                                type="url"
-                                placeholder="https://example.com/logo.png"
-                                value={formData.app_logo_url}
-                                onChange={handleChange('app_logo_url')}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                If empty, the default Aixel Labs logo will be used.
-                            </p>
-                        </div>
+                        <StringControlledField
+                            name="label"
+                            label="Tenant label"
+                            description="Tip: This is the label of the tenant that will be used to identify the tenant in the system."
+                        />
 
-                        <div className="space-y-2">
-                            <ZodColorPicker
-                                name="tenant-theme-color"
-                                label="Tenant global theme color (Optional)"
-                                description="Hex color for the tenant's primary theme (e.g. #4f46e5). Users can still override this in their account settings."
-                                value={formData.app_theme_color || '#4f46e5'}
-                                onChange={(color) =>
-                                    setFormData((prev) => ({
-                                        ...prev,
-                                        app_theme_color: color ?? '',
-                                    }))
-                                }
-                            />
-                        </div>
+                        <StringControlledField
+                            name="app_description"
+                            label="App description"
+                            description="This is the description of the tenant."
+                        />
 
-                        <div className="space-y-2">
-                            <Label htmlFor="app_description">App Description (Optional)</Label>
-                            <Textarea
-                                id="app_description"
-                                placeholder="Enter app description for metadata"
-                                value={formData.app_description}
-                                onChange={handleChange('app_description')}
-                                rows={3}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Add a description for your app to help with SEO and metadata.
-                            </p>
-                        </div>
-                    </div>
+                        <StringControlledField
+                            name="app_logo_url"
+                            label="Tenant app logo URL"
+                            description="This is the URL of the tenant's logo."
+                        />
 
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? 'Saving...' : editingTenant ? 'Update' : 'Create'}
-                        </Button>
-                    </DialogFooter>
-                </form>
+                        <ColorPickerControlledField
+                            name="app_theme_color"
+                            label="Tenant global theme color"
+                            description="Hex color for the tenant's primary theme. Users can still override this in their account settings."
+                        />
+
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" form={createTenantFormName} disabled={isSubmitting}>
+                                {isSubmitting ? 'Saving...' : editingTenant ? 'Update' : 'Create'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </FormProvider>
             </DialogContent>
         </Dialog>
     );

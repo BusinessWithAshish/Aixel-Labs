@@ -48,7 +48,7 @@ export function TenantCard({ tenant, onClick, onEdit, onDelete, className }: Ten
                     <Button
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 shadow-sm hover:bg-secondary cursor-pointer"
+                        className="h-8 w-8 shadow-sm hover:bg-secondary hover:text-primary cursor-pointer"
                         onClick={handleEditClick}
                     >
                         <Pencil className="h-4 w-4" />
