@@ -10,15 +10,14 @@ import { copyPhoneNumber } from '@/lib/clipboard';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import Image from 'next/image';
-import { hasWebsite, hasPhone, getLeadType, type LeadType } from './lead-utils';
-import ConditionalRendering from './ConditionalRendering';
-import { Else, If } from './ConditionalRendering';
+import { hasWebsite, hasPhone } from './lead-utils';
+import ConditionalRendering from '../ConditionalRendering';
+import { Else, If } from '../ConditionalRendering';
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
 
 type LeadCardProps = {
     lead: GMAPS_SCRAPE_LEAD_INFO;
-    leadType?: LeadType;
     actions?: ReactNode;
     className?: string;
     onDelete?: () => void;
@@ -29,7 +28,6 @@ type LeadCardProps = {
 
 export const CommonLeadCard = ({
     lead,
-    leadType,
     actions,
     className,
     onDelete,
@@ -37,7 +35,6 @@ export const CommonLeadCard = ({
     isSelected,
     onSelect,
 }: LeadCardProps) => {
-    const computedLeadType = leadType || getLeadType(lead);
     const [isPhoneHovered, setIsPhoneHovered] = useState(false);
 
     const handleMapsClick = () => {
@@ -57,7 +54,6 @@ export const CommonLeadCard = ({
             className={cn(
                 'transition-shadow min-h-[250px] hover:shadow-lg relative',
                 isSelected && 'ring-2 ring-primary',
-                computedLeadType.color,
                 className,
             )}
         >
@@ -101,7 +97,7 @@ export const CommonLeadCard = ({
                         onClick={handleMapsClick}
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 rounded-full"
+                        className="h-8 w-8 hover:scale-110 duration-100 transition-all rounded-full"
                         title="Open in Google Maps"
                         aria-label="Open location in Google Maps"
                     >

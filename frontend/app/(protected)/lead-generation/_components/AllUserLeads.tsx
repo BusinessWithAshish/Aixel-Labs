@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Database, Trash2, StickyNote, CheckSquare, Square } from 'lucide-react';
 import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
 import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
-import { CommonLeadCard } from '@/components/common/CommonLeadCard';
+import { CommonLeadCard } from '@/components/common/lead-card/CommonLeadCard';
 import { usePage } from '@/contexts/PageStore';
 import type { TUseAllLeadsPageReturn } from '../_hooks';
 import { DeleteAllLeadsDialog } from './DeleteAllLeadsDialog';
