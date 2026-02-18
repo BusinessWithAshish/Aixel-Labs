@@ -66,9 +66,9 @@ export function TenantCard({ tenant, onClick, onEdit, onDelete, className }: Ten
                 )}
             </div>
 
-            <div className="flex items-center justify-center w-16 h-16 rounded-lg bg-primary/10 mb-4">
-                <AppLogo title={tenant.label ?? tenant.name} src={tenant.app_logo_url} className="w-8 h-8 text-primary" />
-            </div>
+
+            <AppLogo title={tenant.label ?? tenant.name} src={tenant.app_logo_url} className="w-8 h-8 text-primary" />
+
             <h1 className="text-2xl font-semibold text-center">{tenant.label || tenant.name}</h1>
             <h3 className="text-sm text-muted-foreground text-center mt-1 break-all px-2">{tenant.app_description}</h3>
             <p className="text-sm text-muted-foreground text-center mt-1 break-all px-2">{tenantUrl}</p>

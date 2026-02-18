@@ -30,7 +30,7 @@ export const AppLogo = ({
             title={title}
             width={size}
             height={size}
-            className={cn("border border-ring rounded-full p-1 bg-white shrink-0", className)}
+            className={cn("rounded-full p-1 bg-white shrink-0", className)}
             priority={true}
         />
     );

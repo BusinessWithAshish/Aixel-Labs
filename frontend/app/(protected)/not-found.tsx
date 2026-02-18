@@ -1,12 +1,9 @@
 /**
- * Root Not Found Page (404)
+ * Protected Not Found Page (404)
  *
- * This file handles all unmatched routes in the Next.js 15 app directory.
- * According to Next.js conventions, this file:
- * - Must be named `not-found.tsx` in the app directory
- * - Automatically catches all 404 errors at the root level
- * - Can be triggered programmatically using `notFound()` from 'next/navigation'
- * - Must include its own <html> and <body> tags as it bypasses the root layout
+ * This file handles unmatched routes under the `(protected)` segment.
+ * It is rendered within the shared root layout, so it MUST NOT render
+ * its own `<html>` or `<body>` tags.
  *
  * @see https://nextjs.org/docs/app/api-reference/file-conventions/not-found
  */
