@@ -114,7 +114,13 @@ export const AllUserLeads = () => {
         }
     };
 
-    // Get leads for current source tab
+    // Total count per source (from full lead list) — used for tab badges
+    const getLeadCountForSource = (source: 'all' | LeadSource) => {
+        if (source === 'all') return leads.length;
+        return leads.filter((lead) => lead.source === source).length;
+    };
+
+    // NL-filtered leads for current source — used for list content
     const getLeadsForSource = (source: 'all' | LeadSource) => {
         if (source === 'all') return filteredLeads;
         return filteredLeads.filter((lead) => lead.source === source);
@@ -238,17 +244,17 @@ export const AllUserLeads = () => {
             >
                 <TabsList className="grid w-full grid-cols-3 shrink-0">
                     <TabsTrigger value="all" className="text-xs sm:text-sm">
-                        All ({leads.length})
+                        All ({getLeadCountForSource('all')})
                     </TabsTrigger>
                     <TabsTrigger value={LeadSource.GOOGLE_MAPS} className="text-xs sm:text-sm">
                         <span className="hidden sm:inline">Google Maps</span>
                         <span className="sm:hidden">GMaps</span>
-                        <span className="ml-1">({getLeadsForSource(LeadSource.GOOGLE_MAPS).length})</span>
+                        <span className="ml-1">({getLeadCountForSource(LeadSource.GOOGLE_MAPS)})</span>
                     </TabsTrigger>
                     <TabsTrigger value={LeadSource.INSTAGRAM} className="text-xs sm:text-sm">
                         <span className="hidden sm:inline">Instagram</span>
                         <span className="sm:hidden">IG</span>
-                        <span className="ml-1">({getLeadsForSource(LeadSource.INSTAGRAM).length})</span>
+                        <span className="ml-1">({getLeadCountForSource(LeadSource.INSTAGRAM)})</span>
                     </TabsTrigger>
                 </TabsList>
 

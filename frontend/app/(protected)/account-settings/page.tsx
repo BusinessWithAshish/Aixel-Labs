@@ -13,7 +13,7 @@ export default function AccountSettingsPage() {
 
     const { appThemeColor } = useTenantBranding();
 
-    const { themeColor, setThemeColor, mounted } = useThemeColor();
+    const { themeColor, setThemeColor } = useThemeColor();
 
     const { theme, setTheme } = useTheme();
 
@@ -38,8 +38,6 @@ export default function AccountSettingsPage() {
     const handleThemeModeChange = (mode: string) => {
         setTheme(mode);
     };
-
-    if (!mounted) return null;
 
     return (
         <PageLayout title="Account Settings">

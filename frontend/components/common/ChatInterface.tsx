@@ -1,17 +1,19 @@
 'use client';
 
 import type React from 'react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AIInput } from '@/components/ui/ai-input';
 import { cn } from '@/lib/utils';
-import { User, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, RotateCcw, User } from 'lucide-react';
 import { ShimmeringText } from '../ui/shimmering-text';
 import { GoogleGenAI } from '@google/genai';
 import { AppLogo } from './AppLogo';
+import { useLocalStorage } from '@/hooks/use-local-storage';
+import { toast } from 'sonner';
 
 // Message type for the chat
 type Message = {
@@ -20,6 +22,27 @@ type Message = {
     content: string;
     timestamp: Date;
 };
+
+// Single persisted state for the chat interface (restored when tab is focused again)
+type ChatInterfaceInfo<T = Record<string, unknown>> = {
+    messages: Message[];
+    inputValue: string;
+    extractedData: Partial<T>;
+    isComplete: boolean;
+    error: string | null;
+    isLoading: boolean;
+};
+
+function getDefaultChatInterfaceInfo<T>(): ChatInterfaceInfo<T> {
+    return {
+        messages: [],
+        inputValue: '',
+        extractedData: {},
+        isComplete: false,
+        error: null,
+        isLoading: false,
+    };
+}
 
 // Generic schema type - any object with a shape property containing field definitions
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,8 +57,10 @@ export type ChatInterfaceProps<T = Record<string, unknown>> = {
     emptyStateMessage?: string;
     systemPrompt?: string;
     outputSchema?: ZodSchema;
+    messagesPersistKey: string;
     onDataExtracted?: (data: T) => void;
-    onConfirm?: (data: T) => void;
+    /** Called when user confirms. Can be async; loading state is shown until it resolves. */
+    onConfirm?: (data: T) => void | Promise<void>;
 };
 
 // Gemini client initialization
@@ -47,15 +72,57 @@ const getGeminiClient = () => {
     return new GoogleGenAI({ apiKey });
 };
 
+type ZodTypeLike = {
+    _def?: {
+        typeName?: string;
+        description?: string;
+        innerType?: ZodTypeLike;
+    };
+};
+
+// Helper: unwrap wrappers like Optional/Nullable/Default to get the base type
+function unwrapZodType(zodType: ZodTypeLike): ZodTypeLike {
+    let current: ZodTypeLike = zodType;
+
+    // Unwrap common container types that wrap another Zod type
+    while (current?._def?.innerType) {
+        const typeName = current._def.typeName;
+        if (typeName === 'ZodOptional' || typeName === 'ZodNullable' || typeName === 'ZodDefault') {
+            current = current._def.innerType as ZodTypeLike;
+        } else {
+            break;
+        }
+    }
+
+    return current;
+}
+
+// Helper: detect whether a field is effectively optional
+function isOptionalZodType(zodType: ZodTypeLike): boolean {
+    const typeName = zodType?._def?.typeName;
+
+    if (typeName === 'ZodOptional' || typeName === 'ZodNullable') {
+        return true;
+    }
+
+    if (typeName === 'ZodDefault' && zodType._def?.innerType) {
+        return isOptionalZodType(zodType._def.innerType);
+    }
+
+    return false;
+}
+
 // Generate a human-readable description of the Zod schema
 function describeSchema(schema: ZodSchema): string {
     const shape = schema.shape;
     const descriptions: string[] = [];
 
     for (const [key, value] of Object.entries(shape)) {
-        const zodType = value as { _def: { typeName: string; description?: string } };
-        const typeName = zodType._def?.typeName;
-        const description = zodType._def?.description;
+        const rawZodType = value as ZodTypeLike;
+        const baseType = unwrapZodType(rawZodType);
+        const typeName = baseType._def?.typeName;
+        const description = baseType._def?.description;
+        const isOptional = isOptionalZodType(rawZodType);
 
         let typeDesc = '';
         if (typeName === 'ZodString') {
@@ -72,7 +139,9 @@ function describeSchema(schema: ZodSchema): string {
             typeDesc = 'value';
         }
 
-        descriptions.push(`• ${key} (${typeDesc})${description ? `: ${description}` : ''}`);
+        const optionalLabel = isOptional ? 'optional ' : '';
+
+        descriptions.push(`• ${key} (${optionalLabel}${typeDesc})${description ? `: ${description}` : ''}`);
     }
 
     return descriptions.join('\n');
@@ -87,7 +156,7 @@ function buildSystemPrompt<T>(
     const basePrompt =
         customPrompt ||
         `You are a friendly and helpful assistant. Your goal is to have a natural conversation 
-with the user to understand their needs and collect the necessary information.`;
+         with the user to understand their needs and collect the necessary information.`;
 
     if (!schema) {
         return basePrompt;
@@ -159,12 +228,19 @@ function checkCompletion<T>(schema: ZodSchema, data: Partial<T>): { isComplete: 
     const shape = schema.shape;
 
     for (const [key, value] of Object.entries(shape)) {
-        const zodType = value as { _def: { typeName: string } };
+        const rawZodType = value as ZodTypeLike;
+
+        // Optional fields should not block completion if they are missing
+        if (isOptionalZodType(rawZodType)) {
+            continue;
+        }
+
+        const baseType = unwrapZodType(rawZodType);
         const fieldValue = (data as Record<string, unknown>)[key];
 
         if (fieldValue === undefined || fieldValue === null || fieldValue === '') {
             missingFields.push(key);
-        } else if (zodType._def?.typeName === 'ZodArray' && Array.isArray(fieldValue) && fieldValue.length === 0) {
+        } else if (baseType._def?.typeName === 'ZodArray' && Array.isArray(fieldValue) && fieldValue.length === 0) {
             missingFields.push(key);
         }
     }
@@ -177,7 +253,6 @@ function checkCompletion<T>(schema: ZodSchema, data: Partial<T>): { isComplete: 
 
 export function ChatInterface<T extends Record<string, unknown>>({
     assistantName = 'AI Assistant',
-    assistantDescription = 'Here to help you',
     placeholder = 'Type your message...',
     className,
     emptyStateMessage = 'Start a conversation to get started',
@@ -185,17 +260,41 @@ export function ChatInterface<T extends Record<string, unknown>>({
     outputSchema,
     onDataExtracted,
     onConfirm,
+    messagesPersistKey,
 }: ChatInterfaceProps<T>) {
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [inputValue, setInputValue] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [extractedData, setExtractedData] = useState<Partial<T>>({});
-    const [isComplete, setIsComplete] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [chatInterfaceInfo, setChatInterfaceInfo] = useLocalStorage<ChatInterfaceInfo<T>>(
+        messagesPersistKey,
+        getDefaultChatInterfaceInfo<T>(),
+        {
+            deserializer: (raw) => {
+                try {
+                    const parsed = JSON.parse(raw) as ChatInterfaceInfo<T>;
+                    const messages = (parsed.messages || []).map((m) => ({
+                        ...m,
+                        timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+                    }));
+                    return {
+                        ...getDefaultChatInterfaceInfo<T>(),
+                        ...parsed,
+                        messages,
+                        isLoading: false,
+                        error: null,
+                    };
+                } catch {
+                    return getDefaultChatInterfaceInfo<T>();
+                }
+            },
+        },
+    );
 
+    const { messages, inputValue, extractedData, isComplete, error, isLoading } = chatInterfaceInfo;
+    const [isConfirming, setIsConfirming] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll to bottom when messages change
+    // Single "busy" for disabling input: either AI is thinking or confirm (Start Now) is in progress
+    const isBusy = isLoading || isConfirming;
+
+    // Auto-scroll to the bottom when messages change
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -203,16 +302,19 @@ export function ChatInterface<T extends Record<string, unknown>>({
     }, [messages]);
 
     // Add a message to the chat
-    const addMessage = useCallback((role: Message['role'], content: string) => {
-        const message: Message = {
-            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            role,
-            content,
-            timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, message]);
-        return message;
-    }, []);
+    const addMessage = useCallback(
+        (role: Message['role'], content: string) => {
+            const message: Message = {
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                role,
+                content,
+                timestamp: new Date(),
+            };
+            setChatInterfaceInfo((prev) => ({ ...prev, messages: [...prev.messages, message] }));
+            return message;
+        },
+        [setChatInterfaceInfo],
+    );
 
     // Extract data from conversation using Gemini
     const extractDataFromConversation = useCallback(
@@ -231,10 +333,9 @@ export function ChatInterface<T extends Record<string, unknown>>({
                 const responseText = response.text || '';
 
                 // Parse the JSON response
-                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                const jsonMatch = responseText.match(/\{[\s\S]*}/);
                 if (jsonMatch) {
-                    const parsed = JSON.parse(jsonMatch[0]) as Partial<T>;
-                    return parsed;
+                    return JSON.parse(jsonMatch[0]) as Partial<T>;
                 }
 
                 return extractedData;
@@ -283,16 +384,14 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
     );
 
     // Handle message submission
-    const handleSubmit = async (e?: React.FormEvent) => {
+    const handleChatMessageSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
-        if (!inputValue.trim() || isLoading) return;
+        if (!inputValue.trim() || isBusy) return;
 
         const userMessageContent = inputValue.trim();
-        setInputValue('');
-        setError(null);
-        setIsLoading(true);
+        setChatInterfaceInfo((prev) => ({ ...prev, inputValue: '', error: null, isLoading: true }));
 
-        // Add user message
+        // Add a user message
         addMessage('user', userMessageContent);
 
         try {
@@ -304,51 +403,63 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
 
             // Extract data from conversation
             const newExtractedData = await extractDataFromConversation(conversationHistory);
-            setExtractedData(newExtractedData);
+            setChatInterfaceInfo((prev) => ({
+                ...prev,
+                extractedData: newExtractedData,
+                ...(outputSchema
+                    ? { isComplete: checkCompletion(outputSchema, newExtractedData).isComplete }
+                    : {}),
+            }));
 
             // Notify parent of extracted data
             if (onDataExtracted) {
                 onDataExtracted(newExtractedData as T);
             }
 
-            // Check completion status
-            if (outputSchema) {
-                const completionStatus = checkCompletion(outputSchema, newExtractedData);
-                setIsComplete(completionStatus.isComplete);
-            }
-
             // Generate AI response
             const aiResponse = await generateResponse(userMessageContent, newExtractedData);
             addMessage('assistant', aiResponse);
         } catch (err) {
-            console.error('Error in chat:', err);
+            console.error('Error in chat message:', err);
             const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-            setError(errorMessage);
+            setChatInterfaceInfo((prev) => ({
+                ...prev,
+                error: errorMessage,
+            }));
             addMessage('assistant', "I'm sorry, I encountered an error. Please try again.");
         } finally {
-            setIsLoading(false);
+            setChatInterfaceInfo((prev) => ({ ...prev, isLoading: false }));
         }
     };
 
     // Reset the chat
     const handleReset = () => {
-        setMessages([]);
-        setExtractedData({});
-        setIsComplete(false);
-        setError(null);
-        setInputValue('');
+        setChatInterfaceInfo(getDefaultChatInterfaceInfo<T>());
     };
 
-    // Handle confirmation
-    const handleConfirm = () => {
-        if (onConfirm && isComplete) {
-            onConfirm(extractedData as T);
+    // Handle confirmation (supports async onConfirm); use isConfirming so we don't show "Thinking..." during submit
+    const handleConfirm = useCallback(async () => {
+        if (!onConfirm || !isComplete) return;
+        setIsConfirming(true);
+        try {
+            await onConfirm(extractedData as T);
+            toast.success(
+                'Your previous request to the scraper for fetching leads was successful, so we are resetting the chat.',
+                { duration: 10_000 },
+            );
+            setChatInterfaceInfo(getDefaultChatInterfaceInfo<T>());
+        } catch (err) {
+            console.error('Error while confirming:', err);
+            toast.error(err instanceof Error ? err.message : 'Something went wrong while confirming. Please try again.');
+            setChatInterfaceInfo((prev) => ({ ...prev, error: err instanceof Error ? err.message : 'Something went wrong while confirming. Please try again.' }));
+        } finally {
+            setIsConfirming(false);
         }
-    };
+    }, [onConfirm, isComplete, extractedData, setChatInterfaceInfo]);
 
     return (
         <Card className={cn('flex flex-col h-full w-full', className)}>
-            <ChatHeader assistantName={assistantName} isComplete={isComplete} onReset={handleReset} />
+            <ChatHeader assistantName={assistantName} onReset={handleReset} />
 
             <CardContent className="flex flex-col h-full">
                 <ScrollArea ref={scrollRef} className="flex-1">
@@ -364,14 +475,16 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
                             />
                         ))}
 
-                        {isLoading && <LoadingIndicator />}
+                        {/* Only show "Thinking..." when AI is responding, not when Start Now is in progress */}
+                        {isLoading && !isConfirming && <LoadingIndicator />}
 
                         {/* Confirmation prompt when data collection is complete */}
-                        {isComplete && !isLoading && onConfirm && (
+                        {isComplete && onConfirm && (
                             <ConfirmationPrompt
                                 extractedData={extractedData}
                                 onConfirm={handleConfirm}
                                 onReset={handleReset}
+                                isConfirming={isConfirming}
                             />
                         )}
 
@@ -388,11 +501,13 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
             <CardFooter>
                 <ChatInputArea
                     inputValue={inputValue}
-                    setInputValue={setInputValue}
-                    handleSubmit={handleSubmit}
+                    setInputValue={(value) =>
+                        setChatInterfaceInfo((prev) => ({ ...prev, inputValue: value }))
+                    }
+                    handleSubmit={handleChatMessageSubmit}
                     placeholder={placeholder}
-                    isLoading={isLoading}
-                    disabled={isLoading}
+                    isLoading={isBusy}
+                    disabled={isBusy}
                 />
             </CardFooter>
         </Card>
@@ -403,11 +518,9 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
 
 function ChatHeader({
     assistantName,
-    isComplete,
     onReset,
 }: {
     assistantName: string;
-    isComplete: boolean;
     onReset: () => void;
 }) {
     return (
@@ -417,15 +530,9 @@ function ChatHeader({
                 <div className="flex-1">
                     <h3 className="font-semibold text-foreground">{assistantName}</h3>
                 </div>
-                {isComplete && (
-                    <div className="flex items-center gap-1 text-green-600">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span className="text-xs font-medium">Ready</span>
-                    </div>
-                )}
             </CardTitle>
             <CardAction>
-                <Button variant="ghost" size="icon" onClick={onReset} title="Start over">
+                <Button variant="outline" size="icon" onClick={onReset} title="Start over">
                     <RotateCcw className="w-4 h-4" />
                 </Button>
             </CardAction>
@@ -456,12 +563,15 @@ function ConfirmationPrompt<T>({
     extractedData,
     onConfirm,
     onReset,
+    isConfirming,
 }: {
     extractedData: Partial<T>;
-    onConfirm: () => void;
+    onConfirm: () => void | Promise<void>;
     onReset: () => void;
+    isConfirming?: boolean;
 }) {
-    const [showDetails, setShowDetails] = useState(false);
+
+    const showDetails = process.env.NEXT_PUBLIC_NODE_ENV === 'development';
 
     return (
         <div className="animate-in slide-in-from-bottom-2 fade-in duration-300 p-4 bg-primary/5 border border-primary/20 rounded-lg">
@@ -478,14 +588,11 @@ function ConfirmationPrompt<T>({
                 </pre>
             )}
             <div className="flex items-center gap-2">
-                <Button onClick={onConfirm} size="sm">
-                    Start Now
+                <Button onClick={onConfirm} size="sm" disabled={isConfirming}>
+                    {isConfirming ? 'Processing...' : 'Start Now'}
                 </Button>
-                <Button onClick={onReset} variant="outline" size="sm">
+                <Button onClick={onReset} variant="outline" size="sm" disabled={isConfirming}>
                     Start Over
-                </Button>
-                <Button onClick={() => setShowDetails(!showDetails)} variant="ghost" size="sm" className="ml-auto">
-                    {showDetails ? 'Hide Details' : 'Show Details'}
                 </Button>
             </div>
         </div>

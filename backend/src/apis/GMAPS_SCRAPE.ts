@@ -5,13 +5,8 @@ import {
   generateGoogleMapsUrls,
 } from "@aixellabs/shared/common/apis";
 import { BrowserBatchHandler } from "../functions/common/browser-batch-handler.js";
-import { scrapeLinks } from "../functions/scrape-links.js";
-import { GmapsDetailsLeadInfoExtractor } from "../functions/gmap-details-lead-extractor.js";
-import {
-  sendStatusMessage,
-  sendCompleteMessage,
-  sendErrorMessage,
-} from "../utils/stream-helpers.js";
+import { scrapeLinks } from "../functions/gmaps/gmaps-scrape-links.js";
+import { GmapsDetailsLeadInfoExtractor } from "../functions/gmaps/gmaps-details-lead-extractor.js";
 
 export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
   const requestBody = req.body;
@@ -30,45 +25,18 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
     return;
   }
 
-  // Set up Server-Sent Events headers for streaming
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
-  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, Cache-Control, X-Requested-With"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS"
-  );
-
-  res.status(200);
-  res.flushHeaders(); // Flush headers immediately
-
-  // Send initial connection message
-  sendStatusMessage(
-    res,
-    `Starting Google Maps scraping for "${parsedBody.data.query}" in ${parsedBody.data.states.length} states`,
-    {
-      total: finalScrappingUrls.length,
-      stage: "api_start",
-    }
-  );
-
   try {
-    sendStatusMessage(res, "Phase 1: Searching for business listings...", {
-      stage: "phase_1_start",
-      phase: 1,
-    });
+    console.log(
+      `Starting Google Maps scraping for "${parsedBody.data.query}" in ${parsedBody.data.state} state`,
+    );
+    console.log(`Total URLs to scrape: ${finalScrappingUrls.length}`);
 
+    // Phase 1: Search for business listings
+    console.log("Phase 1: Searching for business listings...");
     const foundedLeads = await BrowserBatchHandler(
       finalScrappingUrls,
       scrapeLinks,
-      res
+      null,
     );
 
     const foundedLeadsResults = foundedLeads.results.flat();
@@ -81,25 +49,22 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
         allLeadsCount: 0,
       };
 
-      sendCompleteMessage(res, "No business listings found", response);
-      res.end();
+      res.status(200).json({
+        success: true,
+        message: "No business listings found",
+        data: response,
+      });
       return;
     }
 
-    sendStatusMessage(
-      res,
+    // Phase 2: Extract details from business listings
+    console.log(
       `Phase 2: Extracting details from ${foundedLeadsResults.length} business listings...`,
-      {
-        stage: "phase_2_start",
-        phase: 2,
-        total: foundedLeadsResults.length,
-      }
     );
-
     const allLeads = await BrowserBatchHandler(
       foundedLeadsResults,
       GmapsDetailsLeadInfoExtractor,
-      res
+      null,
     );
     const allLeadsResults = allLeads.results.flat();
 
@@ -110,13 +75,17 @@ export const GMAPS_SCRAPE = async (req: Request, res: Response) => {
       allLeadsCount: allLeadsResults.length,
     };
 
-    sendCompleteMessage(res, "Scraping completed successfully!", response);
-    res.end();
-  } catch (error) {
-    sendErrorMessage(res, "Scraping failed due to system error", {
-      stage: "api_error",
-      error: error instanceof Error ? error.message : String(error),
+    res.status(200).json({
+      success: true,
+      message: "Scraping completed successfully!",
+      data: response,
     });
-    res.end();
+  } catch (error) {
+    console.error("Scraping failed:", error);
+    res.status(500).json({
+      success: false,
+      error: "Scraping failed due to system error",
+      details: error instanceof Error ? error.message : String(error),
+    });
   }
 };

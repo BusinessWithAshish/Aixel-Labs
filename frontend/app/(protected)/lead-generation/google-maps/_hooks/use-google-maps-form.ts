@@ -8,20 +8,21 @@ import { useMemo, useState } from 'react';
 import { BACKEND_URL } from '@/config/app-config';
 import { API_ENDPOINTS } from '@aixellabs/shared/common/utils';
 import { toast } from 'sonner';
-import sampledata from '../sample-data.json'
+
+const DEFAULT_FORM_VALUES: GMAPS_SCRAPE_REQUEST = {
+    query: '',
+    country: '',
+    state: '',
+    cities: [],
+    urls: [],
+};
 
 export const useGoogleMapsForm = () => {
     const [response, setResponse] = useState<GMAPS_SCRAPE_RESPONSE | null>(null);
 
     const form = useForm<GMAPS_SCRAPE_REQUEST>({
         resolver: zodResolver(GMAPS_SCRAPE_REQUEST_SCHEMA as any),
-        defaultValues: {
-            query: 'cafes',
-            country: 'India',
-            state: 'Maharashtra',
-            cities: ['pimpri'],
-            urls: [],
-        },
+        defaultValues: DEFAULT_FORM_VALUES,
     });
 
     const countries = Country.getAllCountries();
@@ -37,7 +38,7 @@ export const useGoogleMapsForm = () => {
             label: state.name,
             value: state.isoCode,
         }));
-    }, [form.watch('country')]);
+    }, [form]);
 
     const cityOptions = useMemo(() => {
         if (!form.watch('country') || !form.watch('state')) return [];
@@ -46,34 +47,41 @@ export const useGoogleMapsForm = () => {
             label: city.name,
             value: city.name,
         }));
-    }, [form.watch('country'), form.watch('state')]);
+    }, [form]);
 
     const isStateFieldDisabled = !form.watch('country');
     const isCityFieldDisabled = !form.watch('country') || !form.watch('state');
 
     const onSubmit = async (data: GMAPS_SCRAPE_REQUEST) => {
-        // const response = await fetch(`${BACKEND_URL}${API_ENDPOINTS.GMAPS_SCRAPE}`, {
-        //     method: 'POST',
-        //     body: JSON.stringify(data),
-        //     headers: {
-        //         'Content-Type': 'application/json',
-        //     },
-        //     credentials: 'include',
-        // });
-        //
-        // if (!response.ok) {
-        //     toast.error('Sorry! Failed to submit form or find leads. Please try again later.');
-        //     return;
-        // }
+        try {
+            const res = await fetch(`${BACKEND_URL}${API_ENDPOINTS.GMAPS_SCRAPE}`, {
+                method: 'POST',
+                body: JSON.stringify(data),
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+            });
 
-
-        // const responseData = (await response.json()) as { data: GMAPS_SCRAPE_RESPONSE };
-        setResponse(sampledata.data);
+            if (!res.ok) {
+                toast.error('Sorry! Failed to submit form or find leads. Please try again later.');
+                return;
+            }
+            const responseData = (await res.json()) as { data: GMAPS_SCRAPE_RESPONSE };
+            setResponse(responseData.data);
+            toast.success('Leads are ready! Check the Results tab.');
+        } catch (error) {
+            console.error('Error while submitting form:', error);
+            toast.error('Sorry! Failed to submit form or find leads. Please try again later.');
+        } finally {
+            form.reset(DEFAULT_FORM_VALUES);
+        }
     };
 
     return {
         form,
         response,
+        isSubmitting: form.formState.isSubmitting,
         onSubmit,
         countryOptions,
         stateOptions,

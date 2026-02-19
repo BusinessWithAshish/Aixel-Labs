@@ -2,6 +2,7 @@ import puppeteer, { Browser, Page } from "puppeteer";
 import { getBrowserOptions } from "../../utils/browser.js";
 import { config } from "dotenv";
 import { Response } from "express";
+import { DEFAULT_PAGE_LOAD_TIMEOUT } from "../../utils/constants.js";
 
 config();
 
@@ -62,53 +63,66 @@ const processSingleBrowser = async <T>(
           page = await browser!.newPage();
           pages.push(page);
 
-          page.setDefaultTimeout(30000);
-          page.setDefaultNavigationTimeout(30000);
-    
+          page.setDefaultTimeout(DEFAULT_PAGE_LOAD_TIMEOUT);
+          page.setDefaultNavigationTimeout(DEFAULT_PAGE_LOAD_TIMEOUT);
+
           // Retry the scraping function if it fails
-          // Reload the page and retry the scraping function on each retry
+          // No need to reload the page on retry attempts
           let lastError: Error | null = null;
-          
-          for (let retryAttempt = 0; retryAttempt < MAX_RETRIES; retryAttempt++) {
+
+          for (
+            let retryAttempt = 0;
+            retryAttempt < MAX_RETRIES;
+            retryAttempt++
+          ) {
             try {
               // Add delay on retry attempts (but not on the first attempt)
               if (retryAttempt > 0) {
-                console.log(`\t\t\t\t ⟳ [Page ${pageIndex + 1} of Browser ${browserIndex}] retry ${retryAttempt}/${MAX_RETRIES - 1}`);
-                
+                console.log(
+                  `\t\t\t\t ⟳ [Page ${pageIndex + 1} of Browser ${browserIndex}] retry ${retryAttempt}/${MAX_RETRIES - 1}`,
+                );
+
                 // Add a small delay before retry to avoid hammering the server
-                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * retryAttempt));
-                
+                await new Promise((resolve) =>
+                  setTimeout(resolve, RETRY_DELAY * retryAttempt),
+                );
+
                 // Don't reload - let the scraping function handle navigation
                 // This avoids conflicts when the scraping function does its own page.goto()
               }
-    
+
               const scrapeData = await scrapingFunction(url, page);
-              
+
               // Success - return immediately
               if (retryAttempt > 0) {
-                console.log(`\t\t\t\t ✓ [Page ${pageIndex + 1} of Browser ${browserIndex}] succeeded on retry ${retryAttempt}`);
+                console.log(
+                  `\t\t\t\t ✓ [Page ${pageIndex + 1} of Browser ${browserIndex}] succeeded on retry ${retryAttempt}`,
+                );
               }
-              
+
               return {
                 success: true,
                 data: scrapeData,
-                url
+                url,
               };
             } catch (error) {
-              lastError = error instanceof Error ? error : new Error(String(error));
-              
+              lastError =
+                error instanceof Error ? error : new Error(String(error));
+
               // Only log if this is the last attempt
               if (retryAttempt === MAX_RETRIES - 1) {
-                console.log(`\t\t\t\t ✗ [Page ${pageIndex + 1} of Browser ${browserIndex}] failed: ${lastError.message}`);
+                console.log(
+                  `\t\t\t\t ✗ [Page ${pageIndex + 1} of Browser ${browserIndex}] failed: ${lastError.message}`,
+                );
               }
-              
+
               // Continue to the next retry attempt (unless this was the last one)
             }
           }
-    
+
           // All retries exhausted - return error
-          const finalErrorMessage = `[Page ${pageIndex + 1} of Browser ${browserIndex} of batch ${batchNumber}] Failed after ${MAX_RETRIES} attempts: ${lastError?.message || 'Unknown error'}`;
-          
+          const finalErrorMessage = `[Page ${pageIndex + 1} of Browser ${browserIndex} of batch ${batchNumber}] Failed after ${MAX_RETRIES} attempts: ${lastError?.message || "Unknown error"}`;
+
           return {
             success: false,
             url,
@@ -188,9 +202,9 @@ const processBatchOfBrowsers = async <T>(
   scrapingFunction: ScrapingFunction<T>,
   res: Response | null = null
 ): Promise<SingleBrowserResult<T>[]> => {
-
-
-  console.log(`\t\t Starting Batch ${batchNumber} with ${urlItems.length} URLs`);
+  console.log(
+    `\t\t Starting Batch ${batchNumber} with ${urlItems.length} URLs`,
+  );
 
   const browserPagesBatches: string[][] = [];
   for (let i = 0; i < urlItems.length; i += MAX_PAGES_PER_BROWSER) {
@@ -210,9 +224,11 @@ const processBatchOfBrowsers = async <T>(
   const browserResults = await Promise.all(browserPromises);
   const flattenedBrowserBatchResults = browserResults.flat();
 
-  console.log('\n\t\t🟠 Waiting for 10 seconds before starting the next batch to avoid rate limiting...');
+  console.log(
+    "\n\t\t🟠 Waiting for 10 seconds before starting the next batch to avoid rate limiting...",
+  );
   await new Promise((resolve) => setTimeout(resolve, 10000));
-  console.log('\t\t🟠 10 seconds passed, starting the next batch...');
+  console.log("\t\t🟠 10 seconds passed, starting the next batch...");
 
   return flattenedBrowserBatchResults;
 };
@@ -231,17 +247,22 @@ type TBrowserBatchHandlerReturn<T> = {
 export const BrowserBatchHandler = async <T>(
   urlItems: string[],
   scrapingFunction: ScrapingFunction<T>,
-  res: Response | null = null
+  res: Response | null = null,
 ): Promise<TBrowserBatchHandlerReturn<T>> => {
   const startTime = Date.now();
-  console.log('\n\n----- STARTING SCRAPING PROCESS -----', new Date(startTime).toISOString());
+  console.log(
+    "\n\n----- STARTING SCRAPING PROCESS -----",
+    new Date(startTime).toISOString(),
+  );
 
   try {
     console.log(`\t🟡 Starting to scrape ${urlItems.length} URLs`);
     const batches: string[][] = [];
     for (let i = 0; i < urlItems.length; i += TOTAL_CONCURRENT_URLS) {
       const singleBatch = urlItems.slice(i, i + TOTAL_CONCURRENT_URLS);
-      console.log(`\t\t Batch ${batches.length + 1}: ${singleBatch.length} URLs`);
+      console.log(
+        `\t\t Batch ${batches.length + 1}: ${singleBatch.length} URLs`,
+      );
       batches.push(singleBatch);
     }
     console.log(`\t🟡 Total ${batches.length} batches`);
@@ -253,12 +274,17 @@ export const BrowserBatchHandler = async <T>(
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       try {
-        console.log('\n\t🟡 Processing browser batch:', batchIndex + 1, '/', batches.length);
+        console.log(
+          "\n\t🟡 Processing browser batch:",
+          batchIndex + 1,
+          "/",
+          batches.length,
+        );
         const currentBatchResults = await processBatchOfBrowsers(
           batches[batchIndex],
           batchIndex + 1,
           scrapingFunction,
-          res
+          res,
         );
 
         currentBatchResults.forEach((browserResult) => {
@@ -289,7 +315,7 @@ export const BrowserBatchHandler = async <T>(
       }
     }
 
-    console.log('\n\t 🟢 No new batch is starting');
+    console.log("\n\t 🟢 No new batch is starting");
 
     const endTime = Date.now();
     const duration = Math.round((endTime - startTime) / 1000);
@@ -297,7 +323,9 @@ export const BrowserBatchHandler = async <T>(
     const infoMessage = `\t🟢 Finished processing all batches with success count: ${successCount} and error count: ${errorCount} in ${duration} seconds`;
     console.log(infoMessage);
 
-    console.log(`----- ENDING BROWSER BATCH HANDLER ----- ${new Date(endTime).toISOString()}`);
+    console.log(
+      `----- ENDING BROWSER BATCH HANDLER ----- ${new Date(endTime).toISOString()}`,
+    );
 
     return {
       success: errorCount < urlItems.length,
@@ -316,7 +344,10 @@ export const BrowserBatchHandler = async <T>(
     const errorMessage = `Critical error: ${error instanceof Error ? error.message : String(error)}`;
 
     console.log(`\t🔴 ${errorMessage}`);
-    console.log('\n\n----- ENDING BROWSER BATCH HANDLER -----', new Date(endTime).toISOString());
+    console.log(
+      "\n\n----- ENDING BROWSER BATCH HANDLER -----",
+      new Date(endTime).toISOString(),
+    );
 
     return {
       duration,

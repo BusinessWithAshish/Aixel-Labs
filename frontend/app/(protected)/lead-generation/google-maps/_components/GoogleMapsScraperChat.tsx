@@ -4,6 +4,20 @@ import { useCallback } from 'react';
 import { ChatInterface } from '@/components/common/ChatInterface';
 import { cn } from '@/lib/utils';
 import { GMAPS_SCRAPE_REQUEST_SCHEMA, type GMAPS_SCRAPE_REQUEST } from '@aixellabs/shared/common/apis';
+import { usePage } from '@/contexts/PageStore';
+import { type UseGoogleMapsFormReturn } from '../_hooks/use-google-maps-form';
+import { toast } from 'sonner';
+
+/** Normalize chat-extracted data to match form schema (arrays, optional strings). */
+function normalizeRequest(data: Partial<GMAPS_SCRAPE_REQUEST>): GMAPS_SCRAPE_REQUEST {
+    return {
+        query: data.query ?? '',
+        country: data.country ?? '',
+        state: data.state ?? '',
+        cities: Array.isArray(data.cities) ? data.cities : [],
+        urls: Array.isArray(data.urls) ? data.urls : [],
+    };
+}
 
 const GOOGLE_MAPS_SYSTEM_PROMPT = `You are a friendly lead generation assistant helping users find business contacts from Google Maps.
 
@@ -24,38 +38,37 @@ Smart location handling:
 
 Keep your responses short and conversational - 1-2 sentences is perfect!`;
 
-type GoogleMapsScraperChatProps = {
-    className?: string;
-    onDataExtracted?: (data: GMAPS_SCRAPE_REQUEST) => void;
-    onConfirm?: (data: GMAPS_SCRAPE_REQUEST) => void;
-};
-
-export function GoogleMapsScraperChat({ className, onDataExtracted, onConfirm }: GoogleMapsScraperChatProps) {
-
-    const handleDataExtracted = useCallback(
-        (data: GMAPS_SCRAPE_REQUEST) => {
-            onDataExtracted?.(data);
-        },
-        [onDataExtracted],
-    );
+export function GoogleMapsScraperChat() {
+    const { form, onSubmit } = usePage<UseGoogleMapsFormReturn>();
 
     const handleConfirm = useCallback(
-        (data: GMAPS_SCRAPE_REQUEST) => {
-            onConfirm?.(data);
+        async (data: Partial<GMAPS_SCRAPE_REQUEST>) => {
+            try {
+                const normalized = normalizeRequest(data);
+                // Sync form state so the Results tab and Manual Form tab show the chat data
+                form.reset(normalized);
+                // Submit the chat-validated data directly so we don't depend on form
+                // validation (which can have stale errors or async reset timing issues)
+                await onSubmit(normalized);
+                toast.success('Leads are ready! Check the Results tab.');
+            } catch (err) {
+                console.error('Start Now failed:', err);
+                toast.error('Something went wrong. Please try again.');
+            }
         },
-        [onConfirm],
+        [form, onSubmit],
     );
 
     return (
-        <div className={cn('flex flex-col h-full', className)}>
+        <div className={cn('flex flex-col h-full')}>
             <ChatInterface<GMAPS_SCRAPE_REQUEST>
-                assistantName="Google Maps Lead Finder"
+                assistantName="Google Maps Leads Finder"
                 assistantDescription="Find business leads from Google Maps"
                 placeholder="Tell me what businesses you're looking for..."
                 emptyStateMessage="Hi! Tell me what type of businesses you'd like to find and where. For example: 'Find restaurants in Mumbai' or 'I need plumbers in New York'"
                 systemPrompt={GOOGLE_MAPS_SYSTEM_PROMPT}
                 outputSchema={GMAPS_SCRAPE_REQUEST_SCHEMA}
-                onDataExtracted={handleDataExtracted}
+                messagesPersistKey="google-maps-scraper-chat-messages"
                 onConfirm={handleConfirm}
             />
         </div>

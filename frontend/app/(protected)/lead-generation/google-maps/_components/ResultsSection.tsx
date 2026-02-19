@@ -1,28 +1,25 @@
 'use client';
 
-import {useEffect, useMemo, useState} from 'react';
-import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
-import {Button} from '@/components/ui/button';
-import {CheckCircle2, Save, SortAsc, SortDesc} from 'lucide-react';
-import {CommonLeadCard} from '@/components/common/CommonLeadCard';
-import {GMAPS_SCRAPE_LEAD_INFO} from '@aixellabs/shared/common/apis';
+import { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { CheckCircle2, Save, SortAsc, SortDesc } from 'lucide-react';
+import { CommonLeadCard } from '@/components/common/lead-card/CommonLeadCard';
+import { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common/apis';
 import {
-    categorizeLeads,
     generateUniqueKey,
-    LeadCategory,
     type SortDirection,
     type SortKey,
     sortLeads,
-} from '@/components/common/lead-utils';
-import {saveLeadsAction} from '@/app/actions/lead-actions';
-import {LeadSource} from '@aixellabs/shared/mongodb';
-import {formatLeadStats} from '@/helpers/lead-operations';
-import {toast} from 'sonner';
-import {UseGoogleMapsFormReturn} from '../_hooks/use-google-maps-form';
-import {usePage} from '@/contexts/PageStore';
-import {CommonLoader} from "@/components/common/CommonLoader";
-import {NoDataFound} from "@/components/common/NoDataFound";
-import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
+} from '@/components/common/lead-card/lead-utils';
+import { saveLeadsAction } from '@/app/actions/lead-actions';
+import { LeadSource } from '@aixellabs/shared/mongodb';
+import { formatLeadStats } from '@/helpers/lead-operations';
+import { toast } from 'sonner';
+import { UseGoogleMapsFormReturn } from '../_hooks/use-google-maps-form';
+import { usePage } from '@/contexts/PageStore';
+import { CommonLoader } from '@/components/common/CommonLoader';
+import { NoDataFound } from '@/components/common/NoDataFound';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const ResultsSection = () => {
     const { response, form } = usePage<UseGoogleMapsFormReturn>();
@@ -41,10 +38,6 @@ export const ResultsSection = () => {
     const sortedLeads = useMemo(() => {
         return sortLeads(displayedLeads, sortKey, sortDirection);
     }, [displayedLeads, sortKey, sortDirection]);
-
-    const leadGroups = useMemo(() => {
-        return categorizeLeads(sortedLeads);
-    }, [sortedLeads]);
 
     const handleDeleteLead = (leadToDelete: GMAPS_SCRAPE_LEAD_INFO) => {
         setDisplayedLeads((prev) => prev.filter((lead) => lead.placeId !== leadToDelete.placeId));
@@ -96,24 +89,24 @@ export const ResultsSection = () => {
         }
     };
 
-    if (form.formState.isSubmitting){
+    if (form.formState.isSubmitting) {
         return <CommonLoader text='Loading your leads' />
     }
 
-    if  ((!response || !leads.length) || !leads.length) {
+    if ((!response || !leads.length) || !leads.length) {
         return <NoDataFound message='No leads found! Please try again.' showBackButton={false} />
     }
 
-    const renderTabContent = (leadsToRender: GMAPS_SCRAPE_LEAD_INFO[]) => (
-            <div className="grid h-screen overflow-auto gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {leadsToRender.map((lead, index) => (
-                    <CommonLeadCard
-                        key={generateUniqueKey(lead, index)}
-                        lead={lead}
-                        onDelete={() => handleDeleteLead(lead)}
-                    />
-                ))}
-            </div>
+    const renderLeadsGrid = (leadsToRender: GMAPS_SCRAPE_LEAD_INFO[]) => (
+        <div className="grid h-screen overflow-auto gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {leadsToRender.map((lead, index) => (
+                <CommonLeadCard
+                    key={generateUniqueKey(lead, index)}
+                    lead={lead}
+                    onDelete={() => handleDeleteLead(lead)}
+                />
+            ))}
+        </div>
     );
 
     if (response && response.allLeadsCount > 0) {
@@ -121,14 +114,14 @@ export const ResultsSection = () => {
             <Card>
                 <CardHeader>
                     <CardTitle>
-                            Results ({displayedLeads.length} leads)
+                        Results ({displayedLeads.length} leads)
                     </CardTitle>
                     <CardDescription>
                         Sorted by {sortKey === 'rating' ? 'Rating' : 'Reviews'} (
                         {sortDirection === 'asc' ? 'Low to High' : 'High to Low'})
                     </CardDescription>
 
-                    <CardAction className='flex flex-wrap items-center gap-2'>
+                    <CardAction className="flex flex-wrap items-center gap-2">
                         <Button
                             size="sm"
                             onClick={handleSaveLeads}
@@ -167,42 +160,7 @@ export const ResultsSection = () => {
                     </CardAction>
                 </CardHeader>
 
-                <CardContent>
-
-                    <Tabs defaultValue={LeadCategory.ALL} className="space-y-4">
-                        <TabsList className="grid grid-cols-2 h-fit lg:grid-cols-4 w-full">
-                            <TabsTrigger value={LeadCategory.ALL}>
-                                All Leads ({leadGroups[LeadCategory.ALL].length})
-                            </TabsTrigger>
-                            <TabsTrigger value={LeadCategory.HOT}>
-                                Hot Leads ({leadGroups[LeadCategory.HOT].length})
-                            </TabsTrigger>
-                            <TabsTrigger value={LeadCategory.WARM} >
-                                Warm Leads ({leadGroups[LeadCategory.WARM].length})
-                            </TabsTrigger>
-                            <TabsTrigger value={LeadCategory.COLD} >
-                                Cold Leads ({leadGroups[LeadCategory.COLD].length})
-                            </TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value={LeadCategory.ALL} className=''>
-                            {renderTabContent(leadGroups[LeadCategory.ALL])}
-                        </TabsContent>
-
-                        <TabsContent value={LeadCategory.HOT}>
-                            {renderTabContent(leadGroups[LeadCategory.HOT])}
-                        </TabsContent>
-
-                        <TabsContent value={LeadCategory.WARM}>
-                            {renderTabContent(leadGroups[LeadCategory.WARM])}
-                        </TabsContent>
-
-                        <TabsContent value={LeadCategory.COLD}>
-                            {renderTabContent(leadGroups[LeadCategory.COLD])}
-                        </TabsContent>
-                    </Tabs>
-
-                </CardContent>
+                <CardContent>{renderLeadsGrid(sortedLeads)}</CardContent>
 
             </Card>
         );

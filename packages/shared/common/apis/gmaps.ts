@@ -7,7 +7,7 @@ export const GMAPS_SCRAPE_REQUEST_SCHEMA = z.object({
   country: z.string().optional(),
   state: z.string().optional(),
   cities: z.array(z.string()).optional(),
-  urls: z.array(z.string()).optional(),
+  urls: z.array(z.url()).optional(),
 });
 
 export type GMAPS_SCRAPE_REQUEST = z.infer<typeof GMAPS_SCRAPE_REQUEST_SCHEMA>;

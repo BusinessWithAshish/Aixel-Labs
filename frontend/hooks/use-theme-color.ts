@@ -73,21 +73,17 @@ export function useThemeColor() {
     const { appThemeColor } = useTenantBranding();
 
     const [themeColor, setThemeColorState] = useState<string | null>(appThemeColor);
-    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        setMounted(true);
-        // Load saved theme color from localStorage
+        // Load saved theme color from localStorage (client-only)
         const saved = localStorage.getItem(THEME_COLOR_STORAGE_KEY);
-
         if (saved) {
             setThemeColorState(saved);
         }
     }, []);
 
     useEffect(() => {
-        if (!mounted) return;
-
+        if (typeof document === 'undefined') return;
         const root = document.documentElement;
 
         // Clear any previous inline overrides for the dynamic color
@@ -104,7 +100,7 @@ export function useThemeColor() {
         }
 
         applyCustomColorVariables(root, effectiveColor);
-    }, [themeColor, mounted]);
+    }, [themeColor]);
 
     const setThemeColor = (color: string) => {
         if (!color) {
@@ -117,9 +113,7 @@ export function useThemeColor() {
     };
 
     return {
-        // Effective color taking tenant default into account
         themeColor,
         setThemeColor,
-        mounted,
     };
 }

@@ -14,11 +14,7 @@ export const ThemeProvider = ({
     defaultTheme = 'light',
     storageKey = 'theme',
 }: ThemeProviderProps) => {
-    const { mounted } = useThemeColor();
-
-    if (!mounted) {
-        return null;
-    }
+    useThemeColor();
 
     return (
         <NextThemesProvider
