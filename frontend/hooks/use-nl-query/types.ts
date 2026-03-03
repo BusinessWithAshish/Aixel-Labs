@@ -46,12 +46,8 @@ export type UseNLQueryReturn<T> = {
     reset: () => void;
     /** Whether the result came from cache */
     isCached: boolean;
-    /** Explanation of how the data was processed */
-    explanation: string | null;
     /** Clear the cache */
     clearCache: () => void;
-    /** The generated transform function code (for debugging) */
-    generatedCode: string | null;
     /** Execute search explicitly - call this to trigger AI query */
     executeSearch: () => Promise<void>;
     /** Query history (last 10 queries) */
@@ -59,11 +55,10 @@ export type UseNLQueryReturn<T> = {
 };
 
 /**
- * Cache entry structure
+ * Cache entry structure (stores only transformed data)
  */
 export type CacheEntry = {
-    transformFunction: string;
-    explanation: string;
+    filteredData: unknown[];
     timestamp: number;
 };
 

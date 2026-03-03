@@ -20,11 +20,5 @@ export type { UseNLQueryConfig, UseNLQueryReturn, QueryResult, CacheEntry, Valid
 // Utilities (exported for advanced usage)
 export { hashData, detectSortingIntent, isComplexQuery, debounce, truncate } from './utils';
 
-// Schema inference (exported for advanced usage)
-export { inferSchema, extractSortableFields, getFieldInfo } from './schema-inference';
-
-// Validation (exported for testing/advanced usage)
-export { validateTransformFunction } from './query-execution';
-
 // Cache (exported for advanced usage)
 export { QueryCache } from './cache';

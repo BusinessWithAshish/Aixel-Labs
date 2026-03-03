@@ -1,461 +1,124 @@
 'use client';
 
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport, isToolUIPart, getToolName, type UIMessage } from 'ai';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AIInput } from '@/components/ui/ai-input';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, RotateCcw, User } from 'lucide-react';
+import { CheckCircle2, RotateCcw, User, AlertCircle, MessageSquareWarning } from 'lucide-react';
 import { ShimmeringText } from '../ui/shimmering-text';
-import { GoogleGenAI } from '@google/genai';
 import { AppLogo } from './AppLogo';
-import { useLocalStorage } from '@/hooks/use-local-storage';
 import { toast } from 'sonner';
 
-// Message type for the chat
-type Message = {
-    id: string;
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-    timestamp: Date;
-};
-
-// Single persisted state for the chat interface (restored when tab is focused again)
-type ChatInterfaceInfo<T = Record<string, unknown>> = {
-    messages: Message[];
-    inputValue: string;
-    extractedData: Partial<T>;
-    isComplete: boolean;
-    error: string | null;
-    isLoading: boolean;
-};
-
-function getDefaultChatInterfaceInfo<T>(): ChatInterfaceInfo<T> {
-    return {
-        messages: [],
-        inputValue: '',
-        extractedData: {},
-        isComplete: false,
-        error: null,
-        isLoading: false,
-    };
-}
-
-// Generic schema type - any object with a shape property containing field definitions
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ZodSchema = { shape: Record<string, any> };
+// ---- conversation limits (keep in sync with route.ts) ----------------------
+const MAX_MESSAGES = 15;
+const WARNING_THRESHOLD = 24; // show "running out of messages" warning
 
 // Props for the ChatInterface component
-export type ChatInterfaceProps<T = Record<string, unknown>> = {
+export type ChatInterfaceProps = {
+    taskType: string;
     assistantName?: string;
-    assistantDescription?: string;
     placeholder?: string;
     className?: string;
     emptyStateMessage?: string;
-    systemPrompt?: string;
-    outputSchema?: ZodSchema;
-    messagesPersistKey: string;
-    onDataExtracted?: (data: T) => void;
-    /** Called when user confirms. Can be async; loading state is shown until it resolves. */
-    onConfirm?: (data: T) => void | Promise<void>;
+    onConfirm?: (data: Record<string, unknown>) => void | Promise<void>;
 };
 
-// Gemini client initialization
-const getGeminiClient = () => {
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) {
-        throw new Error('NEXT_PUBLIC_GEMINI_API_KEY is not configured');
-    }
-    return new GoogleGenAI({ apiKey });
-};
-
-type ZodTypeLike = {
-    _def?: {
-        typeName?: string;
-        description?: string;
-        innerType?: ZodTypeLike;
-    };
-};
-
-// Helper: unwrap wrappers like Optional/Nullable/Default to get the base type
-function unwrapZodType(zodType: ZodTypeLike): ZodTypeLike {
-    let current: ZodTypeLike = zodType;
-
-    // Unwrap common container types that wrap another Zod type
-    while (current?._def?.innerType) {
-        const typeName = current._def.typeName;
-        if (typeName === 'ZodOptional' || typeName === 'ZodNullable' || typeName === 'ZodDefault') {
-            current = current._def.innerType as ZodTypeLike;
-        } else {
-            break;
-        }
-    }
-
-    return current;
-}
-
-// Helper: detect whether a field is effectively optional
-function isOptionalZodType(zodType: ZodTypeLike): boolean {
-    const typeName = zodType?._def?.typeName;
-
-    if (typeName === 'ZodOptional' || typeName === 'ZodNullable') {
-        return true;
-    }
-
-    if (typeName === 'ZodDefault' && zodType._def?.innerType) {
-        return isOptionalZodType(zodType._def.innerType);
-    }
-
-    return false;
-}
-
-// Generate a human-readable description of the Zod schema
-function describeSchema(schema: ZodSchema): string {
-    const shape = schema.shape;
-    const descriptions: string[] = [];
-
-    for (const [key, value] of Object.entries(shape)) {
-        const rawZodType = value as ZodTypeLike;
-        const baseType = unwrapZodType(rawZodType);
-        const typeName = baseType._def?.typeName;
-        const description = baseType._def?.description;
-        const isOptional = isOptionalZodType(rawZodType);
-
-        let typeDesc = '';
-        if (typeName === 'ZodString') {
-            typeDesc = 'text';
-        } else if (typeName === 'ZodNumber') {
-            typeDesc = 'number';
-        } else if (typeName === 'ZodBoolean') {
-            typeDesc = 'yes/no';
-        } else if (typeName === 'ZodArray') {
-            typeDesc = 'list';
-        } else if (typeName === 'ZodObject') {
-            typeDesc = 'structured data';
-        } else {
-            typeDesc = 'value';
-        }
-
-        const optionalLabel = isOptional ? 'optional ' : '';
-
-        descriptions.push(`• ${key} (${optionalLabel}${typeDesc})${description ? `: ${description}` : ''}`);
-    }
-
-    return descriptions.join('\n');
-}
-
-// Build the system prompt for conversational data collection
-function buildSystemPrompt<T>(
-    schema: ZodSchema | undefined,
-    customPrompt: string | undefined,
-    extractedData: Partial<T>,
-): string {
-    const basePrompt =
-        customPrompt ||
-        `You are a friendly and helpful assistant. Your goal is to have a natural conversation 
-         with the user to understand their needs and collect the necessary information.`;
-
-    if (!schema) {
-        return basePrompt;
-    }
-
-    const schemaDescription = describeSchema(schema);
-    const currentDataStr = Object.keys(extractedData).length > 0 ? JSON.stringify(extractedData, null, 2) : 'None yet';
-
-    return `${basePrompt}
-
-## Your Task
-You need to collect the following information from the user through natural conversation:
-
-${schemaDescription}
-
-## Current Collected Information
-${currentDataStr}
-
-## Guidelines for Your Responses
-
-1. **Be Conversational**: Ask questions naturally, one or two at a time. Don't overwhelm the user with a list of questions.
-
-2. **Be Smart About Context**: 
-   - When users mention a city (like "Mumbai" or "New York"), automatically infer the country and state/region
-   - If something is ambiguous, ask for clarification politely
-
-3. **Keep It Concise**: Your responses should be 1-3 sentences. Be helpful but brief.
-
-4. **Acknowledge Progress**: When the user provides information, acknowledge it before asking for more.
-
-5. **When Complete**: Once you have all required information, summarize what you've collected and ask the user to confirm.
-
-6. **Natural Language Only**: Always respond in natural conversational language. Never output JSON or code in your responses.
-
-Remember: You're having a conversation, not conducting an interview. Be personable and helpful!`;
-}
-
-// Build the extraction prompt to get structured data from conversation
-function buildExtractionPrompt<T>(schema: ZodSchema, conversationHistory: string, currentData: Partial<T>): string {
-    const schemaDescription = describeSchema(schema);
-
-    return `Analyze this conversation and extract structured data.
-
-## Target Schema
-${schemaDescription}
-
-## Conversation
-${conversationHistory}
-
-## Previously Extracted Data
-${JSON.stringify(currentData, null, 2)}
-
-## Instructions
-1. Extract any new information mentioned in the conversation
-2. For locations:
-   - "Mumbai" → country: "India", states: [{ name: "Maharashtra", cities: ["Mumbai"] }]
-   - "New York" → country: "United States", states: [{ name: "New York", cities: ["New York"] }]
-   - "restaurants in Delhi and Mumbai" → states: [{ name: "Delhi", cities: ["Delhi"] }, { name: "Maharashtra", cities: ["Mumbai"] }]
-3. Merge new data with existing data
-4. Return ONLY valid JSON matching the schema structure
-5. If a field cannot be determined, use empty string for strings or empty array for arrays
-
-Return the extracted data as JSON:`;
-}
-
-// Check if all required fields are filled
-function checkCompletion<T>(schema: ZodSchema, data: Partial<T>): { isComplete: boolean; missingFields: string[] } {
-    const missingFields: string[] = [];
-    const shape = schema.shape;
-
-    for (const [key, value] of Object.entries(shape)) {
-        const rawZodType = value as ZodTypeLike;
-
-        // Optional fields should not block completion if they are missing
-        if (isOptionalZodType(rawZodType)) {
-            continue;
-        }
-
-        const baseType = unwrapZodType(rawZodType);
-        const fieldValue = (data as Record<string, unknown>)[key];
-
-        if (fieldValue === undefined || fieldValue === null || fieldValue === '') {
-            missingFields.push(key);
-        } else if (baseType._def?.typeName === 'ZodArray' && Array.isArray(fieldValue) && fieldValue.length === 0) {
-            missingFields.push(key);
-        }
-    }
-
-    return {
-        isComplete: missingFields.length === 0,
-        missingFields,
-    };
-}
-
-export function ChatInterface<T extends Record<string, unknown>>({
+export function ChatInterface({
+    taskType,
     assistantName = 'AI Assistant',
     placeholder = 'Type your message...',
     className,
     emptyStateMessage = 'Start a conversation to get started',
-    systemPrompt,
-    outputSchema,
-    onDataExtracted,
     onConfirm,
-    messagesPersistKey,
-}: ChatInterfaceProps<T>) {
-    const [chatInterfaceInfo, setChatInterfaceInfo] = useLocalStorage<ChatInterfaceInfo<T>>(
-        messagesPersistKey,
-        getDefaultChatInterfaceInfo<T>(),
-        {
-            deserializer: (raw) => {
-                try {
-                    const parsed = JSON.parse(raw) as ChatInterfaceInfo<T>;
-                    const messages = (parsed.messages || []).map((m) => ({
-                        ...m,
-                        timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
-                    }));
-                    return {
-                        ...getDefaultChatInterfaceInfo<T>(),
-                        ...parsed,
-                        messages,
-                        isLoading: false,
-                        error: null,
-                    };
-                } catch {
-                    return getDefaultChatInterfaceInfo<T>();
-                }
-            },
-        },
-    );
-
-    const { messages, inputValue, extractedData, isComplete, error, isLoading } = chatInterfaceInfo;
+}: ChatInterfaceProps) {
+    const [input, setInput] = useState('');
     const [isConfirming, setIsConfirming] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Single "busy" for disabling input: either AI is thinking or confirm (Start Now) is in progress
-    const isBusy = isLoading || isConfirming;
+    const transport = useMemo(
+        () => new DefaultChatTransport({ api: '/api/nl-chat', body: { taskType } }),
+        [taskType],
+    );
 
-    // Auto-scroll to the bottom when messages change
+    const { messages, sendMessage, setMessages, status, error, stop } = useChat({
+        id: `nl-chat-${taskType}`,
+        transport,
+    });
+
+    const isBusy = status === 'submitted' || status === 'streaming' || isConfirming;
+
+    const messagesRemaining = MAX_MESSAGES - messages.length;
+    const isNearLimit = messages.length >= WARNING_THRESHOLD && messages.length < MAX_MESSAGES;
+    const isAtLimit = messages.length >= MAX_MESSAGES;
+
+    // Auto-scroll when messages change
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
+    }, [messages, status]);
+
+    const handleSubmit = useCallback(
+        (e?: React.FormEvent) => {
+            e?.preventDefault();
+            if (!input.trim() || isBusy || isAtLimit) return;
+            sendMessage({ text: input });
+            setInput('');
+        },
+        [input, isBusy, isAtLimit, sendMessage],
+    );
+
+    const handleReset = useCallback(() => {
+        stop();
+        setMessages([]);
+        setInput('');
+    }, [stop, setMessages]);
+
+    // Extract submitted data from the latest submitLeadData tool call
+    const submittedData = useMemo(() => {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const message = messages[i];
+            if (message.role !== 'assistant') continue;
+            for (const part of message.parts) {
+                if (!isToolUIPart(part)) continue;
+                if (getToolName(part) !== 'submitLeadData') continue;
+                if (part.state === 'input-available' || part.state === 'output-available') {
+                    return {
+                        data: part.input as Record<string, unknown>,
+                        toolCallId: part.toolCallId,
+                    };
+                }
+            }
+        }
+        return null;
     }, [messages]);
 
-    // Add a message to the chat
-    const addMessage = useCallback(
-        (role: Message['role'], content: string) => {
-            const message: Message = {
-                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                role,
-                content,
-                timestamp: new Date(),
-            };
-            setChatInterfaceInfo((prev) => ({ ...prev, messages: [...prev.messages, message] }));
-            return message;
-        },
-        [setChatInterfaceInfo],
-    );
-
-    // Extract data from conversation using Gemini
-    const extractDataFromConversation = useCallback(
-        async (conversationHistory: string): Promise<Partial<T>> => {
-            if (!outputSchema) return extractedData;
-
-            try {
-                const client = getGeminiClient();
-                const extractionPrompt = buildExtractionPrompt(outputSchema, conversationHistory, extractedData);
-
-                const response = await client.models.generateContent({
-                    model: 'gemini-2.0-flash',
-                    contents: extractionPrompt,
-                });
-
-                const responseText = response.text || '';
-
-                // Parse the JSON response
-                const jsonMatch = responseText.match(/\{[\s\S]*}/);
-                if (jsonMatch) {
-                    return JSON.parse(jsonMatch[0]) as Partial<T>;
-                }
-
-                return extractedData;
-            } catch (err) {
-                console.error('Error extracting data:', err);
-                return extractedData;
-            }
-        },
-        [outputSchema, extractedData],
-    );
-
-    // Generate AI response using Gemini
-    const generateResponse = useCallback(
-        async (userMessage: string, currentExtractedData: Partial<T>): Promise<string> => {
-            try {
-                const client = getGeminiClient();
-                const contextPrompt = buildSystemPrompt(outputSchema, systemPrompt, currentExtractedData);
-
-                // Build conversation context
-                const conversationContext = messages
-                    .filter((m) => m.role !== 'system')
-                    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-                    .join('\n');
-
-                const fullPrompt = `${contextPrompt}
-
-## Conversation So Far
-${conversationContext}
-
-User: ${userMessage}
-
-Respond naturally to the user. Remember to be conversational and helpful.`;
-
-                const response = await client.models.generateContent({
-                    model: 'gemini-2.0-flash',
-                    contents: fullPrompt,
-                });
-
-                return response.text || "I'm sorry, I couldn't generate a response. Please try again.";
-            } catch (err) {
-                console.error('Error generating response:', err);
-                throw err;
-            }
-        },
-        [messages, outputSchema, systemPrompt],
-    );
-
-    // Handle message submission
-    const handleChatMessageSubmit = async (e?: React.FormEvent) => {
-        e?.preventDefault();
-        if (!inputValue.trim() || isBusy) return;
-
-        const userMessageContent = inputValue.trim();
-        setChatInterfaceInfo((prev) => ({ ...prev, inputValue: '', error: null, isLoading: true }));
-
-        // Add a user message
-        addMessage('user', userMessageContent);
-
-        try {
-            // Build conversation history for extraction
-            const conversationHistory = [...messages, { role: 'user' as const, content: userMessageContent }]
-                .filter((m) => m.role !== 'system')
-                .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-                .join('\n');
-
-            // Extract data from conversation
-            const newExtractedData = await extractDataFromConversation(conversationHistory);
-            setChatInterfaceInfo((prev) => ({
-                ...prev,
-                extractedData: newExtractedData,
-                ...(outputSchema
-                    ? { isComplete: checkCompletion(outputSchema, newExtractedData).isComplete }
-                    : {}),
-            }));
-
-            // Notify parent of extracted data
-            if (onDataExtracted) {
-                onDataExtracted(newExtractedData as T);
-            }
-
-            // Generate AI response
-            const aiResponse = await generateResponse(userMessageContent, newExtractedData);
-            addMessage('assistant', aiResponse);
-        } catch (err) {
-            console.error('Error in chat message:', err);
-            const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-            setChatInterfaceInfo((prev) => ({
-                ...prev,
-                error: errorMessage,
-            }));
-            addMessage('assistant', "I'm sorry, I encountered an error. Please try again.");
-        } finally {
-            setChatInterfaceInfo((prev) => ({ ...prev, isLoading: false }));
-        }
-    };
-
-    // Reset the chat
-    const handleReset = () => {
-        setChatInterfaceInfo(getDefaultChatInterfaceInfo<T>());
-    };
-
-    // Handle confirmation (supports async onConfirm); use isConfirming so we don't show "Thinking..." during submit
     const handleConfirm = useCallback(async () => {
-        if (!onConfirm || !isComplete) return;
+        if (!onConfirm || !submittedData) return;
         setIsConfirming(true);
         try {
-            await onConfirm(extractedData as T);
+            await onConfirm(submittedData.data);
             toast.success(
-                'Your previous request to the scraper for fetching leads was successful, so we are resetting the chat.',
-                { duration: 10_000 },
+                'Your request was submitted successfully. Resetting the chat.',
+                { duration: 8_000 },
             );
-            setChatInterfaceInfo(getDefaultChatInterfaceInfo<T>());
+            setMessages([]);
+            setInput('');
         } catch (err) {
             console.error('Error while confirming:', err);
-            toast.error(err instanceof Error ? err.message : 'Something went wrong while confirming. Please try again.');
-            setChatInterfaceInfo((prev) => ({ ...prev, error: err instanceof Error ? err.message : 'Something went wrong while confirming. Please try again.' }));
+            toast.error(
+                err instanceof Error ? err.message : 'Something went wrong while confirming. Please try again.',
+            );
         } finally {
             setIsConfirming(false);
         }
-    }, [onConfirm, isComplete, extractedData, setChatInterfaceInfo]);
+    }, [onConfirm, submittedData, setMessages]);
 
     return (
         <Card className={cn('flex flex-col h-full w-full', className)}>
@@ -464,65 +127,61 @@ Respond naturally to the user. Remember to be conversational and helpful.`;
             <CardContent className="flex flex-col h-full">
                 <ScrollArea ref={scrollRef} className="flex-1">
                     <div className="space-y-4">
-                        {messages.length === 0 && <EmptyState assistantName={assistantName} message={emptyStateMessage} />}
+                        {messages.length === 0 && (
+                            <EmptyState assistantName={assistantName} message={emptyStateMessage} />
+                        )}
 
                         {messages.map((message, index) => (
-                            <ChatMessage
+                            <MessageBubble
                                 key={message.id}
-                                role={message.role}
-                                content={message.content}
+                                message={message}
                                 isLatest={index === messages.length - 1}
                             />
                         ))}
 
-                        {/* Only show "Thinking..." when AI is responding, not when Start Now is in progress */}
-                        {isLoading && !isConfirming && <LoadingIndicator />}
+                        {status === 'submitted' && <LoadingIndicator />}
 
-                        {/* Confirmation prompt when data collection is complete */}
-                        {isComplete && onConfirm && (
+                        {submittedData && onConfirm && (
                             <ConfirmationPrompt
-                                extractedData={extractedData}
+                                extractedData={submittedData.data}
                                 onConfirm={handleConfirm}
                                 onReset={handleReset}
                                 isConfirming={isConfirming}
                             />
                         )}
 
-                        {/* Error display */}
-                        {error && (
-                            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                                <p className="text-sm text-destructive">{error}</p>
-                            </div>
+                        {isAtLimit && (
+                            <LimitReachedBanner onReset={handleReset} />
                         )}
+
+                        {isNearLimit && !isAtLimit && (
+                            <NearLimitWarning remaining={messagesRemaining} />
+                        )}
+
+                        {error && <ErrorDisplay error={error} onRetry={handleReset} />}
                     </div>
                 </ScrollArea>
             </CardContent>
 
             <CardFooter>
                 <ChatInputArea
-                    inputValue={inputValue}
-                    setInputValue={(value) =>
-                        setChatInterfaceInfo((prev) => ({ ...prev, inputValue: value }))
-                    }
-                    handleSubmit={handleChatMessageSubmit}
-                    placeholder={placeholder}
+                    inputValue={input}
+                    setInputValue={setInput}
+                    handleSubmit={handleSubmit}
+                    placeholder={isAtLimit ? 'Message limit reached — please start over' : placeholder}
                     isLoading={isBusy}
-                    disabled={isBusy}
+                    disabled={isBusy || isAtLimit}
                 />
             </CardFooter>
         </Card>
     );
 }
 
+// ---------------------------------------------------------------------------
 // Sub-components
+// ---------------------------------------------------------------------------
 
-function ChatHeader({
-    assistantName,
-    onReset,
-}: {
-    assistantName: string;
-    onReset: () => void;
-}) {
+function ChatHeader({ assistantName, onReset }: { assistantName: string; onReset: () => void }) {
     return (
         <CardHeader>
             <CardTitle className="flex items-center gap-3">
@@ -559,18 +218,60 @@ function LoadingIndicator() {
     );
 }
 
-function ConfirmationPrompt<T>({
+function ErrorDisplay({ error, onRetry }: { error: Error; onRetry: () => void }) {
+    return (
+        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg animate-in fade-in duration-300">
+            <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-4 h-4 text-destructive" />
+                <p className="text-sm font-medium text-destructive">Something went wrong</p>
+            </div>
+            <p className="text-sm text-destructive/80 mb-3">{error.message}</p>
+            <Button variant="outline" size="sm" onClick={onRetry}>
+                Start Over
+            </Button>
+        </div>
+    );
+}
+
+function LimitReachedBanner({ onReset }: { onReset: () => void }) {
+    return (
+        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg animate-in fade-in duration-300">
+            <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-4 h-4 text-destructive" />
+                <p className="text-sm font-medium text-destructive">Conversation limit reached</p>
+            </div>
+            <p className="text-sm text-destructive/80 mb-3">
+                This conversation has reached the maximum of {MAX_MESSAGES} messages. Please start a new chat to continue.
+            </p>
+            <Button variant="outline" size="sm" onClick={onReset}>
+                Start New Chat
+            </Button>
+        </div>
+    );
+}
+
+function NearLimitWarning({ remaining }: { remaining: number }) {
+    return (
+        <div className="px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg animate-in fade-in duration-300 flex items-center gap-2">
+            <MessageSquareWarning className="w-4 h-4 text-amber-600 shrink-0" />
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+                {remaining} message{remaining !== 1 ? 's' : ''} remaining — try to finalize your request soon.
+            </p>
+        </div>
+    );
+}
+
+function ConfirmationPrompt({
     extractedData,
     onConfirm,
     onReset,
     isConfirming,
 }: {
-    extractedData: Partial<T>;
+    extractedData: Record<string, unknown>;
     onConfirm: () => void | Promise<void>;
     onReset: () => void;
     isConfirming?: boolean;
 }) {
-
     const showDetails = process.env.NEXT_PUBLIC_NODE_ENV === 'development';
 
     return (
@@ -623,25 +324,16 @@ function ChatInputArea({ inputValue, setInputValue, handleSubmit, placeholder, i
     );
 }
 
-type ChatMessageProps = {
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-    isLatest: boolean;
-};
+/** Renders a single chat message using the AI SDK UIMessage parts. */
+function MessageBubble({ message, isLatest }: { message: UIMessage; isLatest: boolean }) {
+    const isUser = message.role === 'user';
 
-function ChatMessage({ role, content, isLatest }: ChatMessageProps) {
-    const isUser = role === 'user';
-    const isSystem = role === 'system';
+    const textContent = message.parts
+        .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+        .map((p) => p.text)
+        .join('');
 
-    if (isSystem) {
-        return (
-            <div className={cn('flex justify-center', isLatest && 'animate-in slide-in-from-bottom-2 fade-in duration-300')}>
-                <div className="px-3 py-1.5 bg-muted/50 rounded-full">
-                    <p className="text-xs text-muted-foreground">{content}</p>
-                </div>
-            </div>
-        );
-    }
+    if (!textContent) return null;
 
     return (
         <div
@@ -665,10 +357,12 @@ function ChatMessage({ role, content, isLatest }: ChatMessageProps) {
             <div
                 className={cn(
                     'max-w-[80%] px-4 py-3 rounded-2xl',
-                    isUser ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-muted text-foreground rounded-tl-sm',
+                    isUser
+                        ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                        : 'bg-muted text-foreground rounded-tl-sm',
                 )}
             >
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{textContent}</p>
             </div>
         </div>
     );

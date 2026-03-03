@@ -2,9 +2,9 @@
 // QUERY EXECUTION - AI query execution and response parsing
 // ============================================================================
 
-import { getGeminiClient } from './gemini-client';
+import { getGeminiClient } from '../../../lib/gemini-client';
 import { buildUserPrompt } from './prompt-builder';
-import type { QueryResult, ValidationResult } from './types';
+import type { QueryResult, ValidationResult } from '../../../hooks/use-nl-query/types';
 
 /**
  * Generate transform function from natural language using Gemini
@@ -22,9 +22,13 @@ export async function generateQueryResult(
         console.log('[useNLQuery] Sending prompt to Gemini:', fullPrompt);
     }
 
+    if (!process.env.GEMINI_MODEL) {
+        throw new Error('Gemini model not found. Please set GEMINI_MODEL.');
+    }
+
     try {
         const response = await client.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: process.env.GEMINI_MODEL,
             contents: fullPrompt,
             config: {
                 temperature: 0.1,

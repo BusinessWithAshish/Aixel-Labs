@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { checkConnection } from '@aixellabs/shared/mongodb';
 
 /**
  * Health check endpoint for MongoDB connection
  * GET /api/health
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const isConnected = await checkConnection();
 

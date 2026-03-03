@@ -1,46 +1,18 @@
 'use client';
 
-// ============================================================================
-// USE NL QUERY - Main hook for natural language data queries
-// ============================================================================
-
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { QueryCache } from './cache';
-import { buildSystemPrompt } from './prompt-builder';
-import { generateQueryResult, validateTransformFunction } from './query-execution';
-import { executeTransformFunction } from './filter-executor';
 import { hashData } from './utils';
 import type { UseNLQueryConfig, UseNLQueryReturn } from './types';
 
-/**
- * useNLQuery Hook
- *
- * A powerful hook that allows filtering and sorting any data structure using natural language queries.
- * The AI generates a single transform function that handles both sorting and filtering.
- *
- * Supports queries like:
- * - "find john" (filtering)
- * - "sort by score high to low" (sorting)
- * - "show tech companies ordered by revenue descending" (both)
- *
- * @example
- * ```tsx
- * const {
- *   filteredData,
- *   query,
- *   setQuery,
- *   executeSearch,
- *   isLoading,
- *   clear,
- *   reset,
- * } = useNLQuery({ data: leads });
- *
- * // In your component:
- * <input value={query} onChange={(e) => setQuery(e.target.value)} />
- * <button onClick={executeSearch}>Search</button>
- * <button onClick={reset}>Reset All</button>
- * ```
- */
+const NL_QUERY_API = '/api/nl-query';
+const MAX_HISTORY = 10;
+
+function pushHistory(prev: string[], query: string): string[] {
+    const filtered = prev.filter((q) => q !== query);
+    return [query, ...filtered].slice(0, MAX_HISTORY);
+}
+
 export function useNLQuery<T>({
     data,
     enableCache = true,
@@ -52,218 +24,116 @@ export function useNLQuery<T>({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isCached, setIsCached] = useState(false);
-    const [explanation, setExplanation] = useState<string | null>(null);
-    const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-    const [activeTransformFunction, setActiveTransformFunction] = useState<string | null>(null);
+    const [resultData, setResultData] = useState<T[] | null>(null);
     const [queryHistory, setQueryHistory] = useState<string[]>([]);
 
     // Refs
     const cacheRef = useRef(new QueryCache(cacheTTL));
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    // Optimized setQuery
-    const setQuery = useCallback((newQuery: string) => {
-        setQueryState(newQuery);
+    const dataHash = useMemo(() => hashData(data), [data]);
+    const setQuery = useCallback((newQuery: string) => setQueryState(newQuery), []);
+
+    /** Single place to clear the result state (no transform/explanation/code – API returns only data) */
+    const resetResult = useCallback(() => {
+        setError(null);
+        setIsCached(false);
+        setResultData(null);
     }, []);
 
-    // Memoize system prompt (only recalculate when data structure changes)
-    const systemPrompt = useMemo(() => buildSystemPrompt(data), [data]);
+    const applySuccess = useCallback((filteredData: T[], fromCache: boolean, trimmedQuery: string) => {
+        setResultData(filteredData);
+        setIsCached(fromCache);
+        setQueryHistory((prev) => pushHistory(prev, trimmedQuery));
+    }, []);
 
-    // Memoize data hash for cache key
-    const dataHash = useMemo(() => hashData(data), [data]);
-
-    // Execute search explicitly
     const executeSearch = useCallback(async () => {
         const trimmedQuery = query.trim();
-
         if (!trimmedQuery) {
-            setError(null);
-            setExplanation(null);
-            setIsCached(false);
-            setGeneratedCode(null);
-            setActiveTransformFunction(null);
+            resetResult();
             return;
         }
 
-        // Cancel previous request
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-
-        const abortController = new AbortController();
-        abortControllerRef.current = abortController;
+        if (abortControllerRef.current) abortControllerRef.current.abort();
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
         setIsLoading(true);
         setError(null);
+        const cacheKey = cacheRef.current.getCacheKey(trimmedQuery, dataHash);
 
         try {
-            const cacheKey = cacheRef.current.getCacheKey(trimmedQuery, dataHash);
-
-            // Check cache first
             if (enableCache) {
                 const cached = cacheRef.current.get(cacheKey);
-
                 if (cached) {
-                    if (debug) {
-                        console.log('[useNLQuery] Cache hit for query:', trimmedQuery);
-                    }
-
-                    // Validate cached function
-                    const validation = validateTransformFunction(cached.transformFunction);
-                    if (!validation.valid) {
-                        if (debug) {
-                            console.warn('[useNLQuery] Cached function failed validation:', validation.error);
-                        }
-                        setError(validation.error || 'Cached function was rejected for safety reasons.');
-                        setGeneratedCode(null);
-                        setActiveTransformFunction(null);
-                        setIsCached(false);
-                        setIsLoading(false);
-                        return;
-                    }
-
-                    if (!abortController.signal.aborted) {
-                        setExplanation(cached.explanation);
-                        setGeneratedCode(cached.transformFunction);
-                        setActiveTransformFunction(cached.transformFunction);
-                        setIsCached(true);
-                        setIsLoading(false);
-
-                        // Add to history
-                        setQueryHistory((prev) => {
-                            const filtered = prev.filter((item) => item !== trimmedQuery);
-                            return [trimmedQuery, ...filtered].slice(0, 10);
-                        });
-                    }
+                    if (debug) console.log('[useNLQuery] Cache hit:', trimmedQuery);
+                    if (!controller.signal.aborted) applySuccess(cached.filteredData as T[], true, trimmedQuery);
+                    setIsLoading(false);
                     return;
                 }
             }
 
-            // Generate transform function using AI
-            const result = await generateQueryResult(trimmedQuery, systemPrompt, debug);
+            const res = await fetch(NL_QUERY_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: trimmedQuery, data, debug }),
+                signal: controller.signal,
+            });
 
-            // Validate generated function
-            const validation = validateTransformFunction(result.transformFunction);
-            if (!validation.valid) {
-                if (!abortController.signal.aborted) {
-                    if (debug) {
-                        console.warn('[useNLQuery] Generated function failed validation:', validation.error);
-                    }
-                    setError(validation.error || 'The generated function was rejected for safety reasons.');
-                    setGeneratedCode(null);
-                    setActiveTransformFunction(null);
-                    setIsCached(false);
-                    setIsLoading(false);
+            if (!res.ok) {
+                let msg = 'Failed to generate query. Please try again.';
+                try {
+                    const body = (await res.json()) as { error?: string };
+                    if (body?.error) msg = body.error;
+                } catch {
+                    /* use default */
                 }
-                return;
+                throw new Error(msg);
             }
 
-            if (abortController.signal.aborted) return;
+            const filteredData = (await res.json()) as T[];
+            if (controller.signal.aborted) return;
 
-            if (debug) {
-                console.log('[useNLQuery] Generated transform function:', result.transformFunction);
-            }
-
-            // Cache the result
             if (enableCache) {
-                cacheRef.current.set(cacheKey, {
-                    transformFunction: result.transformFunction,
-                    explanation: result.explanation,
-                    timestamp: Date.now(),
-                });
+                cacheRef.current.set(cacheKey, { filteredData, timestamp: Date.now() });
             }
 
-            // Update state
-            if (!abortController.signal.aborted) {
-                setExplanation(result.explanation);
-                setGeneratedCode(result.transformFunction);
-                setActiveTransformFunction(result.transformFunction);
-                setIsCached(false);
-
-                // Add to history
-                setQueryHistory((prev) => {
-                    const filtered = prev.filter((item) => item !== trimmedQuery);
-                    return [trimmedQuery, ...filtered].slice(0, 10);
-                });
-            }
+            if (!controller.signal.aborted) applySuccess(filteredData, false, trimmedQuery);
+            if (debug) console.log('[useNLQuery] Result applied');
         } catch (err) {
-            if (!abortController.signal.aborted) {
-                const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-                setError(errorMessage);
-                setGeneratedCode(null);
-                setActiveTransformFunction(null);
+            if (!controller.signal.aborted) {
+                resetResult();
+                setError(err instanceof Error ? err.message : 'An error occurred');
             }
         } finally {
-            if (!abortController.signal.aborted) {
-                setIsLoading(false);
-            }
+            if (!controller.signal.aborted) setIsLoading(false);
         }
-    }, [query, systemPrompt, enableCache, dataHash, debug]);
+    }, [query, enableCache, dataHash, debug, data, resetResult, applySuccess]);
 
-    // Calculate transformed data
-    const filteredData = useMemo(() => {
-        if (!activeTransformFunction) {
-            return data;
-        }
+    const filteredData = useMemo(() => resultData ?? data, [data, resultData]);
 
-        try {
-            return executeTransformFunction(data, activeTransformFunction, debug);
-        } catch (err) {
-            console.error('[useNLQuery] Error executing transform:', err);
-            return data;
-        }
-    }, [data, activeTransformFunction, debug]);
-
-    // Clear function
     const clear = useCallback(() => {
         setQueryState('');
-        setError(null);
-        setExplanation(null);
-        setIsCached(false);
-        setGeneratedCode(null);
-        setActiveTransformFunction(null);
+        resetResult();
+        abortControllerRef.current?.abort();
+    }, [resetResult]);
 
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-    }, []);
-
-    // Reset function
     const reset = useCallback(() => {
         setQueryState('');
-        setError(null);
-        setExplanation(null);
-        setIsCached(false);
-        setGeneratedCode(null);
-        setActiveTransformFunction(null);
-        setIsLoading(false);
         setQueryHistory([]);
+        setIsLoading(false);
+        resetResult();
+        abortControllerRef.current?.abort();
+        if (debug) console.log('[useNLQuery] Reset');
+    }, [debug, resetResult]);
 
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-
-        if (debug) {
-            console.log('[useNLQuery] Complete reset - returning to original data');
-        }
-    }, [debug]);
-
-    // Clear cache function
     const clearCache = useCallback(() => {
         cacheRef.current.clear();
-        if (debug) {
+        if (debug)
             console.log('[useNLQuery] Cache cleared');
-        }
     }, [debug]);
 
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-            }
-        };
-    }, []);
+    useEffect(() => () => abortControllerRef.current?.abort(), []);
 
     return {
         filteredData,
@@ -274,9 +144,7 @@ export function useNLQuery<T>({
         clear,
         reset,
         isCached,
-        explanation,
         clearCache,
-        generatedCode,
         executeSearch,
         queryHistory,
     };
