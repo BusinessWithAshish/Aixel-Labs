@@ -41,6 +41,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "country-state-city": "^3.2.1",
+    "impit": "^0.9.2",
     "lucide-react": "^0.503.0",
     "mongodb": "^6.11.0",
     "motion": "^12.23.26",
