@@ -19,15 +19,32 @@ import { toast } from 'sonner';
 const MAX_MESSAGES = 15;
 const WARNING_THRESHOLD = 24; // show "running out of messages" warning
 
-// Props for the ChatInterface component
-export type ChatInterfaceProps = {
+export type ConfirmResult = {
+    success: boolean;
+    message?: string;
+    resetChat?: boolean;
+};
+
+type BaseChatInterfaceProps = {
     taskType: string;
     assistantName?: string;
     placeholder?: string;
     className?: string;
     emptyStateMessage?: string;
-    onConfirm?: (data: Record<string, unknown>) => void | Promise<void>;
 };
+
+type AutoConfirmProps = {
+    confirmMode?: 'auto';
+    onConfirm?: (data: object) => void | Promise<void>;
+};
+
+type ManualConfirmProps = {
+    confirmMode: 'manual';
+    onConfirm?: (data: object) => ConfirmResult | Promise<ConfirmResult>;
+};
+
+// Props for the ChatInterface component
+export type ChatInterfaceProps = BaseChatInterfaceProps & (AutoConfirmProps | ManualConfirmProps);
 
 export function ChatInterface({
     taskType,
@@ -36,6 +53,7 @@ export function ChatInterface({
     className,
     emptyStateMessage = 'Start a conversation to get started',
     onConfirm,
+    confirmMode = 'auto',
 }: ChatInterfaceProps) {
     const [input, setInput] = useState('');
     const [isConfirming, setIsConfirming] = useState(false);
@@ -103,13 +121,33 @@ export function ChatInterface({
         if (!onConfirm || !submittedData) return;
         setIsConfirming(true);
         try {
-            await onConfirm(submittedData.data);
-            toast.success(
-                'Your request was submitted successfully. Resetting the chat.',
-                { duration: 8_000 },
-            );
-            setMessages([]);
-            setInput('');
+            if (confirmMode === 'manual') {
+                const result = await onConfirm(submittedData.data);
+
+                if (!result) {
+                    // Caller chose to handle all UX themselves.
+                    return;
+                }
+
+                if (result.success) {
+                    if (result.message) {
+                        toast.success(result.message);
+                    }
+
+                    if (result.resetChat) {
+                        handleReset();
+                    }
+                } else if (result.message) {
+                    toast.error(result.message);
+                }
+            } else {
+                await onConfirm(submittedData.data);
+                toast.success(
+                    'Your request was submitted successfully. Resetting the chat.',
+                    { duration: 8_000 },
+                );
+                handleReset();
+            }
         } catch (err) {
             console.error('Error while confirming:', err);
             toast.error(
@@ -118,7 +156,7 @@ export function ChatInterface({
         } finally {
             setIsConfirming(false);
         }
-    }, [onConfirm, submittedData, setMessages]);
+    }, [confirmMode, handleReset, onConfirm, submittedData]);
 
     return (
         <Card className={cn('flex flex-col h-full w-full', className)}>

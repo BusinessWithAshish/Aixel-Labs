@@ -1,6 +1,5 @@
 'use client';
 
-import { useThemeColor } from '@/hooks/use-theme-color';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 
 type ThemeProviderProps = {
@@ -14,8 +13,6 @@ export const ThemeProvider = ({
     defaultTheme = 'light',
     storageKey = 'theme',
 }: ThemeProviderProps) => {
-    useThemeColor();
-
     return (
         <NextThemesProvider
             attribute="class"

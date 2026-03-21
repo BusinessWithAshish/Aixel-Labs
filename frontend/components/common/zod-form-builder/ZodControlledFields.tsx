@@ -1,5 +1,6 @@
 import { FieldController } from './FieldController';
 import { generateFieldLabel } from './helpers';
+import type { HTMLInputTypeAttribute } from 'react';
 import {
     ZodCheckboxField,
     ZodSelectField,
@@ -29,13 +30,18 @@ import { Button } from '@/components/ui/button';
 type ControlledFieldBaseProps = {
     metadata?: ZodMetaType | null;
 };
-type ControlledFieldModifiedProps<T> = Omit<T, 'value' | 'onChange' | 'invalid' | 'errors'>
+type ControlledFieldModifiedProps<T> = Omit<T, 'value' | 'onChange' | 'invalid' | 'errors'>;
 
-type StringControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodStringFieldProps | ZodTextAreaFieldProps>
+type StringControlledFieldProps = ControlledFieldBaseProps &
+    ControlledFieldModifiedProps<ZodStringFieldProps | ZodTextAreaFieldProps> & {
+        placeholder?: string;
+        type?: HTMLInputTypeAttribute;
+    };
 
-export const StringControlledField = ({ name, description, required, label, disabled, className, classNames, metadata }: StringControlledFieldProps) => {
+export const StringControlledField = ({ name, description, required, label, disabled, className, classNames, metadata, placeholder, type }: StringControlledFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
-    const Component = metadata === ZodMetaType.TEXT_AREA ? ZodTextAreaField : ZodStringField;
+    const isTextArea = metadata === ZodMetaType.TEXT_AREA;
+    const Component = isTextArea ? ZodTextAreaField : ZodStringField;
     return (
         <FieldController
             name={name}
@@ -52,6 +58,7 @@ export const StringControlledField = ({ name, description, required, label, disa
                     disabled={disabled}
                     className={className}
                     classNames={classNames}
+                    {...(!isTextArea && { placeholder, type })}
                 />
             )}
         />
@@ -144,7 +151,7 @@ export const EnumControlledField = ({ name, description, required, label, disabl
 
 type SelectControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodSelectFieldProps>
 
-export const SelectControlledField = ({ name, description, required, label, disabled, className, classNames, metadata, options }: SelectControlledFieldProps) => {
+export const SelectControlledField = ({ name, description, required, label, disabled, className, classNames, metadata, options, isClearable }: SelectControlledFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
     return (
         <FieldController
@@ -157,6 +164,7 @@ export const SelectControlledField = ({ name, description, required, label, disa
                     value={value}
                     invalid={invalid}
                     errors={errors}
+                    isClearable={isClearable}
                     onChange={onChange}
                     options={options}
                     required={required}

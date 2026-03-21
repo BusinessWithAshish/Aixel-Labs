@@ -12,11 +12,10 @@ import {
     SidebarMenu,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { getAllTenants } from '@/helpers/tenant-operations';
-import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
+import { getAllTenants } from '@/app/actions/tenant-actions';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { generateSidebarConfig } from '@/helpers/sidebar-config-helpers';
-import { Tenant } from '@aixellabs/shared/mongodb';
+import { Tenant } from '@aixellabs/backend/db/types';
 import { validateAndGetTenant } from '@/helpers/validate-tenant';
 
 export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -28,13 +27,13 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
     // Generate sidebar config based on user's access
     const sidebarConfig = generateSidebarConfig(isAdmin, moduleAccess);
 
-    const tenants = isAdmin ? await getAllTenants() : [];
+    const tenantsRes = isAdmin ? await getAllTenants() : { success: true, data: [] };
+    const tenants = tenantsRes.success ? tenantsRes.data ?? [] : [];
 
     const currentTenant = await validateAndGetTenant();
 
     const tenantsForSwitcher: Tenant[] = tenants.map((tenant) => ({
         ...tenant,
-        redirect_url: getTenantRedirectUrl(tenant),
     }));
 
     const user = {

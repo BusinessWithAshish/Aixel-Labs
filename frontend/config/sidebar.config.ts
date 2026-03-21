@@ -1,12 +1,16 @@
-import { SubModuleUrls, ModuleUrls } from './app-config';
+import { SubModuleUrls, ModuleUrls, MANAGE_TENANTS_ROUTE } from './app-config';
+
+/** Admin-only paths (not in sidebar nav). Exact match or nested routes (e.g. /manage-tenants/[tenantId]) require admin. */
+export const ADMIN_ONLY_PATHS = [MANAGE_TENANTS_ROUTE] as const;
 import {
     EMAIL_SUB_MODULES,
+    LEAD_ENRICHMENT_SUB_MODULES,
     LEAD_GENERATION_SUB_MODULES,
     MESSAGING_SUB_MODULES,
     Modules,
     SubModule,
     VOICE_AGENT_SUB_MODULES,
-} from '@aixellabs/shared/mongodb';
+} from '@aixellabs/backend/db/types';
 import {
     AudioWaveform,
     Instagram,
@@ -19,6 +23,7 @@ import {
     FacebookIcon,
     MapPinIcon,
     SearchIcon,
+    PhoneIcon,
 } from 'lucide-react';
 
 export type SidebarNavItem = {
@@ -47,6 +52,7 @@ export const modulesIconMap: Record<Modules, LucideIcon> = {
     [Modules.VOICE_AGENT]: AudioWaveform,
     [Modules.MESSAGING]: MessageCircleMore,
     [Modules.EMAIL]: Mail,
+    [Modules.LEAD_ENRICHMENT]: UsersRound,
 };
 
 export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: string }> = {
@@ -73,6 +79,14 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
     [LEAD_GENERATION_SUB_MODULES.LINKEDIN]: {
         icon: Linkedin,
         color: '!text-blue-700',
+    },
+    [LEAD_ENRICHMENT_SUB_MODULES.EMAIL_VERIFICATION]: {
+        icon: Mail,
+        color: '!text-blue-500',
+    },
+    [LEAD_ENRICHMENT_SUB_MODULES.PHONE_VERIFICATION]: {
+        icon: PhoneIcon,
+        color: '!text-green-500',
     },
     [VOICE_AGENT_SUB_MODULES.WEB_DIALER]: {
         icon: Phone,
@@ -112,8 +126,6 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
     },
 };
 
-
-
 export const sidebarConfig: SidebarConfig = {
     navMain: [
         {
@@ -145,6 +157,14 @@ export const sidebarConfig: SidebarConfig = {
                     title: LEAD_GENERATION_SUB_MODULES.LINKEDIN,
                     url: SubModuleUrls.LINKEDIN,
                 },
+            ],
+        },
+        {
+            title: Modules.LEAD_ENRICHMENT,
+            url: ModuleUrls.LEAD_ENRICHMENT,
+            items: [
+                { title: LEAD_ENRICHMENT_SUB_MODULES.EMAIL_VERIFICATION, url: SubModuleUrls.EMAIL_VERIFICATION },
+                { title: LEAD_ENRICHMENT_SUB_MODULES.PHONE_VERIFICATION, url: SubModuleUrls.PHONE_VERIFICATION },
             ],
         },
         {

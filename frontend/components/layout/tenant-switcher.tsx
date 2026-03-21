@@ -15,7 +15,8 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { APP_NAME, DEFAULT_HOME_PAGE_ROUTE } from "@/config/app-config";
 import { AppLogo } from '../common/AppLogo';
-import { Tenant } from '@aixellabs/shared/mongodb';
+import { Tenant } from '@aixellabs/backend/db/types';
+import { getTenantMaskedUrl } from '@/helpers/get-tenant-masked-url';
 
 export function TenantSwitcher({
     tenants,
@@ -32,7 +33,7 @@ export function TenantSwitcher({
     const handleTenantClick = (e: React.MouseEvent, tenant: Tenant) => {
         e.preventDefault();
         e.stopPropagation();
-        window.location.href = tenant.redirect_url ?? DEFAULT_HOME_PAGE_ROUTE;
+        window.location.href = getTenantMaskedUrl(tenant) || DEFAULT_HOME_PAGE_ROUTE;
     };
 
     const handleManageTenantsClick = () => {
@@ -40,7 +41,7 @@ export function TenantSwitcher({
     };
 
     const getTenantDisplayName = (tenant: Tenant) => {
-        return tenant.label ?? tenant.name.toLocaleUpperCase();
+        return tenant.label || tenant.name || 'Unnamed Tenant';
     };
 
     if (!currentTenant) {

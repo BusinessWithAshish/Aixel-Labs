@@ -1,6 +1,13 @@
 import NextAuth, { DefaultSession, CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { getCollection, MongoCollections, type UserDoc, type TenantDoc, type ModuleAccess, MongoObjectId } from '@aixellabs/shared/mongodb';
+import {
+    getCollection,
+    MongoCollections,
+    type UserDoc,
+    type TenantDoc,
+    type ModuleAccess,
+    MongoObjectId,
+} from '@aixellabs/backend/db';
 import { z } from 'zod';
 
 // Custom error classes for specific error types
@@ -74,7 +81,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                     // Find the tenant by name to get its ObjectId
                     const tenant = await tenantsCollection.findOne({ name: tenantId });
-                    
+
                     if (!tenant) {
                         // Tenant doesn't exist
                         throw new UserNotInTenantError();
@@ -89,9 +96,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     }
 
                     // Check if user exists with this email AND tenant
-                    const user = await usersCollection.findOne({ 
-                        email, 
-                        tenantId: tenant._id 
+                    const user = await usersCollection.findOne({
+                        email,
+                        tenantId: tenant._id,
                     });
 
                     if (!user) {
@@ -138,36 +145,36 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         async jwt({ token, user }) {
             // On first sign-in, store data
             if (user) {
-              token.id = user.id;
-              token.tenantId = user.tenantId;
-              token.tenantName = user.tenantName;
+                token.id = user.id;
+                token.tenantId = user.tenantId;
+                token.tenantName = user.tenantName;
             }
-        
+
             // IMPORTANT PART: Re-fetch the latest user from DB
             const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
             const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
-        
+
             const freshUser = await usersCollection.findOne({
-              _id: new MongoObjectId(token.id as string),
+                _id: new MongoObjectId(token.id as string),
             });
-        
+
             if (freshUser) {
-              token.email = freshUser.email;
-              token.name = freshUser.name;
-              token.isAdmin = freshUser.isAdmin;
-              token.moduleAccess = freshUser.moduleAccess;
-              
-              // Fetch the tenant to get the tenant name
-              const tenant = await tenantsCollection.findOne({
-                _id: freshUser.tenantId,
-              });
-              
-              if (tenant) {
-                token.tenantId = tenant.name; // Store tenant name as tenantId for consistency
-                token.tenantName = tenant.name;
-              }
+                token.email = freshUser.email;
+                token.name = freshUser.name;
+                token.isAdmin = freshUser.isAdmin;
+                token.moduleAccess = freshUser.moduleAccess;
+
+                // Fetch the tenant to get the tenant name
+                const tenant = await tenantsCollection.findOne({
+                    _id: freshUser.tenantId,
+                });
+
+                if (tenant) {
+                    token.tenantId = tenant.name; // Store tenant name as tenantId for consistency
+                    token.tenantName = tenant.name;
+                }
             }
-        
+
             return token;
         },
 
@@ -178,7 +185,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 session.user.name = token.name as string | undefined;
                 session.user.isAdmin = token.isAdmin as boolean;
                 session.user.tenantId = token.tenantId as string;
-                session.user.tenantName = token.tenantName as string
+                session.user.tenantName = token.tenantName as string;
                 session.user.moduleAccess = token.moduleAccess as ModuleAccess | undefined;
             }
             return session;

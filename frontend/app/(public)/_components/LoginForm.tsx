@@ -2,17 +2,17 @@
 
 import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm, type ControllerRenderProps, type FieldError as RHFFieldError } from 'react-hook-form';
+import { useForm, FormProvider } from 'react-hook-form';
 import { toast } from 'sonner';
 import * as z from 'zod';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { Field, FieldGroup } from '@/components/ui/field';
 import { getTenantCurrentByUrl } from '@/helpers/get-current-tenant-by-url';
 import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
+import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 
 const formSchema = z.object({
     email: z
@@ -52,7 +52,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'form'>)
 
             if (!rawTenantId) {
                 toast.error('Tenant not found', {
-                    description: 'Unable to determine tenant from URL. Please access from the correct subdomain.',
+                    description: 'Unable to determine tenant. Please access from the correct subdomain.',
                 });
                 setIsLoading(false);
                 return;
@@ -119,101 +119,45 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'form'>)
     }
 
     return (
-        <form className={cn('flex flex-col gap-6', className)} onSubmit={form.handleSubmit(onSubmit)} {...props}>
-            <FieldGroup>
-                <div className="flex flex-col items-center gap-2 text-center">
-                    <h1 className="text-2xl font-bold">Login to your account</h1>
-                    <p className="text-muted-foreground text-balance text-sm">
-                        Enter your email below to login to your account
-                    </p>
-                </div>
-                <Controller
-                    name="email"
-                    control={form.control}
-                    render={({
-                        field,
-                        fieldState,
-                    }: {
-                        field: ControllerRenderProps<FormSchema, 'email'>;
-                        fieldState: { invalid: boolean; error?: RHFFieldError };
-                    }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                            <FieldLabel htmlFor="sign-in-email">Email</FieldLabel>
-                            <Input
-                                {...field}
-                                id="sign-in-email"
-                                type="email"
-                                aria-invalid={fieldState.invalid}
-                                placeholder="m@example.com"
-                                autoComplete="email"
-                                disabled={isLoading}
-                                required
-                            />
-                            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                    )}
-                />
-                <Controller
-                    name="password"
-                    control={form.control}
-                    render={({
-                        field,
-                        fieldState,
-                    }: {
-                        field: ControllerRenderProps<FormSchema, 'password'>;
-                        fieldState: { invalid: boolean; error?: RHFFieldError };
-                    }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                            <FieldLabel htmlFor="sign-in-password">Password</FieldLabel>
-                            <Input
-                                {...field}
-                                id="sign-in-password"
-                                type="password"
-                                aria-invalid={fieldState.invalid}
-                                placeholder="Enter your password"
-                                autoComplete="current-password"
-                                disabled={isLoading}
-                                required
-                            />
-                            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                    )}
-                />
-                <Controller
-                    name="name"
-                    control={form.control}
-                    render={({
-                        field,
-                        fieldState,
-                    }: {
-                        field: ControllerRenderProps<FormSchema, 'name'>;
-                        fieldState: { invalid: boolean; error?: RHFFieldError };
-                    }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                            <FieldLabel htmlFor="sign-in-name">
-                                Name <span className="text-muted-foreground text-xs">(optional)</span>
-                            </FieldLabel>
-                            <Input
-                                {...field}
-                                id="sign-in-name"
-                                type="text"
-                                aria-invalid={fieldState.invalid}
-                                placeholder="Your name"
-                                autoComplete="name"
-                                disabled={isLoading}
-                            />
-                            <FieldDescription>This field is optional and only used for display purposes.</FieldDescription>
-                            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                    )}
-                />
-                <Field>
-                    <Button type="submit" disabled={isLoading} className="w-full">
-                        {isLoading ? 'Signing in...' : 'Sign In'}
-                    </Button>
-                </Field>
-            </FieldGroup>
-        </form>
+        <FormProvider {...form}>
+            <form className={cn('flex flex-col gap-6', className)} onSubmit={form.handleSubmit(onSubmit)} {...props}>
+                <FieldGroup>
+                    <div className="flex flex-col items-center gap-2 text-center">
+                        <h1 className="text-2xl font-bold">Login to your account</h1>
+                        <p className="text-muted-foreground text-balance text-sm">
+                            Enter your email below to login to your account
+                        </p>
+                    </div>
+                    <StringControlledField
+                        name="email"
+                        label="Email"
+                        required
+                        disabled={isLoading}
+                        placeholder="m@example.com"
+                        type="email"
+                    />
+                    <StringControlledField
+                        name="password"
+                        label="Password"
+                        required
+                        disabled={isLoading}
+                        placeholder="Enter your password"
+                        type="password"
+                    />
+                    <StringControlledField
+                        name="name"
+                        label="Name (optional)"
+                        description="This field is optional and only used for display purposes."
+                        disabled={isLoading}
+                    />
+                    <Field>
+                        <Button type="submit" disabled={isLoading} className="w-full">
+                            {isLoading ? 'Signing in...' : 'Sign In'}
+                        </Button>
+                    </Field>
+                </FieldGroup>
+            </form>
+        </FormProvider>
     );
 }
 

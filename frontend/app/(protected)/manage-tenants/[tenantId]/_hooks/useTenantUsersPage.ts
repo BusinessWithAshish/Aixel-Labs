@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { User } from '@aixellabs/shared/mongodb';
+import type { User } from '@aixellabs/backend/db/types';
 
 export type UseTenantUsersPageReturn = {
     users: User[];

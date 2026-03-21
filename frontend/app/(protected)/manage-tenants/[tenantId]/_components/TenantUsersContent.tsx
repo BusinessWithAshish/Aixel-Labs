@@ -8,8 +8,8 @@ import { UserDialog } from './EditUserDialog';
 import { DeleteUserConfirmDialog } from './DeleteUserConfirmDialog';
 import { usePage } from '@/contexts/PageStore';
 import type { UseTenantUsersPageReturn } from '../_hooks';
-import type { User } from '@aixellabs/shared/mongodb';
-import { deleteUserAction } from '@/app/actions/user-actions';
+import type { User } from '@aixellabs/backend/db/types';
+import { deleteUser } from '@/app/actions/user-actions';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -63,7 +63,7 @@ export function TenantUsersContent() {
         if (!userToDelete) return;
 
         setIsDeleting(true);
-        const result = await deleteUserAction(userToDelete._id);
+        const result = await deleteUser(userToDelete._id as string);
 
         if (result.success) {
             toast.success('User deleted successfully');

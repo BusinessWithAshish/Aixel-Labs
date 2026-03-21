@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import '@/app/globals.css';
 import { RootLayoutUI } from '@/components/common/RootLayout';
-import { ExternalEmbed } from '@/components/layout/custom-demo-layout';
 import { validateAndGetTenant } from '@/helpers/validate-tenant';
 import { APP_DESCRIPTION, APP_NAME } from "@/config/app-config";
 
@@ -15,17 +14,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-    const currentTenantData = await validateAndGetTenant();
-    const redirectUrl = currentTenantData?.redirect_url;
 
-    if (redirectUrl) {
-        return <ExternalEmbed src={redirectUrl} />;
-    }
+    // ONLY GET THE CURRENT TENANT AND PASS ITS UI INFO BELOW
+    // PER TENANT VALIDATION LOGIC IS HANDLED ITS THEIR OWN LAYOUT FILES.
+    const currentTenantData = await validateAndGetTenant();
+
+    const tenantLogoUrl = currentTenantData?.app_logo_url;
+    const tenantThemeColor = currentTenantData?.app_theme_color;
 
     return (
         <RootLayoutUI
-            tenantAppLogoUrl={currentTenantData?.app_logo_url}
-            tenantAppThemeColor={currentTenantData?.app_theme_color}
+            tenantLogoUrl={tenantLogoUrl}
+            tenantThemeColor={tenantThemeColor}
         >
             {children}
         </RootLayoutUI>

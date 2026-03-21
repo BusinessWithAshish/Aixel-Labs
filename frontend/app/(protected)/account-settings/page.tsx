@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 
 export default function AccountSettingsPage() {
 
-    const { appThemeColor } = useTenantBranding();
+    const { defaultThemeColor } = useTenantBranding();
 
     const { themeColor, setThemeColor } = useThemeColor();
 
@@ -63,15 +63,15 @@ export default function AccountSettingsPage() {
                                 name="theme-color"
                                 label="Theme Color"
                                 description="Pick a custom accent color for buttons, focus rings, and the sidebar."
-                                value={themeColor ?? appThemeColor}
+                                value={themeColor ?? defaultThemeColor}
                                 onChange={setThemeColor}
                             />
                             <Button
                                 variant="outline"
                                 size="sm"
                                 title="Reset to tenant default"
-                                onClick={() => setThemeColor(appThemeColor)}
-                                disabled={themeColor === appThemeColor}
+                                onClick={() => setThemeColor(defaultThemeColor)}
+                                disabled={themeColor === defaultThemeColor}
                             >
                                 <RotateCcw className="size-4" />
                             </Button>

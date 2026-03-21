@@ -5,7 +5,7 @@ import {
     Modules, 
     type ModuleAccess,
     type SubModule 
-} from '@aixellabs/shared/mongodb';
+} from '@aixellabs/backend/db/types';
 import { 
     hasModuleAccess, 
     hasSubModuleAccess 

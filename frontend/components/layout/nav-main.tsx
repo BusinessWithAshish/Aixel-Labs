@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import type { SidebarNavItem } from '@/config/sidebar.config';
 import { useCallback } from 'react';
-import { Modules, SubModule } from '@aixellabs/shared/mongodb';
+import { Modules, SubModule } from '@aixellabs/backend/db/types';
 import { modulesIconMap, subModuleIconMap } from '@/config/sidebar.config';
 import { enumToTitleCase } from '@/helpers/string-helpers';
 import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
@@ -65,7 +65,7 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                                 <CollapsibleTrigger asChild>
                                     <SidebarMenuButton className='cursor-pointer' tooltip={enumToTitleCase(item.title)} active={itemActive}>
                                         {Icon && <Icon />}
-                                        <Link href={item.url}>
+                                        <Link prefetch={true} href={item.url}>
                                             <span>{enumToTitleCase(item.title)}</span>
                                         </Link>
                                         <ChevronRight className="ml-auto cursor-pointer transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[state=open]/collapsible:text-primary" />
@@ -79,7 +79,7 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                                             return (
                                                 <SidebarMenuSubItem key={subItem.title}>
                                                     <SidebarMenuSubButton asChild active={isSubItemActive(subItem.url)}>
-                                                        <Link href={subItem.url}>
+                                                        <Link prefetch={true} href={subItem.url}>
                                                             {SubItemIcon && <SubItemIcon.icon className={SubItemIcon.color} />}
                                                             <span>
                                                                 {enumToTitleCase(subItem.title)}

@@ -1,6 +1,7 @@
-import type {NextConfig} from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+    transpilePackages: ['@aixellabs/backend'],
     /* config options here */
     eslint: {
         ignoreDuringBuilds: true,
@@ -17,7 +18,7 @@ const nextConfig: NextConfig = {
         if (!isServer) {
             config.resolve.alias = {
                 ...config.resolve.alias,
-                'mongodb': false,
+                mongodb: false,
             };
         }
         return config;

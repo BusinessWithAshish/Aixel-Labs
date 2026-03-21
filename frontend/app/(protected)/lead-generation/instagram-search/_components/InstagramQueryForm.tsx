@@ -1,49 +1,56 @@
-import { usePage } from "@/contexts/PageStore"
-import { UseInstagramFormReturn } from "../_hooks/use-instagram-form"
-import { FormProvider } from "react-hook-form"
-import { StringControlledField, StringArrayControlledField } from "@/components/common/zod-form-builder/ZodControlledFields";
+import { StringControlledField, StringArrayControlledField, SearchableSelectControlledField, SelectControlledField } from "@/components/common/zod-form-builder/ZodControlledFields";
+import { usePage } from "@/contexts/PageStore";
+import { UseInstagramFormReturn } from "../_hooks/use-instagram-form";
 
-export const formName = 'instagram-query-form';
 export const InstagramQueryForm = () => {
 
-    const { form, onSubmit } = usePage<UseInstagramFormReturn>();
-
+    const { countryOptions, cityOptions, isCityFieldDisabled } = usePage<UseInstagramFormReturn>();
     return (
-        <FormProvider {...form}>
-            <form
-                className="space-y-3 h-full w-full p-1"
-                id={formName}
-                onSubmit={form.handleSubmit(onSubmit)}
-            >
+        <>
+            <StringControlledField
+                name="query"
+                description="Enter the query to search for leads on Instagram"
+                required={false}
+            />
 
-                <StringControlledField
-                    name="query"
-                    description="Enter the query to search for leads on Instagram"
-                    required={false}
-                />
+            <SearchableSelectControlledField
+                name="country"
+                description="Select the country to search for leads on Instagram"
+                options={countryOptions}
+                required={false}
+            />
 
-                <StringArrayControlledField
-                    name="hashtags"
-                    description="Enter the hashtags to search for leads on Instagram"
-                />
+            <SearchableSelectControlledField
+                name="city"
+                options={cityOptions}
+                description="Enter the city to search for leads on Instagram"
+                disabled={isCityFieldDisabled}
+                required={false}
+            />
 
-                <StringArrayControlledField
-                    name="keywords"
-                    description="Enter the keywords to search for leads on Instagram"
-                />
+            <StringArrayControlledField
+                name="hashtags"
+                description="Enter the hashtags to search for leads on Instagram"
+                required={false}
+            />
 
-                <StringArrayControlledField
-                    name="excludeKeywords"
-                    description="Enter the keywords to exclude from the search"
-                />
+            <StringArrayControlledField
+                name="keywords"
+                description="Enter the keywords to search for leads on Instagram"
+                required={false}
+            />
 
-                <StringArrayControlledField
-                    name="excludeHashtags"
-                    description="Enter the hashtags to exclude from the search"
-                />
+            <StringArrayControlledField
+                name="excludeKeywords"
+                description="Enter the keywords to exclude from the search"
+                required={false}
+            />
 
-
-            </form>
-        </FormProvider>
+            <StringArrayControlledField
+                name="excludeHashtags"
+                description="Enter the hashtags to exclude from the search"
+                required={false}
+            />
+        </>
     );
 };

@@ -1,15 +1,17 @@
 'use client';
 
 import { useForm } from 'react-hook-form';
-import { GMAPS_SCRAPE_REQUEST, GMAPS_SCRAPE_REQUEST_SCHEMA, GMAPS_SCRAPE_RESPONSE } from '@aixellabs/shared/common/apis';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { City, Country, State } from 'country-state-city';
 import { useMemo, useState } from 'react';
-import { BACKEND_URL } from '@/config/app-config';
-import { API_ENDPOINTS } from '@aixellabs/shared/common/utils';
-import { toast } from 'sonner';
+import { GMAPS_REQUEST_SCHEMA as GMAPS_INTERNAL_REQUEST_SCHEMA } from '@aixellabs/backend/gmaps';
+import type { GMAPS_INTERNAL_REQUEST } from '@aixellabs/backend/gmaps/internal/types';
+import { Lead } from '@aixellabs/backend/db/types';
+import { API_ENDPOINTS } from '@aixellabs/backend/config';
+import apiClient from '@/lib/api-client';
+import { ConfirmResult } from '@/components/common/ChatInterface';
 
-const DEFAULT_FORM_VALUES: GMAPS_SCRAPE_REQUEST = {
+const DEFAULT_FORM_VALUES: GMAPS_INTERNAL_REQUEST = {
     query: '',
     country: '',
     state: '',
@@ -18,10 +20,10 @@ const DEFAULT_FORM_VALUES: GMAPS_SCRAPE_REQUEST = {
 };
 
 export const useGoogleMapsForm = () => {
-    const [response, setResponse] = useState<GMAPS_SCRAPE_RESPONSE | null>(null);
+    const [leads, setLeads] = useState<Lead[]>([]);
 
-    const form = useForm<GMAPS_SCRAPE_REQUEST>({
-        resolver: zodResolver(GMAPS_SCRAPE_REQUEST_SCHEMA as any),
+    const form = useForm<GMAPS_INTERNAL_REQUEST>({
+        resolver: zodResolver(GMAPS_INTERNAL_REQUEST_SCHEMA),
         defaultValues: DEFAULT_FORM_VALUES,
     });
 
@@ -31,56 +33,48 @@ export const useGoogleMapsForm = () => {
         value: country.isoCode,
     }));
 
-    const stateOptions = useMemo(() => {
-        if (!form.watch('country')) return [];
+    const selectedCountry = form.watch('country');
+    const selectedState = form.watch('state');
 
-        return State.getStatesOfCountry(form.watch('country')).map((state) => ({
-            label: state.name,
-            value: state.isoCode,
+    const stateOptions = useMemo(() => {
+        if (!selectedCountry) return [];
+        return State.getStatesOfCountry(selectedCountry).map((s) => ({
+            label: s.name,
+            value: s.isoCode,
         }));
-    }, [form]);
+    }, [selectedCountry]);
 
     const cityOptions = useMemo(() => {
-        if (!form.watch('country') || !form.watch('state')) return [];
-
-        return City.getCitiesOfState(form.watch('country'), form.watch('state')).map((city) => ({
+        if (!selectedCountry || !selectedState) return [];
+        return City.getCitiesOfState(selectedCountry, selectedState).map((city) => ({
             label: city.name,
             value: city.name,
         }));
-    }, [form]);
+    }, [selectedCountry, selectedState]);
 
-    const isStateFieldDisabled = !form.watch('country');
-    const isCityFieldDisabled = !form.watch('country') || !form.watch('state');
+    const isStateFieldDisabled = !selectedCountry;
+    const isCityFieldDisabled = !selectedCountry || !selectedState;
 
-    const onSubmit = async (data: GMAPS_SCRAPE_REQUEST) => {
-        try {
-            const res = await fetch(`${BACKEND_URL}${API_ENDPOINTS.GMAPS_SCRAPE}`, {
-                method: 'POST',
-                body: JSON.stringify(data),
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-            });
-
-            if (!res.ok) {
-                toast.error('Sorry! Failed to submit form or find leads. Please try again later.');
-                return;
-            }
-            const responseData = (await res.json()) as { data: GMAPS_SCRAPE_RESPONSE };
-            setResponse(responseData.data);
-            toast.success('Leads are ready! Check the Results tab.');
-        } catch (error) {
-            console.error('Error while submitting form:', error);
-            toast.error('Sorry! Failed to submit form or find leads. Please try again later.');
-        } finally {
-            form.reset(DEFAULT_FORM_VALUES);
+    const onSubmit = async (data: GMAPS_INTERNAL_REQUEST): Promise<ConfirmResult> => {
+        const apiResponse = await apiClient.post<Lead[], GMAPS_INTERNAL_REQUEST>(API_ENDPOINTS.GMAPS.INTERNAL.full, data);
+        if (!apiResponse.success || !apiResponse.data) {
+            return {
+                success: false,
+                message: apiResponse.error || 'Sorry! Failed to submit form or find leads. Please try again later.',
+            };
         }
+        setLeads(apiResponse.data);
+        form.reset(DEFAULT_FORM_VALUES);
+        return {
+            success: true,
+            message: 'Leads are ready! Check the Results tab.',
+        };
     };
 
     return {
         form,
-        response,
+        leads,
+        setLeads,
         isSubmitting: form.formState.isSubmitting,
         onSubmit,
         countryOptions,

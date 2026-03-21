@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Tenant } from '@aixellabs/shared/mongodb';
+import type { Tenant } from '@aixellabs/backend/db/types';
 
 export type UseManageTenantsPageReturn = {
     isCreateDialogOpen: boolean;

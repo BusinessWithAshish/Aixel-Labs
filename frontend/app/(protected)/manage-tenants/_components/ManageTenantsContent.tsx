@@ -5,13 +5,14 @@ import { TenantCard } from './TenantCard';
 import { CreateTenantCard } from './CreateTenantCard';
 import { CreateTenantDialog } from './CreateTenantDialog';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
-import { deleteTenant } from '@/helpers/tenant-operations';
-import type { Tenant } from '@aixellabs/shared/mongodb';
+import { deleteTenant } from '@/app/actions/tenant-actions';
+import type { Tenant } from '@aixellabs/backend/db/types';
 import { usePage } from '@/contexts/PageStore';
 import { toast } from 'sonner';
 import type { UseManageTenantsPageReturn } from '@/app/(protected)/manage-tenants/_hooks';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
+import { MANAGE_TENANTS_PREFIX } from '@/config/app-config';
 
 export function ManageTenantsContent() {
     const { isCreateDialogOpen, setIsCreateDialogOpen, tenants, editingTenant, setEditingTenant } =
@@ -34,15 +35,15 @@ export function ManageTenantsContent() {
         return tenants.filter((tenant) => tenant.name.toLowerCase().includes(normalizedQuery));
     }, [searchQuery, tenants]);
 
-    const handleTenantClick = (tenant: (typeof tenants)[0]) => {
-        router.push(`/manage-tenants/${tenant.name}`);
+    const handleTenantClick = (tenant: Tenant) => {
+        router.push(`${MANAGE_TENANTS_PREFIX}${tenant.name}`);
     };
 
-    const handleEditTenant = (tenant: (typeof tenants)[0]) => {
+    const handleEditTenant = (tenant: Tenant) => {
         setEditingTenant(tenant);
     };
 
-    const handleDeleteClick = (tenant: (typeof tenants)[0]) => {
+    const handleDeleteClick = (tenant: Tenant) => {
         setTenantToDelete(tenant);
         setDeleteDialogOpen(true);
     };
@@ -51,14 +52,14 @@ export function ManageTenantsContent() {
         if (!tenantToDelete) return;
 
         setIsDeleting(true);
-        const success = await deleteTenant(tenantToDelete._id);
+        const res = await deleteTenant(tenantToDelete._id as string);
 
-        if (success) {
+        if (res.success && res.data) {
             toast.success('Tenant deleted successfully');
             setDeleteDialogOpen(false);
             setTenantToDelete(null);
         } else {
-            toast.error('Failed to delete tenant');
+            toast.error(res.error ?? 'Failed to delete tenant');
         }
         setIsDeleting(false);
     };

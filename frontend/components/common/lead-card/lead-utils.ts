@@ -1,14 +1,14 @@
-import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common/apis';
+import type { GMAPS_INTERNAL_RESPONSE } from '@aixellabs/backend/gmaps/internal/types';
 
 export type SortKey = 'rating' | 'reviews';
 export type SortDirection = 'asc' | 'desc';
 
-const extractNumericValue = (value: string | null, isRating: boolean): number => {
+const extractNumericValue = (value: string | number | null, isRating: boolean): number => {
     if (!value) {
         return -1;
     }
 
-    const stringValue = String(value);
+    const stringValue = typeof value === 'number' ? String(value) : value;
     const normalized = stringValue.replace(/[^\d.]/g, '');
 
     if (!normalized || normalized === '') {
@@ -20,15 +20,15 @@ const extractNumericValue = (value: string | null, isRating: boolean): number =>
 };
 
 export const sortLeads = (
-    leads: GMAPS_SCRAPE_LEAD_INFO[],
+    leads: GMAPS_INTERNAL_RESPONSE[],
     sortKey: SortKey,
     sortDirection: SortDirection,
-): GMAPS_SCRAPE_LEAD_INFO[] => {
+): GMAPS_INTERNAL_RESPONSE[] => {
     const isRating = sortKey === 'rating';
 
     return [...leads].sort((a, b) => {
-        const aValue = extractNumericValue(isRating ? a.overAllRating : a.numberOfReviews, isRating);
-        const bValue = extractNumericValue(isRating ? b.overAllRating : b.numberOfReviews, isRating);
+        const aValue = extractNumericValue(isRating ? a.rating : a.reviewCount, isRating);
+        const bValue = extractNumericValue(isRating ? b.rating : b.reviewCount, isRating);
 
         if (aValue === -1 && bValue === -1) return 0;
         if (aValue === -1) return 1;
@@ -39,17 +39,7 @@ export const sortLeads = (
     });
 };
 
-export const hasWebsite = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    const website = lead.website?.trim();
-    return !!website;
-};
-
-export const hasPhone = (lead: GMAPS_SCRAPE_LEAD_INFO): boolean => {
-    const phoneNumber = lead.phoneNumber?.trim();
-    return !!phoneNumber;
-};
-
-export const generateUniqueKey = (lead: GMAPS_SCRAPE_LEAD_INFO, index: number): string => {
-    const baseKey = lead.gmapsUrl || `${lead.name}-${lead.phoneNumber || 'no-phone'}-${lead.website || 'no-website'}`;
+export const generateUniqueKey = (lead: GMAPS_INTERNAL_RESPONSE, index: number): string => {
+    const baseKey = lead.gmapsUrl || `${lead.name}-${lead.phone ?? 'no-phone'}`;
     return `${baseKey}-${index}`;
 };

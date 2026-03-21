@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import z from 'zod';
-import { ColorPickerControlledField, StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
+import { ColorPickerControlledField, SelectControlledField, StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { createTenant, updateTenant, type CreateTenantInput } from '@/helpers/tenant-operations';
-import type { Tenant } from '@aixellabs/shared/mongodb';
+import { createTenant, updateTenant } from '@/app/actions/tenant-actions';
+import type { Tenant } from '@aixellabs/backend/db/types';
+import { TenantType } from '@aixellabs/backend/db/types';
 import { toast } from 'sonner';
+import { TENANT_TYPE_OPTIONS } from '@/config/app-config';
 
 type CreateTenantDialogProps = {
     open: boolean;
@@ -20,6 +21,7 @@ type CreateTenantDialogProps = {
 
 const tenantSchema = z.object({
     name: z.string().min(1, 'Tenant name is required'),
+    type: z.nativeEnum(TenantType).optional(),
     redirect_url: z.string().optional(),
     app_description: z.string().optional(),
     label: z.string().optional(),
@@ -33,46 +35,25 @@ type TenantFormValues = z.infer<typeof tenantSchema>;
 export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSuccess }: CreateTenantDialogProps) {
     const form = useForm<TenantFormValues>({
         resolver: zodResolver(tenantSchema),
-        defaultValues: {
-            name: '',
-            redirect_url: '',
-            app_description: '',
-            label: '',
-            app_logo_url: '',
-            app_theme_color: '',
+        values: {
+            name: editingTenant?.name ?? '',
+            type: editingTenant?.type ?? undefined,
+            redirect_url: editingTenant?.redirect_url ?? '',
+            app_description: editingTenant?.app_description ?? '',
+            label: editingTenant?.label ?? '',
+            app_logo_url: editingTenant?.app_logo_url ?? '',
+            app_theme_color: editingTenant?.app_theme_color ?? '',
         },
     });
 
-    const { handleSubmit, reset, formState: { isSubmitting } } = form;
-
-    useEffect(() => {
-        if (!open) return;
-
-        if (editingTenant) {
-            reset({
-                name: editingTenant.name ?? '',
-                redirect_url: editingTenant.redirect_url ?? '',
-                app_description: editingTenant.app_description ?? '',
-                label: editingTenant.label ?? '',
-                app_logo_url: editingTenant.app_logo_url ?? '',
-                app_theme_color: editingTenant.app_theme_color ?? '',
-            });
-        } else {
-            reset({
-                name: '',
-                redirect_url: '',
-                app_description: '',
-                label: '',
-                app_logo_url: '',
-                app_theme_color: '',
-            });
-        }
-    }, [editingTenant, open, reset]);
+    const { handleSubmit, watch, formState: { isSubmitting } } = form;
+    const watchedType = watch('type');
 
     const onSubmit = async (values: TenantFormValues) => {
-        const payload: CreateTenantInput = {
+        const payload = {
             name: values.name.trim(),
             label: values.label?.trim() ?? '',
+            type: (values.type as TenantType) || undefined,
             redirect_url: values.redirect_url?.trim() || undefined,
             app_description: values.app_description?.trim() || undefined,
             app_logo_url: values.app_logo_url?.trim() || undefined,
@@ -81,24 +62,24 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
 
         try {
             if (editingTenant) {
-                const result = await updateTenant(editingTenant._id, payload);
+                const res = await updateTenant({ _id: editingTenant._id, ...payload });
 
-                if (result) {
+                if (res.success && res.data) {
                     toast.success('Tenant updated successfully');
                     onSuccess?.();
                     onOpenChange(false);
                 } else {
-                    toast.error('Failed to update tenant');
+                    toast.error(res.error ?? 'Failed to update tenant');
                 }
             } else {
-                const result = await createTenant(payload);
+                const res = await createTenant(payload);
 
-                if (result) {
+                if (res.success && res.data) {
                     toast.success('Tenant created successfully');
                     onSuccess?.();
                     onOpenChange(false);
                 } else {
-                    toast.error('Failed to create tenant');
+                    toast.error(res.error ?? 'Failed to create tenant');
                 }
             }
         } catch (error) {
@@ -122,20 +103,29 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
 
                         <StringControlledField
                             name="name"
-                            disabled={true}
+                            disabled={!!editingTenant?.name}
                             label="Tenant name"
                             description="Tip: This is the name of the tenant that will be used to identify the tenant in the system."
                             required
                         />
 
-                        {/* NOTE: Never allow to change the redirect URL */}
-                        {/* <StringControlledField
-                            name="redirect_url"
-                            label="Redirect URL"
-                            disabled={true}
-                            description="Tenant's redirect URL. Leave empty to auto-generate from tenant name. Cannot be changed once set."
-                            required
-                        /> */}
+                        <SelectControlledField
+                            name="type"
+                            isClearable={true}
+                            label="Tenant type"
+                            options={TENANT_TYPE_OPTIONS}
+                            description="Normal: full SaaS app with auth. Iframe: embeds an external URL. External: redirects to external URL. Product: in-house product under subdomain."
+                        />
+
+                        {(watchedType === TenantType.IFRAME || watchedType === TenantType.EXTERNAL) && (
+                            <StringControlledField
+                                name="redirect_url"
+                                label="Redirect URL"
+                                disabled={!!editingTenant?.redirect_url}
+                                description="The external URL to embed (iframe) or redirect to (external). Cannot be changed once set."
+                                required
+                            />
+                        )}
 
                         <StringControlledField
                             name="label"

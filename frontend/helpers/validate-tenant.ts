@@ -1,8 +1,9 @@
 'use server';
 
-import { getCollection, MongoCollections, type Tenant, type TenantDoc } from '@aixellabs/shared/mongodb';
+import { type Tenant } from '@aixellabs/backend/db/types';
 import { extractSubdomain } from '@/middleware';
 import { headers } from 'next/headers';
+import { getTenantByNamePublic } from '@/app/actions/tenant-actions';
 
 export const getCurrentTenantFromHeaders = async (): Promise<string | null> => {
     const currentHeaders = await headers();
@@ -10,36 +11,15 @@ export const getCurrentTenantFromHeaders = async (): Promise<string | null> => {
     return subdomain;
 };
 
-const validateTenant = async (tenant: string): Promise<boolean> => {
+const getTenantData = async (tenantName: string): Promise<Tenant | null> => {
     try {
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
-        const tenantData = await tenantsCollection.findOne({ name: tenant });
-        return !!tenantData;
+        const res = await getTenantByNamePublic(tenantName);
+        if (!res.success || !res.data) {
+            return null;
+        }
+        return res.data;
     } catch (error) {
         console.error('Error validating tenant:', error);
-        return false;
-    }
-};
-
-const getCurrentTenantData = async (tenant: string): Promise<Tenant | null> => {
-    try {
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
-        const tenantDoc = await tenantsCollection.findOne({ name: tenant });
-
-        if (!tenantDoc) return null;
-
-        // Convert to frontend-friendly format
-        return {
-            _id: tenantDoc._id.toString(),
-            name: tenantDoc.name,
-            label: tenantDoc.label,
-            redirect_url: tenantDoc.redirect_url,
-            app_description: tenantDoc.app_description,
-            app_logo_url: tenantDoc.app_logo_url,
-            app_theme_color: tenantDoc.app_theme_color,
-        };
-    } catch (error) {
-        console.error('Error getting tenant data:', error);
         return null;
     }
 };
@@ -50,17 +30,12 @@ const getCurrentTenantData = async (tenant: string): Promise<Tenant | null> => {
  * This is a convenience function that combines tenant extraction, validation, and data retrieval.
  */
 export const validateAndGetTenant = async (): Promise<Tenant | null> => {
-    const currentTenant = await getCurrentTenantFromHeaders();
-    if (!currentTenant) {
+    const currentTenantName = await getCurrentTenantFromHeaders();
+    if (!currentTenantName) {
         return null;
     }
 
-    const isTenantValid = await validateTenant(currentTenant);
-    if (!isTenantValid) {
-        return null;
-    }
-
-    const tenantData = await getCurrentTenantData(currentTenant);
+    const tenantData = await getTenantData(currentTenantName);
     if (!tenantData) {
         return null;
     }

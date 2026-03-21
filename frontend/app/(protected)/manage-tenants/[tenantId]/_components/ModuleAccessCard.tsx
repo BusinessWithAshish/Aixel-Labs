@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Toggle } from '@/components/ui/toggle';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { type ModuleAccess, Modules, type SubModule } from '@aixellabs/shared/mongodb';
+import { type ModuleAccess, Modules, type SubModule } from '@aixellabs/backend/db/types';
 import {
     areAllSubModulesEnabled,
     areSomeSubModulesEnabled,

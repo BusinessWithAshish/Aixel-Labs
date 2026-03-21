@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RootLayoutUI } from '../common/RootLayout';
 import { getTenantCurrentByUrl } from '@/helpers/get-current-tenant-by-url';
 
 type IframeEmbedProps = {
@@ -120,33 +119,31 @@ export default function IframeEmbed({
     };
 
     return (
-        <RootLayoutUI>
-            <div className={`w-full h-full flex flex-col ${className}`}>
-                {showHeader && (
-                    <div className="bg-linear-to-r from-blue-600 to-blue-700 text-end text-white px-6 py-3 shadow-md">
-                        <p className="text-sm font-medium animate-pulse">
-                            {headerText || `Viewing: ${new URL(src).hostname}`}
-                        </p>
-                    </div>
-                )}
-
-                <div className="relative flex-1">
-                    {loading && (loadingComponent || defaultLoadingComponent())}
-                    {error && (errorComponent || defaultErrorComponent())}
-
-                    <iframe
-                        src={src}
-                        title={title}
-                        className={`w-full h-full border-0 ${loading || error ? 'hidden' : ''}`}
-                        sandbox={sandboxRules.join(' ')}
-                        allow={allowedFeatures.join('; ')}
-                        onLoad={handleLoad}
-                        onError={handleError}
-                        referrerPolicy="strict-origin-when-cross-origin"
-                    />
+        <div className={`h-dvh w-full flex flex-col ${className}`}>
+            {showHeader && (
+                <div className="bg-linear-to-r from-blue-600 to-blue-700 text-end text-white px-6 py-3 shadow-md">
+                    <p className="text-sm font-medium animate-pulse">
+                        {headerText || `Viewing: ${new URL(src).hostname}`}
+                    </p>
                 </div>
+            )}
+
+            <div className="relative flex-1">
+                {loading && (loadingComponent || defaultLoadingComponent())}
+                {error && (errorComponent || defaultErrorComponent())}
+
+                <iframe
+                    src={src}
+                    title={title}
+                    className={`w-full h-full border-0 ${loading || error ? 'hidden' : ''}`}
+                    sandbox={sandboxRules.join(' ')}
+                    allow={allowedFeatures.join('; ')}
+                    onLoad={handleLoad}
+                    onError={handleError}
+                    referrerPolicy="strict-origin-when-cross-origin"
+                />
             </div>
-        </RootLayoutUI>
+        </div>
     );
 }
 

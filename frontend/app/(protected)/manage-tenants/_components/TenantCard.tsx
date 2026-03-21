@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getTenantRedirectUrl } from '@/helpers/get-tenant-redirect-url';
-import type { Tenant } from '@aixellabs/shared/mongodb';
+import { getTenantMaskedUrl } from '@/helpers/get-tenant-masked-url';
+import type { Tenant } from '@aixellabs/backend/db/types';
 import { AppLogo } from "@/components/common/AppLogo";
 
 type TenantCardProps = {
@@ -19,8 +18,7 @@ type TenantCardProps = {
 
 export function TenantCard({ tenant, onClick, onEdit, onDelete, className }: TenantCardProps) {
     const isDeployedTenant = !!tenant.redirect_url;
-    const [isHovered, setIsHovered] = useState(false);
-    const tenantUrl = getTenantRedirectUrl(tenant);
+    const tenantUrl = getTenantMaskedUrl(tenant);
 
     const handleEditClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -32,18 +30,18 @@ export function TenantCard({ tenant, onClick, onEdit, onDelete, className }: Ten
         onDelete?.();
     };
 
+    const tenantName = tenant.label || tenant.name || 'Unnamed Tenant';
+
     return (
         <Card
             className={cn(
-                'relative flex flex-col items-center justify-center p-6 cursor-pointer transition-all hover:shadow-lg hover:scale-105',
+                'relative group flex flex-col items-center justify-center p-6 cursor-pointer transition-all hover:shadow-lg hover:scale-105',
                 isDeployedTenant && 'cursor-not-allowed bg-muted',
                 className,
             )}
             onClick={onClick}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
         >
-            <div className={cn('absolute top-2 right-2 flex gap-1', 'max-md:flex', !isHovered && 'md:hidden')}>
+            <div className={cn('absolute top-2 right-2 flex gap-1', 'max-md:flex', 'group-hover:block hidden')}>
                 {onEdit && (
                     <Button
                         size="icon"
@@ -66,11 +64,12 @@ export function TenantCard({ tenant, onClick, onEdit, onDelete, className }: Ten
                 )}
             </div>
 
+            <AppLogo title={tenantName} src={tenant.app_logo_url} className="w-8 h-8 text-primary mb-3" />
 
-            <AppLogo title={tenant.label ?? tenant.name} src={tenant.app_logo_url} className="w-8 h-8 text-primary" />
-
-            <h1 className="text-2xl font-semibold text-center">{tenant.label || tenant.name}</h1>
-            <h3 className="text-sm text-muted-foreground text-center mt-1 break-all px-2">{tenant.app_description}</h3>
+            <h1 className="text-2xl font-semibold text-center">{tenantName}</h1>
+            {tenant.app_description && (
+                <h3 className="text-sm text-muted-foreground text-center mt-1 break-all px-2">{tenant.app_description}</h3>
+            )}
             <p className="text-sm text-muted-foreground text-center mt-1 break-all px-2">{tenantUrl}</p>
         </Card>
     );

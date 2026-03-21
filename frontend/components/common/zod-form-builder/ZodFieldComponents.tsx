@@ -12,6 +12,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DEFAULT_THEME_COLOR } from '@/config/app-config';
+import { cn } from '@/lib/utils';
+import { XIcon } from 'lucide-react';
+import { VirtualizedSelectContent } from '../VirtualizedSelect';
 
 export type BaseZodFieldProps = {
     name: string;
@@ -332,6 +335,7 @@ export const ZodSwitchField = ({ name, description, value, invalid, errors, onCh
 
 export type ZodSelectFieldProps = BaseZodFieldProps & {
     value?: string;
+    isClearable?: boolean;
     onChange?: (value: string) => void;
     options: OptionType[];
 };
@@ -343,6 +347,7 @@ export const ZodSelectField = ({
     invalid,
     errors,
     label,
+    isClearable = false,
     onChange,
     options,
     required,
@@ -360,16 +365,20 @@ export const ZodSelectField = ({
                 {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
             </FieldContent>
             <Select name={name} value={value} onValueChange={onChange} disabled={disabled} aria-disabled={disabled}>
-                <SelectTrigger className={classNames?.input}>
+                <SelectTrigger className={cn(classNames?.input, "[&_.select-clear-icon]:pointer-events-auto")}>
                     <SelectValue placeholder={`Select ${fieldLabel.toLowerCase()}`} />
+                    {isClearable && value && (
+                        <XIcon
+                            className="select-clear-icon ml-auto size-4 shrink-0 opacity-50 cursor-pointer"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onChange?.('');
+                            }}
+                        />
+                    )}
                 </SelectTrigger>
-                <SelectContent>
-                    {options.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
+                <VirtualizedSelectContent options={options} />
             </Select>
             {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
         </Field>
@@ -524,7 +533,7 @@ export const ZodStringArrayField = ({
     // Validation: Check if last item is empty
     const lastItem = values.length > 0 ? values[values.length - 1] : null;
     const isLastItemEmpty = lastItem !== null && lastItem.trim().length === 0;
-    
+
     // Disable "Add Item" button if:
     // 1. The whole field is disabled, OR
     // 2. The last item is empty (has 0 chars)

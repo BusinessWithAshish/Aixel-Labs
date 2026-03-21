@@ -5,38 +5,45 @@ import { createContext, useContext } from 'react';
 
 type TenantBrandingContextValue = {
     appLogoUrl: string;
-    appThemeColor: string;
+    /** Active color: user's saved cookie preference, or the tenant default. */
+    themeColor: string;
+    /** Tenant's MongoDB-configured default — the target when the user hits reset. */
+    defaultThemeColor: string;
 };
 
 export const normalizeLogo = (value?: string) => {
-    if (!value) return DEFAULT_LOGO_SRC;
-    const trimmed = value.trim();
-    return trimmed.length === 0 ? DEFAULT_LOGO_SRC : trimmed;
-};
-
-const normalizeThemeColor = (value?: string) => {
-    if (!value) return DEFAULT_THEME_COLOR;
-    const trimmed = value.trim();
-    return trimmed.length === 0 ? DEFAULT_THEME_COLOR : trimmed;
+    const trimmed = value?.trim();
+    return trimmed?.length ? trimmed : DEFAULT_LOGO_SRC;
 };
 
 const TenantBrandingContext = createContext<TenantBrandingContextValue>({
     appLogoUrl: DEFAULT_LOGO_SRC,
-    appThemeColor: DEFAULT_THEME_COLOR,
+    themeColor: DEFAULT_THEME_COLOR,
+    defaultThemeColor: DEFAULT_THEME_COLOR,
 });
 
 type TenantBrandingProviderProps = {
     children: React.ReactNode;
     appLogoUrl?: string;
-    appThemeColor?: string;
+    /** Tenant's configured color from MongoDB. Falls back to DEFAULT_THEME_COLOR. */
+    defaultThemeColor?: string;
+    /** Pre-resolved active color (cookie ?? tenant default). */
+    themeColor: string;
 };
 
-export const TenantBrandingProvider = ({ children, appLogoUrl, appThemeColor }: TenantBrandingProviderProps) => {
+export const TenantBrandingProvider = ({
+    children,
+    appLogoUrl,
+    defaultThemeColor,
+    themeColor,
+}: TenantBrandingProviderProps) => {
+    const resolvedDefault = defaultThemeColor?.trim() || DEFAULT_THEME_COLOR;
     return (
         <TenantBrandingContext.Provider
             value={{
                 appLogoUrl: normalizeLogo(appLogoUrl),
-                appThemeColor: normalizeThemeColor(appThemeColor),
+                defaultThemeColor: resolvedDefault,
+                themeColor: themeColor?.trim() || resolvedDefault,
             }}
         >
             {children}
@@ -44,7 +51,4 @@ export const TenantBrandingProvider = ({ children, appLogoUrl, appThemeColor }: 
     );
 };
 
-export const useTenantBranding = () => {
-    return useContext(TenantBrandingContext);
-};
-
+export const useTenantBranding = () => useContext(TenantBrandingContext);

@@ -3,10 +3,11 @@ import {
     LEAD_GENERATION_SUB_MODULES,
     VOICE_AGENT_SUB_MODULES,
     MESSAGING_SUB_MODULES,
+    LEAD_ENRICHMENT_SUB_MODULES,
     EMAIL_SUB_MODULES,
     type ModuleAccess,
     type SubModule,
-} from '@aixellabs/shared/mongodb';
+} from '@aixellabs/backend/db/types';
 
 /**
  * Get all available submodules for a given module
@@ -21,6 +22,8 @@ export function getSubModulesForModule(module: Modules): SubModule[] {
             return Object.values(MESSAGING_SUB_MODULES);
         case Modules.EMAIL:
             return Object.values(EMAIL_SUB_MODULES);
+        case Modules.LEAD_ENRICHMENT:
+            return Object.values(LEAD_ENRICHMENT_SUB_MODULES);
         default:
             const _exhaustive: never = module;
             return [];
@@ -36,6 +39,7 @@ export function getDefaultModuleAccess(): ModuleAccess {
         [Modules.VOICE_AGENT]: Object.values(VOICE_AGENT_SUB_MODULES),
         [Modules.MESSAGING]: Object.values(MESSAGING_SUB_MODULES),
         [Modules.EMAIL]: Object.values(EMAIL_SUB_MODULES),
+        [Modules.LEAD_ENRICHMENT]: Object.values(LEAD_ENRICHMENT_SUB_MODULES),
     };
 }
 
