@@ -5,9 +5,16 @@
     "scripts": {
         "installFE": "pnpm --filter frontend install",
         "installBE": "PUPPETEER_SKIP_DOWNLOAD=true && pnpm --filter backend install",
+        "installAll": "pnpm installFE && pnpm installBE",
+        "devAll": "pnpm devFE && pnpm devBE",
         "devFE": "pnpm --filter frontend dev",
         "devBE": "pnpm --filter backend run start",
         "prodBE": "pnpm --filter backend run start:prod",
         "prodFE": "pnpm --filter frontend run prod"
+    },
+    "pnpm": {
+        "patchedDependencies": {
+            "node-tls-client@2.1.0": "patches/node-tls-client@2.1.0.patch"
+        }
     }
 }
