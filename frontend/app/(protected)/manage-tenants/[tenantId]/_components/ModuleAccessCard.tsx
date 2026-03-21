@@ -74,7 +74,7 @@ export function ModuleAccessCard({ moduleAccess, onChange, className }: ModuleAc
                                             checked={allEnabled}
                                             ref={(el) => {
                                                 if (el) {
-                                                    (el as any).indeterminate = someEnabled && !allEnabled;
+                                                    (el as HTMLInputElement).indeterminate = someEnabled && !allEnabled;
                                                 }
                                             }}
                                             onCheckedChange={(checked) => {

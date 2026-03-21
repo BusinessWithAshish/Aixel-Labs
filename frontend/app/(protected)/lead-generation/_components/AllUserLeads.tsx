@@ -3,20 +3,19 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Database, Trash2, StickyNote, CheckSquare, Square } from 'lucide-react';
-import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
-import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
-import { CommonLeadCard } from '@/components/common/lead-card/CommonLeadCard';
+import { Database, Trash2, CheckSquare, Square } from 'lucide-react';
+import { LeadSource, type Lead } from '@aixellabs/backend/db/types';
+import type { GMAPS_INTERNAL_RESPONSE } from '@aixellabs/backend/gmaps/internal/types';
 import { usePage } from '@/contexts/PageStore';
 import type { TUseAllLeadsPageReturn } from '../_hooks';
 import { DeleteAllLeadsDialog } from './DeleteAllLeadsDialog';
-import { AddNotesDialog } from './AddNotesDialog';
 import { NLQueryInput } from '@/components/common/NLQueryInput';
-import { useState, useEffect } from 'react';
-import { deleteLeadsAction, deleteLeadsBySourceAction, updateLeadsNotesAction } from '@/app/actions/lead-actions';
+import { useState, useEffect, useCallback } from 'react';
+import { deleteUserLeads, deleteUserLeadsBySource } from '@/app/actions/user-lead-actions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
+import { GoogleMapLead } from '@/components/common/lead-card/GoogleMapLead';
 
 export const AllUserLeads = () => {
     const router = useRouter();
@@ -35,37 +34,53 @@ export const AllUserLeads = () => {
 
     const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
     const [deleteBulkDialogOpen, setDeleteBulkDialogOpen] = useState(false);
-    const [notesDialogOpen, setNotesDialogOpen] = useState(false);
     const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
     const [isDeleting, setIsDeleting] = useState(false);
-    const [isSavingNotes, setIsSavingNotes] = useState(false);
 
     const hasSelectedLeads = selectedLeadIds.size > 0;
+
+    // Derive current leads for the active tab (used by select-all and list)
+    const getLeadCountForSource = (source: 'all' | LeadSource) => {
+        if (source === 'all') return leads.length;
+        return leads.filter((lead) => lead.source === source).length;
+    };
+    const getLeadsForSource = (source: 'all' | LeadSource) => {
+        if (source === 'all') return filteredLeads;
+        return filteredLeads.filter((lead) => lead.source === source);
+    };
+    const currentLeads = getLeadsForSource(selectedSource);
+    const currentLeadsCount = currentLeads.length;
 
     useEffect(() => {
         setSelectedLeadIds(new Set());
     }, [selectedSource]);
 
-    const handleSelectLead = (leadId: string, selected: boolean) => {
+    const handleSelectLead = useCallback((leadId: string, selected: boolean) => {
         setSelectedLeadIds((prev) => {
-            const newSet = new Set(prev);
-            selected ? newSet.add(leadId) : newSet.delete(leadId);
-            return newSet;
+            const next = new Set(prev);
+            if (selected) next.add(leadId); else next.delete(leadId);
+            return next;
         });
-    };
+    }, []);
 
-    const handleSelectAll = () => {
-        setSelectedLeadIds(new Set(currentLeads.map((lead) => lead._id)));
-    };
+    const handleSelectAll = useCallback(() => {
+        setSelectedLeadIds(new Set(currentLeads.map((lead) => lead._id as string)));
+    }, [currentLeads]);
 
-    const handleDeselectAll = () => {
+    const handleDeselectAll = useCallback(() => {
         setSelectedLeadIds(new Set());
-    };
+    }, []);
+
+    const isAllSelected = currentLeadsCount > 0 && selectedLeadIds.size === currentLeadsCount;
+    const handleToggleSelectAll = useCallback(() => {
+        if (isAllSelected) handleDeselectAll();
+        else handleSelectAll();
+    }, [isAllSelected, handleSelectAll, handleDeselectAll]);
 
     const handleConfirmDeleteAll = async () => {
         setIsDeleting(true);
         try {
-            const result = await deleteLeadsBySourceAction(selectedSource === 'all' ? undefined : selectedSource);
+            const result = await deleteUserLeadsBySource(selectedSource === 'all' ? undefined : selectedSource);
             if (result.success) {
                 toast.success('Leads deleted successfully');
                 setSelectedLeadIds(new Set());
@@ -82,7 +97,7 @@ export const AllUserLeads = () => {
     const handleConfirmDeleteSelected = async () => {
         setIsDeleting(true);
         try {
-            const result = await deleteLeadsAction(Array.from(selectedLeadIds));
+            const result = await deleteUserLeads(Array.from(selectedLeadIds));
             if (result.success) {
                 toast.success(`${selectedLeadIds.size} lead(s) deleted successfully`);
                 setDeleteBulkDialogOpen(false);
@@ -96,44 +111,26 @@ export const AllUserLeads = () => {
         }
     };
 
-    const handleConfirmNotes = async (notes: string) => {
-        if (selectedLeadIds.size === 0) return;
-        setIsSavingNotes(true);
-        try {
-            const result = await updateLeadsNotesAction(Array.from(selectedLeadIds), notes);
-            if (result.success) {
-                toast.success(`Notes saved for ${selectedLeadIds.size} lead(s)`);
-                setNotesDialogOpen(false);
-                setSelectedLeadIds(new Set());
-                router.refresh();
-            } else {
-                toast.error(result.error || 'Failed to save notes');
-            }
-        } finally {
-            setIsSavingNotes(false);
-        }
-    };
-
-    // Total count per source (from full lead list) — used for tab badges
-    const getLeadCountForSource = (source: 'all' | LeadSource) => {
-        if (source === 'all') return leads.length;
-        return leads.filter((lead) => lead.source === source).length;
-    };
-
-    // NL-filtered leads for current source — used for list content
-    const getLeadsForSource = (source: 'all' | LeadSource) => {
-        if (source === 'all') return filteredLeads;
-        return filteredLeads.filter((lead) => lead.source === source);
-    };
-
-    const currentLeads = getLeadsForSource(selectedSource);
-    const currentLeadsCount = currentLeads.length;
-
     const getCategoryName = () => {
         if (selectedSource === 'all') return 'All';
         if (selectedSource === LeadSource.GOOGLE_MAPS) return 'Google Maps';
         if (selectedSource === LeadSource.INSTAGRAM) return 'Instagram';
         return 'All';
+    };
+
+    const getLeadCard = (lead: Lead) => {
+        if (lead.source === LeadSource.GOOGLE_MAPS)
+            return (
+                <GoogleMapLead
+                    key={lead._id as string}
+                    data={lead.data as GMAPS_INTERNAL_RESPONSE}
+                    showCheckbox
+                    isSelected={selectedLeadIds.has(lead._id as string)}
+                    onSelect={(checked) => handleSelectLead(lead._id as string, checked === true)}
+                />
+            );
+        if (lead.source === LeadSource.INSTAGRAM) return null;
+        return null;
     };
 
     // Render leads grid
@@ -154,13 +151,7 @@ export const AllUserLeads = () => {
             <ScrollArea className="h-full">
                 <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 p-1">
                     {leadsToRender.map((lead) => (
-                        <CommonLeadCard
-                            key={lead._id}
-                            lead={lead.data as GMAPS_SCRAPE_LEAD_INFO}
-                            showCheckbox={true}
-                            isSelected={selectedLeadIds.has(lead._id)}
-                            onSelect={(selected) => handleSelectLead(lead._id, selected)}
-                        />
+                        getLeadCard(lead)
                     ))}
                 </div>
             </ScrollArea>
@@ -173,26 +164,26 @@ export const AllUserLeads = () => {
             <div className="flex items-center gap-2 flex-wrap">
                 {currentLeadsCount > 0 && (
                     <Button
-                        variant={selectedLeadIds.size === currentLeadsCount ? 'default' : 'outline'}
+                        variant={isAllSelected ? 'default' : 'outline'}
                         size="sm"
-                        onClick={selectedLeadIds.size === currentLeadsCount ? handleDeselectAll : handleSelectAll}
+                        onClick={handleToggleSelectAll}
                         className="gap-2"
                         aria-label={
-                            selectedLeadIds.size === currentLeadsCount
+                            isAllSelected
                                 ? `Deselect all ${currentLeadsCount} leads`
                                 : `Select all ${currentLeadsCount} leads`
                         }
                     >
-                        {selectedLeadIds.size === currentLeadsCount ? (
+                        {isAllSelected ? (
                             <CheckSquare className="w-4 h-4" />
                         ) : (
                             <Square className="w-4 h-4" />
                         )}
                         <span className="hidden sm:inline">
-                            {selectedLeadIds.size === currentLeadsCount ? 'Deselect All' : 'Select All'}
+                            {isAllSelected ? 'Deselect All' : 'Select All'}
                         </span>
                         <span className="sm:hidden">
-                            {selectedLeadIds.size === currentLeadsCount ? 'None selected' : 'Select all'}
+                            {isAllSelected ? 'None selected' : 'Select all'}
                         </span>
                         <span className="font-semibold">
                             ({selectedLeadIds.size}/{currentLeadsCount})
@@ -200,25 +191,17 @@ export const AllUserLeads = () => {
                     </Button>
                 )}
                 {hasSelectedLeads && (
-                    <>
-                        <Button variant="outline" size="sm" onClick={() => setNotesDialogOpen(true)} className="gap-2">
-                            <StickyNote className="w-4 h-4" />
-                            <span className="hidden sm:inline">Add Notes</span>
-                            <span className="sm:hidden">Notes</span>
-                            <span className="font-semibold">({selectedLeadIds.size})</span>
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => setDeleteBulkDialogOpen(true)}
-                            className="gap-2"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            <span className="hidden sm:inline">Delete Selected</span>
-                            <span className="sm:hidden">Delete</span>
-                            <span className="font-semibold">({selectedLeadIds.size})</span>
-                        </Button>
-                    </>
+                    <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setDeleteBulkDialogOpen(true)}
+                        className="gap-2"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">Delete Selected</span>
+                        <span className="sm:hidden">Delete</span>
+                        <span className="font-semibold">({selectedLeadIds.size})</span>
+                    </Button>
                 )}
                 <Button
                     variant="outline"
@@ -291,12 +274,6 @@ export const AllUserLeads = () => {
             </motion.div>
 
             {/* Dialogs */}
-            <AddNotesDialog
-                open={notesDialogOpen}
-                onOpenChange={setNotesDialogOpen}
-                onConfirm={handleConfirmNotes}
-                isLoading={isSavingNotes}
-            />
             <DeleteAllLeadsDialog
                 open={deleteAllDialogOpen}
                 onOpenChange={setDeleteAllDialogOpen}

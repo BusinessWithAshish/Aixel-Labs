@@ -1,1 +1,1 @@
-export { useAllLeadsPage, type TUseAllLeadsPageReturn, type FilterMode } from './useAllLeadsPage';
+export { useAllLeadsPage, type TUseAllLeadsPageReturn } from './use-lead-generation';

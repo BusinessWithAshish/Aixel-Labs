@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { LeadSource, type Lead } from '@aixellabs/shared/mongodb';
-import type { GMAPS_SCRAPE_LEAD_INFO } from '@aixellabs/shared/common';
+import { LeadSource, type Lead } from '@aixellabs/backend/db/types';
+import type { GMAPS_INTERNAL_RESPONSE } from '@aixellabs/backend/gmaps/internal/types';
 import { useNLQuery } from '@/hooks/use-nl-query';
 import { toNumber } from '@/helpers/normalize-helpers';
 
@@ -26,8 +26,8 @@ export const useAllLeadsPage = (leads: Lead[]) => {
             ...lead,
             data: {
                 ...lead.data,
-                numberOfReviews: toNumber((lead.data as GMAPS_SCRAPE_LEAD_INFO).numberOfReviews),
-                overAllRating: toNumber((lead.data as GMAPS_SCRAPE_LEAD_INFO).overAllRating),
+                reviewCount: toNumber((lead.data as GMAPS_INTERNAL_RESPONSE).reviewCount),
+                rating: toNumber((lead.data as GMAPS_INTERNAL_RESPONSE).rating),
             },
         }));
     }, [sourceFilteredLeads]);

@@ -5,8 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { City, Country, State } from 'country-state-city';
 import { useMemo, useState } from 'react';
 import { GMAPS_REQUEST_SCHEMA as GMAPS_INTERNAL_REQUEST_SCHEMA } from '@aixellabs/backend/gmaps';
-import type { GMAPS_INTERNAL_REQUEST } from '@aixellabs/backend/gmaps/internal/types';
-import { Lead } from '@aixellabs/backend/db/types';
+import type { GMAPS_INTERNAL_REQUEST, GMAPS_INTERNAL_RESPONSE} from '@aixellabs/backend/gmaps/internal/types';
 import { API_ENDPOINTS } from '@aixellabs/backend/config';
 import apiClient from '@/lib/api-client';
 import { ConfirmResult } from '@/components/common/ChatInterface';
@@ -20,7 +19,7 @@ const DEFAULT_FORM_VALUES: GMAPS_INTERNAL_REQUEST = {
 };
 
 export const useGoogleMapsForm = () => {
-    const [leads, setLeads] = useState<Lead[]>([]);
+    const [leads, setLeads] = useState<GMAPS_INTERNAL_RESPONSE[]>([]);
 
     const form = useForm<GMAPS_INTERNAL_REQUEST>({
         resolver: zodResolver(GMAPS_INTERNAL_REQUEST_SCHEMA),
@@ -56,7 +55,7 @@ export const useGoogleMapsForm = () => {
     const isCityFieldDisabled = !selectedCountry || !selectedState;
 
     const onSubmit = async (data: GMAPS_INTERNAL_REQUEST): Promise<ConfirmResult> => {
-        const apiResponse = await apiClient.post<Lead[], GMAPS_INTERNAL_REQUEST>(API_ENDPOINTS.GMAPS.INTERNAL.full, data);
+        const apiResponse = await apiClient.post<GMAPS_INTERNAL_RESPONSE[], GMAPS_INTERNAL_REQUEST>(API_ENDPOINTS.GMAPS.INTERNAL.full, data);
         if (!apiResponse.success || !apiResponse.data) {
             return {
                 success: false,
