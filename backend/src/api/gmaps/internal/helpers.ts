@@ -321,6 +321,7 @@ export const parsePlaces = (data: any): GMAPS_INTERNAL_RESPONSE[] => {
     const p4 = p[FIELDS.RATING[0]];
 
     places.push({
+      id: placeId,
       placeId,
       name: p[FIELDS.NAME] ?? null,
       address: p[FIELDS.FULL_ADDRESS] ?? p[FIELDS.ALT_ADDRESS] ?? null,

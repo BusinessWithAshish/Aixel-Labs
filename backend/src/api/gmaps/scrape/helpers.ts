@@ -139,7 +139,7 @@ function buildLead(
   },
 ): GMAPS_SCRAPE_LEAD_INFO {
   return {
-    placeId,
+    id: placeId,
     gmapsUrl,
     website: data.website,
     phoneNumber: data.phoneNumber,

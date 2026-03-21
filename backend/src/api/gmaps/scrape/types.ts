@@ -2,7 +2,7 @@ import { z } from "zod";
 import { GMAPS_REQUEST_SCHEMA } from "../schemas";
 
 export type GMAPS_SCRAPE_LEAD_INFO = {
-  placeId: string | null;
+  id: string | null;
   website: string | null;
   phoneNumber: string | null;
   name: string | null;

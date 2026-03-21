@@ -208,20 +208,14 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
   }
   const unique = Array.from(byPlaceId.values());
 
-  const leads: Lead[] = unique.map((p) => ({
-    source: LeadSource.GOOGLE_MAPS,
-    sourceId: p.placeId!,
-    data: p,
-  }));
-
   const duplicatesRemoved = allPlaces.length - unique.length;
   console.log(
     `[gmaps] Done — ${allPlaces.length} fetched, ${unique.length} unique, ${duplicatesRemoved} dupes removed`,
   );
 
-  const response: ALApiResponse<Lead[]> = {
+  const response: ALApiResponse<GMAPS_INTERNAL_RESPONSE[]> = {
     success: true,
-    data: leads,
+    data: unique,
   };
 
   res.status(200).json(response);
