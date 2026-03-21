@@ -6,6 +6,7 @@ import { TenantBrandingProvider } from '@/contexts/TenantBranding';
 import { buildThemeStyleTag, THEME_COLOR_COOKIE_KEY } from '@/helpers/theme-color-utils';
 import { DEFAULT_THEME_COLOR } from '@/config/app-config';
 import { cookies } from 'next/headers';
+import Head from "next/head";
 
 type RootLayoutUIProps = {
     children: React.ReactNode;
@@ -31,9 +32,9 @@ export const RootLayoutUI = async ({
 
     return (
         <html lang="en" suppressHydrationWarning>
-            <head>
+            <Head>
                 <style dangerouslySetInnerHTML={{ __html: buildThemeStyleTag(activeColor) }} />
-            </head>
+            </Head>
             <body className={cn(`${poppinsFont.variable} h-dvh w-full`, className)} suppressHydrationWarning>
 
                 <TenantBrandingProvider

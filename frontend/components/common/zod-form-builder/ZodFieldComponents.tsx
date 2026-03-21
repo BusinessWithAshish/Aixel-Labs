@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { SearchableMultiSelect } from '@/components/ui/searchable-multi-select';
 import { SearchableSelect, OptionType } from '@/components/ui/searchable-select';
-import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { FieldError as ReactHookFormFieldError } from 'react-hook-form';
 import { generateFieldLabel } from './helpers';

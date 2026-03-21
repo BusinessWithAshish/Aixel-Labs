@@ -104,8 +104,8 @@ type PhoneNumberProps = {
 };
 
 export const PhoneNumber = ({ value, className, hideWhenEmpty }: PhoneNumberProps) => {
-    if (hideWhenEmpty && !hasValue(value)) return null;
     const [isHovered, setIsHovered] = useState(false);
+    if (hideWhenEmpty && !hasValue(value)) return null;
 
     const handleCopy = async () => {
         if (hasValue(value)) {
@@ -166,8 +166,8 @@ type EmailProps = {
 };
 
 export const Email = ({ value, className, hideWhenEmpty }: EmailProps) => {
-    if (hideWhenEmpty && !hasValue(value)) return null;
     const [isHovered, setIsHovered] = useState(false);
+    if (hideWhenEmpty && !hasValue(value)) return null;
 
     const handleCopy = async () => {
         if (hasValue(value)) {

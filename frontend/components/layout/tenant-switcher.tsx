@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { ChevronsUpDown, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 

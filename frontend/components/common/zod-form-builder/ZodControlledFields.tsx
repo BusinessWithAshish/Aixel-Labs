@@ -67,7 +67,7 @@ export const StringControlledField = ({ name, description, required, label, disa
 
 type NumberControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodNumberFieldProps>
 
-export const NumberControlledField = ({ name, description, required, label, disabled, className, classNames, metadata }: NumberControlledFieldProps) => {
+export const NumberControlledField = ({ name, description, required, label, disabled, className, classNames }: NumberControlledFieldProps) => {
 
     const fieldLabel = label ?? generateFieldLabel(name);
     return (
@@ -151,7 +151,7 @@ export const EnumControlledField = ({ name, description, required, label, disabl
 
 type SelectControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodSelectFieldProps>
 
-export const SelectControlledField = ({ name, description, required, label, disabled, className, classNames, metadata, options, isClearable }: SelectControlledFieldProps) => {
+export const SelectControlledField = ({ name, description, required, label, disabled, className, classNames, options, isClearable }: SelectControlledFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
     return (
         <FieldController
@@ -179,7 +179,7 @@ export const SelectControlledField = ({ name, description, required, label, disa
 
 type SearchableSelectControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodSearchableSelectFieldProps>
 
-export const SearchableSelectControlledField = ({ name, description, required, label, disabled, className, classNames, metadata, options }: SearchableSelectControlledFieldProps) => {
+export const SearchableSelectControlledField = ({ name, description, required, label, disabled, className, classNames, options }: SearchableSelectControlledFieldProps) => {
 
     const fieldLabel = label ?? generateFieldLabel(name);
     return (
@@ -207,7 +207,7 @@ export const SearchableSelectControlledField = ({ name, description, required, l
 
 type SearchableMultiSelectControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodSearchableMultiSelectFieldProps>
 
-export const SearchableMultiSelectControlledField = ({ name, description, required, label, disabled, className, classNames, metadata, options }: SearchableMultiSelectControlledFieldProps) => {
+export const SearchableMultiSelectControlledField = ({ name, description, required, label, disabled, className, classNames, options }: SearchableMultiSelectControlledFieldProps) => {
 
     const fieldLabel = label ?? generateFieldLabel(name);
     return (
@@ -244,7 +244,6 @@ export const StringArrayControlledField = ({
     disabled,
     className,
     classNames,
-    metadata,
 }: StringArrayControlledFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
     const { control, formState, watch } = useFormContext();
@@ -284,7 +283,7 @@ export const StringArrayControlledField = ({
             // Provide stable keys from useFieldArray for proper React rendering
             fieldKeys={fields.map((field) => field.id)}
             // Custom renderItem that uses StringControlledField - reusing existing component!
-            renderItem={({ itemName, placeholder, disabled: itemDisabled, onRemove }) => (
+            renderItem={({ itemName, disabled: itemDisabled, onRemove }) => (
                 <>
                     <StringControlledField
                         name={itemName}
@@ -310,7 +309,7 @@ export const StringArrayControlledField = ({
 
 type ColorPickerControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodColorPickerFieldProps>
 
-export const ColorPickerControlledField = ({ name, description, required, label, disabled, className, classNames, metadata }: ColorPickerControlledFieldProps) => {
+export const ColorPickerControlledField = ({ name, description, required, label, disabled, className, classNames }: ColorPickerControlledFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
     return (
         <FieldController

@@ -1,4 +1,4 @@
-import { ZodTypeAny } from 'zod';
+import { ZodTypeAny, ZodObject } from 'zod';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import { Button } from '../../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from '../../ui/card';
@@ -49,7 +49,7 @@ export const ZodArrayField = ({ name, fieldInfo, description }: ZodArrayFieldPro
     // Handle array of objects
     if (elementTypeName === 'ZodObject') {
         const unwrappedElementSchema = unwrapDefault(elementSchema);
-        const objectShape = (unwrappedElementSchema as any)?.shape;
+        const objectShape = (unwrappedElementSchema as ZodObject<Record<string, ZodTypeAny>>)?.shape;
 
         // Safety check: ensure shape exists
         if (!objectShape || Object.keys(objectShape).length === 0) {
