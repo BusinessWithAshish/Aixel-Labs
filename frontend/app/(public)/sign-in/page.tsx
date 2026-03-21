@@ -26,7 +26,7 @@ export default async function SignInPage() {
                 <div className="flex justify-center gap-2 md:justify-start">
                     <LogoWithText tenantLabel={tenantLabel} />
                 </div>
-                <div className="flex flex-1 max-w-xs items-center justify-center">
+                <div className="flex flex-1 items-center justify-center">
                     <LoginForm />
                 </div>
             </div>
