@@ -1,0 +1,30 @@
+diff --git a/dist/lib/Cookie.js b/dist/lib/Cookie.js
+index a00ab45ff12671920e7b32051d373eee7eae53ef..7d8e79cef6d329121705771878509997803b9 100644
+--- a/dist/lib/Cookie.js
++++ b/dist/lib/Cookie.js
+@@ -30,7 +30,7 @@ class Cookies extends tough_cookie_1.CookieJar {
+         const result = {};
+         await Promise.all(Object.entries(cookies).map(async ([key, value]) => {
+             const cookie = await this.setCookie(`${key}=${value}`, url);
+-            result[cookie.key] = cookie.value;
++            if (cookie) result[cookie.key] = cookie.value;
+         }));
+         return result;
+     }
+@@ -45,13 +45,10 @@ class Cookies extends tough_cookie_1.CookieJar {
+      * mergeCookies({ 'cookie1': 'value1', 'cookie2': 'value2' }, 'http://example.com')
+      */
+     async mergeCookies(cookies, url) {
+-        return Promise.all(Object.entries(cookies).map(async ([key, value]) => {
++        return (await Promise.all(Object.entries(cookies).map(async ([key, value]) => {
+             const cookie = await this.setCookie(`${key}=${value}`, url);
+-            return {
+-                name: cookie.key,
+-                value: cookie.value,
+-            };
+-        }));
++            return cookie ? { name: cookie.key, value: cookie.value } : null;
++        }))).filter(Boolean);
+     }
+ }
+ exports.Cookies = Cookies;
