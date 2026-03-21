@@ -32,11 +32,11 @@ export async function GET(request: Request): Promise<NextResponse<ALApiResponse<
         }
 
         return NextResponse.json(currentTenantData);
-    } catch (error) {
+    } catch (error: unknown) {
         return NextResponse.json(
             {
                 success: false,
-                error: 'Failed to get tenant data',
+                error: error instanceof Error ? error.message : 'Failed to get tenant data',
             },
             { status: 500 },
         );
