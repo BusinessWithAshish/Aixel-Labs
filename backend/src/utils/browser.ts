@@ -60,16 +60,32 @@ export const optimisedBrowserArgs = [
   "--allow-running-insecure-content",
 ];
 
+type TGetBrowserOptionsProps = {
+  customBrowserArgs?: LaunchOptions;
+};
+
+export const PROXY_CONFIG = {
+  PROTOCOL: "http",
+  HOSTNAME: process.env.EVOMI_PROXY_HOSTNAME ?? "core-residential.evomi.com",
+  PORT: process.env.EVOMI_PROXY_PORT ?? 1000,
+};
+
 export const getBrowserOptions = async (
-  proxyUrl?: string,
+  props?: TGetBrowserOptionsProps,
 ): Promise<LaunchOptions> => {
+  const { customBrowserArgs } = props ?? {};
   const isProduction = process.env.NODE_ENV === "production";
+  const { PROTOCOL, HOSTNAME, PORT } = PROXY_CONFIG;
+
+  const args = [...optimisedBrowserArgs];
+  args.push(`--proxy-server=${PROTOCOL}://${HOSTNAME}:${PORT}`);
+  args.push(...(customBrowserArgs?.args ?? []));
 
   return {
     headless: isProduction ? "shell" : false,
     defaultViewport: null,
     executablePath: isProduction ? "/usr/bin/chromium-browser" : undefined,
-    args: optimisedBrowserArgs,
+    args: args,
     timeout: 60000,
   };
 };

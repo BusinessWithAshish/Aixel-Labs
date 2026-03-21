@@ -116,7 +116,6 @@ type Viewport = {
 
 export const randomViewportGenerator = (): Viewport => {
   const viewports: Viewport[] = [
-    // Common desktop resolutions
     {
       width: 1920,
       height: 1080,
@@ -181,7 +180,6 @@ export const randomViewportGenerator = (): Viewport => {
       isLandscape: true,
       isMobile: false,
     },
-    // MacBook resolutions with retina
     {
       width: 1440,
       height: 900,
@@ -231,28 +229,16 @@ export const randomHttpHeaders = (): Record<string, string> => {
   };
 };
 
-/**
- * Apply stealth techniques to a page to avoid bot detection
- * Based on puppeteer-extra-plugin-stealth techniques
- */
 export const pageBotStealthHandler = async (page: Page): Promise<void> => {
-  // Must be called before any navigation
   await page.evaluateOnNewDocument(() => {
-    // 1. Remove webdriver property
-    Object.defineProperty(navigator, "webdriver", {
-      get: () => undefined,
-    });
+    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
 
-    // 2. Mock chrome.runtime to look like a real browser
     // @ts-ignore
     window.chrome = {
       runtime: {
         connect: () => {},
         sendMessage: () => {},
-        onMessage: {
-          addListener: () => {},
-          removeListener: () => {},
-        },
+        onMessage: { addListener: () => {}, removeListener: () => {} },
       },
       loadTimes: () => {},
       csi: () => {},
@@ -271,7 +257,6 @@ export const pageBotStealthHandler = async (page: Page): Promise<void> => {
       },
     };
 
-    // 3. Mock plugins array (headless Chrome has empty plugins)
     Object.defineProperty(navigator, "plugins", {
       get: () => [
         {
@@ -292,12 +277,10 @@ export const pageBotStealthHandler = async (page: Page): Promise<void> => {
       ],
     });
 
-    // 4. Mock languages
     Object.defineProperty(navigator, "languages", {
       get: () => ["en-US", "en"],
     });
 
-    // 5. Fix permissions query
     const originalQuery = window.navigator.permissions.query;
     // @ts-ignore
     window.navigator.permissions.query = (parameters: any) =>
@@ -307,21 +290,13 @@ export const pageBotStealthHandler = async (page: Page): Promise<void> => {
           } as PermissionStatus)
         : originalQuery(parameters);
 
-    // 6. Override the `getParameter` function to return non-empty values for WebGL
     const getParameter = WebGLRenderingContext.prototype.getParameter;
     WebGLRenderingContext.prototype.getParameter = function (parameter) {
-      // UNMASKED_VENDOR_WEBGL
-      if (parameter === 37445) {
-        return "Intel Inc.";
-      }
-      // UNMASKED_RENDERER_WEBGL
-      if (parameter === 37446) {
-        return "Intel Iris OpenGL Engine";
-      }
+      if (parameter === 37445) return "Intel Inc.";
+      if (parameter === 37446) return "Intel Iris OpenGL Engine";
       return getParameter.call(this, parameter);
     };
 
-    // 7. Mock connection type
     Object.defineProperty(navigator, "connection", {
       get: () => ({
         effectiveType: "4g",
@@ -330,66 +305,43 @@ export const pageBotStealthHandler = async (page: Page): Promise<void> => {
         saveData: false,
       }),
     });
+    Object.defineProperty(navigator, "deviceMemory", { get: () => 8 });
+    Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 });
 
-    // 8. Mock deviceMemory
-    Object.defineProperty(navigator, "deviceMemory", {
-      get: () => 8,
-    });
-
-    // 9. Mock hardwareConcurrency (CPU cores)
-    Object.defineProperty(navigator, "hardwareConcurrency", {
-      get: () => 8,
-    });
-
-    // 10. Remove Puppeteer-specific properties from Error stack traces
-    // Override Error.prepareStackTrace to clean up stack traces
     // @ts-ignore
-    if (Error.prepareStackTrace) {
-      const originalPrepare = Error.prepareStackTrace;
-      // @ts-ignore
-      Error.prepareStackTrace = function (error: Error, stack: any[]) {
-        const result = originalPrepare(error, stack);
-        if (typeof result === "string") {
-          return result.replace(/__puppeteer_evaluation_script__/g, "");
-        }
-        return result;
-      };
-    }
+    // if (Error.prepareStackTrace) {
+    //   const originalPrepare = Error.prepareStackTrace;
+    //   // @ts-ignore
+    //   Error.prepareStackTrace = function (error: Error, stack: any[]) {
+    //     const result = originalPrepare(error, stack);
+    //     if (typeof result === "string") {
+    //       return result.replace(/__puppeteer_evaluation_script__/g, "");
+    //     }
+    //     return result;
+    //   };
+    // }
   });
 };
 
 // ============================================================
-// REQUEST INTERCEPTION (Combined for all scrapers)
+// REQUEST INTERCEPTION
 // ============================================================
 
-/**
- * Setup request interception to block unnecessary resources
- * Blocks CSS, fonts, images, media, analytics, tracking, etc.
- * This speeds up page loads significantly
- */
-export const pageResourcesRequestInterceptor = async (page: Page): Promise<void> => {
-  // Check if request interception is already enabled by checking if there are listeners
-  const hasRequestListeners = page.listenerCount('request') > 0;
-  
-  if (hasRequestListeners) {
-    // Request interception already set up, skip
-    return;
-  }
+export const pageResourcesRequestInterceptor = async (
+  page: Page,
+): Promise<void> => {
+  const hasRequestListeners = page.listenerCount("request") > 0;
+  if (hasRequestListeners) return;
 
   await page.setRequestInterception(true);
 
   page.on("request", (req) => {
-    // Check if request is already handled
-    if (req.isInterceptResolutionHandled()) {
-      return;
-    }
+    if (req.isInterceptResolutionHandled()) return;
 
     const resourceType = req.resourceType();
     const url = req.url().toLowerCase();
 
-    // Block unnecessary resources for faster loading
     const shouldBlock =
-      // Resource types to block
       resourceType === "stylesheet" ||
       resourceType === "font" ||
       resourceType === "image" ||
@@ -398,7 +350,6 @@ export const pageResourcesRequestInterceptor = async (page: Page): Promise<void>
       resourceType === "eventsource" ||
       resourceType === "websocket" ||
       resourceType === "manifest" ||
-      // File extensions to block
       url.endsWith(".css") ||
       url.endsWith(".woff") ||
       url.endsWith(".woff2") ||
@@ -415,7 +366,6 @@ export const pageResourcesRequestInterceptor = async (page: Page): Promise<void>
       url.endsWith(".mp4") ||
       url.endsWith(".webm") ||
       url.endsWith(".mp3") ||
-      // Analytics and tracking to block
       url.includes("google-analytics") ||
       url.includes("googletagmanager") ||
       url.includes("analytics") ||
@@ -430,12 +380,11 @@ export const pageResourcesRequestInterceptor = async (page: Page): Promise<void>
       url.includes("pixel") ||
       url.includes("beacon") ||
       url.includes("telemetry") ||
-      // Social widgets
       url.includes("platform.twitter") ||
       url.includes("platform.linkedin") ||
-      // Other unnecessary resources
       url.includes("recaptcha") ||
-      url.includes("gstatic.com/recaptcha");
+      (url.includes("gstatic.com/recaptcha") &&
+        !url.includes("google.com/xjs"));
 
     try {
       if (shouldBlock) {
@@ -444,40 +393,26 @@ export const pageResourcesRequestInterceptor = async (page: Page): Promise<void>
         req.continue();
       }
     } catch (error) {
-      // Request was already handled, ignore
       console.log("Request already handled, skipping:", url);
     }
   });
 };
 
 // ============================================================
-// STEALTH APPLY (Generic for any page)
+// STEALTH APPLY
 // ============================================================
 
-/**
- * Apply stealth techniques to a page to avoid bot detection
- * - Sets random user agent
- * - Sets random viewport (production only)
- * - Sets random HTTP headers
- * - Applies JavaScript stealth patches
- *
- * MUST be called BEFORE any navigation
- */
 export const pageFingerprintRandomizer = async (page: Page): Promise<void> => {
   const isProduction = process.env.NODE_ENV === "production";
 
-  // Set a random user agent
   const userAgent = randomUserAgentGenerator();
   await page.setUserAgent(userAgent);
 
-  // Set random viewport ONLY in production (for more stealth)
-  // In development, let the browser window size determine viewport
   if (isProduction) {
     const viewport = randomViewportGenerator();
     await page.setViewport(viewport);
   }
 
-  // Set random HTTP headers
   const headers = randomHttpHeaders();
   await page.setExtraHTTPHeaders(headers);
 };
@@ -486,11 +421,6 @@ export const pageFingerprintRandomizer = async (page: Page): Promise<void> => {
 // PAGE STEALTHER (Combined: Stealth + Request Interception)
 // ============================================================
 
-/**
- * Full stealth setup for a page
- * Applies stealth techniques + request interception
- * Call this BEFORE any navigation
- */
 export const pageStealther = async (page: Page): Promise<void> => {
   await pageFingerprintRandomizer(page);
   await pageResourcesRequestInterceptor(page);

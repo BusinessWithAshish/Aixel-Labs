@@ -2,23 +2,70 @@
   "name": "@aixellabs/backend",
   "version": "1.0.0",
   "description": "Internal Google Maps scraping API server",
-  "main": "dist/index.js",
   "type": "module",
+  "main": "dist/server.js",
+  "exports": {
+    ".": "./dist/server.js",
+    "./api/types": {
+      "types": "./src/api/types.ts",
+      "default": "./src/api/types.ts"
+    },
+    "./db": {
+      "types": "./src/db/index.ts",
+      "default": "./src/db/index.ts"
+    },
+    "./db/types": {
+      "types": "./src/db/types.ts",
+      "default": "./src/db/types.ts"
+    },
+    "./gmaps": {
+      "types": "./src/api/gmaps/schemas.ts",
+      "default": "./src/api/gmaps/schemas.ts"
+    },
+    "./gmaps/internal/types": {
+      "types": "./src/api/gmaps/internal/types.ts",
+      "default": "./src/api/gmaps/internal/types.ts"
+    },
+    "./gmaps/scrape/types": {
+      "types": "./src/api/gmaps/scrape/types.ts",
+      "default": "./src/api/gmaps/scrape/types.ts"
+    },
+    "./instagram": {
+      "types": "./src/api/instagram/types.ts",
+      "default": "./src/api/instagram/types.ts"
+    },
+    "./instagram/schemas": {
+      "types": "./src/api/instagram/schemas.ts",
+      "default": "./src/api/instagram/schemas.ts"
+    },
+    "./db/mongo-client": {
+      "types": "./src/db/mongo-client.ts",
+      "default": "./src/db/mongo-client.ts"
+    },
+    "./config": {
+      "types": "./src/config.ts",
+      "default": "./src/config.ts"
+    }
+  },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "rm -rf dist && pnpm --filter @aixellabs/shared build && tsc",
-    "prod": "pnpm build && node dist/index.js"
+    "dev": "tsx watch src/server.ts",
+    "build": "rm -rf dist && tsc",
+    "prod": "pnpm build && node dist/server.js"
   },
   "dependencies": {
-    "@aixellabs/shared": "workspace:*",
+    "@cemalgnlts/mailjs": "^3.1.1",
+    "@types/cheerio": "^1.0.0",
+    "cheerio": "^1.2.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-rate-limit": "^8.0.1",
     "helmet": "^8.0.0",
+    "impit": "^0.9.2",
     "jsdom": "^26.1.0",
     "mongodb": "^6.17.0",
     "morgan": "^1.10.1",
+    "node-tls-client": "^2.1.0",
     "puppeteer": "^24.9.0",
     "zod": "^3.25.43"
   },

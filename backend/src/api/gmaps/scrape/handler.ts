@@ -30,11 +30,12 @@ export const gmapsScrapeHandler = async (req: Request, res: Response) => {
     console.log(`Total URLs to scrape: ${finalScrappingUrls.length}`);
 
     console.log("Phase 1: Searching for business listings...");
-    const foundedLeads = await BrowserBatchHandler(
-      finalScrappingUrls,
-      scrapeLinks,
-      null,
-    );
+    const foundedLeads = await BrowserBatchHandler({
+      urlItems: finalScrappingUrls,
+      scrapingFunction: scrapeLinks,
+      res: null,
+      allowBatchWaiting: true,
+    });
 
     const foundedLeadsResults = foundedLeads.results.flat();
 
@@ -57,11 +58,12 @@ export const gmapsScrapeHandler = async (req: Request, res: Response) => {
     console.log(
       `Phase 2: Extracting details from ${foundedLeadsResults.length} business listings...`,
     );
-    const allLeads = await BrowserBatchHandler(
-      foundedLeadsResults,
-      GmapsDetailsLeadInfoExtractor,
-      null,
-    );
+    const allLeads = await BrowserBatchHandler({
+      urlItems: foundedLeadsResults,
+      scrapingFunction: GmapsDetailsLeadInfoExtractor,
+      res: null,
+      allowBatchWaiting: true,
+    });
     const allLeadsResults = allLeads.results.flat();
 
     const response: GMAPS_SCRAPE_RESPONSE = {
