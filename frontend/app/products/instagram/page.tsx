@@ -94,13 +94,11 @@ export default function InstagramProductsPage() {
 
                 <div className="grid grid-cols-3 gap-2 mt-4">
                     {accountProfile?.latestPostUrls?.map((url, i) => (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                             key={i}
-                            src={url}
+                            src={`/api/instagram/image?url=${encodeURIComponent(url)}`}
                             alt={`Post ${i + 1}`}
                             className="w-full aspect-square object-cover rounded-md"
-                            referrerPolicy="no-referrer"
                             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                         />
                     ))}

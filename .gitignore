@@ -2,7 +2,8 @@
 node_modules/
 .pnpm-store/
 /scraper
-
+skills-lock.json
+frontend/skills-lock.json
 # Build outputs
 dist/
 build/
