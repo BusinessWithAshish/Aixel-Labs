@@ -5,15 +5,16 @@ import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import morgan from "morgan";
 import { registerRoutes } from "./routes";
+import type { Express } from "express";
 import {
   ALLOWED_ORIGINS_DEV_REGEX,
   ALLOWED_ORIGINS_PROD_REGEX,
   API_ENDPOINTS,
-} from "./config";
+} from "./config.js";
 
 dotenv.config();
 
-const app = express();
+const app: Express = express();
 
 // ===================
 // 1. Basic Security
@@ -99,17 +100,24 @@ registerRoutes(app);
 // ===================
 // 8. Start Server
 // ===================
-const PORT = process.env.PORT || 8100;
-app.listen(PORT, () => {
-  const timestamp = new Date().toLocaleString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
+// On Vercel, Express apps run as a Serverless Function.
+// Export the app so Vercel can invoke it without binding a port.
+export default app;
+
+// For local/dev or traditional servers, keep `listen`.
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 8100;
+  app.listen(PORT, () => {
+    const timestamp = new Date().toLocaleString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    console.log(
+      `Aixel Labs backend running on port ${PORT} [${process.env.NODE_ENV}] - Started at ${timestamp}...`,
+    );
   });
-  console.log(
-    `Aixel Labs backend running on port ${PORT} [${process.env.NODE_ENV}] - Started at ${timestamp}...`,
-  );
-});
+}
