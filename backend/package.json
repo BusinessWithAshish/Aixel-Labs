@@ -2,7 +2,7 @@
   "name": "@aixellabs/backend",
   "version": "1.0.0",
   "description": "Internal Google Maps scraping API server",
-  "type": "module",
+  "type": "commonjs",
   "main": "dist/server.js",
   "exports": {
     ".": "./dist/server.js",
@@ -49,7 +49,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "rm -rf dist && tsc",
+    "build": "rm -rf dist && tsc && mkdir -p dist/api/gsearch && cp src/api/gsearch/gsearch-injector.js dist/api/gsearch/gsearch-injector.js",
     "prod": "pnpm build && node dist/server.js"
   },
   "dependencies": {

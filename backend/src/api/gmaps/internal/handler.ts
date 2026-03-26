@@ -31,10 +31,16 @@ import { GMAPS_REQUEST_SCHEMA } from "../schemas";
 
 // ─────────────────────────────────────────────────────────────
 
-// ── Initialize TLS ─────────────────────────────────────────────
-await initTLS();
+// ── Initialize TLS lazily (CJS-safe, avoids top-level await) ──
+let tlsInitialized = false;
+async function ensureTls() {
+  if (tlsInitialized) return;
+  await initTLS();
+  tlsInitialized = true;
+}
 
 export const gmapsInternalHandler = async (req: Request, res: Response) => {
+  await ensureTls();
   // ── Validate request ────────────────────────────────────────
   const parsed = GMAPS_REQUEST_SCHEMA.safeParse(req.body);
 

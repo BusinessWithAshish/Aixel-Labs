@@ -6,8 +6,7 @@ import {
 import { BrowserBatchHandler } from "../../utils/browser-batch-handler";
 import { DEFAULT_PAGE_LOAD_TIMEOUT } from "../../utils/constants";
 import { readFileSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
+import { join } from "path";
 import {
   HEADERS,
   DEFAULT_GSEARCH_MAX_PAGES,
@@ -15,8 +14,6 @@ import {
   GOOGLE_SEARCH_QUERY_PARAMS,
   DEFAULT_GSEARCH_LANGUAGE,
 } from "./constants";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ── Load the inspector script once at module level (not on every request) ──
 const INSPECTOR_SCRIPT = readFileSync(

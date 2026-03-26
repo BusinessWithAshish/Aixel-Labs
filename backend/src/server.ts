@@ -10,7 +10,7 @@ import {
   ALLOWED_ORIGINS_DEV_REGEX,
   ALLOWED_ORIGINS_PROD_REGEX,
   API_ENDPOINTS,
-} from "./config.js";
+} from "./config";
 
 dotenv.config();
 
@@ -102,7 +102,7 @@ registerRoutes(app);
 // ===================
 // On Vercel, Express apps run as a Serverless Function.
 // Export the app so Vercel can invoke it without binding a port.
-export default app;
+export = app;
 
 // For local/dev or traditional servers, keep `listen`.
 if (!process.env.VERCEL) {

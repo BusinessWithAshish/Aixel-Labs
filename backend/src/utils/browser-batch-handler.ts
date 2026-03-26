@@ -1,8 +1,8 @@
 import puppeteer, { Browser, LaunchOptions, Page } from "puppeteer";
-import { getBrowserOptions } from "./browser.js";
+import { getBrowserOptions } from "./browser";
 import { config } from "dotenv";
 import { Response } from "express";
-import { DEFAULT_PAGE_LOAD_TIMEOUT } from "./constants.js";
+import { DEFAULT_PAGE_LOAD_TIMEOUT } from "./constants";
 
 config();
 
