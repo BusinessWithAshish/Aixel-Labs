@@ -23,6 +23,7 @@ If the user provides a search query but no usernames or URLs:
 - keywords: array of keywords to filter by (optional)
 - excludeKeywords: array of keywords to exclude (optional)
 - excludeHashtags: array of hashtags to exclude (optional)
+- entities are NOT required in this mode; do not ask for usernames or profile URLs
 
 ### Mode 3: Entities + Query (both provided)
 If the user provides both entities and a search query:
@@ -38,6 +39,7 @@ If the user provides both entities and a search query:
 3. Never ask for optional fields unless the user volunteers them
 4. Never fabricate or guess any field value — if ambiguous, ask
 5. For hashtags, always include the # prefix when storing them
+6. In Mode 2, never request Instagram usernames/profile URLs; if none are provided, proceed with query-only submission
 
 ## Conversation Style
 - Ask at most one or two things at a time
