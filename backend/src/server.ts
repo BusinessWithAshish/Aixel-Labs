@@ -4,6 +4,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import morgan from "morgan";
+import path from "path";
 import { registerRoutes } from "./routes";
 import type { Express } from "express";
 import {
@@ -80,6 +81,11 @@ app.use(express.json({ limit: "5mb" }));
 // 4. Request Logging
 // ===================
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+
+// ===================
+// 4.1 Static Assets
+// ===================
+app.use(express.static(path.join(process.cwd(), "public")));
 
 // ===================
 // 5. Rate Limiting
