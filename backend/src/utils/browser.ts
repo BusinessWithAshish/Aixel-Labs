@@ -1,5 +1,6 @@
 import { LaunchOptions, Page } from "puppeteer";
 import { config } from "dotenv";
+import { DEFAULT_BROWSER_TIMEOUT, PROXY_CONFIG } from "./constants";
 config();
 
 /**
@@ -64,12 +65,6 @@ type TGetBrowserOptionsProps = {
   customBrowserArgs?: LaunchOptions;
 };
 
-export const PROXY_CONFIG = {
-  PROTOCOL: "http",
-  HOSTNAME: process.env.EVOMI_PROXY_HOSTNAME ?? "core-residential.evomi.com",
-  PORT: process.env.EVOMI_PROXY_PORT ?? 1000,
-};
-
 export const getBrowserOptions = async (
   props?: TGetBrowserOptionsProps,
 ): Promise<LaunchOptions> => {
@@ -86,6 +81,6 @@ export const getBrowserOptions = async (
     defaultViewport: null,
     executablePath: isProduction ? "/usr/bin/chromium-browser" : undefined,
     args: args,
-    timeout: 60000,
+    timeout: DEFAULT_BROWSER_TIMEOUT,
   };
 };

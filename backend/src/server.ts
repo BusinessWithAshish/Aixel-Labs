@@ -16,6 +16,23 @@ dotenv.config();
 
 const app: Express = express();
 
+// Vercel/reverse-proxy setups require trust proxy for correct client IP detection.
+// This avoids express-rate-limit proxy validation warnings and global limiting.
+const trustProxyEnv = process.env.TRUST_PROXY;
+if (trustProxyEnv !== undefined) {
+  const normalized = trustProxyEnv.trim().toLowerCase();
+  if (normalized === "true") {
+    app.set("trust proxy", true);
+  } else if (normalized === "false") {
+    app.set("trust proxy", false);
+  } else {
+    const parsed = Number(trustProxyEnv);
+    app.set("trust proxy", Number.isFinite(parsed) ? parsed : 1);
+  }
+} else if (process.env.VERCEL) {
+  app.set("trust proxy", 1);
+}
+
 // ===================
 // 1. Basic Security
 // ===================
