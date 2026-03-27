@@ -1,4 +1,4 @@
-import { LaunchOptions, Page } from "puppeteer";
+import { LaunchOptions } from "puppeteer-core";
 import { config } from "dotenv";
 import { DEFAULT_BROWSER_TIMEOUT, PROXY_CONFIG } from "./constants";
 config();
@@ -73,14 +73,33 @@ export const getBrowserOptions = async (
   const { PROTOCOL, HOSTNAME, PORT } = PROXY_CONFIG;
 
   const args = [...optimisedBrowserArgs];
-  args.push(`--proxy-server=${PROTOCOL}://${HOSTNAME}:${PORT}`);
+  if (PROTOCOL && HOSTNAME && PORT) {
+    args.push(`--proxy-server=${PROTOCOL}://${HOSTNAME}:${PORT}`);
+  }
   args.push(...(customBrowserArgs?.args ?? []));
 
+  let executablePath: string | undefined = undefined;
+  let headless: LaunchOptions["headless"] = false;
+
+  if (isProduction) {
+    const chromium = (await import("@sparticuz/chromium")).default;
+    chromium.setGraphicsMode = false;
+    executablePath = await chromium.executablePath();
+    headless = "shell";
+  }
+
   return {
-    headless: isProduction ? "shell" : false,
+    headless,
     defaultViewport: null,
-    executablePath: isProduction ? "/usr/bin/chromium-browser" : undefined,
-    args: args,
+    ...(executablePath ? { executablePath } : {}),
+    args,
     timeout: DEFAULT_BROWSER_TIMEOUT,
   };
+};
+
+export const getPuppeteer = async () => {
+  if (process.env.NODE_ENV === "production") {
+    return (await import("puppeteer-core")).default;
+  }
+  return (await import("puppeteer")).default;
 };

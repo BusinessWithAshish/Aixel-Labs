@@ -1,5 +1,5 @@
-import puppeteer, { Browser, LaunchOptions, Page } from "puppeteer";
-import { getBrowserOptions } from "./browser";
+import { Browser, LaunchOptions, Page } from "puppeteer-core";
+import { getBrowserOptions, getPuppeteer } from "./browser";
 import { config } from "dotenv";
 import { Response } from "express";
 import { DEFAULT_PAGE_LOAD_TIMEOUT } from "./constants";
@@ -53,8 +53,12 @@ const processSingleBrowser = async <T>(
   const pages: Page[] = [];
 
   try {
-    const browserOptions = await getBrowserOptions({ customBrowserArgs });
-    browser = await puppeteer.launch(browserOptions);
+    const [puppeteer, browserOptions] = await Promise.all([
+      getPuppeteer(),
+      getBrowserOptions({ customBrowserArgs }),
+    ]);
+
+    browser = (await puppeteer.launch(browserOptions)) as Browser;
     console.log(
       `\t\t\t Launching browser ${browserIndex} with ${urlItems.length} URLs`,
     );
