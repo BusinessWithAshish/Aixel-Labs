@@ -80,11 +80,6 @@ const processSingleBrowser = async <T>(
         try {
           page = await browser!.newPage();
 
-          await page.authenticate({
-            username: process.env.EVOMI_USERNAME ?? "businesswi5",
-            password: process.env.EVOMI_PASSWORD ?? "xYPLYvYQaw22xqDfWfi5",
-          });
-
           pages.push(page);
 
           page.setDefaultTimeout(DEFAULT_PAGE_LOAD_TIMEOUT);

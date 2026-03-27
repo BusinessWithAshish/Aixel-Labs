@@ -4,7 +4,7 @@ import {
   GSEARCH_RESPONSE,
 } from "./types";
 import { BrowserBatchHandler } from "../../utils/browser-batch-handler";
-import { DEFAULT_PAGE_LOAD_TIMEOUT } from "../../utils/constants";
+import { DEFAULT_PAGE_LOAD_TIMEOUT, PROXY_CONFIG } from "../../utils/constants";
 import { readFileSync } from "fs";
 import { join } from "path";
 import {
@@ -40,6 +40,15 @@ export async function fetchGSearch(
   const finalResults = await BrowserBatchHandler({
     urlItems: [GOOGLE_SEARCH_URL],
     scrapingFunction: async (url, page) => {
+      if (!PROXY_CONFIG.USERNAME || !PROXY_CONFIG.PASSWORD) {
+        throw new Error("[GSearch] Proxy credentials are not set");
+      }
+
+      await page.authenticate({
+        username: PROXY_CONFIG.USERNAME,
+        password: PROXY_CONFIG.PASSWORD,
+      });
+
       page.on("console", (msg) =>
         console.log(`[Browser:${msg.type()}] ${msg.text()}`),
       );
