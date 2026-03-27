@@ -70,11 +70,13 @@ export default function InstagramProductsPage() {
 
 
     return (
-        <Card className="max-w-2xl h-full mx-auto my-auto">
+        <Card className="max-h-[90%] max-w-[90%] self-center">
             <CardHeader>
                 <CardTitle>Instagram private account viewer</CardTitle>
                 <CardDescription>
-                    View private Instagram accounts without being logged in.
+                    <span>View private Instagram accounts without being logged in.</span>
+                    <br />
+                    <strong className="text-primary italic">(If you&#39;re lucky you might see the top 11 latest posts OR a single random post is atleast confirmed to be from the account)</strong>
                 </CardDescription>
                 <CardAction>
                     <Button type="button" disabled={isLoading} onClick={() => findAccountProfile(username)}>
@@ -92,7 +94,7 @@ export default function InstagramProductsPage() {
                     required
                 />
 
-                <div className="grid grid-cols-3 gap-2 mt-4">
+                <div className="grid grid-cols-3 overflow-y-auto gap-2 mt-4">
                     {accountProfile?.latestPostUrls?.map((url, i) => (
                         <img
                             key={i}

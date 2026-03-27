@@ -1,5 +1,5 @@
 import { Impit } from 'impit';
-import type { InstagramResponse } from './types';
+import type { FetchInstagramProfileResult, InstagramResponse } from './types';
 
 export const IG_APP_ID = '936619743392459';
 export const INSTAGRAM_BASE_URL = 'https://www.instagram.com';
@@ -108,7 +108,7 @@ export function mapToResponse(user: any): InstagramResponse {
     };
 }
 
-export async function fetchInstagramProfile(username: string): Promise<InstagramResponse | null> {
+export async function fetchInstagramProfile(username: string): Promise<FetchInstagramProfileResult> {
     const url = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`;
     let lastError: Error | null = null;
 
@@ -116,7 +116,9 @@ export async function fetchInstagramProfile(username: string): Promise<Instagram
         try {
             const response = await withTimeout(igFetch(url), REQUEST_TIMEOUT_MS);
 
-            if (response.status === 404) return null;
+            if (response.status === 404) {
+                return { ok: false, failure: 'instagram_user_not_found' };
+            }
 
             if (response.status === 429 || response.status >= 500) {
                 const retryAfter = response.headers.get?.('retry-after');
@@ -126,7 +128,11 @@ export async function fetchInstagramProfile(username: string): Promise<Instagram
                     await sleep(backoff);
                     continue;
                 }
-                return null;
+                return {
+                    ok: false,
+                    failure: 'retries_exhausted',
+                    detail: lastError.message,
+                };
             }
 
             if (response.status === 401 || response.status === 403) {
@@ -134,7 +140,13 @@ export async function fetchInstagramProfile(username: string): Promise<Instagram
                 throw new Error(`Instagram auth failure (${response.status}). Body: ${body.slice(0, 200)}`);
             }
 
-            if (!response.ok) return null;
+            if (!response.ok) {
+                return {
+                    ok: false,
+                    failure: 'bad_http_status',
+                    detail: `HTTP ${response.status}`,
+                };
+            }
 
             let json: { data?: { user?: unknown } };
             try {
@@ -145,13 +157,16 @@ export async function fetchInstagramProfile(username: string): Promise<Instagram
                     await sleep(RETRY_BASE_DELAY_MS * attempt);
                     continue;
                 }
-                return null;
+                return { ok: false, failure: 'parse_error', detail: lastError.message };
             }
 
             const user = json?.data?.user;
-            if (!user) return null;
+            if (!user) {
+                // Very common: private accounts, age-restricted, or IG omitting user without a real session
+                return { ok: false, failure: 'no_user_payload' };
+            }
 
-            return mapToResponse(user);
+            return { ok: true, profile: mapToResponse(user) };
         } catch (err) {
             const error = err as Error;
             if (error.message.includes('auth failure')) throw error;
@@ -163,5 +178,9 @@ export async function fetchInstagramProfile(username: string): Promise<Instagram
     }
 
     console.error(`[instagram] Giving up on @${username} after ${MAX_RETRIES} attempts: ${lastError?.message}`);
-    return null;
+    return {
+        ok: false,
+        failure: 'request_failed',
+        detail: lastError?.message,
+    };
 }

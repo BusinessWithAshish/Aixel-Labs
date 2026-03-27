@@ -356,6 +356,7 @@ export const ZodSelectField = ({
     classNames,
 }: ZodSelectFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
+    const selectedOptionLabel = options.find((option) => option.value === value)?.label;
     return (
         <Field data-invalid={invalid} className={className} data-disabled={disabled}>
             <FieldContent>
@@ -366,7 +367,7 @@ export const ZodSelectField = ({
             </FieldContent>
             <Select name={name} value={value} onValueChange={onChange} disabled={disabled} aria-disabled={disabled}>
                 <SelectTrigger className={cn(classNames?.input, "[&_.select-clear-icon]:pointer-events-auto")}>
-                    <SelectValue placeholder={`Select ${fieldLabel.toLowerCase()}`} />
+                    <SelectValue placeholder={`Select ${fieldLabel.toLowerCase()}`}>{selectedOptionLabel}</SelectValue>
                     {isClearable && value && (
                         <XIcon
                             className="select-clear-icon ml-auto size-4 shrink-0 opacity-50 cursor-pointer"
