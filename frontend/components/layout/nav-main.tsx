@@ -2,7 +2,7 @@
 
 import { ChevronRight, HomeIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -16,11 +16,12 @@ import {
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import type { SidebarNavItem } from '@/config/sidebar.config';
-import { useCallback } from 'react';
+import { ReactNode, useCallback, useEffect } from 'react';
 import { Modules, SubModule } from '@aixellabs/backend/db/types';
 import { modulesIconMap, subModuleIconMap } from '@/config/sidebar.config';
 import { enumToTitleCase } from '@/helpers/string-helpers';
 import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
+import { eventBus } from '@/lib/event-bus';
 
 export function NavMain({ items }: { items: SidebarNavItem[] }) {
     const pathname = usePathname();
@@ -45,12 +46,22 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
         [pathname],
     );
 
+    const LinkItem = ({ children }: { children: ReactNode }) => {
+        const { pending } = useLinkStatus()
+        useEffect(() => {
+            void eventBus.publish('navigation:loading', pending);
+        }, [pending]);
+        return <>{children}</>
+    };
+
     return (
         <SidebarGroup>
             <SidebarMenuButton tooltip="Home" className='cursor-pointer' asChild active={pathname === DEFAULT_HOME_PAGE_ROUTE}>
-                <Link href={DEFAULT_HOME_PAGE_ROUTE}>
-                    <HomeIcon className="size-4 shrink-0" />
-                    <span className="group-data-[collapsible=icon]:hidden">Home</span>
+                <Link prefetch={true} href={DEFAULT_HOME_PAGE_ROUTE}>
+                    <LinkItem>
+                        <HomeIcon className="size-4 shrink-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">Home</span>
+                    </LinkItem>
                 </Link>
             </SidebarMenuButton>
             <SidebarGroupLabel>Platform</SidebarGroupLabel>
@@ -66,7 +77,9 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                                     <SidebarMenuButton className='cursor-pointer' tooltip={enumToTitleCase(item.title)} active={itemActive}>
                                         {Icon && <Icon />}
                                         <Link prefetch={true} href={item.url}>
-                                            <span>{enumToTitleCase(item.title)}</span>
+                                            <LinkItem>
+                                                <span>{enumToTitleCase(item.title)}</span>
+                                            </LinkItem>
                                         </Link>
                                         <ChevronRight className="ml-auto cursor-pointer transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[state=open]/collapsible:text-primary" />
                                     </SidebarMenuButton>
@@ -80,10 +93,12 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                                                 <SidebarMenuSubItem key={subItem.title}>
                                                     <SidebarMenuSubButton asChild active={isSubItemActive(subItem.url)}>
                                                         <Link prefetch={true} href={subItem.url}>
-                                                            {SubItemIcon && <SubItemIcon.icon className={SubItemIcon.color} />}
-                                                            <span>
-                                                                {enumToTitleCase(subItem.title)}
-                                                            </span>
+                                                            <LinkItem>
+                                                                {SubItemIcon && <SubItemIcon.icon className={SubItemIcon.color} />}
+                                                                <span>
+                                                                    {enumToTitleCase(subItem.title)}
+                                                                </span>
+                                                            </LinkItem>
                                                         </Link>
                                                     </SidebarMenuSubButton>
                                                 </SidebarMenuSubItem>
