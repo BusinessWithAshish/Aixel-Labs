@@ -1,0 +1,16 @@
+{
+  "name": "scraper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Python scraper service using Botasaurus",
+  "scripts": {
+    "setup": "python3 -m venv venv && ./venv/bin/pip install -r requirements.txt",
+    "install:dev": "./venv/bin/pip install -r requirements-dev.txt",
+    "dev": "DEBUG=true HEADLESS=false ./venv/bin/python main.py",
+    "start": "./venv/bin/python main.py",
+    "install:deps": "./venv/bin/pip install -r requirements.txt",
+    "lint": "./venv/bin/python -m ruff check .",
+    "typecheck": "./venv/bin/python -m mypy main.py config.py api --ignore-missing-imports",
+    "check": "pnpm run lint && pnpm run typecheck"
+  }
+}

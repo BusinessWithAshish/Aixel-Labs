@@ -1,7 +1,6 @@
 # Dependencies
 node_modules/
 .pnpm-store/
-/scraper
 skills-lock.json
 frontend/skills-lock.json
 # Build outputs
@@ -118,3 +117,4 @@ Thumbs.db
 /frontend/.clerk
 /backend/node_modules
 /scraper/venv
+/scraper/output/
