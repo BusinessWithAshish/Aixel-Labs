@@ -1,3 +1,5 @@
+ 'use server';
+
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { getCollection } from '@aixellabs/backend/db/mongo-client';
 import { MongoCollections, Tenant, TenantDoc } from '@aixellabs/backend/db/types';

@@ -34,7 +34,8 @@ export function SearchableSelect({
     const [search, setSearch] = useState('');
     const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
 
-    const selectedLabel = options.find((o) => o.value === value)?.label;
+    const selectedOption = options.find((o) => o.value === value);
+    const selectedLabel = selectedOption?.label ?? (value ? String(value) : undefined);
 
     const filteredOptions = useMemo(
         () => (search ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase())) : options),

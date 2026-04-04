@@ -16,4 +16,4 @@ class HealthResponse(BaseModel):
 @router.get(HEALTH_API.CHECK, response_model=HealthResponse)
 async def health():
     """Health check endpoint."""
-    return HealthResponse(status="healthy", service="scraper")
+    return HealthResponse(status="healthy", service="Aixel Labs scraper is up and running")

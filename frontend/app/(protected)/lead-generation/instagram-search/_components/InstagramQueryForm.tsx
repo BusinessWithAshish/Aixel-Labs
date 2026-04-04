@@ -1,10 +1,11 @@
 import { StringControlledField, StringArrayControlledField, SearchableSelectControlledField } from "@/components/common/zod-form-builder/ZodControlledFields";
 import { usePage } from "@/contexts/PageStore";
 import { UseInstagramFormReturn } from "../_hooks/use-instagram-form";
+import { ZodSearchableSelectField } from "@/components/common/zod-form-builder";
 
 export const InstagramQueryForm = () => {
 
-    const { countryOptions, cityOptions, isCityFieldDisabled } = usePage<UseInstagramFormReturn>();
+    const { countryOptions, cityOptions, stateOptions, isStateFieldDisabled, isCityFieldDisabled, selectedState, setSelectedState } = usePage<UseInstagramFormReturn>();
     return (
         <>
             <StringControlledField
@@ -17,6 +18,16 @@ export const InstagramQueryForm = () => {
                 name="country"
                 description="Select the country to search for leads on Instagram"
                 options={countryOptions}
+                required={false}
+            />
+
+            <ZodSearchableSelectField
+                name="state"
+                description="Select the state to search for leads on Instagram"
+                options={stateOptions}
+                disabled={isStateFieldDisabled}
+                value={selectedState}
+                onChange={setSelectedState}
                 required={false}
             />
 

@@ -7,8 +7,8 @@ import { useMemo, useState } from 'react';
 import type { INSTAGRAM_REQUEST, INSTAGRAM_RESPONSE } from '@aixellabs/backend/instagram';
 import { INSTAGRAM_REQUEST_SCHEMA } from '@aixellabs/backend/instagram/schemas';
 import { ConfirmResult } from '@/components/common/ChatInterface';
-import countries from '../_static-data/countries.json';
-import cities from '../_static-data/cities.json';
+import { City, Country, ICity, IState, State } from 'country-state-city';
+import { OptionType } from '@/components/ui/searchable-select';
 
 const defaultValues: INSTAGRAM_REQUEST = {
     entities: [],
@@ -23,13 +23,17 @@ const defaultValues: INSTAGRAM_REQUEST = {
 
 export const useInstagramForm = () => {
     const [instagramLeads, setInstagramLeads] = useState<INSTAGRAM_RESPONSE[]>([]);
+    const [selectedState, setSelectedState] = useState<string | undefined>(undefined);
     const form = useForm<INSTAGRAM_REQUEST>({
         resolver: zodResolver(INSTAGRAM_REQUEST_SCHEMA),
         defaultValues,
     });
 
     const onSubmit = async (data: INSTAGRAM_REQUEST): Promise<ConfirmResult> => {
-        const apiResponse = await apiClient.post<INSTAGRAM_RESPONSE[], INSTAGRAM_REQUEST>(API_ENDPOINTS.INSTAGRAM.API.full, data);
+        const apiResponse = await apiClient.post<INSTAGRAM_RESPONSE[], INSTAGRAM_REQUEST>(
+            API_ENDPOINTS.INSTAGRAM.API.full,
+            data,
+        );
 
         if (!apiResponse.success || !apiResponse.data) {
             return {
@@ -45,27 +49,44 @@ export const useInstagramForm = () => {
         };
     };
 
-    const countryOptions = Object.entries(countries).map(([key, value]) => ({
-        label: value,
-        value: key,
+    const countries = Country.getAllCountries();
+    const countryOptions = countries.map((country) => ({
+        label: country.name,
+        value: country.isoCode,
     }));
 
     const selectedCountry = form.watch('country');
 
-    const cityOptions = useMemo(() => {
-        return cities
-            .filter((city) => city.country_code !== 'NA' && city.country_code === selectedCountry)
-            .map((city) => ({
-                label: city.name,
-                value: city.id,
-            }));
+    const stateOptions: OptionType[] = useMemo(() => {
+        if (!selectedCountry) return [];
+        return (
+            State.getStatesOfCountry(selectedCountry)?.map((state: IState) => ({
+                label: state.name,
+                value: state.isoCode,
+            })) || []
+        );
     }, [selectedCountry]);
 
-    const isCityFieldDisabled = !selectedCountry;
+    const cityOptions: OptionType[] = useMemo(() => {
+        if (!selectedCountry || !selectedState) return [];
+        return (
+            City.getCitiesOfState(selectedCountry, selectedState)?.map((city: ICity) => ({
+                label: city?.name || '',
+                value: city.name,
+            })) || []
+        );
+    }, [selectedCountry, selectedState]);
+
+    const isStateFieldDisabled = !selectedCountry;
+    const isCityFieldDisabled = !selectedCountry || !selectedState;
 
     return {
         form,
         countryOptions,
+        stateOptions,
+        selectedState,
+        setSelectedState,
+        isStateFieldDisabled,
         isCityFieldDisabled,
         cityOptions,
         onSubmit,

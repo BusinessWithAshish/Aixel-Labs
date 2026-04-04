@@ -1,10 +1,12 @@
+'use client';
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BadgeCheck, LucideIcon } from "lucide-react";
 import { Email, PhoneNumber, WebsiteList } from "@/components/common/lead-card/ExternalContacts";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -73,13 +75,17 @@ export const InstagramLeadCard = ({ lead }: { lead: INSTAGRAM_RESPONSE }) => {
         return lead.profilePictureHd || lead.profilePicture;
     };
 
+    const [bioExpanded, setBioExpanded] = useState(false);
+    const showBioToggle =
+        leadInfo.bio !== DEFAULT_DISPLAY_VALUE && leadInfo.bio.trim().length > 0 && leadInfo.bio.length > 100;
+
     return (
         <Card className="w-full min-w-0 overflow-auto h-[400px] py-2 gap-2">
-            <CardHeader className="flex items-center justify-between text-center min-w-0 overflow-hidden">
-                <div className="flex flex-col gap-2 min-w-0 overflow-hidden">
+            <CardHeader className="flex items-center justify-between gap-2 text-center min-w-0 overflow-hidden">
+                <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-hidden">
 
-                    <section className="flex items-center gap-2 min-w-0">
-                        <Avatar className="size-10">
+                    <section className="flex min-w-0 w-full items-center gap-2">
+                        <Avatar className="size-10 shrink-0">
                             <AvatarImage
                                 src={getProfilePicture(leadInfo) ?? undefined}
                                 alt={leadInfo.fullName}
@@ -87,8 +93,8 @@ export const InstagramLeadCard = ({ lead }: { lead: INSTAGRAM_RESPONSE }) => {
                             <AvatarFallback className="text-lg">{getInitials(leadInfo.fullName)}</AvatarFallback>
                         </Avatar>
                         <div className="flex items-start flex-col min-w-0 flex-1 overflow-hidden">
-                            <CardTitle className="flex items-center gap-1.5 min-w-0">
-                                <span className="truncate">{leadInfo.fullName}</span>
+                            <CardTitle className="flex w-full min-w-0 max-w-full items-center gap-1.5">
+                                <span className="min-w-0 flex-1 truncate">{leadInfo.fullName}</span>
                                 {leadInfo.isVerified && (
                                     <ProfileBadgePopover message="Profile Verified" Icon={BadgeCheck} className="text-white fill-blue-500 shrink-0" />
                                 )}
@@ -140,14 +146,14 @@ export const InstagramLeadCard = ({ lead }: { lead: INSTAGRAM_RESPONSE }) => {
 
                 </div>
 
-                <CardAction>
+                <CardAction className="shrink-0">
                     <Button
                         onClick={() => window.open(leadInfo.instagramUrl, '_blank')}
                         variant="ghost"
                         size="icon"
                         className="transition-transform hover:scale-110"
                     >
-                        <Image src="/instagram-logo.svg" alt="Instagram" width={24} height={24} />
+                        <Image src={`/api/instagram/image?url=${encodeURIComponent(leadInfo.profilePictureHd ?? '')}`} alt="Instagram" width={24} height={24} />
                         <span className="sr-only">View Profile</span>
                     </Button>
                 </CardAction>
@@ -171,9 +177,26 @@ export const InstagramLeadCard = ({ lead }: { lead: INSTAGRAM_RESPONSE }) => {
                     </div>
                 </dl>
 
-                <p className="text-sm leading-relaxed text-muted-foreground line-clamp-3 wrap-break-words min-w-0">
-                    {leadInfo.bio}
-                </p>
+                <div className="min-w-0">
+                    <p
+                        className={cn(
+                            "text-sm leading-relaxed text-muted-foreground wrap-break-words min-w-0",
+                            !bioExpanded && "line-clamp-3",
+                        )}
+                    >
+                        {leadInfo.bio}
+                    </p>
+                    {showBioToggle && (
+                        <Button
+                            type="button"
+                            variant="link"
+                            className="h-auto p-0 text-sm font-medium"
+                            onClick={() => setBioExpanded((e) => !e)}
+                        >
+                            {bioExpanded ? "See less" : "See more"}
+                        </Button>
+                    )}
+                </div>
 
                 {leadInfo.businessCategoryName && (
                     <Badge key={leadInfo.businessCategoryName} variant="secondary" className="rounded-full">

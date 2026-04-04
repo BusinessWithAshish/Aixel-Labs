@@ -66,10 +66,8 @@ export async function instagramApiHandler(req: Request, res: Response) {
     const response: ALApiResponse<never> = {
       success: false,
       error: msg,
-    }
-    res
-      .status(500)
-      .json(response);
+    };
+    res.status(500).json(response);
     return;
   }
 }

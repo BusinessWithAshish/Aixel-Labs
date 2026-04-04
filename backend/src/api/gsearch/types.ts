@@ -14,6 +14,8 @@ export type GSEARCH_INJECTOR_PROPS = {
   totalPages: number;
   language: string;
   tbs: string | null;
+  gl: string;
+  near: string;
 };
 
 export type GSEARCH_RESPONSE = {

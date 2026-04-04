@@ -1,12 +1,12 @@
 [
     {
       "id": "1",
-      "fullName": "John Doe",
+      "fullName": "John Doe Long Name to test the bio expansion more effectively and see how it looks in the UI and how it behaves when the bio is expanded and collapsed.",
       "username": "john_doe",
       "email": "john_doe@example.com",
       "instagramUrl": "https://www.instagram.com/john_doe/",
       "websites": ["https://www.example.com"],
-      "bio": "This is a bio",
+      "bio": "This is a bio with a lot of text to test the bio expansion more effectively and see how it looks in the UI and how it behaves when the bio is expanded and collapsed. More text to test the bio expansion more effectively and see how it looks in the UI and how it behaves when the bio is expanded and collapsed.",
       "bioHashtags": ["#example"],
       "bioMentions": ["@example"],
       "followers": 100,

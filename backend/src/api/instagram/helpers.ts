@@ -3,6 +3,7 @@ import type {
   INSTAGRAM_RESPONSE,
   InstagramUser,
 } from "./types";
+import crypto from "crypto";
 import { INSTAGRAM_BASE_URL } from "./constants";
 import { Impit } from "impit";
 import {
@@ -11,10 +12,52 @@ import {
   MAX_RETRIES,
   RETRY_BASE_DELAY_MS,
 } from "./constants";
+import { PROXY_CONFIG } from "../../utils/constants";
 import { GSEARCH_RESPONSE } from "../gsearch/types";
 import { fetchGSearch } from "../gsearch/helpers";
 import { GOOGLE_SEARCH_QUERY_LIMITS } from "../gsearch/constants";
 import { DEFAULT_GSEARCH_MAX_PAGES } from "../gsearch/constants";
+
+const IMPIT_CONCURRENCY = Math.max(
+  1,
+  Math.min(32, Number(process.env.INSTAGRAM_IMPIT_CONCURRENCY) || 2),
+);
+const IMPIT_CHUNK_GAP_MS = Math.max(
+  0,
+  Number(process.env.INSTAGRAM_IMPIT_CHUNK_GAP_MS) || 400,
+);
+
+function newStickySessionId(): string {
+  return (
+    (crypto as { randomUUID?: () => string }).randomUUID?.() ??
+    crypto.randomBytes(16).toString("hex")
+  );
+}
+
+/** `{password}_session-{id}` via `URL` userinfo */
+function evomiProxyUrl(sessionId: string): string | undefined {
+  const { PROTOCOL, HOSTNAME, PORT, USERNAME, PASSWORD } = PROXY_CONFIG;
+  if (!USERNAME || !PASSWORD || !HOSTNAME || !PORT) return undefined;
+  const sep = "_";
+  const sid = sessionId.trim() || newStickySessionId();
+  const pwd = `${PASSWORD}${sep}session-${sid}`;
+  const u = new URL(`${PROTOCOL}://${HOSTNAME}:${String(PORT)}`);
+  u.username = USERNAME;
+  u.password = pwd;
+  return u.href.replace(/\/$/, "");
+}
+
+function createInstagramImpit(sessionId: string): Impit {
+  const proxyUrl = evomiProxyUrl(sessionId);
+  return new Impit({
+    browser: "chrome",
+    ignoreTlsErrors: true,
+    timeout: REQUEST_TIMEOUT_MS,
+    ...(proxyUrl ? { proxyUrl } : {}),
+  });
+}
+
+type ProfileFetchOpts = { client?: Impit };
 
 export const generateAdvanceQuery = (
   keywords: string[] | undefined,
@@ -66,7 +109,8 @@ export const generateInstagramSearchQuery = (request: INSTAGRAM_REQUEST) => {
   };
 };
 
-const RESERVED_INSTAGRAM_PATH_SEGMENTS = new Set([
+/** First path segment must not be a site section (profile URLs use @handle as first segment). */
+const RESERVED_IG_FIRST_SEGMENT = new Set([
   "explore",
   "accounts",
   "p",
@@ -77,44 +121,44 @@ const RESERVED_INSTAGRAM_PATH_SEGMENTS = new Set([
   "direct",
 ]);
 
-/**
- * Google SERP links often use https://instagram.com/user (no www).
- * INSTAGRAM_URL_REGEX required www, so every URL was filtered and the API returned success + empty data.
- */
-export function isInstagramProfileUrlFromSerp(url: string): boolean {
+function isInstagramHost(url: string): boolean {
   try {
-    const u = new URL(url);
-    if (!u.hostname.toLowerCase().endsWith("instagram.com")) return false;
-    const segments = u.pathname.split("/").filter(Boolean);
-    if (segments.length !== 1) return false;
-    const first = segments[0].toLowerCase();
-    if (RESERVED_INSTAGRAM_PATH_SEGMENTS.has(first)) return false;
-    return /^[a-zA-Z0-9._]+$/.test(segments[0]);
+    return new URL(url).hostname.toLowerCase().endsWith("instagram.com");
   } catch {
     return false;
   }
 }
 
+/** URL-shaped input: absolute URL or hostname path containing `instagram.com`. */
+function looksLikeUrl(input: string): boolean {
+  return (
+    input.startsWith("http://") ||
+    input.startsWith("https://") ||
+    input.includes("instagram.com")
+  );
+}
+
+/**
+ * Single extractor for Instagram handles used with `web_profile_info`:
+ * - URL-like input: must be `*.instagram.com` with profile-style path
+ *   (`/${username}`, `/${username}/…`); rejects `/p/`, `/reel/`, `/explore/`, etc.
+ * - Plain input: treated as a bare handle (leading `@` stripped).
+ */
 export function extractUsername(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  if (
-    trimmed.startsWith("http://") ||
-    trimmed.startsWith("https://") ||
-    trimmed.includes("instagram.com")
-  ) {
+  if (looksLikeUrl(trimmed)) {
     try {
       const url = new URL(
         trimmed.startsWith("http") ? trimmed : `https://${trimmed}`,
       );
+      if (!isInstagramHost(url.href)) return null;
       const parts = url.pathname.split("/").filter(Boolean);
       const candidate = parts[0];
       if (
         !candidate ||
-        ["explore", "accounts", "p", "reel", "stories", "tv"].includes(
-          candidate,
-        )
+        RESERVED_IG_FIRST_SEGMENT.has(candidate.toLowerCase())
       ) {
         return null;
       }
@@ -125,6 +169,21 @@ export function extractUsername(input: string): string | null {
   }
 
   return trimmed.replace(/^@/, "") || null;
+}
+
+function uniqueUsernames(entities: (string | null)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of entities) {
+    if (raw === null) continue;
+    const u = extractUsername(raw);
+    if (!u) continue;
+    const k = u.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(u);
+  }
+  return out;
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -198,14 +257,14 @@ export const hasQuery = (q: string | undefined) =>
 
 export async function fetchInstagramProfile(
   username: string,
+  opts: ProfileFetchOpts = {},
 ): Promise<INSTAGRAM_RESPONSE | null> {
   const url = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`;
 
   let lastError: Error | null = null;
+  const client = opts.client ?? createInstagramImpit(newStickySessionId());
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    const client = new Impit({});
-
     try {
       const response = await withTimeout(
         client.fetch(url, { headers: IG_HEADERS }),
@@ -274,9 +333,13 @@ export async function fetchInstagramProfile(
       lastError = error;
 
       if (attempt < MAX_RETRIES) {
-        const backoff =
+        const base =
           RETRY_BASE_DELAY_MS * 2 ** (attempt - 1) + Math.random() * 500;
-        await sleep(backoff);
+        const tunnel =
+          /TunnelUnsuccessful|Failed to connect to the server/i.test(
+            error.message,
+          );
+        await sleep(tunnel ? base * 3 + 1_500 + Math.random() * 1_000 : base);
       }
     }
   }
@@ -294,21 +357,22 @@ export async function fetchFromEntities(
     throw new Error("Entities must be an array of strings.");
   }
 
-  const seen = new Set<string>();
-  const usernames: string[] = [];
-  for (const entity of entities) {
-    if (entity === null) continue;
-    const resolved = extractUsername(entity);
-    if (!resolved) continue;
-    const key = resolved.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    usernames.push(resolved);
+  const usernames = uniqueUsernames(entities);
+  const impit = createInstagramImpit(newStickySessionId());
+  const settled: PromiseSettledResult<INSTAGRAM_RESPONSE | null>[] = [];
+
+  for (let i = 0; i < usernames.length; i += IMPIT_CONCURRENCY) {
+    const chunk = usernames.slice(i, i + IMPIT_CONCURRENCY);
+    settled.push(
+      ...(await Promise.allSettled(
+        chunk.map((u) => fetchInstagramProfile(u, { client: impit })),
+      )),
+    );
+    if (i + IMPIT_CONCURRENCY < usernames.length && IMPIT_CHUNK_GAP_MS > 0) {
+      await sleep(IMPIT_CHUNK_GAP_MS);
+    }
   }
 
-  const settled = await Promise.allSettled(
-    usernames.map((username) => fetchInstagramProfile(username)),
-  );
   return settled
     .filter(
       (r): r is PromiseFulfilledResult<INSTAGRAM_RESPONSE> =>
@@ -349,11 +413,15 @@ export async function fetchFromQuery(
     throw new Error("Failed to fetch search results from GSearch.");
   }
 
-  const searchResults = searchResulstsData
-    .map((result) => result.url)
-    .filter(
-      (url): url is string => url !== null && isInstagramProfileUrlFromSerp(url),
-    );
+  // SERP URLs like /handle/reel/… or /handle/tagged/… still yield the profile handle
+  // from the first path segment via `extractUsername` (same path as fetchFromEntities).
+  const entities = uniqueUsernames(
+    searchResulstsData.map((row) => row.url ?? null),
+  );
 
-  return await fetchFromEntities(searchResults);
+  console.log(
+    `[instagram] SERP rows=${searchResulstsData.length} → unique profile handles=${entities.length}`,
+  );
+
+  return await fetchFromEntities(entities);
 }

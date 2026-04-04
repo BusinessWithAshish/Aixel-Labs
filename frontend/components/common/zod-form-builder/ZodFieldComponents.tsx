@@ -356,7 +356,8 @@ export const ZodSelectField = ({
     classNames,
 }: ZodSelectFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
-    const selectedOptionLabel = options.find((option) => option.value === value)?.label;
+    const selectedOptionLabel =
+        options.find((option) => option.value === value)?.label ?? (value ? String(value) : undefined);
     return (
         <Field data-invalid={invalid} className={className} data-disabled={disabled}>
             <FieldContent>

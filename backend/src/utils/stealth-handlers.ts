@@ -435,11 +435,14 @@ export const pageStealther = async (page: Page): Promise<void> => {
  */
 export const applyGoogleSearchStealth = async (page: Page): Promise<void> => {
   const isProduction = process.env.NODE_ENV === "production";
-  const userAgent = randomUserAgentGenerator();
-  await page.setUserAgent(userAgent);
+
+  /** Avoid randomizing the user agent to match the sparticuz user agent */
+  // const userAgent = randomUserAgentGenerator();
+  // await page.setUserAgent(userAgent);
   if (isProduction) {
     const viewport = randomViewportGenerator();
     await page.setViewport(viewport);
   }
+  await pageResourcesRequestInterceptor(page);
   await pageBotStealthHandler(page);
 };

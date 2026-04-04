@@ -32,7 +32,8 @@ export function SearchableMultiSelect({
     const [search, setSearch] = useState('');
     const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
 
-    const selectedValues = values?.map((v) => options.find((o) => o.value === v)) || [];
+    const selectedValues =
+        values?.map((v) => options.find((o) => o.value === v) ?? { value: v, label: String(v) }) || [];
 
     const filteredOptions = useMemo(
         () => (search ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase())) : options),
@@ -69,18 +70,18 @@ export function SearchableMultiSelect({
                             selectedValues.map(
                                 (option) =>
                                     option && (
-                                        <Badge
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onChange?.((values || []).filter((v) => v !== option.value));
-                                            }}
-                                            className="cursor-pointer"
-                                            key={option.value}
-                                        >
-                                            {option.label}
-                                            <XIcon className="h-4 w-4 shrink-0 opacity-50" />
-                                        </Badge>
-                                    ),
+                                      <Badge
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              onChange?.((values || []).filter((v) => v !== option.value));
+                                          }}
+                                          className="cursor-pointer"
+                                          key={option.value}
+                                      >
+                                          {option.label}
+                                          <XIcon className="h-4 w-4 shrink-0 opacity-50" />
+                                      </Badge>
+                                  ),
                             )
                         )}
                     </div>

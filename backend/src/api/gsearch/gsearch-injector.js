@@ -3,13 +3,15 @@
  * Two structural patterns cover 100% of Google organic results:
  *   Pattern A: <a href="http..."><h3>title</h3></a>  — standard
  *   Pattern B: <h3> and <a href="http..."> are siblings under same parent  — sitelinks/variants
- * Inject vars before running: window.__GSCRAPER__ = { q, totalPages, language, tbs }
+ * Inject vars before running: window.__GSCRAPER__ = { searchQuery, totalPages, language, tbs, gl, near }
  */
 (async function () {
     const searchQuery        = window.__GSCRAPER__.searchQuery;
     const totalPages = window.__GSCRAPER__.totalPages;
     const language = window.__GSCRAPER__.language;
     const tbs = window.__GSCRAPER__.tbs;
+    const gl = window.__GSCRAPER__.gl;
+    const near = window.__GSCRAPER__.near;
     const GOOGLE_SEARCH_MAX_RESULTS_PER_PAGE = 10;
 
   let all = [];
@@ -91,29 +93,38 @@
   
     function wait(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
   
+    /** Max 2 tries per page (immediate and one backoff) to limit total wait underrate limits. */
+    const MAX_PAGE_ATTEMPTS = 2;
+
     async function fetchPage(pageNum, attempt) {
       attempt = attempt || 0;
-      const preDelay = [0, 5000, 15000, 30000][Math.min(attempt, 3)];
+      const preDelay = [0, 5000][Math.min(attempt, 1)];
       if (preDelay > 0) {
-        console.log("[GScraper] ⏳ Waiting " + (preDelay/1000) + "s before page " + pageNum + " attempt " + (attempt+1));
+        console.log("[GScraper] ⏳ Waiting " + (preDelay/1000) + "s before page " + pageNum + " attempt " + (attempt + 1));
         await wait(preDelay);
       }
-  
-      const params = new URLSearchParams({
-        q: searchQuery,
-        start: String((pageNum - 1) * GOOGLE_SEARCH_MAX_RESULTS_PER_PAGE),
-        num: String(GOOGLE_SEARCH_MAX_RESULTS_PER_PAGE),
-        hl: language,
+
+      const defaultParams = new URLSearchParams({
         filter: "0",
         nfpr: "1",
-      });
-      if (tbs) params.set("tbs", tbs);
+        pws: "0",
+        udm: "14",
+      })
+
+      const finalParams = new URLSearchParams(defaultParams);
+      finalParams.set("q", searchQuery);
+      finalParams.set("start", String((pageNum - 1) * GOOGLE_SEARCH_MAX_RESULTS_PER_PAGE));
+      finalParams.set("num", String(GOOGLE_SEARCH_MAX_RESULTS_PER_PAGE));
+      finalParams.set("hl", language);
+      finalParams.set("gl", gl);
+      finalParams.set("near", near);
+      if (tbs) finalParams.set("tbs", tbs);
   
       console.log("[GScraper] Fetching page " + pageNum + (attempt ? " (attempt " + (attempt+1) + ")" : ""));
 
       let html, status;
       try {
-        const resp = await fetch("/search?" + params, {
+        const resp = await fetch("/search?" + finalParams.toString(), {
           credentials: "include",
           headers: {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -128,7 +139,7 @@
         html   = await resp.text();
       } catch (e) {
         console.log("[GScraper] ❌ Network error page " + pageNum + ": " + e.message);
-        if (attempt < 3) return fetchPage(pageNum, attempt + 1);
+        if (attempt + 1 < MAX_PAGE_ATTEMPTS) return fetchPage(pageNum, attempt + 1);
         return null;
       }
   
@@ -137,8 +148,7 @@
       const blockReason = detectBlock(html, status);
       if (blockReason) {
         console.log("[GScraper] ⚠️ Blocked page " + pageNum + ": " + blockReason);
-        if (attempt < 3) return fetchPage(pageNum, attempt + 1);
-        console.log("[GScraper] 🚫 Giving up on page " + pageNum);
+        if (attempt + 1 < MAX_PAGE_ATTEMPTS) return fetchPage(pageNum, attempt + 1);
         return null;
       }
 
@@ -162,10 +172,22 @@
       return all;
     }
   
+    let consecutivePageFailures = 0;
     for (let pageNum = 2; pageNum <= totalPages; pageNum++) {
       await wait(2000);
       const result = await fetchPage(pageNum, 0);
-      if (!result) { console.log("[GScraper] ⏭️ Skipping page " + pageNum); continue; }
+      if (!result) {
+        consecutivePageFailures++;
+        console.log("[GScraper] ⏭️ Skipping page " + pageNum);
+        if (consecutivePageFailures >= 2) {
+          console.log(
+            "[GScraper] 2 consecutive failed pages — stopping early, returning " + all.length + " results so far"
+          );
+          break;
+        }
+        continue;
+      }
+      consecutivePageFailures = 0;
       all = all.concat(result.cards);
       if (!result.hasNext) { console.log("[GScraper] No more pages after " + pageNum); break; }
     }

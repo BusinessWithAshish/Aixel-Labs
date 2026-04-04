@@ -10,9 +10,11 @@ import { join } from "path";
 import crypto from "crypto";
 import {
   DEFAULT_GSEARCH_MAX_PAGES,
+  GOOGLE_BASE_URL,
   GOOGLE_SEARCH_URL,
   GOOGLE_SEARCH_QUERY_PARAMS,
   DEFAULT_GSEARCH_LANGUAGE,
+  defaultGsearchQueryParams,
 } from "./constants";
 import { applyGoogleSearchStealth } from "../../utils/stealth-handlers";
 import type { Page } from "puppeteer-core";
@@ -26,6 +28,21 @@ const INSPECTOR_SCRIPT = readFileSync(
 /** One stealth apply per Puppeteer page (retries reuse the same page). */
 const gsearchStealthedPages = new WeakSet<Page>();
 
+/**
+ * Build the Google SERP URL like `scraper/api/google_search/helpers.normalize_google_search_target`:
+ * optional ` in {near}` on `q`, `gl` / `hl`, `filter=0`, `nfpr=1`, `pws=0`, `udm=14`, optional `near` & `tbs`.
+ */
+export function buildGSearchUrl(props: GSEARCH_REQUEST) {
+  const { searchQuery, country, city, timeFilter } = props;
+
+  const finalQuery = `${searchQuery} in ${city}`;
+  const params = new URLSearchParams(defaultGsearchQueryParams);
+  params.set(GOOGLE_SEARCH_QUERY_PARAMS.q, finalQuery);
+  params.set(GOOGLE_SEARCH_QUERY_PARAMS.gl, country.toLowerCase());
+  if (timeFilter) params.set(GOOGLE_SEARCH_QUERY_PARAMS.tbs, timeFilter);
+  return `${GOOGLE_BASE_URL}/search?${params.toString()}`;
+}
+
 export async function fetchGSearch(
   props: GSEARCH_REQUEST,
 ): Promise<GSEARCH_RESPONSE[]> {
@@ -38,9 +55,11 @@ export async function fetchGSearch(
     language = DEFAULT_GSEARCH_LANGUAGE,
   } = props;
 
+  const finalUrl = buildGSearchUrl(props);
+
   const totalPages = Math.min(pages, DEFAULT_GSEARCH_MAX_PAGES);
 
-  console.log(`[GScraper] Query: "${searchQuery}" | Pages: ${totalPages}`);
+  console.log(`[GScraper] Search URL: ${finalUrl}`);
 
   const finalResults = await BrowserBatchHandler({
     urlItems: [GOOGLE_SEARCH_URL],
@@ -54,7 +73,7 @@ export async function fetchGSearch(
       const sessionId =
         (crypto as any).randomUUID?.() ??
         crypto.randomBytes(12).toString("hex");
-      const proxyPassword = `${PROXY_CONFIG.PASSWORD}${proxyDelimiter}country-${country}${proxyDelimiter}city-${city}${proxyDelimiter}session-${sessionId}`;
+      const proxyPassword = `${PROXY_CONFIG.PASSWORD}${proxyDelimiter}country-${country}${proxyDelimiter}session-${sessionId}`;
 
       await page.authenticate({
         username: PROXY_CONFIG.USERNAME,
@@ -94,32 +113,9 @@ export async function fetchGSearch(
         );
       }
 
-      // ── Step 2: Navigate to search — minimal params ──
-      const finalSearchUrl = new URL(GOOGLE_SEARCH_URL);
-
-      // APPLY SEARCH QUERY
-      finalSearchUrl.searchParams.set(
-        GOOGLE_SEARCH_QUERY_PARAMS.q,
-        searchQuery,
-      );
-
-      // APPLY LANGUAGE
-      finalSearchUrl.searchParams.set(GOOGLE_SEARCH_QUERY_PARAMS.hl, language);
-
-      // APPLY COUNTRY
-      finalSearchUrl.searchParams.set(GOOGLE_SEARCH_QUERY_PARAMS.gl, country);
-
-      // CONDITIONAL FILTERS
-      // APPLY TIME FILTER
-      if (timeFilter) {
-        finalSearchUrl.searchParams.set(
-          GOOGLE_SEARCH_QUERY_PARAMS.tbs,
-          timeFilter,
-        );
-      }
-
-      console.log(`[GScraper] Navigating to ${finalSearchUrl.toString()}`);
-      const searchNavigation = await page.goto(finalSearchUrl.toString(), {
+      // ── Step 2: Navigate to search (same params as Python gsearch) ──
+      console.log(`[GScraper] Navigating to ${finalUrl}`);
+      const searchNavigation = await page.goto(finalUrl, {
         waitUntil: "domcontentloaded",
         timeout: DEFAULT_PAGE_LOAD_TIMEOUT,
       });
@@ -138,10 +134,12 @@ export async function fetchGSearch(
       // ── Step 3: Inject dynamic vars then run inspector script ──
       // Variables are injected as a global before the script runs — clean and type-safe
       const gsearchInjectorProps: GSEARCH_INJECTOR_PROPS = {
-        searchQuery: searchQuery,
-        totalPages: totalPages,
-        language: language,
-        tbs: timeFilter ?? null, // ← pass null not undefined so JSON.stringify omits cleanly
+        searchQuery,
+        totalPages,
+        language,
+        tbs: timeFilter ?? null,
+        gl: country.toLowerCase(),
+        near: city,
       };
 
       await page.evaluate(
