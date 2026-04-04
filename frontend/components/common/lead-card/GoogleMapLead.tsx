@@ -34,7 +34,7 @@ export const GoogleMapLead = (props: LeadCardProps) => {
     return (
         <Card
             className={cn(
-                'transition-shadow gap-3 min-h-[180px] overflow-auto hover:shadow-lg relative',
+                'relative h-fit min-h-[180px] w-full gap-3 overflow-hidden transition-shadow hover:shadow-lg',
                 isSelected && 'ring-2 ring-primary',
                 className,
             )}

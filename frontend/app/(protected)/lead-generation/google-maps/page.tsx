@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, FormInput, List } from 'lucide-react';
 import { PageProvider } from '@/contexts/PageStore';
 import { useGoogleMapsForm } from './_hooks/use-google-maps-form';
-import { GoogleMapsFormWrapper, GoogleMapsScraperChat, ResultsSection } from './_components';
+import { GoogleMapsFormWrapper, GoogleMapsScraperChat, GoogleMapsResultsSection } from './_components';
 
 enum GoogleMapsPageTabs {
     CHAT = 'AI Chat',
@@ -40,7 +40,7 @@ export default function GoogleMapsPage() {
                     </TabsContent>
 
                     <TabsContent className="h-full w-full" value={GoogleMapsPageTabs.RESULTS}>
-                        <ResultsSection />
+                        <GoogleMapsResultsSection />
                     </TabsContent>
 
                 </Tabs>

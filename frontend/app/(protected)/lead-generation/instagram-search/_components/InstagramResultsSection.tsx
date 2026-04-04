@@ -19,7 +19,7 @@ export const InstagramResultsSection = () => {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 h-full overflow-y-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-full overflow-y-auto">
             {instagramLeads.map((lead) => (
                 <InstagramLeadCard key={lead.id} lead={lead} />
             ))}

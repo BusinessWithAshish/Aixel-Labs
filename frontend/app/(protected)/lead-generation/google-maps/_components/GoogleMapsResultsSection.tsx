@@ -21,7 +21,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import type { GMAPS_INTERNAL_RESPONSE } from '@aixellabs/backend/gmaps/internal/types';
 import { GoogleMapLead } from '@/components/common/lead-card/GoogleMapLead';
 
-export const ResultsSection = () => {
+export const GoogleMapsResultsSection = () => {
     const { leads, setLeads, form } = usePage<UseGoogleMapsFormReturn>();
     const [sortKey, setSortKey] = useState<SortKey>('rating');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -90,18 +90,6 @@ export const ResultsSection = () => {
         return <NoDataFound message='No leads found! Please try again.' showBackButton={false} />
     }
 
-    const renderLeadsGrid = (leadsToRender: GMAPS_INTERNAL_RESPONSE[]) => (
-        <div className="grid h-screen overflow-auto gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {leadsToRender.map((lead, index) => (
-                <GoogleMapLead
-                    key={generateUniqueKey(lead, index)}
-                    data={lead}
-                    onDelete={() => handleDeleteLead(lead)}
-                />
-            ))}
-        </div>
-    );
-
     return (
         <Card>
             <CardHeader>
@@ -152,7 +140,15 @@ export const ResultsSection = () => {
                 </CardAction>
             </CardHeader>
 
-            <CardContent>{renderLeadsGrid(sortedLeads)}</CardContent>
+            <CardContent className="grid min-h-0 grid-cols-1 gap-4 overflow-y-auto md:grid-cols-2 lg:grid-cols-3">
+                {sortedLeads.map((lead, index) => (
+                    <GoogleMapLead
+                        key={generateUniqueKey(lead, index)}
+                        data={lead}
+                        onDelete={() => handleDeleteLead(lead)}
+                    />
+                ))}
+            </CardContent>
 
         </Card>
     );
