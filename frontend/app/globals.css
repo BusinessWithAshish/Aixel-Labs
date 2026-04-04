@@ -162,7 +162,33 @@
   * {
     @apply border-border outline-ring/50;
     @apply transition-colors duration-300;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary) color-mix(in oklch, var(--muted) 55%, transparent);
   }
+
+  *::-webkit-scrollbar {
+    width: 1px;
+    height: 1px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: color-mix(in oklch, var(--muted) 45%, transparent);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--primary);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--primary) 82%, var(--foreground));
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -171,6 +197,21 @@
 @layer utilities {
   .radix-table-fix [data-radix-scroll-area-viewport] > div[style*='display: table'] {
     height: 100% !important;
+  }
+
+  /**
+   * Hide scrollbars but keep scrolling (use on the same element as overflow-auto / scroll / overflow-x-auto, etc.).
+   * Example: className="overflow-x-auto scrollbar-none"
+   */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 }
 

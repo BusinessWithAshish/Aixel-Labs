@@ -9,8 +9,6 @@ import type { ReactNode } from 'react';
 import Image from 'next/image';
 import type { GMAPS_INTERNAL_RESPONSE } from '@aixellabs/backend/gmaps/internal/types';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@radix-ui/react-scroll-area';
-import { ScrollBar } from '@/components/ui/scroll-area';
 import { Website, PhoneNumber } from './ExternalContacts';
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
@@ -36,7 +34,7 @@ export const GoogleMapLead = (props: LeadCardProps) => {
     return (
         <Card
             className={cn(
-                'transition-shadow gap-3 min-h-[180px] hover:shadow-lg relative',
+                'transition-shadow gap-3 min-h-[180px] overflow-auto hover:shadow-lg relative',
                 isSelected && 'ring-2 ring-primary',
                 className,
             )}
@@ -55,40 +53,48 @@ export const GoogleMapLead = (props: LeadCardProps) => {
                 </div>
             )}
 
-            <CardHeader className="space-y-2 overflow-hidden">
+            <CardHeader className="min-w-0 gap-2">
                 <CardTitle
-                    className="flex w-full items-center gap-2 overflow-hidden"
+                    className="min-w-0 flex w-full items-center gap-2 font-normal"
                     title={data.name ?? DEFAULT_DISPLAY_VALUE}
                 >
-                    {showCheckbox && onSelect && <Checkbox checked={isSelected} onCheckedChange={onSelect} />}
-                    <span className="text-lg text-foreground font-semibold truncate" title={data.name ?? DEFAULT_DISPLAY_VALUE}>
+                    {showCheckbox && onSelect && (
+                        <Checkbox className="shrink-0" checked={isSelected} onCheckedChange={onSelect} />
+                    )}
+                    <span
+                        className="min-w-0 flex-1 text-lg font-semibold text-foreground truncate"
+                        title={data.name ?? DEFAULT_DISPLAY_VALUE}
+                    >
                         {data.name ?? DEFAULT_DISPLAY_VALUE}
                     </span>
                 </CardTitle>
-                <CardDescription className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 dark:text-yellow-400 dark:fill-yellow-400" />
-                        <span className="font-medium">
-                            {data.rating != null ? `${data.rating}/5.0` : DEFAULT_DISPLAY_VALUE}
-                        </span>
+                <CardDescription className="flex min-w-0 flex-col gap-2 font-normal">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                        <div className="flex shrink-0 items-center gap-1">
+                            <Star className="h-4 w-4 shrink-0 fill-yellow-500 text-yellow-500 dark:fill-yellow-400 dark:text-yellow-400" />
+                            <span className="font-medium">
+                                {data.rating != null ? `${data.rating}/5.0` : DEFAULT_DISPLAY_VALUE}
+                            </span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                            <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <span>{data.reviewCount ?? DEFAULT_DISPLAY_VALUE} reviews</span>
+                        </div>
                     </div>
-
-                    <div className="flex items-center gap-1">
-                        <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                        <span>{data.reviewCount ?? DEFAULT_DISPLAY_VALUE} reviews</span>
-                    </div>
-
-                    <ScrollArea className="w-full">
-                        {data.categories?.map((category: string) => (
-                            <Badge key={category} variant="secondary" className="rounded-full shrink-0">
-                                {category}
-                            </Badge>
-                        ))}
-                        <ScrollBar orientation="horizontal" />
-                    </ScrollArea>
+                    {data.categories && data.categories.length > 0 && (
+                        <div className="min-w-0 w-full max-w-full overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+                            <div className="flex w-max flex-nowrap items-center gap-1.5">
+                                {data.categories.map((category: string) => (
+                                    <Badge key={category} variant="secondary" className="shrink-0 whitespace-nowrap rounded-full">
+                                        {category}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </CardDescription>
 
-                <CardAction className="flex items-center gap-2">
+                <CardAction className="shrink-0">
                     <Button
                         onClick={handleMapsClick}
                         variant="ghost"
