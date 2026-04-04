@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.11"
 
 [[package]]
-name = "aixel-scraper"
+name = "aixellabs-scraper"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
