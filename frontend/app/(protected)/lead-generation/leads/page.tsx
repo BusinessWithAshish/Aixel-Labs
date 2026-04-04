@@ -4,7 +4,7 @@ import { AllUserLeads } from '@/app/(protected)/lead-generation/_components/AllU
 import { getAllUserLeads } from '@/app/actions/user-lead-actions';
 import { PageProvider } from '@/contexts/PageStore';
 import type { Lead } from '@aixellabs/backend/db/types';
-import { useAllLeadsPage } from "@/app/(protected)/lead-generation/_hooks";
+import { useAllLeadsPage } from '@/app/(protected)/lead-generation/_hooks';
 
 const PAGE_TITLE = 'All Leads';
 

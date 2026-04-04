@@ -3,7 +3,6 @@ import {
     LEAD_ENRICHMENT_SUB_MODULES,
     LEAD_GENERATION_SUB_MODULES,
     MESSAGING_SUB_MODULES,
-    Modules,
     SubModule,
     TenantType,
     VOICE_AGENT_SUB_MODULES,
@@ -13,15 +12,8 @@ export const APP_NAME = 'Aixel Labs';
 
 export const APP_DESCRIPTION = 'Agentic Lead management system';
 
-export const ModuleUrls = {
-    [Modules.LEAD_GENERATION]: '/lead-generation',
-    [Modules.LEAD_ENRICHMENT]: '/lead-enrichment',
-    [Modules.VOICE_AGENT]: '/voice-agent',
-    [Modules.MESSAGING]: '/messaging',
-    [Modules.EMAIL]: '/email',
-};
-
 export const SubModuleUrls: Record<SubModule, string> = {
+    [LEAD_GENERATION_SUB_MODULES.LEADS]: '/lead-generation/leads',
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS]: '/lead-generation/google-maps',
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH]: '/lead-generation/google-advanced-search',
     [LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH]: '/lead-generation/instagram-search',

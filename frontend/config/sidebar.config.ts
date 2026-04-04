@@ -1,4 +1,4 @@
-import { SubModuleUrls, ModuleUrls, MANAGE_TENANTS_ROUTE } from './app-config';
+import { SubModuleUrls, MANAGE_TENANTS_ROUTE } from './app-config';
 
 /** Admin-only paths (not in sidebar nav). Exact match or nested routes (e.g. /manage-tenants/[tenantId]) require admin. */
 export const ADMIN_ONLY_PATHS = [MANAGE_TENANTS_ROUTE] as const;
@@ -24,11 +24,11 @@ import {
     MapPinIcon,
     SearchIcon,
     PhoneIcon,
+    ListIcon,
 } from 'lucide-react';
 
 export type SidebarNavItem = {
     title: string;
-    url: string;
     items?: {
         title: string;
         url: string;
@@ -56,6 +56,10 @@ export const modulesIconMap: Record<Modules, LucideIcon> = {
 };
 
 export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: string }> = {
+    [LEAD_GENERATION_SUB_MODULES.LEADS]: {
+        icon: ListIcon,
+        color: '!text-slate-600',
+    },
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS]: {
         icon: MapPinIcon,
         color: '!text-red-500',
@@ -130,8 +134,11 @@ export const sidebarConfig: SidebarConfig = {
     navMain: [
         {
             title: Modules.LEAD_GENERATION,
-            url: ModuleUrls.LEAD_GENERATION,
             items: [
+                {
+                    title: LEAD_GENERATION_SUB_MODULES.LEADS,
+                    url: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.LEADS],
+                },
                 {
                     title: LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS,
                     url: SubModuleUrls.GOOGLE_MAPS,
@@ -161,7 +168,6 @@ export const sidebarConfig: SidebarConfig = {
         },
         {
             title: Modules.LEAD_ENRICHMENT,
-            url: ModuleUrls.LEAD_ENRICHMENT,
             items: [
                 { title: LEAD_ENRICHMENT_SUB_MODULES.EMAIL_VERIFICATION, url: SubModuleUrls.EMAIL_VERIFICATION },
                 { title: LEAD_ENRICHMENT_SUB_MODULES.PHONE_VERIFICATION, url: SubModuleUrls.PHONE_VERIFICATION },
@@ -169,7 +175,6 @@ export const sidebarConfig: SidebarConfig = {
         },
         {
             title: Modules.VOICE_AGENT,
-            url: ModuleUrls.VOICE_AGENT,
             items: [
                 {
                     title: VOICE_AGENT_SUB_MODULES.WEB_DIALER,
@@ -187,7 +192,6 @@ export const sidebarConfig: SidebarConfig = {
         },
         {
             title: Modules.MESSAGING,
-            url: ModuleUrls.MESSAGING,
             items: [
                 { title: MESSAGING_SUB_MODULES.WHATSAPP, url: SubModuleUrls.WHATSAPP },
                 { title: MESSAGING_SUB_MODULES.SMS, url: SubModuleUrls.SMS },
@@ -195,7 +199,6 @@ export const sidebarConfig: SidebarConfig = {
         },
         {
             title: Modules.EMAIL,
-            url: ModuleUrls.EMAIL,
             items: [
                 { title: EMAIL_SUB_MODULES.COLD_OUTREACH, url: SubModuleUrls.COLD_OUTREACH },
                 { title: EMAIL_SUB_MODULES.WARM_OUTREACH, url: SubModuleUrls.WARM_OUTREACH },
