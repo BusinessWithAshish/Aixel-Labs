@@ -1,6 +1,37 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aixellabs-scraper"
+version = "1.0.0"
+description = "Aixel Labs scraper service"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "botasaurus>=4.0.0",
+    "beautifulsoup4>=4.12.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.8.0",
+    "mypy>=1.11.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["api*"]
+
+[tool.setuptools]
+# Top-level modules next to ``api/`` (importable after install).
+py-modules = ["main", "config"]
+
 [tool.ruff]
 target-version = "py311"
-exclude = ["venv"]
+exclude = ["venv", ".vercel"]
 
 [tool.ruff.lint]
 # Pyflakes + pycodestyle errors only (no line-length / pyupgrade noise).
