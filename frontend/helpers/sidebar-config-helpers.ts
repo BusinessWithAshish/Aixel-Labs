@@ -1,5 +1,5 @@
 import { type ModuleAccess, Modules } from '@aixellabs/backend/db/types';
-import { SubModuleUrls, ModuleUrls, ALWAYS_ALLOWED_PATHS, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
+import { SubModuleUrls, ALWAYS_ALLOWED_PATHS, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
 import { sidebarConfig, SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS } from '@/config/sidebar.config';
 
 /**
@@ -37,7 +37,6 @@ export function generateSidebarConfig(isAdmin: boolean, moduleAccess?: ModuleAcc
 
         navMain.push({
             title: module,
-            url: ModuleUrls[module],
             items,
         });
     }
@@ -61,7 +60,6 @@ export function getAccessiblePaths(isAdmin: boolean, moduleAccess?: ModuleAccess
     const paths = new Set<string>();
 
     for (const item of config.navMain) {
-        paths.add(item.url);
         for (const sub of item.items ?? []) {
             paths.add(sub.url);
         }
