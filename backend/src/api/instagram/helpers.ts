@@ -9,7 +9,6 @@ import {
   IG_HEADERS,
   REQUEST_TIMEOUT_MS,
   MAX_RETRIES,
-  INSTAGRAM_URL_REGEX,
   RETRY_BASE_DELAY_MS,
 } from "./constants";
 import { GSEARCH_RESPONSE } from "../gsearch/types";
@@ -66,6 +65,35 @@ export const generateInstagramSearchQuery = (request: INSTAGRAM_REQUEST) => {
     chars: finalQuery.length,
   };
 };
+
+const RESERVED_INSTAGRAM_PATH_SEGMENTS = new Set([
+  "explore",
+  "accounts",
+  "p",
+  "reel",
+  "reels",
+  "stories",
+  "tv",
+  "direct",
+]);
+
+/**
+ * Google SERP links often use https://instagram.com/user (no www).
+ * INSTAGRAM_URL_REGEX required www, so every URL was filtered and the API returned success + empty data.
+ */
+export function isInstagramProfileUrlFromSerp(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.toLowerCase().endsWith("instagram.com")) return false;
+    const segments = u.pathname.split("/").filter(Boolean);
+    if (segments.length !== 1) return false;
+    const first = segments[0].toLowerCase();
+    if (RESERVED_INSTAGRAM_PATH_SEGMENTS.has(first)) return false;
+    return /^[a-zA-Z0-9._]+$/.test(segments[0]);
+  } catch {
+    return false;
+  }
+}
 
 export function extractUsername(input: string): string | null {
   const trimmed = input.trim();
@@ -323,7 +351,9 @@ export async function fetchFromQuery(
 
   const searchResults = searchResulstsData
     .map((result) => result.url)
-    .filter((url) => url !== null && INSTAGRAM_URL_REGEX.test(url));
+    .filter(
+      (url): url is string => url !== null && isInstagramProfileUrlFromSerp(url),
+    );
 
   return await fetchFromEntities(searchResults);
 }
