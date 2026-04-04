@@ -10,7 +10,8 @@ config();
 const MAX_BROWSER_SESSIONS = Number(process.env.MAX_BROWSER_SESSIONS) || 10;
 const MAX_PAGES_PER_BROWSER = Number(process.env.MAX_PAGES_PER_BROWSER) || 5;
 const MAX_RETRIES = Number(process.env.MAX_RETRIES) || 3;
-const RETRY_DELAY = Number(process.env.RETRY_DELAY) || 3000;
+const RETRY_BASE_DELAY = Number(process.env.RETRY_DELAY) || 5000;
+const RETRY_JITTER_MS = Number(process.env.RETRY_JITTER_MS) || 750;
 const TOTAL_CONCURRENT_URLS = MAX_BROWSER_SESSIONS * MAX_PAGES_PER_BROWSER;
 
 export type ScrapingFunction<T> = (url: string, page: Page) => Promise<T>;
@@ -98,9 +99,10 @@ const processSingleBrowser = async <T>(
                   `\t\t\t\t ⟳ [Page ${pageIndex + 1} of Browser ${browserIndex}] retry ${retryAttempt}/${MAX_RETRIES - 1}`,
                 );
 
-                await new Promise((resolve) =>
-                  setTimeout(resolve, RETRY_DELAY * retryAttempt),
-                );
+                const backoffMs =
+                  RETRY_BASE_DELAY * 2 ** (retryAttempt - 1) +
+                  Math.floor(Math.random() * RETRY_JITTER_MS);
+                await new Promise((resolve) => setTimeout(resolve, backoffMs));
               }
 
               const scrapeData = await scrapingFunction(url, page);

@@ -9,18 +9,22 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import crypto from "crypto";
 import {
-  HEADERS,
   DEFAULT_GSEARCH_MAX_PAGES,
   GOOGLE_SEARCH_URL,
   GOOGLE_SEARCH_QUERY_PARAMS,
   DEFAULT_GSEARCH_LANGUAGE,
 } from "./constants";
+import { pageStealther } from "../../utils/stealth-handlers";
+import type { Page } from "puppeteer-core";
 
 // ── Load the inspector script once at module level (not on every request) ──
 const INSPECTOR_SCRIPT = readFileSync(
   join(__dirname, "gsearch-injector.js"),
   "utf-8",
 );
+
+/** One stealth apply per Puppeteer page (retries reuse the same page). */
+const gsearchStealthedPages = new WeakSet<Page>();
 
 export async function fetchGSearch(
   props: GSEARCH_REQUEST,
@@ -57,12 +61,25 @@ export async function fetchGSearch(
         password: proxyPassword,
       });
 
-      page.on("console", (msg) =>
-        console.log(`[Browser:${msg.type()}] ${msg.text()}`),
-      );
-      page.on("pageerror", (err: any) =>
-        console.error(`[Browser:pageerror] ${err?.message}`),
-      );
+      // Match GMaps: real UA + stealth. Sparticuz headless shell defaults trigger
+      // Google 429 far more often than local bundled Chrome.
+      if (!gsearchStealthedPages.has(page)) {
+        await pageStealther(page as Page);
+        gsearchStealthedPages.add(page);
+      }
+
+      if (page.listenerCount("console") === 0) {
+        page.on("console", (msg) =>
+          console.log(`[Browser:${msg.type()}] ${msg.text()}`),
+        );
+      }
+      if (page.listenerCount("pageerror") === 0) {
+        page.on("pageerror", (err) =>
+          console.error(
+            `[Browser:pageerror] ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        );
+      }
 
       // ── Step 1: Proxy auth + homepage ──
       console.log(`[GScraper] Base navigation to ${url}`);
