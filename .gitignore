@@ -118,3 +118,7 @@ Thumbs.db
 /backend/node_modules
 /scraper/venv
 /scraper/output/
+
+# Python packaging metadata (setuptools local install)
+*.egg-info/
+*.egg
