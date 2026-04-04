@@ -14,7 +14,7 @@ import {
   GOOGLE_SEARCH_QUERY_PARAMS,
   DEFAULT_GSEARCH_LANGUAGE,
 } from "./constants";
-import { pageStealther } from "../../utils/stealth-handlers";
+import { applyGoogleSearchStealth } from "../../utils/stealth-handlers";
 import type { Page } from "puppeteer-core";
 
 // ── Load the inspector script once at module level (not on every request) ──
@@ -61,10 +61,10 @@ export async function fetchGSearch(
         password: proxyPassword,
       });
 
-      // Match GMaps: real UA + stealth. Sparticuz headless shell defaults trigger
-      // Google 429 far more often than local bundled Chrome.
+      // Not full pageStealther: extra headers + request interception break Google
+      // reCAPTCHA / gstatic (CORS + aborted scripts). See applyGoogleSearchStealth.
       if (!gsearchStealthedPages.has(page)) {
-        await pageStealther(page as Page);
+        await applyGoogleSearchStealth(page as Page);
         gsearchStealthedPages.add(page);
       }
 
@@ -166,3 +166,13 @@ export async function fetchGSearch(
 
   return finalResults.results.flat();
 }
+
+
+// export async function fetchGSearchScraper(
+//   props: GSEARCH_REQUEST,
+// ): Promise<GSEARCH_RESPONSE[]> {
+//   const { searchQuery, country, city, language = DEFAULT_GSEARCH_LANGUAGE, timeFilter } = props;
+
+
+
+// }

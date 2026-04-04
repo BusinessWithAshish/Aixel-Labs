@@ -426,3 +426,20 @@ export const pageStealther = async (page: Page): Promise<void> => {
   await pageResourcesRequestInterceptor(page);
   await pageBotStealthHandler(page);
 };
+
+/**
+ * Google Search / reCAPTCHA safe: real UA + navigator tweaks only.
+ * Full `pageStealther` breaks Google challenge pages because:
+ * - `setExtraHTTPHeaders` applies document navigation headers to every subresource → CORS preflight failures on gstatic/recaptcha.
+ * - Request interception aborts `recaptcha` / gstatic loads → `solveSimpleChallenge is not defined`, flaky 429 recovery.
+ */
+export const applyGoogleSearchStealth = async (page: Page): Promise<void> => {
+  const isProduction = process.env.NODE_ENV === "production";
+  const userAgent = randomUserAgentGenerator();
+  await page.setUserAgent(userAgent);
+  if (isProduction) {
+    const viewport = randomViewportGenerator();
+    await page.setViewport(viewport);
+  }
+  await pageBotStealthHandler(page);
+};
