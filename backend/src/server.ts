@@ -129,7 +129,7 @@ export = app;
 
 // For local/dev or traditional servers, keep `listen`.
 if (!process.env.VERCEL) {
-  const PORT = process.env.PORT || 8100;
+  const PORT = process.env.PORT || 8002;
   app.listen(PORT, () => {
     const timestamp = new Date().toLocaleString("en-US", {
       weekday: "long",

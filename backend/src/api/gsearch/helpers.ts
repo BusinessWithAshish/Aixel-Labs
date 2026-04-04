@@ -7,6 +7,7 @@ import { BrowserBatchHandler } from "../../utils/browser-batch-handler";
 import { DEFAULT_PAGE_LOAD_TIMEOUT, PROXY_CONFIG } from "../../utils/constants";
 import { readFileSync } from "fs";
 import { join } from "path";
+import crypto from "crypto";
 import {
   HEADERS,
   DEFAULT_GSEARCH_MAX_PAGES,
@@ -44,9 +45,16 @@ export async function fetchGSearch(
         throw new Error("[GSearch] Proxy credentials are not set");
       }
 
+      const proxyDelimiter = "_";
+      // EVOMI session rotation: new session id => new exit IP (most pools)
+      const sessionId =
+        (crypto as any).randomUUID?.() ??
+        crypto.randomBytes(12).toString("hex");
+      const proxyPassword = `${PROXY_CONFIG.PASSWORD}${proxyDelimiter}country-${country}${proxyDelimiter}city-${city}${proxyDelimiter}session-${sessionId}`;
+
       await page.authenticate({
         username: PROXY_CONFIG.USERNAME,
-        password: PROXY_CONFIG.PASSWORD,
+        password: proxyPassword,
       });
 
       page.on("console", (msg) =>
@@ -57,20 +65,17 @@ export async function fetchGSearch(
       );
 
       // ── Step 1: Proxy auth + homepage ──
-
-      const proxyDelimiter = "_";
-      const buildPRoxyPassword = `${process.env.EVOMI_PROXY_PASSWORD!}${proxyDelimiter}country-${country}${proxyDelimiter}city-${city}`;
-
-      await page.authenticate({
-        username: process.env.EVOMI_PROXY_USERNAME!,
-        password: buildPRoxyPassword,
-      });
-
       console.log(`[GScraper] Base navigation to ${url}`);
-      await page.goto(url, {
+      const baseNavigation = await page.goto(url, {
         waitUntil: "domcontentloaded",
         timeout: DEFAULT_PAGE_LOAD_TIMEOUT,
       });
+      const baseStatusCode = baseNavigation?.status();
+      if (baseStatusCode && baseStatusCode >= 400) {
+        throw new Error(
+          `[GSearch] Base navigation failed with status ${baseStatusCode}`,
+        );
+      }
 
       // ── Step 2: Navigate to search — minimal params ──
       const finalSearchUrl = new URL(GOOGLE_SEARCH_URL);
@@ -97,10 +102,21 @@ export async function fetchGSearch(
       }
 
       console.log(`[GScraper] Navigating to ${finalSearchUrl.toString()}`);
-      await page.goto(finalSearchUrl.toString(), {
+      const searchNavigation = await page.goto(finalSearchUrl.toString(), {
         waitUntil: "domcontentloaded",
         timeout: DEFAULT_PAGE_LOAD_TIMEOUT,
       });
+      const searchStatusCode = searchNavigation?.status();
+      if (searchStatusCode === 429) {
+        throw new Error(
+          "[GSearch] Google returned HTTP 429 (rate limited). Rotate proxy/session and retry later.",
+        );
+      }
+      if (searchStatusCode && searchStatusCode >= 400) {
+        throw new Error(
+          `[GSearch] Search navigation failed with status ${searchStatusCode}`,
+        );
+      }
 
       // ── Step 3: Inject dynamic vars then run inspector script ──
       // Variables are injected as a global before the script runs — clean and type-safe
@@ -126,6 +142,10 @@ export async function fetchGSearch(
     res: null,
     allowBatchWaiting: false,
   });
+
+  if (!finalResults.results.length && finalResults.errors.length) {
+    throw new Error(finalResults.errors[0]);
+  }
 
   return finalResults.results.flat();
 }
