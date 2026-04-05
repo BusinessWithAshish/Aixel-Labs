@@ -1,12 +1,12 @@
 import PageLayout from '@/components/common/PageLayout';
 import { withPageHandler } from '@/components/hocs/with-page-handler';
-import { AllUserLeads } from '@/app/(protected)/lead-generation/_components/AllUserLeads';
+import { AllUserLeads } from './_components/AllUserLeads';
 import { getAllUserLeads } from '@/app/actions/user-lead-actions';
 import { PageProvider } from '@/contexts/PageStore';
 import type { Lead } from '@aixellabs/backend/db/types';
-import { useAllLeadsPage } from '@/app/(protected)/lead-generation/_hooks';
+import { useAllLeadsPage } from '@/app/(protected)/lead-generation/leads/_hooks';
 
-const PAGE_TITLE = 'All Leads';
+const PAGE_TITLE = 'Leads Overview';
 
 async function SavedLeadsPage() {
     const result = await getAllUserLeads();

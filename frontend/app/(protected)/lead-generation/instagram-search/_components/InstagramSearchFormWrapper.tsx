@@ -7,6 +7,7 @@ import { InstagramQueryForm } from "./InstagramQueryForm";
 import { Tabs, TabsTrigger, TabsList, TabsContent } from "@/components/ui/tabs";
 import { InstagramUsernamesForm } from './InstagramUsernamesForm';
 import { FormProvider } from "react-hook-form";
+import Image from "next/image";
 
 enum InstagramFormMode {
     QUERY = 'Query',
@@ -22,7 +23,10 @@ export const InstagramSearchFormWrapper = () => {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Instagram Search Form</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                    <Image src="/instagram-logo.svg" alt="Instagram" width={20} height={20} />
+                    <span>Instagram Search Form</span>
+                </CardTitle>
                 <CardDescription>Enter the search parameters to search for leads on Instagram</CardDescription>
                 <CardAction className="flex gap-2 items-center">
                     <Button type="button" variant="outline" onClick={() => form.reset()}>Reset</Button>

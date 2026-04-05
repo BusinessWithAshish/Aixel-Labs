@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { GoogleMapLead } from '@/components/common/lead-card/GoogleMapLead';
+import { InstagramLeadCard } from '@/components/common/lead-card/InstagramLeadCard';
+import { INSTAGRAM_RESPONSE } from '@aixellabs/backend/instagram';
 
 export const AllUserLeads = () => {
     const router = useRouter();
@@ -129,7 +131,16 @@ export const AllUserLeads = () => {
                     onSelect={(checked) => handleSelectLead(lead._id as string, checked === true)}
                 />
             );
-        if (lead.source === LeadSource.INSTAGRAM) return null;
+        if (lead.source === LeadSource.INSTAGRAM)
+            return (
+                <InstagramLeadCard
+                    key={lead._id as string}
+                    lead={lead.data as INSTAGRAM_RESPONSE}
+                    showCheckbox
+                    isSelected={selectedLeadIds.has(lead._id as string)}
+                    onSelect={(checked) => handleSelectLead(lead._id as string, checked === true)}
+                />
+            );
         return null;
     };
 

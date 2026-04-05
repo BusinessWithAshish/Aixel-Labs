@@ -4,13 +4,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { BadgeCheck, LucideIcon } from "lucide-react";
+import { BadgeCheck, LucideIcon, Trash2 } from "lucide-react";
 import { Email, PhoneNumber, WebsiteList } from "@/components/common/lead-card/ExternalContacts";
-import { useMemo, useState } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import type { INSTAGRAM_RESPONSE } from "@aixellabs/backend/instagram";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
 
@@ -27,7 +28,20 @@ const ProfileBadgePopover = ({ message, Icon, className }: { message: string, Ic
     );
 };
 
-export const InstagramLeadCard = ({ lead }: { lead: INSTAGRAM_RESPONSE }) => {
+type InstagramLeadCardProps = {
+    lead: INSTAGRAM_RESPONSE;
+    className?: string;
+    actions?: ReactNode;
+    showCheckbox?: boolean;
+    onDelete?: () => void;
+    onSelect?: (selected: boolean) => void;
+    isSelected?: boolean;
+};
+
+export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
+
+    const { lead, className, actions, showCheckbox, onDelete, onSelect, isSelected } = props;
+
     const leadInfo = useMemo(() => {
         return {
             fullName: lead.fullName ?? DEFAULT_DISPLAY_VALUE,
@@ -80,11 +94,33 @@ export const InstagramLeadCard = ({ lead }: { lead: INSTAGRAM_RESPONSE }) => {
         leadInfo.bio !== DEFAULT_DISPLAY_VALUE && leadInfo.bio.trim().length > 0 && leadInfo.bio.length > 100;
 
     return (
-        <Card className="w-full min-w-0 overflow-auto h-[400px] py-2 gap-2">
+        <Card
+            className={cn(
+                "relative h-fit min-h-[400px] w-full gap-3 overflow-y-auto py-2 transition-shadow hover:shadow-lg",
+                isSelected && "ring-2 ring-primary",
+                className,
+            )}>
+            {onDelete && (
+                <div className="absolute bottom-4 right-4 z-10">
+                    <Button
+                        type="button"
+                        onClick={onDelete}
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                        title="Remove from results"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
+            )}
             <CardHeader className="flex items-center justify-between gap-2 text-center min-w-0 overflow-hidden">
                 <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-hidden">
 
                     <section className="flex min-w-0 w-full items-center gap-2">
+                        {showCheckbox && onSelect && (
+                            <Checkbox className="shrink-0" checked={isSelected} onCheckedChange={onSelect} />
+                        )}
                         <Avatar className="size-10 shrink-0">
                             <AvatarImage
                                 src={getProfilePicture(leadInfo) ?? undefined}
@@ -95,11 +131,13 @@ export const InstagramLeadCard = ({ lead }: { lead: INSTAGRAM_RESPONSE }) => {
                         <div className="flex items-start flex-col min-w-0 flex-1 overflow-hidden">
                             <CardTitle className="flex w-full min-w-0 max-w-full items-center gap-1.5">
                                 <span className="min-w-0 flex-1 truncate">{leadInfo.fullName}</span>
+                            </CardTitle>
+                            <CardDescription className="truncate">
+                                @{leadInfo.username}
                                 {leadInfo.isVerified && (
                                     <ProfileBadgePopover message="Profile Verified" Icon={BadgeCheck} className="text-white fill-blue-500 shrink-0" />
                                 )}
-                            </CardTitle>
-                            <CardDescription className="truncate">@{leadInfo.username}</CardDescription>
+                            </CardDescription>
                         </div>
                     </section>
 
@@ -151,10 +189,11 @@ export const InstagramLeadCard = ({ lead }: { lead: INSTAGRAM_RESPONSE }) => {
                         onClick={() => window.open(leadInfo.instagramUrl, '_blank')}
                         variant="ghost"
                         size="icon"
-                        className="transition-transform hover:scale-110"
+                        className="h-8 w-8 hover:scale-110 duration-100 transition-all rounded-full"
+                        title="Open in Instagram"
+                        aria-label="Open in Instagram"
                     >
-                        <Image src={`/api/instagram/image?url=${encodeURIComponent(leadInfo.profilePictureHd ?? '')}`} alt="Instagram" width={24} height={24} />
-                        <span className="sr-only">View Profile</span>
+                        <Image src="/instagram-logo.svg" alt="Instagram" width={20} height={20} />
                     </Button>
                 </CardAction>
 
@@ -203,6 +242,9 @@ export const InstagramLeadCard = ({ lead }: { lead: INSTAGRAM_RESPONSE }) => {
                         Category: {leadInfo.businessCategoryName}
                     </Badge>
                 )}
+
+                {actions && <div className="border-t">{actions}</div>}
+
             </CardContent>
 
             <CardFooter className="flex items-start flex-col gap-2 min-w-0 overflow-hidden">
