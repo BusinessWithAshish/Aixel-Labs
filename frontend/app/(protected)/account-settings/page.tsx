@@ -21,17 +21,17 @@ export default function AccountSettingsPage() {
         {
             label: 'Light',
             value: 'light',
-            icon: Sun
+            icon: <Sun className="size-4" />,
         },
         {
             label: 'Dark',
             value: 'dark',
-            icon: Moon
+            icon: <Moon className="size-4" />,
         },
         {
             label: 'System',
             value: 'system',
-            icon: Monitor
+            icon: <Monitor className="size-4" />,
         },
     ];
 
@@ -82,8 +82,9 @@ export default function AccountSettingsPage() {
                             label='Theme Mode'
                             description="Select light, dark, or system theme mode"
                             options={themeModeOptions}
-                            value={theme || 'system'}
+                            value={theme ?? 'system'}
                             onChange={handleThemeModeChange}
+                            suppressSelectValueHydrationWarning
                         />
                     </div>
 
