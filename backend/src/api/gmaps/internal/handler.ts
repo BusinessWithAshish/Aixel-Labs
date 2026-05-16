@@ -6,7 +6,7 @@
 //  ┌─────────────────────────────────────────────────────────┐
 //  │  1 browser profile (random, fixed for entire lifecycle) │
 //  │  └── per city:                                          │
-//  │       • fresh TLS session (new cookie jar)              │
+//  │       • fresh session (new cookie jar)              │
 //  │       • fresh PSI  (never reused across cities)         │
 //  │       • pages 1..N reuse same session + PSI             │
 //  └─────────────────────────────────────────────────────────┘
@@ -15,7 +15,7 @@
 import { Request, Response } from "express";
 import { GMAPS } from "./constants";
 import {
-  createTlsSession,
+  createSession,
   delay,
   extractPsi,
   fetchPage,
@@ -59,8 +59,15 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
     return;
   }
 
-  const { query, cities = [], state = "", country = "" } = parsed.data;
+  const {
+    query,
+    cities = [],
+    state = "",
+    country = "",
+    countryCode,
+  } = parsed.data;
   const resolvedHl = GMAPS.DEFAULT_HL;
+  const resolvedGl = countryCode
 
   const queries = generateQueries(query, cities, state, country);
 
@@ -107,7 +114,7 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
     ) {
       // Fresh TLS session per city = clean cookie jar, new TLS handshake.
       // Profile (UA + clientIdentifier) stays the same → consistent fingerprint.
-      const session = createTlsSession(profile);
+      const session = createSession(profile);
 
       try {
         console.log(
@@ -119,6 +126,7 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
           profile,
           cityQuery,
           resolvedHl,
+          resolvedGl,
         );
 
         const cityPlaces: GMAPS_INTERNAL_RESPONSE[] = [];
@@ -142,6 +150,7 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
               page,
               psi,
               resolvedHl,
+              resolvedGl,
             );
             const places = parsePlaces(data);
 

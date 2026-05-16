@@ -8,10 +8,27 @@
 // ─────────────────────────────────────────────────────────────
 
 import { ClientIdentifier, Session } from "node-tls-client";
+import { Impit } from "impit";
 import { EARTH_RADIUS, GMAPS, TILE_SIZE, BrowserProfile } from "./constants";
 import type { GMAPS_INTERNAL_RESPONSE } from "./types";
 
 type TlsSession = InstanceType<typeof Session>;
+
+// ─────────────────────────────────────────────────────────────
+//  SESSION ADAPTER — switchable fetch backend
+//  Flip ACTIVE_FETCH_METHOD to toggle between node-tls-client
+//  and impit without touching any other code.
+// ─────────────────────────────────────────────────────────────
+
+export const ACTIVE_FETCH_METHOD: "tls" | "impit" = "tls";
+
+/** Common interface satisfied by both the TLS and Impit adapters. */
+export interface SessionAdapter {
+  get(
+    url: string,
+    opts: { headers: Record<string, string> },
+  ): Promise<{ status: number; text(): Promise<string> }>;
+}
 
 // ─────────────────────────────────────────────────────────────
 //  UTILITIES
@@ -99,6 +116,55 @@ export const createTlsSession = (profile: BrowserProfile): TlsSession =>
   });
 
 /**
+ * NOTE: node-tls-client requires its Go binary to be initialised before use.
+ * When switching ACTIVE_FETCH_METHOD to "tls", call `initTLS()` on server
+ * startup and `destroyTLS()` on shutdown (SIGTERM/SIGINT) from node-tls-client.
+ */
+function createTlsSessionAdapter(profile: BrowserProfile): SessionAdapter {
+  const session = createTlsSession(profile);
+  return {
+    async get(url, { headers }) {
+      const resp = await session.get(url, { headers });
+      return { status: resp.status, text: () => resp.text() };
+    },
+  };
+}
+
+/**
+ * Wraps an Impit instance to satisfy SessionAdapter.
+ * One Impit instance is shared across all get() calls for a city batch,
+ * preserving cookie state the same way Session does.
+ */
+function createImpitSessionAdapter(profile: BrowserProfile): SessionAdapter {
+  const client = new Impit({
+    browser: "chrome",
+    ignoreTlsErrors: true,
+    timeout: GMAPS.TLS_TIMEOUT_SECS * 1000,
+    headers: { "User-Agent": profile.userAgent },
+  });
+  return {
+    async get(url, { headers }) {
+      const resp = await client.fetch(url, { method: "GET", headers });
+      return { status: resp.status, text: () => resp.text() };
+    },
+  };
+}
+
+/**
+ * Creates a SessionAdapter using the method set by ACTIVE_FETCH_METHOD.
+ * Change that constant at the top of this file to swap backends.
+ */
+export function createSession(profile: BrowserProfile): SessionAdapter {
+  switch (ACTIVE_FETCH_METHOD) {
+    case "impit":
+      return createImpitSessionAdapter(profile);
+    case "tls":
+    default:
+      return createTlsSessionAdapter(profile);
+  }
+}
+
+/**
  * Headers for the initial Maps page navigation request (PSI fetch).
  * Mimics a browser visiting a URL from a cold start.
  */
@@ -158,14 +224,16 @@ const xhrHeaders = (p: BrowserProfile, hl: string): Record<string, string> => ({
  * that reuse the same session.
  */
 export const extractPsi = async (
-  session: TlsSession,
+  session: SessionAdapter,
   profile: BrowserProfile,
   query: string,
   hl = GMAPS.DEFAULT_HL,
+  gl: string,
 ): Promise<{ psi: string; lat: number; lng: number }> => {
   const slug = query.toLowerCase().trim().replace(/\s+/g, "+");
-  const url = `${GMAPS.MAPS_SEARCH_URL}${slug}?hl=${hl}`;
+  const glParam = `&gl=${gl.toLowerCase()}`;
 
+  const url = `${GMAPS.MAPS_SEARCH_URL}${slug}?hl=${hl}${glParam}`;
   const resp = await session.get(url, { headers: navHeaders(profile) });
 
   if (resp.status >= 400) {
@@ -218,7 +286,8 @@ export const extractPsi = async (
     }
   }
 
-  if (!lat || !lng) {
+  const coordsFromFallback = !lat || !lng;
+  if (coordsFromFallback) {
     lat = GMAPS.FALLBACK_LAT;
     lng = GMAPS.FALLBACK_LNG;
   }
@@ -236,7 +305,7 @@ export const extractPsi = async (
  * whether to abort immediately or retry.
  */
 export const fetchPage = async (
-  session: TlsSession,
+  session: SessionAdapter,
   profile: BrowserProfile,
   query: string,
   lat: number,
@@ -244,11 +313,16 @@ export const fetchPage = async (
   page: number,
   psi: string,
   hl = GMAPS.DEFAULT_HL,
+  gl: string,
   zoom = GMAPS.DEFAULT_ZOOM,
 ): Promise<any> => {
   const pb = buildPb(lat, lng, zoom, page, psi);
+  const glParam = `&gl=${gl.toLowerCase()}`;
   const url =
-    `${GMAPS.MAPS_API_URL}?tbm=map&hl=${hl}` +
+    `${GMAPS.MAPS_API_URL}?
+    tbm=map
+    &hl=${hl}
+    ${glParam}` +
     `&pb=${pb}` +
     `&q=${encodeURIComponent(query)}` +
     `&tch=1&ech=${page}` +
@@ -289,13 +363,44 @@ const extractRating = (p4: any): number | null => {
 };
 
 /**
+ * Parses a review count from any value Google puts at p[4][8] or p[4][3][1].
+ *
+ * Google returns review counts in several formats:
+ *   number  → 1234
+ *   string  → "1,234"  |  "(1,234)"  |  "1.2K"  |  "1.2K reviews"
+ */
+const parseReviewValue = (val: any): number | null => {
+  if (typeof val === "number" && Number.isInteger(val) && val > 0) return val;
+  if (typeof val !== "string") return null;
+
+  // Strip parentheses, spaces, commas, and common suffixes
+  const cleaned = val.replace(/[(),\s]/g, "").replace(/reviews?$/i, "");
+
+  const kMatch = cleaned.match(/^(\d+(?:\.\d+)?)K$/i);
+  if (kMatch) return Math.round(parseFloat(kMatch[1]) * 1_000);
+
+  const mMatch = cleaned.match(/^(\d+(?:\.\d+)?)M$/i);
+  if (mMatch) return Math.round(parseFloat(mMatch[1]) * 1_000_000);
+
+  const numMatch = cleaned.match(/^(\d+)/);
+  if (numMatch) return parseInt(numMatch[1], 10);
+
+  return null;
+};
+
+/**
  * Extracts review count from p[4].
- * Tries the known index first, then tries to parse from reviewText.
+ * Tries p[4][8] (integer or formatted string) first, then falls back to
+ * parsing the review-text string at p[4][3][1] (e.g. "(1,234 reviews)").
  */
 const extractReviewCount = (p4: any): number | null => {
   if (!p4 || !Array.isArray(p4)) return null;
-  const val = p4[8];
-  return typeof val === "number" && Number.isInteger(val) ? val : null;
+
+  const fromIndex = parseReviewValue(p4[8]);
+  if (fromIndex !== null) return fromIndex;
+
+  // Fallback: parse from the review-text string Google embeds at p4[3][1]
+  return parseReviewValue(p4[3]?.[1]);
 };
 
 /**

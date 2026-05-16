@@ -6,4 +6,5 @@ export const GMAPS_REQUEST_SCHEMA = z.object({
   state: z.string().optional(),
   cities: z.array(z.string()).optional(),
   urls: z.array(z.string()).optional(),
+  countryCode: z.string().length(2),
 });
