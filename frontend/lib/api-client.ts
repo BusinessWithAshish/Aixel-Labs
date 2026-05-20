@@ -1,7 +1,6 @@
 import axios, { AxiosRequestConfig } from 'axios';
 import { BACKEND_URL } from '@/config/app-config';
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
-import { toast } from 'sonner';
 
 export type RequestOptions = {
     params?: Record<string, string | number | boolean>;
@@ -31,8 +30,6 @@ const toErrorResponse = (error: unknown): ALApiResponse<never> => {
 
         const errorMessage = data?.error ?? (error.message || 'Request failed');
 
-        toast.error(errorMessage);
-
         return {
             success: false,
             error: errorMessage,
@@ -40,8 +37,6 @@ const toErrorResponse = (error: unknown): ALApiResponse<never> => {
     }
 
     const message = error instanceof Error ? error.message : 'Request failed';
-
-    toast.error(message);
 
     return {
         success: false,
