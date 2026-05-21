@@ -3,15 +3,12 @@
  * Two structural patterns cover 100% of Google organic results:
  *   Pattern A: <a href="http..."><h3>title</h3></a>  — standard
  *   Pattern B: <h3> and <a href="http..."> are siblings under same parent  — sitelinks/variants
- * Inject vars before running: window.__GSCRAPER__ = { searchQuery, totalPages, language, tbs, gl, near }
+ * Inject vars before running: window.__GSCRAPER__ = { baseQueryString, totalPages }
+ * (`baseQueryString` from buildGSearchUrlSearchParams in helpers.ts)
  */
 (async function () {
-    const searchQuery        = window.__GSCRAPER__.searchQuery;
+    const initialUrl = window.__GSCRAPER__.initialUrl;
     const totalPages = window.__GSCRAPER__.totalPages;
-    const language = window.__GSCRAPER__.language;
-    const tbs = window.__GSCRAPER__.tbs;
-    const gl = window.__GSCRAPER__.gl;
-    const near = window.__GSCRAPER__.near;
     const GOOGLE_SEARCH_MAX_RESULTS_PER_PAGE = 10;
 
   let all = [];
@@ -104,27 +101,15 @@
         await wait(preDelay);
       }
 
-      const defaultParams = new URLSearchParams({
-        filter: "0",
-        nfpr: "1",
-        pws: "0",
-        udm: "14",
-      })
-
-      const finalParams = new URLSearchParams(defaultParams);
-      finalParams.set("q", searchQuery);
-      finalParams.set("start", String((pageNum - 1) * GOOGLE_SEARCH_MAX_RESULTS_PER_PAGE));
-      finalParams.set("num", String(GOOGLE_SEARCH_MAX_RESULTS_PER_PAGE));
-      finalParams.set("hl", language);
-      finalParams.set("gl", gl);
-      finalParams.set("near", near);
-      if (tbs) finalParams.set("tbs", tbs);
+      const finalUrl = new URL(initialUrl);
+      finalUrl.searchParams.set("start", String((pageNum - 1) * GOOGLE_SEARCH_MAX_RESULTS_PER_PAGE));
+      finalUrl.searchParams.set("num", String(GOOGLE_SEARCH_MAX_RESULTS_PER_PAGE));
   
       console.log("[GScraper] Fetching page " + pageNum + (attempt ? " (attempt " + (attempt+1) + ")" : ""));
 
       let html, status;
       try {
-        const resp = await fetch("/search?" + finalParams.toString(), {
+        const resp = await fetch(finalUrl.toString(), {
           credentials: "include",
           headers: {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",

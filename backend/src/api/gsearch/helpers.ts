@@ -13,8 +13,8 @@ import {
   GOOGLE_BASE_URL,
   GOOGLE_SEARCH_URL,
   GOOGLE_SEARCH_QUERY_PARAMS,
-  DEFAULT_GSEARCH_LANGUAGE,
   defaultGsearchQueryParams,
+  GOOGLE_SEARCH_PATH,
 } from "./constants";
 import { applyGoogleSearchStealth } from "../../utils/stealth-handlers";
 import type { Page } from "puppeteer-core";
@@ -29,31 +29,34 @@ const INSPECTOR_SCRIPT = readFileSync(
 const gsearchStealthedPages = new WeakSet<Page>();
 
 /**
- * Build the Google SERP URL like `scraper/api/google_search/helpers.normalize_google_search_target`:
- * optional ` in {near}` on `q`, `gl` / `hl`, `filter=0`, `nfpr=1`, `pws=0`, `udm=14`, optional `near` & `tbs`.
+ * Canonical Google SERP query string (no `start` / `num`). Single source for `page.goto` and injector fetches.
+ * Matches previous behavior: `q` = `{searchQuery} in {city}`, `filter`/`nfpr`/`pws`/`udm`/`hl`, `gl`, optional `tbs`.
  */
-export function buildGSearchUrl(props: GSEARCH_REQUEST) {
+export function buildGSearchUrl(props: GSEARCH_REQUEST): string {
+  const baseUrl = new URL(GOOGLE_BASE_URL);
+  baseUrl.pathname = GOOGLE_SEARCH_PATH;
+
   const { searchQuery, country, city, timeFilter } = props;
 
-  const finalQuery = `${searchQuery} in ${city}`;
+  // DEFAULT PARAMS
   const params = new URLSearchParams(defaultGsearchQueryParams);
+
+  // DYNAMIC PARAMS
+  const finalQuery = `${searchQuery} in ${city}`;
   params.set(GOOGLE_SEARCH_QUERY_PARAMS.q, finalQuery);
   params.set(GOOGLE_SEARCH_QUERY_PARAMS.gl, country.toLowerCase());
+
+  // OPTIONAL PARAMS
+  if (city) params.set(GOOGLE_SEARCH_QUERY_PARAMS.near, city);
   if (timeFilter) params.set(GOOGLE_SEARCH_QUERY_PARAMS.tbs, timeFilter);
-  return `${GOOGLE_BASE_URL}/search?${params.toString()}`;
+
+  return `${baseUrl.toString()}?${params.toString()}`;
 }
 
 export async function fetchGSearch(
   props: GSEARCH_REQUEST,
 ): Promise<GSEARCH_RESPONSE[]> {
-  const {
-    searchQuery,
-    pages,
-    country,
-    city,
-    timeFilter,
-    language = DEFAULT_GSEARCH_LANGUAGE,
-  } = props;
+  const { pages, country } = props;
 
   const finalUrl = buildGSearchUrl(props);
 
@@ -70,10 +73,7 @@ export async function fetchGSearch(
 
       const proxyDelimiter = "_";
       // EVOMI session rotation: new session id => new exit IP (most pools)
-      const sessionId =
-        (crypto as any).randomUUID?.() ??
-        crypto.randomBytes(12).toString("hex");
-      const proxyPassword = `${PROXY_CONFIG.PASSWORD}${proxyDelimiter}country-${country}${proxyDelimiter}session-${sessionId}`;
+      const proxyPassword = `${PROXY_CONFIG.PASSWORD}${proxyDelimiter}country-${country}`;
 
       await page.authenticate({
         username: PROXY_CONFIG.USERNAME,
@@ -134,12 +134,8 @@ export async function fetchGSearch(
       // ── Step 3: Inject dynamic vars then run inspector script ──
       // Variables are injected as a global before the script runs — clean and type-safe
       const gsearchInjectorProps: GSEARCH_INJECTOR_PROPS = {
-        searchQuery,
+        initialUrl: finalUrl,
         totalPages,
-        language,
-        tbs: timeFilter ?? null,
-        gl: country.toLowerCase(),
-        near: city,
       };
 
       await page.evaluate(
@@ -164,13 +160,3 @@ export async function fetchGSearch(
 
   return finalResults.results.flat();
 }
-
-
-// export async function fetchGSearchScraper(
-//   props: GSEARCH_REQUEST,
-// ): Promise<GSEARCH_RESPONSE[]> {
-//   const { searchQuery, country, city, language = DEFAULT_GSEARCH_LANGUAGE, timeFilter } = props;
-
-
-
-// }

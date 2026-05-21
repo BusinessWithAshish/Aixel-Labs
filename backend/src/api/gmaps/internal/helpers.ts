@@ -231,9 +231,8 @@ export const extractPsi = async (
   gl: string,
 ): Promise<{ psi: string; lat: number; lng: number }> => {
   const slug = query.toLowerCase().trim().replace(/\s+/g, "+");
-  const glParam = `&gl=${gl.toLowerCase()}`;
-
-  const url = `${GMAPS.MAPS_SEARCH_URL}${slug}?hl=${hl}${glParam}`;
+  const url =
+    GMAPS.MAPS_SEARCH_URL + slug + `?hl=${hl}` + `&gl=${gl.toLowerCase()}`;
   const resp = await session.get(url, { headers: navHeaders(profile) });
 
   if (resp.status >= 400) {
@@ -317,15 +316,15 @@ export const fetchPage = async (
   zoom = GMAPS.DEFAULT_ZOOM,
 ): Promise<any> => {
   const pb = buildPb(lat, lng, zoom, page, psi);
-  const glParam = `&gl=${gl.toLowerCase()}`;
   const url =
-    `${GMAPS.MAPS_API_URL}?
-    tbm=map
-    &hl=${hl}
-    ${glParam}` +
+    GMAPS.MAPS_API_URL +
+    "?tbm=map" +
+    `&hl=${hl}` +
+    `&gl=${gl.toLowerCase()}` +
     `&pb=${pb}` +
     `&q=${encodeURIComponent(query)}` +
-    `&tch=1&ech=${page}` +
+    "&tch=1" +
+    `&ech=${page}` +
     `&psi=${psi}.${Date.now()}.1`;
 
   const resp = await session.get(url, { headers: xhrHeaders(profile, hl) });
@@ -339,12 +338,25 @@ export const fetchPage = async (
     .replace(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//g, "")
     .trim();
 
-  // Handle both response wrapper formats Google uses
-  if (raw.startsWith("{")) {
-    const wrapper = JSON.parse(raw);
-    return JSON.parse(wrapper.d.replace(/^\)\]\}'\s*\n?/, ""));
+  if (!raw) {
+    throw new Error("[fetchPage] Empty response body");
   }
-  return JSON.parse(raw.replace(/^[^\[]+/, ""));
+
+  try {
+    // Handle both response wrapper formats Google uses
+    if (raw.startsWith("{")) {
+      const wrapper = JSON.parse(raw);
+      const payload = wrapper.d?.replace(/^\)\]\}'\s*\n?/, "") ?? "";
+      return JSON.parse(payload);
+    }
+    return JSON.parse(raw.replace(/^[^\[]+/, ""));
+  } catch (err) {
+    const preview = raw.slice(0, 200).replace(/\s+/g, " ");
+    throw new Error(
+      `[fetchPage] Failed to parse response (${preview || "no content"})`,
+      { cause: err },
+    );
+  }
 };
 
 // ─────────────────────────────────────────────────────────────

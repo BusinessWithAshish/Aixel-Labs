@@ -1,7 +1,8 @@
-export const DEFAULT_GSEARCH_MAX_PAGES = 10;
+export const DEFAULT_GSEARCH_MAX_PAGES = 25;
 export const DEFAULT_GSEARCH_LANGUAGE = "en";
 export const GOOGLE_BASE_URL = "https://www.google.com";
-export const GOOGLE_SEARCH_URL = `${GOOGLE_BASE_URL}/search`;
+export const GOOGLE_SEARCH_PATH = "search";
+export const GOOGLE_SEARCH_URL = `${GOOGLE_BASE_URL}/${GOOGLE_SEARCH_PATH}`;
 
 export const GOOGLE_SEARCH_QUERY_LIMITS = {
   maxQueryChars: 1900,

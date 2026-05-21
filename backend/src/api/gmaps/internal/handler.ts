@@ -67,7 +67,7 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
     countryCode,
   } = parsed.data;
   const resolvedHl = GMAPS.DEFAULT_HL;
-  const resolvedGl = countryCode
+  const resolvedGl = countryCode;
 
   const queries = generateQueries(query, cities, state, country);
 

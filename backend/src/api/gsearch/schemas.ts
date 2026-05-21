@@ -11,7 +11,7 @@ export const GSEARCH_REQUEST_SCHEMA = z.object({
   searchQuery: z.string().max(GOOGLE_SEARCH_QUERY_LIMITS.maxQueryChars),
   pages: z.number().min(1).max(DEFAULT_GSEARCH_MAX_PAGES),
   country: z.string(),
-  city: z.string(),
+  city: z.string().optional(),
   timeFilter: z.nativeEnum(GSEARCH_TIME_FILTER).optional(),
   language: z.string().default(DEFAULT_GSEARCH_LANGUAGE).optional(),
 });

@@ -10,12 +10,8 @@ export enum GSEARCH_TIME_FILTER {
 }
 
 export type GSEARCH_INJECTOR_PROPS = {
-  searchQuery: string;
+  initialUrl: string;
   totalPages: number;
-  language: string;
-  tbs: string | null;
-  gl: string;
-  near: string;
 };
 
 export type GSEARCH_RESPONSE = {
