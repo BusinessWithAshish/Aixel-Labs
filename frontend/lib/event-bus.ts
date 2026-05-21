@@ -1,17 +1,9 @@
 'use client';
 
-import type { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
-
 export type Listener<T = never> = (data: T) => void | Promise<void>;
-
-export type LeadGenLoadingEvent = {
-    scope: LEAD_GENERATION_SUB_MODULES;
-    loading: boolean;
-};
 
 type EventMap = {
     'navigation:loading': boolean;
-    'lead-gen:loading': LeadGenLoadingEvent;
 };
 
 class EventBusImpl {
