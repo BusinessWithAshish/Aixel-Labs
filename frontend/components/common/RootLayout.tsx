@@ -6,7 +6,6 @@ import { TenantBrandingProvider } from '@/contexts/TenantBranding';
 import { buildThemeStyleTag, THEME_COLOR_COOKIE_KEY } from '@/helpers/theme-color-utils';
 import { DEFAULT_THEME_COLOR } from '@/config/app-config';
 import { cookies } from 'next/headers';
-import Head from "next/head";
 
 type RootLayoutUIProps = {
     children: React.ReactNode;
@@ -32,9 +31,13 @@ export const RootLayoutUI = async ({
 
     return (
         <html lang="en" suppressHydrationWarning>
-            <Head>
+            {/*
+              App Router: do not use next/head — it does not inject into the document from
+              layouts. Use a real <head> so tenant CSS variables apply before paint.
+            */}
+            <head>
                 <style dangerouslySetInnerHTML={{ __html: buildThemeStyleTag(activeColor) }} />
-            </Head>
+            </head>
             <body className={cn(`${poppinsFont.variable} h-dvh w-full`, className)} suppressHydrationWarning>
 
                 <TenantBrandingProvider

@@ -1,17 +1,9 @@
-import { SidebarProvider } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/layout/app-sidebar';
+import { SidebarAppShell } from '@/components/layout/sidebar-app-shell';
 import { withRouteGuard } from '@/components/hocs/with-route-guard';
-import { NavigationLoaderProvider } from '@/contexts/NavigationLoader';
 
-function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
-    return (
-        <SidebarProvider className="h-full w-full">
-            <AppSidebar />
-            <NavigationLoaderProvider>
-                {children}
-            </NavigationLoaderProvider>
-        </SidebarProvider>
-    );
+/** `(protected)` segment: full route guard, then shared app chrome. */
+function ProtectedSegmentLayout({ children }: { children: React.ReactNode }) {
+    return <SidebarAppShell>{children}</SidebarAppShell>;
 }
 
-export default withRouteGuard(ProtectedLayoutContent);
+export default withRouteGuard(ProtectedSegmentLayout);
