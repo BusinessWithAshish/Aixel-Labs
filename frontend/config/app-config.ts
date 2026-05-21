@@ -10,6 +10,8 @@ import {
 
 export const APP_NAME = 'Aixel Labs';
 
+export const LOCAL_STORAGE_KEY_BASE = 'aixellabs';
+
 export const APP_DESCRIPTION = 'Agentic Lead management system';
 
 export const SubModuleUrls: Record<SubModule, string> = {
@@ -46,7 +48,7 @@ export const TENANT_TYPE_OPTIONS = [
 ];
 
 export const DEFAULT_HOME_PAGE_ROUTE = '/';
-export const PATHNAME_HEADER_KEY = 'x-pathname'
+export const PATHNAME_HEADER_KEY = 'x-pathname';
 export const API_ROUTE_PREFIX = '/api';
 export const TENANT_API_ROUTE_PREFIX = '/tenant';
 export const SUBDOMAIN_PARAM_NAME = 'name';
@@ -56,8 +58,6 @@ export const NOT_FOUND_ROUTE = '/not-found';
 export const ACCOUNT_SETTINGS_ROUTE = '/account-settings';
 export const MANAGE_TENANTS_ROUTE = '/manage-tenants';
 
-/** Paths always allowed for signed-in users (not module-gated) */
 export const ALWAYS_ALLOWED_PATHS = [DEFAULT_HOME_PAGE_ROUTE, ACCOUNT_SETTINGS_ROUTE] as const;
 
-/** Path prefix for manage-tenants dynamic routes */
 export const MANAGE_TENANTS_PREFIX = `${MANAGE_TENANTS_ROUTE}/`;
