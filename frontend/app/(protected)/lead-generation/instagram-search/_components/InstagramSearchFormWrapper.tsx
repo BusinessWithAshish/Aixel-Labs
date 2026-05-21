@@ -1,68 +1,63 @@
 'use client';
-import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { usePage } from "@/contexts/PageStore";
-import { UseInstagramFormReturn } from "../_hooks/use-instagram-form";
-import { InstagramQueryForm } from "./InstagramQueryForm";
-import { Tabs, TabsTrigger, TabsList, TabsContent } from "@/components/ui/tabs";
-import { InstagramUsernamesForm } from './InstagramUsernamesForm';
-import { FormProvider } from "react-hook-form";
-import Image from "next/image";
 
-enum InstagramFormMode {
+import { FormProvider } from 'react-hook-form';
+import { Tabs, TabsTrigger, TabsList, TabsContent } from '@/components/ui/tabs';
+import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
+import { usePage } from '@/contexts/PageStore';
+import { UseInstagramFormReturn } from '../_hooks/use-instagram-form';
+import { InstagramQueryForm } from './InstagramQueryForm';
+import { InstagramUsernamesForm } from './InstagramUsernamesForm';
+import { LeadFormWrapper } from '@/components/common/LeadFormWrappers';
+import { FormPresetScraperActions } from '@/components/common/FormPresetScraperActions';
+
+enum InstagramFormInputMode {
     QUERY = 'Query',
     USERNAMES = 'Usernames',
 }
 
-export const instagramSearchFormName = 'instagram-search-form';
+export const INSTAGRAM_SEARCH_FORM_NAME = 'instagram-search-form';
 
 export const InstagramSearchFormWrapper = () => {
-
     const { form, onSubmit } = usePage<UseInstagramFormReturn>();
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Image src="/instagram-logo.svg" alt="Instagram" width={20} height={20} />
-                    <span>Instagram Search Form</span>
-                </CardTitle>
-                <CardDescription>Enter the search parameters to search for leads on Instagram</CardDescription>
-                <CardAction className="flex gap-2 items-center">
-                    <Button type="button" variant="outline" onClick={() => form.reset()}>Reset</Button>
-                    <Button
-                        form={instagramSearchFormName}
-                        disabled={form.formState.isSubmitting}
-                        type="submit"
-                    >
-                        {form.formState.isSubmitting ? 'Submitting...' : 'Submit'}
-                    </Button>
-                </CardAction>
-            </CardHeader>
-            <CardContent>
-                <Tabs defaultValue={InstagramFormMode.QUERY}>
-
+        <FormProvider {...form}>
+            <LeadFormWrapper
+                config={{
+                    title: 'Instagram Search Form',
+                    description: 'Enter search parameters to find leads on Instagram',
+                    icon: { src: '/instagram-logo.svg', alt: 'Instagram' },
+                }}
+                actions={
+                    <FormPresetScraperActions
+                        module={LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH}
+                        onSubmit={onSubmit}
+                    />
+                }
+            >
+                <Tabs defaultValue={InstagramFormInputMode.QUERY}>
                     <TabsList className="w-full">
-                        <TabsTrigger value={InstagramFormMode.QUERY}>Query</TabsTrigger>
-                        <TabsTrigger value={InstagramFormMode.USERNAMES}>Usernames/URL(s)</TabsTrigger>
-
+                        <TabsTrigger value={InstagramFormInputMode.QUERY}>
+                            {InstagramFormInputMode.QUERY}
+                        </TabsTrigger>
+                        <TabsTrigger value={InstagramFormInputMode.USERNAMES}>
+                            {InstagramFormInputMode.USERNAMES}
+                        </TabsTrigger>
                     </TabsList>
-                    <FormProvider {...form}>
-                        <form
-                            className="h-full w-full"
-                            id={instagramSearchFormName}
-                            onSubmit={form.handleSubmit(onSubmit)}
-                        >
-                            <TabsContent className="space-y-3" value={InstagramFormMode.QUERY}>
-                                <InstagramQueryForm />
-                            </TabsContent>
-                            <TabsContent className="space-y-3" value={InstagramFormMode.USERNAMES}>
-                                <InstagramUsernamesForm />
-                            </TabsContent>
-                        </form>
-                    </FormProvider>
+                    <form
+                        className="h-full w-full"
+                        id={INSTAGRAM_SEARCH_FORM_NAME}
+                        onSubmit={form.handleSubmit(onSubmit)}
+                    >
+                        <TabsContent className="space-y-3" value={InstagramFormInputMode.QUERY}>
+                            <InstagramQueryForm />
+                        </TabsContent>
+                        <TabsContent className="space-y-3" value={InstagramFormInputMode.USERNAMES}>
+                            <InstagramUsernamesForm />
+                        </TabsContent>
+                    </form>
                 </Tabs>
-            </CardContent>
-        </Card>
+            </LeadFormWrapper>
+        </FormProvider>
     );
 };

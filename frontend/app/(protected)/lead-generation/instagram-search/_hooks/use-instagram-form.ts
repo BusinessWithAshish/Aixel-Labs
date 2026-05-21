@@ -1,16 +1,16 @@
 'use client';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { API_ENDPOINTS } from '@aixellabs/backend/config';
-import apiClient from '@/lib/api-client';
 import { useMemo, useState } from 'react';
-import type { INSTAGRAM_REQUEST, INSTAGRAM_RESPONSE } from '@aixellabs/backend/instagram';
+import type { INSTAGRAM_REQUEST } from '@aixellabs/backend/instagram';
 import { INSTAGRAM_REQUEST_SCHEMA } from '@aixellabs/backend/instagram/schemas';
-import { ConfirmResult } from '@/components/common/ChatInterface';
+import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { City, Country, ICity, IState, State } from 'country-state-city';
 import { OptionType } from '@/components/ui/searchable-select';
+import { useLeadGenScraper } from '@/hooks/use-lead-gen-scraper';
 
-const defaultValues: INSTAGRAM_REQUEST = {
+const DEFAULT_FORM_VALUES: INSTAGRAM_REQUEST = {
     entities: [],
     query: '',
     country: '',
@@ -22,31 +22,24 @@ const defaultValues: INSTAGRAM_REQUEST = {
 };
 
 export const useInstagramForm = () => {
-    const [instagramLeads, setInstagramLeads] = useState<INSTAGRAM_RESPONSE[]>([]);
+    const { submitLeadGenScraperForm } = useLeadGenScraper(LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH);
+
+    // state is not part of schema, so we need to handle it separately
     const [selectedState, setSelectedState] = useState<string | undefined>(undefined);
+
     const form = useForm<INSTAGRAM_REQUEST>({
         resolver: zodResolver(INSTAGRAM_REQUEST_SCHEMA),
-        defaultValues,
+        defaultValues: DEFAULT_FORM_VALUES,
     });
 
-    const onSubmit = async (data: INSTAGRAM_REQUEST): Promise<ConfirmResult> => {
-        const apiResponse = await apiClient.post<INSTAGRAM_RESPONSE[], INSTAGRAM_REQUEST>(
-            API_ENDPOINTS.INSTAGRAM.API.full,
-            data,
-        );
-
-        if (!apiResponse.success || !apiResponse.data) {
-            return {
-                success: false,
-                message: apiResponse.error || 'Sorry! Failed to submit form or find leads. Please try again later.',
-            };
-        }
-
-        setInstagramLeads(apiResponse.data);
-        return {
-            success: true,
-            message: 'Your Instagram search results are ready! Check the Results tab.',
-        };
+    const onSubmit = async (data: INSTAGRAM_REQUEST) => {
+        await submitLeadGenScraperForm({
+            body: data,
+            onSuccess: () => {
+                form.reset(DEFAULT_FORM_VALUES);
+                setSelectedState(undefined);
+            },
+        });
     };
 
     const countries = Country.getAllCountries();
@@ -90,8 +83,6 @@ export const useInstagramForm = () => {
         isCityFieldDisabled,
         cityOptions,
         onSubmit,
-        instagramLeads,
-        setInstagramLeads,
     };
 };
 
