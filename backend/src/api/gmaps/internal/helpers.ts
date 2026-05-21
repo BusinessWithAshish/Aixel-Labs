@@ -1,34 +1,17 @@
 // ─────────────────────────────────────────────────────────────
 //  GMAPS SCRAPER — HELPERS
-//
-//  All functions are pure / stateless except createTlsSession,
-//  which creates a new node-tls-client Session instance.
-//
-//  node-tls-client: https://sahil1337.github.io/node-tls-client/
 // ─────────────────────────────────────────────────────────────
 
-import { ClientIdentifier, Session } from "node-tls-client";
-import { Impit } from "impit";
+import { ClientIdentifier } from "node-tls-client";
+import {
+  DEFAULT_HTML_HEADERS,
+  closeUrlFetchSession,
+  createUrlFetchSession,
+  type UrlFetchSession,
+} from "../../../utils/url-session-handler";
+import { mergeHttpHeaderRecords } from "../../../utils/async-helpers";
 import { EARTH_RADIUS, GMAPS, TILE_SIZE, BrowserProfile } from "./constants";
 import type { GMAPS_INTERNAL_RESPONSE } from "./types";
-
-type TlsSession = InstanceType<typeof Session>;
-
-// ─────────────────────────────────────────────────────────────
-//  SESSION ADAPTER — switchable fetch backend
-//  Flip ACTIVE_FETCH_METHOD to toggle between node-tls-client
-//  and impit without touching any other code.
-// ─────────────────────────────────────────────────────────────
-
-export const ACTIVE_FETCH_METHOD: "tls" | "impit" = "tls";
-
-/** Common interface satisfied by both the TLS and Impit adapters. */
-export interface SessionAdapter {
-  get(
-    url: string,
-    opts: { headers: Record<string, string> },
-  ): Promise<{ status: number; text(): Promise<string> }>;
-}
 
 // ─────────────────────────────────────────────────────────────
 //  UTILITIES
@@ -94,117 +77,58 @@ export const buildPb = (
 //  SESSION / HEADERS
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Picks a random browser profile and creates a new TLS session.
- *
- * Call once per handler invocation — the SAME profile is reused
- * across all city queries so Google sees a consistent browser
- * identity throughout the run.
- *
- * A NEW session (fresh TLS handshake + cookie jar) is created
- * per city inside the handler loop, but always from the same
- * profile returned here.
- */
+/** One profile per handler run; fresh TLS session (batch) per city. */
 export const pickBrowserProfile = (): BrowserProfile =>
   pick(GMAPS.BROWSER_PROFILES);
 
-export const createTlsSession = (profile: BrowserProfile): TlsSession =>
-  new Session({
+const profileHeaders = (p: BrowserProfile): Record<string, string> => ({
+  "user-agent": p.userAgent,
+  "sec-ch-ua": p.secChUa,
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": p.platform,
+});
+
+/** Per-city batch session — shared cookie jar for PSI + pagination. */
+export const createGmapsSession = (
+  profile: BrowserProfile,
+): Promise<UrlFetchSession> =>
+  createUrlFetchSession({
     clientIdentifier: profile.clientIdentifier as ClientIdentifier,
-    randomTlsExtensionOrder: GMAPS.TLS_RANDOM_EXTENSIONS,
-    timeout: GMAPS.TLS_TIMEOUT_SECS * 1000,
+    headers: profileHeaders(profile),
+    useProxy: false,
   });
 
-/**
- * NOTE: node-tls-client requires its Go binary to be initialised before use.
- * When switching ACTIVE_FETCH_METHOD to "tls", call `initTLS()` on server
- * startup and `destroyTLS()` on shutdown (SIGTERM/SIGINT) from node-tls-client.
- */
-function createTlsSessionAdapter(profile: BrowserProfile): SessionAdapter {
-  const session = createTlsSession(profile);
-  return {
-    async get(url, { headers }) {
-      const resp = await session.get(url, { headers });
-      return { status: resp.status, text: () => resp.text() };
-    },
-  };
-}
+export { closeUrlFetchSession };
 
-/**
- * Wraps an Impit instance to satisfy SessionAdapter.
- * One Impit instance is shared across all get() calls for a city batch,
- * preserving cookie state the same way Session does.
- */
-function createImpitSessionAdapter(profile: BrowserProfile): SessionAdapter {
-  const client = new Impit({
-    browser: "chrome",
-    ignoreTlsErrors: true,
-    timeout: GMAPS.TLS_TIMEOUT_SECS * 1000,
-    headers: { "User-Agent": profile.userAgent },
+/** Maps PSI navigation — cold document load on top of DEFAULT_HTML_HEADERS. */
+const navHeaders = (p: BrowserProfile): Record<string, string> =>
+  mergeHttpHeaderRecords(DEFAULT_HTML_HEADERS, profileHeaders(p), {
+    accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "accept-language": "en-US,en;q=0.9",
+    "accept-encoding": "gzip, deflate, br, zstd",
+    "cache-control": "max-age=0",
+    "upgrade-insecure-requests": "1",
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "none",
+    "sec-fetch-user": "?1",
+    dnt: "1",
   });
-  return {
-    async get(url, { headers }) {
-      const resp = await client.fetch(url, { method: "GET", headers });
-      return { status: resp.status, text: () => resp.text() };
-    },
-  };
-}
 
-/**
- * Creates a SessionAdapter using the method set by ACTIVE_FETCH_METHOD.
- * Change that constant at the top of this file to swap backends.
- */
-export function createSession(profile: BrowserProfile): SessionAdapter {
-  switch (ACTIVE_FETCH_METHOD) {
-    case "impit":
-      return createImpitSessionAdapter(profile);
-    case "tls":
-    default:
-      return createTlsSessionAdapter(profile);
-  }
-}
-
-/**
- * Headers for the initial Maps page navigation request (PSI fetch).
- * Mimics a browser visiting a URL from a cold start.
- */
-const navHeaders = (p: BrowserProfile): Record<string, string> => ({
-  "User-Agent": p.userAgent,
-  Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Accept-Encoding": "gzip, deflate, br, zstd",
-  "Cache-Control": "max-age=0",
-  "Upgrade-Insecure-Requests": "1",
-  "Sec-Fetch-Dest": "document",
-  "Sec-Fetch-Mode": "navigate",
-  "Sec-Fetch-Site": "none",
-  "Sec-Fetch-User": "?1",
-  "Sec-Ch-Ua": p.secChUa,
-  "Sec-Ch-Ua-Mobile": "?0",
-  "Sec-Ch-Ua-Platform": p.platform,
-  DNT: "1",
-});
-
-/**
- * Headers for paginated search API requests (XHR-style).
- * Mimics a fetch() call made from within the Maps page.
- */
-const xhrHeaders = (p: BrowserProfile, hl: string): Record<string, string> => ({
-  "User-Agent": p.userAgent,
-  Accept: "*/*",
-  "Accept-Language": `${hl},en;q=0.9`,
-  "Accept-Encoding": "gzip, deflate, br, zstd",
-  Referer: "https://www.google.com/maps",
-  "Sec-Fetch-Dest": "empty",
-  "Sec-Fetch-Mode": "cors",
-  "Sec-Fetch-Site": "same-origin",
-  "Sec-Ch-Ua": p.secChUa,
-  "Sec-Ch-Ua-Mobile": "?0",
-  "Sec-Ch-Ua-Platform": p.platform,
-  "X-Maps-Diversion-Context-Bin": "1",
-  DNT: "1",
-});
+/** Paginated Maps search API — XHR from the Maps page. */
+const xhrHeaders = (p: BrowserProfile, hl: string): Record<string, string> =>
+  mergeHttpHeaderRecords(DEFAULT_HTML_HEADERS, profileHeaders(p), {
+    accept: "*/*",
+    "accept-language": `${hl},en;q=0.9`,
+    "accept-encoding": "gzip, deflate, br, zstd",
+    referer: "https://www.google.com/maps",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "x-maps-diversion-context-bin": "1",
+    dnt: "1",
+  });
 
 // ─────────────────────────────────────────────────────────────
 //  CORE FETCHERS
@@ -224,7 +148,7 @@ const xhrHeaders = (p: BrowserProfile, hl: string): Record<string, string> => ({
  * that reuse the same session.
  */
 export const extractPsi = async (
-  session: SessionAdapter,
+  session: UrlFetchSession,
   profile: BrowserProfile,
   query: string,
   hl = GMAPS.DEFAULT_HL,
@@ -241,8 +165,11 @@ export const extractPsi = async (
 
   const html = await resp.text();
 
-  if (html.includes("unusual traffic") || html.length < 10_000) {
-    throw new Error("[extractPsi] Bot detection triggered — response blocked");
+  const unusualTraffic = html.includes("unusual traffic");
+  if (unusualTraffic || html.length < 10_000) {
+    throw new Error(
+      `[extractPsi] Bot detection triggered — HTTP ${resp.status}, len=${html.length}, unusualTraffic=${unusualTraffic}`,
+    );
   }
 
   // ── PSI extraction (3 strategies) ────────────────────────────
@@ -304,7 +231,7 @@ export const extractPsi = async (
  * whether to abort immediately or retry.
  */
 export const fetchPage = async (
-  session: SessionAdapter,
+  session: UrlFetchSession,
   profile: BrowserProfile,
   query: string,
   lat: number,

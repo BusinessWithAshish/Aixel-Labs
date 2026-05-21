@@ -15,7 +15,8 @@
 import { Request, Response } from "express";
 import { GMAPS } from "./constants";
 import {
-  createSession,
+  closeUrlFetchSession,
+  createGmapsSession,
   delay,
   extractPsi,
   fetchPage,
@@ -24,23 +25,12 @@ import {
   pickBrowserProfile,
 } from "./helpers";
 import type { GMAPS_INTERNAL_RESPONSE } from "./types";
-import { destroyTLS, initTLS } from "node-tls-client";
-import { Lead, LeadSource } from "../../../db/types";
 import { ALApiResponse } from "../../types";
 import { GMAPS_REQUEST_SCHEMA } from "../schemas";
 
 // ─────────────────────────────────────────────────────────────
 
-// ── Initialize TLS lazily (CJS-safe, avoids top-level await) ──
-let tlsInitialized = false;
-async function ensureTls() {
-  if (tlsInitialized) return;
-  await initTLS();
-  tlsInitialized = true;
-}
-
 export const gmapsInternalHandler = async (req: Request, res: Response) => {
-  await ensureTls();
   // ── Validate request ────────────────────────────────────────
   const parsed = GMAPS_REQUEST_SCHEMA.safeParse(req.body);
 
@@ -112,9 +102,8 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
       attempt <= GMAPS.MAX_RETRIES && !citySuccess;
       attempt++
     ) {
-      // Fresh TLS session per city = clean cookie jar, new TLS handshake.
-      // Profile (UA + clientIdentifier) stays the same → consistent fingerprint.
-      const session = createSession(profile);
+      // One url-session-handler batch per city (cookie jar + sticky proxy).
+      const session = await createGmapsSession(profile);
 
       try {
         console.log(
@@ -191,6 +180,8 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
           const backoff = GMAPS.DELAY_RETRY_BASE * attempt;
           await delay(backoff, backoff + 1_000);
         }
+      } finally {
+        await closeUrlFetchSession(session);
       }
     }
 
@@ -235,13 +226,3 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
 
   res.status(200).json(response);
 };
-
-// ── Cleanup ───────────────────────────────────────────────────
-process.on("SIGTERM", async () => {
-  await destroyTLS();
-  process.exit(0);
-});
-process.on("SIGINT", async () => {
-  await destroyTLS();
-  process.exit(0);
-});
