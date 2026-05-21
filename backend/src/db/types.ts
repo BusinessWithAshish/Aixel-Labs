@@ -4,6 +4,7 @@
  */
 import { type GMAPS_INTERNAL_RESPONSE } from "../api/gmaps/internal/types";
 import { type GMAPS_SCRAPE_LEAD_INFO } from "../api/gmaps/scrape/types";
+import { INSTAGRAM_RESPONSE } from "../api/instagram";
 import { ObjectId } from "mongodb";
 import {INSTAGRAM_RESPONSE} from "../api/instagram";
 
@@ -18,6 +19,7 @@ export enum MongoCollections {
   USERS = "users",
   LEADS = "leads",
   USER_LEADS = "user_leads",
+  LEAD_LISTS = "lead_lists",
 }
 
 export enum Modules {
@@ -124,9 +126,25 @@ export type UserLeadDoc<Id = ObjectId> = {
   _id?: Id;
   userId: Id;
   leadId: Id;
+  listId: Id;
+  tags?: string[];
+  lastVerifiedAt?: Date;
+  score?: number;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
 };
 
 export type UserLead = UserLeadDoc<string>;
+
+export type UserLeadListDoc<Id = ObjectId> = {
+  _id?: Id;
+  userId: Id;
+  name: string;
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** List row for UI/API: `leadCount` is derived from `user_leads`, not stored on the list document. */
+export type UserLeadList = UserLeadListDoc<string> & { leadCount: number };
