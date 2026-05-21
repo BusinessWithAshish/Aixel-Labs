@@ -3,7 +3,7 @@ import { validateAndGetTenant } from '@/helpers/validate-tenant';
 import { isPathAccessible } from '@/helpers/sidebar-config-helpers';
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
-import { DEFAULT_HOME_PAGE_ROUTE, PATHNAME_HEADER_KEY} from '@/config/app-config';
+import { DEFAULT_HOME_PAGE_ROUTE, PATHNAME_HEADER_KEY } from '@/config/app-config';
 
 /**
  * HOC that guards protected routes: auth, tenant validation, and module access.
@@ -11,7 +11,7 @@ import { DEFAULT_HOME_PAGE_ROUTE, PATHNAME_HEADER_KEY} from '@/config/app-config
  *
  * @example
  * ```tsx
- * export default withRouteGuard(function ProtectedLayout({ children }) {
+ * export default withRouteGuard(function ProtectedSegmentLayout({ children }) {
  *   return <SidebarProvider><AppSidebar />{children}</SidebarProvider>;
  * });
  * ```
