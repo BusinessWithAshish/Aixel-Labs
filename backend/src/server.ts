@@ -1,8 +1,9 @@
+// Load `.env` before any local module reads `process.env` into constants (e.g. PROXY_CONFIG).
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import dotenv from "dotenv";
 import morgan from "morgan";
 import path from "path";
 import { registerRoutes } from "./routes";
@@ -12,8 +13,6 @@ import {
   ALLOWED_ORIGINS_PROD_REGEX,
   API_ENDPOINTS,
 } from "./config";
-
-dotenv.config();
 
 const app: Express = express();
 
