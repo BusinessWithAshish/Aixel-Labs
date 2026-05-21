@@ -15,3 +15,15 @@ export function toBoolean(value: string | boolean | null) {
     if (v === 'false') return false;
     return value;
 }
+
+export type WithStringId<T extends { _id?: unknown }> = Omit<T, '_id'> & {
+    _id?: string;
+};
+
+export function mapMongoDocToClient<T extends { _id?: { toString(): string } | null | undefined }>(doc: T): WithStringId<T> {
+    const { _id, ...rest } = doc;
+    return {
+        ...rest,
+        _id: _id?.toString(),
+    } as WithStringId<T>;
+}

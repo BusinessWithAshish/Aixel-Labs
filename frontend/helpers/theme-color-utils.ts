@@ -2,8 +2,17 @@ type RGB = { r: number; g: number; b: number };
 
 export const THEME_COLOR_COOKIE_KEY = 'theme-color';
 
+/** Ensures `#rrggbb` for parsing (Mongo / admins often store without `#`). */
+export function normalizeThemeHex(hex: string): string {
+    const t = hex.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(t)) return t;
+    if (/^[0-9a-fA-F]{6}$/.test(t)) return `#${t}`;
+    return t;
+}
+
 function hexToRgb(hex: string): RGB | null {
-    const match = hex.trim().match(/^#([0-9a-fA-F]{6})$/);
+    const normalized = normalizeThemeHex(hex);
+    const match = normalized.match(/^#([0-9a-fA-F]{6})$/);
     if (!match) return null;
     const intVal = parseInt(match[1], 16);
     return {
@@ -58,8 +67,8 @@ export function getCssVarsFromHex(hex: string): ThemeCssVars | null {
 }
 
 /**
- * Builds an inline CSS string (for a <style> tag) that sets the theme CSS
- * variables on :root for a given hex color. Returns an empty string if invalid.
+ * Inline <style> body: sets primary-related CSS vars on `html:root` and `html.dark`
+ * so they override `globals.css`. Returns an empty string if hex is invalid.
  */
 export function buildThemeStyleTag(hex: string): string {
     const vars = getCssVarsFromHex(hex);
@@ -67,7 +76,9 @@ export function buildThemeStyleTag(hex: string): string {
 
     const declarations = (Object.entries(vars) as [string, string][]).map(([k, v]) => `  ${k}: ${v};`).join('\n');
 
-    return `:root {\n${declarations}\n}`;
+    // Higher specificity than globals.css `:root` / `.dark` so tenant primary wins in light + dark.
+    const block = `{\n${declarations}\n}`;
+    return `html:root ${block}\nhtml.dark ${block}`;
 }
 
 /**
