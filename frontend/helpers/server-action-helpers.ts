@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { MongoObjectId } from '@aixellabs/backend/db';
+import { isValidObjectId } from '@/helpers/object-id';
 
 const CRITICAL_LOG_PREFIX = '[critical]';
 
@@ -55,7 +56,7 @@ export async function runPublicAction<T>(
 }
 
 export function assertValidObjectId(id: string, label = 'ID'): void {
-    if (!MongoObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
         throw new Error(`${label} is invalid`);
     }
 }
