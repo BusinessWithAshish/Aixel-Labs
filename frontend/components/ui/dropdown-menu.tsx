@@ -27,6 +27,10 @@ function DropdownMenuTrigger({
     <DropdownMenuPrimitive.Trigger
       data-slot="dropdown-menu-trigger"
       {...props}
+      className={cn(
+        "cursor-pointer",
+        props.className
+      )}
     />
   )
 }

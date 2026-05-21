@@ -18,21 +18,21 @@ const badgeVariants = cva(
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         green:
-          "border-transparent bg-green-500 text-white [a&]:hover:bg-green-500/90",
+          "border-transparent bg-green-100 text-green-600 [a&]:hover:bg-green-100/90",
         yellow:
-          "border-transparent bg-yellow-500 text-white [a&]:hover:bg-yellow-500/90",
+          "border-transparent bg-yellow-100 text-yellow-600 [a&]:hover:bg-yellow-100/90",
         red:
-          "border-transparent bg-red-500 text-white [a&]:hover:bg-red-500/90",
+          "border-transparent bg-red-100 text-red-600 [a&]:hover:bg-red-100/90",
         blue:
-          "border-transparent bg-blue-500 text-white [a&]:hover:bg-blue-500/90",
+          "border-transparent bg-blue-100 text-blue-600 [a&]:hover:bg-blue-100/90",
         purple:
-          "border-transparent bg-purple-500 text-white [a&]:hover:bg-purple-500/90",
+          "border-transparent bg-purple-100 text-purple-600 [a&]:hover:bg-purple-100/90",
         orange:
-          "border-transparent bg-orange-500 text-white [a&]:hover:bg-orange-500/90",
+          "border-transparent bg-orange-100 text-orange-600 [a&]:hover:bg-orange-100/90",
         pink:
-          "border-transparent bg-pink-500 text-white [a&]:hover:bg-pink-500/90",
+          "border-transparent bg-pink-100 text-pink-600 [a&]:hover:bg-pink-100/90",
         brown:
-          "border-transparent bg-brown-500 text-white [a&]:hover:bg-brown-500/90",
+          "border-transparent bg-brown-100 text-brown-600 [a&]:hover:bg-brown-100/90",
       },
       size: {
         default: "px-2 py-0.5",
