@@ -3,61 +3,12 @@ import type {
   INSTAGRAM_RESPONSE,
   InstagramUser,
 } from "./types";
-import crypto from "crypto";
-import { INSTAGRAM_BASE_URL } from "./constants";
-import { Impit } from "impit";
-import {
-  IG_HEADERS,
-  REQUEST_TIMEOUT_MS,
-  MAX_RETRIES,
-  RETRY_BASE_DELAY_MS,
-} from "./constants";
-import { PROXY_CONFIG } from "../../utils/constants";
+import { IG_HEADERS, INSTAGRAM_BASE_URL } from "./constants";
+import { fetchUrls } from "../../utils/url-session-handler";
 import { GSEARCH_RESPONSE } from "../gsearch/types";
 import { fetchGSearch } from "../gsearch/helpers";
 import { GOOGLE_SEARCH_QUERY_LIMITS } from "../gsearch/constants";
 import { DEFAULT_GSEARCH_MAX_PAGES } from "../gsearch/constants";
-
-const IMPIT_CONCURRENCY = Math.max(
-  1,
-  Math.min(32, Number(process.env.INSTAGRAM_IMPIT_CONCURRENCY) || 2),
-);
-const IMPIT_CHUNK_GAP_MS = Math.max(
-  0,
-  Number(process.env.INSTAGRAM_IMPIT_CHUNK_GAP_MS) || 400,
-);
-
-function newStickySessionId(): string {
-  return (
-    (crypto as { randomUUID?: () => string }).randomUUID?.() ??
-    crypto.randomBytes(16).toString("hex")
-  );
-}
-
-/** `{password}_session-{id}` via `URL` userinfo */
-function evomiProxyUrl(sessionId: string): string | undefined {
-  const { PROTOCOL, HOSTNAME, PORT, USERNAME, PASSWORD } = PROXY_CONFIG;
-  if (!USERNAME || !PASSWORD || !HOSTNAME || !PORT) return undefined;
-  const sep = "_";
-  const sid = sessionId.trim() || newStickySessionId();
-  const pwd = `${PASSWORD}${sep}session-${sid}`;
-  const u = new URL(`${PROTOCOL}://${HOSTNAME}:${String(PORT)}`);
-  u.username = USERNAME;
-  u.password = pwd;
-  return u.href.replace(/\/$/, "");
-}
-
-function createInstagramImpit(sessionId: string): Impit {
-  const proxyUrl = evomiProxyUrl(sessionId);
-  return new Impit({
-    browser: "chrome",
-    ignoreTlsErrors: true,
-    timeout: REQUEST_TIMEOUT_MS,
-    ...(proxyUrl ? { proxyUrl } : {}),
-  });
-}
-
-type ProfileFetchOpts = { client?: Impit };
 
 export const generateAdvanceQuery = (
   keywords: string[] | undefined,
@@ -186,26 +137,6 @@ function uniqueUsernames(entities: (string | null)[]): string[] {
   return out;
 }
 
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  label: string,
-): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Request timed out after ${ms}ms (${label})`)),
-        ms,
-      ),
-    ),
-  ]);
-}
-
 function mapToResponse(
   user: InstagramUser["data"]["user"],
 ): INSTAGRAM_RESPONSE {
@@ -255,99 +186,15 @@ export const hasEntities = (entities: string[] | undefined) =>
 export const hasQuery = (q: string | undefined) =>
   typeof q === "string" && q.trim().length > 0;
 
-export async function fetchInstagramProfile(
-  username: string,
-  opts: ProfileFetchOpts = {},
-): Promise<INSTAGRAM_RESPONSE | null> {
-  const url = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`;
+export function instagramWebProfileInfoUrl(username: string): string {
+  return `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`;
+}
 
-  let lastError: Error | null = null;
-  const client = opts.client ?? createInstagramImpit(newStickySessionId());
-
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await withTimeout(
-        client.fetch(url, { headers: IG_HEADERS }),
-        REQUEST_TIMEOUT_MS,
-        username,
-      );
-
-      // Not found / banned / deactivated → skip silently
-      if (response.status === 404) return null;
-
-      // Rate-limited or transient server error → retry with backoff
-      if (response.status === 429 || response.status >= 500) {
-        const retryAfterHeader = response.headers.get?.("retry-after");
-        const backoff = retryAfterHeader
-          ? parseInt(retryAfterHeader, 10) * 1_000
-          : RETRY_BASE_DELAY_MS * 2 ** (attempt - 1) + Math.random() * 500;
-
-        lastError = new Error(`HTTP ${response.status} on attempt ${attempt}`);
-
-        if (attempt < MAX_RETRIES) {
-          await sleep(backoff);
-          continue;
-        }
-
-        // Retries exhausted on transient error → skip
-        return null;
-      }
-
-      // Hard auth failure (app-id stale) → throw so the handler can surface it
-      if (response.status === 401 || response.status === 403) {
-        const body = await response.text().catch(() => "");
-        throw new Error(
-          `Instagram auth failure (${response.status}) — x-ig-app-id may be stale. Body: ${body.slice(0, 200)}`,
-        );
-      }
-
-      // Any other unexpected non-OK status → skip
-      if (!response.ok) return null;
-
-      // Parse response
-      let json: InstagramUser;
-      try {
-        json = await response.json();
-      } catch {
-        // Encoding / decompression mismatch → retry
-        lastError = new Error(`JSON parse failed for @${username}`);
-        if (attempt < MAX_RETRIES) {
-          await sleep(RETRY_BASE_DELAY_MS * attempt);
-          continue;
-        }
-        return null;
-      }
-
-      const user = json?.data?.user;
-
-      // null user = private / deactivated / banned → skip
-      if (!user) return null;
-
-      return mapToResponse(user);
-    } catch (err) {
-      const error = err as Error;
-
-      // Hard auth failure — bubble up immediately, stop all retries
-      if (error.message.includes("auth failure")) throw error;
-
-      lastError = error;
-
-      if (attempt < MAX_RETRIES) {
-        const base =
-          RETRY_BASE_DELAY_MS * 2 ** (attempt - 1) + Math.random() * 500;
-        const tunnel =
-          /TunnelUnsuccessful|Failed to connect to the server/i.test(
-            error.message,
-          );
-        await sleep(tunnel ? base * 3 + 1_500 + Math.random() * 1_000 : base);
-      }
-    }
-  }
-
-  console.error(
-    `[instagram] Giving up on @${username} after ${MAX_RETRIES} attempts: ${lastError?.message}`,
-  );
-  return null;
+function mapInstagramWebProfileBody(text: string): INSTAGRAM_RESPONSE {
+  const json = JSON.parse(text) as InstagramUser;
+  const user = json?.data?.user;
+  if (!user) throw new Error("Instagram profile response missing user");
+  return mapToResponse(user);
 }
 
 export async function fetchFromEntities(
@@ -358,27 +205,17 @@ export async function fetchFromEntities(
   }
 
   const usernames = uniqueUsernames(entities);
-  const impit = createInstagramImpit(newStickySessionId());
-  const settled: PromiseSettledResult<INSTAGRAM_RESPONSE | null>[] = [];
+  const urls = usernames.map(instagramWebProfileInfoUrl);
 
-  for (let i = 0; i < usernames.length; i += IMPIT_CONCURRENCY) {
-    const chunk = usernames.slice(i, i + IMPIT_CONCURRENCY);
-    settled.push(
-      ...(await Promise.allSettled(
-        chunk.map((u) => fetchInstagramProfile(u, { client: impit })),
-      )),
-    );
-    if (i + IMPIT_CONCURRENCY < usernames.length && IMPIT_CHUNK_GAP_MS > 0) {
-      await sleep(IMPIT_CHUNK_GAP_MS);
-    }
+  if (urls.length === 0) {
+    return [];
   }
 
-  return settled
-    .filter(
-      (r): r is PromiseFulfilledResult<INSTAGRAM_RESPONSE> =>
-        r.status === "fulfilled" && r.value !== null,
-    )
-    .map((r) => r.value);
+  return fetchUrls<INSTAGRAM_RESPONSE>({
+    targets: [urls],
+    headers: IG_HEADERS,
+    mapper: (text) => mapInstagramWebProfileBody(text),
+  });
 }
 
 export async function fetchFromQuery(
@@ -401,26 +238,25 @@ export async function fetchFromQuery(
     );
   }
 
-  // CALL THE GSEARCH ENDPOINT
-  const searchResulstsData: GSEARCH_RESPONSE[] = await fetchGSearch({
+  const searchResultsData: GSEARCH_RESPONSE[] = await fetchGSearch({
     searchQuery: searchQuery,
     pages: DEFAULT_GSEARCH_MAX_PAGES,
     country: country!,
     city: city!,
   });
 
-  if (!searchResulstsData.length) {
-    throw new Error("Failed to fetch search results from GSearch.");
+  if (!searchResultsData.length) {
+    throw new Error("Failed to fetch instagram search results from GSearch.");
   }
 
   // SERP URLs like /handle/reel/… or /handle/tagged/… still yield the profile handle
   // from the first path segment via `extractUsername` (same path as fetchFromEntities).
   const entities = uniqueUsernames(
-    searchResulstsData.map((row) => row.url ?? null),
+    searchResultsData.map((row) => row.url ?? null),
   );
 
   console.log(
-    `[instagram] SERP rows=${searchResulstsData.length} → unique profile handles=${entities.length}`,
+    `[instagram] SERP rows=${searchResultsData.length} → unique profile handles=${entities.length}`,
   );
 
   return await fetchFromEntities(entities);
