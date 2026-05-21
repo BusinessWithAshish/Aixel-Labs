@@ -1,23 +1,23 @@
 import PageLayout from '@/components/common/PageLayout';
 import { withPageHandler } from '@/components/hocs/with-page-handler';
-import { AllUserLeads } from './_components/AllUserLeads';
-import { getAllUserLeads } from '@/app/actions/user-lead-actions';
 import { PageProvider } from '@/contexts/PageStore';
-import type { Lead } from '@aixellabs/backend/db/types';
-import { useAllLeadsPage } from '@/app/(protected)/lead-generation/leads/_hooks';
+import type { UserLeadList } from '@aixellabs/backend/db/types';
+import { useUserLeadListsPage } from '@/app/(protected)/lead-generation/leads/_hooks/use-user-lead-lists-page';
+import { UserLeadLists } from './_components/UserLeadLists';
+import { getUserLeadLists } from '@/app/actions/user-lead-lists-actions';
 
-const PAGE_TITLE = 'Leads Overview';
+const PAGE_TITLE = 'Leads list';
 
 async function SavedLeadsPage() {
-    const result = await getAllUserLeads();
-    const leads: Lead[] = result.success && result.data ? result.data : [];
+    const userLeadLists = await getUserLeadLists();
+    const userLeadListsData: UserLeadList[] = userLeadLists.success && userLeadLists.data ? userLeadLists.data : [];
 
     return (
-        <PageProvider data={leads} usePageHook={useAllLeadsPage}>
-            <PageLayout title={PAGE_TITLE}>
-                <AllUserLeads />
-            </PageLayout>
-        </PageProvider>
+        <PageLayout title={PAGE_TITLE}>
+            <PageProvider data={userLeadListsData} usePageHook={useUserLeadListsPage}>
+                <UserLeadLists />
+            </PageProvider>
+        </PageLayout>
     );
 }
 

@@ -2,38 +2,36 @@
 
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 
-type DeleteAllLeadsDialogProps = {
+type DeleteLeadsDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    category: string;
     count: number;
     onConfirm: () => void;
     isDeleting?: boolean;
 };
 
-export const DeleteAllLeadsDialog = ({
+export const DeleteLeadsDialog = ({
     open,
     onOpenChange,
-    category,
     count,
     onConfirm,
     isDeleting,
-}: DeleteAllLeadsDialogProps) => {
+}: DeleteLeadsDialogProps) => {
     return (
         <ConfirmDialog
             open={open}
             onOpenChange={onOpenChange}
-            title="Delete All Leads"
+            title="Delete Selected Leads"
             description="This action cannot be undone."
             alertMessage={
                 <>
-                    You are about to delete <strong>{count}</strong> lead(s) from <strong>{category}</strong>. This will
+                    You are about to delete <strong>{count}</strong> lead(s). This will
                     permanently remove all these leads from your saved leads.
                 </>
             }
             onConfirm={onConfirm}
             isLoading={isDeleting}
-            confirmText="Delete All"
+            confirmText="Delete Selected"
             variant="destructive"
         />
     );
