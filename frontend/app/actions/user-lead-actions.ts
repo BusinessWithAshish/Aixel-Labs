@@ -1,279 +1,129 @@
 'use server';
 
-import { Lead, LeadDoc, LeadSource, MongoCollections, MongoObjectId, getCollection, LeadData} from '@aixellabs/backend/db';
-import type { ObjectId, UserLeadDoc } from '@aixellabs/backend/db';
-import { withAuthentication } from './auth-actions';
+import { Lead, LeadDoc, MongoCollections, MongoObjectId, UserLead, getCollection } from '@aixellabs/backend/db';
+import { LEAD_GENERATION_SUB_MODULES, UserLeadDoc, UserLeadListDoc } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
+import {
+    assertRequiredTrimmedString,
+    assertValidObjectId,
+    requireUserObjectId,
+    runAuthenticatedAction,
+    toObjectId,
+} from '@/helpers/server-action-helpers';
+import { buildDefaultLeadListName, generateLeads, getLeadSoruceFromSubModule } from '@/helpers/lead-gen-api';
+import { createUserLeadList } from './user-lead-lists-actions';
 
-export const getAllUserLeads = async (): Promise<ALApiResponse<Lead[]>> => {
-    try {
-        const userLeadsResponse = await withAuthentication(async (userId) => {
-            const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
-            const userLeads = await userLeadsCollection.find({ userId: new MongoObjectId(userId) }).toArray();
-            if (!userLeads.length) return [];
-            const leadIds = userLeads.map((ul) => ul.leadId);
-            if (!leadIds.length) return [];
-            const leadsCollection = await getCollection<LeadDoc>(MongoCollections.LEADS);
-            const userDefinedLeads = await leadsCollection.find({ _id: { $in: leadIds } }).toArray();
-            if (!userDefinedLeads.length) return [];
+export async function createUserLeads<TRequest>(
+    subModule: LEAD_GENERATION_SUB_MODULES,
+    body: TRequest,
+): Promise<ALApiResponse<UserLead[]>> {
+    return runAuthenticatedAction(async function createUserLeads(userId: string) {
+        const uid = requireUserObjectId(userId);
 
-            const leads: Lead[] = userDefinedLeads.map((lead) => ({
-                _id: lead._id.toString(),
-                source: lead.source,
-                sourceId: lead.sourceId,
-                data: lead.data,
-            }));
-            return leads;
-        });
+        const leadsResponse = await generateLeads({ subModule, body });
 
-        if (!userLeadsResponse?.success)
-            return {
-                success: false,
-                error: userLeadsResponse.error,
-            };
-        return {
-            success: true,
-            data: userLeadsResponse.data ?? [],
-        };
-    } catch (error) {
-        console.error('Error fetching user leads:', error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to fetch leads',
-        };
-    }
-};
-
-type SaveUserLeadsBySourceResult = {
-    success: boolean;
-    error?: string;
-    data?: {
-        totalLeads: number;
-        newLeads: number;
-        newUserLeads: number;
-        skippedLeads: number;
-    };
-};
-
-// TODO: Change the return type to be more BE type.
-export async function saveUserLeadsBySource(leads: LeadData[], source: LeadSource): Promise<SaveUserLeadsBySourceResult> {
-    try {
-        const saveUserLeadsResponse = await withAuthentication(async (userId) => {
-            const leadsCollection = await getCollection<LeadDoc>(MongoCollections.LEADS);
-            const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
-            const userIdObj = new MongoObjectId(userId);
-
-            let newLeads = 0;
-            let newUserLeads = 0;
-            let skippedLeads = 0;
-
-            for (const lead of leads) {
-                // 1. Ensure lead exists in leads collection: update if exists, insert if not
-                const existingLead = await leadsCollection.findOne({
-                    source: source,
-                    sourceId: lead.id as string,
-                });
-
-                let leadId: ObjectId;
-
-                if (existingLead) {
-                    leadId = existingLead._id as ObjectId;
-                    await leadsCollection.updateOne({ _id: leadId }, { $set: { data: lead } });
-                } else {
-                    leadId = new MongoObjectId();
-                    await leadsCollection.insertOne({
-                        _id: leadId,
-                        source: source,
-                        sourceId: lead.id as string,
-                        data: lead,
-                    });
-                    newLeads += 1;
-                }
-
-                // 2. Link to user via user_leads if not already saved for this user
-                const existingUserLead = await userLeadsCollection.findOne({
-                    userId: userIdObj,
-                    leadId,
-                });
-
-                if (existingUserLead) {
-                    skippedLeads += 1;
-                } else {
-                    const now = new Date();
-                    await userLeadsCollection.insertOne({
-                        userId: userIdObj,
-                        leadId,
-                        createdAt: now,
-                        updatedAt: now,
-                    } as UserLeadDoc);
-                    newUserLeads += 1;
-                }
-            }
-
-            return {
-                totalLeads: leads.length,
-                newLeads,
-                newUserLeads,
-                skippedLeads,
-            };
-        });
-
-        if (!saveUserLeadsResponse.success) {
-            return {
-                success: false,
-                error: saveUserLeadsResponse.error,
-            };
+        if (!leadsResponse.success || !leadsResponse.data?.length) {
+            throw new Error(leadsResponse.error ?? 'Failed to generate leads');
         }
 
-        return {
-            success: true,
-            data: saveUserLeadsResponse.data,
-        };
-    } catch (error) {
-        console.error('Error saving leads:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Failed to save leads';
-        return {
-            success: false,
-            error: errorMessage,
-        };
-    }
-}
+        const leads = [
+            ...new Map(leadsResponse.data.filter((lead) => lead.id != null).map((lead) => [lead.id!, lead])).values(),
+        ];
+        if (!leads.length) {
+            throw new Error('[CRITICAL] No leads to save');
+        }
 
-type DeleteResult = { success: boolean; error?: string };
-type UpdateNotesResult = { success: boolean; error?: string };
+        const leadSource = getLeadSoruceFromSubModule(subModule);
 
-export async function deleteUserLead(leadId: string): Promise<DeleteResult> {
-    try {
-        const deletedLeadResponse = await withAuthentication(async (userId) => {
-            const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
+        const userLeadListResponse = await createUserLeadList({ name: buildDefaultLeadListName(subModule) });
+        if (!userLeadListResponse.success || !userLeadListResponse.data) {
+            throw new Error('Failed to create user lead list');
+        }
 
-            const deletedLeadResponse = await userLeadsCollection.deleteOne({
-                userId: new MongoObjectId(userId),
-                leadId: new MongoObjectId(leadId),
-            });
+        const listId = new MongoObjectId(userLeadListResponse.data._id);
+        const now = new Date();
+        const leadsCollection = await getCollection<LeadDoc>(MongoCollections.LEADS);
+        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
 
-            if (deletedLeadResponse.deletedCount === 0) throw new Error('Lead not found or already deleted');
-        });
-        if (!deletedLeadResponse?.success)
-            return {
-                success: false,
-                error: deletedLeadResponse.error,
-            };
-        return {
-            success: true,
-        };
-    } catch (error) {
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to delete lead',
-        };
-    }
-}
-
-export async function deleteUserLeads(leadIds: string[]): Promise<DeleteResult> {
-    try {
-        const deletedLeadsResponse = await withAuthentication(async (userId) => {
-            const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
-            await userLeadsCollection.deleteMany({
-                userId: new MongoObjectId(userId),
-                leadId: { $in: leadIds.map((id) => new MongoObjectId(id)) },
-            });
-        });
-        if (!deletedLeadsResponse?.success)
-            return {
-                success: false,
-                error: deletedLeadsResponse.error,
-            };
-        return {
-            success: true,
-        };
-    } catch (error) {
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to delete leads',
-        };
-    }
-}
-
-export async function deleteUserLeadsBySource(source?: LeadSource): Promise<DeleteResult> {
-    try {
-        const deletedLeadsBySourceResponse = await withAuthentication(async (userId) => {
-            const uid = new MongoObjectId(userId);
-
-            const userLeadsCollection = await getCollection(MongoCollections.USER_LEADS);
-
-            const leadsCollection = await getCollection(MongoCollections.LEADS);
-
-            const userLeads = (await userLeadsCollection.find({ userId: uid }).toArray()) as UserLeadDoc[];
-
-            const leadIds = userLeads.map((ul) => ul.leadId);
-
-            if (leadIds.length === 0) return;
-            const query: { _id: { $in: typeof leadIds }; source?: LeadSource } = { _id: { $in: leadIds } };
-            if (source) query.source = source;
-            const leadsToDelete = (await leadsCollection.find(query).toArray()) as LeadDoc[];
-            const leadIdsToDelete = leadsToDelete.map((lead) => lead._id);
-            if (leadIdsToDelete.length === 0) return;
-            await userLeadsCollection.deleteMany({ userId: uid, leadId: { $in: leadIdsToDelete } });
-        });
-        if (!deletedLeadsBySourceResponse.success)
-            return {
-                success: false,
-                error: deletedLeadsBySourceResponse.error,
-            };
-        return {
-            success: true,
-        };
-    } catch (error) {
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to delete leads by source',
-        };
-    }
-}
-
-export async function updateUserLeadNotes(leadId: string, notes: string): Promise<UpdateNotesResult> {
-    try {
-        const updatedNotesResponse = await withAuthentication(async (userId) => {
-            const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
-            const updatedNotesResponse = await userLeadsCollection.updateOne(
-                { userId: new MongoObjectId(userId), leadId: new MongoObjectId(leadId) },
-                { $set: { notes, updatedAt: new Date() } },
+        const userLeads: UserLead[] = [];
+        for (const lead of leads) {
+            const sourceId = lead.id!;
+            const leadDoc = await leadsCollection.findOneAndUpdate(
+                { source: leadSource, sourceId },
+                { $set: { data: lead }, $setOnInsert: { source: leadSource, sourceId } },
+                { upsert: true, returnDocument: 'after' },
             );
-            if (updatedNotesResponse.modifiedCount === 0) throw new Error('Lead not found');
-        });
-        if (!updatedNotesResponse.success)
-            return {
-                success: false,
-                error: updatedNotesResponse.error,
-            };
-        return {
-            success: true,
-        };
-    } catch (error) {
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to update notes',
-        };
-    }
+            if (!leadDoc?._id) {
+                throw new Error('Failed to upsert lead');
+            }
+
+            const userLeadDoc = await userLeadsCollection.findOneAndUpdate(
+                { userId: uid, leadId: leadDoc._id },
+                {
+                    $set: { listId, updatedAt: now },
+                    $setOnInsert: { userId: uid, leadId: leadDoc._id, createdAt: now },
+                },
+                { upsert: true, returnDocument: 'after' },
+            );
+            if (!userLeadDoc?._id) {
+                throw new Error('Failed to upsert user lead');
+            }
+
+            userLeads.push({
+                _id: userLeadDoc._id.toString(),
+                userId: uid.toString(),
+                leadId: leadDoc._id.toString(),
+                listId: listId.toString(),
+                createdAt: userLeadDoc.createdAt,
+                updatedAt: now,
+            });
+        }
+
+        return userLeads;
+    });
 }
 
-export async function updateUserLeadsNotes(leadIds: string[], notes: string): Promise<UpdateNotesResult> {
-    try {
-        await withAuthentication(async (userId) => {
-            const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
-            await userLeadsCollection.updateMany(
-                { userId: new MongoObjectId(userId), leadId: { $in: leadIds.map((id) => new MongoObjectId(id)) } },
-                { $set: { notes, updatedAt: new Date() } },
-            );
+export const getUserLeadsForList = async (listId: string): Promise<ALApiResponse<Lead[]>> => {
+    assertRequiredTrimmedString(listId, 'List ID');
+    assertValidObjectId(listId, 'List ID');
+
+    return runAuthenticatedAction(async function getUserLeadsForList(userId: string) {
+        const uid = requireUserObjectId(userId);
+        const lid = toObjectId(listId, 'List ID');
+
+        const listsCollection = await getCollection<UserLeadListDoc>(MongoCollections.LEAD_LISTS);
+        const listDoc = await listsCollection.findOne({ _id: lid, userId: uid });
+        if (!listDoc) {
+            throw new Error('List not found');
+        }
+
+        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
+        const userLeadDocs = await userLeadsCollection.find({ userId: uid, listId: lid }).toArray();
+        if (!userLeadDocs.length) {
+            throw new Error('No leads found for list');
+        }
+
+        const leadIds = userLeadDocs.map((userLeadDoc) => userLeadDoc.leadId);
+        const leadsCollection = await getCollection<LeadDoc>(MongoCollections.LEADS);
+        const leadDocs = await leadsCollection.find({ _id: { $in: leadIds } }).toArray();
+
+        return leadDocs.map((leadDoc) => ({
+            _id: leadDoc._id.toString(),
+            source: leadDoc.source,
+            sourceId: leadDoc.sourceId,
+            data: leadDoc.data,
+        }));
+    });
+};
+
+export const deleteUserLeads = async (leadIds: string[]): Promise<ALApiResponse<boolean>> =>
+    runAuthenticatedAction(async function deleteUserLeads(userId: string) {
+        const uid = requireUserObjectId(userId);
+        const leadOids = leadIds.map((id) => toObjectId(id, 'Lead ID'));
+        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
+        await userLeadsCollection.deleteMany({
+            userId: uid,
+            leadId: { $in: leadOids },
         });
-        return {
-            success: true,
-        };
-    } catch (error) {
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to update notes',
-        };
-    }
-}
+        return true;
+    });
