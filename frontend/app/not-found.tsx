@@ -21,7 +21,7 @@ import type { Metadata } from 'next';
 import { auth } from '@/auth';
 import PageLayout from '@/components/common/PageLayout';
 import { CommonNotFound } from "@/components/common/CommonNotFound";
-import { ProtectedLayout } from '@/components/common/ProtectedLayout';
+import { SidebarAppShell } from '@/components/layout/sidebar-app-shell';
 
 export const metadata: Metadata = {
     title: '404 - Page Not Found',
@@ -35,11 +35,11 @@ export default async function NotFound() {
     // If authenticated, render with sidebar (like protected routes)
     if (session?.user) {
         return (
-            <ProtectedLayout>
+            <SidebarAppShell>
                 <PageLayout className="h-full" title="404 - Page Not Found">
                     <CommonNotFound />
                 </PageLayout>
-            </ProtectedLayout>
+            </SidebarAppShell>
         );
     }
 
