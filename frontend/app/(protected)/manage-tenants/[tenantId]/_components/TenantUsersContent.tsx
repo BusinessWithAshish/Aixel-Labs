@@ -7,7 +7,7 @@ import { AddUserCard } from './AddUserCard';
 import { UserDialog } from './EditUserDialog';
 import { DeleteUserConfirmDialog } from './DeleteUserConfirmDialog';
 import { usePage } from '@/contexts/PageStore';
-import type { UseTenantUsersPageReturn } from '../_hooks';
+import type { UseTenantUsersPageReturn } from '../_hooks/useTenantUsersPage';
 import type { User } from '@aixellabs/backend/db/types';
 import { deleteUser } from '@/app/actions/user-actions';
 import { Input } from '@/components/ui/input';

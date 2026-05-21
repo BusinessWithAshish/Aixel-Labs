@@ -9,7 +9,7 @@ import { deleteTenant } from '@/app/actions/tenant-actions';
 import type { Tenant } from '@aixellabs/backend/db/types';
 import { usePage } from '@/contexts/PageStore';
 import { toast } from 'sonner';
-import type { UseManageTenantsPageReturn } from '@/app/(protected)/manage-tenants/_hooks';
+import type { UseManageTenantsPageReturn } from '@/app/(protected)/manage-tenants/_hooks/useManageTenantsPage';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { MANAGE_TENANTS_PREFIX } from '@/config/app-config';

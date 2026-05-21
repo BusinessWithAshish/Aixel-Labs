@@ -1,7 +1,7 @@
 import PageLayout from '@/components/common/PageLayout';
 import { withPageHandler } from '@/components/hocs/with-page-handler';
-import { ManageTenantsContent } from './_components';
-import { useManageTenantsPage } from './_hooks';
+import { ManageTenantsContent } from './_components/ManageTenantsContent';
+import { useManageTenantsPage } from './_hooks/useManageTenantsPage';
 import { withAdminOnly } from '@/components/hocs/with-admin';
 import { getAllTenants } from '@/app/actions/tenant-actions';
 import { PageProvider } from '@/contexts/PageStore';
