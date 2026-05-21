@@ -1,14 +1,14 @@
 import PageLayout from '@/components/common/PageLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, FormInput, List } from 'lucide-react';
+import { MessageSquare, FormInput } from 'lucide-react';
 import { PageProvider } from '@/contexts/PageStore';
 import { useGoogleMapsForm } from './_hooks/use-google-maps-form';
-import { GoogleMapsFormWrapper, GoogleMapsScraperChat, GoogleMapsResultsSection } from './_components';
+import { GoogleMapsFormWrapper } from './_components/GoogleMapsFormWrapper';
+import { GoogleMapsScraperChat } from './_components/GoogleMapsScraperChat';
 
 enum GoogleMapsPageTabs {
     CHAT = 'AI Chat',
     FORM = 'Manual Form',
-    RESULTS = 'Results',
 }
 
 export default function GoogleMapsPage() {
@@ -25,10 +25,6 @@ export default function GoogleMapsPage() {
                             <FormInput className="w-4 h-4" />
                             {GoogleMapsPageTabs.FORM}
                         </TabsTrigger>
-                        <TabsTrigger value={GoogleMapsPageTabs.RESULTS} className="flex items-center gap-2">
-                            <List className="w-4 h-4" />
-                            {GoogleMapsPageTabs.RESULTS}
-                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent className="h-full w-full" value={GoogleMapsPageTabs.CHAT}>
@@ -38,11 +34,6 @@ export default function GoogleMapsPage() {
                     <TabsContent className="h-full w-full" value={GoogleMapsPageTabs.FORM}>
                         <GoogleMapsFormWrapper />
                     </TabsContent>
-
-                    <TabsContent className="h-full w-full" value={GoogleMapsPageTabs.RESULTS}>
-                        <GoogleMapsResultsSection />
-                    </TabsContent>
-
                 </Tabs>
             </PageLayout>
         </PageProvider>

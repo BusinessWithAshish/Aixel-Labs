@@ -3,34 +3,34 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { City, Country, State } from 'country-state-city';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { GMAPS_REQUEST_SCHEMA as GMAPS_INTERNAL_REQUEST_SCHEMA } from '@aixellabs/backend/gmaps';
-import type { GMAPS_INTERNAL_REQUEST, GMAPS_INTERNAL_RESPONSE} from '@aixellabs/backend/gmaps/internal/types';
-import { API_ENDPOINTS } from '@aixellabs/backend/config';
-import apiClient from '@/lib/api-client';
-import { ConfirmResult } from '@/components/common/ChatInterface';
+import type { GMAPS_INTERNAL_REQUEST } from '@aixellabs/backend/gmaps/internal/types';
+import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
+import { useLeadGenScraper } from '@/hooks/use-lead-gen-scraper';
 
 const DEFAULT_FORM_VALUES: GMAPS_INTERNAL_REQUEST = {
     query: '',
     country: '',
+    countryCode: '',
     state: '',
     cities: [],
     urls: [],
 };
 
+const countries = Country.getAllCountries();
+const countryOptions = countries.map((country) => ({
+    label: country.name,
+    value: country.isoCode,
+}));
+
 export const useGoogleMapsForm = () => {
-    const [leads, setLeads] = useState<GMAPS_INTERNAL_RESPONSE[]>([]);
+    const { submitLeadGenScraperForm } = useLeadGenScraper(LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS);
 
     const form = useForm<GMAPS_INTERNAL_REQUEST>({
         resolver: zodResolver(GMAPS_INTERNAL_REQUEST_SCHEMA),
         defaultValues: DEFAULT_FORM_VALUES,
     });
-
-    const countries = Country.getAllCountries();
-    const countryOptions = countries.map((country) => ({
-        label: country.name,
-        value: country.isoCode,
-    }));
 
     const selectedCountry = form.watch('country');
     const selectedState = form.watch('state');
@@ -51,30 +51,27 @@ export const useGoogleMapsForm = () => {
         }));
     }, [selectedCountry, selectedState]);
 
+    const selectedCountryISOCode = useMemo(() => {
+        if (!selectedCountry) return undefined;
+        return Country.getCountryByCode(selectedCountry)?.isoCode;
+    }, [selectedCountry]);
+
+    useEffect(() => {
+        if (!selectedCountryISOCode) return;
+        form.setValue('countryCode', selectedCountryISOCode);
+    }, [selectedCountryISOCode, form]);
+
     const isStateFieldDisabled = !selectedCountry;
     const isCityFieldDisabled = !selectedCountry || !selectedState;
 
-    const onSubmit = async (data: GMAPS_INTERNAL_REQUEST): Promise<ConfirmResult> => {
-        const apiResponse = await apiClient.post<GMAPS_INTERNAL_RESPONSE[], GMAPS_INTERNAL_REQUEST>(API_ENDPOINTS.GMAPS.INTERNAL.full, data);
-        if (!apiResponse.success || !apiResponse.data) {
-            return {
-                success: false,
-                message: apiResponse.error || 'Sorry! Failed to submit form or find leads. Please try again later.',
-            };
-        }
-        setLeads(apiResponse.data);
-        form.reset(DEFAULT_FORM_VALUES);
-        return {
-            success: true,
-            message: 'Leads are ready! Check the Results tab.',
-        };
-    };
+    const onSubmit = (data: GMAPS_INTERNAL_REQUEST) =>
+        submitLeadGenScraperForm({
+            body: data,
+            onSuccess: () => form.reset(DEFAULT_FORM_VALUES),
+        });
 
     return {
         form,
-        leads,
-        setLeads,
-        isSubmitting: form.formState.isSubmitting,
         onSubmit,
         countryOptions,
         stateOptions,
