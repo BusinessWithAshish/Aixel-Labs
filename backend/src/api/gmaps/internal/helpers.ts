@@ -8,7 +8,7 @@ import {
   closeUrlFetchSession,
   createUrlFetchSession,
   type UrlFetchSession,
-} from "../../../utils/url-session-handler";
+} from "../../../utils/node-tls-client-session-handler";
 import { mergeHttpHeaderRecords } from "../../../utils/async-helpers";
 import { EARTH_RADIUS, GMAPS, TILE_SIZE, BrowserProfile } from "./constants";
 import type { GMAPS_INTERNAL_RESPONSE } from "./types";

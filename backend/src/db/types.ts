@@ -6,7 +6,10 @@ import { type GMAPS_INTERNAL_RESPONSE } from "../api/gmaps/internal/types";
 import { type GMAPS_SCRAPE_LEAD_INFO } from "../api/gmaps/scrape/types";
 import { INSTAGRAM_RESPONSE } from "../api/instagram";
 import { ObjectId } from "mongodb";
-import {INSTAGRAM_RESPONSE} from "../api/instagram";
+import {
+  LINKEDIN_BY_COMPANY_RESPONSE,
+  LINKEDIN_BY_PEOPLE_RESPONSE,
+} from "../api/linkedin/types";
 
 export enum TenantType {
   IFRAME = "IFRAME",
@@ -81,7 +84,9 @@ export type ModuleAccess = {
 export type LeadData =
   | GMAPS_SCRAPE_LEAD_INFO
   | INSTAGRAM_RESPONSE
-  | GMAPS_INTERNAL_RESPONSE;
+  | GMAPS_INTERNAL_RESPONSE
+  | LINKEDIN_BY_COMPANY_RESPONSE
+  | LINKEDIN_BY_PEOPLE_RESPONSE;
 
 export type TenantDoc<Id = ObjectId> = {
   _id?: Id;
@@ -111,6 +116,8 @@ export type User = UserDoc<string>;
 export enum LeadSource {
   GOOGLE_MAPS = "GOOGLE_MAPS",
   INSTAGRAM = "INSTAGRAM",
+  LINKEDIN = "LINKEDIN",
+  FACEBOOK = "FACEBOOK",
 }
 
 export type LeadDoc<Id = ObjectId> = {

@@ -3,6 +3,7 @@ export enum ENDPOINTS {
   GMAPS = "/gmaps",
   INSTAGRAM = "/instagram",
   GSEARCH = "/gsearch",
+  LINKEDIN = "/linkedin",
   SAMPLE = "/sample",
 }
 
@@ -17,6 +18,9 @@ export const ALLOWED_ORIGINS_PROD_REGEX = [/^https:\/\/.*\.aixellabs\.com$/];
  * Single config per endpoint: `route` for backend Express, `full` for frontend API calls.
  */
 export const API_ENDPOINTS = {
+  LINKEDIN: {
+    API: { route: "/", full: `${ENDPOINTS.LINKEDIN}` },
+  },
   HOME: {
     API: { route: "/", full: `${ENDPOINTS.HOME}` },
   },

@@ -38,6 +38,18 @@
       "types": "./src/api/instagram/schemas.ts",
       "default": "./src/api/instagram/schemas.ts"
     },
+    "./linkedin/constants": {
+      "types": "./src/api/linkedin/constants.ts",
+      "default": "./src/api/linkedin/constants.ts"
+    },
+    "./linkedin/schemas": {
+      "types": "./src/api/linkedin/schemas.ts",
+      "default": "./src/api/linkedin/schemas.ts"
+    },
+    "./linkedin/types": {
+      "types": "./src/api/linkedin/types.ts",
+      "default": "./src/api/linkedin/types.ts"
+    },
     "./db/mongo-client": {
       "types": "./src/db/mongo-client.ts",
       "default": "./src/db/mongo-client.ts"
