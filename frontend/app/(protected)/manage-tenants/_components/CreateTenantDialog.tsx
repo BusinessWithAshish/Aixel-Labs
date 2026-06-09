@@ -100,7 +100,6 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
 
                 <FormProvider {...form}>
                     <form id={createTenantFormName} onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
-
                         <StringControlledField
                             name="name"
                             disabled={!!editingTenant?.name}

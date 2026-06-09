@@ -59,7 +59,6 @@ export const createUser = async (input: User): Promise<ALApiResponse<User>> => {
         throw new Error('Email, password, and tenant ID are required');
     }
     return runAuthenticatedAction(async function createUser() {
-        assertValidObjectId(input._id as string, 'User ID');
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
 

@@ -5,6 +5,7 @@ export enum FeatureFlagKey {
     NL_CHAT_GOOGLE_MAPS = 'nl-chat-google-maps',
     NL_CHAT_INSTAGRAM_SEARCH = 'nl-chat-instagram-search',
     NL_CHAT_LINKEDIN = 'nl-chat-linkedin',
+    LINKEDIN_BY_PEOPLE = 'linkedin-by-people',
 }
 
 export const nlChatGoogleMapsFlag = flag<boolean>({
@@ -34,10 +35,20 @@ export const nlChatLinkedInFlag = flag<boolean>({
     },
 });
 
+export const linkedInByPeopleFlag = flag<boolean>({
+    key: FeatureFlagKey.LINKEDIN_BY_PEOPLE,
+    description: 'LinkedIn lead search by people (form and related flows)',
+    defaultValue: false,
+    decide() {
+        return false;
+    },
+});
+
 const FLAG_BY_KEY = {
     [FeatureFlagKey.NL_CHAT_GOOGLE_MAPS]: nlChatGoogleMapsFlag,
     [FeatureFlagKey.NL_CHAT_INSTAGRAM_SEARCH]: nlChatInstagramFlag,
     [FeatureFlagKey.NL_CHAT_LINKEDIN]: nlChatLinkedInFlag,
+    [FeatureFlagKey.LINKEDIN_BY_PEOPLE]: linkedInByPeopleFlag,
 } as const satisfies Record<FeatureFlagKey, ReturnType<typeof flag<boolean>>>;
 
 export async function evaluateFlag(key: FeatureFlagKey): Promise<boolean> {

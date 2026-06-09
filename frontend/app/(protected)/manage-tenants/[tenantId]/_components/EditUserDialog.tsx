@@ -94,7 +94,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="sm:max-w-2xl max-h-fit">
+            <DialogContent className="sm:max-w-2xl">
                 <FormProvider {...form}>
                     <form onSubmit={handleSubmit(onSubmit)}>
                         <DialogHeader>
@@ -103,7 +103,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                                 {isEditMode ? 'Update user details. Click save when you\'re done.' : 'Create a new user for this tenant. Click create when you\'re done.'}
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="max-h-[50dvh] overflow-y-auto p-2 grid gap-4 py-4">
+                        <div className="grid gap-4 py-4">
                             <StringControlledField
                                 name="email"
                                 label="Email"
@@ -135,7 +135,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                             />
                             <ModuleAccessCard moduleAccess={moduleAccess} onChange={setModuleAccess} />
                         </div>
-                        <DialogFooter className="mt-4">
+                        <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
                                 Cancel
                             </Button>
