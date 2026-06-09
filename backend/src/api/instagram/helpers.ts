@@ -211,8 +211,9 @@ export async function fetchFromEntities(
     return [];
   }
 
+  // Flat targets → one TLS session + fresh Evomi sticky proxy per profile URL.
   return fetchUrls<INSTAGRAM_RESPONSE>({
-    targets: [urls],
+    targets: urls,
     headers: IG_HEADERS,
     mapper: (text) => mapInstagramWebProfileBody(text),
   });

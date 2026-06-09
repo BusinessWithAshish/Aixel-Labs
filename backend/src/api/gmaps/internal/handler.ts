@@ -49,6 +49,11 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
     return;
   }
 
+  if (!parsed.data.countryCode?.trim()) {
+    res.status(400).json({ success: false, error: "countryCode is required" });
+    return;
+  }
+
   const {
     query,
     cities = [],
@@ -57,7 +62,7 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
     countryCode,
   } = parsed.data;
   const resolvedHl = GMAPS.DEFAULT_HL;
-  const resolvedGl = countryCode;
+  const resolvedGl = countryCode.toLowerCase();
 
   const queries = generateQueries(query, cities, state, country);
 
@@ -102,7 +107,7 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
       attempt <= GMAPS.MAX_RETRIES && !citySuccess;
       attempt++
     ) {
-      // One url-session-handler batch per city (cookie jar + sticky proxy).
+      // One TLS session batch per city (cookie jar + sticky proxy).
       const session = await createGmapsSession(profile);
 
       try {

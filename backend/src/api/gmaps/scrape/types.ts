@@ -11,7 +11,7 @@ export type GMAPS_SCRAPE_LEAD_INFO = {
   numberOfReviews: string | null;
 };
 
-export type GMAPS_SCRAPE_REQUEST = z.infer<typeof GMAPS_REQUEST_SCHEMA>;
+export type GMAPS_SCRAPE_REQUEST = z.output<typeof GMAPS_REQUEST_SCHEMA>;
 
 export type GMAPS_SCRAPE_RESPONSE = {
   founded: string[];
