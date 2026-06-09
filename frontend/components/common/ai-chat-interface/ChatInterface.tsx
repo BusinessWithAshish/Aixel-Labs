@@ -1,13 +1,10 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useNlChat } from '@/hooks/use-nl-chat/use-nl-chat';
 import type { UseNlChatOptions } from '@/hooks/use-nl-chat/types';
-import { TASK_REGISTRY, type NlChatModule } from '@/app/api/nl-chat/registry';
-import { NL_CHAT_MODULES } from '@/hooks/use-nl-chat/constants';
 import { ChatHeader } from '@/components/common/ai-chat-interface/ChatHeader';
 import { MessageBubble } from '@/components/common/ai-chat-interface/MessageBubble';
 import { LimitReachedBanner, NearLimitWarning } from '@/components/common/ai-chat-interface/ChatLimits';
@@ -22,11 +19,6 @@ import { ChatInputArea } from '@/components/common/ai-chat-interface/ChatInput';
 import { ChatHistorySidebar } from './ChatHistorySidebar';
 
 export type { UseNlChatOptions } from '@/hooks/use-nl-chat/types';
-
-function isModuleReady(name: UseNlChatOptions['name']): boolean {
-    if (!NL_CHAT_MODULES.has(name)) return false;
-    return TASK_REGISTRY[name as NlChatModule]?.implemented ?? false;
-}
 
 function attachAutoScroll(node: HTMLDivElement | null) {
     if (!node) return;
@@ -47,8 +39,6 @@ export function ChatInterface({
     onConfirm,
     isConfirming = false,
 }: UseNlChatOptions) {
-    const moduleReady = isModuleReady(name);
-
     const {
         input,
         setInput,
@@ -75,14 +65,12 @@ export function ChatInterface({
     const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
     const openSidebar = useCallback(() => setIsSidebarOpen(true), []);
 
-    const isInputDisabled = !moduleReady || isBusy || isAtLimit || isSubmitted;
-    const inputPlaceholder = !moduleReady
-        ? 'Natural language chat is not available for this module yet'
-        : isAtLimit
-            ? 'Turn limit reached — please start a new chat'
-            : isSubmitted
-                ? 'Action already initiated — start a new chat to continue'
-                : placeholder;
+    const isInputDisabled = isBusy || isAtLimit || isSubmitted;
+    const inputPlaceholder = isAtLimit
+        ? 'Turn limit reached — please start a new chat'
+        : isSubmitted
+            ? 'Action already initiated — start a new chat to continue'
+            : placeholder;
 
     return (
         <Card className={cn('h-full w-full flex flex-col overflow-hidden relative', className)}>
@@ -113,14 +101,6 @@ export function ChatInterface({
                     />
 
                     <CardContent ref={attachAutoScroll} className="flex flex-col space-y-4 flex-1 overflow-y-auto">
-                        {!moduleReady && (
-                            <Alert>
-                                <AlertDescription>
-                                    Natural language chat for this module is not available yet. Please use the form instead.
-                                </AlertDescription>
-                            </Alert>
-                        )}
-
                         {messages.length === 0 && (
                             <EmptyState assistantName={assistantName} message={emptyStateMessage} />
                         )}
@@ -135,7 +115,7 @@ export function ChatInterface({
 
                         {status === 'loading' && <LoadingIndicator />}
 
-                        {showConfirm && onConfirm && moduleReady && (
+                        {showConfirm && onConfirm && (
                             <ConfirmationPrompt
                                 extractedData={draft}
                                 onConfirm={confirm}

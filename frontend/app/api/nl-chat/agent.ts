@@ -3,6 +3,7 @@ import type { LanguageModel, UIMessage } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { z } from 'zod';
 import { NL_CHAT_MAX_TURNS } from '@/hooks/use-nl-chat/constants';
+import { isNlChatEnabled } from '@/flags';
 import { buildSystemPrompt, TASK_REGISTRY, type NlChatModule, type ServerPhase, type TurnModelOutput } from './registry';
 
 export type AgentRequest = {
@@ -99,7 +100,7 @@ const FALLBACK_MESSAGE =
 export async function runAgentTurn(req: AgentRequest): Promise<AgentResponse> {
     const config = TASK_REGISTRY[req.key];
 
-    if (!config.implemented) {
+    if (!(await isNlChatEnabled(req.key))) {
         return {
             message: 'This module does not support natural language chat yet. Please use the form instead.',
             draft: req.draft,

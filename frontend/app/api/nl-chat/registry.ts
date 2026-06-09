@@ -17,7 +17,6 @@ export type TaskConfig = {
     turnSchema: z.ZodTypeAny;
     label: string;
     description: string;
-    implemented: boolean;
 };
 
 export type NlChatModule =
@@ -152,7 +151,6 @@ Worked examples:
   "plumbers in dubai"          → query:"plumbers",      cities:["Dubai"],                                country:"United Arab Emirates", countryCode:"ae"
   "cafes in mumbai"            → query:"cafes",         cities:["Mumbai"],     state:"Maharashtra",      country:"India",               countryCode:"in"
   "gyms in toronto"            → query:"gyms",          cities:["Toronto"],    state:"Ontario",          country:"Canada",              countryCode:"ca"`,
-        implemented: false,
     },
 
     [LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH]: {
@@ -172,7 +170,6 @@ Worked examples:
   "#fitness influencers in London"     → hashtags:["fitness"],  city:"London",  country:"United Kingdom"
   "personal trainers in Mumbai"        → query:"personal trainers", city:"Mumbai", country:"India"
   "exclude bots and spam accounts"     → excludeKeywords:["bot","spam"]`,
-        implemented: false,
     },
 
     [LEAD_GENERATION_SUB_MODULES.LINKEDIN]: {
@@ -194,6 +191,5 @@ Worked examples:
   "CTOs at Google or Meta"              → discovery_filters:{ companies:["Google","Meta"], job_titles:["CTO"] }
   "finance professionals with 10+ years" → discovery_filters:{ }, enrichment:{ experience_years:{ min:10 }, industry:["Finance"] }
   "marketers in London"                 → discovery_filters:{ country:"United Kingdom", city:"London", job_titles:["Marketing Manager","Marketing Director","CMO"] }`,
-        implemented: false,
     },
 };
