@@ -674,3 +674,48 @@ export const ZodStringArrayField = ({
         </FieldSet>
     );
 };
+
+export type ZodSearchableGroupedMultiSelectFieldProps = BaseZodFieldProps & {
+    values?: string[];
+    onChange?: (value: string[]) => void;
+    options: OptionGroupType[];
+};
+
+export const ZodSearchableGroupedMultiSelectField = ({
+    name,
+    description,
+    values,
+    invalid,
+    errors,
+    label,
+    onChange,
+    options,
+    required,
+    disabled,
+    className,
+    classNames,
+    orientation,
+    placeholder,
+}: ZodSearchableGroupedMultiSelectFieldProps) => {
+    const fieldLabel = label ?? generateFieldLabel(name);
+    return (
+        <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
+            <FieldContent>
+                <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                    {fieldLabel}
+                </FieldLabel>
+                {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
+            </FieldContent>
+            <SearchableGroupedMultiSelect
+                options={options}
+                values={values}
+                onChange={onChange}
+                placeholder={placeholder ?? `Select ${fieldLabel.toLowerCase()}`}
+                disabled={disabled}
+                aria-disabled={disabled}
+                className={classNames?.input}
+            />
+            {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
+        </Field>
+    );
+};

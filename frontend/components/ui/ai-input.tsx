@@ -15,7 +15,7 @@ export interface AIInputProps {
     value: string;
     /** Value change handler (controlled) */
     onChange: (value: string) => void;
-    /** Submit handler - called when user presses Enter (input) or Cmd+Enter (textarea) */
+    /** Submit handler - called when user presses Enter (input) or Enter without Shift (textarea) */
     onSubmit?: () => void;
     /** Whether the input is disabled */
     disabled?: boolean;
@@ -92,7 +92,7 @@ export const AIInput = forwardRef<AIInputRef, AIInputProps>(function AIInput(
                 e.preventDefault();
                 handleSubmit();
             }
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && variant === 'textarea') {
+            if (e.key === 'Enter' && variant === 'textarea' && !e.shiftKey) {
                 e.preventDefault();
                 handleSubmit();
             }
@@ -115,8 +115,10 @@ export const AIInput = forwardRef<AIInputRef, AIInputProps>(function AIInput(
     const defaultHelperText =
         variant === 'textarea' ? (
             <>
-                Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground font-mono text-[10px]">⌘</kbd> +{' '}
                 <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground font-mono text-[10px]">Enter</kbd> to send
+                {' · '}
+                <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground font-mono text-[10px]">Shift</kbd> +{' '}
+                <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground font-mono text-[10px]">Enter</kbd> for a new line
             </>
         ) : null;
 

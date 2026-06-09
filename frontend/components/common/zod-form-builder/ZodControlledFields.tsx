@@ -5,6 +5,8 @@ import {
     ZodCheckboxField,
     ZodSelectField,
     ZodSwitchField,
+    ZodSearchableGroupedMultiSelectField,
+    ZodSearchableGroupedMultiSelectFieldProps,
     ZodSearchableMultiSelectField,
     ZodSearchableMultiSelectFieldProps,
     ZodSearchableSelectField,
@@ -232,6 +234,45 @@ export const SearchableMultiSelectControlledField = ({ name, description, requir
         />
     );
 }
+
+type SearchableGroupedMultiSelectControlledFieldProps = ControlledFieldBaseProps &
+    ControlledFieldModifiedProps<ZodSearchableGroupedMultiSelectFieldProps>;
+
+export const SearchableGroupedMultiSelectControlledField = ({
+    name,
+    description,
+    required,
+    label,
+    disabled,
+    className,
+    classNames,
+    options,
+    placeholder,
+}: SearchableGroupedMultiSelectControlledFieldProps) => {
+    const fieldLabel = label ?? generateFieldLabel(name);
+    return (
+        <FieldController
+            name={name}
+            render={({ value, invalid, errors, onChange }) => (
+                <ZodSearchableGroupedMultiSelectField
+                    name={name}
+                    label={fieldLabel}
+                    description={description}
+                    values={value}
+                    invalid={invalid}
+                    errors={errors}
+                    onChange={onChange}
+                    options={options}
+                    required={required}
+                    disabled={disabled}
+                    className={className}
+                    classNames={classNames}
+                    placeholder={placeholder}
+                />
+            )}
+        />
+    );
+};
 
 type StringArrayControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodStringArrayFieldProps>
 

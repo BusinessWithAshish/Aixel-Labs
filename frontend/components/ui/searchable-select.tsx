@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, ReactNode } from 'react';
 import { CheckIcon, ChevronsUpDownIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,8 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 export type OptionType = {
     value: string;
     label: string;
+    description?: string;
+    icon?: ReactNode;
 };
 
 type SearchableSelectProps = {
