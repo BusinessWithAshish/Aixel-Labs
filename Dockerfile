@@ -15,6 +15,7 @@ WORKDIR /workspace
 COPY package.json ./
 COPY pnpm-lock.yaml ./
 COPY pnpm-workspace.yaml ./
+COPY patches ./patches
 
 COPY browser-worker/package.json ./browser-worker/package.json
 
