@@ -31,9 +31,6 @@ COPY browser-worker ./browser-worker
 # Build browser-worker
 RUN pnpm --filter @aixellabs/browser-worker build
 
-# Remove dev dependencies
-RUN pnpm --filter @aixellabs/browser-worker prune --prod
-
 
 # ==========================
 # Stage 2 - Runtime
