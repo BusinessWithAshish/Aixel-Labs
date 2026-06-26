@@ -11,7 +11,6 @@
     "prod": "pnpm build && node dist/server.js"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^143.0.4",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "puppeteer-core": "^24.40.0",

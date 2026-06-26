@@ -82,9 +82,7 @@ export const getBrowserOptions = async (
   let headless: LaunchOptions["headless"] = false;
 
   if (isProduction) {
-    const chromium = (await import("@sparticuz/chromium")).default;
-    chromium.setGraphicsMode = false;
-    executablePath = await chromium.executablePath();
+    executablePath = "/usr/bin/chromium";
     headless = "shell";
   }
 

@@ -40,6 +40,11 @@ RUN pnpm --filter @aixellabs/browser-worker deploy --prod /deploy
 # ==========================
 FROM node:22-bookworm-slim
 
+# Install Chromium (brings all required shared libs with it)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+  && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production
 
 WORKDIR /app
