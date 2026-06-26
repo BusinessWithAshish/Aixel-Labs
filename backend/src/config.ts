@@ -3,6 +3,7 @@ export enum ENDPOINTS {
   GMAPS = "/gmaps",
   INSTAGRAM = "/instagram",
   LINKEDIN = "/linkedin",
+  YOUTUBE = "/youtube",
   SAMPLE = "/sample",
 }
 
@@ -30,9 +31,13 @@ export const API_ENDPOINTS = {
   INSTAGRAM: {
     API: { route: "/", full: `${ENDPOINTS.INSTAGRAM}` },
   },
-  GSEARCH: {
-    API: { route: "/", full: `${ENDPOINTS.GSEARCH}` },
-    DRY_RUN: { route: "/dry-run", full: `${ENDPOINTS.GSEARCH}/dry-run` },
+  YOUTUBE: {
+    SEARCH: { route: "/search", full: `${ENDPOINTS.YOUTUBE}/search` },
+    VIDEO: { route: "/videos/:videoId", full: `${ENDPOINTS.YOUTUBE}/videos` },
+    PLAYLIST: {
+      route: "/playlist/:playlistId",
+      full: `${ENDPOINTS.YOUTUBE}/playlist`,
+    },
   },
   SAMPLE: {
     API: { route: "/api", full: `${ENDPOINTS.SAMPLE}/api` },
