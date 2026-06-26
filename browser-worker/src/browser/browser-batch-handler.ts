@@ -36,6 +36,7 @@ type TProcessSingleBrowserProps<T> = {
   scrapingFunction: ScrapingFunction<T>;
   res: Response | null;
   customBrowserArgs?: LaunchOptions;
+  proxyUrl?: string;
 };
 
 const processSingleBrowser = async <T>(
@@ -48,6 +49,7 @@ const processSingleBrowser = async <T>(
     scrapingFunction,
     res,
     customBrowserArgs,
+    proxyUrl,
   } = props;
 
   let browser: Browser | null = null;
@@ -56,7 +58,7 @@ const processSingleBrowser = async <T>(
   try {
     const [puppeteer, browserOptions] = await Promise.all([
       getPuppeteer(),
-      getBrowserOptions({ customBrowserArgs }),
+      getBrowserOptions({ customBrowserArgs, proxyUrl }),
     ]);
 
     browser = (await puppeteer.launch(browserOptions)) as Browser;
@@ -211,6 +213,7 @@ type TProcessBatchOfBrowsersProps<T> = {
   res: Response | null;
   allowBatchWaiting: boolean;
   customBrowserArgs?: LaunchOptions;
+  proxyUrl?: string;
 };
 
 const processBatchOfBrowsers = async <T>(
@@ -223,6 +226,7 @@ const processBatchOfBrowsers = async <T>(
     res,
     allowBatchWaiting,
     customBrowserArgs,
+    proxyUrl,
   } = props;
 
   console.log(
@@ -242,6 +246,7 @@ const processBatchOfBrowsers = async <T>(
       scrapingFunction: scrapingFunction,
       res: res,
       customBrowserArgs: customBrowserArgs,
+      proxyUrl,
     }),
   );
 
@@ -276,6 +281,7 @@ type TBrowserBatchHandlerProps<T> = {
   res: Response | null;
   allowBatchWaiting: boolean;
   customBrowserArgs?: LaunchOptions;
+  proxyUrl?: string;
 };
 
 export const BrowserBatchHandler = async <T>(
@@ -287,6 +293,7 @@ export const BrowserBatchHandler = async <T>(
     res,
     allowBatchWaiting,
     customBrowserArgs,
+    proxyUrl,
   } = props;
 
   const startTime = Date.now();
@@ -327,6 +334,7 @@ export const BrowserBatchHandler = async <T>(
           res: res,
           allowBatchWaiting: allowBatchWaiting,
           customBrowserArgs: customBrowserArgs,
+          proxyUrl,
         });
 
         currentBatchResults.forEach((browserResult) => {

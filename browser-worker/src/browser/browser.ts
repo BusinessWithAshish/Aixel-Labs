@@ -63,19 +63,25 @@ export const optimisedBrowserArgs = [
 
 type TGetBrowserOptionsProps = {
   customBrowserArgs?: LaunchOptions;
+  /** Full proxy URL including credentials, e.g. http://user:pass@host:port */
+  proxyUrl?: string;
 };
 
 export const getBrowserOptions = async (
   props?: TGetBrowserOptionsProps,
 ): Promise<LaunchOptions> => {
-  const { customBrowserArgs } = props ?? {};
+  const { customBrowserArgs, proxyUrl } = props ?? {};
   const isProduction = process.env.NODE_ENV === "production";
   const { PROTOCOL, HOSTNAME, PORT } = PROXY_CONFIG;
 
   const args = [...optimisedBrowserArgs];
-  if (PROTOCOL && HOSTNAME && PORT) {
+
+  if (proxyUrl) {
+    args.push(`--proxy-server=${proxyUrl}`);
+  } else if (PROTOCOL && HOSTNAME && PORT) {
     args.push(`--proxy-server=${PROTOCOL}://${HOSTNAME}:${PORT}`);
   }
+
   args.push(...(customBrowserArgs?.args ?? []));
 
   let executablePath: string | undefined = undefined;
