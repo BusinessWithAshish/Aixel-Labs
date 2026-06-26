@@ -3,7 +3,7 @@ import {
   LINKEDIN_BY_COMPANY_REQUEST,
   LINKEDIN_BY_COMPANY_RESPONSE,
 } from "../types";
-import { fetchGSearch } from "../../gsearch/helpers";
+import { fetchGSearch } from "../../../utils/browser-worker";
 import { fetchUrls } from "../../../utils/node-tls-client-session-handler";
 import { LINKEDIN_BY_COMPANY_ADVANCED_SEARCH_QUERY } from "../constants";
 import {

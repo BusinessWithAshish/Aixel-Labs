@@ -3,7 +3,7 @@ import {
   LINKEDIN_BY_PEOPLE_REQUEST,
   LINKEDIN_BY_PEOPLE_RESPONSE,
 } from "../types";
-import { fetchGSearch } from "../../gsearch/helpers";
+import { fetchGSearch } from "../../../utils/browser-worker";
 import { fetchUrlsImpit } from "../../../utils/impit-session-handler";
 import { LINKEDIN_BY_PEOPLE_ADVANCED_SEARCH_QUERY } from "../constants";
 import {

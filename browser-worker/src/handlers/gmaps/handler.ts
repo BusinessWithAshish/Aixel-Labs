@@ -1,15 +1,16 @@
-import { generateGoogleMapsUrls } from "./helpers";
 import { Request, Response } from "express";
-import { BrowserBatchHandler } from "../../../utils/browser-batch-handler";
-import { scrapeLinks } from "./helpers";
+import { BrowserBatchHandler } from "../../browser/browser-batch-handler";
 import { GMAPS_SCRAPE_RESPONSE } from "./types";
-import { GmapsDetailsLeadInfoExtractor } from "./helpers";
-import { GMAPS_REQUEST_SCHEMA } from "../schemas";
+import { GMAPS_REQUEST_SCHEMA } from "./schemas";
+import {
+  generateGoogleMapsUrls,
+  GmapsDetailsLeadInfoExtractor,
+  scrapeLinks,
+} from "./helpers";
 
 // ─── Handler: POST /gmaps/scrape ───────────────────────────
 export const gmapsScrapeHandler = async (req: Request, res: Response) => {
-  const requestBody = req.body;
-  const parsedBody = GMAPS_REQUEST_SCHEMA.safeParse(requestBody);
+  const parsedBody = GMAPS_REQUEST_SCHEMA.safeParse(req.body);
 
   if (!parsedBody.success) {
     res.status(400).json({ success: false, error: "Invalid query parameters" });
@@ -46,7 +47,6 @@ export const gmapsScrapeHandler = async (req: Request, res: Response) => {
         allLeads: [],
         allLeadsCount: 0,
       };
-
       res.status(200).json({
         success: true,
         message: "No business listings found",

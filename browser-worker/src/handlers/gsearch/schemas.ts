@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { GSEARCH_TIME_FILTER } from "./types";
 import {
+  GSEARCH_TIME_FILTER,
   DEFAULT_GSEARCH_MAX_PAGES,
   DEFAULT_GSEARCH_LANGUAGE,
   GOOGLE_SEARCH_QUERY_LIMITS,

@@ -1,14 +1,15 @@
-import { GMAPS_SCRAPE_LEAD_INFO } from "./types";
-import { GMAPS_SCRAPE_REQUEST } from "./types";
+import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_REQUEST } from "./types";
 import { Page } from "puppeteer";
-import { pageStealther } from "../../../utils/stealth-handlers";
-import { randomUserAgentGenerator } from "../../../utils/stealth-handlers";
+import {
+  pageStealther,
+  randomUserAgentGenerator,
+} from "../../browser/stealth-handlers";
 import {
   DEFAULT_PAGE_LOAD_TIMEOUT,
   DEFAULT_ELEMENT_LOAD_TIMEOUT,
-} from "../../../utils/constants";
-import { browserDebugger } from "../../../utils/browser-batch-handler";
-import { DEFAULT_GOOGLE_MAPS_URL } from "../helpers";
+} from "../../browser/constants";
+import { browserDebugger } from "../../browser/browser-batch-handler";
+import { DEFAULT_GOOGLE_MAPS_URL } from "./constants";
 
 export const scrapeLinks = async (
   url: string,
@@ -107,7 +108,6 @@ const URL_PLACE_ID_REGEX = /(ChI[0-9A-Za-z_-]{10,})/;
 const URL_DATA_PLACE_ID_REGEX = /!1s(ChI[0-9A-Za-z_-]{10,})/;
 const CID_REGEX = /(0x[0-9a-f]+:0x[0-9a-f]+)/i;
 
-// ─── Helper: extractPlaceId ───────────────────────────────
 function extractPlaceId(url: string | null, html: string): string | null {
   if (!url) return null;
   const queryMatch = url.match(/query_place_id=(ChI[0-9A-Za-z_-]{10,})/);
@@ -126,7 +126,6 @@ function extractPlaceId(url: string | null, html: string): string | null {
   return null;
 }
 
-// ─── Helper: buildLead ───────────────────────────────
 function buildLead(
   placeId: string | null,
   gmapsUrl: string,
@@ -240,7 +239,6 @@ export const GmapsDetailsLeadInfoExtractor = async (
   });
 };
 
-// ─── Helper: generateGoogleMapsUrls ───────────────────────────────
 export const generateGoogleMapsUrls = (
   data: GMAPS_SCRAPE_REQUEST,
 ): string[] => {

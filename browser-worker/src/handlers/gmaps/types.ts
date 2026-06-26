@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GMAPS_REQUEST_SCHEMA } from "../schemas";
+import { GMAPS_REQUEST_SCHEMA } from "./schemas";
 
 export type GMAPS_SCRAPE_LEAD_INFO = {
   id: string | null;

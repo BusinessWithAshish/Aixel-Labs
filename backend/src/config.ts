@@ -2,7 +2,6 @@ export enum ENDPOINTS {
   HOME = "/",
   GMAPS = "/gmaps",
   INSTAGRAM = "/instagram",
-  GSEARCH = "/gsearch",
   LINKEDIN = "/linkedin",
   SAMPLE = "/sample",
 }
@@ -26,7 +25,6 @@ export const API_ENDPOINTS = {
   },
   PING: "/v1/ping",
   GMAPS: {
-    SCRAPE: { route: "/scrape", full: `${ENDPOINTS.GMAPS}/scrape` },
     INTERNAL: { route: "/internal", full: `${ENDPOINTS.GMAPS}/internal` },
   },
   INSTAGRAM: {

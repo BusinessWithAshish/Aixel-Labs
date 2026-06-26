@@ -5,10 +5,12 @@ import type {
 } from "./types";
 import { IG_HEADERS, INSTAGRAM_BASE_URL } from "./constants";
 import { fetchUrls } from "../../utils/node-tls-client-session-handler";
-import { GSEARCH_RESPONSE } from "../gsearch/types";
-import { fetchGSearch } from "../gsearch/helpers";
-import { GOOGLE_SEARCH_QUERY_LIMITS } from "../gsearch/constants";
-import { DEFAULT_GSEARCH_MAX_PAGES } from "../gsearch/constants";
+import {
+  GSEARCH_RESPONSE,
+  fetchGSearch,
+  GOOGLE_SEARCH_QUERY_LIMITS,
+  DEFAULT_GSEARCH_MAX_PAGES,
+} from "../../utils/browser-worker";
 
 export const generateAdvanceQuery = (
   keywords: string[] | undefined,

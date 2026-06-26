@@ -1,3 +1,11 @@
+export enum GSEARCH_TIME_FILTER {
+  LAST_HOUR = "qdr:h",
+  LAST_24_HOURS = "qdr:d",
+  LAST_WEEK = "qdr:w",
+  LAST_MONTH = "qdr:m",
+  LAST_YEAR = "qdr:y",
+}
+
 export const DEFAULT_GSEARCH_MAX_PAGES = 25;
 export const DEFAULT_GSEARCH_LANGUAGE = "en";
 export const GOOGLE_BASE_URL = "https://www.google.com";

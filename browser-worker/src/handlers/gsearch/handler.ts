@@ -1,23 +1,29 @@
+import { Request, Response } from "express";
+import { readFileSync } from "fs";
+import { join } from "path";
+import type { Page } from "puppeteer-core";
+
+import { BrowserBatchHandler } from "../../browser/browser-batch-handler";
+import {
+  DEFAULT_PAGE_LOAD_TIMEOUT,
+  PROXY_CONFIG,
+} from "../../browser/constants";
+import { applyGoogleSearchStealth } from "../../browser/stealth-handlers";
+
+import {
+  DEFAULT_GSEARCH_MAX_PAGES,
+  GOOGLE_BASE_URL,
+  GOOGLE_SEARCH_URL,
+  GOOGLE_SEARCH_PATH,
+  GOOGLE_SEARCH_QUERY_PARAMS,
+  defaultGsearchQueryParams,
+} from "./constants";
+import { GSEARCH_REQUEST_SCHEMA } from "./schemas";
 import {
   GSEARCH_INJECTOR_PROPS,
   GSEARCH_REQUEST,
   GSEARCH_RESPONSE,
 } from "./types";
-import { BrowserBatchHandler } from "../../utils/browser-batch-handler";
-import { DEFAULT_PAGE_LOAD_TIMEOUT, PROXY_CONFIG } from "../../utils/constants";
-import { readFileSync } from "fs";
-import { join } from "path";
-import crypto from "crypto";
-import {
-  DEFAULT_GSEARCH_MAX_PAGES,
-  GOOGLE_BASE_URL,
-  GOOGLE_SEARCH_URL,
-  GOOGLE_SEARCH_QUERY_PARAMS,
-  defaultGsearchQueryParams,
-  GOOGLE_SEARCH_PATH,
-} from "./constants";
-import { applyGoogleSearchStealth } from "../../utils/stealth-handlers";
-import type { Page } from "puppeteer-core";
 
 // ── Load the inspector script once at module level (not on every request) ──
 const INSPECTOR_SCRIPT = readFileSync(
@@ -38,15 +44,12 @@ export function buildGSearchUrl(props: GSEARCH_REQUEST): string {
 
   const { searchQuery, country, city, timeFilter } = props;
 
-  // DEFAULT PARAMS
   const params = new URLSearchParams(defaultGsearchQueryParams);
 
-  // DYNAMIC PARAMS
   const finalQuery = `${searchQuery} in ${city}`;
   params.set(GOOGLE_SEARCH_QUERY_PARAMS.q, finalQuery);
   params.set(GOOGLE_SEARCH_QUERY_PARAMS.gl, country.toLowerCase());
 
-  // OPTIONAL PARAMS
   if (city) params.set(GOOGLE_SEARCH_QUERY_PARAMS.near, city);
   if (timeFilter) params.set(GOOGLE_SEARCH_QUERY_PARAMS.tbs, timeFilter);
 
@@ -59,7 +62,6 @@ export async function fetchGSearch(
   const { pages, country } = props;
 
   const finalUrl = buildGSearchUrl(props);
-
   const totalPages = Math.min(pages, DEFAULT_GSEARCH_MAX_PAGES);
 
   console.log(`[GScraper] Search URL: ${finalUrl}`);
@@ -72,7 +74,6 @@ export async function fetchGSearch(
       }
 
       const proxyDelimiter = "_";
-      // EVOMI session rotation: new session id => new exit IP (most pools)
       const proxyPassword = `${PROXY_CONFIG.PASSWORD}${proxyDelimiter}country-${country}`;
 
       await page.authenticate({
@@ -132,7 +133,6 @@ export async function fetchGSearch(
       }
 
       // ── Step 3: Inject dynamic vars then run inspector script ──
-      // Variables are injected as a global before the script runs — clean and type-safe
       const gsearchInjectorProps: GSEARCH_INJECTOR_PROPS = {
         initialUrl: finalUrl,
         totalPages,
@@ -159,4 +159,42 @@ export async function fetchGSearch(
   }
 
   return finalResults.results.flat();
+}
+
+// ─── Handler: POST /gsearch ───────────────────────────
+export async function gsearchHandler(req: Request, res: Response) {
+  const requestBody = GSEARCH_REQUEST_SCHEMA.safeParse(req.body);
+
+  if (!process.env.EVOMI_PROXY_USERNAME || !process.env.EVOMI_PROXY_PASSWORD) {
+    res.status(403).json({
+      success: false,
+      error: "[GSEARCH] : Missing proxy credentials",
+    });
+    return;
+  }
+
+  if (!requestBody.success) {
+    res.status(400).json({
+      success: false,
+      error: "[GSEARCH] : Invalid request parameters",
+    });
+    return;
+  }
+
+  try {
+    const finalResults = await fetchGSearch(requestBody.data);
+
+    res.status(200).json({
+      success: true,
+      data: finalResults,
+    });
+    return;
+  } catch (error) {
+    console.error("[GSEARCH] : Error fetching results", error);
+    res.status(500).json({
+      success: false,
+      error: "[GSEARCH] : Internal server error",
+    });
+    return;
+  }
 }

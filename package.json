@@ -4,12 +4,15 @@
     "packageManager": "pnpm@8.x",
     "scripts": {
         "installFE": "pnpm --filter frontend install",
-        "installBE": "PUPPETEER_SKIP_DOWNLOAD=true && pnpm --filter backend install",
-        "installAll": "pnpm installFE && pnpm installBE",
-        "devAll": "pnpm devFE && pnpm devBE",
+        "installBE": "pnpm --filter backend install",
+        "installBW": "pnpm --filter browser-worker install",
+        "installAll": "pnpm installFE && pnpm installBE && pnpm installBW",
+        "devAll": "pnpm devFE && pnpm devBE && pnpm devBW",
         "devFE": "pnpm --filter frontend dev",
         "devBE": "pnpm --filter backend run start",
+        "devBW": "pnpm --filter browser-worker run dev",
         "prodBE": "pnpm --filter backend run start:prod",
+        "prodBW": "pnpm --filter browser-worker run prod",
         "prodFE": "pnpm --filter frontend run prod"
     },
     "pnpm": {

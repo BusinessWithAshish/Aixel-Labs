@@ -1,0 +1,27 @@
+{
+  "name": "@aixellabs/browser-worker",
+  "version": "1.0.0",
+  "description": "Standalone Google Search browser scraping worker",
+  "type": "commonjs",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "rm -rf dist && tsc && mkdir -p dist/handlers && cp src/handlers/gsearch-injector.js dist/handlers/gsearch-injector.js",
+    "start": "node dist/server.js",
+    "prod": "pnpm build && node dist/server.js"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^143.0.4",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "puppeteer-core": "^24.40.0",
+    "zod": "^3.25.43"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.2",
+    "@types/node": "^22.5.5",
+    "puppeteer": "^24.40.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3"
+  }
+}

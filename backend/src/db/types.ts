@@ -3,7 +3,7 @@
  * No "mongodb" or Node built-ins here so this file is safe for the client bundle.
  */
 import { type GMAPS_INTERNAL_RESPONSE } from "../api/gmaps/internal/types";
-import { type GMAPS_SCRAPE_LEAD_INFO } from "../api/gmaps/scrape/types";
+
 import { INSTAGRAM_RESPONSE } from "../api/instagram";
 import { ObjectId } from "mongodb";
 import {
@@ -82,7 +82,6 @@ export type ModuleAccess = {
 };
 
 export type LeadData =
-  | GMAPS_SCRAPE_LEAD_INFO
   | INSTAGRAM_RESPONSE
   | GMAPS_INTERNAL_RESPONSE
   | LINKEDIN_BY_COMPANY_RESPONSE

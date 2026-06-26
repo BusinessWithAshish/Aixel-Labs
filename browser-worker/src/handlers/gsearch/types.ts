@@ -1,13 +1,7 @@
 import { GSEARCH_REQUEST_SCHEMA } from "./schemas";
 import { z } from "zod";
 
-export enum GSEARCH_TIME_FILTER {
-  LAST_HOUR = "qdr:h",
-  LAST_24_HOURS = "qdr:d",
-  LAST_WEEK = "qdr:w",
-  LAST_MONTH = "qdr:m",
-  LAST_YEAR = "qdr:y",
-}
+export { GSEARCH_TIME_FILTER } from "./constants";
 
 export type GSEARCH_INJECTOR_PROPS = {
   initialUrl: string;

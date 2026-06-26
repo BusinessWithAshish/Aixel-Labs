@@ -307,19 +307,6 @@ export const pageBotStealthHandler = async (page: Page): Promise<void> => {
     });
     Object.defineProperty(navigator, "deviceMemory", { get: () => 8 });
     Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 });
-
-    // @ts-ignore
-    // if (Error.prepareStackTrace) {
-    //   const originalPrepare = Error.prepareStackTrace;
-    //   // @ts-ignore
-    //   Error.prepareStackTrace = function (error: Error, stack: any[]) {
-    //     const result = originalPrepare(error, stack);
-    //     if (typeof result === "string") {
-    //       return result.replace(/__puppeteer_evaluation_script__/g, "");
-    //     }
-    //     return result;
-    //   };
-    // }
   });
 };
 

@@ -3,6 +3,7 @@ node_modules/
 .pnpm-store/
 skills-lock.json
 frontend/skills-lock.json
+.cursor/settings.json
 # Build outputs
 dist/
 build/
