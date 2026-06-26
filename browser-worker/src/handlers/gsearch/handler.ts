@@ -66,19 +66,19 @@ export async function fetchGSearch(
 
   console.log(`[GScraper] Search URL: ${finalUrl}`);
 
-  if (!PROXY_CONFIG.USERNAME || !PROXY_CONFIG.PASSWORD) {
-    throw new Error("[GSearch] Proxy credentials are not set");
-  }
-
-  // Embed credentials in the proxy URL so Chromium sends them on the initial
-  // CONNECT request — page.authenticate() only covers HTTP 401, not 407 proxy auth.
-  const proxyPassword = `${PROXY_CONFIG.PASSWORD}_country-${country}`;
-  const proxyUrl = `${PROXY_CONFIG.PROTOCOL}://${PROXY_CONFIG.USERNAME}:${proxyPassword}@${PROXY_CONFIG.HOSTNAME}:${PROXY_CONFIG.PORT}`;
-
   const finalResults = await BrowserBatchHandler({
     urlItems: [GOOGLE_SEARCH_URL],
-    proxyUrl,
     scrapingFunction: async (url, page) => {
+      if (!PROXY_CONFIG.USERNAME || !PROXY_CONFIG.PASSWORD) {
+        throw new Error("[GSearch] Proxy credentials are not set");
+      }
+
+      const proxyPassword = `${PROXY_CONFIG.PASSWORD}_country-${country}`;
+
+      await page.authenticate({
+        username: PROXY_CONFIG.USERNAME,
+        password: proxyPassword,
+      });
 
       // Not full pageStealther: extra headers + request interception break Google
       // reCAPTCHA / gstatic (CORS + aborted scripts). See applyGoogleSearchStealth.
