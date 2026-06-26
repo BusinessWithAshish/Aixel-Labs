@@ -1,5 +1,21 @@
-# Placeholder — Docker implementation coming in a later step.
 node_modules
 dist
+
 .env
+.env.*
+
+coverage
+
+.git
+.gitignore
+
+.vscode
+.idea
+
 *.log
+
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+README.md
