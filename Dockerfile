@@ -31,21 +31,21 @@ COPY browser-worker ./browser-worker
 # Build browser-worker
 RUN pnpm --filter @aixellabs/browser-worker build
 
+# Deploy to a self-contained directory with flattened production deps (no symlinks)
+RUN pnpm --filter @aixellabs/browser-worker deploy --prod /deploy
+
 
 # ==========================
 # Stage 2 - Runtime
 # ==========================
 FROM node:22-bookworm-slim
 
-RUN corepack enable
-
 ENV NODE_ENV=production
 
 WORKDIR /app
 
-COPY --from=builder /workspace/browser-worker/dist ./dist
-COPY --from=builder /workspace/browser-worker/package.json ./
-COPY --from=builder /workspace/browser-worker/node_modules ./node_modules
+# /deploy contains package.json, dist/, and node_modules/ with all deps flattened
+COPY --from=builder /deploy ./
 
 EXPOSE 8080
 
