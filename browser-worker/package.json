@@ -13,6 +13,7 @@
   "dependencies": {
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "i18n-iso-countries": "^7.14.0",
     "puppeteer-core": "^24.40.0",
     "zod": "^3.25.43"
   },

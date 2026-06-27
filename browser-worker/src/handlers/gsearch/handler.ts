@@ -9,6 +9,7 @@ import {
   PROXY_CONFIG,
 } from "../../browser/constants";
 import { applyGoogleSearchStealth } from "../../browser/stealth-handlers";
+import { toAlpha2CountryCode } from "../../utils/country";
 
 import {
   DEFAULT_GSEARCH_MAX_PAGES,
@@ -48,7 +49,11 @@ export function buildGSearchUrl(props: GSEARCH_REQUEST): string {
 
   const finalQuery = city ? `${searchQuery} in ${city}` : searchQuery;
   params.set(GOOGLE_SEARCH_QUERY_PARAMS.q, finalQuery);
-  params.set(GOOGLE_SEARCH_QUERY_PARAMS.gl, country.toLowerCase());
+
+  const countryCode = toAlpha2CountryCode(country);
+  if (countryCode) {
+    params.set(GOOGLE_SEARCH_QUERY_PARAMS.gl, countryCode.toLowerCase());
+  }
 
   if (city) params.set(GOOGLE_SEARCH_QUERY_PARAMS.near, city);
   if (timeFilter) params.set(GOOGLE_SEARCH_QUERY_PARAMS.tbs, timeFilter);
@@ -73,7 +78,14 @@ export async function fetchGSearch(
         throw new Error("[GSearch] Proxy credentials are not set");
       }
 
-      const proxyPassword = `${PROXY_CONFIG.PASSWORD}_country-${country}`;
+      const countryCode = toAlpha2CountryCode(country);
+      if (!countryCode) {
+        throw new Error(`[GSearch] Unrecognized country: "${country}"`);
+      }
+
+      // Evomi expects an ISO alpha-2 code (e.g. "_country-IN"); a full name
+      // like "_country-india" makes the proxy return an empty response.
+      const proxyPassword = `${PROXY_CONFIG.PASSWORD}_country-${countryCode}`;
 
       await page.authenticate({
         username: PROXY_CONFIG.USERNAME,
