@@ -423,9 +423,14 @@ export const pageStealther = async (page: Page): Promise<void> => {
 export const applyGoogleSearchStealth = async (page: Page): Promise<void> => {
   const isProduction = process.env.NODE_ENV === "production";
 
-  /** Avoid randomizing the user agent to match the sparticuz user agent */
-  // const userAgent = randomUserAgentGenerator();
-  // await page.setUserAgent(userAgent);
+  // The headless `chromium` binary reports a `HeadlessChrome/...` user agent,
+  // which Google flags instantly (429 + bot challenge). Reuse the browser's own
+  // UA with the `Headless` token stripped so the version stays consistent with
+  // the auto-sent Sec-CH-UA client hints.
+  const browserUserAgent = await page.browser().userAgent();
+  const realUserAgent = browserUserAgent.replace("HeadlessChrome", "Chrome");
+  await page.setUserAgent(realUserAgent);
+
   if (isProduction) {
     const viewport = randomViewportGenerator();
     await page.setViewport(viewport);
