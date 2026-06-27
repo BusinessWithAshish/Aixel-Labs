@@ -33,6 +33,10 @@ export const GOOGLE_SEARCH_QUERY_LIMITS = {
 export async function fetchGSearch(
   props: GSEARCH_REQUEST,
 ): Promise<GSEARCH_RESPONSE[]> {
+  if (!BROWSER_WORKER_URL) {
+    throw new Error("BROWSER_WORKER_URL is not set");
+  }
+
   const response = await fetch(`${BROWSER_WORKER_URL}/gsearch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
