@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { YT_SEARCH_FILTER } from "../constants";
 import {
-  YOUTUBE_DEFAULT_SEARCH_LIMIT,
-  YOUTUBE_MAX_SEARCH_LIMIT,
-} from "../constants";
+  YOUTUBE_SEARCH_DEFAULT_LIMIT,
+  YOUTUBE_SEARCH_MAX_LIMIT,
+} from "./constants";
 
 export const YOUTUBE_SEARCH_REQUEST_SCHEMA = z.object({
   query: z
@@ -19,10 +19,12 @@ export const YOUTUBE_SEARCH_REQUEST_SCHEMA = z.object({
     .number()
     .int()
     .min(1)
-    .max(YOUTUBE_MAX_SEARCH_LIMIT)
-    .default(YOUTUBE_DEFAULT_SEARCH_LIMIT)
+    .max(YOUTUBE_SEARCH_MAX_LIMIT)
+    .default(YOUTUBE_SEARCH_DEFAULT_LIMIT)
     .optional()
-    .describe("Maximum number of results to return"),
+    .describe(
+      "Maximum number of results to return (default 1000, max 1000)",
+    ),
   withPlaylist: z
     .boolean()
     .default(false)
