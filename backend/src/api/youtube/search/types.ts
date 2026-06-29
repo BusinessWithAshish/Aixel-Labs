@@ -78,6 +78,8 @@ export type YOUTUBE_SEARCH_RESPONSE_ITEM = {
   channelLogoUrl: string | null;
   description: string | null;
   duration: number | null;
+  viewCountText: string | null;
+  viewCount: number | null;
   thumbnails: YTThumbnail[] | null;
 };
 

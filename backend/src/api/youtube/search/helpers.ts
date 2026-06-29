@@ -1,7 +1,4 @@
-import {
-  YOUTUBE_SCRAPE_HEADERS,
-  YOUTUBE_SEARCH_FILTER_SP,
-} from "../constants";
+import { YOUTUBE_SCRAPE_HEADERS, YOUTUBE_SEARCH_FILTER_SP } from "../constants";
 import { getYoutubeInitData } from "../helpers";
 import {
   YOUTUBE_INNERTUBE_SEARCH_URL,
@@ -46,6 +43,13 @@ function lengthTextToDuration(lengthText: string | null): number | null {
   return null;
 }
 
+function viewCountTextToNumber(viewCountText: string | null): number | null {
+  if (!viewCountText) return null;
+  const match = viewCountText.match(/^(\d+(?:,\d+)*)\s*views$/);
+  if (!match) return null;
+  return Number(match[1].replace(/,/g, ""));
+}
+
 export function mapSearchResponseItem(
   item: YOUTUBE_SEARCH_RAW_RESPONSE_ITEM,
 ): YOUTUBE_SEARCH_RESPONSE_ITEM {
@@ -65,6 +69,8 @@ export function mapSearchResponseItem(
     ? `${YOUTUBE_SEARCH_BASE_URL}${browseEndpoint.canonicalBaseUrl}`
     : null;
 
+  const viewCountText = item.videoCountText?.simpleText ?? null;
+
   return {
     id: item.videoId ?? null,
     videoId: item.videoId ?? null,
@@ -77,6 +83,8 @@ export function mapSearchResponseItem(
     description,
     duration: lengthTextToDuration(lengthText),
     thumbnails: item.thumbnail?.thumbnails ?? null,
+    viewCountText,
+    viewCount: viewCountTextToNumber(viewCountText),
   };
 }
 
