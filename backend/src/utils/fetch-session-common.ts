@@ -25,10 +25,12 @@ export type FetchUrlsOptions<T = unknown> = {
   /** Default: true when Evomi env creds resolve; false otherwise */
   useProxy?: boolean;
   /**
-   * Reserved for future Evomi geography routing. Currently ignored — we do not
-   * append `_country-*` (app locale strings differ from Evomi’s supported codes).
+   * ISO 3166-1 alpha-2 code for Evomi `_country-XX` proxy routing.
+   * When set, appended to the proxy password (see `buildEvomiProxyUrl`).
    */
   proxyCountry?: string;
+  /** Optional region for Evomi `_region-*` proxy routing (not sent to YouTube). */
+  proxyRegion?: string;
 };
 
 export const fetchUrlPresets = {
@@ -91,16 +93,29 @@ export function evomiConfigured(): boolean {
 }
 
 /**
- * Builds Evomi proxy URL: password `{BASE}_session-{id}` when `sessionId` is set.
+ * Builds Evomi proxy URL: password `{BASE}_session-{id}` when `sessionId` is set,
+ * `{BASE}_country-{CC}` when `countryCode` is set, `{BASE}_region-{name}` when `region` is set.
  */
 export function buildEvomiProxyUrl(parts: {
   sessionId?: string | undefined;
+  countryCode?: string | undefined;
+  region?: string | undefined;
 }): string | undefined {
   const { PROTOCOL, HOSTNAME, PORT, USERNAME, PASSWORD } = PROXY_CONFIG;
   if (!USERNAME || !PASSWORD || !HOSTNAME || !PORT) return undefined;
 
   let pwd = PASSWORD;
   if (parts.sessionId?.trim()) pwd = `${pwd}_session-${parts.sessionId.trim()}`;
+  if (parts.countryCode?.trim()) {
+    pwd = `${pwd}_country-${parts.countryCode.trim().toUpperCase()}`;
+  }
+  if (parts.region?.trim()) {
+    const normalizedRegion = parts.region
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_-]/g, "");
+    if (normalizedRegion) pwd = `${pwd}_region-${normalizedRegion}`;
+  }
 
   const url = new URL(`${PROTOCOL}://${HOSTNAME}:${String(PORT)}`);
   url.username = USERNAME;

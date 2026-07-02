@@ -1,3 +1,5 @@
+import { YOUTUBE_API_ROUTES } from "./api/youtube/constants";
+
 export enum ENDPOINTS {
   HOME = "/",
   GMAPS = "/gmaps",
@@ -32,11 +34,25 @@ export const API_ENDPOINTS = {
     API: { route: "/", full: `${ENDPOINTS.INSTAGRAM}` },
   },
   YOUTUBE: {
-    SEARCH: { route: "/search", full: `${ENDPOINTS.YOUTUBE}/search` },
-    VIDEO: { route: "/videos/:videoId", full: `${ENDPOINTS.YOUTUBE}/videos` },
-    PLAYLIST: {
-      route: "/playlist/:playlistId",
-      full: `${ENDPOINTS.YOUTUBE}/playlist`,
+    SEARCH: {
+      route: YOUTUBE_API_ROUTES.SEARCH,
+      full: `${ENDPOINTS.YOUTUBE}${YOUTUBE_API_ROUTES.SEARCH}`,
+    },
+    VIDEO: {
+      route: YOUTUBE_API_ROUTES.VIDEO,
+      full: `${ENDPOINTS.YOUTUBE}${YOUTUBE_API_ROUTES.VIDEO}`,
+    },
+    VIDEO_SUGGESTED: {
+      route: YOUTUBE_API_ROUTES.VIDEO_SUGGESTED,
+      full: `${ENDPOINTS.YOUTUBE}${YOUTUBE_API_ROUTES.VIDEO_SUGGESTED}`,
+    },
+    CHANNEL: {
+      route: YOUTUBE_API_ROUTES.CHANNEL,
+      full: `${ENDPOINTS.YOUTUBE}${YOUTUBE_API_ROUTES.CHANNEL}`,
+    },
+    HANDLE: {
+      route: YOUTUBE_API_ROUTES.HANDLE,
+      full: `${ENDPOINTS.YOUTUBE}${YOUTUBE_API_ROUTES.HANDLE}`,
     },
   },
   SAMPLE: {

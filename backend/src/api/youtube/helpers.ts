@@ -1,282 +1,223 @@
-import { YOUTUBE_SCRAPE_HEADERS } from "./constants";
-import type { YT_INIT_DATA, YT_PLAYER_DETAIL, YT_SEARCH_ITEM } from "./types";
+import { randomUUID } from "crypto";
+import {
+  YOUTUBE_DEFAULT_COUNTRY,
+  YOUTUBE_INNERTUBE_CLIENT_NAME,
+  YOUTUBE_INNERTUBE_HL,
+  YOUTUBE_INNERTUBE_JSON_HEADERS,
+} from "./constants";
+import type { YOUTUBE_GEO_REQUEST } from "./types";
+import {
+  createUrlFetchSession,
+  type UrlFetchSession,
+} from "../../utils/node-tls-client-session-handler";
+import { evomiConfigured } from "../../utils/fetch-session-common";
 
-export class YoutubeDataError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "YoutubeDataError";
-  }
+// ─── Geo routing (proxy + InnerTube gl) ──────────────────────────────────────
+
+/** Resolves country/region into InnerTube `gl` and proxy routing params. */
+export function resolveYoutubeGeo(geo: Partial<YOUTUBE_GEO_REQUEST> = {}): {
+  country: string;
+  region: string | undefined;
+  gl: string;
+} {
+  const country = (geo.country ?? YOUTUBE_DEFAULT_COUNTRY).toUpperCase();
+  const region = geo.region?.trim() || undefined;
+  return { country, region, gl: country };
 }
 
-/**
- * Fetches a YouTube page and extracts `ytInitialData`, the innertube API
- * token, and the INNERTUBE_CONTEXT needed for pagination calls.
- */
-export async function getYoutubeInitData(url: string): Promise<YT_INIT_DATA> {
-  const response = await fetch(url, { headers: YOUTUBE_SCRAPE_HEADERS });
+/** Creates a TLS session with country/region-targeted Evomi proxy when configured. */
+export async function createYoutubeFetchSession(
+  geo: Partial<YOUTUBE_GEO_REQUEST> = {},
+): Promise<UrlFetchSession> {
+  const { country, region } = resolveYoutubeGeo(geo);
 
+  return createUrlFetchSession({
+    useProxy: evomiConfigured(),
+    proxyCountry: country,
+    proxyRegion: region,
+    proxySessionSuffix: randomUUID().replace(/-/g, "").slice(0, 12),
+  });
+}
+
+/** Fetches a YouTube HTML page and returns the InnerTube client version. */
+export async function fetchInnertubeClientVersion(
+  session: UrlFetchSession,
+  pageUrl: string,
+): Promise<string> {
+  const response = await session.get(pageUrl);
   if (!response.ok) {
-    throw new YoutubeDataError(
-      `YouTube page request failed: ${response.status} ${response.statusText}`,
-    );
+    throw new Error(`YouTube page request failed: ${response.status}`);
   }
 
-  const html = await response.text();
-
-  const initDataMatch = html.match(/var ytInitialData = ({.+?});/);
-  if (!initDataMatch) {
-    throw new YoutubeDataError("Cannot extract ytInitialData from YouTube page");
-  }
-
-  let initdata: Record<string, unknown>;
-  try {
-    initdata = JSON.parse(initDataMatch[1]);
-  } catch {
-    throw new YoutubeDataError("Failed to parse ytInitialData JSON");
-  }
-
-  const apiTokenMatch = html.match(/"innertubeApiKey":"([^"]+)"/);
-  const apiToken = apiTokenMatch ? apiTokenMatch[1] : null;
-
-  const contextMatch = html.match(
-    /"INNERTUBE_CONTEXT":({.+?}),"INNERTUBE_CONTEXT_CLIENT_NAME"/,
-  );
-  let context: unknown = null;
-  if (contextMatch) {
-    try {
-      context = JSON.parse(contextMatch[1]);
-    } catch {
-      // context is optional; continue without it
-    }
-  }
-
-  return { initdata, apiToken, context };
+  return extractInnertubeClientVersion(await response.text());
 }
 
-/**
- * Fetches a YouTube watch page and extracts player-level details:
- * author, channelId, description, keywords, and thumbnail.
- */
-export async function getYoutubePlayerDetail(
-  url: string,
-): Promise<YT_PLAYER_DETAIL> {
-  const response = await fetch(url, { headers: YOUTUBE_SCRAPE_HEADERS });
+// ─── Text & number parsing ───────────────────────────────────────────────────
 
-  if (!response.ok) {
-    throw new YoutubeDataError(
-      `YouTube player page request failed: ${response.status} ${response.statusText}`,
-    );
-  }
+function parseNumericWithSuffix(value: string): number | null {
+  const match = value.match(/^([\d,.]+)\s*([KMB])?/i);
+  if (!match) return null;
 
-  const html = await response.text();
+  let num = Number.parseFloat(match[1].replace(/,/g, ""));
+  if (Number.isNaN(num)) return null;
 
-  const videoIdMatch = url.match(/[?&]v=([^&]+)/);
-  const fallbackVideoId = videoIdMatch ? videoIdMatch[1] : "";
+  const suffix = match[2]?.toUpperCase();
+  if (suffix === "K") num *= 1_000;
+  else if (suffix === "M") num *= 1_000_000;
+  else if (suffix === "B") num *= 1_000_000_000;
 
-  const patterns = [
-    /var ytInitialPlayerResponse = ({.+?});/,
-    /"ytInitialPlayerResponse":\s*({.+?}),/,
-    /ytInitialPlayerResponse\s*=\s*({.+?});/,
-    /window\["ytInitialPlayerResponse"\]\s*=\s*({.+?});/,
-  ];
-
-  let playerData: Record<string, unknown> | null = null;
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match) {
-      try {
-        playerData = JSON.parse(match[1]);
-        break;
-      } catch {
-        continue;
-      }
-    }
-  }
-
-  if (!playerData) {
-    throw new YoutubeDataError("Cannot extract ytInitialPlayerResponse");
-  }
-
-  const videoDetails = (playerData.videoDetails ?? {}) as Record<
-    string,
-    unknown
-  >;
-
-  return {
-    videoId: (videoDetails.videoId as string | undefined) ?? fallbackVideoId,
-    thumbnail:
-      (
-        videoDetails.thumbnail as
-          | { thumbnails?: { url: string; width?: number; height?: number }[] }
-          | undefined
-      )?.thumbnails ?? null,
-    author: (videoDetails.author as string | undefined) ?? null,
-    channelId: (videoDetails.channelId as string | undefined) ?? "",
-    shortDescription:
-      (videoDetails.shortDescription as string | undefined) ?? "",
-    keywords: (videoDetails.keywords as string[] | undefined) ?? [],
-  };
+  return Math.round(num);
 }
 
-/** Extracts text from a YouTube runs/simpleText title object. */
-function extractText(
-  data: unknown,
-): string {
-  if (!data || typeof data !== "object") return "";
-  const obj = data as Record<string, unknown>;
-
-  if (Array.isArray(obj.runs) && obj.runs.length > 0) {
-    return (obj.runs as Array<{ text?: string }>)
-      .map((r) => r?.text ?? "")
-      .join("");
-  }
-  if (typeof obj.simpleText === "string") return obj.simpleText;
-  return "";
+/** Parses abbreviated counts like "1.2M subscribers" or "500K". */
+export function abbreviatedCountTextToNumber(
+  text: string | null,
+): number | null {
+  if (!text) return null;
+  return parseNumericWithSuffix(text.trim());
 }
 
-function normalizeThumbnails(
-  thumb: unknown,
-): { url: string; width?: number; height?: number }[] | null {
-  if (!thumb || typeof thumb !== "object") return null;
-  const t = thumb as Record<string, unknown>;
+/** Parses view count display text (e.g. "1.2M views", "5 thousand views"). */
+export function viewsTextToNumber(viewsText: string | null): number | null {
+  if (!viewsText) return null;
 
-  if (Array.isArray(t.thumbnails)) return t.thumbnails as { url: string; width?: number; height?: number }[];
-  if (Array.isArray(thumb)) return thumb as { url: string; width?: number; height?: number }[];
+  const thousandMatch = viewsText.match(/^([\d,.]+)\s+thousand\s+views$/i);
+  if (thousandMatch) {
+    const value = Number.parseFloat(thousandMatch[1].replace(/,/g, ""));
+    return Number.isNaN(value) ? null : Math.round(value * 1_000);
+  }
+
+  const viewsMatch = viewsText.match(/^([\d,.]+)\s*([KMB])?\s*views$/i);
+  if (viewsMatch) {
+    const raw = viewsMatch[2]
+      ? `${viewsMatch[1]}${viewsMatch[2]}`
+      : viewsMatch[1];
+    return parseNumericWithSuffix(raw);
+  }
+
+  const plainMatch = viewsText.match(/^(\d+(?:,\d+)*)\s*views$/i);
+  if (plainMatch) {
+    const value = Number.parseInt(plainMatch[1].replace(/,/g, ""), 10);
+    return Number.isNaN(value) ? null : value;
+  }
+
   return null;
 }
 
-/**
- * Converts a `videoRenderer` or `playlistVideoRenderer` object into a
- * normalised `YT_SEARCH_ITEM`.
- */
-export function renderVideoItem(
-  itemData: Record<string, unknown>,
-): YT_SEARCH_ITEM {
-  const renderer = (itemData.videoRenderer ??
-    itemData.playlistVideoRenderer) as Record<string, unknown> | undefined;
+/** Parses duration strings like "3:45" or "1:02:30" into seconds. */
+export function durationTextToSeconds(
+  durationText: string | null,
+): number | null {
+  if (!durationText) return null;
 
-  if (!renderer) {
-    return {
-      id: "",
-      type: "",
-      title: "",
-      thumbnail: null,
-      channelTitle: null,
-      shortBylineText: null,
-      length: null,
-      isLive: false,
-      videoCount: null,
-    };
+  const trimmed = durationText.trim();
+  if (!/^\d/.test(trimmed)) return null;
+
+  const parts = trimmed.split(":").map(Number);
+  if (parts.some((part) => Number.isNaN(part))) return null;
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts;
+    return minutes * 60 + seconds;
   }
 
-  // Detect live badge
-  let isLive = false;
-  const badges = renderer.badges as Array<Record<string, unknown>> | undefined;
-  if (Array.isArray(badges)) {
-    for (const badge of badges) {
-      const meta = badge?.metadataBadgeRenderer as
-        | Record<string, unknown>
-        | undefined;
-      if (meta?.style === "BADGE_STYLE_TYPE_LIVE_NOW") {
-        isLive = true;
-        break;
-      }
-    }
-  }
-  if (!isLive) {
-    const overlays = renderer.thumbnailOverlays as
-      | Array<Record<string, unknown>>
-      | undefined;
-    if (Array.isArray(overlays)) {
-      for (const overlay of overlays) {
-        const timeStatus = overlay?.thumbnailOverlayTimeStatusRenderer as
-          | Record<string, unknown>
-          | undefined;
-        if (timeStatus?.style === "LIVE") {
-          isLive = true;
-          break;
-        }
-      }
-    }
+  if (parts.length === 3) {
+    const [hours, minutes, seconds] = parts;
+    return hours * 3600 + minutes * 60 + seconds;
   }
 
-  const channelTitle =
-    extractText(
-      (renderer.ownerText as Record<string, unknown> | undefined) ?? {},
-    ) || null;
+  return null;
+}
 
-  const shortBylineText =
-    extractText(
-      (renderer.shortBylineText as Record<string, unknown> | undefined) ?? {},
-    ) || null;
+/** Parses video count text like "42 videos". */
+export function videoCountTextToNumber(
+  videoCountText: string | null,
+): number | null {
+  if (!videoCountText) return null;
 
-  const lengthData = renderer.lengthText;
-  const length = lengthData ? extractText(lengthData) || String(lengthData) : null;
+  const match = videoCountText.match(/^([\d,.]+)\s+videos?$/i);
+  if (!match) return null;
 
+  const value = Number.parseInt(match[1].replace(/,/g, ""), 10);
+  return Number.isNaN(value) ? null : value;
+}
+
+/** Joins YouTube text runs into a single string, or null if empty. */
+export function joinYoutubeTextRuns(
+  runs?: Array<{ text?: string }>,
+): string | null {
+  if (!runs?.length) return null;
+  const text = runs.map((r) => r?.text ?? "").join("");
+  return text || null;
+}
+
+export function emptyToNull(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function resolveRedirectUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const target = parsed.searchParams.get("q");
+    return target ? decodeURIComponent(target) : url;
+  } catch {
+    return url;
+  }
+}
+
+// ─── HTML / InnerTube extraction ─────────────────────────────────────────────
+
+export function extractInnertubeClientVersion(html: string): string {
+  const match = html.match(/"INNERTUBE_CLIENT_VERSION":"([^"]+)"/);
+  if (!match) {
+    throw new Error(
+      "Could not extract INNERTUBE_CLIENT_VERSION from YouTube page",
+    );
+  }
+  return match[1];
+}
+
+export function extractYtInitialDataFromHtml<T = Record<string, unknown>>(
+  html: string,
+): T {
+  const initDataMatch = html.match(/var ytInitialData = ({.+?});/);
+  if (!initDataMatch) {
+    throw new Error("Cannot extract ytInitialData from YouTube page");
+  }
+
+  try {
+    return JSON.parse(initDataMatch[1]) as T;
+  } catch {
+    throw new Error("Failed to parse ytInitialData JSON");
+  }
+}
+
+export function buildInnertubeContext(clientVersion: string, gl: string) {
   return {
-    id: String(renderer.videoId ?? ""),
-    type: "video",
-    title: extractText(renderer.title),
-    thumbnail: normalizeThumbnails(renderer.thumbnail),
-    channelTitle,
-    shortBylineText,
-    length,
-    isLive,
-    videoCount: null,
+    client: {
+      clientName: YOUTUBE_INNERTUBE_CLIENT_NAME,
+      clientVersion,
+      hl: YOUTUBE_INNERTUBE_HL,
+      gl,
+    },
   };
 }
 
-/**
- * Converts a `compactVideoRenderer` object (used in suggestions sidebar)
- * into a normalised `YT_SEARCH_ITEM`.
- */
-export function renderCompactVideo(
-  itemData: Record<string, unknown>,
-): YT_SEARCH_ITEM {
-  const renderer = (itemData.compactVideoRenderer ?? {}) as Record<
-    string,
-    unknown
-  >;
+export async function postInnertube<T>(
+  session: UrlFetchSession,
+  url: string,
+  body: Record<string, unknown>,
+  errorLabel = "YouTube innertube request",
+): Promise<T> {
+  const response = await session.post(`${url}?prettyPrint=false`, {
+    headers: YOUTUBE_INNERTUBE_JSON_HEADERS,
+    body: JSON.stringify(body),
+  });
 
-  let isLive = false;
-  const badges = renderer.badges as Array<Record<string, unknown>> | undefined;
-  if (Array.isArray(badges)) {
-    for (const badge of badges) {
-      const meta = badge?.metadataBadgeRenderer as
-        | Record<string, unknown>
-        | undefined;
-      if (meta?.style === "BADGE_STYLE_TYPE_LIVE_NOW") {
-        isLive = true;
-        break;
-      }
-    }
+  if (!response.ok) {
+    throw new Error(`${errorLabel} failed: ${response.status}`);
   }
 
-  const title = extractText(renderer.title);
-  const shortByline = (renderer.shortBylineText ?? {}) as Record<
-    string,
-    unknown
-  >;
-  const channelTitle =
-    Array.isArray(shortByline.runs) && shortByline.runs.length > 0
-      ? String(
-          (shortByline.runs as Array<{ text?: string }>)[0]?.text ?? "",
-        )
-      : null;
-
-  const thumbObj = renderer.thumbnail as Record<string, unknown> | undefined;
-
-  return {
-    id: String(renderer.videoId ?? ""),
-    type: "video",
-    title,
-    thumbnail: thumbObj ? normalizeThumbnails(thumbObj) : null,
-    channelTitle,
-    shortBylineText: channelTitle,
-    length: renderer.lengthText
-      ? extractText(renderer.lengthText) || null
-      : null,
-    isLive,
-    videoCount: null,
-  };
+  return JSON.parse(await response.text()) as T;
 }

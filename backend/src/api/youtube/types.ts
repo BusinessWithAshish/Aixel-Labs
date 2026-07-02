@@ -1,42 +1,63 @@
+import type { YOUTUBE_GEO_REQUEST_SCHEMA } from "./schemas";
+import type { z } from "zod";
+
+export type YOUTUBE_GEO_REQUEST = z.infer<typeof YOUTUBE_GEO_REQUEST_SCHEMA>;
+
 export type YT_THUMBNAIL = {
   url: string;
   width?: number;
   height?: number;
 };
 
-export type YT_SEARCH_ITEM = {
-  id: string;
-  type: "video" | "channel" | "playlist" | "reel" | string;
-  title: string;
-  thumbnail: YT_THUMBNAIL[] | null;
-  channelTitle: string | null;
-  shortBylineText: string | null;
-  length: string | null;
-  isLive: boolean;
-  videoCount: string | null;
+/** Shared YouTube text object (`runs` / `simpleText`) */
+export type YT_SIMPLE_TEXT = { simpleText?: string };
+export type YT_TEXT_RUNS = { runs?: Array<{ text: string }> };
+export type YT_THUMBNAIL_LIST = { thumbnails: YT_THUMBNAIL[] };
+
+export type YT_BROWSE_ENDPOINT = {
+  browseId?: string;
+  canonicalBaseUrl?: string;
 };
 
-export type YT_NEXT_PAGE = {
-  nextPageToken: string | null;
-  nextPageContext: {
-    context: unknown;
-    continuation: string | null;
-  } | null;
+export type YT_METADATA_BADGE = {
+  metadataBadgeRenderer?: { style?: string };
 };
 
-/** Internal — parsed from the YouTube HTML page */
-export type YT_INIT_DATA = {
-  initdata: Record<string, unknown>;
-  apiToken: string | null;
-  context: unknown | null;
+export type YT_METADATA_PART = { text?: { content?: string } };
+export type YT_CONTENT_METADATA_ROW = { metadataParts?: YT_METADATA_PART[] };
+
+/** Lockup metadata used on watch-next suggestions and channel grids */
+export type YT_LOCKUP_METADATA_VIEW_MODEL = {
+  title?: { content?: string };
+  image?: {
+    decoratedAvatarViewModel?: {
+      rendererContext?: {
+        commandContext?: {
+          onTap?: {
+            innertubeCommand?: {
+              browseEndpoint?: { browseId?: string };
+            };
+          };
+        };
+      };
+    };
+  };
+  metadata?: {
+    contentMetadataViewModel?: {
+      metadataRows?: YT_CONTENT_METADATA_ROW[];
+    };
+  };
 };
 
-/** Internal — parsed from ytInitialPlayerResponse */
-export type YT_PLAYER_DETAIL = {
-  videoId: string;
-  thumbnail: YT_THUMBNAIL[] | null;
-  author: string | null;
-  channelId: string;
-  shortDescription: string;
-  keywords: string[];
+export type YT_LOCKUP_THUMBNAIL_IMAGE = {
+  thumbnailViewModel?: {
+    image?: { sources?: YT_THUMBNAIL[] };
+    overlays?: Array<{
+      thumbnailBottomOverlayViewModel?: {
+        badges?: Array<{
+          thumbnailBadgeViewModel?: { text?: string };
+        }>;
+      };
+    }>;
+  };
 };

@@ -1,10 +1,24 @@
 import { z } from "zod";
+import { YOUTUBE_DEFAULT_LIMIT, YOUTUBE_MAX_LIMIT } from "../constants";
+import {
+  YOUTUBE_GEO_REQUEST_SCHEMA,
+  YOUTUBE_VIDEO_ID_SCHEMA,
+} from "../schemas";
 
-export const YOUTUBE_VIDEO_PARAMS_SCHEMA = z.object({
-  videoId: z
-    .string()
-    .min(1)
-    .max(20)
-    .regex(/^[a-zA-Z0-9_-]+$/, "Invalid YouTube video ID")
-    .describe("YouTube video ID (e.g. dQw4w9WgXcQ)"),
+export const YOUTUBE_VIDEO_REQUEST_SCHEMA = YOUTUBE_GEO_REQUEST_SCHEMA.extend({
+  videoId: YOUTUBE_VIDEO_ID_SCHEMA,
 });
+
+export const YOUTUBE_VIDEO_SUGGESTED_REQUEST_SCHEMA =
+  YOUTUBE_VIDEO_REQUEST_SCHEMA.extend({
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(YOUTUBE_MAX_LIMIT)
+      .default(YOUTUBE_DEFAULT_LIMIT)
+      .optional()
+      .describe(
+        `Maximum number of suggested videos to return (default ${YOUTUBE_DEFAULT_LIMIT}, max ${YOUTUBE_MAX_LIMIT})`,
+      ),
+  });

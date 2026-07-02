@@ -1,11 +1,16 @@
 export const YOUTUBE_BASE_URL = "https://www.youtube.com";
 
+/** Default ISO 3166-1 alpha-2 country code for geo routing and InnerTube `gl`. */
+export const YOUTUBE_DEFAULT_COUNTRY = "US";
+
+export const YOUTUBE_DEFAULT_LIMIT = 1000;
+export const YOUTUBE_MAX_LIMIT = 1000;
+
+export const YOUTUBE_HANDLE_MAX_LENGTH = 100;
+
 export enum YT_SEARCH_FILTER {
   VIDEO = "video",
   CHANNEL = "channel",
-  PLAYLIST = "playlist",
-  MOVIE = "movie",
-  SHORT = "short",
 }
 
 /**
@@ -15,19 +20,31 @@ export enum YT_SEARCH_FILTER {
 export const YOUTUBE_SEARCH_FILTER_SP: Record<YT_SEARCH_FILTER, string> = {
   [YT_SEARCH_FILTER.VIDEO]: "EgIQAQ%3D%3D",
   [YT_SEARCH_FILTER.CHANNEL]: "EgIQAg%3D%3D",
-  [YT_SEARCH_FILTER.PLAYLIST]: "EgIQAw%3D%3D",
-  [YT_SEARCH_FILTER.MOVIE]: "EgIQBA%3D%3D",
-  [YT_SEARCH_FILTER.SHORT]: "EgQQARgD",
 };
 
-export const YOUTUBE_DEFAULT_TIMEOUT_MS = 30_000;
-export const YOUTUBE_DEFAULT_SEARCH_LIMIT = 20;
-export const YOUTUBE_MAX_SEARCH_LIMIT = 50;
+/** YouTube channel ID format (UC + 22 chars) */
+export const YOUTUBE_CHANNEL_ID_PATTERN = /UC[a-zA-Z0-9_-]{22}/;
 
-export const YOUTUBE_SCRAPE_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  "Accept-Language": "en-US,en;q=0.9",
-  Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-};
+// ─── InnerTube API ───────────────────────────────────────────────────────────
+
+export const YOUTUBE_INNERTUBE_CLIENT_NAME = "WEB";
+export const YOUTUBE_INNERTUBE_HL = "en";
+
+export const YOUTUBE_INNERTUBE_JSON_HEADERS = {
+  "Content-Type": "application/json",
+} as const;
+
+export const YOUTUBE_INNERTUBE_SEARCH_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/search`;
+export const YOUTUBE_INNERTUBE_GET_WATCH_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/get_watch`;
+export const YOUTUBE_INNERTUBE_NEXT_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/next`;
+export const YOUTUBE_INNERTUBE_BROWSE_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/browse`;
+
+// ─── Shared route paths (method is always POST) ────────────────────────────────
+
+export const YOUTUBE_API_ROUTES = {
+  SEARCH: "/search",
+  VIDEO: "/video",
+  VIDEO_SUGGESTED: "/video/suggested",
+  CHANNEL: "/channel",
+  HANDLE: "/handle",
+} as const;

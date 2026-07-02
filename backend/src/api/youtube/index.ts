@@ -1,12 +1,14 @@
-import { Router, type IRouter } from "express";
-import { registerYoutubeSearchRoutes } from "./search/index";
-import { registerYoutubeVideoRoutes } from "./video/index";
-import { registerYoutubePlaylistRoutes } from "./playlist/index";
+import { type IRouter, Router } from "express";
+import { registerYoutubeSearchRoutes } from "./search";
+import { registerYoutubeVideoRoutes } from "./video";
+import { registerYoutubeChannelRoutes } from "./channel";
+import { registerYoutubeHandleRoutes } from "./handle";
 
 const youtubeRoutes: IRouter = Router();
 
 registerYoutubeSearchRoutes(youtubeRoutes);
 registerYoutubeVideoRoutes(youtubeRoutes);
-registerYoutubePlaylistRoutes(youtubeRoutes);
+registerYoutubeHandleRoutes(youtubeRoutes);
+registerYoutubeChannelRoutes(youtubeRoutes);
 
 export default youtubeRoutes;

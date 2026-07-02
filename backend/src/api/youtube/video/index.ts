@@ -1,7 +1,14 @@
 import type { IRouter } from "express";
-import { API_ENDPOINTS } from "../../../config";
-import { youtubeVideoHandler } from "./handler";
+import { YOUTUBE_API_ROUTES } from "../constants";
+import {
+  youtubeVideoHandler,
+  youtubeVideoSuggestedVideosHandler,
+} from "./handler";
 
 export function registerYoutubeVideoRoutes(router: IRouter) {
-  router.get(API_ENDPOINTS.YOUTUBE.VIDEO.route, youtubeVideoHandler);
+  router.post(YOUTUBE_API_ROUTES.VIDEO, youtubeVideoHandler);
+  router.post(
+    YOUTUBE_API_ROUTES.VIDEO_SUGGESTED,
+    youtubeVideoSuggestedVideosHandler,
+  );
 }

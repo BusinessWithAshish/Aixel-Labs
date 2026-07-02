@@ -1,7 +1,7 @@
 import type { IRouter } from "express";
-import { API_ENDPOINTS } from "../../../config";
+import { YOUTUBE_API_ROUTES } from "../constants";
 import { youtubeSearchHandler } from "./handler";
 
 export function registerYoutubeSearchRoutes(router: IRouter) {
-  router.post(API_ENDPOINTS.YOUTUBE.SEARCH.route, youtubeSearchHandler);
+  router.post(YOUTUBE_API_ROUTES.SEARCH, youtubeSearchHandler);
 }

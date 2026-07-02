@@ -97,6 +97,10 @@ export type CreateUrlFetchSessionOptions = {
   useProxy?: boolean;
   /** Evomi sticky suffix; random when omitted. */
   proxySessionSuffix?: string;
+  /** ISO 3166-1 alpha-2 code for `_country-XX` proxy routing. */
+  proxyCountry?: string;
+  /** Optional region for `_region-*` proxy routing. */
+  proxyRegion?: string;
 };
 
 /** One TLS session (cookie jar + optional Evomi sticky proxy) for a caller batch. */
@@ -110,11 +114,17 @@ export async function createUrlFetchSession(
     clientIdentifier = DEFAULT_TLS_FETCH_CLIENT_IDENTIFIER,
     useProxy,
     proxySessionSuffix = randomUUID().replace(/-/g, "").slice(0, 12),
+    proxyCountry,
+    proxyRegion,
   } = options;
 
   const resolvedUseProxy = useProxy ?? evomiConfigured();
   const proxyUrl = resolvedUseProxy
-    ? buildEvomiProxyUrl({ sessionId: proxySessionSuffix })
+    ? buildEvomiProxyUrl({
+        sessionId: proxySessionSuffix,
+        countryCode: proxyCountry,
+        region: proxyRegion,
+      })
     : undefined;
 
   if (shouldDebugProxy()) {
