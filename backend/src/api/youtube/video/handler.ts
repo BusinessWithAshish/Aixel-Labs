@@ -6,6 +6,7 @@ import {
 import {
   fetchYoutubeVideoDetails,
   fetchYoutubeVideoSuggestedVideos,
+  YoutubeVideoError,
 } from "./helpers";
 import type { ALApiResponse } from "../../types";
 import type {
@@ -34,6 +35,15 @@ export async function youtubeVideoHandler(req: Request, res: Response) {
 
     res.status(200).json(response);
   } catch (err) {
+    if (err instanceof YoutubeVideoError) {
+      console.error("[YOUTUBE/VIDEO] Video error:", err.message);
+      res.status(err.statusCode).json({
+        success: false,
+        error: `[YOUTUBE/VIDEO] : ${err.message}`,
+      });
+      return;
+    }
+
     if (err instanceof Error) {
       console.error("[YOUTUBE/VIDEO] Data extraction error:", err.message);
       res.status(502).json({
@@ -74,6 +84,15 @@ export async function youtubeVideoSuggestedVideosHandler(
 
     res.status(200).json(response);
   } catch (err) {
+    if (err instanceof YoutubeVideoError) {
+      console.error("[YOUTUBE/VIDEO/SUGGESTED] Video error:", err.message);
+      res.status(err.statusCode).json({
+        success: false,
+        error: `[YOUTUBE/VIDEO/SUGGESTED] : ${err.message}`,
+      });
+      return;
+    }
+
     if (err instanceof Error) {
       console.error(
         "[YOUTUBE/VIDEO/SUGGESTED] Data extraction error:",

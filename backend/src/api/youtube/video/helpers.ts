@@ -33,6 +33,53 @@ type YoutubeVideoFetchRequest = YOUTUBE_GEO_REQUEST & {
   videoId: string;
 };
 
+export class YoutubeVideoError extends Error {
+  constructor(
+    message: string,
+    readonly statusCode: 404 | 502,
+  ) {
+    super(message);
+    this.name = "YoutubeVideoError";
+  }
+}
+
+function isVideoResolvable(
+  data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+  requestedVideoId: string,
+): boolean {
+  const playerResponse = data[0]?.playerResponse;
+  if (!playerResponse) return false;
+
+  const playabilityStatus = playerResponse.playabilityStatus?.status;
+  if (
+    playabilityStatus === "ERROR" ||
+    playabilityStatus === "UNPLAYABLE" ||
+    playabilityStatus === "LOGIN_REQUIRED"
+  ) {
+    return false;
+  }
+
+  const details = playerResponse.videoDetails;
+  if (details?.title?.trim()) return true;
+
+  return Boolean(
+    details?.videoId === requestedVideoId &&
+      (details?.author?.trim() || details?.channelId),
+  );
+}
+
+function assertVideoResolvable(
+  data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+  videoId: string,
+): void {
+  if (!isVideoResolvable(data, videoId)) {
+    throw new YoutubeVideoError(
+      `Video not found or unavailable: ${videoId}`,
+      404,
+    );
+  }
+}
+
 async function fetchGetWatch(
   session: UrlFetchSession,
   clientVersion: string,
@@ -189,12 +236,30 @@ function parsePlayerResponse(
   };
 }
 
-function parseWatchNextResponse(data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE): {
+function parseWatchNextResponse(
+  data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+  videoId: string,
+): {
   suggestions: YOUTUBE_VIDEO_SUGGESTION_ITEM[];
   nextPageToken: string | null;
 } {
-  const items = collectWatchNextItems(data[1]?.watchNextResponse?.contents);
-  return parseWatchNextItems(items);
+  const watchNextContents = data[1]?.watchNextResponse?.contents;
+  const items = collectWatchNextItems(watchNextContents);
+  const result = parseWatchNextItems(items);
+
+  if (result.suggestions.length === 0) {
+    console.warn(
+      "[YOUTUBE/VIDEO/SUGGESTED] parseWatchNextResponse returned 0 suggestions",
+      {
+        videoId,
+        rawItemCount: items.length,
+        hasWatchNext: Boolean(watchNextContents),
+        hasContinuationToken: Boolean(result.nextPageToken),
+      },
+    );
+  }
+
+  return result;
 }
 
 async function fetchWatchNextContinuation(
@@ -230,6 +295,76 @@ async function fetchWatchNextContinuation(
   return { suggestions: [], nextPageToken: null };
 }
 
+async function collectSuggestedVideos(
+  session: UrlFetchSession,
+  clientVersion: string,
+  gl: string,
+  videoId: string,
+  data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+  limit: number,
+): Promise<YOUTUBE_VIDEO_SUGGESTED_VIDEOS_RESPONSE> {
+  const items: YOUTUBE_VIDEO_SUGGESTION_ITEM[] = [];
+  const seen = new Set<string>();
+
+  const addSuggestions = (suggestions: YOUTUBE_VIDEO_SUGGESTION_ITEM[]) => {
+    for (const suggestion of suggestions) {
+      if (seen.has(suggestion.videoId)) continue;
+      seen.add(suggestion.videoId);
+      items.push(suggestion);
+      if (items.length >= limit) return;
+    }
+  };
+
+  const initial = parseWatchNextResponse(data, videoId);
+  addSuggestions(initial.suggestions);
+
+  let continuationToken = initial.nextPageToken;
+  while (continuationToken && items.length < limit) {
+    const page = await fetchWatchNextContinuation(
+      session,
+      clientVersion,
+      gl,
+      continuationToken,
+    );
+    addSuggestions(page.suggestions);
+    continuationToken = page.nextPageToken;
+  }
+
+  return {
+    videoId,
+    items: items.slice(0, limit),
+    totalResults: items.length,
+  };
+}
+
+async function fetchSuggestedVideosAttempt(
+  request: YoutubeVideoFetchRequest & { limit: number },
+): Promise<YOUTUBE_VIDEO_SUGGESTED_VIDEOS_RESPONSE> {
+  const { videoId, country, region, limit } = request;
+  const { gl } = resolveYoutubeGeo({ country, region });
+  const session = await createYoutubeFetchSession({ country, region });
+
+  try {
+    const clientVersion = await fetchInnertubeClientVersion(
+      session,
+      `${YOUTUBE_BASE_URL}/watch?v=${videoId}`,
+    );
+    const data = await fetchGetWatch(session, clientVersion, gl, videoId);
+    assertVideoResolvable(data, videoId);
+
+    return collectSuggestedVideos(
+      session,
+      clientVersion,
+      gl,
+      videoId,
+      data,
+      limit,
+    );
+  } finally {
+    await closeUrlFetchSession(session);
+  }
+}
+
 export async function fetchYoutubeVideoDetails(
   request: YoutubeVideoFetchRequest,
 ): Promise<YOUTUBE_VIDEO_DETAILS_RESPONSE> {
@@ -243,6 +378,7 @@ export async function fetchYoutubeVideoDetails(
       `${YOUTUBE_BASE_URL}/watch?v=${videoId}`,
     );
     const data = await fetchGetWatch(session, clientVersion, gl, videoId);
+    assertVideoResolvable(data, videoId);
     return parsePlayerResponse(data, videoId);
   } finally {
     await closeUrlFetchSession(session);
@@ -252,50 +388,22 @@ export async function fetchYoutubeVideoDetails(
 export async function fetchYoutubeVideoSuggestedVideos(
   request: YoutubeVideoFetchRequest & { limit?: number },
 ): Promise<YOUTUBE_VIDEO_SUGGESTED_VIDEOS_RESPONSE> {
-  const { videoId, country, region, limit = YOUTUBE_DEFAULT_LIMIT } = request;
-  const { gl } = resolveYoutubeGeo({ country, region });
-  const session = await createYoutubeFetchSession({ country, region });
+  const { videoId, limit = YOUTUBE_DEFAULT_LIMIT, ...geo } = request;
+  const attemptRequest = { videoId, limit, ...geo };
 
-  try {
-    const clientVersion = await fetchInnertubeClientVersion(
-      session,
-      `${YOUTUBE_BASE_URL}/watch?v=${videoId}`,
-    );
-    const data = await fetchGetWatch(session, clientVersion, gl, videoId);
+  const firstAttempt = await fetchSuggestedVideosAttempt(attemptRequest);
+  if (firstAttempt.items.length > 0) return firstAttempt;
 
-    const items: YOUTUBE_VIDEO_SUGGESTION_ITEM[] = [];
-    const seen = new Set<string>();
+  console.warn(
+    "[YOUTUBE/VIDEO/SUGGESTED] Retrying after 0 suggestions on resolvable watch page",
+    { videoId, limit },
+  );
 
-    const addSuggestions = (suggestions: YOUTUBE_VIDEO_SUGGESTION_ITEM[]) => {
-      for (const suggestion of suggestions) {
-        if (seen.has(suggestion.videoId)) continue;
-        seen.add(suggestion.videoId);
-        items.push(suggestion);
-        if (items.length >= limit) return;
-      }
-    };
+  const secondAttempt = await fetchSuggestedVideosAttempt(attemptRequest);
+  if (secondAttempt.items.length > 0) return secondAttempt;
 
-    const initial = parseWatchNextResponse(data);
-    addSuggestions(initial.suggestions);
-
-    let continuationToken = initial.nextPageToken;
-    while (continuationToken && items.length < limit) {
-      const page = await fetchWatchNextContinuation(
-        session,
-        clientVersion,
-        gl,
-        continuationToken,
-      );
-      addSuggestions(page.suggestions);
-      continuationToken = page.nextPageToken;
-    }
-
-    return {
-      videoId,
-      items: items.slice(0, limit),
-      totalResults: items.length,
-    };
-  } finally {
-    await closeUrlFetchSession(session);
-  }
+  throw new YoutubeVideoError(
+    `Could not extract suggested videos for ${videoId}`,
+    502,
+  );
 }

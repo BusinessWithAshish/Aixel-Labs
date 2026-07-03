@@ -59,6 +59,10 @@ export type YOUTUBE_VIDEO_GET_WATCH_RESPONSE = [
   {
     playerResponse?: {
       videoDetails?: YOUTUBE_VIDEO_DETAILS;
+      playabilityStatus?: {
+        status?: string;
+        reason?: string;
+      };
     };
   },
   {
