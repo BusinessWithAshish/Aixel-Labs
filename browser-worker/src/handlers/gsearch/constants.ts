@@ -8,6 +8,7 @@ export enum GSEARCH_TIME_FILTER {
 
 export const DEFAULT_GSEARCH_MAX_PAGES = 25;
 export const DEFAULT_GSEARCH_LANGUAGE = "en";
+export const GSEARCH_NAVIGATION_TIMEOUT_MS = 25_000;
 export const GOOGLE_BASE_URL = "https://www.google.com";
 export const GOOGLE_SEARCH_PATH = "search";
 export const GOOGLE_SEARCH_URL = `${GOOGLE_BASE_URL}/${GOOGLE_SEARCH_PATH}`;

@@ -1,108 +1,17 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import { Page } from "puppeteer";
 import { config } from "dotenv";
+
 config();
 
-// ============================================================
-// USER AGENTS
-// ============================================================
-
-export const randomUserAgentGenerator = (): string => {
-  const userAgents = [
-    // Chrome on Windows
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-
-    // Chrome on macOS
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-
-    // Chrome on Linux
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-
-    // Firefox on Windows
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-    "Mozilla/5.0 (Windows NT 11.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
-
-    // Firefox on macOS
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:122.0) Gecko/20100101 Firefox/122.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13.6; rv:121.0) Gecko/20100101 Firefox/121.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.1; rv:122.0) Gecko/20100101 Firefox/122.0",
-
-    // Firefox on Linux
-    "Mozilla/5.0 (X11; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0",
-    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
-
-    // Safari on macOS
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
-
-    // Edge on Windows
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
-    "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-
-    // Edge on macOS
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
-
-    // Opera on Windows
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 OPR/106.0.0.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 OPR/107.0.0.0",
-
-    // Opera on macOS
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 OPR/106.0.0.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 OPR/107.0.0.0",
-
-    // Chrome on Android
-    "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
-    "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
-
-    // Safari on iOS
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (iPad; CPU OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
-
-    // Firefox on Android
-    "Mozilla/5.0 (Android 13; Mobile; rv:122.0) Gecko/122.0 Firefox/122.0",
-    "Mozilla/5.0 (Android 14; Mobile; rv:121.0) Gecko/121.0 Firefox/121.0",
-
-    // Chrome on ChromeOS
-    "Mozilla/5.0 (X11; CrOS x86_64 15509.89.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; CrOS x86_64 15359.58.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-
-    // Brave on Windows
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Brave/1.61",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Brave/1.60",
-
-    // Vivaldi on Windows
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Vivaldi/6.5",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Vivaldi/6.4",
-
-    // Additional Chrome variants
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-
-    // Additional Firefox variants
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:120.0) Gecko/20100101 Firefox/120.0",
-    "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0",
-
-    // Additional Safari variants
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_7_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-  ];
-  return userAgents[Math.floor(Math.random() * userAgents.length)];
-};
+const BOT_STEALTH_INJECT_SCRIPT = readFileSync(
+  join(__dirname, "bot-stealth-inject.js"),
+  "utf-8",
+);
 
 // ============================================================
-// RANDOM VIEWPORT GENERATOR (for production)
+// VIEWPORT
 // ============================================================
 
 type Viewport = {
@@ -201,240 +110,261 @@ export const randomViewportGenerator = (): Viewport => {
 };
 
 // ============================================================
-// RANDOM HTTP HEADERS
+// SESSION FINGERPRINT (UA + Sec-CH-UA client hints)
 // ============================================================
 
-export const randomHttpHeaders = (): Record<string, string> => {
-  const chromeVersions = ["119", "120", "121", "122", "130", "131"];
-  const platforms = ['"macOS"', '"Windows"', '"Linux"'];
+export type UserAgentMetadata = {
+  brands: Array<{ brand: string; version: string }>;
+  fullVersion: string;
+  platform: string;
+  platformVersion: string;
+  architecture: string;
+  model: string;
+  mobile: boolean;
+};
 
-  const randomChromeVersion =
-    chromeVersions[Math.floor(Math.random() * chromeVersions.length)];
-  const randomPlatform =
-    platforms[Math.floor(Math.random() * platforms.length)];
+export type ParsedChromeUserAgent = {
+  userAgent: string;
+  majorVersion: string;
+  fullVersion: string;
+  platform: string;
+  platformVersion: string;
+  architecture: string;
+  mobile: boolean;
+};
+
+export function parseChromeUserAgent(rawUa: string): ParsedChromeUserAgent {
+  const userAgent = rawUa.replace(/HeadlessChrome/g, "Chrome");
+
+  const chromeMatch = userAgent.match(
+    /Chrome\/(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:\.(\d+))?/,
+  );
+  const majorVersion = chromeMatch?.[1] ?? "131";
+  const fullVersion = chromeMatch
+    ? [
+        chromeMatch[1],
+        chromeMatch[2] ?? "0",
+        chromeMatch[3] ?? "0",
+        chromeMatch[4] ?? "0",
+      ].join(".")
+    : `${majorVersion}.0.0.0`;
+
+  let platform = "Windows";
+  let platformVersion = "10.0.0";
+  let architecture = "x86";
+  const mobile = /Mobile|Android/i.test(userAgent);
+
+  if (/Macintosh|Mac OS X/i.test(userAgent)) {
+    platform = "macOS";
+    const macMatch = userAgent.match(/Mac OS X (\d+[._]\d+(?:[._]\d+)?)/);
+    platformVersion = macMatch ? macMatch[1].replace(/_/g, ".") : "10.15.7";
+    architecture = /arm64|aarch64/i.test(userAgent) ? "arm" : "x86";
+  } else if (/Windows/i.test(userAgent)) {
+    platform = "Windows";
+    platformVersion = "10.0.0";
+    architecture = /Win64|x64|WOW64/i.test(userAgent) ? "x86" : "x86";
+  } else if (/Linux|X11/i.test(userAgent)) {
+    platform = "Linux";
+    platformVersion = "";
+    architecture = /aarch64|arm64/i.test(userAgent) ? "arm" : "x86";
+  }
 
   return {
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    Accept:
-      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-    "Sec-Ch-Ua": `"Google Chrome";v="${randomChromeVersion}", "Chromium";v="${randomChromeVersion}", "Not?A_Brand";v="24"`,
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": randomPlatform,
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Upgrade-Insecure-Requests": "1",
+    userAgent,
+    majorVersion,
+    fullVersion,
+    platform,
+    platformVersion,
+    architecture,
+    mobile,
   };
-};
+}
 
-export const pageBotStealthHandler = async (page: Page): Promise<void> => {
-  await page.evaluateOnNewDocument(() => {
-    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+export function buildUserAgentMetadata(
+  parsed: ParsedChromeUserAgent,
+): UserAgentMetadata {
+  return {
+    brands: [
+      { brand: "Google Chrome", version: parsed.majorVersion },
+      { brand: "Chromium", version: parsed.majorVersion },
+      { brand: "Not_A Brand", version: "24" },
+    ],
+    fullVersion: parsed.fullVersion,
+    platform: parsed.platform,
+    platformVersion: parsed.platformVersion,
+    architecture: parsed.architecture,
+    model: "",
+    mobile: parsed.mobile,
+  };
+}
 
-    // @ts-ignore
-    window.chrome = {
-      runtime: {
-        connect: () => {},
-        sendMessage: () => {},
-        onMessage: { addListener: () => {}, removeListener: () => {} },
-      },
-      loadTimes: () => {},
-      csi: () => {},
-      app: {
-        isInstalled: false,
-        InstallState: {
-          DISABLED: "disabled",
-          INSTALLED: "installed",
-          NOT_INSTALLED: "not_installed",
-        },
-        RunningState: {
-          CANNOT_RUN: "cannot_run",
-          READY_TO_RUN: "ready_to_run",
-          RUNNING: "running",
-        },
-      },
-    };
+async function applySessionFingerprint(page: Page): Promise<void> {
+  const rawUa = await page.browser().userAgent();
+  const parsed = parseChromeUserAgent(rawUa);
 
-    Object.defineProperty(navigator, "plugins", {
-      get: () => [
-        {
-          name: "Chrome PDF Plugin",
-          filename: "internal-pdf-viewer",
-          description: "Portable Document Format",
-        },
-        {
-          name: "Chrome PDF Viewer",
-          filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai",
-          description: "",
-        },
-        {
-          name: "Native Client",
-          filename: "internal-nacl-plugin",
-          description: "",
-        },
-      ],
-    });
+  await page.setUserAgent(parsed.userAgent, buildUserAgentMetadata(parsed));
 
-    Object.defineProperty(navigator, "languages", {
-      get: () => ["en-US", "en"],
-    });
-
-    const originalQuery = window.navigator.permissions.query;
-    // @ts-ignore
-    window.navigator.permissions.query = (parameters: any) =>
-      parameters.name === "notifications"
-        ? Promise.resolve({
-            state: Notification.permission,
-          } as PermissionStatus)
-        : originalQuery(parameters);
-
-    const getParameter = WebGLRenderingContext.prototype.getParameter;
-    WebGLRenderingContext.prototype.getParameter = function (parameter) {
-      if (parameter === 37445) return "Intel Inc.";
-      if (parameter === 37446) return "Intel Iris OpenGL Engine";
-      return getParameter.call(this, parameter);
-    };
-
-    Object.defineProperty(navigator, "connection", {
-      get: () => ({
-        effectiveType: "4g",
-        rtt: 100,
-        downlink: 10,
-        saveData: false,
-      }),
-    });
-    Object.defineProperty(navigator, "deviceMemory", { get: () => 8 });
-    Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 });
-  });
-};
+  if (process.env.NODE_ENV === "production") {
+    await page.setViewport(randomViewportGenerator());
+  }
+}
 
 // ============================================================
-// REQUEST INTERCEPTION
+// STATIC ASSET REQUEST INTERCEPTION
 // ============================================================
 
-export const pageResourcesRequestInterceptor = async (
-  page: Page,
-): Promise<void> => {
-  const hasRequestListeners = page.listenerCount("request") > 0;
-  if (hasRequestListeners) return;
+const ESSENTIAL_RESOURCE_TYPES = new Set([
+  "document",
+  "script",
+  "fetch",
+  "xhr",
+  "other",
+  "ping",
+]);
+
+const STATIC_RESOURCE_TYPES = new Set([
+  "image",
+  "stylesheet",
+  "font",
+  "media",
+  "texttrack",
+  "manifest",
+  "websocket",
+  "eventsource",
+]);
+
+const THIRD_PARTY_DENYLIST = [
+  "youtube.com",
+  "instagram.com",
+  "doubleclick.net",
+  "googlesyndication.com",
+  "adtrafficquality.google",
+  "google-analytics.com",
+  "googletagmanager.com",
+  "play.google.com",
+  "mtalk.google.com",
+  "content-autofill.googleapis.com",
+];
+
+function matchesThirdPartyDenylist(url: string): boolean {
+  const lower = url.toLowerCase();
+  return THIRD_PARTY_DENYLIST.some((domain) => lower.includes(domain));
+}
+
+export function shouldAllowGoogleRequest(
+  url: string,
+  resourceType: string,
+): boolean {
+  if (!ESSENTIAL_RESOURCE_TYPES.has(resourceType)) {
+    return false;
+  }
+
+  const lower = url.toLowerCase();
+
+  if (matchesThirdPartyDenylist(lower)) {
+    return false;
+  }
+
+  if (lower.includes("google.com/search")) return true;
+  if (/google\.com\/?(\?|#|$)/.test(lower)) return true;
+  if (lower.includes("google.com/maps")) return true;
+  if (lower.includes("google.com/xjs")) return true;
+  if (lower.includes("gstatic.com") && lower.endsWith(".js")) return true;
+  if (lower.includes("recaptcha")) return true;
+  if (lower.includes("gstatic.com/recaptcha")) return true;
+  if (lower.includes("google.com") || lower.includes("gstatic.com"))
+    return true;
+
+  return true;
+}
+
+export function shouldBlockStaticAsset(
+  url: string,
+  resourceType: string,
+): boolean {
+  if (shouldAllowGoogleRequest(url, resourceType)) {
+    return false;
+  }
+
+  if (STATIC_RESOURCE_TYPES.has(resourceType)) {
+    return true;
+  }
+
+  if (matchesThirdPartyDenylist(url)) {
+    return true;
+  }
+
+  return false;
+}
+
+async function applyStaticAssetInterceptor(page: Page): Promise<void> {
+  if (page.listenerCount("request") > 0) return;
+
+  const debug =
+    process.env.STEALTH_INTERCEPTOR_DEBUG === "1" ||
+    process.env.GSEARCH_INTERCEPTOR_DEBUG === "1";
+
+  let blocked = 0;
+  let allowed = 0;
 
   await page.setRequestInterception(true);
 
   page.on("request", (req) => {
     if (req.isInterceptResolutionHandled()) return;
 
+    const url = req.url();
     const resourceType = req.resourceType();
-    const url = req.url().toLowerCase();
-
-    const shouldBlock =
-      resourceType === "stylesheet" ||
-      resourceType === "font" ||
-      resourceType === "image" ||
-      resourceType === "media" ||
-      resourceType === "texttrack" ||
-      resourceType === "eventsource" ||
-      resourceType === "websocket" ||
-      resourceType === "manifest" ||
-      url.endsWith(".css") ||
-      url.endsWith(".woff") ||
-      url.endsWith(".woff2") ||
-      url.endsWith(".ttf") ||
-      url.endsWith(".eot") ||
-      url.endsWith(".otf") ||
-      url.endsWith(".jpg") ||
-      url.endsWith(".jpeg") ||
-      url.endsWith(".png") ||
-      url.endsWith(".gif") ||
-      url.endsWith(".webp") ||
-      url.endsWith(".svg") ||
-      url.endsWith(".ico") ||
-      url.endsWith(".mp4") ||
-      url.endsWith(".webm") ||
-      url.endsWith(".mp3") ||
-      url.includes("google-analytics") ||
-      url.includes("googletagmanager") ||
-      url.includes("analytics") ||
-      url.includes("doubleclick") ||
-      url.includes("facebook.com/tr") ||
-      url.includes("connect.facebook") ||
-      url.includes("facebook.com") ||
-      url.includes("twitter.com") ||
-      url.includes("ads.") ||
-      url.includes("adservice") ||
-      url.includes("tracking") ||
-      url.includes("pixel") ||
-      url.includes("beacon") ||
-      url.includes("telemetry") ||
-      url.includes("platform.twitter") ||
-      url.includes("platform.linkedin") ||
-      url.includes("recaptcha") ||
-      (url.includes("gstatic.com/recaptcha") &&
-        !url.includes("google.com/xjs"));
+    const block = shouldBlockStaticAsset(url, resourceType);
 
     try {
-      if (shouldBlock) {
+      if (block) {
+        blocked++;
+        if (debug) {
+          console.log(
+            `[Stealth:intercept] BLOCK ${resourceType} ${url.slice(0, 120)}`,
+          );
+        }
         req.abort();
       } else {
+        allowed++;
         req.continue();
       }
-    } catch (error) {
-      console.log("Request already handled, skipping:", url);
+    } catch {
+      // Request already handled by another listener or navigation teardown.
     }
   });
-};
+
+  page.once("close", () => {
+    if (debug) {
+      console.log(
+        `[Stealth:intercept] session stats blocked=${blocked} allowed=${allowed}`,
+      );
+    }
+  });
+}
 
 // ============================================================
-// STEALTH APPLY
+// BOT STEALTH (in-page navigator patches)
 // ============================================================
 
-export const pageFingerprintRandomizer = async (page: Page): Promise<void> => {
-  const isProduction = process.env.NODE_ENV === "production";
-
-  const userAgent = randomUserAgentGenerator();
-  await page.setUserAgent(userAgent);
-
-  if (isProduction) {
-    const viewport = randomViewportGenerator();
-    await page.setViewport(viewport);
-  }
-
-  const headers = randomHttpHeaders();
-  await page.setExtraHTTPHeaders(headers);
-};
+async function applyBotStealth(page: Page): Promise<void> {
+  await page.evaluateOnNewDocument(
+    new Function(BOT_STEALTH_INJECT_SCRIPT) as () => void,
+  );
+}
 
 // ============================================================
-// PAGE STEALTHER (Combined: Stealth + Request Interception)
+// UNIFIED PAGE STEALTH (gsearch + gmaps)
 // ============================================================
-
-export const pageStealther = async (page: Page): Promise<void> => {
-  await pageFingerprintRandomizer(page);
-  await pageResourcesRequestInterceptor(page);
-  await pageBotStealthHandler(page);
-};
 
 /**
- * Google Search / reCAPTCHA safe: real UA + navigator tweaks only.
- * Full `pageStealther` breaks Google challenge pages because:
- * - `setExtraHTTPHeaders` applies document navigation headers to every subresource → CORS preflight failures on gstatic/recaptcha.
- * - Request interception aborts `recaptcha` / gstatic loads → `solveSimpleChallenge is not defined`, flaky 429 recovery.
+ * Single stealth pipeline for all Google scraping (Search + Maps).
+ * 1. Static asset interception — saves proxy bandwidth
+ * 2. Session fingerprint — real browser UA + matching client hints (no setExtraHTTPHeaders)
+ * 3. Bot stealth — in-page navigator / WebGL patches
  */
-export const applyGoogleSearchStealth = async (page: Page): Promise<void> => {
-  const isProduction = process.env.NODE_ENV === "production";
-
-  // The headless `chromium` binary reports a `HeadlessChrome/...` user agent,
-  // which Google flags instantly (429 + bot challenge). Reuse the browser's own
-  // UA with the `Headless` token stripped so the version stays consistent with
-  // the auto-sent Sec-CH-UA client hints.
-  const browserUserAgent = await page.browser().userAgent();
-  const realUserAgent = browserUserAgent.replace("HeadlessChrome", "Chrome");
-  await page.setUserAgent(realUserAgent);
-
-  if (isProduction) {
-    const viewport = randomViewportGenerator();
-    await page.setViewport(viewport);
-  }
-  await pageResourcesRequestInterceptor(page);
-  await pageBotStealthHandler(page);
-};
+export async function pageStealther(page: Page): Promise<void> {
+  await applyStaticAssetInterceptor(page);
+  await applySessionFingerprint(page);
+  await applyBotStealth(page);
+}

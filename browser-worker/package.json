@@ -6,7 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "rm -rf dist && tsc && mkdir -p dist/handlers/gsearch && cp src/handlers/gsearch/gsearch-injector.js dist/handlers/gsearch/gsearch-injector.js",
+    "build": "rm -rf dist && tsc",
     "start": "node dist/server.js",
     "prod": "pnpm build && node dist/server.js"
   },

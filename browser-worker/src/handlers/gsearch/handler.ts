@@ -4,19 +4,16 @@ import { join } from "path";
 import type { Page } from "puppeteer-core";
 
 import { BrowserBatchHandler } from "../../browser/browser-batch-handler";
-import {
-  DEFAULT_PAGE_LOAD_TIMEOUT,
-  PROXY_CONFIG,
-} from "../../browser/constants";
-import { applyGoogleSearchStealth } from "../../browser/stealth-handlers";
+import { PROXY_CONFIG } from "../../browser/constants";
+import { pageStealther } from "../../browser/stealth-handlers";
 import { toAlpha2CountryCode } from "../../utils/country";
 
 import {
   DEFAULT_GSEARCH_MAX_PAGES,
   GOOGLE_BASE_URL,
-  GOOGLE_SEARCH_URL,
   GOOGLE_SEARCH_PATH,
   GOOGLE_SEARCH_QUERY_PARAMS,
+  GSEARCH_NAVIGATION_TIMEOUT_MS,
   defaultGsearchQueryParams,
 } from "./constants";
 import { GSEARCH_REQUEST_SCHEMA } from "./schemas";
@@ -72,7 +69,8 @@ export async function fetchGSearch(
   console.log(`[GScraper] Search URL: ${finalUrl}`);
 
   const finalResults = await BrowserBatchHandler({
-    urlItems: [GOOGLE_SEARCH_URL],
+    // Warm up on the homepage (cookies + proxy session), not bare /search — matches Python scraper.
+    urlItems: [GOOGLE_BASE_URL],
     scrapingFunction: async (url, page) => {
       if (!PROXY_CONFIG.USERNAME || !PROXY_CONFIG.PASSWORD) {
         throw new Error("[GSearch] Proxy credentials are not set");
@@ -92,12 +90,14 @@ export async function fetchGSearch(
         password: proxyPassword,
       });
 
-      // Not full pageStealther: extra headers + request interception break Google
-      // reCAPTCHA / gstatic (CORS + aborted scripts). See applyGoogleSearchStealth.
+      // Unified stealth pipeline (Search + Maps). See stealth-handlers.ts.
       if (!gsearchStealthedPages.has(page)) {
-        await applyGoogleSearchStealth(page as Page);
+        await pageStealther(page as Page);
         gsearchStealthedPages.add(page);
       }
+
+      page.setDefaultTimeout(GSEARCH_NAVIGATION_TIMEOUT_MS);
+      page.setDefaultNavigationTimeout(GSEARCH_NAVIGATION_TIMEOUT_MS);
 
       if (page.listenerCount("console") === 0) {
         page.on("console", (msg) =>
@@ -112,11 +112,11 @@ export async function fetchGSearch(
         );
       }
 
-      // ── Step 1: Proxy auth + homepage ──
+      // ── Step 1: Proxy auth + Google homepage (session warmup) ──
       console.log(`[GScraper] Base navigation to ${url}`);
       const baseNavigation = await page.goto(url, {
         waitUntil: "domcontentloaded",
-        timeout: DEFAULT_PAGE_LOAD_TIMEOUT,
+        timeout: GSEARCH_NAVIGATION_TIMEOUT_MS,
       });
       const baseStatusCode = baseNavigation?.status();
       if (baseStatusCode && baseStatusCode >= 400) {
@@ -125,11 +125,12 @@ export async function fetchGSearch(
         );
       }
 
-      // ── Step 2: Navigate to search (same params as Python gsearch) ──
+      // ── Step 2: Navigate to SERP (referer mimics clicking from homepage) ──
       console.log(`[GScraper] Navigating to ${finalUrl}`);
       const searchNavigation = await page.goto(finalUrl, {
         waitUntil: "domcontentloaded",
-        timeout: DEFAULT_PAGE_LOAD_TIMEOUT,
+        timeout: GSEARCH_NAVIGATION_TIMEOUT_MS,
+        referer: `${GOOGLE_BASE_URL}/`,
       });
       const searchStatusCode = searchNavigation?.status();
       if (searchStatusCode === 429) {
@@ -142,6 +143,22 @@ export async function fetchGSearch(
           `[GSearch] Search navigation failed with status ${searchStatusCode}`,
         );
       }
+
+      await page
+        .waitForSelector("#rso, #search, form[action='/search']", {
+          timeout: GSEARCH_NAVIGATION_TIMEOUT_MS,
+        })
+        .catch(() => {
+          const currentUrl = page.url();
+          if (
+            currentUrl.includes("/sorry/") ||
+            currentUrl.includes("consent.")
+          ) {
+            throw new Error(
+              `[GSearch] Google blocked or consent interstitial at ${currentUrl}`,
+            );
+          }
+        });
 
       // ── Step 3: Inject dynamic vars then run inspector script ──
       const gsearchInjectorProps: GSEARCH_INJECTOR_PROPS = {

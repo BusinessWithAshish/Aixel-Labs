@@ -1,7 +1,38 @@
+import { existsSync } from "fs";
+import { platform } from "os";
 import { LaunchOptions } from "puppeteer-core";
 import { config } from "dotenv";
 import { DEFAULT_BROWSER_TIMEOUT, PROXY_CONFIG } from "./constants";
 config();
+
+const DEFAULT_CHROME_PATHS: Partial<Record<NodeJS.Platform, string[]>> = {
+  darwin: [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  ],
+  linux: [
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ],
+  win32: [
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+  ],
+};
+
+/** Resolve a locally installed Chrome/Chromium binary (no Puppeteer download needed). */
+export const resolveChromeExecutablePath = (): string | undefined => {
+  const fromEnv =
+    process.env.CHROME_EXECUTABLE_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
+  if (fromEnv && existsSync(fromEnv)) {
+    return fromEnv;
+  }
+
+  const candidates = DEFAULT_CHROME_PATHS[platform()] ?? [];
+  return candidates.find((path) => existsSync(path));
+};
 
 /**
  * Combined browser args for:
@@ -84,12 +115,20 @@ export const getBrowserOptions = async (
 
   args.push(...(customBrowserArgs?.args ?? []));
 
-  let executablePath: string | undefined = undefined;
+  let executablePath: string | undefined;
   let headless: LaunchOptions["headless"] = false;
 
   if (isProduction) {
     executablePath = "/usr/bin/chromium";
     headless = "shell";
+  } else {
+    executablePath = resolveChromeExecutablePath();
+    if (!executablePath) {
+      console.warn(
+        "[browser] No local Chrome found. Install Google Chrome or set CHROME_EXECUTABLE_PATH. " +
+          "Falling back to Puppeteer's bundled browser (run `npx puppeteer browsers install chrome`).",
+      );
+    }
   }
 
   return {
@@ -102,7 +141,10 @@ export const getBrowserOptions = async (
 };
 
 export const getPuppeteer = async () => {
-  if (process.env.NODE_ENV === "production") {
+  const useSystemChrome =
+    process.env.NODE_ENV === "production" || !!resolveChromeExecutablePath();
+
+  if (useSystemChrome) {
     return (await import("puppeteer-core")).default;
   }
   return (await import("puppeteer")).default;

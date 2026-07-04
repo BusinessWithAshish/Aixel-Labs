@@ -1,9 +1,6 @@
 import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_REQUEST } from "./types";
 import { Page } from "puppeteer";
-import {
-  pageStealther,
-  randomUserAgentGenerator,
-} from "../../browser/stealth-handlers";
+import { pageStealther } from "../../browser/stealth-handlers";
 import {
   DEFAULT_PAGE_LOAD_TIMEOUT,
   DEFAULT_ELEMENT_LOAD_TIMEOUT,
@@ -16,9 +13,6 @@ export const scrapeLinks = async (
   page: Page,
 ): Promise<string[]> => {
   await pageStealther(page);
-
-  const randomUserAgent = randomUserAgentGenerator();
-  await page.setUserAgent(randomUserAgent);
 
   await page.goto(url, {
     waitUntil: "networkidle2",
