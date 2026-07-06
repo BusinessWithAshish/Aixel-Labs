@@ -44,12 +44,28 @@ export async function fetchInnertubeClientVersion(
   session: UrlFetchSession,
   pageUrl: string,
 ): Promise<string> {
+  const { clientVersion } = await fetchYoutubeWatchPageContext(session, pageUrl);
+  return clientVersion;
+}
+
+/** Fetches a watch/channel HTML page and extracts InnerTube client version + ytInitialData. */
+export async function fetchYoutubeWatchPageContext(
+  session: UrlFetchSession,
+  pageUrl: string,
+): Promise<{
+  clientVersion: string;
+  initialData: Record<string, unknown>;
+}> {
   const response = await session.get(pageUrl);
   if (!response.ok) {
     throw new Error(`YouTube page request failed: ${response.status}`);
   }
 
-  return extractInnertubeClientVersion(await response.text());
+  const html = await response.text();
+  return {
+    clientVersion: extractInnertubeClientVersion(html),
+    initialData: extractYtInitialDataFromHtml(html),
+  };
 }
 
 // ─── Text & number parsing ───────────────────────────────────────────────────

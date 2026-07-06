@@ -85,6 +85,7 @@ export type YOUTUBE_SEARCH_RESPONSE_ITEM =
 export type YOUTUBE_SEARCH_VIDEO_ITEM = {
   id: string | null;
   videoId: string | null;
+  videoUrl: string | null;
   title: string | null;
   channelId: string | null;
   channelUrl: string | null;

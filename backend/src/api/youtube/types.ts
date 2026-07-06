@@ -9,7 +9,6 @@ export type YT_THUMBNAIL = {
   height?: number;
 };
 
-/** Shared YouTube text object (`runs` / `simpleText`) */
 export type YT_SIMPLE_TEXT = { simpleText?: string };
 export type YT_TEXT_RUNS = { runs?: Array<{ text: string }> };
 export type YT_THUMBNAIL_LIST = { thumbnails: YT_THUMBNAIL[] };
@@ -26,7 +25,6 @@ export type YT_METADATA_BADGE = {
 export type YT_METADATA_PART = { text?: { content?: string } };
 export type YT_CONTENT_METADATA_ROW = { metadataParts?: YT_METADATA_PART[] };
 
-/** Lockup metadata used on watch-next suggestions and channel grids */
 export type YT_LOCKUP_METADATA_VIEW_MODEL = {
   title?: { content?: string };
   image?: {

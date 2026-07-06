@@ -63,14 +63,81 @@ export type YOUTUBE_VIDEO_GET_WATCH_RESPONSE = [
         status?: string;
         reason?: string;
       };
+      microformat?: {
+        playerMicroformatRenderer?: {
+          uploadDate?: string;
+          publishDate?: string;
+          likeCount?: string;
+        };
+      };
     };
   },
   {
     watchNextResponse?: {
-      contents?: YOUTUBE_VIDEO_WATCH_NEXT_RESULTS;
+      contents?: YOUTUBE_VIDEO_WATCH_NEXT_RESULTS & {
+        twoColumnWatchNextResults?: {
+          results?: {
+            results?: Array<{
+              contents?: Array<{
+                videoSecondaryInfoRenderer?: {
+                  owner?: {
+                    videoOwnerRenderer?: {
+                      subscriberCountText?: { simpleText?: string };
+                    };
+                  };
+                };
+                itemSectionRenderer?: {
+                  header?: {
+                    commentsHeaderRenderer?: {
+                      countText?: { runs?: Array<{ text?: string }> };
+                    };
+                  };
+                };
+              }>;
+            }>;
+          };
+        };
+      };
+      engagementPanels?: YOUTUBE_VIDEO_ENGAGEMENT_PANEL[];
     };
   },
 ];
+
+export type YOUTUBE_VIDEO_ENGAGEMENT_PANEL = {
+  engagementPanelSectionListRenderer?: {
+    targetId?: string;
+    header?: {
+      engagementPanelTitleHeaderRenderer?: {
+        contextualInfo?: {
+          runs?: Array<{ text?: string }>;
+          simpleText?: string;
+        };
+        title?: {
+          runs?: Array<{ text?: string }>;
+          simpleText?: string;
+          contextualInfo?: {
+            runs?: Array<{ text?: string }>;
+            simpleText?: string;
+          };
+        };
+      };
+    };
+    content?: {
+      structuredDescriptionContentRenderer?: {
+        items?: Array<{
+          videoDescriptionHeaderRenderer?: {
+            factoid?: Array<{
+              factoidRenderer?: {
+                value?: { simpleText?: string };
+                label?: { simpleText?: string };
+              };
+            }>;
+          };
+        }>;
+      };
+    };
+  };
+};
 
 export type YOUTUBE_VIDEO_NEXT_CONTINUATION_RESPONSE = {
   onResponseReceivedEndpoints?: Array<{
@@ -87,6 +154,7 @@ export type YOUTUBE_VIDEO_NEXT_CONTINUATION_RESPONSE = {
 
 export type YOUTUBE_VIDEO_SUGGESTION_ITEM = {
   videoId: string;
+  videoUrl: string;
   title: string | null;
   thumbnail: YT_THUMBNAIL[] | null;
   channelTitle: string | null;
@@ -100,6 +168,7 @@ export type YOUTUBE_VIDEO_SUGGESTION_ITEM = {
 
 export type YOUTUBE_VIDEO_DETAILS_RESPONSE = {
   id: string;
+  videoUrl: string;
   title: string | null;
   thumbnail: YT_THUMBNAIL[] | null;
   isLive: boolean;
@@ -110,6 +179,10 @@ export type YOUTUBE_VIDEO_DETAILS_RESPONSE = {
   viewCountText: string | null;
   lengthSeconds: number | null;
   keywords: string[];
+  publishedAt: string | null;
+  channelSubscribers: number | null;
+  likeCount: number | null;
+  commentCount: number | null;
 };
 
 export type YOUTUBE_VIDEO_SUGGESTED_VIDEOS_RESPONSE = {

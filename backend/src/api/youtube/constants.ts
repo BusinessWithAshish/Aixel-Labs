@@ -13,6 +13,23 @@ export enum YT_SEARCH_FILTER {
   CHANNEL = "channel",
 }
 
+export enum YOUTUBE_DURATION_BUCKET {
+  SHORTS = "shorts",
+  SHORT = "short",
+  MID = "mid",
+  LONG = "long",
+}
+
+export enum YOUTUBE_CHANNEL_TIER {
+  MICRO = "micro",
+  SMALL = "small",
+  MID = "mid",
+  LARGE = "large",
+}
+
+export const YOUTUBE_VIDEO_URL = (videoId: string) =>
+  `${YOUTUBE_BASE_URL}/watch?v=${videoId}`;
+
 /**
  * YouTube search filter `sp` query param values.
  * These are base64-encoded protobuf filter descriptors.
@@ -45,6 +62,11 @@ export const YOUTUBE_API_ROUTES = {
   SEARCH: "/search",
   VIDEO: "/video",
   VIDEO_SUGGESTED: "/video/suggested",
+  VIDEO_META: "/video-meta",
   CHANNEL: "/channel",
   HANDLE: "/handle",
 } as const;
+
+export const YOUTUBE_VIDEO_META_MAX_BATCH = 100;
+
+export const YOUTUBE_VIDEO_META_CONCURRENCY = 10;

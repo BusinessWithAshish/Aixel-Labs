@@ -5,11 +5,6 @@ export type YOUTUBE_HANDLE_REQUEST = z.infer<
   typeof YOUTUBE_HANDLE_REQUEST_SCHEMA
 >;
 
-export type YOUTUBE_HANDLE_RESPONSE = {
-  handle: string;
-  channelId: string;
-};
-
 type YTHandlePageMetadata = {
   channelMetadataRenderer?: {
     externalId?: string;
@@ -41,4 +36,9 @@ export type YOUTUBE_HANDLE_PAGE_INIT_DATA = {
       urlCanonical?: string;
     };
   };
+};
+
+export type YOUTUBE_HANDLE_RESPONSE = {
+  handle: string;
+  channelId: string;
 };

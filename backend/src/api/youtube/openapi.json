@@ -1,0 +1,1215 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Aixel Labs YouTube",
+    "description": "YouTube data APIs that scrape YouTube via InnerTube — no official YouTube Data API key required. All endpoints use POST with a JSON body. Responses are wrapped in a standard `{ success, data?, error? }` envelope.",
+    "version": "1.0.0",
+    "x-category": "Data"
+  },
+  "servers": [
+    {
+      "url": "https://api.aixellabs.in",
+      "description": "Production API server. YouTube endpoints are served under /youtube."
+    }
+  ],
+  "tags": [
+    {
+      "name": "Search",
+      "description": "Search YouTube for videos or channels."
+    },
+    {
+      "name": "Video",
+      "description": "Fetch video metadata and suggested (related) videos."
+    },
+    {
+      "name": "Channel",
+      "description": "Fetch channel metadata and tab content (videos, shorts, or playlists)."
+    },
+    {
+      "name": "Handle",
+      "description": "Resolve a YouTube @handle to a channel ID."
+    }
+  ],
+  "paths": {
+    "/youtube/search": {
+      "post": {
+        "tags": ["Search"],
+        "operationId": "youtubeSearch",
+        "summary": "Search YouTube",
+        "description": "Scrapes YouTube search results for a query with optional content-type filter.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/YoutubeSearchRequest"
+              },
+              "examples": {
+                "videoSearch": {
+                  "summary": "Search for videos",
+                  "value": {
+                    "query": "machine learning tutorial",
+                    "filter": "video",
+                    "limit": 25
+                  }
+                },
+                "channelSearch": {
+                  "summary": "Search for channels",
+                  "value": {
+                    "query": "tech news",
+                    "filter": "channel",
+                    "limit": 10
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search completed successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeSearchSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/youtube/video": {
+      "post": {
+        "tags": ["Video"],
+        "operationId": "youtubeVideoDetails",
+        "summary": "Get video details",
+        "description": "Fetches metadata for a single YouTube video by ID via InnerTube `get_watch`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/YoutubeVideoRequest"
+              },
+              "examples": {
+                "default": {
+                  "summary": "Fetch video details",
+                  "value": {
+                    "videoId": "dQw4w9WgXcQ"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Video details retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeVideoDetailsSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Video not found or unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream YouTube data extraction error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/youtube/video/suggested": {
+      "post": {
+        "tags": ["Video"],
+        "operationId": "youtubeVideoSuggested",
+        "summary": "Get suggested videos",
+        "description": "Fetches suggested (related) videos for a YouTube video via InnerTube watch-next results.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/YoutubeVideoSuggestedRequest"
+              },
+              "examples": {
+                "default": {
+                  "summary": "Fetch suggested videos",
+                  "value": {
+                    "videoId": "dQw4w9WgXcQ",
+                    "limit": 25
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Suggested videos retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeVideoSuggestedSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Video not found or unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream YouTube data extraction error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/youtube/channel": {
+      "post": {
+        "tags": ["Channel"],
+        "operationId": "youtubeChannel",
+        "summary": "Get channel data",
+        "description": "Scrapes a YouTube channel page and returns channel metadata plus tab content (videos, shorts, or playlists). Provide either `channelId` or `handle`, not both.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/YoutubeChannelRequest"
+              },
+              "examples": {
+                "byChannelId": {
+                  "summary": "Fetch channel by ID",
+                  "value": {
+                    "channelId": "UC_x5XG1OV2P6uZZ5FSM9Ttw",
+                    "contentType": "videos",
+                    "limit": 25
+                  }
+                },
+                "byHandle": {
+                  "summary": "Fetch channel by handle",
+                  "value": {
+                    "handle": "GoogleDevelopers",
+                    "contentType": "shorts",
+                    "limit": 10
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Channel data retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeChannelSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream YouTube data extraction error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/youtube/handle": {
+      "post": {
+        "tags": ["Handle"],
+        "operationId": "youtubeHandle",
+        "summary": "Resolve handle to channel ID",
+        "description": "Resolves a YouTube channel handle (@username or username) to its canonical channel ID.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/YoutubeHandleRequest"
+              },
+              "examples": {
+                "default": {
+                  "summary": "Resolve a handle",
+                  "value": {
+                    "handle": "GoogleDevelopers"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Handle resolved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YoutubeHandleSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream YouTube resolution error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "RapidAPIKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-RapidAPI-Key",
+        "description": "RapidAPI subscription key issued to API consumers."
+      },
+      "RapidAPIHost": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-RapidAPI-Host",
+        "description": "RapidAPI host header for this API listing."
+      }
+    },
+    "schemas": {
+      "Region": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "description": "Optional region or state for geo-targeted proxy routing. Not sent to YouTube InnerTube.",
+        "example": "California"
+      },
+      "GeoRequest": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "$ref": "#/components/schemas/Region"
+          }
+        }
+      },
+      "VideoId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[a-zA-Z0-9_-]+$",
+        "description": "YouTube video ID.",
+        "example": "dQw4w9WgXcQ"
+      },
+      "ChannelId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50,
+        "pattern": "^[a-zA-Z0-9_-]+$",
+        "description": "YouTube channel ID (e.g. UCxxxxxxxxxxxxxxxxxxxxxx).",
+        "example": "UC_x5XG1OV2P6uZZ5FSM9Ttw"
+      },
+      "Handle": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^@?[a-zA-Z0-9._-]+$",
+        "description": "YouTube channel handle (@username or username). Leading @ is optional.",
+        "example": "GoogleDevelopers"
+      },
+      "SearchFilter": {
+        "type": "string",
+        "enum": ["video", "channel"],
+        "default": "video",
+        "description": "Content type filter for search results."
+      },
+      "ChannelContentType": {
+        "type": "string",
+        "enum": ["videos", "shorts", "playlists"],
+        "default": "videos",
+        "description": "Channel content tab to fetch."
+      },
+      "ResultLimit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000,
+        "default": 1000,
+        "description": "Maximum number of results to return (max 1000)."
+      },
+      "Thumbnail": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "width": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "integer"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["success"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [false]
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "YoutubeSearchRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GeoRequest"
+          },
+          {
+            "type": "object",
+            "required": ["query"],
+            "properties": {
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500,
+                "description": "Search keyword or phrase.",
+                "example": "machine learning tutorial"
+              },
+              "filter": {
+                "$ref": "#/components/schemas/SearchFilter"
+              },
+              "limit": {
+                "$ref": "#/components/schemas/ResultLimit"
+              }
+            }
+          }
+        ]
+      },
+      "YoutubeVideoRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GeoRequest"
+          },
+          {
+            "type": "object",
+            "required": ["videoId"],
+            "properties": {
+              "videoId": {
+                "$ref": "#/components/schemas/VideoId"
+              }
+            }
+          }
+        ]
+      },
+      "YoutubeVideoSuggestedRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/YoutubeVideoRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "$ref": "#/components/schemas/ResultLimit"
+              }
+            }
+          }
+        ]
+      },
+      "YoutubeChannelRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GeoRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "$ref": "#/components/schemas/ChannelId"
+              },
+              "handle": {
+                "$ref": "#/components/schemas/Handle"
+              },
+              "contentType": {
+                "$ref": "#/components/schemas/ChannelContentType"
+              },
+              "limit": {
+                "$ref": "#/components/schemas/ResultLimit"
+              }
+            },
+            "description": "Either `channelId` or `handle` is required, but not both."
+          }
+        ]
+      },
+      "YoutubeHandleRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GeoRequest"
+          },
+          {
+            "type": "object",
+            "required": ["handle"],
+            "properties": {
+              "handle": {
+                "$ref": "#/components/schemas/Handle"
+              }
+            }
+          }
+        ]
+      },
+      "YoutubeSearchVideoItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "videoId": {
+            "type": "string",
+            "nullable": true
+          },
+          "videoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelId": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "lengthText": {
+            "type": "string",
+            "nullable": true
+          },
+          "publishedTimeText": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelLogoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration": {
+            "type": "number",
+            "nullable": true
+          },
+          "viewCountText": {
+            "type": "string",
+            "nullable": true
+          },
+          "viewCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "thumbnails": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/Thumbnail"
+            }
+          }
+        }
+      },
+      "YoutubeSearchChannelItem": {
+        "type": "object",
+        "required": ["channelId", "isVerified"],
+        "properties": {
+          "channelId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "handle": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnails": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/Thumbnail"
+            }
+          },
+          "subscriberCountText": {
+            "type": "string",
+            "nullable": true
+          },
+          "subscribers": {
+            "type": "number",
+            "nullable": true
+          },
+          "isVerified": {
+            "type": "boolean"
+          }
+        }
+      },
+      "YoutubeSearchResponseData": {
+        "type": "object",
+        "required": ["resultType", "items", "searchQuery"],
+        "properties": {
+          "resultType": {
+            "$ref": "#/components/schemas/SearchFilter"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/YoutubeSearchVideoItem"
+                },
+                {
+                  "$ref": "#/components/schemas/YoutubeSearchChannelItem"
+                }
+              ]
+            }
+          },
+          "searchQuery": {
+            "type": "string"
+          },
+          "estimatedResults": {
+            "type": "number",
+            "nullable": true
+          },
+          "totalResults": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "YoutubeSearchSuccessResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "data": {
+            "$ref": "#/components/schemas/YoutubeSearchResponseData"
+          }
+        }
+      },
+      "YoutubeVideoDetailsResponseData": {
+        "type": "object",
+        "required": ["id", "videoUrl", "isLive", "keywords"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "videoUrl": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnail": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/Thumbnail"
+            }
+          },
+          "isLive": {
+            "type": "boolean"
+          },
+          "channel": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelId": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "viewCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "viewCountText": {
+            "type": "string",
+            "nullable": true
+          },
+          "lengthSeconds": {
+            "type": "number",
+            "nullable": true
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "YoutubeVideoDetailsSuccessResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "data": {
+            "$ref": "#/components/schemas/YoutubeVideoDetailsResponseData"
+          }
+        }
+      },
+      "YoutubeVideoSuggestionItem": {
+        "type": "object",
+        "required": ["videoId", "videoUrl"],
+        "properties": {
+          "videoId": {
+            "type": "string"
+          },
+          "videoUrl": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnail": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/Thumbnail"
+            }
+          },
+          "channelTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelId": {
+            "type": "string",
+            "nullable": true
+          },
+          "viewsText": {
+            "type": "string",
+            "nullable": true
+          },
+          "views": {
+            "type": "number",
+            "nullable": true
+          },
+          "publishedText": {
+            "type": "string",
+            "nullable": true
+          },
+          "durationText": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "YoutubeVideoSuggestedResponseData": {
+        "type": "object",
+        "required": ["videoId", "items", "totalResults"],
+        "properties": {
+          "videoId": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/YoutubeVideoSuggestionItem"
+            }
+          },
+          "totalResults": {
+            "type": "integer"
+          }
+        }
+      },
+      "YoutubeVideoSuggestedSuccessResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "data": {
+            "$ref": "#/components/schemas/YoutubeVideoSuggestedResponseData"
+          }
+        }
+      },
+      "YoutubeChannelLink": {
+        "type": "object",
+        "required": ["title", "url"],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "displayUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "YoutubeChannelInfo": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptionPreview": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelId": {
+            "type": "string",
+            "nullable": true
+          },
+          "channelUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "handle": {
+            "type": "string",
+            "nullable": true
+          },
+          "handleUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatar": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/Thumbnail"
+            }
+          },
+          "banner": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/Thumbnail"
+            }
+          },
+          "isVerified": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "isFamilySafe": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "subscriberCountText": {
+            "type": "string",
+            "nullable": true
+          },
+          "subscribers": {
+            "type": "number",
+            "nullable": true
+          },
+          "videoCountText": {
+            "type": "string",
+            "nullable": true
+          },
+          "videoCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "totalViewsText": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalViews": {
+            "type": "number",
+            "nullable": true
+          },
+          "joinedDateText": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string",
+            "nullable": true,
+            "description": "Channel's listed country from YouTube About metadata."
+          },
+          "rssUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "keywords": {
+            "type": "string",
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/YoutubeChannelLink"
+            }
+          }
+        }
+      },
+      "YoutubeChannelVideoItem": {
+        "type": "object",
+        "required": ["videoId"],
+        "properties": {
+          "videoId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnail": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/Thumbnail"
+            }
+          },
+          "viewsText": {
+            "type": "string",
+            "nullable": true
+          },
+          "views": {
+            "type": "number",
+            "nullable": true
+          },
+          "publishedText": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "YoutubeChannelShortItem": {
+        "type": "object",
+        "required": ["shortId"],
+        "properties": {
+          "shortId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnail": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/Thumbnail"
+            }
+          },
+          "viewsText": {
+            "type": "string",
+            "nullable": true
+          },
+          "views": {
+            "type": "number",
+            "nullable": true
+          },
+          "publishedText": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "YoutubeChannelPlaylistItem": {
+        "type": "object",
+        "required": ["playlistId", "playlistUrl"],
+        "properties": {
+          "playlistId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnail": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/Thumbnail"
+            }
+          },
+          "videoCountText": {
+            "type": "string",
+            "nullable": true
+          },
+          "videoCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "firstVideoId": {
+            "type": "string",
+            "nullable": true
+          },
+          "playlistUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "YoutubeChannelResponseData": {
+        "type": "object",
+        "required": ["channelId", "contentType", "items", "totalResults"],
+        "properties": {
+          "channelId": {
+            "type": "string"
+          },
+          "channelInfo": {
+            "type": "object",
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/YoutubeChannelInfo"
+              }
+            ]
+          },
+          "contentType": {
+            "$ref": "#/components/schemas/ChannelContentType"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/YoutubeChannelVideoItem"
+                },
+                {
+                  "$ref": "#/components/schemas/YoutubeChannelShortItem"
+                },
+                {
+                  "$ref": "#/components/schemas/YoutubeChannelPlaylistItem"
+                }
+              ]
+            }
+          },
+          "totalResults": {
+            "type": "integer"
+          }
+        }
+      },
+      "YoutubeChannelSuccessResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "data": {
+            "$ref": "#/components/schemas/YoutubeChannelResponseData"
+          }
+        }
+      },
+      "YoutubeHandleResponseData": {
+        "type": "object",
+        "required": ["handle", "channelId"],
+        "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "channelId": {
+            "type": "string"
+          }
+        }
+      },
+      "YoutubeHandleSuccessResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "data": {
+            "$ref": "#/components/schemas/YoutubeHandleResponseData"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "RapidAPIKey": [],
+      "RapidAPIHost": []
+    }
+  ]
+}

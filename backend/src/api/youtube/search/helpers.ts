@@ -3,6 +3,7 @@ import {
   YOUTUBE_DEFAULT_LIMIT,
   YOUTUBE_INNERTUBE_SEARCH_URL,
   YOUTUBE_SEARCH_FILTER_SP,
+  YOUTUBE_VIDEO_URL,
   YT_SEARCH_FILTER,
 } from "../constants";
 import {
@@ -82,6 +83,7 @@ function mapVideoSearchItem(
   return {
     id: item.videoId ?? null,
     videoId: item.videoId ?? null,
+    videoUrl: item.videoId ? YOUTUBE_VIDEO_URL(item.videoId) : null,
     title: joinYoutubeTextRuns(item.title?.runs),
     channelId: browseEndpoint?.browseId ?? null,
     channelUrl,

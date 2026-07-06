@@ -27,6 +27,9 @@ importers:
       cors:
         specifier: ^2.8.5
         version: 2.8.6
+      cycletls:
+        specifier: ^2.0.5
+        version: 2.0.5
       dotenv:
         specifier: ^16.5.0
         version: 16.6.1
@@ -45,6 +48,9 @@ importers:
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0
+      libphonenumber-js:
+        specifier: ^1.13.8
+        version: 1.13.8
       mongodb:
         specifier: ^6.17.0
         version: 6.21.0
@@ -54,6 +60,9 @@ importers:
       node-tls-client:
         specifier: ^2.1.0
         version: 2.1.0(patch_hash=limbagjnlb7kyzykxozkx2lfpi)
+      undici:
+        specifier: ^7.16.0
+        version: 7.24.6
       zod:
         specifier: ^3.25.43
         version: 3.25.76
@@ -2759,7 +2768,6 @@ packages:
     resolution: {integrity: sha512-8kzdPJ3FsNsVIurqBs7oodNnCEVbni9yUEkaHbgptDACOPW04jimGagZ51E6+lXUwJjgnBw+hyko/lkFWCldqw==}
     dependencies:
       undici-types: 6.21.0
-    dev: true
 
   /@types/node@22.19.15:
     resolution: {integrity: sha512-F0R/h2+dsy5wJAUe3tAU6oqa2qbWY5TpNfL/RGmo1y38hiyO1w3x2jPtt76wmuaJI4DQnOBu21cNXQ2STIUUWg==}
@@ -3771,6 +3779,18 @@ packages:
 
   /csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+
+  /cycletls@2.0.5:
+    resolution: {integrity: sha512-Nud94JBPZu1JTXWJ1GpIoQNR1xxU84WYt7G0dxzwpUe1xAAs6YbihvlQhIhPv9xljjonINJfWPFaeb8Ex1wLhQ==}
+    engines: {node: '>=18.0.0'}
+    dependencies:
+      '@types/node': 20.19.37
+      form-data: 4.0.5
+      ws: 8.20.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+    dev: false
 
   /damerau-levenshtein@1.0.8:
     resolution: {integrity: sha512-sdQSFB7+llfUcQHUQO3+B8ERRj0Oa4w9POWMI/puGtuf7gFywGmkaLCElnudfTiKZV+NvHqL0ifzdrI8Ro7ESA==}
@@ -5635,6 +5655,10 @@ packages:
       prelude-ls: 1.2.1
       type-check: 0.4.0
     dev: true
+
+  /libphonenumber-js@1.13.8:
+    resolution: {integrity: sha512-80xal1m93rADejw2pMp2MSzFhHCPLEspjHxnH2UtqI+DgAmElsbmLMiqk9niwH9NWAfjsRtaJI+qBrOEmRx9nQ==}
+    dev: false
 
   /lightningcss-android-arm64@1.32.0:
     resolution: {integrity: sha512-YK7/ClTt4kAK0vo6w3X+Pnm0D2cf2vPHbhOXdoNti1Ga0al1P4TBZhwjATvjNwLEBCnKvjJc2jQgHXH0NEwlAg==}

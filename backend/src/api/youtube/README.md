@@ -12,8 +12,9 @@ Express router mounting scraper sub-APIs under `/youtube`. All endpoints use **P
 | Video | [video/README.md](./video/README.md) | `POST` | `/video`, `/video/suggested` |
 | Handle | — | `POST` | `/handle` |
 | Channel | [channel/README.md](./channel/README.md) | `POST` | `/channel` |
+| Intelligence | [intelligence/README.md](./intelligence/README.md) | `POST` | `/intelligence/search`, `/intelligence/video`, `/intelligence/channel`, `/intelligence/handle` |
 
-Route paths are defined once in `constants.ts` → `YOUTUBE_API_ROUTES` and mirrored in `backend/src/config.ts` → `API_ENDPOINTS.YOUTUBE`.
+Raw routes: `constants.ts` → `YOUTUBE_API_ROUTES`. Intelligence routes: `intelligence/constants.ts` → `YOUTUBE_INTELLIGENCE_ROUTES`. Both mirrored in `backend/src/config.ts` → `API_ENDPOINTS.YOUTUBE`.
 
 ## Shared request fields (every API)
 
@@ -36,7 +37,8 @@ youtube/
 ├── search/
 ├── video/
 ├── handle/
-└── channel/
+├── channel/
+└── intelligence/     # Derived endpoints (raw + computed intelligence block)
 ```
 
 ## Single source of truth
