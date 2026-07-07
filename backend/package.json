@@ -90,6 +90,8 @@
     "@types/jsdom": "^21.1.7",
     "@types/morgan": "^1.9.10",
     "@types/node": "^22.5.5",
+    "happy-dom": "^20.10.6",
+    "puppeteer": "^24.40.0",
     "tsx": "^4.20.6",
     "typescript": "^5.8.3"
   }
