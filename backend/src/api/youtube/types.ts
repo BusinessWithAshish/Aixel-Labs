@@ -59,3 +59,11 @@ export type YT_LOCKUP_THUMBNAIL_IMAGE = {
     }>;
   };
 };
+
+export type YOUTUBE_VIDEO_WATCH_META = {
+  publishedAt: string | null;
+  lengthSeconds: number | null;
+  channelSubscribers: number | null;
+  likeCount: number | null;
+  commentCount: number | null;
+};

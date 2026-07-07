@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { YOUTUBE_DEFAULT_LIMIT, YOUTUBE_MAX_LIMIT } from "../constants";
 import {
   YOUTUBE_CHANNEL_ID_SCHEMA,
   YOUTUBE_GEO_REQUEST_SCHEMA,
   YOUTUBE_HANDLE_VALUE_SCHEMA,
+  youtubeLimitSchema,
 } from "../schemas";
 import { YT_CHANNEL_CONTENT_TYPE } from "./constants";
 
@@ -20,16 +20,7 @@ export const YOUTUBE_CHANNEL_REQUEST_SCHEMA = YOUTUBE_GEO_REQUEST_SCHEMA.extend(
       .describe(
         "Channel content tab to fetch (videos, shorts, playlists). Defaults to videos.",
       ),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(YOUTUBE_MAX_LIMIT)
-      .default(YOUTUBE_DEFAULT_LIMIT)
-      .optional()
-      .describe(
-        `Maximum number of items to return (default ${YOUTUBE_DEFAULT_LIMIT}, max ${YOUTUBE_MAX_LIMIT})`,
-      ),
+    limit: youtubeLimitSchema("Maximum number of items to return"),
   },
 ).superRefine((data, ctx) => {
   if (!data.channelId && !data.handle) {

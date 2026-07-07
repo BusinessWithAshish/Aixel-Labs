@@ -80,6 +80,7 @@
     "mongodb": "^6.17.0",
     "morgan": "^1.10.1",
     "node-tls-client": "^2.1.0",
+    "simple-statistics": "^7.9.3",
     "undici": "^7.16.0",
     "zod": "^3.25.43"
   },

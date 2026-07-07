@@ -1,7 +1,11 @@
-import { YOUTUBE_BASE_URL, YOUTUBE_CHANNEL_ID_PATTERN } from "../constants";
+import {
+  YOUTUBE_CHANNEL_ID_PATTERN,
+  YOUTUBE_HANDLE_PAGE_URL,
+} from "../constants";
 import {
   createYoutubeFetchSession,
   extractYtInitialDataFromHtml,
+  normalizeYoutubeHandle,
 } from "../helpers";
 import { closeUrlFetchSession } from "../../../utils/node-tls-client-session-handler";
 import type { YOUTUBE_GEO_REQUEST } from "../types";
@@ -59,10 +63,6 @@ function extractChannelIdFromInitData(
   return null;
 }
 
-function normalizeYoutubeHandle(handle: string): string {
-  return handle.trim().replace(/^@/, "");
-}
-
 export async function resolveYoutubeHandleToChannelId(
   handle: string,
   geo: Partial<YOUTUBE_GEO_REQUEST> = {},
@@ -72,7 +72,7 @@ export async function resolveYoutubeHandleToChannelId(
 
   try {
     const response = await session.get(
-      `${YOUTUBE_BASE_URL}/@${normalizedHandle}`,
+      YOUTUBE_HANDLE_PAGE_URL(normalizedHandle),
     );
 
     if (!response.ok) {

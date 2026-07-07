@@ -44,7 +44,10 @@ export async function fetchInnertubeClientVersion(
   session: UrlFetchSession,
   pageUrl: string,
 ): Promise<string> {
-  const { clientVersion } = await fetchYoutubeWatchPageContext(session, pageUrl);
+  const { clientVersion } = await fetchYoutubeWatchPageContext(
+    session,
+    pageUrl,
+  );
   return clientVersion;
 }
 
@@ -170,6 +173,20 @@ export function joinYoutubeTextRuns(
 export function emptyToNull(value: string | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+/** Parses plain numeric strings (with optional commas) into integers. */
+export function parseNumericString(
+  value: string | null | undefined,
+): number | null {
+  if (!value?.trim()) return null;
+  const parsed = Number(value.replace(/,/g, ""));
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/** Strips leading `@` and surrounding whitespace from a YouTube handle. */
+export function normalizeYoutubeHandle(handle: string): string {
+  return handle.trim().replace(/^@/, "");
 }
 
 export function resolveRedirectUrl(url: string): string {

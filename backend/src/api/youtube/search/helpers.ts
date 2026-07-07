@@ -1,5 +1,7 @@
 import {
+  YOUTUBE_BADGE_STYLES,
   YOUTUBE_BASE_URL,
+  YOUTUBE_CHANNEL_CANONICAL_URL,
   YOUTUBE_DEFAULT_LIMIT,
   YOUTUBE_INNERTUBE_SEARCH_URL,
   YOUTUBE_SEARCH_FILTER_SP,
@@ -18,6 +20,12 @@ import {
   resolveYoutubeGeo,
   viewsTextToNumber,
 } from "../helpers";
+import { extractNestedContinuationToken } from "../innertube-continuation";
+import {
+  hasChannelRenderer,
+  hasItemSectionRenderer,
+  hasVideoRenderer,
+} from "../type-guards";
 import {
   closeUrlFetchSession,
   type UrlFetchSession,
@@ -75,7 +83,7 @@ function mapVideoSearchItem(
       ?.thumbnail?.thumbnails?.[0]?.url ?? null;
 
   const channelUrl = browseEndpoint?.canonicalBaseUrl
-    ? `${YOUTUBE_BASE_URL}${browseEndpoint.canonicalBaseUrl}`
+    ? YOUTUBE_CHANNEL_CANONICAL_URL(browseEndpoint.canonicalBaseUrl)
     : null;
 
   const viewCountText = item.viewCountText?.simpleText ?? null;
@@ -103,7 +111,7 @@ function mapChannelSearchItem(
 ): YOUTUBE_SEARCH_CHANNEL_ITEM {
   const browseEndpoint = item.navigationEndpoint?.browseEndpoint;
   const channelUrl = browseEndpoint?.canonicalBaseUrl
-    ? `${YOUTUBE_BASE_URL}${browseEndpoint.canonicalBaseUrl}`
+    ? YOUTUBE_CHANNEL_CANONICAL_URL(browseEndpoint.canonicalBaseUrl)
     : null;
 
   const subscriberCountText = item.videoCountText?.simpleText ?? null;
@@ -111,7 +119,7 @@ function mapChannelSearchItem(
   const isVerified =
     item.ownerBadges?.some(
       (badge) =>
-        badge.metadataBadgeRenderer?.style === "BADGE_STYLE_TYPE_VERIFIED",
+        badge.metadataBadgeRenderer?.style === YOUTUBE_BADGE_STYLES.VERIFIED,
     ) ?? false;
 
   return {
@@ -137,7 +145,7 @@ function extractSearchItems(
   const items: YOUTUBE_SEARCH_RESPONSE_ITEM[] = [];
 
   for (const sectionItem of sectionItems) {
-    if ("itemSectionRenderer" in sectionItem) {
+    if (hasItemSectionRenderer(sectionItem)) {
       items.push(
         ...extractSearchItems(sectionItem.itemSectionRenderer.contents, filter),
       );
@@ -146,38 +154,26 @@ function extractSearchItems(
 
     if (
       filter === YT_SEARCH_FILTER.CHANNEL &&
-      "channelRenderer" in sectionItem
+      hasChannelRenderer(sectionItem)
     ) {
-      items.push(mapChannelSearchItem(sectionItem.channelRenderer));
+      items.push(
+        mapChannelSearchItem(
+          sectionItem.channelRenderer as YOUTUBE_SEARCH_RAW_CHANNEL_ITEM,
+        ),
+      );
       continue;
     }
 
-    if (filter !== YT_SEARCH_FILTER.CHANNEL && "videoRenderer" in sectionItem) {
-      items.push(mapVideoSearchItem(sectionItem.videoRenderer));
+    if (filter !== YT_SEARCH_FILTER.CHANNEL && hasVideoRenderer(sectionItem)) {
+      items.push(
+        mapVideoSearchItem(
+          sectionItem.videoRenderer as YOUTUBE_SEARCH_RAW_VIDEO_ITEM,
+        ),
+      );
     }
   }
 
   return items;
-}
-
-function extractContinuationToken(
-  sectionItems: YOUTUBE_SEARCH_SECTION_ITEM[],
-): string | null {
-  for (const sectionItem of sectionItems) {
-    if ("continuationItemRenderer" in sectionItem) {
-      return sectionItem.continuationItemRenderer.continuationEndpoint
-        .continuationCommand.token;
-    }
-
-    if ("itemSectionRenderer" in sectionItem) {
-      const nestedToken = extractContinuationToken(
-        sectionItem.itemSectionRenderer.contents,
-      );
-      if (nestedToken) return nestedToken;
-    }
-  }
-
-  return null;
 }
 
 function parseContinuationResponse(
@@ -193,7 +189,7 @@ function parseContinuationResponse(
     if (sectionItems.length > 0) {
       return {
         sectionItems,
-        continuationToken: extractContinuationToken(sectionItems),
+        continuationToken: extractNestedContinuationToken(sectionItems),
       };
     }
   }
@@ -257,7 +253,7 @@ export async function fetchYoutubeSearch(
         .sectionListRenderer.contents;
 
     const items = extractSearchItems(sectionContents, filter);
-    let continuationToken = extractContinuationToken(sectionContents);
+    let continuationToken = extractNestedContinuationToken(sectionContents);
 
     while (items.length < limit && continuationToken) {
       const nextPage = await fetchSearchContinuation(

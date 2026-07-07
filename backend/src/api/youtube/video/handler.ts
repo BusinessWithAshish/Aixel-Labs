@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import { YOUTUBE_HANDLER_LABELS } from "../constants";
+import { createYoutubeHandler } from "../create-handler";
 import {
   YOUTUBE_VIDEO_REQUEST_SCHEMA,
   YOUTUBE_VIDEO_SUGGESTED_REQUEST_SCHEMA,
@@ -8,107 +9,24 @@ import {
   fetchYoutubeVideoSuggestedVideos,
   YoutubeVideoError,
 } from "./helpers";
-import type { ALApiResponse } from "../../types";
-import type {
-  YOUTUBE_VIDEO_DETAILS_RESPONSE,
-  YOUTUBE_VIDEO_SUGGESTED_VIDEOS_RESPONSE,
-} from "./types";
 
-export async function youtubeVideoHandler(req: Request, res: Response) {
-  const parsed = YOUTUBE_VIDEO_REQUEST_SCHEMA.safeParse(req.body);
-
-  if (!parsed.success) {
-    res.status(400).json({
-      success: false,
-      error: "[YOUTUBE/VIDEO] : Invalid request parameters",
-    });
-    return;
+function mapYoutubeVideoError(err: unknown) {
+  if (err instanceof YoutubeVideoError) {
+    return { statusCode: err.statusCode, message: err.message };
   }
-
-  try {
-    const data = await fetchYoutubeVideoDetails(parsed.data);
-
-    const response: ALApiResponse<YOUTUBE_VIDEO_DETAILS_RESPONSE> = {
-      success: true,
-      data,
-    };
-
-    res.status(200).json(response);
-  } catch (err) {
-    if (err instanceof YoutubeVideoError) {
-      console.error("[YOUTUBE/VIDEO] Video error:", err.message);
-      res.status(err.statusCode).json({
-        success: false,
-        error: `[YOUTUBE/VIDEO] : ${err.message}`,
-      });
-      return;
-    }
-
-    if (err instanceof Error) {
-      console.error("[YOUTUBE/VIDEO] Data extraction error:", err.message);
-      res.status(502).json({
-        success: false,
-        error: `[YOUTUBE/VIDEO] : ${err.message}`,
-      });
-      return;
-    }
-
-    console.error("[YOUTUBE/VIDEO] Unexpected error:", err);
-    res.status(500).json({
-      success: false,
-      error: "[YOUTUBE/VIDEO] : Internal server error",
-    });
-  }
+  return null;
 }
 
-export async function youtubeVideoSuggestedVideosHandler(
-  req: Request,
-  res: Response,
-) {
-  const parsed = YOUTUBE_VIDEO_SUGGESTED_REQUEST_SCHEMA.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({
-      success: false,
-      error: "[YOUTUBE/VIDEO/SUGGESTED] : Invalid request parameters",
-    });
-    return;
-  }
+export const youtubeVideoHandler = createYoutubeHandler({
+  label: YOUTUBE_HANDLER_LABELS.VIDEO,
+  schema: YOUTUBE_VIDEO_REQUEST_SCHEMA,
+  fetch: fetchYoutubeVideoDetails,
+  mapError: mapYoutubeVideoError,
+});
 
-  try {
-    const data = await fetchYoutubeVideoSuggestedVideos(parsed.data);
-
-    const response: ALApiResponse<YOUTUBE_VIDEO_SUGGESTED_VIDEOS_RESPONSE> = {
-      success: true,
-      data,
-    };
-
-    res.status(200).json(response);
-  } catch (err) {
-    if (err instanceof YoutubeVideoError) {
-      console.error("[YOUTUBE/VIDEO/SUGGESTED] Video error:", err.message);
-      res.status(err.statusCode).json({
-        success: false,
-        error: `[YOUTUBE/VIDEO/SUGGESTED] : ${err.message}`,
-      });
-      return;
-    }
-
-    if (err instanceof Error) {
-      console.error(
-        "[YOUTUBE/VIDEO/SUGGESTED] Data extraction error:",
-        err.message,
-      );
-      res.status(502).json({
-        success: false,
-        error: `[YOUTUBE/VIDEO/SUGGESTED] : ${err.message}`,
-      });
-      return;
-    }
-
-    console.error("[YOUTUBE/VIDEO/SUGGESTED] Unexpected error:", err);
-    res.status(500).json({
-      success: false,
-      error: "[YOUTUBE/VIDEO/SUGGESTED] : Internal server error",
-    });
-  }
-}
+export const youtubeVideoSuggestedVideosHandler = createYoutubeHandler({
+  label: YOUTUBE_HANDLER_LABELS.VIDEO_SUGGESTED,
+  schema: YOUTUBE_VIDEO_SUGGESTED_REQUEST_SCHEMA,
+  fetch: fetchYoutubeVideoSuggestedVideos,
+  mapError: mapYoutubeVideoError,
+});

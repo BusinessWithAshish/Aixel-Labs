@@ -30,6 +30,15 @@ export enum YOUTUBE_CHANNEL_TIER {
 export const YOUTUBE_VIDEO_URL = (videoId: string) =>
   `${YOUTUBE_BASE_URL}/watch?v=${videoId}`;
 
+export const YOUTUBE_CHANNEL_PAGE_URL = (channelId: string) =>
+  `${YOUTUBE_BASE_URL}/channel/${channelId}`;
+
+export const YOUTUBE_HANDLE_PAGE_URL = (handle: string) =>
+  `${YOUTUBE_BASE_URL}/@${handle}`;
+
+export const YOUTUBE_CHANNEL_CANONICAL_URL = (canonicalBaseUrl: string) =>
+  `${YOUTUBE_BASE_URL}${canonicalBaseUrl}`;
+
 /**
  * YouTube search filter `sp` query param values.
  * These are base64-encoded protobuf filter descriptors.
@@ -70,3 +79,32 @@ export const YOUTUBE_API_ROUTES = {
 export const YOUTUBE_VIDEO_META_MAX_BATCH = 100;
 
 export const YOUTUBE_VIDEO_META_CONCURRENCY = 10;
+
+// ─── Handler log / error labels ───────────────────────────────────────────────
+
+export const YOUTUBE_HANDLER_LABELS = {
+  SEARCH: "YOUTUBE/SEARCH",
+  VIDEO: "YOUTUBE/VIDEO",
+  VIDEO_SUGGESTED: "YOUTUBE/VIDEO/SUGGESTED",
+  VIDEO_META: "YOUTUBE/VIDEO-META",
+  CHANNEL: "YOUTUBE/CHANNEL",
+  HANDLE: "YOUTUBE/HANDLE",
+} as const;
+
+// ─── YouTube renderer enum-like strings ──────────────────────────────────────
+
+export const YOUTUBE_BADGE_STYLES = {
+  VERIFIED: "BADGE_STYLE_TYPE_VERIFIED",
+} as const;
+
+export const YOUTUBE_LOCKUP_CONTENT_TYPES = {
+  VIDEO: "LOCKUP_CONTENT_TYPE_VIDEO",
+} as const;
+
+export const YOUTUBE_ENGAGEMENT_PANEL_TARGET_IDS = {
+  COMMENTS: "engagement-panel-comments-section",
+} as const;
+
+export const YOUTUBE_COMMENTS_DISABLED_MARKER = "Comments are turned off";
+
+export const YOUTUBE_VERIFIED_ACCESSIBILITY_MARKER = "Verified";

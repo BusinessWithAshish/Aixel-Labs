@@ -1,7 +1,8 @@
 import {
-  YOUTUBE_BASE_URL,
+  YOUTUBE_CHANNEL_PAGE_URL,
   YOUTUBE_DEFAULT_LIMIT,
   YOUTUBE_INNERTUBE_BROWSE_URL,
+  YOUTUBE_VERIFIED_ACCESSIBILITY_MARKER,
 } from "../constants";
 import {
   abbreviatedCountTextToNumber,
@@ -15,6 +16,7 @@ import {
   videoCountTextToNumber,
   viewsTextToNumber,
 } from "../helpers";
+import { extractLastContinuationToken } from "../innertube-continuation";
 import {
   closeUrlFetchSession,
   type UrlFetchSession,
@@ -181,7 +183,9 @@ function mapChannelInfo(
       channel?.avatar?.thumbnails ??
       null,
     banner: header?.banner?.imageBannerViewModel?.image?.sources ?? null,
-    isVerified: verifiedLabel ? verifiedLabel.includes("Verified") : null,
+    isVerified: verifiedLabel
+      ? verifiedLabel.includes(YOUTUBE_VERIFIED_ACCESSIBILITY_MARKER)
+      : null,
     isFamilySafe: channel?.isFamilySafe ?? null,
     subscriberCountText,
     subscribers: abbreviatedCountTextToNumber(subscriberCountText),
@@ -203,7 +207,7 @@ async function fetchInnertubeClientVersionForChannel(
 ): Promise<string> {
   return fetchInnertubeClientVersion(
     session,
-    `${YOUTUBE_BASE_URL}/channel/${channelId}`,
+    YOUTUBE_CHANNEL_PAGE_URL(channelId),
   );
 }
 
@@ -445,19 +449,6 @@ function findPlaylistGridItems(
   return [];
 }
 
-function extractContinuationToken(
-  items: YOUTUBE_CHANNEL_GRID_ITEM[],
-): string | null {
-  for (let i = items.length - 1; i >= 0; i--) {
-    const item = items[i];
-    if ("continuationItemRenderer" in item) {
-      return item.continuationItemRenderer.continuationEndpoint
-        .continuationCommand.token;
-    }
-  }
-  return null;
-}
-
 function parseGridItems(
   gridItems: YOUTUBE_CHANNEL_GRID_ITEM[],
   contentType: YT_CHANNEL_CONTENT_TYPE.SHORTS,
@@ -492,7 +483,10 @@ function parseGridItems(
       if (short) items.push(short);
     }
 
-    return { items, continuationToken: extractContinuationToken(gridItems) };
+    return {
+      items,
+      continuationToken: extractLastContinuationToken(gridItems),
+    };
   }
 
   const items: YOUTUBE_CHANNEL_VIDEO_ITEM[] = [];
@@ -502,7 +496,7 @@ function parseGridItems(
     if (video) items.push(video);
   }
 
-  return { items, continuationToken: extractContinuationToken(gridItems) };
+  return { items, continuationToken: extractLastContinuationToken(gridItems) };
 }
 
 function findContentGrid(

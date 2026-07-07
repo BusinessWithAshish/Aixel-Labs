@@ -13,9 +13,9 @@ export {
   videoMetaItemsToPublishedAtMap,
   videoMetaItemsToWatchMetaMap,
 } from "./helpers";
-export type { YOUTUBE_VIDEO_WATCH_META } from "./helpers";
 export type {
   YOUTUBE_VIDEO_META_ITEM,
   YOUTUBE_VIDEO_META_REQUEST,
   YOUTUBE_VIDEO_META_RESPONSE,
 } from "./types";
+export type { YOUTUBE_VIDEO_WATCH_META } from "../types";

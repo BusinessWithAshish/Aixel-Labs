@@ -1,14 +1,17 @@
 import {
-  YOUTUBE_BASE_URL,
+  YOUTUBE_HANDLER_LABELS,
   YOUTUBE_VIDEO_META_CONCURRENCY,
   YOUTUBE_VIDEO_META_MAX_BATCH,
+  YOUTUBE_VIDEO_URL,
 } from "../constants";
+import { runWithConcurrency } from "../concurrency";
 import {
   abbreviatedCountTextToNumber,
   createYoutubeFetchSession,
   fetchInnertubeClientVersion,
   resolveYoutubeGeo,
 } from "../helpers";
+import type { YOUTUBE_VIDEO_WATCH_META } from "../types";
 import {
   closeUrlFetchSession,
   type UrlFetchSession,
@@ -27,30 +30,6 @@ import type {
   YOUTUBE_VIDEO_META_RESPONSE,
 } from "./types";
 
-async function runWithConcurrency<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  if (items.length === 0) return [];
-
-  const results: R[] = new Array(items.length);
-  let nextIndex = 0;
-
-  async function worker(): Promise<void> {
-    while (nextIndex < items.length) {
-      const index = nextIndex++;
-      results[index] = await fn(items[index]!);
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
-  );
-
-  return results;
-}
-
 async function bootstrapInnertubeClientVersion(
   geo: Pick<YOUTUBE_VIDEO_META_REQUEST, "country" | "region">,
   sampleVideoId: string,
@@ -60,7 +39,7 @@ async function bootstrapInnertubeClientVersion(
   try {
     return await fetchInnertubeClientVersion(
       session,
-      `${YOUTUBE_BASE_URL}/watch?v=${sampleVideoId}`,
+      YOUTUBE_VIDEO_URL(sampleVideoId),
     );
   } finally {
     await closeUrlFetchSession(session);
@@ -91,7 +70,11 @@ async function fetchVideoMetaForVideo(
       commentCount: extractCommentCountFromGetWatch(data),
     };
   } catch (err) {
-    console.warn("[YOUTUBE/VIDEO-META] Failed to resolve video:", videoId, err);
+    console.warn(
+      `[${YOUTUBE_HANDLER_LABELS.VIDEO_META}] Failed to resolve video:`,
+      videoId,
+      err,
+    );
     return {
       videoId,
       publishedAt: null,
@@ -153,14 +136,6 @@ export function videoMetaItemsToPublishedAtMap(
 ): Map<string, string | null> {
   return new Map(items.map((item) => [item.videoId, item.publishedAt]));
 }
-
-export type YOUTUBE_VIDEO_WATCH_META = {
-  publishedAt: string | null;
-  lengthSeconds: number | null;
-  channelSubscribers: number | null;
-  likeCount: number | null;
-  commentCount: number | null;
-};
 
 export function videoMetaItemsToWatchMetaMap(
   items: YOUTUBE_VIDEO_META_ITEM[],

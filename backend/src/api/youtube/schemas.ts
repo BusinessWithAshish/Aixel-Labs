@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
   YOUTUBE_DEFAULT_COUNTRY,
+  YOUTUBE_DEFAULT_LIMIT,
   YOUTUBE_HANDLE_MAX_LENGTH,
+  YOUTUBE_MAX_LIMIT,
 } from "./constants";
 
 /** Two-letter ISO 3166-1 alpha-2 country code — used for proxy routing and InnerTube `gl`. */
@@ -53,3 +55,17 @@ export const YOUTUBE_CHANNEL_ID_SCHEMA = z
   .max(50)
   .regex(/^[a-zA-Z0-9_-]+$/, "Invalid YouTube channel ID")
   .describe("YouTube channel ID (e.g. UCxxxxxxxxxxxxxxxxxxxxxx)");
+
+/** Shared optional result-limit field for paginated YouTube scrapers. */
+export function youtubeLimitSchema(description: string) {
+  return z
+    .number()
+    .int()
+    .min(1)
+    .max(YOUTUBE_MAX_LIMIT)
+    .default(YOUTUBE_DEFAULT_LIMIT)
+    .optional()
+    .describe(
+      `${description} (default ${YOUTUBE_DEFAULT_LIMIT}, max ${YOUTUBE_MAX_LIMIT})`,
+    );
+}
