@@ -1,10 +1,11 @@
-import type { GSEARCH_REQUEST_SCHEMA } from "./schemas";
 import type { z } from "zod";
 
-export type { GsearchRequest } from "./schemas";
+import type { GSEARCH_REQUEST_SCHEMA } from "./schemas";
+
+export type GSEARCH_REQUEST = z.infer<typeof GSEARCH_REQUEST_SCHEMA>;
 
 /** Short-lived token pair required by the CSE element endpoint. */
-export type GsearchToken = {
+export type GSEARCH_TOKEN = {
   cseToken: string;
   cselibVersion: string;
   exp: string[];
@@ -12,7 +13,7 @@ export type GsearchToken = {
 };
 
 /** OpenGraph video block (present on YouTube/video results). */
-export type GsearchVideo = {
+export type GSEARCH_VIDEO = {
   url: string | null;
   secureUrl: string | null;
   type: string | null;
@@ -21,18 +22,16 @@ export type GsearchVideo = {
 };
 
 /** Author/creator extracted from schema.org `person` or article meta. */
-export type GsearchAuthor = {
+export type GSEARCH_AUTHOR = {
   name: string | null;
   url: string | null;
 };
 
 /**
  * A single organic web result. Superset of the browser-worker's
- * `{ url, title, snippet, index }`, enriched with everything useful the CSE
- * endpoint exposes: display/formatted URLs, thumbnail + full-size image,
- * OpenGraph/Twitter metadata, publish/modified dates, author, site, and video.
+ * `{ url, title, snippet, index }`, enriched with CSE richSnippet metadata.
  */
-export type GsearchResult = {
+export type GSEARCH_RESULT = {
   /** 1-based position across all requested pages. */
   index: number;
   title: string | null;
@@ -59,18 +58,18 @@ export type GsearchResult = {
   /** ISO modified time (`article:modified_time` / `og:updated_time`). */
   modifiedTime: string | null;
   /** Article author / schema.org person. */
-  author: GsearchAuthor | null;
+  author: GSEARCH_AUTHOR | null;
   /** Comma-joined keywords/tags from `news_keywords` / `article:tag`. */
   keywords: string | null;
   /** Twitter handle (`twitter:site` / `twitter:creator`). */
   twitterHandle: string | null;
   /** Video block for video results (YouTube etc.). */
-  video: GsearchVideo | null;
+  video: GSEARCH_VIDEO | null;
   /** Google click-tracking redirect URL. */
   clickUrl: string | null;
 };
 
-export type GsearchResponse = {
+export type GSEARCH_RESPONSE = {
   query: string;
   /** Query actually sent to Google (with location appended when `region` set). */
   resolvedQuery: string;
@@ -80,7 +79,61 @@ export type GsearchResponse = {
   /** Google's estimated total result count (string as returned). */
   estimatedResultCount: string | null;
   pagesFetched: number;
-  results: GsearchResult[];
+  results: GSEARCH_RESULT[];
 };
 
-export type GsearchRequestType = z.infer<typeof GSEARCH_REQUEST_SCHEMA>;
+// ─── Raw CSE payload shapes (internal) ───────────────────────────────────────
+
+export type GSEARCH_RAW_METATAGS = Record<string, string | undefined> & {
+  ogSiteName?: string;
+  ogDescription?: string;
+  ogImage?: string;
+  ogImageSecureUrl?: string;
+  twitterImage?: string;
+  twitterImageSrc?: string;
+  ogType?: string;
+  ogLocale?: string;
+  articlePublishedTime?: string;
+  articlePublished?: string;
+  pubDate?: string;
+  articleModifiedTime?: string;
+  articleModified?: string;
+  ogUpdatedTime?: string;
+  author?: string;
+  articleAuthor?: string;
+  newsKeywords?: string;
+  articleTag?: string;
+  parselyTags?: string;
+  twitterCreator?: string;
+  twitterSite?: string;
+  ogVideoUrl?: string;
+  ogVideoSecureUrl?: string;
+  ogVideoType?: string;
+  ogVideoWidth?: string;
+  ogVideoHeight?: string;
+};
+
+export type GSEARCH_RAW_CSE_RESULT = {
+  url?: string;
+  unescapedUrl?: string;
+  visibleUrl?: string;
+  formattedUrl?: string;
+  clicktrackUrl?: string;
+  title?: string;
+  titleNoFormatting?: string;
+  content?: string;
+  contentNoFormatting?: string;
+  richSnippet?: {
+    cseThumbnail?: { src?: string };
+    cseImage?: { src?: string };
+    metatags?: GSEARCH_RAW_METATAGS;
+    person?: { name?: string; url?: string };
+    videoobject?: { url?: string; duration?: string };
+  };
+};
+
+export type GSEARCH_CSE_JS_OPTIONS = {
+  cse_token?: string;
+  cselibVersion?: string;
+  exp?: string[];
+};

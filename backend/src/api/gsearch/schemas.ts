@@ -1,6 +1,6 @@
 import { z } from "zod";
+
 import {
-  GSEARCH_DEFAULT_COUNTRY,
   GSEARCH_DEFAULT_LANGUAGE,
   GSEARCH_DEFAULT_PAGES,
   GSEARCH_MAX_PAGES,
@@ -22,10 +22,8 @@ export const GSEARCH_COUNTRY_SCHEMA = z
   );
 
 /**
- * Optional region / city (e.g. "Austin, Texas" or "Mumbai"). Used two ways:
- *   1. Appended to the query text ("<query> in <region>") — the reliable location
- *      signal for the CSE endpoint (uule/near are ignored by it).
- *   2. Best-effort Evomi `_region-*` proxy routing (limited city coverage).
+ * Optional region / city (e.g. "Austin, Texas" or "Mumbai"). Appended to the
+ * query text ("<query> in <region>") — the reliable location signal for CSE.
  */
 export const GSEARCH_REGION_SCHEMA = z
   .string()
@@ -76,5 +74,3 @@ export const GSEARCH_REQUEST_SCHEMA = z.object({
     .optional()
     .describe("Restrict to results from the last day/week/month/year."),
 });
-
-export type GsearchRequest = z.infer<typeof GSEARCH_REQUEST_SCHEMA>;

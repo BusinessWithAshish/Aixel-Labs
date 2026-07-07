@@ -1,13 +1,18 @@
 import { type IRouter, Router } from "express";
 
-import { GSEARCH_ROUTES } from "./constants";
-import { gsearchHandler } from "./handler";
+import { API_ENDPOINTS } from "../../config";
+import { gsearchApiHandler } from "./handler";
 
 const gsearchRoutes: IRouter = Router();
 
-gsearchRoutes.post(GSEARCH_ROUTES.SEARCH, gsearchHandler);
+gsearchRoutes.post(API_ENDPOINTS.GSEARCH.SEARCH.route, gsearchApiHandler);
 
 export default gsearchRoutes;
 
 export { fetchGsearch } from "./client";
-export type { GsearchRequest, GsearchResponse, GsearchResult } from "./types";
+export { GSEARCH_REQUEST_SCHEMA } from "./schemas";
+export type {
+  GSEARCH_REQUEST,
+  GSEARCH_RESPONSE,
+  GSEARCH_RESULT,
+} from "./types";

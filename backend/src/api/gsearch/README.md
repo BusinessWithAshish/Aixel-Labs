@@ -63,7 +63,7 @@ ignored by this endpoint.
 
 Schema: `schemas.ts` → `GSEARCH_REQUEST_SCHEMA`. Constants/limits: `constants.ts`.
 
-## Response — `ALApiResponse<GsearchResponse>`
+## Response — `ALApiResponse<GSEARCH_RESPONSE>`
 
 ```jsonc
 {
@@ -99,20 +99,40 @@ Schema: `schemas.ts` → `GSEARCH_REQUEST_SCHEMA`. Constants/limits: `constants.
 `displayUrl`, `thumbnail`, `image`, `siteName`, `metaDescription`, `modifiedTime` — all
 extracted from the CSE result's `visibleUrl` and `richSnippet` (OpenGraph metatags). The
 raw endpoint also returns `formattedUrl`, `clicktrackUrl`, `breadcrumbUrl`, and more
-metatags; add them to `mapCseResult` in `helpers.ts` if needed.
+metatags; add them to `compute/map-result.ts` if needed.
 
 ## Architecture
 
 ```
 gsearch/
-├── index.ts       # Router (POST /) + public fetchGsearch export
-├── constants.ts   # cx, URLs, limits, safe/time enums, UA, timeouts
-├── schemas.ts     # GSEARCH_REQUEST_SCHEMA (country required, region optional)
-├── types.ts       # GsearchResult, GsearchResponse, GsearchToken
-├── helpers.ts     # location query, time→sort, JSONP parse, result mapping
-├── client.ts      # token fetch/cache + paginated proxied search (fetchGsearch)
-└── handler.ts     # Express handler (403 if no proxy, parse → fetch → respond)
+├── index.ts          # Router (POST /) + public exports
+├── constants.ts      # URLs, limits, enums, handler labels, patterns
+├── schemas.ts        # GSEARCH_REQUEST_SCHEMA (country required, region optional)
+├── types.ts          # GSEARCH_REQUEST/RESPONSE/RESULT + raw CSE payload types
+├── compute/
+│   ├── query.ts      # buildLocationQuery, buildTimeSort
+│   ├── parse.ts      # parseJsonp, parseCseJsToken
+│   ├── map-result.ts # mapCseResult (CSE row → GSEARCH_RESULT)
+│   └── index.ts
+├── helpers.ts        # barrel re-export of compute/
+├── http.ts           # proxied GET (Impit + Evomi)
+├── token.ts          # cse.js token cache + search URL builder
+├── client.ts         # fetchGsearch orchestration
+└── handler.ts        # gsearchApiHandler (403 if no proxy → fetch → respond)
 ```
+
+### DRY map
+
+| Concern | Location |
+|--------|----------|
+| Limits, URLs, enums | `constants.ts` |
+| Request/response types | `types.ts` |
+| Zod schema | `schemas.ts` |
+| Pure transforms (no I/O) | `compute/` |
+| HTTP transport | `http.ts` |
+| Token cache + URL | `token.ts` |
+| Search orchestration | `client.ts` |
+| Express handler | `handler.ts` |
 
 ## Notes & limits
 
