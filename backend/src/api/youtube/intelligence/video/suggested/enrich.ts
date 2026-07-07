@@ -1,21 +1,12 @@
 import type { YOUTUBE_VIDEO_SUGGESTED_VIDEOS_RESPONSE } from "../../../video/types";
-import {
-  fetchVideoWatchMetaByVideoIds,
-  type YOUTUBE_VIDEO_WATCH_META,
-} from "../../../video-meta";
+import { fetchVideoWatchMetaByVideoIds } from "../../../video-meta";
+import { createEmptyWatchMetaMap, resolveWatchMeta } from "../../watch-meta";
 import {
   enrichSuggestionItemFields,
   computeSuggestedAggregateIntelligence,
 } from "./compute";
 import type { YOUTUBE_VIDEO_SUGGESTED_INTELLIGENCE_RESPONSE } from "./types";
-
-const EMPTY_WATCH_META: YOUTUBE_VIDEO_WATCH_META = {
-  publishedAt: null,
-  lengthSeconds: null,
-  channelSubscribers: null,
-  likeCount: null,
-  commentCount: null,
-};
+import type { YOUTUBE_INTELLIGENCE_GEO_INPUT } from "../../types";
 
 export type SuggestedVideosIntelligenceHarvest = {
   sourceChannelId: string | null;
@@ -25,7 +16,7 @@ export type SuggestedVideosIntelligenceHarvest = {
 export async function enrichSuggestedVideos(
   harvest: SuggestedVideosIntelligenceHarvest,
   harvestedAt: Date = new Date(),
-  geo: { country: string; region?: string },
+  geo: YOUTUBE_INTELLIGENCE_GEO_INPUT,
 ): Promise<YOUTUBE_VIDEO_SUGGESTED_INTELLIGENCE_RESPONSE> {
   const { sourceChannelId, suggested } = harvest;
 
@@ -33,10 +24,10 @@ export async function enrichSuggestedVideos(
   const watchMetaByVideoId =
     videoIds.length > 0
       ? await fetchVideoWatchMetaByVideoIds(videoIds, geo)
-      : new Map<string, YOUTUBE_VIDEO_WATCH_META>();
+      : createEmptyWatchMetaMap();
 
   const items = suggested.items.map((item, index) => {
-    const watchMeta = watchMetaByVideoId.get(item.videoId) ?? EMPTY_WATCH_META;
+    const watchMeta = resolveWatchMeta(watchMetaByVideoId, item.videoId);
 
     return {
       ...item,

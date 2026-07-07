@@ -1,11 +1,12 @@
 import { YOUTUBE_CHANNEL_REQUEST_SCHEMA } from "../../channel/schemas";
 import { resolveYoutubeHandleToChannelId } from "../../handle/helpers";
+import { YOUTUBE_INTELLIGENCE_HANDLER_LABELS } from "../constants";
 import { createIntelligenceHandler } from "../create-handler";
 import { enrichChannelResults } from "./enrich";
 import { fetchChannelIntelligenceHarvest } from "./harvest";
 
 export const youtubeChannelIntelligenceHandler = createIntelligenceHandler({
-  label: "YOUTUBE/INTELLIGENCE/CHANNEL",
+  label: YOUTUBE_INTELLIGENCE_HANDLER_LABELS.CHANNEL,
   schema: YOUTUBE_CHANNEL_REQUEST_SCHEMA,
   fetch: async (data) => {
     const {

@@ -2,31 +2,34 @@ import type {
   YOUTUBE_SEARCH_CHANNEL_ITEM,
   YOUTUBE_SEARCH_VIDEO_ITEM,
 } from "../../search/types";
-import {
-  computeAverage,
-  computeMax,
-  computePercentiles,
-  computeRatio,
-  emptyChannelTierDistribution,
-  emptyDurationBucketDistribution,
-  incrementChannelTier,
-  incrementDurationBucket,
-} from "../helpers";
 import type { YOUTUBE_VIDEO_WATCH_META } from "../../video-meta";
 import {
   computeChannelTier,
   computeDescriptionLength,
   computeDurationBucket,
   computeIsShort,
-  computePublishedDaysAgo,
-  computeTitleHasNumber,
-  computeTitleHasQuestion,
-  computeTitleHasYear,
-  computeTitleLength,
-  computeTitleWordCount,
+  computePublishingVelocityFields,
+  computeTitleTextFields,
   computeVelocityScore,
-  computeViewsPerDay,
-} from "../video/compute";
+} from "../compute";
+import {
+  computeAverage,
+  computeMax,
+  computePercentiles,
+  computeRatio,
+  computeTruthyRatio,
+  extractIntelligenceValues,
+} from "../math";
+import {
+  emptyChannelTierDistribution,
+  emptyDurationBucketDistribution,
+  incrementChannelTier,
+  incrementDurationBucket,
+} from "../distributions";
+import {
+  isSearchChannelItemIntelligence,
+  isSearchVideoItemIntelligence,
+} from "../type-guards";
 import type {
   YOUTUBE_SEARCH_CHANNEL_ITEM_INTELLIGENCE,
   YOUTUBE_SEARCH_INTELLIGENCE_FIELDS,
@@ -38,11 +41,11 @@ export function enrichSearchVideoItemFields(
   watchMeta: YOUTUBE_VIDEO_WATCH_META,
   harvestedAt: Date = new Date(),
 ) {
-  const publishedDaysAgo = computePublishedDaysAgo(
+  const { publishedDaysAgo, viewsPerDay } = computePublishingVelocityFields(
     watchMeta.publishedAt,
+    item.viewCount,
     harvestedAt,
   );
-  const viewsPerDay = computeViewsPerDay(item.viewCount, publishedDaysAgo);
   const channelSubscribers = watchMeta.channelSubscribers;
 
   return {
@@ -56,11 +59,7 @@ export function enrichSearchVideoItemFields(
     channelTier: computeChannelTier(channelSubscribers),
     durationBucket: computeDurationBucket(item.duration),
     isShort: computeIsShort(item.duration),
-    titleLength: computeTitleLength(item.title),
-    titleWordCount: computeTitleWordCount(item.title),
-    titleHasNumber: computeTitleHasNumber(item.title),
-    titleHasQuestion: computeTitleHasQuestion(item.title),
-    titleHasYear: computeTitleHasYear(item.title),
+    ...computeTitleTextFields(item.title),
     descriptionLength: computeDescriptionLength(item.description),
   };
 }
@@ -73,22 +72,6 @@ export function enrichSearchChannelItemFields(
   };
 }
 
-function isSearchVideoItemIntelligence(
-  item:
-    | YOUTUBE_SEARCH_VIDEO_ITEM_INTELLIGENCE
-    | YOUTUBE_SEARCH_CHANNEL_ITEM_INTELLIGENCE,
-): item is YOUTUBE_SEARCH_VIDEO_ITEM_INTELLIGENCE {
-  return "videoId" in item;
-}
-
-function isSearchChannelItemIntelligence(
-  item:
-    | YOUTUBE_SEARCH_VIDEO_ITEM_INTELLIGENCE
-    | YOUTUBE_SEARCH_CHANNEL_ITEM_INTELLIGENCE,
-): item is YOUTUBE_SEARCH_CHANNEL_ITEM_INTELLIGENCE {
-  return "channelId" in item && !("videoId" in item);
-}
-
 export function computeSearchAggregateIntelligence(
   items: Array<
     | YOUTUBE_SEARCH_VIDEO_ITEM_INTELLIGENCE
@@ -99,43 +82,42 @@ export function computeSearchAggregateIntelligence(
   const videoItems = items.filter(isSearchVideoItemIntelligence);
   const channelItems = items.filter(isSearchChannelItemIntelligence);
 
-  const viewsPerDayValues = videoItems
-    .map((item) => item.intelligence.viewsPerDay)
-    .filter((value): value is number => value !== null);
+  const viewsPerDayValues = extractIntelligenceValues(
+    videoItems,
+    (item) => item.intelligence.viewsPerDay,
+  );
   const avgViewsPerDay = computeAverage(viewsPerDayValues);
 
-  const velocityScoreValues = videoItems
-    .map((item) => item.intelligence.velocityScore)
-    .filter((value): value is number => value !== null);
+  const velocityScoreValues = extractIntelligenceValues(
+    videoItems,
+    (item) => item.intelligence.velocityScore,
+  );
   const avgVelocityScore = computeAverage(velocityScoreValues);
   const topVelocityScore = computeMax(velocityScoreValues);
-  const velocityPercentiles = computePercentiles(velocityScoreValues);
-  const velocityDistribution = velocityPercentiles
-    ? {
-        p25: velocityPercentiles.p25,
-        p50: velocityPercentiles.p50,
-        p75: velocityPercentiles.p75,
-      }
-    : null;
+  const velocityDistribution = computePercentiles(velocityScoreValues);
 
-  const titleLengths = videoItems
-    .map((item) => item.intelligence.titleLength)
-    .filter((value): value is number => value !== null);
+  const titleLengths = extractIntelligenceValues(
+    videoItems,
+    (item) => item.intelligence.titleLength,
+  );
   const avgTitleLength = computeAverage(titleLengths);
 
-  const shortCount = videoItems.filter(
-    (item) => item.intelligence.isShort === true,
-  ).length;
   const shortRatio =
-    videoItems.length > 0 ? computeRatio(shortCount, videoItems.length) : null;
+    videoItems.length > 0
+      ? computeRatio(
+          videoItems.filter((item) => item.intelligence.isShort === true)
+            .length,
+          videoItems.length,
+        )
+      : null;
 
-  const titleWithNumberRatio = computeRatio(
-    videoItems.filter((item) => item.intelligence.titleHasNumber).length,
-    videoItems.length,
+  const titleWithNumberRatio = computeTruthyRatio(
+    videoItems,
+    (item) => item.intelligence.titleHasNumber,
   );
-  const titleWithQuestionRatio = computeRatio(
-    videoItems.filter((item) => item.intelligence.titleHasQuestion).length,
-    videoItems.length,
+  const titleWithQuestionRatio = computeTruthyRatio(
+    videoItems,
+    (item) => item.intelligence.titleHasQuestion,
   );
 
   const durationBucketDistribution = emptyDurationBucketDistribution();

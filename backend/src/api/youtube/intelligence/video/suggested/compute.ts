@@ -1,21 +1,18 @@
 import type { YOUTUBE_VIDEO_SUGGESTION_ITEM } from "../../../video/types";
 import type { YOUTUBE_VIDEO_WATCH_META } from "../../../video-meta";
 import {
-  computeRatio,
-  emptyDurationBucketDistribution,
-  incrementDurationBucket,
-} from "../../helpers";
-import {
   computeChannelTier,
   computeDurationBucket,
   computeIsShort,
-  computePublishedDaysAgo,
-  computeTitleHasNumber,
-  computeTitleHasQuestion,
-  computeTitleHasYear,
-  computeTitleLength,
-  computeViewsPerDay,
-} from "../compute";
+  computePublishingVelocityFields,
+  computeTitleLengthField,
+  computeTitlePatternFields,
+} from "../../compute";
+import { computeTruthyRatio, findDominantMapEntry } from "../../math";
+import {
+  emptyDurationBucketDistribution,
+  incrementDurationBucket,
+} from "../../distributions";
 import type {
   YOUTUBE_VIDEO_SUGGESTED_INTELLIGENCE_FIELDS,
   YOUTUBE_VIDEO_SUGGESTION_ITEM_INTELLIGENCE,
@@ -38,21 +35,17 @@ export function enrichSuggestionItemFields(
     harvestedAt: Date;
   },
 ) {
-  const publishedDaysAgo = computePublishedDaysAgo(
-    context.watchMeta.publishedAt,
-    context.harvestedAt,
-  );
-
   return {
     suggestionPosition: context.suggestionPosition,
-    publishedDaysAgo,
-    viewsPerDay: computeViewsPerDay(item.views, publishedDaysAgo),
+    ...computePublishingVelocityFields(
+      context.watchMeta.publishedAt,
+      item.views,
+      context.harvestedAt,
+    ),
     durationBucket: computeDurationBucket(item.duration),
     isShort: computeIsShort(item.duration),
-    titleLength: computeTitleLength(item.title),
-    titleHasNumber: computeTitleHasNumber(item.title),
-    titleHasQuestion: computeTitleHasQuestion(item.title),
-    titleHasYear: computeTitleHasYear(item.title),
+    ...computeTitleLengthField(item.title),
+    ...computeTitlePatternFields(item.title),
     channelTier: computeChannelTier(context.watchMeta.channelSubscribers),
     isSameChannel: computeIsSameChannel(
       item.channelId,
@@ -67,9 +60,9 @@ export function computeSuggestedAggregateIntelligence(
   const comparableItems = items.filter(
     (item) => item.intelligence.isSameChannel !== null,
   );
-  const sameChannelRatio = computeRatio(
-    comparableItems.filter((item) => item.intelligence.isSameChannel).length,
-    comparableItems.length,
+  const sameChannelRatio = computeTruthyRatio(
+    comparableItems,
+    (item) => item.intelligence.isSameChannel === true,
   );
 
   const avgSuggestionPosition =
@@ -97,14 +90,8 @@ export function computeSuggestedAggregateIntelligence(
     );
   }
 
-  let dominantChannelId: string | null = null;
-  let dominantChannelCount = 0;
-  for (const [channelId, count] of channelCounts) {
-    if (count > dominantChannelCount) {
-      dominantChannelId = channelId;
-      dominantChannelCount = count;
-    }
-  }
+  const { key: dominantChannelId, count: dominantChannelCount } =
+    findDominantMapEntry(channelCounts);
 
   return {
     sameChannelRatio,

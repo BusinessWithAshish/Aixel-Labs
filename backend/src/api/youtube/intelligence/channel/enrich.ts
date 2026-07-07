@@ -6,8 +6,13 @@ import type {
 } from "../../channel/types";
 import { YT_CHANNEL_CONTENT_TYPE } from "../../channel/constants";
 import { fetchVideoWatchMetaByVideoIds } from "../../video-meta";
-import type { YOUTUBE_VIDEO_WATCH_META } from "../../video-meta";
 import type { ChannelIntelligenceHarvest } from "./harvest";
+import { createEmptyWatchMetaMap, resolveWatchMeta } from "../watch-meta";
+import {
+  isChannelPlaylistItem,
+  isChannelShortItem,
+  isChannelVideoItem,
+} from "../type-guards";
 import {
   computeChannelAvgViews,
   enrichChannelInfoFields,
@@ -18,32 +23,7 @@ import type {
   YOUTUBE_CHANNEL_INTELLIGENCE_RESPONSE,
   YOUTUBE_CHANNEL_PLAYLIST_INTELLIGENCE_FIELDS,
 } from "./types";
-
-const EMPTY_WATCH_META: YOUTUBE_VIDEO_WATCH_META = {
-  publishedAt: null,
-  lengthSeconds: null,
-  channelSubscribers: null,
-  likeCount: null,
-  commentCount: null,
-};
-
-function isChannelVideoItem(
-  item: YOUTUBE_CHANNEL_RESPONSE["items"][number],
-): item is YOUTUBE_CHANNEL_VIDEO_ITEM {
-  return "videoId" in item;
-}
-
-function isChannelShortItem(
-  item: YOUTUBE_CHANNEL_RESPONSE["items"][number],
-): item is YOUTUBE_CHANNEL_SHORT_ITEM {
-  return "shortId" in item;
-}
-
-function isChannelPlaylistItem(
-  item: YOUTUBE_CHANNEL_RESPONSE["items"][number],
-): item is YOUTUBE_CHANNEL_PLAYLIST_ITEM {
-  return "playlistId" in item;
-}
+import type { YOUTUBE_INTELLIGENCE_GEO_INPUT } from "../types";
 
 function collectWatchMetaVideoIds(
   harvest: ChannelIntelligenceHarvest,
@@ -64,14 +44,14 @@ function collectWatchMetaVideoIds(
 export async function enrichChannelResults(
   harvest: ChannelIntelligenceHarvest,
   harvestedAt: Date = new Date(),
-  geo: { country: string; region?: string },
+  geo: YOUTUBE_INTELLIGENCE_GEO_INPUT,
 ): Promise<YOUTUBE_CHANNEL_INTELLIGENCE_RESPONSE> {
   const { primary, videosTab, shortsTab } = harvest;
   const videoIds = collectWatchMetaVideoIds(harvest);
-  const watchMetaByVideoId: Map<string, YOUTUBE_VIDEO_WATCH_META> =
+  const watchMetaByVideoId =
     videoIds.length > 0
       ? await fetchVideoWatchMetaByVideoIds(videoIds, geo)
-      : new Map();
+      : createEmptyWatchMetaMap();
 
   const enrichContext = {
     videosTab: videosTab.items as YOUTUBE_CHANNEL_VIDEO_ITEM[],
@@ -109,8 +89,7 @@ export async function enrichChannelResults(
     ...primary,
     items: primary.items.map((item) => {
       if (isChannelVideoItem(item)) {
-        const watchMeta =
-          watchMetaByVideoId.get(item.videoId) ?? EMPTY_WATCH_META;
+        const watchMeta = resolveWatchMeta(watchMetaByVideoId, item.videoId);
 
         return {
           ...item,
@@ -126,8 +105,7 @@ export async function enrichChannelResults(
       }
 
       if (isChannelShortItem(item)) {
-        const watchMeta =
-          watchMetaByVideoId.get(item.shortId) ?? EMPTY_WATCH_META;
+        const watchMeta = resolveWatchMeta(watchMetaByVideoId, item.shortId);
 
         return {
           ...item,

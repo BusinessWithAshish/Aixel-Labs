@@ -3,24 +3,20 @@ import {
   computeChannelTier,
   computeCommentToViewRatio,
   computeDecayAdjustedVelocity,
-  computeHashtagCount,
-  computeHasHashtags,
   computeDescriptionLength,
   computeDurationBucket,
   computeEngagementRatio,
+  computeHashtagCount,
+  computeHasHashtags,
   computeIsShort,
   computeLikeToViewRatio,
   computePublishedDaysAgo,
   computeSubscriberEfficiencyAtVideo,
   computeTagCount,
-  computeTitleHasNumber,
-  computeTitleHasQuestion,
-  computeTitleHasYear,
-  computeTitleLength,
-  computeTitleWordCount,
+  computeTitleTextFields,
   computeVelocityScore,
   computeViewsPerDay,
-} from "./compute";
+} from "../compute";
 import type { YOUTUBE_VIDEO_INTELLIGENCE_RESPONSE } from "./types";
 
 export type VideoIntelligenceHarvest = {
@@ -33,7 +29,10 @@ export function enrichVideoDetails(
   harvestedAt: Date = new Date(),
 ): YOUTUBE_VIDEO_INTELLIGENCE_RESPONSE {
   const { details: raw, suggestionDegree } = harvest;
-  const publishedDaysAgo = computePublishedDaysAgo(raw.publishedAt, harvestedAt);
+  const publishedDaysAgo = computePublishedDaysAgo(
+    raw.publishedAt,
+    harvestedAt,
+  );
   const viewsPerDay = computeViewsPerDay(raw.viewCount, publishedDaysAgo);
   const velocityScore = computeVelocityScore(
     raw.viewCount,
@@ -64,15 +63,11 @@ export function enrichVideoDetails(
       ),
       durationBucket: computeDurationBucket(raw.lengthSeconds),
       isShort: computeIsShort(raw.lengthSeconds),
-      titleLength: computeTitleLength(raw.title),
-      titleWordCount: computeTitleWordCount(raw.title),
+      ...computeTitleTextFields(raw.title),
       descriptionLength: computeDescriptionLength(raw.description),
       tagCount: computeTagCount(raw.keywords),
       hasHashtags: computeHasHashtags(raw.title, raw.description),
       hashtagCount: computeHashtagCount(raw.title, raw.description),
-      titleHasNumber: computeTitleHasNumber(raw.title),
-      titleHasQuestion: computeTitleHasQuestion(raw.title),
-      titleHasYear: computeTitleHasYear(raw.title),
       channelTier: computeChannelTier(raw.channelSubscribers),
       subscriberEfficiencyAtVideo: computeSubscriberEfficiencyAtVideo(
         raw.viewCount,

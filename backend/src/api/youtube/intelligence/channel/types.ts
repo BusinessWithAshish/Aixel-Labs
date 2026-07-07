@@ -6,9 +6,14 @@ import type {
   YOUTUBE_CHANNEL_PLAYLIST_ITEM,
 } from "../../channel/types";
 import type {
-  YOUTUBE_CHANNEL_TIER,
-  YOUTUBE_DURATION_BUCKET,
-} from "../../constants";
+  YOUTUBE_INTELLIGENCE_CHANNEL_TIER_FIELD,
+  YOUTUBE_INTELLIGENCE_DURATION_FIELDS,
+  YOUTUBE_INTELLIGENCE_PERCENTILE_DISTRIBUTION,
+  YOUTUBE_INTELLIGENCE_PUBLISHING_FIELDS,
+  YOUTUBE_INTELLIGENCE_TITLE_LENGTH_FIELD,
+  YOUTUBE_INTELLIGENCE_TITLE_PATTERN_FIELDS,
+  YOUTUBE_RECENT_VELOCITY_TREND_VALUE,
+} from "../types";
 
 export type YOUTUBE_CHANNEL_VIDEO_ITEM_ENRICHED = YOUTUBE_CHANNEL_VIDEO_ITEM & {
   publishedAt: string | null;
@@ -17,31 +22,21 @@ export type YOUTUBE_CHANNEL_VIDEO_ITEM_ENRICHED = YOUTUBE_CHANNEL_VIDEO_ITEM & {
   commentCount: number | null;
 };
 
-export type YOUTUBE_CHANNEL_VIDEO_INTELLIGENCE_FIELDS = {
-  titleLength: number | null;
-  titleHasNumber: boolean;
-  titleHasQuestion: boolean;
-  titleHasYear: boolean;
-  publishedDaysAgo: number | null;
-  viewsPerDay: number | null;
-  durationBucket: YOUTUBE_DURATION_BUCKET | null;
-  isShort: boolean | null;
-  engagementRatio: number | null;
-  rankOnChannel: number | null;
-  viewsVsChannelAvg: number | null;
-};
-
-export type YOUTUBE_CHANNEL_RECENT_VELOCITY_TREND =
-  | "accelerating"
-  | "stable"
-  | "decelerating";
+export type YOUTUBE_CHANNEL_VIDEO_INTELLIGENCE_FIELDS =
+  YOUTUBE_INTELLIGENCE_TITLE_LENGTH_FIELD &
+    YOUTUBE_INTELLIGENCE_TITLE_PATTERN_FIELDS &
+    YOUTUBE_INTELLIGENCE_PUBLISHING_FIELDS &
+    YOUTUBE_INTELLIGENCE_DURATION_FIELDS & {
+      engagementRatio: number | null;
+      rankOnChannel: number | null;
+      viewsVsChannelAvg: number | null;
+    };
 
 export type YOUTUBE_CHANNEL_INTELLIGENCE_FIELDS = {
   channelAgeInDays: number | null;
   avgViewsPerVideo: number | null;
   uploadsPerWeek: number | null;
   subscriberEfficiencyRatio: number | null;
-  channelTier: YOUTUBE_CHANNEL_TIER | null;
   viewsPerSubscriber: number | null;
   isKidsChannel: boolean | null;
   keywordCount: number;
@@ -51,30 +46,25 @@ export type YOUTUBE_CHANNEL_INTELLIGENCE_FIELDS = {
   avgVideoDuration: number | null;
   topVideoViewCount: number | null;
   bottomVideoViewCount: number | null;
-  velocityDistribution: {
-    p25: number | null;
-    p50: number | null;
-    p75: number | null;
-  } | null;
+  velocityDistribution: YOUTUBE_INTELLIGENCE_PERCENTILE_DISTRIBUTION;
   uploadsLast30Days: number | null;
   uploadsLast90Days: number | null;
-  recentVelocityTrend: YOUTUBE_CHANNEL_RECENT_VELOCITY_TREND | null;
-};
+  recentVelocityTrend: YOUTUBE_RECENT_VELOCITY_TREND_VALUE | null;
+} & YOUTUBE_INTELLIGENCE_CHANNEL_TIER_FIELD;
 
 export type YOUTUBE_CHANNEL_SHORT_ITEM_ENRICHED = YOUTUBE_CHANNEL_SHORT_ITEM & {
   publishedAt: string | null;
   duration: number | null;
 };
 
-export type YOUTUBE_CHANNEL_SHORT_INTELLIGENCE_FIELDS = {
-  publishedDaysAgo: number | null;
-  viewsPerDay: number | null;
-  isShort: true;
-  titleLength: number | null;
-  titleHasNumber: boolean;
-  rankOnChannel: number | null;
-  viewsVsChannelAvg: number | null;
-};
+export type YOUTUBE_CHANNEL_SHORT_INTELLIGENCE_FIELDS =
+  YOUTUBE_INTELLIGENCE_PUBLISHING_FIELDS & {
+    isShort: true;
+    titleLength: number | null;
+    titleHasNumber: boolean;
+    rankOnChannel: number | null;
+    viewsVsChannelAvg: number | null;
+  };
 
 export type YOUTUBE_CHANNEL_PLAYLIST_INTELLIGENCE_FIELDS = Record<
   string,

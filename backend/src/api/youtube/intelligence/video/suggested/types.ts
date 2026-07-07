@@ -1,12 +1,16 @@
 import type { WithIntelligence } from "../../types";
 import type {
-  YOUTUBE_CHANNEL_TIER,
-  YOUTUBE_DURATION_BUCKET,
-} from "../../../constants";
-import type {
   YOUTUBE_VIDEO_SUGGESTED_VIDEOS_RESPONSE,
   YOUTUBE_VIDEO_SUGGESTION_ITEM,
 } from "../../../video/types";
+import type {
+  YOUTUBE_INTELLIGENCE_CHANNEL_TIER_FIELD,
+  YOUTUBE_INTELLIGENCE_DURATION_BUCKET_DISTRIBUTION,
+  YOUTUBE_INTELLIGENCE_DURATION_FIELDS,
+  YOUTUBE_INTELLIGENCE_PUBLISHING_FIELDS,
+  YOUTUBE_INTELLIGENCE_TITLE_LENGTH_FIELD,
+  YOUTUBE_INTELLIGENCE_TITLE_PATTERN_FIELDS,
+} from "../../types";
 
 export type YOUTUBE_VIDEO_SUGGESTION_ITEM_ENRICHED =
   YOUTUBE_VIDEO_SUGGESTION_ITEM & {
@@ -16,17 +20,13 @@ export type YOUTUBE_VIDEO_SUGGESTION_ITEM_ENRICHED =
 
 export type YOUTUBE_VIDEO_SUGGESTION_INTELLIGENCE_FIELDS = {
   suggestionPosition: number;
-  publishedDaysAgo: number | null;
-  viewsPerDay: number | null;
-  durationBucket: YOUTUBE_DURATION_BUCKET | null;
-  isShort: boolean | null;
-  titleLength: number | null;
-  titleHasNumber: boolean;
-  titleHasQuestion: boolean;
-  titleHasYear: boolean;
-  channelTier: YOUTUBE_CHANNEL_TIER | null;
-  isSameChannel: boolean | null;
-};
+} & YOUTUBE_INTELLIGENCE_PUBLISHING_FIELDS &
+  YOUTUBE_INTELLIGENCE_DURATION_FIELDS &
+  YOUTUBE_INTELLIGENCE_TITLE_LENGTH_FIELD &
+  YOUTUBE_INTELLIGENCE_TITLE_PATTERN_FIELDS &
+  YOUTUBE_INTELLIGENCE_CHANNEL_TIER_FIELD & {
+    isSameChannel: boolean | null;
+  };
 
 export type YOUTUBE_VIDEO_SUGGESTION_ITEM_INTELLIGENCE = WithIntelligence<
   YOUTUBE_VIDEO_SUGGESTION_ITEM_ENRICHED,
@@ -36,7 +36,7 @@ export type YOUTUBE_VIDEO_SUGGESTION_ITEM_INTELLIGENCE = WithIntelligence<
 export type YOUTUBE_VIDEO_SUGGESTED_INTELLIGENCE_FIELDS = {
   sameChannelRatio: number;
   avgSuggestionPosition: number;
-  durationBucketDistribution: Record<YOUTUBE_DURATION_BUCKET, number>;
+  durationBucketDistribution: YOUTUBE_INTELLIGENCE_DURATION_BUCKET_DISTRIBUTION;
   channelDiversityCount: number;
   dominantChannelId: string | null;
   dominantChannelCount: number;

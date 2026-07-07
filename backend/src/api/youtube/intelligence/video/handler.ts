@@ -4,6 +4,7 @@ import {
   fetchYoutubeVideoSuggestedVideos,
   YoutubeVideoError,
 } from "../../video/helpers";
+import { YOUTUBE_INTELLIGENCE_HANDLER_LABELS } from "../constants";
 import { createIntelligenceHandler } from "../create-handler";
 import { enrichVideoDetails } from "./enrich";
 import type { VideoIntelligenceHarvest } from "./enrich";
@@ -19,7 +20,7 @@ async function fetchVideoIntelligenceHarvest(
     suggestionDegree = suggested.totalResults;
   } catch (err) {
     console.warn(
-      "[YOUTUBE/INTELLIGENCE/VIDEO] Suggested videos fetch failed; suggestionDegree=null",
+      `[${YOUTUBE_INTELLIGENCE_HANDLER_LABELS.VIDEO}] Suggested videos fetch failed; suggestionDegree=null`,
       err instanceof Error ? err.message : err,
     );
   }
@@ -28,7 +29,7 @@ async function fetchVideoIntelligenceHarvest(
 }
 
 export const youtubeVideoIntelligenceHandler = createIntelligenceHandler({
-  label: "YOUTUBE/INTELLIGENCE/VIDEO",
+  label: YOUTUBE_INTELLIGENCE_HANDLER_LABELS.VIDEO,
   schema: YOUTUBE_VIDEO_REQUEST_SCHEMA,
   fetch: fetchVideoIntelligenceHarvest,
   enrich: (raw) => enrichVideoDetails(raw),

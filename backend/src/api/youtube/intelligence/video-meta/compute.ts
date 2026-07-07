@@ -1,5 +1,15 @@
-import { computePublishedDaysAgo } from "../video/compute";
+import { computePublishedDaysAgo } from "../compute";
 import type { YOUTUBE_VIDEO_META_INTELLIGENCE_FIELDS } from "./types";
+
+const EMPTY_PUBLISH_DATE_FIELDS: Pick<
+  YOUTUBE_VIDEO_META_INTELLIGENCE_FIELDS,
+  "publishedDayOfWeek" | "publishedHourUTC" | "publishedMonth" | "publishedYear"
+> = {
+  publishedDayOfWeek: null,
+  publishedHourUTC: null,
+  publishedMonth: null,
+  publishedYear: null,
+};
 
 export function enrichVideoMetaFields(
   publishedAt: string | null,
@@ -10,10 +20,7 @@ export function enrichVideoMetaFields(
   if (!publishedAt) {
     return {
       publishedDaysAgo,
-      publishedDayOfWeek: null,
-      publishedHourUTC: null,
-      publishedMonth: null,
-      publishedYear: null,
+      ...EMPTY_PUBLISH_DATE_FIELDS,
     };
   }
 
@@ -21,10 +28,7 @@ export function enrichVideoMetaFields(
   if (Number.isNaN(published.getTime())) {
     return {
       publishedDaysAgo,
-      publishedDayOfWeek: null,
-      publishedHourUTC: null,
-      publishedMonth: null,
-      publishedYear: null,
+      ...EMPTY_PUBLISH_DATE_FIELDS,
     };
   }
 

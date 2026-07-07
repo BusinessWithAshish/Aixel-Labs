@@ -4,6 +4,7 @@ import {
   fetchYoutubeVideoSuggestedVideos,
   YoutubeVideoError,
 } from "../../../video/helpers";
+import { YOUTUBE_INTELLIGENCE_HANDLER_LABELS } from "../../constants";
 import { createIntelligenceHandler } from "../../create-handler";
 import { enrichSuggestedVideos } from "./enrich";
 import type { SuggestedVideosIntelligenceHarvest } from "./enrich";
@@ -22,9 +23,9 @@ async function fetchSuggestedVideosIntelligenceHarvest(
   };
 }
 
-export const youtubeVideoSuggestedIntelligenceHandler = createIntelligenceHandler(
-  {
-    label: "YOUTUBE/INTELLIGENCE/VIDEO/SUGGESTED",
+export const youtubeVideoSuggestedIntelligenceHandler =
+  createIntelligenceHandler({
+    label: YOUTUBE_INTELLIGENCE_HANDLER_LABELS.VIDEO_SUGGESTED,
     schema: YOUTUBE_VIDEO_SUGGESTED_REQUEST_SCHEMA,
     fetch: fetchSuggestedVideosIntelligenceHarvest,
     enrich: async (harvest, input) => {
@@ -40,5 +41,4 @@ export const youtubeVideoSuggestedIntelligenceHandler = createIntelligenceHandle
       }
       return null;
     },
-  },
-);
+  });
