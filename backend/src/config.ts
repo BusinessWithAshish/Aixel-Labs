@@ -7,6 +7,7 @@ export enum ENDPOINTS {
   INSTAGRAM = "/instagram",
   LINKEDIN = "/linkedin",
   YOUTUBE = "/youtube",
+  GSEARCH = "/gsearch",
   SAMPLE = "/sample",
 }
 
@@ -77,6 +78,9 @@ export const API_ENDPOINTS = {
         full: `${ENDPOINTS.YOUTUBE}${YOUTUBE_INTELLIGENCE_ROUTES.HANDLE}`,
       },
     },
+  },
+  GSEARCH: {
+    SEARCH: { route: "/", full: `${ENDPOINTS.GSEARCH}` },
   },
   SAMPLE: {
     API: { route: "/api", full: `${ENDPOINTS.SAMPLE}/api` },
