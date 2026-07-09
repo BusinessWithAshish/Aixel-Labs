@@ -137,11 +137,11 @@ export function toFetchBatches(
 }
 
 export function shouldRetryHttpStatus(status: number): boolean {
-  return status === 408 || status === 429 || status >= 500;
+  return status === 401 || status === 408 || status === 429 || status >= 500;
 }
 
 export function shouldSkipHttpStatus(status: number): boolean {
-  return status === 401 || status === 403 || status === 404;
+  return status === 403 || status === 404;
 }
 
 export function isProxyTunnelError(message: string): boolean {
