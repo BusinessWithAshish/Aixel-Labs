@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { type DefaultValues, type FieldValues, type SubmitHandler, useFormContext, } from 'react-hook-form';
+import { useEffect, useRef, useState } from 'react';
+import { type DefaultValues, type FieldValues, type SubmitHandler, useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
 import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
 import useLocalStorageState from 'use-local-storage-state';
 import { generateLocalStorageKey } from '@/helpers/generate-local-storage-key';
+import { useLeadGenScraper } from '@/hooks/use-lead-gen-scraper';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -36,6 +37,7 @@ import {
     Loader2Icon,
     PlayIcon,
     RotateCcwIcon,
+    XIcon,
 } from 'lucide-react';
 
 const PRESET_NAME_MAX_LENGTH = 50;
@@ -52,12 +54,37 @@ export function formPresetLocalStorageKey(module: LEAD_GENERATION_SUB_MODULES, m
         : generateLocalStorageKey('lead-gen-form-preset', String(module));
 }
 
-function snapshotFormValues(values: FieldValues): string {
-    return JSON.stringify(values, (_, value) => (value === undefined ? null : value));
+/**
+ * Stable compare for preset matching. localStorage JSON drops `undefined`, and
+ * RHF/controlled fields often coerce empty optionals to `null` / `""` after
+ * reset — treat those as equivalent and ignore key order.
+ */
+function normalizePresetValue(value: unknown): unknown {
+    if (value === undefined || value === null || value === '') return null;
+    if (typeof value === 'number' && Number.isNaN(value)) return null;
+    if (Array.isArray(value)) return value.map(normalizePresetValue);
+    if (typeof value === 'object') {
+        const obj = value as Record<string, unknown>;
+        const out: Record<string, unknown> = {};
+        for (const key of Object.keys(obj).sort()) {
+            const normalized = normalizePresetValue(obj[key]);
+            if (normalized === null) continue;
+            if (
+                typeof normalized === 'object' &&
+                !Array.isArray(normalized) &&
+                Object.keys(normalized as Record<string, unknown>).length === 0
+            ) {
+                continue;
+            }
+            out[key] = normalized;
+        }
+        return out;
+    }
+    return value;
 }
 
-function presetFormValuesMatch(current: FieldValues, saved: FieldValues): boolean {
-    return snapshotFormValues(current) === snapshotFormValues(saved);
+function snapshotFormValues(values: FieldValues): string {
+    return JSON.stringify(normalizePresetValue(values));
 }
 
 export type FormPresetScraperActionsProps<TFieldValues extends FieldValues = FieldValues> = {
@@ -75,7 +102,9 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
     const [originalDefaults] = useState(
         () => form.formState.defaultValues as DefaultValues<TFieldValues> | undefined,
     );
-    const { isSubmitting: busy } = form.formState;
+    const { isSubmitting } = form.formState;
+    const { loading: scraperLoading, abortRequest, clearPendingAbort } = useLeadGenScraper(module);
+    const busy = isSubmitting || scraperLoading;
 
     const presetKey = formPresetLocalStorageKey(module, moduleSegment);
     const [presets, setPresets] = useLocalStorageState<Record<string, DefaultValues<TFieldValues>>>(presetKey, {
@@ -83,16 +112,56 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
     });
 
     const [loadedPresetName, setLoadedPresetName] = useState<string | null>(null);
+    /** Settled form snapshot after load/save — used for dirty checks (not localStorage). */
+    const loadedPresetSnapshotRef = useRef<string | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [saveMode, setSaveMode] = useState<'save-and-run' | 'save-only' | null>(null);
     const [presetNameInput, setPresetNameInput] = useState('');
 
     const presetNames = Object.keys(presets).sort((a, b) => a.localeCompare(b));
 
+    // After reset, controlled fields may coerce values on the next paint(s).
+    // Capture that settled shape as the dirty baseline (not the localStorage blob).
+    useEffect(() => {
+        if (!loadedPresetName) {
+            loadedPresetSnapshotRef.current = null;
+            return;
+        }
+        let cancelled = false;
+        const capture = () => {
+            if (!cancelled) {
+                loadedPresetSnapshotRef.current = snapshotFormValues(form.getValues());
+            }
+        };
+        capture();
+        const raf1 = requestAnimationFrame(() => {
+            capture();
+            requestAnimationFrame(capture);
+        });
+        return () => {
+            cancelled = true;
+            cancelAnimationFrame(raf1);
+        };
+    }, [loadedPresetName, form]);
+
     const runForm = () => {
+        clearPendingAbort();
         void form.handleSubmit(onSubmit, () => {
+            clearPendingAbort();
             toast.error('Form validation failed. Please check your inputs.');
         })();
+    };
+
+    const unlinkLoadedPreset = (message?: string) => {
+        loadedPresetSnapshotRef.current = null;
+        setLoadedPresetName(null);
+        if (message) toast.info(message);
+    };
+
+    const isLoadedPresetDirty = (saved: FieldValues): boolean => {
+        const current = snapshotFormValues(form.getValues());
+        const baseline = loadedPresetSnapshotRef.current ?? snapshotFormValues(saved);
+        return current !== baseline;
     };
 
     const openSaveDialog = (mode: 'save-and-run' | 'save-only') => {
@@ -100,18 +169,15 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
         if (mode === 'save-and-run' && loadedPresetName) {
             const saved = presets[loadedPresetName];
             if (!saved) {
-                setLoadedPresetName(null);
+                unlinkLoadedPreset();
                 toast.error('Preset not found.');
                 return;
             }
-            if (!presetFormValuesMatch(form.getValues(), saved)) {
-                toast.info('Form was changed after loading the preset — preset unlinked.');
-                setPresets((prev) => {
-                    const next = { ...prev };
-                    delete next[loadedPresetName];
-                    return next;
-                });
-                setLoadedPresetName(null);
+            if (isLoadedPresetDirty(saved as FieldValues)) {
+                // Unlink only — never delete the stored preset on a mismatch.
+                unlinkLoadedPreset(
+                    'Form was changed after loading the preset — preset unlinked.',
+                );
                 return;
             }
             runForm();
@@ -129,8 +195,13 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
             toast.error('Preset not found.');
             return;
         }
-        form.reset(data);
+        // Keep defaults so missing optional keys from JSON round-trip stay registered.
+        form.reset({
+            ...(originalDefaults as TFieldValues),
+            ...(data as TFieldValues),
+        });
         form.clearErrors();
+        loadedPresetSnapshotRef.current = snapshotFormValues(form.getValues());
         setLoadedPresetName(name);
         toast(`Loaded preset "${name}"`);
     };
@@ -160,8 +231,10 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
             }
         }
 
+        // Persist the settled form values (same shape used for match checks).
         const snapshot = form.getValues() as DefaultValues<TFieldValues>;
         setPresets((prev) => ({ ...prev, [trimmed]: snapshot }));
+        loadedPresetSnapshotRef.current = snapshotFormValues(snapshot as FieldValues);
         toast.success(`Saved preset "${trimmed}"`);
         setDialogOpen(false);
         setSaveMode(null);
@@ -174,6 +247,7 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
 
     const handleReset = () => {
         form.reset(originalDefaults ?? undefined);
+        loadedPresetSnapshotRef.current = null;
         setLoadedPresetName(null);
         toast.success('Form reset to defaults.');
     };
@@ -216,18 +290,31 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
                             <span className="max-w-56 truncate">{primaryLabel}</span>
                         )}
                     </Button>
-                    <DropdownMenuTrigger asChild>
+                    {busy ? (
                         <Button
                             type="button"
                             variant="default"
                             size="sm"
-                            disabled={busy}
-                            className="rounded-l-none border-l border-primary-foreground/20 px-2 data-[state=open]:[&_svg]:rotate-180"
-                            aria-label="More preset and run options"
+                            className="rounded-l-none border-l border-primary-foreground/20 px-2"
+                            onClick={abortRequest}
+                            aria-label="Abort request"
+                            title="Abort request"
                         >
-                            <ChevronDownIcon className="size-4 transition-transform duration-200" />
+                            <XIcon className="size-4" />
                         </Button>
-                    </DropdownMenuTrigger>
+                    ) : (
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="default"
+                                size="sm"
+                                className="rounded-l-none border-l border-primary-foreground/20 px-2 data-[state=open]:[&_svg]:rotate-180"
+                                aria-label="More preset and run options"
+                            >
+                                <ChevronDownIcon className="size-4 transition-transform duration-200" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                    )}
                 </div>
 
                 <DropdownMenuContent align="end" side="bottom">
