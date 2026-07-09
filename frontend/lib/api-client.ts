@@ -13,7 +13,7 @@ export type RequestOptions = {
 function getBackendUrl(): string {
     const url = process.env.BE_API?.trim();
     if (!url) {
-        throw new Error('BE_API is not configured');
+        throw new Error('Backend URL is not configured');
     }
     return url;
 }
