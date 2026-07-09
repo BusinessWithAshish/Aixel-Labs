@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Pencil, Trash2, User as UserIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { User } from '@aixellabs/backend/db/types';
@@ -12,11 +13,14 @@ type UserCardProps = {
     user: User;
     onEdit?: () => void;
     onDelete?: () => void;
+    selected?: boolean;
+    onSelectedChange?: (selected: boolean) => void;
     className?: string;
 };
 
-export function UserCard({ user, onEdit, onDelete, className }: UserCardProps) {
+export function UserCard({ user, onEdit, onDelete, selected, onSelectedChange, className }: UserCardProps) {
     const [isHovered, setIsHovered] = useState(false);
+    const showSelection = onSelectedChange !== undefined;
 
     const handleEditClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -32,11 +36,25 @@ export function UserCard({ user, onEdit, onDelete, className }: UserCardProps) {
         <Card
             className={cn(
                 'relative flex items-start gap-2 sm:gap-4 p-3 sm:p-4 transition-all hover:shadow-md w-full overflow-hidden',
+                selected && 'bg-primary/5 border-primary/30',
                 className,
             )}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
+            {showSelection && (
+                <div
+                    className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-10"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <Checkbox
+                        checked={selected === true}
+                        onCheckedChange={(checked) => onSelectedChange(checked === true)}
+                        aria-label={`Select ${user.name || user.email}`}
+                    />
+                </div>
+            )}
+
             {/* Action buttons - top right */}
             <div
                 className={cn(
@@ -73,7 +91,12 @@ export function UserCard({ user, onEdit, onDelete, className }: UserCardProps) {
             </div>
 
             {/* User icon - left */}
-            <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 shrink-0">
+            <div
+                className={cn(
+                    'flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 shrink-0',
+                    showSelection && 'ml-5 sm:ml-6',
+                )}
+            >
                 <UserIcon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
             </div>
 
