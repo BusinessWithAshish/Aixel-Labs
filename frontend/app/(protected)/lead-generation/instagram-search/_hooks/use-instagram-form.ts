@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { INSTAGRAM_REQUEST } from '@aixellabs/backend/instagram';
 import { INSTAGRAM_REQUEST_SCHEMA } from '@aixellabs/backend/instagram/schemas';
 import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
@@ -14,6 +14,7 @@ const DEFAULT_FORM_VALUES: INSTAGRAM_REQUEST = {
     entities: [],
     query: '',
     country: '',
+    state: '',
     city: '',
     hashtags: [],
     keywords: [],
@@ -23,9 +24,6 @@ const DEFAULT_FORM_VALUES: INSTAGRAM_REQUEST = {
 
 export const useInstagramForm = () => {
     const { submitLeadGenScraperForm } = useLeadGenScraper(LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH);
-
-    // state is not part of schema, so we need to handle it separately
-    const [selectedState, setSelectedState] = useState<string | undefined>(undefined);
 
     const form = useForm<INSTAGRAM_REQUEST>({
         resolver: zodResolver(INSTAGRAM_REQUEST_SCHEMA),
@@ -37,7 +35,6 @@ export const useInstagramForm = () => {
             body: data,
             onSuccess: () => {
                 form.reset(DEFAULT_FORM_VALUES);
-                setSelectedState(undefined);
             },
         });
     };
@@ -49,21 +46,24 @@ export const useInstagramForm = () => {
     }));
 
     const selectedCountry = form.watch('country');
+    const selectedState = form.watch('state');
 
     const stateOptions: OptionType[] = useMemo(() => {
         if (!selectedCountry) return [];
         return (
             State.getStatesOfCountry(selectedCountry)?.map((state: IState) => ({
                 label: state.name,
-                value: state.isoCode,
+                value: state.name,
             })) || []
         );
     }, [selectedCountry]);
 
     const cityOptions: OptionType[] = useMemo(() => {
         if (!selectedCountry || !selectedState) return [];
+        const stateIso = State.getStatesOfCountry(selectedCountry)?.find((s: IState) => s.name === selectedState)?.isoCode;
+        if (!stateIso) return [];
         return (
-            City.getCitiesOfState(selectedCountry, selectedState)?.map((city: ICity) => ({
+            City.getCitiesOfState(selectedCountry, stateIso)?.map((city: ICity) => ({
                 label: city?.name || '',
                 value: city.name,
             })) || []
@@ -77,8 +77,6 @@ export const useInstagramForm = () => {
         form,
         countryOptions,
         stateOptions,
-        selectedState,
-        setSelectedState,
         isStateFieldDisabled,
         isCityFieldDisabled,
         cityOptions,
