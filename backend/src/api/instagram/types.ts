@@ -127,7 +127,7 @@ export type INSTAGRAM_RESPONSE = {
   isPrivate: boolean | null;
   isJoinedRecently: boolean | null;
   businessEmail: string | null;
-  businessPhoneNumber: string | null;
+  businessPhoneNumber: string[] | null;
   businessCategoryName: string | null;
   overallCategoryName: string | null;
   businessAddressJson: string | null;

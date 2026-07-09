@@ -4,6 +4,13 @@ import {
   INSTAGRAM_URL_REGEX,
   INSTAGRAM_QUERY_LIMITS,
 } from "./constants";
+import {
+  ISO_COUNTRY_CODE_SCHEMA,
+  LOCATION_FIELDS_SCHEMA,
+} from "../../utils/location-schema";
+
+/** @deprecated Prefer `ISO_COUNTRY_CODE_SCHEMA` from `utils/location-schema`. */
+export const INSTAGRAM_COUNTRY_SCHEMA = ISO_COUNTRY_CODE_SCHEMA;
 
 export const INSTAGRAM_REQUEST_SCHEMA = z.object({
   entities: z
@@ -23,7 +30,7 @@ export const INSTAGRAM_REQUEST_SCHEMA = z.object({
       },
     )
     .describe(
-      "List of Instagram usernames (e.g. 'nike') or full profile URLs (e.g. 'https://www.instagram.com/nike'). Populate this when the user provides specific accounts to look up.",
+      "List of Instagram usernames (e.g. 'adidas') or full profile URLs (e.g. 'https://www.instagram.com/adidas'). Populate this when the user provides specific accounts to look up.",
     ),
   query: z
     .string()
@@ -31,18 +38,7 @@ export const INSTAGRAM_REQUEST_SCHEMA = z.object({
     .describe(
       "Free-text search query describing the type of profiles to find (e.g. 'fitness coaches in London', 'vegan food bloggers').",
     ),
-  country: z
-    .string()
-    .optional()
-    .describe(
-      "Full country name to restrict the search geographically (e.g. 'India', 'United States').",
-    ),
-  city: z
-    .string()
-    .optional()
-    .describe(
-      "City name to restrict the search geographically (e.g. 'Mumbai', 'New York'). Use alongside country when possible.",
-    ),
+  ...LOCATION_FIELDS_SCHEMA.shape,
   hashtags: z
     .array(z.string())
     .optional()

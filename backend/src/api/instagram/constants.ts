@@ -28,6 +28,8 @@ export const IG_HEADERS: Record<string, string> = {
 
 export const INSTAGRAM_QUERY_LIMITS = {
   maxEntities: 100,
+  /** Google query word cap (same as legacy browser-worker gsearch). */
+  maxQueryWords: 30,
 };
 export const INSTAGRAM_USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
 export const INSTAGRAM_URL_REGEX =

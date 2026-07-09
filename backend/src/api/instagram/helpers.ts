@@ -1,16 +1,20 @@
+import { findPhoneNumbersInText, type CountryCode } from "libphonenumber-js";
 import type {
   INSTAGRAM_REQUEST,
   INSTAGRAM_RESPONSE,
   InstagramUser,
 } from "./types";
-import { IG_HEADERS, INSTAGRAM_BASE_URL } from "./constants";
-import { fetchUrls } from "../../utils/node-tls-client-session-handler";
+import { fetchGsearch } from "../gsearch";
 import {
-  GSEARCH_RESPONSE,
-  fetchGSearch,
-  GOOGLE_SEARCH_QUERY_LIMITS,
-  DEFAULT_GSEARCH_MAX_PAGES,
-} from "../../utils/browser-worker";
+  GSEARCH_MAX_PAGES,
+  GSEARCH_MAX_QUERY_CHARS,
+} from "../gsearch/constants";
+import {
+  IG_HEADERS,
+  INSTAGRAM_BASE_URL,
+  INSTAGRAM_QUERY_LIMITS,
+} from "./constants";
+import { fetchUrls } from "../../utils/node-tls-client-session-handler";
 
 export const generateAdvanceQuery = (
   keywords: string[] | undefined,
@@ -139,8 +143,57 @@ function uniqueUsernames(entities: (string | null)[]): string[] {
   return out;
 }
 
+function phoneDigits(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+function uniqueValidPhones(
+  matches: ReturnType<typeof findPhoneNumbersInText>,
+): string[] {
+  const seen = new Set<string>();
+  const phones: string[] = [];
+
+  for (const { number } of matches) {
+    if (!number.isValid()) continue;
+    const formatted = number.formatInternational();
+    const key = phoneDigits(formatted);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    phones.push(formatted);
+  }
+
+  return phones;
+}
+
+function extractPhonesFromText(
+  text: string | null | undefined,
+  country: CountryCode,
+): string[] {
+  if (!text?.trim()) return [];
+
+  try {
+    return uniqueValidPhones(findPhoneNumbersInText(text, country));
+  } catch {
+    return [];
+  }
+}
+
+function collectBusinessPhoneNumbers(
+  businessPhone: string | null | undefined,
+  bio: string | null | undefined,
+  country: CountryCode,
+): string[] | null {
+  if (businessPhone?.trim()) {
+    return [businessPhone.trim()];
+  }
+
+  const phones = extractPhonesFromText(bio, country);
+  return phones.length > 0 ? phones : null;
+}
+
 function mapToResponse(
   user: InstagramUser["data"]["user"],
+  country: CountryCode,
 ): INSTAGRAM_RESPONSE {
   const bioEntities = user.biography_with_entities?.entities ?? [];
 
@@ -176,7 +229,11 @@ function mapToResponse(
     isPrivate: user.is_private ?? null,
     isJoinedRecently: user.if_joined_recently ?? null,
     businessEmail: user.business_email ?? null,
-    businessPhoneNumber: user.business_phone_number ?? null,
+    businessPhoneNumber: collectBusinessPhoneNumbers(
+      user.business_phone_number,
+      user.biography,
+      country,
+    ),
     businessCategoryName: user.business_category_name ?? null,
     overallCategoryName: user.overall_category_name ?? null,
     businessAddressJson: user.business_address_json ?? null,
@@ -192,15 +249,19 @@ export function instagramWebProfileInfoUrl(username: string): string {
   return `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`;
 }
 
-function mapInstagramWebProfileBody(text: string): INSTAGRAM_RESPONSE {
+function mapInstagramWebProfileBody(
+  text: string,
+  country: CountryCode,
+): INSTAGRAM_RESPONSE {
   const json = JSON.parse(text) as InstagramUser;
   const user = json?.data?.user;
   if (!user) throw new Error("Instagram profile response missing user");
-  return mapToResponse(user);
+  return mapToResponse(user, country);
 }
 
 export async function fetchFromEntities(
   entities: string[] | (string | null)[],
+  country: string,
 ): Promise<INSTAGRAM_RESPONSE[]> {
   if (!Array.isArray(entities)) {
     throw new Error("Entities must be an array of strings.");
@@ -213,39 +274,40 @@ export async function fetchFromEntities(
     return [];
   }
 
+  const countryCode = country as CountryCode;
+
   // Flat targets → one TLS session + fresh Evomi sticky proxy per profile URL.
   return fetchUrls<INSTAGRAM_RESPONSE>({
     targets: urls,
     headers: IG_HEADERS,
-    mapper: (text) => mapInstagramWebProfileBody(text),
+    mapper: (text) => mapInstagramWebProfileBody(text, countryCode),
   });
 }
 
 export async function fetchFromQuery(
   data: INSTAGRAM_REQUEST,
 ): Promise<INSTAGRAM_RESPONSE[]> {
-  const { country, city } = data;
-
-  if (!country && !city) {
-    throw new Error("Country and city are required to fetch search results");
-  }
+  const { country, city, state } = data;
 
   const { searchQuery, words, chars } = generateInstagramSearchQuery(data);
 
   if (
-    chars > GOOGLE_SEARCH_QUERY_LIMITS.maxQueryChars ||
-    words > GOOGLE_SEARCH_QUERY_LIMITS.maxQueryWords
+    chars > GSEARCH_MAX_QUERY_CHARS ||
+    words > INSTAGRAM_QUERY_LIMITS.maxQueryWords
   ) {
     throw new Error(
       `Query is too long. Try adjusting the keywors, hashtags, excludeKeywords, excludeHashtags, country, state, cities, or query.`,
     );
   }
 
-  const searchResultsData: GSEARCH_RESPONSE[] = await fetchGSearch({
-    searchQuery: searchQuery,
-    pages: DEFAULT_GSEARCH_MAX_PAGES,
-    country: country!,
-    city: city!,
+  const countryCode = country as CountryCode;
+
+  const { results: searchResultsData } = await fetchGsearch({
+    searchQuery,
+    pages: GSEARCH_MAX_PAGES,
+    country: countryCode,
+    region: city,
+    state,
   });
 
   if (!searchResultsData.length) {
@@ -262,5 +324,5 @@ export async function fetchFromQuery(
     `[instagram] SERP rows=${searchResultsData.length} → unique profile handles=${entities.length}`,
   );
 
-  return await fetchFromEntities(entities);
+  return await fetchFromEntities(entities, countryCode);
 }

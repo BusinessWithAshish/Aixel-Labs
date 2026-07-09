@@ -42,7 +42,7 @@ export async function instagramApiHandler(req: Request, res: Response) {
 
     // ENTITIES ONLY
     if (hasEntities(entities) && !hasQuery(query)) {
-      const data = await fetchFromEntities(entities!);
+      const data = await fetchFromEntities(entities!, parsed.data.country);
       const response: ALApiResponse<INSTAGRAM_RESPONSE[]> = {
         success: true,
         data,
@@ -52,7 +52,10 @@ export async function instagramApiHandler(req: Request, res: Response) {
     }
 
     // BOTH ENTITIES AND QUERY
-    const entitiesData = await fetchFromEntities(entities!);
+    const entitiesData = await fetchFromEntities(
+      entities!,
+      parsed.data.country,
+    );
     const queryData = await fetchFromQuery(parsed.data);
     const data = [...entitiesData, ...queryData];
     const response: ALApiResponse<INSTAGRAM_RESPONSE[]> = {
