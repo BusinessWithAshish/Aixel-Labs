@@ -1,63 +1,88 @@
 'use client';
 
-import { ZodSearchableSelectField } from '@/components/common/zod-form-builder';
+import { useMemo } from 'react';
+import { useFormContext } from 'react-hook-form';
+import { City, ICity, IState, State } from 'country-state-city';
+import { SearchableSelectControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { usePage } from '@/contexts/PageStore';
+import type { OptionType } from '@/components/ui/searchable-select';
 import type { UseLinkedInFormReturn } from '../_hooks/use-linkedin-form';
 
 type LinkedInLocationFieldsProps = {
-    /** Used only for unique field names when both tab forms are mounted. */
+    /** Used only for copy differences between people vs company. */
     mode: 'people' | 'company';
 };
 
 const LOCATION_COPY: Record<LinkedInLocationFieldsProps['mode'], { country: string; state: string; city: string }> = {
     people: {
         country:
-            'Where this person is based on their profile. Country is required. Add state or city to narrow results; the most specific place you pick is what we search for.',
-        state: 'Optional. Regions or provinces for the selected country (standard ISO list).',
-        city: 'Optional. When set, we use this city (or metro) as the location instead of only country or state.',
+            'Where this person is based. Country is required (ISO code). Add state and/or city to narrow results — both are sent to search as "in City, State".',
+        state: 'Optional. State or province name for the selected country.',
+        city: 'Optional. City name. Combined with state when both are set.',
     },
     company: {
         country:
-            'Where the company is headquartered or primarily operates. Country is required. Add state or city to narrow; the most specific selection is used.',
-        state: 'Optional. Regions or provinces for the selected country (standard ISO list).',
-        city: 'Optional. When set, we use this city or region as the company location.',
+            'Where the company is headquartered. Country is required (ISO code). Add state and/or city to narrow — both are sent as "in City, State".',
+        state: 'Optional. State or province name for the selected country.',
+        city: 'Optional. City name. Combined with state when both are set.',
     },
 };
 
 export function LinkedInLocationFields({ mode }: LinkedInLocationFieldsProps) {
-    const page = usePage<UseLinkedInFormReturn>();
+    const { locationCountryOptions } = usePage<UseLinkedInFormReturn>();
+    const { watch } = useFormContext();
     const copy = LOCATION_COPY[mode];
-    const suffix = mode === 'people' ? 'people' : 'company';
+
+    const selectedCountry = (watch('discovery_filters.country') as string) || '';
+    const selectedState = (watch('discovery_filters.state') as string | undefined) || '';
+
+    const stateOptions: OptionType[] = useMemo(() => {
+        if (!selectedCountry) return [];
+        return (
+            State.getStatesOfCountry(selectedCountry)?.map((state: IState) => ({
+                label: state.name,
+                value: state.name,
+            })) ?? []
+        );
+    }, [selectedCountry]);
+
+    const cityOptions: OptionType[] = useMemo(() => {
+        if (!selectedCountry || !selectedState) return [];
+        const stateIso = State.getStatesOfCountry(selectedCountry)?.find(
+            (s: IState) => s.name === selectedState,
+        )?.isoCode;
+        if (!stateIso) return [];
+        return (
+            City.getCitiesOfState(selectedCountry, stateIso)?.map((city: ICity) => ({
+                label: city.name,
+                value: city.name,
+            })) ?? []
+        );
+    }, [selectedCountry, selectedState]);
 
     return (
         <div className="space-y-3">
-            <ZodSearchableSelectField
-                name={`linkedin-location-country-${suffix}`}
+            <SearchableSelectControlledField
+                name="discovery_filters.country"
                 label="Country"
                 description={copy.country}
-                value={page.locationCountryCode}
-                onChange={page.setLocationCountryCode}
-                options={page.locationCountryOptions}
+                options={locationCountryOptions}
                 required
             />
-            <ZodSearchableSelectField
-                name={`linkedin-location-state-${suffix}`}
+            <SearchableSelectControlledField
+                name="discovery_filters.state"
                 label="State / province"
                 description={copy.state}
-                value={page.locationStateIso ?? ''}
-                onChange={(v) => page.setLocationStateIso(v || undefined)}
-                options={page.locationStateOptions}
-                disabled={page.isLocationStateDisabled}
+                options={stateOptions}
+                disabled={!selectedCountry}
                 required={false}
             />
-            <ZodSearchableSelectField
-                name={`linkedin-location-city-${suffix}`}
+            <SearchableSelectControlledField
+                name="discovery_filters.city"
                 label="City / region"
                 description={copy.city}
-                value={page.locationCity}
-                onChange={page.setLocationCity}
-                options={page.locationCityOptions}
-                disabled={page.isLocationCityDisabled}
+                options={cityOptions}
+                disabled={!selectedCountry || !selectedState}
                 required={false}
             />
         </div>

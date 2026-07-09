@@ -23,7 +23,7 @@ type LinkedInFormWrapperClientProps = {
 
 export const LinkedInFormWrapperClient = ({ children }: LinkedInFormWrapperClientProps) => {
     const { peopleForm, companyForm, onSubmitPeople, onSubmitCompany } = usePage<UseLinkedInFormReturn>();
-    const [formMode, setFormMode] = useState<LinkedInFormMode>(LinkedInFormMode.BY_PEOPLE);
+    const [formMode, setFormMode] = useState<LinkedInFormMode>(LinkedInFormMode.BY_COMPANY);
 
     return (
         <LeadFormWrapper
@@ -54,13 +54,9 @@ export const LinkedInFormWrapperClient = ({ children }: LinkedInFormWrapperClien
         >
             <Tabs value={formMode} onValueChange={(v) => setFormMode(v as LinkedInFormMode)}>
                 <TabsList className="w-full">
-                    <TabsTrigger value={LinkedInFormMode.BY_PEOPLE}>{LinkedInFormMode.BY_PEOPLE}</TabsTrigger>
                     <TabsTrigger value={LinkedInFormMode.BY_COMPANY}>{LinkedInFormMode.BY_COMPANY}</TabsTrigger>
+                    <TabsTrigger value={LinkedInFormMode.BY_PEOPLE}>{LinkedInFormMode.BY_PEOPLE}</TabsTrigger>
                 </TabsList>
-
-                <TabsContent className="mt-3 space-y-3 outline-none" value={LinkedInFormMode.BY_PEOPLE}>
-                    {children}
-                </TabsContent>
 
                 <TabsContent className="mt-3 space-y-3 outline-none" value={LinkedInFormMode.BY_COMPANY}>
                     <FormProvider {...companyForm}>
@@ -72,6 +68,10 @@ export const LinkedInFormWrapperClient = ({ children }: LinkedInFormWrapperClien
                             <LinkedInByCompanyForm />
                         </form>
                     </FormProvider>
+                </TabsContent>
+
+                <TabsContent className="mt-3 space-y-3 outline-none" value={LinkedInFormMode.BY_PEOPLE}>
+                    {children}
                 </TabsContent>
             </Tabs>
         </LeadFormWrapper>
