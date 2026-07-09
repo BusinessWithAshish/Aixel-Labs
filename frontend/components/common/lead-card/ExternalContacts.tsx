@@ -96,6 +96,22 @@ export const WebsiteList = ({ websites, className }: WebsiteListProps) => {
 // PhoneNumber
 // ---------------------------------------------------------------------------
 
+type PhoneNumberListProps = {
+    phoneNumbers: string[];
+    className?: string;
+};
+
+export const PhoneNumberList = ({ phoneNumbers, className }: PhoneNumberListProps) => {
+    if (!phoneNumbers?.length) return null;
+    return (
+        <div className={cn('flex flex-col gap-2 w-full min-w-0', className)}>
+            {phoneNumbers.map((phone) => (
+                <PhoneNumber key={phone} value={phone} hideWhenEmpty />
+            ))}
+        </div>
+    );
+};
+
 type PhoneNumberProps = {
     value?: string | null;
     className?: string;

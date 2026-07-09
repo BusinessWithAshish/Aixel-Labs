@@ -127,3 +127,37 @@ export const deleteUserLeads = async (leadIds: string[]): Promise<ALApiResponse<
         });
         return true;
     });
+
+export const createUserLeadListFromLeadIds = async (input: {
+    name: string;
+    leadIds: string[];
+}): Promise<ALApiResponse<{ listId: string; movedCount: number }>> => {
+    const name = input.name?.trim() ?? '';
+    if (!name) throw new Error('Name is required');
+    if (!input.leadIds.length) throw new Error('Select at least one lead');
+
+    return runAuthenticatedAction(async function createUserLeadListFromLeadIds(userId: string) {
+        const uid = requireUserObjectId(userId);
+        const leadOids = input.leadIds.map((id) => toObjectId(id, 'Lead ID'));
+        const now = new Date();
+
+        const listsCollection = await getCollection<UserLeadListDoc>(MongoCollections.LEAD_LISTS);
+        const listInsert = await listsCollection.insertOne({
+            userId: uid,
+            name,
+            createdAt: now,
+            updatedAt: now,
+        });
+
+        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
+        const updateResult = await userLeadsCollection.updateMany(
+            { userId: uid, leadId: { $in: leadOids } },
+            { $set: { listId: listInsert.insertedId, updatedAt: now } },
+        );
+
+        return {
+            listId: listInsert.insertedId.toString(),
+            movedCount: updateResult.modifiedCount,
+        };
+    });
+};

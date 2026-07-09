@@ -116,7 +116,7 @@ function FilterGroup({
         <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
                 {imageSrc ? (
-                    <Image src={imageSrc} alt="" className="size-4 object-contain" aria-hidden />
+                    <Image src={imageSrc} alt="" width={16} height={16} className="size-4 object-contain" aria-hidden />
                 ) : null}
                 <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
                     {title}

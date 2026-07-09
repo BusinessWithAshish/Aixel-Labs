@@ -9,7 +9,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, ListChecks, ListOrdered, ListX, Send, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, FolderPlus, ListChecks, ListOrdered, ListX, Send, Sparkles, Trash2, type LucideIcon } from 'lucide-react';
+import { toast } from 'sonner';
 
 const DELETE_ITEM_CLASS =
     'text-red-500 focus:text-red-600 focus:bg-red-500/10 data-highlighted:text-red-600 data-highlighted:bg-red-500/10 dark:focus:text-red-400 dark:data-highlighted:text-red-400 dark:focus:bg-red-500/15 dark:data-highlighted:bg-red-500/15 [&_svg]:text-red-500! data-highlighted:[&_svg]:text-red-600! dark:[&_svg]:text-red-400! dark:data-highlighted:[&_svg]:text-red-300!';
@@ -20,28 +21,36 @@ const DESELECT_ITEM_CLASS =
 const SELECT_ALL_ITEM_CLASS =
     'text-primary focus:text-primary focus:bg-primary/10 data-highlighted:text-primary data-highlighted:bg-primary/10 dark:focus:bg-primary/15 dark:data-highlighted:bg-primary/15 [&_svg]:text-primary! data-highlighted:[&_svg]:text-primary! dark:[&_svg]:text-primary! dark:data-highlighted:[&_svg]:text-primary!';
 
+const PLANNED_BULK_ACTIONS: ReadonlyArray<{ label: string; icon: LucideIcon }> = [
+    { label: 'Send to CRM', icon: Send },
+    { label: 'Move to sequence', icon: ListOrdered },
+    { label: 'Enrich', icon: Sparkles },
+];
+
+function notifyActionComingSoon() {
+    toast.info("This action is coming soon — we're still working on it.");
+}
+
 export type LeadBulkActionsDropdownProps = {
     selectedCount: number;
-    onSendToCrm: () => void;
-    onMoveToSequence: () => void;
-    onEnrich: () => void;
     onSelectAll?: () => void;
     selectAllDisabled?: boolean;
     onDeselectAll: () => void;
     onDelete: () => void;
+    onCreateListFromFilters?: () => void;
+    createListFromFiltersDisabled?: boolean;
     deselectAllLabel?: string;
     deleteLabel?: string;
 };
 
 export function LeadBulkActionsDropdown({
     selectedCount,
-    onSendToCrm,
-    onMoveToSequence,
-    onEnrich,
     onSelectAll,
     selectAllDisabled,
     onDeselectAll,
     onDelete,
+    onCreateListFromFilters,
+    createListFromFiltersDisabled,
     deselectAllLabel = 'Deselect all',
     deleteLabel = 'Delete',
 }: LeadBulkActionsDropdownProps) {
@@ -72,18 +81,21 @@ export function LeadBulkActionsDropdown({
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup aria-label="Lead bulk actions">
-                    <DropdownMenuItem onSelect={() => onSendToCrm()}>
-                        <Send className="size-4" />
-                        Send to CRM
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onMoveToSequence()}>
-                        <ListOrdered className="size-4" />
-                        Move to sequence
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onEnrich()}>
-                        <Sparkles className="size-4" />
-                        Enrich
-                    </DropdownMenuItem>
+                    {onCreateListFromFilters ? (
+                        <DropdownMenuItem
+                            disabled={createListFromFiltersDisabled}
+                            onSelect={() => onCreateListFromFilters()}
+                        >
+                            <FolderPlus className="size-4" />
+                            Create list from filters
+                        </DropdownMenuItem>
+                    ) : null}
+                    {PLANNED_BULK_ACTIONS.map(({ label, icon: Icon }) => (
+                        <DropdownMenuItem key={label} onSelect={notifyActionComingSoon}>
+                            <Icon className="size-4" />
+                            {label}
+                        </DropdownMenuItem>
+                    ))}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className={DELETE_ITEM_CLASS} onSelect={() => onDelete()}>

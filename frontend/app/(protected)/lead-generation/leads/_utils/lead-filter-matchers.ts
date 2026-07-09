@@ -113,7 +113,12 @@ export function matchInstagram(data: unknown, f: InstagramFilters): boolean {
     }
 
     if (f.requireEmail && !nonEmpty(d.businessEmail)) return false;
-    if (f.requirePhone && !nonEmpty(d.businessPhoneNumber)) return false;
+    if (f.requirePhone) {
+        const hasPhone =
+            Array.isArray(d.businessPhoneNumber) &&
+            d.businessPhoneNumber.some((x) => nonEmpty(x));
+        if (!hasPhone) return false;
+    }
     if (f.requireWebsite) {
         const has = Array.isArray(d.websites) && d.websites.some((x) => nonEmpty(x));
         if (!has) return false;

@@ -222,29 +222,6 @@ export function useUserLeadListsPage(apiLeadLists: UserLeadList[]) {
         setDeleteIntent(null);
     }, [deleteSubmitting]);
 
-    const requireSelection = useCallback(() => {
-        if (selectedIds.size === 0) {
-            toast.message('Select at least one list');
-            return false;
-        }
-        return true;
-    }, [selectedIds]);
-
-    const sendToCrm = useCallback(() => {
-        if (!requireSelection()) return;
-        toast.success(`Send to CRM queued for ${selectedCount} list(s)`);
-    }, [requireSelection, selectedCount]);
-
-    const moveToSequence = useCallback(() => {
-        if (!requireSelection()) return;
-        toast.success(`Move to sequence queued for ${selectedCount} list(s)`);
-    }, [requireSelection, selectedCount]);
-
-    const enrich = useCallback(() => {
-        if (!requireSelection()) return;
-        toast.success(`Enrich queued for ${selectedCount} list(s)`);
-    }, [requireSelection, selectedCount]);
-
     const deleteDialogOpen = deleteTargetIds !== null;
 
     return {
@@ -282,9 +259,6 @@ export function useUserLeadListsPage(apiLeadLists: UserLeadList[]) {
         confirmDelete,
         cancelDelete,
         deleteSubmitting,
-        sendToCrm,
-        moveToSequence,
-        enrich,
     };
 }
 

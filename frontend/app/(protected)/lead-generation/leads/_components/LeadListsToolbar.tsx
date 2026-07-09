@@ -17,9 +17,6 @@ export function LeadListsToolbar() {
         selectedIds,
         openAddDialog,
         selectedCount,
-        sendToCrm,
-        moveToSequence,
-        enrich,
         selectAllFiltered,
         deselectAll,
         requestDeleteFromMenu,
@@ -53,9 +50,6 @@ export function LeadListsToolbar() {
                 ) : (
                     <LeadBulkActionsDropdown
                         selectedCount={selectedCount}
-                        onSendToCrm={sendToCrm}
-                        onMoveToSequence={moveToSequence}
-                        onEnrich={enrich}
                         onSelectAll={selectAllFiltered}
                         selectAllDisabled={allFilteredSelected}
                         onDeselectAll={deselectAll}

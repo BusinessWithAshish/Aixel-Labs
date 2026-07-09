@@ -6,7 +6,6 @@ import { usePage } from '@/contexts/PageStore';
 import type { TUseAllLeadsPageReturn } from '../../_hooks/use-list-leads';
 import { DeleteLeadsDialog } from './DeleteLeadsDialog';
 import { LeadsFilterSheet } from './LeadsFilterSheet';
-import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,6 +30,8 @@ export const AllUserLeads = () => {
         confirmBulkDelete,
         isDeleting,
         filterPanel,
+        createListFromSelection,
+        isCreatingList,
     } = usePage<TUseAllLeadsPageReturn>();
 
     const hasLeads = leads.length > 0;
@@ -49,18 +50,19 @@ export const AllUserLeads = () => {
     return (
         <Card className="h-full w-full gap-2">
             <CardHeader>
-                <CardTitle>Leads</CardTitle>
+                <CardTitle>
+                    Leads ({filteredLeads.length})
+                </CardTitle>
                 <CardDescription>Manage your leads</CardDescription>
                 <CardAction className="flex flex-wrap items-center justify-end gap-2 self-end">
                     <LeadBulkActionsDropdown
                         selectedCount={selectedLeadIds.size}
-                        onSendToCrm={() => toast.info('Send to CRM is not available here yet.')}
-                        onMoveToSequence={() => toast.info('Move to sequence is not available here yet.')}
-                        onEnrich={() => toast.info('Enrich is not available here yet.')}
                         onSelectAll={selectAllFiltered}
                         selectAllDisabled={allFilteredSelected}
                         onDeselectAll={deselectAll}
                         onDelete={() => setBulkDeleteOpen(true)}
+                        onCreateListFromFilters={filterPanel.filtersActive ? createListFromSelection : undefined}
+                        createListFromFiltersDisabled={isCreatingList}
                         deleteLabel="Delete selected"
                     />
                 </CardAction>

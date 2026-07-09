@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteUserLeads } from '@/app/actions/user-lead-actions';
+import { createUserLeadListFromLeadIds, deleteUserLeads } from '@/app/actions/user-lead-actions';
 import type { Lead } from '@aixellabs/backend/db/types';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -14,12 +14,20 @@ function leadMatchesSearchQuery(lead: Lead, rawQuery: string): boolean {
     return blob.includes(q);
 }
 
+function buildFilteredListName(): string {
+    const now = new Date();
+    const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
+    const time = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+    return `Filtered leads ${weekday} ${time} ${now.getFullYear()}`;
+}
+
 export const useAllLeadsPage = (leads: Lead[]) => {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
     const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
     const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isCreatingList, setIsCreatingList] = useState(false);
 
     const filterPanel = useLeadsFilterPanel();
 
@@ -69,6 +77,25 @@ export const useAllLeadsPage = (leads: Lead[]) => {
         }
     }, [selectedLeadIds, router]);
 
+    const createListFromSelection = useCallback(async () => {
+        const ids = [...selectedLeadIds];
+        if (!ids.length || !filterPanel.filtersActive || isCreatingList) return;
+
+        setIsCreatingList(true);
+        try {
+            const result = await createUserLeadListFromLeadIds({ name: buildFilteredListName(), leadIds: ids });
+            if (!result.success || !result.data) {
+                toast.error(result.error ?? 'Failed to create list');
+                return;
+            }
+            toast.success(`Created list with ${result.data.movedCount} lead(s)`);
+            setSelectedLeadIds(new Set());
+            router.push(`/lead-generation/leads/${result.data.listId}`);
+        } finally {
+            setIsCreatingList(false);
+        }
+    }, [selectedLeadIds, filterPanel.filtersActive, isCreatingList, router]);
+
     return {
         leads,
         filteredLeads,
@@ -83,6 +110,8 @@ export const useAllLeadsPage = (leads: Lead[]) => {
         confirmBulkDelete,
         isDeleting,
         filterPanel,
+        createListFromSelection,
+        isCreatingList,
     };
 };
 

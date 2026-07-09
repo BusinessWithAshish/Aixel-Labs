@@ -5,8 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BadgeCheck, LucideIcon, Trash2 } from "lucide-react";
-import { Email, PhoneNumber, WebsiteList } from "@/components/common/lead-card/ExternalContacts";
-import { ReactNode, useMemo, useState } from "react";
+import { Email, PhoneNumberList, WebsiteList } from "@/components/common/lead-card/ExternalContacts";
+import { ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -62,7 +62,7 @@ export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
             isPrivate: lead.isPrivate ?? false,
             isJoinedRecently: lead.isJoinedRecently ?? false,
             businessEmail: lead.businessEmail ?? DEFAULT_DISPLAY_VALUE,
-            businessPhoneNumber: lead.businessPhoneNumber ?? DEFAULT_DISPLAY_VALUE,
+            businessPhoneNumbers: lead.businessPhoneNumber ?? [],
             businessCategoryName: lead.businessCategoryName ?? DEFAULT_DISPLAY_VALUE,
             overallCategoryName: lead.overallCategoryName ?? DEFAULT_DISPLAY_VALUE,
             businessAddressJson: lead.businessAddressJson ?? DEFAULT_DISPLAY_VALUE,
@@ -90,8 +90,27 @@ export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
     };
 
     const [bioExpanded, setBioExpanded] = useState(false);
-    const showBioToggle =
-        leadInfo.bio !== DEFAULT_DISPLAY_VALUE && leadInfo.bio.trim().length > 0 && leadInfo.bio.length > 100;
+    const [bioOverflows, setBioOverflows] = useState(false);
+    const bioRef = useRef<HTMLParagraphElement>(null);
+
+    useLayoutEffect(() => {
+        if (bioExpanded) return;
+
+        const el = bioRef.current;
+        if (!el || leadInfo.bio === DEFAULT_DISPLAY_VALUE || !leadInfo.bio.trim()) {
+            setBioOverflows(false);
+            return;
+        }
+
+        const checkOverflow = () => {
+            setBioOverflows(el.scrollHeight > el.clientHeight + 1);
+        };
+
+        checkOverflow();
+        const observer = new ResizeObserver(checkOverflow);
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [leadInfo.bio, bioExpanded]);
 
     return (
         <Card
@@ -218,6 +237,7 @@ export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
 
                 <div className="min-w-0">
                     <p
+                        ref={bioRef}
                         className={cn(
                             "text-sm leading-relaxed text-muted-foreground wrap-break-words min-w-0",
                             !bioExpanded && "line-clamp-3",
@@ -225,7 +245,7 @@ export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
                     >
                         {leadInfo.bio}
                     </p>
-                    {showBioToggle && (
+                    {bioOverflows && (
                         <Button
                             type="button"
                             variant="link"
@@ -250,7 +270,7 @@ export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
             <CardFooter className="flex items-start flex-col gap-2 min-w-0 overflow-hidden">
                 <CardDescription>Business Details</CardDescription>
                 <Email value={lead.businessEmail} hideWhenEmpty />
-                <PhoneNumber value={lead.businessPhoneNumber} hideWhenEmpty />
+                <PhoneNumberList phoneNumbers={leadInfo.businessPhoneNumbers} />
                 <WebsiteList websites={lead.websites ?? []} />
             </CardFooter>
         </Card>
