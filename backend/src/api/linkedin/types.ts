@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   LINKEDIN_BY_COMPANY_REQUEST_SCHEMA,
   LINKEDIN_BY_PEOPLE_REQUEST_SCHEMA,
+  LINKEDIN_SEARCH_TYPE,
 } from "./schemas";
 
 export type LINKEDIN_BY_PEOPLE_REQUEST = z.infer<
@@ -12,6 +13,7 @@ export type LINKEDIN_BY_COMPANY_REQUEST = z.infer<
 >;
 
 export type LINKEDIN_BY_PEOPLE_RESPONSE = {
+  searchType: typeof LINKEDIN_SEARCH_TYPE.PEOPLE;
   id: string | null;
   url: string | null;
   name: string | null;
@@ -124,6 +126,7 @@ export type LINKEDIN_BY_COMPANY_META_HIDDEN_INFO = {
 };
 
 export type LINKEDIN_BY_COMPANY_RESPONSE = {
+  searchType: typeof LINKEDIN_SEARCH_TYPE.COMPANY;
   id: string | null;
   name: string | null;
   url: string | null;

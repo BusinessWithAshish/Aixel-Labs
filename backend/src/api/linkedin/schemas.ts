@@ -4,32 +4,31 @@ import {
   LINKEDIN_COMPANY_TYPE_ENUM,
   LINKEDIN_REQUEST_RESULT_LIMIT_MAX,
 } from "./constants";
+import { LOCATION_FIELDS_SCHEMA } from "../../utils/location-schema";
+
+/**
+ * Discriminator so people vs company payloads cannot both `safeParse` successfully.
+ * Zod strips unknown keys by default, so overlapping shapes (shared location + limit)
+ * previously matched both schemas and the handler returned "Only one of the search types is allowed".
+ */
+export const LINKEDIN_SEARCH_TYPE = {
+  PEOPLE: "people",
+  COMPANY: "company",
+} as const;
 
 export const LINKEDIN_BY_PEOPLE_REQUEST_SCHEMA = z.object({
+  searchType: z
+    .literal(LINKEDIN_SEARCH_TYPE.PEOPLE)
+    .describe('Must be "people" for LinkedIn profile search.'),
   discovery_filters: z
     .object({
-      country: z
-        .string()
-        .min(1, "Select a country at minimum")
-        .describe(
-          "Full country name where the person is based (required). E.g. 'India', 'United States', 'United Kingdom'.",
-        ),
-      state: z
-        .string()
-        .optional()
-        .describe(
-          "State or province within the country (optional). E.g. 'California', 'Maharashtra'.",
-        ),
-      city: z
-        .string()
-        .optional()
-        .describe(
-          "City where the person is located (optional). E.g. 'Mumbai', 'San Francisco'.",
-        ),
+      ...LOCATION_FIELDS_SCHEMA.shape,
       name: z
         .string()
         .optional()
-        .describe("Partial or full name of the person to search for (optional)."),
+        .describe(
+          "Partial or full name of the person to search for (optional).",
+        ),
       bio: z
         .string()
         .optional()
@@ -51,7 +50,9 @@ export const LINKEDIN_BY_PEOPLE_REQUEST_SCHEMA = z.object({
       languages: z
         .array(z.string())
         .optional()
-        .describe("Languages the person speaks (optional). E.g. ['English', 'Spanish']."),
+        .describe(
+          "Languages the person speaks (optional). E.g. ['English', 'Spanish'].",
+        ),
       companies: z
         .array(z.string())
         .optional()
@@ -78,11 +79,19 @@ export const LINKEDIN_BY_PEOPLE_REQUEST_SCHEMA = z.object({
         .describe("Filter by LinkedIn follower count range (optional)."),
       experience_years: z
         .object({
-          min: z.number().optional().describe("Minimum years of professional experience."),
-          max: z.number().optional().describe("Maximum years of professional experience."),
+          min: z
+            .number()
+            .optional()
+            .describe("Minimum years of professional experience."),
+          max: z
+            .number()
+            .optional()
+            .describe("Maximum years of professional experience."),
         })
         .optional()
-        .describe("Filter by total years of professional experience (optional)."),
+        .describe(
+          "Filter by total years of professional experience (optional).",
+        ),
       industry: z
         .array(z.string())
         .optional()
@@ -103,18 +112,12 @@ export const LINKEDIN_BY_PEOPLE_REQUEST_SCHEMA = z.object({
 });
 
 export const LINKEDIN_BY_COMPANY_REQUEST_SCHEMA = z.object({
+  searchType: z
+    .literal(LINKEDIN_SEARCH_TYPE.COMPANY)
+    .describe('Must be "company" for LinkedIn company search.'),
   discovery_filters: z
     .object({
-      country: z
-        .string()
-        .min(1, "Select a country at minimum")
-        .describe(
-          "Full country name where the company is headquartered (required). E.g. 'India', 'United States'.",
-        ),
-      city: z
-        .string()
-        .optional()
-        .describe("City where the company is located (optional)."),
+      ...LOCATION_FIELDS_SCHEMA.shape,
       company_name: z
         .string()
         .optional()
@@ -171,7 +174,9 @@ export const LINKEDIN_BY_COMPANY_REQUEST_SCHEMA = z.object({
       is_recently_active: z
         .boolean()
         .optional()
-        .describe("Only include companies that have posted recently on LinkedIn (optional)."),
+        .describe(
+          "Only include companies that have posted recently on LinkedIn (optional).",
+        ),
       company_engagement_rate: z
         .object({
           min_likes: z.number().optional(),
@@ -180,19 +185,31 @@ export const LINKEDIN_BY_COMPANY_REQUEST_SCHEMA = z.object({
           max_comment: z.number().optional(),
         })
         .optional()
-        .describe("Filter by post engagement metrics — likes and comments (optional)."),
+        .describe(
+          "Filter by post engagement metrics — likes and comments (optional).",
+        ),
       is_hiring: z
         .boolean()
         .optional()
-        .describe("Only include companies that are actively hiring on LinkedIn (optional)."),
+        .describe(
+          "Only include companies that are actively hiring on LinkedIn (optional).",
+        ),
       recently_funded: z
         .boolean()
         .optional()
-        .describe("Only include companies that recently received funding (optional)."),
+        .describe(
+          "Only include companies that recently received funding (optional).",
+        ),
       follower_count: z
         .object({
-          min: z.number().optional().describe("Minimum LinkedIn follower count."),
-          max: z.number().optional().describe("Maximum LinkedIn follower count."),
+          min: z
+            .number()
+            .optional()
+            .describe("Minimum LinkedIn follower count."),
+          max: z
+            .number()
+            .optional()
+            .describe("Maximum LinkedIn follower count."),
         })
         .optional()
         .describe("Filter by company LinkedIn page follower count (optional)."),
