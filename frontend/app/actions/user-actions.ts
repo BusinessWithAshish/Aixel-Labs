@@ -14,8 +14,8 @@ import {
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
 import { parseUserName } from '@/helpers/user-name';
-import { normalizeCredits, parseCreditsInput } from '@/helpers/credits';
-import { getUserCredits } from '@/app/actions/credit-db';
+import { normalizeCredits, parseCreditsInput, type UserCreditsState } from '@/helpers/credits';
+import { getUserCreditsState } from '@/app/actions/credit-db';
 import type { Filter } from 'mongodb';
 
 const mapUserDocToUser = (user: UserDoc): User => ({
@@ -208,11 +208,11 @@ export const updateCurrentUserName = async (name: string): Promise<ALApiResponse
         return { name: updatedUser.name ?? normalizedName };
     });
 
-/** Returns the authenticated user's current credit balance. */
-export const getCurrentUserCredits = async (): Promise<ALApiResponse<number>> =>
+/** Returns the authenticated user's credit balance (and whether they are credit-exempt). */
+export const getCurrentUserCredits = async (): Promise<ALApiResponse<UserCreditsState>> =>
     runAuthenticatedAction(async function getCurrentUserCredits(userId) {
         assertValidObjectId(userId, 'User ID');
-        return getUserCredits(userId);
+        return getUserCreditsState(userId);
     });
 
 /** Replaces `moduleAccess` for selected users (or all users) within a tenant. */

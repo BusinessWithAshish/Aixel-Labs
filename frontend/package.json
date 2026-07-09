@@ -38,6 +38,7 @@
     "ai": "^6.0.105",
     "aws-sdk": "^2.1691.0",
     "axios": "^1.11.0",
+    "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

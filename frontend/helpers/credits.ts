@@ -7,6 +7,48 @@ export const CREDIT_COST_PER_ITEM: Partial<Record<LEAD_GENERATION_SUB_MODULES, n
     [LEAD_GENERATION_SUB_MODULES.LINKEDIN]: 1,
 };
 
+export type UserCreditsState = {
+    credits: number;
+    /** Admins are outside the credits system. */
+    exempt: boolean;
+};
+
+/** Balance tone thresholds (inclusive upper bounds for warn/critical). */
+export const CREDITS_WARN_THRESHOLD = 20;
+export const CREDITS_CRITICAL_THRESHOLD = 10;
+
+export type CreditsTone = 'ok' | 'warn' | 'critical';
+
+export function getCreditsTone(credits: number): CreditsTone {
+    if (credits <= CREDITS_CRITICAL_THRESHOLD) return 'critical';
+    if (credits <= CREDITS_WARN_THRESHOLD) return 'warn';
+    return 'ok';
+}
+
+/** Maps balance to existing Badge variants (`green` / `yellow` / `red`). */
+export function creditsBadgeVariant(credits: number): 'green' | 'yellow' | 'red' {
+    switch (getCreditsTone(credits)) {
+        case 'critical':
+            return 'red';
+        case 'warn':
+            return 'yellow';
+        default:
+            return 'green';
+    }
+}
+
+/** Tailwind text color for standalone credit numbers (e.g. account settings). */
+export function creditsToneClassName(credits: number): string {
+    switch (getCreditsTone(credits)) {
+        case 'critical':
+            return 'text-destructive';
+        case 'warn':
+            return 'text-amber-600 dark:text-amber-500';
+        default:
+            return 'text-emerald-600 dark:text-emerald-500';
+    }
+}
+
 export function normalizeCredits(value: number | null | undefined): number {
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
         return 0;
@@ -30,10 +72,7 @@ export function getCreditCostPerItem(subModule: LEAD_GENERATION_SUB_MODULES): nu
     return cost;
 }
 
-export function computeLeadGenCreditCost(
-    subModule: LEAD_GENERATION_SUB_MODULES,
-    itemCount: number,
-): number {
+export function computeLeadGenCreditCost(subModule: LEAD_GENERATION_SUB_MODULES, itemCount: number): number {
     if (itemCount <= 0) return 0;
     return itemCount * getCreditCostPerItem(subModule);
 }

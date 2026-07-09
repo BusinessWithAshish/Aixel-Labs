@@ -8,6 +8,7 @@ import {
     type ModuleAccess,
     MongoObjectId,
 } from '@aixellabs/backend/db';
+import { hashPassword, verifyPassword } from '@/lib/password';
 import { z } from 'zod';
 
 // Custom error classes for specific error types
@@ -106,9 +107,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         throw new UserNotInTenantError();
                     }
 
-                    // Plain text password comparison (not secure for production)
-                    if (password !== user.password) {
+                    const { ok, needsRehash } = await verifyPassword(password, user.password);
+                    if (!ok) {
                         throw new InvalidPasswordError();
+                    }
+
+                    if (needsRehash) {
+                        await usersCollection.updateOne(
+                            { _id: user._id },
+                            { $set: { password: await hashPassword(password) } },
+                        );
                     }
 
                     return {

@@ -31,7 +31,7 @@ export const getUserLeadLists = async (): Promise<ALApiResponse<UserLeadList[]>>
     runAuthenticatedAction(async function getUserLeadLists(userId) {
         const uid = requireUserObjectId(userId);
         const collection = await getCollection<UserLeadListDoc>(MongoCollections.LEAD_LISTS);
-        const docs = await collection.find({ userId: uid }).toArray();
+        const docs = await collection.find({ userId: uid }).sort({ createdAt: -1 }).toArray();
 
         const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
         const countRows = await userLeadsCollection

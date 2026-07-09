@@ -85,7 +85,7 @@ export function useUserLeadListsPage(apiLeadLists: UserLeadList[]) {
                 return;
             }
             const createdList = res.data;
-            setLists((prev) => [...prev, createdList]);
+            setLists((prev) => [createdList, ...prev]);
             setAddDialogOpen(false);
             setNewName('');
             setNewDescription('');

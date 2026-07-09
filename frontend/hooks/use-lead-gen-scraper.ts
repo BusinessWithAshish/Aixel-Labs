@@ -1,12 +1,17 @@
 'use client';
 
 import { useCallback } from 'react';
-import { LEAD_GENERATION_SUB_MODULES, UserLead } from '@aixellabs/backend/db/types';
-import { createUserLeads } from '@/app/actions/user-lead-actions';
+import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
+import {
+    createUserLeads,
+    type CreateUserLeadsResult,
+} from '@/app/actions/user-lead-actions';
 import { toast } from 'sonner';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import useLocalStorageState from 'use-local-storage-state';
 import { generateLocalStorageKey } from '@/helpers/generate-local-storage-key';
+import { showCreditsExhaustedDialog } from '@/components/common/credits/CreditsExhaustedDialog';
+import { setCreditsBadgeCache } from '@/components/common/credits/CreditsBadge';
 
 const LEADS_OVERVIEW_PATH = '/lead-generation/leads';
 
@@ -33,7 +38,7 @@ const defaultSuccessToast = {
 export type SubmitLeadGenScraperFormOptions<TRequest> = {
     body: TRequest;
     errorMessage?: string;
-    onSuccess?: (result: ALApiResponse<UserLead[]>) => void;
+    onSuccess?: (result: ALApiResponse<CreateUserLeadsResult>) => void;
 };
 
 function isAbortError(error: unknown): boolean {
@@ -118,15 +123,22 @@ export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
                     return false;
                 }
 
-                if (!result.success || !result.data?.length) {
+                if (!result.success || !result.data?.leads.length) {
                     toast.error(result.error ?? errorMessage ?? 'Failed to generate leads');
                     return false;
                 }
 
-                toast.success(defaultSuccessToast.message, {
-                    ...defaultSuccessToast.options,
-                    description: `Saved ${result.data.length} leads. ${defaultSuccessToast.options.description}`,
-                });
+                const { leads, remainingCredits } = result.data;
+                setCreditsBadgeCache(remainingCredits);
+
+                if (remainingCredits === 0) {
+                    showCreditsExhaustedDialog(leads.length);
+                } else {
+                    toast.success(defaultSuccessToast.message, {
+                        ...defaultSuccessToast.options,
+                        description: `Saved ${leads.length} leads. ${defaultSuccessToast.options.description}`,
+                    });
+                }
 
                 options.onSuccess?.(result);
 

@@ -11,19 +11,25 @@ import {
     toObjectId,
 } from '@/helpers/server-action-helpers';
 import { buildDefaultLeadListName, generateLeads, getLeadSoruceFromSubModule } from '@/helpers/lead-gen-api';
-import { computeLeadGenCreditCost } from '@/helpers/credits';
-import { assertAndDebitCredits, getUserCredits } from '@/app/actions/credit-db';
+import { computeLeadGenCreditCost, getCreditCostPerItem } from '@/helpers/credits';
+import { assertAndDebitCredits, getUserCreditsState } from '@/app/actions/credit-db';
 import { createUserLeadList } from './user-lead-lists-actions';
+
+export type CreateUserLeadsResult = {
+    leads: UserLead[];
+    /** Balance after debit (admins keep their stored balance; never charged). */
+    remainingCredits: number;
+};
 
 export async function createUserLeads<TRequest>(
     subModule: LEAD_GENERATION_SUB_MODULES,
     body: TRequest,
-): Promise<ALApiResponse<UserLead[]>> {
+): Promise<ALApiResponse<CreateUserLeadsResult>> {
     return runAuthenticatedAction(async function createUserLeads(userId: string) {
         const uid = requireUserObjectId(userId);
 
-        const availableCredits = await getUserCredits(uid);
-        if (availableCredits < 1) {
+        const { credits: availableCredits, exempt } = await getUserCreditsState(uid);
+        if (!exempt && availableCredits < 1) {
             throw new Error('Insufficient credits');
         }
 
@@ -33,15 +39,27 @@ export async function createUserLeads<TRequest>(
             throw new Error(leadsResponse.error ?? 'Failed to generate leads');
         }
 
-        const leads = [
+        const uniqueLeads = [
             ...new Map(leadsResponse.data.filter((lead) => lead.id != null).map((lead) => [lead.id!, lead])).values(),
         ];
-        if (!leads.length) {
+        if (!uniqueLeads.length) {
             throw new Error('[CRITICAL] No leads to save');
         }
 
-        const creditCost = computeLeadGenCreditCost(subModule, leads.length);
-        await assertAndDebitCredits(uid, creditCost);
+        // Cap to what the balance can cover (e.g. 250 credits + 255 leads → keep 250).
+        // Debit before creating a list so a failed charge cannot leave an orphan list.
+        const costPerItem = getCreditCostPerItem(subModule);
+        const balance = exempt ? availableCredits : (await getUserCreditsState(uid)).credits;
+        const maxItems = exempt ? uniqueLeads.length : Math.floor(balance / costPerItem);
+        const leads = uniqueLeads.slice(0, Math.max(0, maxItems));
+        if (!leads.length) {
+            throw new Error(`Insufficient credits: need at least ${costPerItem}, have ${balance}`);
+        }
+
+        const remainingCredits = await assertAndDebitCredits(
+            uid,
+            computeLeadGenCreditCost(subModule, leads.length),
+        );
 
         const leadSource = getLeadSoruceFromSubModule(subModule);
 
@@ -89,7 +107,7 @@ export async function createUserLeads<TRequest>(
             });
         }
 
-        return userLeads;
+        return { leads: userLeads, remainingCredits };
     });
 }
 

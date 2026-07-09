@@ -58,6 +58,7 @@ export function ManageTenantsContent() {
             toast.success('Tenant deleted successfully');
             setDeleteDialogOpen(false);
             setTenantToDelete(null);
+            router.refresh();
         } else {
             toast.error(res.error ?? 'Failed to delete tenant');
         }

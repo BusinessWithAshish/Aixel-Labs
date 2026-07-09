@@ -4,6 +4,8 @@ export type Listener<T = never> = (data: T) => void | Promise<void>;
 
 type EventMap = {
     'navigation:loading': boolean;
+    /** New credit balance after a debit (header badge). */
+    'credits:updated': number;
 };
 
 class EventBusImpl {

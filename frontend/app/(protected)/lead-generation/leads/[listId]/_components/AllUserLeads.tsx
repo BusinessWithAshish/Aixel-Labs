@@ -79,12 +79,19 @@ export const AllUserLeads = () => {
                             aria-label="Search leads"
                         />
                         <Button
-                            variant={filterPanel.filtersActive ? 'default' : 'outline'}
+                            variant="ghost"
                             size="icon"
+                            className="relative"
                             onClick={() => setFilterSheetOpen(true)}
                             aria-label="Filter leads"
                         >
                             <ListFilter className="size-4" />
+                            {filterPanel.filtersActive ? (
+                                <span
+                                    className="absolute top-1 right-1 size-2 rounded-full bg-primary"
+                                    aria-hidden
+                                />
+                            ) : null}
                         </Button>
                     </div>
                 ) : null}

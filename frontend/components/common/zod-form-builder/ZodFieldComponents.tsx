@@ -39,9 +39,10 @@ export type BaseZodFieldProps = {
 export type ZodStringFieldProps = BaseZodFieldProps & {
     value?: string;
     onChange?: (value: string) => void;
+    type?: React.HTMLInputTypeAttribute;
 };
 
-export const ZodStringField = ({ name, label, description, value, invalid, errors, onChange, required, disabled, className, classNames, orientation, placeholder }: ZodStringFieldProps) => {
+export const ZodStringField = ({ name, label, description, value, invalid, errors, onChange, required, disabled, className, classNames, orientation, placeholder, type }: ZodStringFieldProps) => {
 
     return (
         <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
@@ -53,6 +54,7 @@ export const ZodStringField = ({ name, label, description, value, invalid, error
                 value={value}
                 onChange={(e) => onChange?.(e.target.value)}
                 id={name}
+                type={type}
                 aria-invalid={invalid}
                 placeholder={placeholder ?? `Type ${label?.toLowerCase()}`}
                 required={required}
