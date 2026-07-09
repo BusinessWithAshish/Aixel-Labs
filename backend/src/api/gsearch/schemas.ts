@@ -8,33 +8,21 @@ import {
   GSEARCH_SAFE,
   GSEARCH_TIME_FILTER,
 } from "./constants";
-
-/** Two-letter ISO 3166-1 alpha-2 country — drives Evomi `_country-XX` proxy + `gl`. */
-export const GSEARCH_COUNTRY_SCHEMA = z
-  .string()
-  .trim()
-  .length(2)
-  .regex(/^[A-Za-z]{2}$/, "Country must be a 2-letter ISO 3166-1 alpha-2 code")
-  .transform((v) => v.toUpperCase())
-  .describe(
-    "Required. Two-letter ISO 3166-1 alpha-2 country code (e.g. US, GB, IN). " +
-      "Routes the request through a country-targeted Evomi proxy and sets Google `gl`.",
-  );
+import {
+  ISO_COUNTRY_CODE_SCHEMA,
+  LOCATION_CITY_SCHEMA,
+  LOCATION_STATE_SCHEMA,
+} from "../../utils/location-schema";
 
 /**
- * Optional region / city (e.g. "Austin, Texas" or "Mumbai"). Appended to the
- * query text ("<query> in <region>") — the reliable location signal for CSE.
+ * Optional city / locality for the CSE `"… in …"` location clause.
+ * Prefer passing `city` here and `state` separately — both are combined in
+ * `buildLocationQuery`.
  */
-export const GSEARCH_REGION_SCHEMA = z
-  .string()
-  .trim()
-  .min(1)
-  .max(100)
-  .optional()
-  .describe(
-    "Optional region/city for location-targeted results (e.g. 'Austin, Texas'). " +
-      "Appended to the query text and used for best-effort proxy region routing.",
-  );
+export const GSEARCH_REGION_SCHEMA = LOCATION_CITY_SCHEMA.describe(
+  "Optional city/locality for location-targeted results (e.g. 'Austin', 'Mumbai'). " +
+    "Combined with `state` into the query text (`q in city, state`).",
+);
 
 export const GSEARCH_REQUEST_SCHEMA = z.object({
   searchQuery: z
@@ -43,8 +31,14 @@ export const GSEARCH_REQUEST_SCHEMA = z.object({
     .min(1)
     .max(GSEARCH_MAX_QUERY_CHARS)
     .describe("The web search query."),
-  country: GSEARCH_COUNTRY_SCHEMA,
+  country: ISO_COUNTRY_CODE_SCHEMA.describe(
+    "Required. Two-letter ISO 3166-1 alpha-2 country code (e.g. US, GB, IN). " +
+      "Routes the request through a country-targeted Evomi proxy and sets Google `gl`.",
+  ),
+  /** City / locality — used as the primary `"in …"` location fragment. */
   region: GSEARCH_REGION_SCHEMA,
+  /** Optional state / province — appended after city when both are set. */
+  state: LOCATION_STATE_SCHEMA,
   pages: z
     .number()
     .int()

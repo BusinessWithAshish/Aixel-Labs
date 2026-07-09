@@ -42,6 +42,9 @@ importers:
       helmet:
         specifier: ^8.0.0
         version: 8.1.0
+      i18n-iso-countries:
+        specifier: ^7.14.0
+        version: 7.14.0
       impit:
         specifier: ^0.9.2
         version: 0.9.2

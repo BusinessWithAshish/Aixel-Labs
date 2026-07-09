@@ -36,6 +36,7 @@ export async function fetchGsearch(
     searchQuery,
     country,
     region,
+    state,
     pages = GSEARCH_DEFAULT_PAGES,
     language = GSEARCH_DEFAULT_LANGUAGE,
     safe = GSEARCH_SAFE.OFF,
@@ -45,7 +46,7 @@ export async function fetchGsearch(
   const cx = GSEARCH_DEFAULT_CX;
   const sessionId = newGsearchSessionId();
   // Proxy is routed by COUNTRY only. Evomi has limited per-city region coverage,
-  // and an unsupported `_region-*` value fails the tunnel — so city/region
+  // and an unsupported `_region-*` value fails the tunnel — so city/state
   // precision comes from the query text (`buildLocationQuery`), matching the
   // browser-worker's `${query} in ${city}` + `_country-XX` pattern.
   const proxyUrl = buildEvomiProxyUrl({
@@ -56,7 +57,7 @@ export async function fetchGsearch(
     throw new Error("Evomi proxy is not configured");
   }
 
-  const resolvedQuery = buildLocationQuery(searchQuery, region);
+  const resolvedQuery = buildLocationQuery(searchQuery, region, state);
   const sort = buildTimeSort(timeFilter);
   const token = await fetchGsearchToken(cx, proxyUrl);
 
@@ -138,6 +139,7 @@ export async function fetchGsearch(
     resolvedQuery,
     country,
     region: region ?? null,
+    state: state ?? null,
     language,
     estimatedResultCount,
     pagesFetched,

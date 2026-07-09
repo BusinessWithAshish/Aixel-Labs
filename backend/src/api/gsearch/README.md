@@ -35,33 +35,36 @@ results are **close to but not byte-identical** to organic `google.com/search`.
 
 ### Location targeting
 
-| Signal | Honored by CSE element? | How we use it |
-|--------|-------------------------|---------------|
-| Country (`gl` + proxy `_country-XX`) | ✅ | From required `country` |
-| Query text `"<q> in <region>"` | ✅ (reliable city signal) | From optional `region` |
-| `uule` | ❌ ignored | not used |
-| `near` | ❌ ignored | not used |
-| Proxy `_region-*` | limited Evomi coverage | best-effort from `region` |
+| Signal                                | Honored by CSE element?   | How we use it                           |
+| ------------------------------------- | ------------------------- | --------------------------------------- |
+| Country (`gl` + proxy `_country-XX`)  | ✅                        | From required ISO `country`             |
+| Query text `"<q> in <city>, <state>"` | ✅ (reliable city signal) | From optional `region` (city) + `state` |
+| `uule`                                | ❌ ignored                | not used                                |
+| `near`                                | ❌ ignored                | not used                                |
+| Proxy `_region-*`                     | limited Evomi coverage    | not used (country proxy only)           |
 
-City/region precision is achieved by appending the location to the query text (the same
-trick `browser-worker` uses) plus country proxy routing. `uule`/`near` are silently
-ignored by this endpoint.
+City/state precision is achieved by appending the location to the query text (the same
+trick `browser-worker` uses) plus country proxy routing. Both city and state →
+`"q in City, State"`; city only → `"q in City"`; state only → `"q in State"`.
+`uule`/`near` are silently ignored by this endpoint.
 
 ## Request — `POST /gsearch`
 
 ```jsonc
 {
-  "searchQuery": "emergency plumber",   // required
-  "country": "US",                       // required — ISO 3166-1 alpha-2
-  "region": "Austin, Texas",             // optional — city/state (appended to query)
-  "pages": 1,                            // optional — 1..6, 20 results/page (~120 max, default 1)
-  "language": "en",                      // optional — hl (default "en")
-  "safe": "off",                         // optional — off | medium | high (default off)
-  "timeFilter": "week"                   // optional — day | week | month | year
+  "searchQuery": "emergency plumber", // required
+  "country": "US", // required — ISO 3166-1 alpha-2
+  "region": "Austin", // optional — city/locality
+  "state": "Texas", // optional — state/province
+  "pages": 1, // optional — 1..6, 20 results/page (~120 max, default 1)
+  "language": "en", // optional — hl (default "en")
+  "safe": "off", // optional — off | medium | high (default off)
+  "timeFilter": "week", // optional — day | week | month | year
 }
 ```
 
-Schema: `schemas.ts` → `GSEARCH_REQUEST_SCHEMA`. Constants/limits: `constants.ts`.
+Schema: `schemas.ts` → `GSEARCH_REQUEST_SCHEMA` (country via shared
+`utils/location-schema`). Constants/limits: `constants.ts`.
 
 ## Response — `ALApiResponse<GSEARCH_RESPONSE>`
 
@@ -72,7 +75,8 @@ Schema: `schemas.ts` → `GSEARCH_REQUEST_SCHEMA`. Constants/limits: `constants.
     "query": "emergency plumber",
     "resolvedQuery": "emergency plumber in Austin, Texas",
     "country": "US",
-    "region": "Austin, Texas",
+    "region": "Austin",
+    "state": "Texas",
     "language": "en",
     "estimatedResultCount": "13400000",
     "pagesFetched": 1,
@@ -87,10 +91,10 @@ Schema: `schemas.ts` → `GSEARCH_REQUEST_SCHEMA`. Constants/limits: `constants.
         "image": "https://example.com/hero.jpg",
         "siteName": "Example",
         "metaDescription": "…",
-        "modifiedTime": "2026-07-07T14:53:11+00:00"
-      }
-    ]
-  }
+        "modifiedTime": "2026-07-07T14:53:11+00:00",
+      },
+    ],
+  },
 }
 ```
 
@@ -123,16 +127,16 @@ gsearch/
 
 ### DRY map
 
-| Concern | Location |
-|--------|----------|
-| Limits, URLs, enums | `constants.ts` |
-| Request/response types | `types.ts` |
-| Zod schema | `schemas.ts` |
-| Pure transforms (no I/O) | `compute/` |
-| HTTP transport | `http.ts` |
-| Token cache + URL | `token.ts` |
-| Search orchestration | `client.ts` |
-| Express handler | `handler.ts` |
+| Concern                  | Location       |
+| ------------------------ | -------------- |
+| Limits, URLs, enums      | `constants.ts` |
+| Request/response types   | `types.ts`     |
+| Zod schema               | `schemas.ts`   |
+| Pure transforms (no I/O) | `compute/`     |
+| HTTP transport           | `http.ts`      |
+| Token cache + URL        | `token.ts`     |
+| Search orchestration     | `client.ts`    |
+| Express handler          | `handler.ts`   |
 
 ## Notes & limits
 

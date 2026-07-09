@@ -1,4 +1,5 @@
 export {
+  buildLocationFragment,
   buildLocationQuery,
   buildTimeSort,
   mapCseResult,

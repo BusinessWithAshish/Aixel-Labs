@@ -5,16 +5,35 @@ import {
 } from "../constants";
 
 /**
+ * Build the `"… in …"` location fragment from optional city (`region`) + state.
+ * - both → `"City, State"`
+ * - city only → `"City"`
+ * - state only → `"State"`
+ */
+export function buildLocationFragment(
+  region?: string | null,
+  state?: string | null,
+): string | null {
+  const city = region?.trim() || "";
+  const st = state?.trim() || "";
+  if (city && st) return `${city}, ${st}`;
+  if (city) return city;
+  if (st) return st;
+  return null;
+}
+
+/**
  * Build the query text sent to Google. City/region precision on the CSE endpoint
- * comes from the query text ("<query> in <region>") — `uule`/`near` are ignored
- * by the element API, so we mirror the browser-worker's `${query} in ${city}` trick.
+ * comes from the query text ("<query> in <city>, <state>") — `uule`/`near` are
+ * ignored by the element API.
  */
 export function buildLocationQuery(
   searchQuery: string,
   region?: string | null,
+  state?: string | null,
 ): string {
   const q = searchQuery.trim();
-  const loc = region?.trim();
+  const loc = buildLocationFragment(region, state);
   if (!loc) return q;
   // Avoid double-appending if the caller already put the location in the query.
   if (q.toLowerCase().includes(loc.toLowerCase())) return q;

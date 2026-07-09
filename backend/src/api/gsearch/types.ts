@@ -71,10 +71,12 @@ export type GSEARCH_RESULT = {
 
 export type GSEARCH_RESPONSE = {
   query: string;
-  /** Query actually sent to Google (with location appended when `region` set). */
+  /** Query actually sent to Google (with location appended when city/state set). */
   resolvedQuery: string;
   country: string;
+  /** City / locality passed as `region`. */
   region: string | null;
+  state: string | null;
   language: string;
   /** Google's estimated total result count (string as returned). */
   estimatedResultCount: string | null;
