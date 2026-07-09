@@ -4,6 +4,7 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { ProfileNameForm } from './_components/ProfileNameForm';
 import { AppearanceSettings } from './_components/AppearanceSettings';
+import { CreditsBalanceCard } from './_components/CreditsBalanceCard';
 
 export default async function AccountSettingsPage() {
     const session = await auth();
@@ -17,6 +18,8 @@ export default async function AccountSettingsPage() {
     return (
         <PageLayout title="Account Settings">
             <div className="flex flex-col gap-4 sm:gap-6">
+                <CreditsBalanceCard />
+
                 <ProfileNameForm initialName={initialName} email={email} />
 
                 <Card>

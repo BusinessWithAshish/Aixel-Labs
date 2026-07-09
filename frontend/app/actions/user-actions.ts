@@ -14,12 +14,15 @@ import {
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
 import { parseUserName } from '@/helpers/user-name';
+import { normalizeCredits, parseCreditsInput } from '@/helpers/credits';
+import { getUserCredits } from '@/app/actions/credit-db';
 import type { Filter } from 'mongodb';
 
 const mapUserDocToUser = (user: UserDoc): User => ({
     ...mapMongoDocToClient(user),
     tenantId: user.tenantId.toString(),
     password: user.password ?? '',
+    credits: normalizeCredits(user.credits),
 });
 
 export const getAllUsers = async (): Promise<ALApiResponse<User[]>> =>
@@ -63,10 +66,13 @@ export const createUser = async (input: User): Promise<ALApiResponse<User>> => {
         throw new Error('Email, password, and tenant ID are required');
     }
     return runAuthenticatedAction(async function createUser() {
+        await assertCallerIsAdmin();
+
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
 
         const normalizedEmail = input.email.trim().toLowerCase();
+        const credits = input.credits !== undefined ? parseCreditsInput(input.credits) : 0;
 
         const tenant = await tenantsCollection.findOne({ name: input.tenantId });
         if (!tenant?._id) {
@@ -88,6 +94,7 @@ export const createUser = async (input: User): Promise<ALApiResponse<User>> => {
             isAdmin: input.isAdmin ?? false,
             tenantId: tenant._id,
             moduleAccess: input.moduleAccess,
+            credits,
         };
 
         const result = await usersCollection.insertOne(docToInsert as UserDoc);
@@ -100,6 +107,7 @@ export const createUser = async (input: User): Promise<ALApiResponse<User>> => {
             tenantId: input.tenantId,
             password: '',
             moduleAccess: docToInsert.moduleAccess,
+            credits,
         };
     });
 };
@@ -109,6 +117,7 @@ export const updateUser = async (input: User): Promise<ALApiResponse<User>> => {
         throw new Error('User ID is required');
     }
     return runAuthenticatedAction(async function updateUser() {
+        await assertCallerIsAdmin();
         assertValidObjectId(input._id as string, 'User ID');
 
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
@@ -117,6 +126,7 @@ export const updateUser = async (input: User): Promise<ALApiResponse<User>> => {
         if (input.name !== undefined) updateFields.name = input.name;
         if (input.isAdmin !== undefined) updateFields.isAdmin = input.isAdmin;
         if (input.moduleAccess !== undefined) updateFields.moduleAccess = input.moduleAccess;
+        if (input.credits !== undefined) updateFields.credits = parseCreditsInput(input.credits);
 
         const updatedUser = await usersCollection.findOneAndUpdate(
             { _id: new MongoObjectId(input._id) },
@@ -196,6 +206,13 @@ export const updateCurrentUserName = async (name: string): Promise<ALApiResponse
         }
 
         return { name: updatedUser.name ?? normalizedName };
+    });
+
+/** Returns the authenticated user's current credit balance. */
+export const getCurrentUserCredits = async (): Promise<ALApiResponse<number>> =>
+    runAuthenticatedAction(async function getCurrentUserCredits(userId) {
+        assertValidObjectId(userId, 'User ID');
+        return getUserCredits(userId);
     });
 
 /** Replaces `moduleAccess` for selected users (or all users) within a tenant. */

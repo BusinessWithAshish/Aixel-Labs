@@ -11,6 +11,8 @@ import {
     toObjectId,
 } from '@/helpers/server-action-helpers';
 import { buildDefaultLeadListName, generateLeads, getLeadSoruceFromSubModule } from '@/helpers/lead-gen-api';
+import { computeLeadGenCreditCost } from '@/helpers/credits';
+import { assertAndDebitCredits, getUserCredits } from '@/app/actions/credit-db';
 import { createUserLeadList } from './user-lead-lists-actions';
 
 export async function createUserLeads<TRequest>(
@@ -19,6 +21,11 @@ export async function createUserLeads<TRequest>(
 ): Promise<ALApiResponse<UserLead[]>> {
     return runAuthenticatedAction(async function createUserLeads(userId: string) {
         const uid = requireUserObjectId(userId);
+
+        const availableCredits = await getUserCredits(uid);
+        if (availableCredits < 1) {
+            throw new Error('Insufficient credits');
+        }
 
         const leadsResponse = await generateLeads({ subModule, body });
 
@@ -32,6 +39,9 @@ export async function createUserLeads<TRequest>(
         if (!leads.length) {
             throw new Error('[CRITICAL] No leads to save');
         }
+
+        const creditCost = computeLeadGenCreditCost(subModule, leads.length);
+        await assertAndDebitCredits(uid, creditCost);
 
         const leadSource = getLeadSoruceFromSubModule(subModule);
 

@@ -11,7 +11,11 @@ import type { User, ModuleAccess } from '@aixellabs/backend/db/types';
 import { createUser, updateUser } from '@/app/actions/user-actions';
 import { ModuleAccessCard } from './ModuleAccessCard';
 import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
-import { StringControlledField, BooleanControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
+import {
+    StringControlledField,
+    BooleanControlledField,
+    NumberControlledField,
+} from '@/components/common/zod-form-builder/ZodControlledFields';
 import { ZodMetaType } from '@/components/common/zod-form-builder/zod-meta-types';
 
 const userSchema = z.object({
@@ -19,6 +23,10 @@ const userSchema = z.object({
     password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
     name: z.string().max(100, 'Name must be less than 100 characters').optional().or(z.literal('')),
     isAdmin: z.boolean(),
+    credits: z.coerce
+        .number({ invalid_type_error: 'Credits must be a number' })
+        .int('Credits must be a whole number')
+        .min(0, 'Credits cannot be below zero'),
 });
 
 type UserFormData = z.infer<typeof userSchema>;
@@ -37,7 +45,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
 
     const form = useForm<UserFormData>({
         resolver: zodResolver(userSchema),
-        defaultValues: { email: '', password: '', name: '', isAdmin: false },
+        defaultValues: { email: '', password: '', name: '', isAdmin: false, credits: 0 },
     });
 
     const { handleSubmit, reset, formState: { isSubmitting } } = form;
@@ -45,10 +53,16 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
     useEffect(() => {
         if (open) {
             if (isEditMode && user) {
-                reset({ email: user.email || '', password: '', name: user.name || '', isAdmin: user.isAdmin ?? false });
+                reset({
+                    email: user.email || '',
+                    password: '',
+                    name: user.name || '',
+                    isAdmin: user.isAdmin ?? false,
+                    credits: user.credits ?? 0,
+                });
                 setModuleAccess(user.moduleAccess || getDefaultModuleAccess());
             } else {
-                reset({ email: '', password: '', name: '', isAdmin: false });
+                reset({ email: '', password: '', name: '', isAdmin: false, credits: 0 });
                 setModuleAccess(getDefaultModuleAccess());
             }
         }
@@ -58,7 +72,13 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
         try {
             if (isEditMode) {
                 if (!user) return;
-                const result = await updateUser({ ...user, name: data.name?.trim(), isAdmin: data.isAdmin, moduleAccess });
+                const result = await updateUser({
+                    ...user,
+                    name: data.name?.trim(),
+                    isAdmin: data.isAdmin,
+                    credits: data.credits,
+                    moduleAccess,
+                });
                 if (!result.success) throw new Error(result.error || 'Failed to update user');
                 toast.success('User updated successfully');
             } else {
@@ -69,6 +89,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                     name: data.name?.trim(),
                     isAdmin: data.isAdmin,
                     tenantId,
+                    credits: data.credits,
                     moduleAccess,
                 };
                 const result = await createUser(newUser);
@@ -86,7 +107,7 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
 
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
-            reset({ email: '', password: '', name: '', isAdmin: false });
+            reset({ email: '', password: '', name: '', isAdmin: false, credits: 0 });
             setModuleAccess(getDefaultModuleAccess());
         }
         onOpenChange(newOpen);
@@ -132,6 +153,13 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                                 label="Admin privileges"
                                 description="Grant administrative access to this user"
                                 metadata={ZodMetaType.CHECKBOX}
+                            />
+                            <NumberControlledField
+                                name="credits"
+                                label="Credits"
+                                description="Absolute credit balance for this user (cannot be below zero)"
+                                min={0}
+                                step={1}
                             />
                             <ModuleAccessCard moduleAccess={moduleAccess} onChange={setModuleAccess} />
                         </div>

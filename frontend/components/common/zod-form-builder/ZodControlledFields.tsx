@@ -69,7 +69,18 @@ export const StringControlledField = ({ name, description, required, label, disa
 
 type NumberControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodNumberFieldProps>
 
-export const NumberControlledField = ({ name, description, required, label, disabled, className, classNames }: NumberControlledFieldProps) => {
+export const NumberControlledField = ({
+    name,
+    description,
+    required,
+    label,
+    disabled,
+    className,
+    classNames,
+    min,
+    max,
+    step,
+}: NumberControlledFieldProps) => {
 
     const fieldLabel = label ?? generateFieldLabel(name);
     return (
@@ -88,6 +99,9 @@ export const NumberControlledField = ({ name, description, required, label, disa
                     disabled={disabled}
                     className={className}
                     classNames={classNames}
+                    min={min}
+                    max={max}
+                    step={step}
                 />
             )}
         />

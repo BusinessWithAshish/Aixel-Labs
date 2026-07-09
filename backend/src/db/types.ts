@@ -108,6 +108,7 @@ export type UserDoc<Id = ObjectId> = {
   tenantId: Id;
   password: string;
   moduleAccess?: ModuleAccess;
+  credits?: number;
 };
 
 export type User = UserDoc<string>;

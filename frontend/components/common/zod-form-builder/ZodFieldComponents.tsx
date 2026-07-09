@@ -110,6 +110,9 @@ export const ZodTextAreaField = ({
 export type ZodNumberFieldProps = BaseZodFieldProps & {
     value?: number;
     onChange?: (value: number) => void;
+    min?: number;
+    max?: number;
+    step?: number | string;
 };
 
 export const ZodNumberField = ({
@@ -126,6 +129,9 @@ export const ZodNumberField = ({
     classNames,
     orientation,
     placeholder,
+    min,
+    max,
+    step,
 }: ZodNumberFieldProps) => {
     const displayValue =
         value !== undefined && value !== null && !Number.isNaN(value) ? value : '';
@@ -147,6 +153,9 @@ export const ZodNumberField = ({
                 className={classNames?.input}
                 disabled={disabled}
                 aria-disabled={disabled}
+                min={min}
+                max={max}
+                step={step}
             />
             {invalid && <FieldError errors={[errors]} className={classNames?.error} />}
         </Field>
