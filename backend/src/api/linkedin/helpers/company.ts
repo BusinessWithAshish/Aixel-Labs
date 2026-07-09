@@ -1,9 +1,11 @@
 import * as cheerio from "cheerio";
+import { LINKEDIN_SEARCH_TYPE } from "../schemas";
 import {
   LINKEDIN_BY_COMPANY_REQUEST,
   LINKEDIN_BY_COMPANY_RESPONSE,
 } from "../types";
-import { fetchGSearch } from "../../../utils/browser-worker";
+import { fetchGsearch } from "../../gsearch";
+import { GSEARCH_MAX_PAGES, GSEARCH_PAGE_SIZE } from "../../gsearch/constants";
 import { fetchUrls } from "../../../utils/node-tls-client-session-handler";
 import { LINKEDIN_BY_COMPANY_ADVANCED_SEARCH_QUERY } from "../constants";
 import {
@@ -255,6 +257,7 @@ export const parseLinkedInCompanyPage = (
       : null;
 
   return {
+    searchType: LINKEDIN_SEARCH_TYPE.COMPANY,
     id,
     name: metaName,
     url: metaUrl,
@@ -281,6 +284,15 @@ export const parseLinkedInCompanyPage = (
   };
 };
 
+function hasFiniteBound(value: number | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function hasRangeBounds(range?: { min?: number; max?: number }): boolean {
+  // Empty `{}` and cleared number inputs (`NaN`) must not activate filters.
+  return hasFiniteBound(range?.min) || hasFiniteBound(range?.max);
+}
+
 function filterLinkedInCompaniesByEnrichment(
   companies: LINKEDIN_BY_COMPANY_RESPONSE[],
   enrichment: LINKEDIN_BY_COMPANY_REQUEST["enrichment"],
@@ -295,54 +307,73 @@ function filterLinkedInCompaniesByEnrichment(
     description_exclude,
   } = enrichment || {};
 
+  // Empty `{}` from form defaults is truthy — only treat ranges as active when
+  // min/max are actually set (same pattern as people enrichment).
+  const hasEmployeeCountFilter = hasRangeBounds(employee_count);
+  const hasFundingFilter = hasRangeBounds(funding);
+  const hasFollowerCountFilter = hasRangeBounds(follower_count);
+  const hasDescriptionInclude = Boolean(description_include?.length);
+  const hasDescriptionExclude = Boolean(description_exclude?.length);
+  // Form switches write `false` when turned off. Labels are "only if …", so
+  // only `true` activates the filter — `false`/`undefined` means no filter.
+  const requireHiring = is_hiring === true;
+  const requireRecentlyFunded = recently_funded === true;
+
+  if (
+    !hasEmployeeCountFilter &&
+    !hasFundingFilter &&
+    !hasFollowerCountFilter &&
+    !hasDescriptionInclude &&
+    !hasDescriptionExclude &&
+    !requireHiring &&
+    !requireRecentlyFunded
+  ) {
+    return companies;
+  }
+
   return companies.filter((item) => {
-    if (employee_count) {
-      const { min, max } = employee_count;
-      if (
-        min !== undefined &&
-        item.employee_count !== null &&
-        item.employee_count < min
-      )
-        return false;
-      if (
-        max !== undefined &&
-        item.employee_count !== null &&
-        item.employee_count > max
-      )
-        return false;
+    if (hasEmployeeCountFilter) {
+      const min = hasFiniteBound(employee_count?.min)
+        ? employee_count.min
+        : undefined;
+      const max = hasFiniteBound(employee_count?.max)
+        ? employee_count.max
+        : undefined;
       if (item.employee_count === null) return false;
+      if (min !== undefined && item.employee_count < min) return false;
+      if (max !== undefined && item.employee_count > max) return false;
     }
 
-    if (funding && !item.funding_info) return false;
+    // Funding amount bounds are not yet applied (schema has min/max USD; parser
+    // only exposes round metadata). Presence of a funding section is the signal.
+    if (hasFundingFilter && !item.funding_info) return false;
 
-    if (is_hiring !== undefined && item.is_hiring !== is_hiring) return false;
+    if (requireHiring && item.is_hiring !== true) return false;
 
-    if (recently_funded && !item.funding_info) return false;
+    if (requireRecentlyFunded && !item.funding_info) return false;
 
-    if (follower_count) {
-      const { min, max } = follower_count;
-      if (
-        min !== undefined &&
-        (item.followers === null || item.followers < min)
-      )
-        return false;
-      if (
-        max !== undefined &&
-        (item.followers === null || item.followers > max)
-      )
-        return false;
+    if (hasFollowerCountFilter) {
+      const min = hasFiniteBound(follower_count?.min)
+        ? follower_count.min
+        : undefined;
+      const max = hasFiniteBound(follower_count?.max)
+        ? follower_count.max
+        : undefined;
+      if (item.followers === null) return false;
+      if (min !== undefined && item.followers < min) return false;
+      if (max !== undefined && item.followers > max) return false;
     }
 
-    if (description_include?.length) {
+    if (hasDescriptionInclude) {
       if (!item.description) return false;
       const desc = item.description.toLowerCase();
-      if (!description_include.some((kw) => desc.includes(kw.toLowerCase())))
+      if (!description_include!.some((kw) => desc.includes(kw.toLowerCase())))
         return false;
     }
 
-    if (description_exclude?.length && item.description) {
+    if (hasDescriptionExclude && item.description) {
       const desc = item.description.toLowerCase();
-      if (description_exclude.every((kw) => desc.includes(kw.toLowerCase())))
+      if (description_exclude!.every((kw) => desc.includes(kw.toLowerCase())))
         return false;
     }
 
@@ -356,6 +387,7 @@ export const fetchLinkedInByCompany = async (
   const { discovery_filters, enrichment, limit } = body;
   const {
     country,
+    state,
     city,
     company_name,
     industry,
@@ -378,24 +410,26 @@ export const fetchLinkedInByCompany = async (
     specialties?.length
       ? `(${specialties.map((s) => `"${s}"`).join(" OR ")})`
       : undefined,
-    city,
-    country,
   ].filter(Boolean);
 
   const searchQuery = `${LINKEDIN_BY_COMPANY_ADVANCED_SEARCH_QUERY} ${parts.join(" ")}`;
 
-  const pages = Math.ceil(limit / 10);
+  const pages = Math.min(
+    Math.ceil(limit / GSEARCH_PAGE_SIZE),
+    GSEARCH_MAX_PAGES,
+  );
 
   console.log(`[LinkedIn] Search query: ${searchQuery}`);
 
-  const linkedInCompanyUrls = await fetchGSearch({
+  const { results: searchResults } = await fetchGsearch({
     searchQuery,
     pages,
     country,
-    city,
+    region: city,
+    state,
   });
 
-  const companyUrls = linkedInCompanyUrls.flatMap((item) =>
+  const companyUrls = searchResults.flatMap((item) =>
     item?.url?.trim() ? [item.url.trim()] : [],
   );
 
@@ -405,8 +439,14 @@ export const fetchLinkedInByCompany = async (
       mapper: (html) => parseLinkedInCompanyPage(html),
     });
 
-  return filterLinkedInCompaniesByEnrichment(
+  const filtered = filterLinkedInCompaniesByEnrichment(
     linkedInCompanyDataResults,
     enrichment,
   );
+
+  console.log(
+    `[LinkedIn] Company scrape: ${linkedInCompanyDataResults.length} fetched, ${filtered.length} after enrichment`,
+  );
+
+  return filtered;
 };

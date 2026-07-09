@@ -1,9 +1,11 @@
 import * as cheerio from "cheerio";
+import { LINKEDIN_SEARCH_TYPE } from "../schemas";
 import {
   LINKEDIN_BY_PEOPLE_REQUEST,
   LINKEDIN_BY_PEOPLE_RESPONSE,
 } from "../types";
-import { fetchGSearch } from "../../../utils/browser-worker";
+import { fetchGsearch } from "../../gsearch";
+import { GSEARCH_MAX_PAGES, GSEARCH_PAGE_SIZE } from "../../gsearch/constants";
 import { fetchUrlsImpit } from "../../../utils/impit-session-handler";
 import { LINKEDIN_BY_PEOPLE_ADVANCED_SEARCH_QUERY } from "../constants";
 import {
@@ -477,18 +479,8 @@ export function extractDirectMessageUrlFromHtml(
 export function buildLinkedInPeopleSearchQuery(
   body: LINKEDIN_BY_PEOPLE_REQUEST,
 ): string {
-  const {
-    country,
-    state,
-    city,
-    name,
-    bio,
-    job_titles,
-    keywords,
-    languages,
-    companies,
-    educations,
-  } = body.discovery_filters;
+  const { name, bio, job_titles, keywords, languages, companies, educations } =
+    body.discovery_filters;
 
   const orQuoted = (items: string[]) =>
     `(${items.map((item) => `"${item.trim()}"`).join(" OR ")})`;
@@ -502,8 +494,6 @@ export function buildLinkedInPeopleSearchQuery(
     languages?.length ? orQuoted(languages) : undefined,
     companies?.length ? orQuoted(companies) : undefined,
     educations?.length ? orQuoted(educations) : undefined,
-    country,
-    city ?? state,
   ];
 
   return parts.filter(Boolean).join(" ");
@@ -533,6 +523,7 @@ export const parseLinkedInPeoplePage = (
   const recent_posts = extractRecentPostsFromJsonLd(allJsonLdNodes);
 
   return {
+    searchType: LINKEDIN_SEARCH_TYPE.PEOPLE,
     id: linkedInProfileSlugFromUrl(url),
     url,
     name,
@@ -679,18 +670,22 @@ export const fetchLinkedInByPeople = async (
   const { limit, discovery_filters, enrichment } = body;
 
   const searchQuery = buildLinkedInPeopleSearchQuery(body);
-  const pages = Math.ceil(limit / 10);
+  const pages = Math.min(
+    Math.ceil(limit / GSEARCH_PAGE_SIZE),
+    GSEARCH_MAX_PAGES,
+  );
 
   console.log(`[LinkedIn] People search query: ${searchQuery}`);
 
-  const serpResults = await fetchGSearch({
+  const { results: searchResults } = await fetchGsearch({
     searchQuery,
     pages,
     country: discovery_filters.country,
-    city: discovery_filters.city ?? discovery_filters.state,
+    region: discovery_filters.city,
+    state: discovery_filters.state,
   });
 
-  const profileUrls = serpResults.flatMap((item) => {
+  const profileUrls = searchResults.flatMap((item) => {
     const u = item?.url?.trim();
     if (!u) return [];
     const canonical = canonicalLinkedInProfileUrl(u);
