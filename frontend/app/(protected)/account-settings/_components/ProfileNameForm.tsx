@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
-import { FormProvider, useForm } from 'react-hook-form';
+import { FormProvider, useForm, useFormContext } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { updateCurrentUserName } from '@/app/actions/user-actions';
 import { USER_NAME_MAX_LENGTH, userNameSchema } from '@/helpers/user-name';
@@ -22,6 +23,16 @@ type ProfileNameFormProps = {
     email: string;
 };
 
+function ProfileNameSaveButton() {
+    const { formState: { isSubmitting, isDirty } } = useFormContext<ProfileNameFormData>();
+
+    return (
+        <Button type="submit" disabled={isSubmitting || !isDirty}>
+            {isSubmitting ? 'Submitting...' : 'Submit'}
+        </Button>
+    );
+}
+
 export function ProfileNameForm({ initialName, email }: ProfileNameFormProps) {
     const router = useRouter();
     const form = useForm<ProfileNameFormData>({
@@ -29,7 +40,7 @@ export function ProfileNameForm({ initialName, email }: ProfileNameFormProps) {
         defaultValues: { name: initialName },
     });
 
-    const { handleSubmit, reset, formState: { isSubmitting, isDirty } } = form;
+    const { handleSubmit, reset } = form;
 
     useEffect(() => {
         reset({ name: initialName });
@@ -54,22 +65,30 @@ export function ProfileNameForm({ initialName, email }: ProfileNameFormProps) {
 
     return (
         <FormProvider {...form}>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <StringControlledField
-                    name="name"
-                    label="Display name"
-                    placeholder="Enter your name"
-                    description={`Letters and numbers only, with at most one space. Max ${USER_NAME_MAX_LENGTH} characters.`}
-                    required
-                />
-                <div className="space-y-1.5">
-                    <p className="text-sm font-medium">Email</p>
-                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">{email}</p>
-                    <p className="text-xs text-muted-foreground">Email cannot be changed here.</p>
-                </div>
-                <Button type="submit" disabled={isSubmitting || !isDirty}>
-                    {isSubmitting ? 'Saving...' : 'Save name'}
-                </Button>
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Profile</CardTitle>
+                        <CardDescription>Update how your name appears across the app.</CardDescription>
+                        <CardAction>
+                            <ProfileNameSaveButton />
+                        </CardAction>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <StringControlledField
+                            name="name"
+                            label="Display name"
+                            placeholder="Enter your name"
+                            description={`Letters and numbers only, with at most one space. Max ${USER_NAME_MAX_LENGTH} characters.`}
+                            required
+                        />
+                        <div className="space-y-1.5">
+                            <p className="text-sm font-medium">Email</p>
+                            <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">{email}</p>
+                            <p className="text-xs text-muted-foreground">Email cannot be changed here.</p>
+                        </div>
+                    </CardContent>
+                </Card>
             </form>
         </FormProvider>
     );

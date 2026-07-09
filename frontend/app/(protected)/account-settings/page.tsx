@@ -17,15 +17,7 @@ export default async function AccountSettingsPage() {
     return (
         <PageLayout title="Account Settings">
             <div className="flex flex-col gap-4 sm:gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Profile</CardTitle>
-                        <CardDescription>Update how your name appears across the app.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ProfileNameForm initialName={initialName} email={email} />
-                    </CardContent>
-                </Card>
+                <ProfileNameForm initialName={initialName} email={email} />
 
                 <Card>
                     <CardHeader>
