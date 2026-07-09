@@ -35,8 +35,6 @@ export const SubModuleUrls: Record<SubModule, string> = {
     [EMAIL_SUB_MODULES.AI_REPLIES]: '/email',
 };
 
-export const BACKEND_URL = process.env.NEXT_PUBLIC_BE_API;
-
 export const DEFAULT_LOGO_SRC = '/aixellabs.svg';
 
 export const DEFAULT_THEME_COLOR = '#4f46e5';

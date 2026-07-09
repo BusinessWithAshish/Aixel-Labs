@@ -1,3 +1,5 @@
+import 'server-only';
+
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
 import { type LeadData, LEAD_GENERATION_SUB_MODULES, LeadSource } from '@aixellabs/backend/db/types';
 import apiClient from '@/lib/api-client';

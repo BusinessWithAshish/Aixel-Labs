@@ -1,5 +1,6 @@
+import 'server-only';
+
 import axios, { AxiosRequestConfig } from 'axios';
-import { BACKEND_URL } from '@/config/app-config';
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
 
 export type RequestOptions = {
@@ -9,12 +10,24 @@ export type RequestOptions = {
     signal?: AbortSignal;
 };
 
+function getBackendUrl(): string {
+    const url = process.env.BE_API?.trim();
+    if (!url) {
+        throw new Error('BE_API is not configured');
+    }
+    return url;
+}
+
 const axiosInstance = axios.create({
-    baseURL: BACKEND_URL,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
+});
+
+axiosInstance.interceptors.request.use((config) => {
+    config.baseURL = getBackendUrl();
+    return config;
 });
 
 const toAxiosConfig = (options?: RequestOptions): AxiosRequestConfig => ({
@@ -41,7 +54,7 @@ const toErrorResponse = (error: unknown): ALApiResponse<never> => {
     return {
         success: false,
         error: message,
-    } as ALApiResponse<never>;
+    };
 };
 
 export const get = async <T = unknown>(url: string, options?: RequestOptions): Promise<ALApiResponse<T>> => {

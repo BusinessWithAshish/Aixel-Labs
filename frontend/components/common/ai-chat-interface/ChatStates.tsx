@@ -96,7 +96,7 @@ export function ConfirmationPrompt({
     onReset,
     isConfirming,
 }: ConfirmationPromptProps) {
-    const showDetails = process.env.NEXT_PUBLIC_NODE_ENV === 'development';
+    const showDetails = process.env.NODE_ENV === 'development';
 
     return (
         <div className="animate-in slide-in-from-bottom-2 fade-in duration-300 p-4 bg-primary/5 border border-primary/20 rounded-lg">
