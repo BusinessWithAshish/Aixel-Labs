@@ -1,101 +1,42 @@
-'use client'
+import PageLayout from '@/components/common/PageLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { auth } from '@/auth';
+import { redirect } from 'next/navigation';
+import { ProfileNameForm } from './_components/ProfileNameForm';
+import { AppearanceSettings } from './_components/AppearanceSettings';
 
-import PageLayout from "@/components/common/PageLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ZodColorPicker, ZodSelectField } from "@/components/common/zod-form-builder";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import { useTheme } from "next-themes";
-import { Monitor, Moon, RotateCcw, Sun } from "lucide-react";
-import { useTenantBranding } from "@/contexts/TenantBranding";
-import { Button } from "@/components/ui/button";
+export default async function AccountSettingsPage() {
+    const session = await auth();
+    if (!session?.user) {
+        redirect('/sign-in');
+    }
 
-export default function AccountSettingsPage() {
-
-    const { defaultThemeColor } = useTenantBranding();
-
-    const { themeColor, setThemeColor } = useThemeColor();
-
-    const { theme, setTheme } = useTheme();
-
-    const themeModeOptions = [
-        {
-            label: 'Light',
-            value: 'light',
-            icon: <Sun className="size-4" />,
-        },
-        {
-            label: 'Dark',
-            value: 'dark',
-            icon: <Moon className="size-4" />,
-        },
-        {
-            label: 'System',
-            value: 'system',
-            icon: <Monitor className="size-4" />,
-        },
-    ];
-
-    const handleThemeModeChange = (mode: string) => {
-        setTheme(mode);
-    };
+    const initialName = session.user.name?.trim() ?? '';
+    const email = session.user.email ?? '';
 
     return (
         <PageLayout title="Account Settings">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Your account settings & application preferences</CardTitle>
-                    <CardDescription>Change and manage your settings for your account.</CardDescription>
-                </CardHeader>
+            <div className="flex flex-col gap-4 sm:gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Profile</CardTitle>
+                        <CardDescription>Update how your name appears across the app.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ProfileNameForm initialName={initialName} email={email} />
+                    </CardContent>
+                </Card>
 
-                <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                        <h3 className="text-lg font-medium">Appearance</h3>
-                        <p className="text-sm text-muted-foreground">
-                            Customize how the application looks and feels.
-                        </p>
-                    </div>
-
-                    <div className="space-y-4">
-
-                        <div className="flex items-end gap-2">
-
-                            <ZodColorPicker
-                                name="theme-color"
-                                label="Theme Color"
-                                description="Pick a custom accent color for buttons, focus rings, and the sidebar."
-                                value={themeColor ?? defaultThemeColor}
-                                onChange={setThemeColor}
-                            />
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                title="Reset to tenant default"
-                                onClick={() => setThemeColor(defaultThemeColor)}
-                                disabled={themeColor === defaultThemeColor}
-                            >
-                                <RotateCcw className="size-4" />
-                            </Button>
-                        </div>
-
-                        <ZodSelectField
-                            name='theme-mode'
-                            label='Theme Mode'
-                            description="Select light, dark, or system theme mode"
-                            options={themeModeOptions}
-                            value={theme ?? 'system'}
-                            onChange={handleThemeModeChange}
-                            suppressSelectValueHydrationWarning
-                        />
-                    </div>
-
-                    <div className="rounded-lg border p-4 bg-muted/50">
-                        <p className="text-sm text-muted-foreground">
-                            <strong>Tip:</strong> The theme mode (light/dark/system) automatically applies to your selected color theme.
-                            Try switching between modes to see how your chosen color adapts!
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Your account settings & application preferences</CardTitle>
+                        <CardDescription>Change and manage your settings for your account.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <AppearanceSettings />
+                    </CardContent>
+                </Card>
+            </div>
         </PageLayout>
-    )
+    );
 }

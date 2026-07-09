@@ -13,6 +13,7 @@ import {
 } from '@aixellabs/backend/db';
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
+import { parseUserName } from '@/helpers/user-name';
 import type { Filter } from 'mongodb';
 
 const mapUserDocToUser = (user: UserDoc): User => ({
@@ -167,6 +168,35 @@ async function assertCallerIsAdmin(): Promise<void> {
         throw new Error('Unauthorized: admin access required');
     }
 }
+
+/** Updates the authenticated user's own display name. */
+export const updateCurrentUserName = async (name: string): Promise<ALApiResponse<{ name: string }>> =>
+    runAuthenticatedAction(async function updateCurrentUserName(userId) {
+        assertValidObjectId(userId, 'User ID');
+
+        let normalizedName: string;
+        try {
+            normalizedName = parseUserName(name);
+        } catch (error) {
+            if (error instanceof Error) {
+                throw new Error(error.message);
+            }
+            throw new Error('Invalid name');
+        }
+
+        const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
+        const updatedUser = await usersCollection.findOneAndUpdate(
+            { _id: new MongoObjectId(userId) },
+            { $set: { name: normalizedName } },
+            { returnDocument: 'after' },
+        );
+
+        if (!updatedUser) {
+            throw new Error('User not found');
+        }
+
+        return { name: updatedUser.name ?? normalizedName };
+    });
 
 /** Replaces `moduleAccess` for selected users (or all users) within a tenant. */
 export const bulkUpdateUsersModuleAccess = async (
