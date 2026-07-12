@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 import { NL_CHAT_MAX_TURNS, NL_CHAT_MODULES } from '@/hooks/use-nl-chat/constants';
 import { checkRateLimit } from './rate-limiter';
 import { runAgentTurn, type AgentRequest } from './agent';
@@ -21,7 +21,7 @@ function isAgentRequest(body: unknown): body is AgentRequest {
 }
 
 export async function POST(req: Request) {
-    const session = await auth();
+    const session = await getAppSession();
     if (!session?.user?.id) return new NextResponse('Unauthorized', { status: 401 });
 
     const rl = checkRateLimit(session.user.id);

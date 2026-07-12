@@ -3,7 +3,7 @@ import { generateQueryResult, validateTransformFunction } from './query-executio
 import { buildSystemPrompt } from './prompt-builder';
 import { z } from 'zod';
 import { executeTransformFunction } from './filter-executor';
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 
 const nlQueryAPIInputSchema = z.object({
     query: z.string().min(1),
@@ -13,7 +13,7 @@ const nlQueryAPIInputSchema = z.object({
 
 export async function POST(req: NextRequest) {
     try {
-        const session = await auth();
+        const session = await getAppSession();
 
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'You must be logged in to use the NL Query API' }, { status: 401 });

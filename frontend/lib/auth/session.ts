@@ -13,7 +13,7 @@ import { SESSION_COOKIE_NAME, type AppSession } from '@/lib/auth/types';
 
 /**
  * Verifies the Firebase session cookie and loads the Mongo user profile.
- * Replaces Auth.js `auth()` — same session shape for route guards and actions.
+ * Used by route guards, server actions, and API routes.
  */
 export async function getAppSession(): Promise<AppSession | null> {
     const cookieStore = await cookies();
