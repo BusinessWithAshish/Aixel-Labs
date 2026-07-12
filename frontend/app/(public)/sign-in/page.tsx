@@ -1,10 +1,9 @@
 import { LoginForm } from '@/app/(public)/_components/LoginForm';
-import { AppLogo } from "@/components/common/AppLogo";
-import { APP_DESCRIPTION, APP_NAME } from '@/config/app-config';
+import { AppLogo } from '@/components/common/AppLogo';
+import { APP_DESCRIPTION, APP_NAME, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
 import { validateAndGetTenant } from '@/helpers/validate-tenant';
 
 const LogoWithText = ({ tenantLabel }: { tenantLabel: string }) => {
-
     return (
         <div className="flex items-center gap-2">
             <div className="bg-white border border-primary text-primary-foreground flex size-8 items-center justify-center rounded-full">
@@ -15,10 +14,27 @@ const LogoWithText = ({ tenantLabel }: { tenantLabel: string }) => {
     );
 };
 
-export default async function SignInPage() {
-    const tenantData = await validateAndGetTenant();
+function resolveCallbackUrl(raw: string | string[] | undefined): string {
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    // Only allow same-origin relative paths to avoid open redirects.
+    if (value && value.startsWith('/') && !value.startsWith('//')) {
+        return value;
+    }
+    return DEFAULT_HOME_PAGE_ROUTE;
+}
+
+export default async function SignInPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ callbackUrl?: string | string[] }>;
+}) {
+    const [{ callbackUrl: rawCallbackUrl }, tenantData] = await Promise.all([
+        searchParams,
+        validateAndGetTenant(),
+    ]);
     const tenantLabel = tenantData?.label ?? APP_NAME;
     const tenantDescription = tenantData?.app_description ?? APP_DESCRIPTION;
+    const callbackUrl = resolveCallbackUrl(rawCallbackUrl);
 
     return (
         <div className="grid min-h-svh lg:grid-cols-2">
@@ -27,7 +43,7 @@ export default async function SignInPage() {
                     <LogoWithText tenantLabel={tenantLabel} />
                 </div>
                 <div className="flex flex-1 items-center justify-center">
-                    <LoginForm />
+                    <LoginForm callbackUrl={callbackUrl} />
                 </div>
             </div>
             <div className="bg-muted relative hidden md:block">
@@ -35,9 +51,7 @@ export default async function SignInPage() {
                     <LogoWithText tenantLabel={tenantLabel} />
                     <div className="max-w-md space-y-4 text-center">
                         <h2 className="text-3xl font-bold tracking-tight">Welcome to {tenantLabel}</h2>
-                        <p className="text-muted-foreground text-lg">
-                            {tenantDescription}
-                        </p>
+                        <p className="text-muted-foreground text-lg">{tenantDescription}</p>
                     </div>
                 </div>
             </div>

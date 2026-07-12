@@ -49,6 +49,9 @@ export function creditsToneClassName(credits: number): string {
     }
 }
 
+/** Upper bound for manually assigned user credit balances. */
+export const MAX_USER_CREDITS = 100_000;
+
 export function normalizeCredits(value: number | null | undefined): number {
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
         return 0;
@@ -60,6 +63,9 @@ export function parseCreditsInput(value: unknown): number {
     const n = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
         throw new Error('Credits must be a non-negative integer');
+    }
+    if (n > MAX_USER_CREDITS) {
+        throw new Error(`Credits cannot exceed ${MAX_USER_CREDITS.toLocaleString()}`);
     }
     return n;
 }
