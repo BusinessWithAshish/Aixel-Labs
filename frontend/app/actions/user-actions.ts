@@ -1,6 +1,6 @@
 'use server';
 
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import {
     getCollection,
@@ -16,12 +16,12 @@ import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-ac
 import { parseUserName } from '@/helpers/user-name';
 import { normalizeCredits, parseCreditsInput, type UserCreditsState } from '@/helpers/credits';
 import { getUserCreditsState } from '@/app/actions/credit-db';
+import { getFirebaseAdminAuth } from '@/lib/firebase/admin';
 import type { Filter } from 'mongodb';
 
 const mapUserDocToUser = (user: UserDoc): User => ({
     ...mapMongoDocToClient(user),
     tenantId: user.tenantId.toString(),
-    password: user.password ?? '',
     credits: normalizeCredits(user.credits),
 });
 
@@ -61,57 +61,6 @@ export const getUserById = async (id: string): Promise<ALApiResponse<User>> =>
         return mapUserDocToUser(user);
     });
 
-export const createUser = async (input: User): Promise<ALApiResponse<User>> => {
-    if (!input.email || !input.password || !input.tenantId) {
-        throw new Error('Email, password, and tenant ID are required');
-    }
-    return runAuthenticatedAction(async function createUser() {
-        await assertCallerIsAdmin();
-
-        const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
-
-        const normalizedEmail = input.email.trim().toLowerCase();
-        const credits = input.credits !== undefined ? parseCreditsInput(input.credits) : 0;
-
-        const tenant = await tenantsCollection.findOne({ name: input.tenantId });
-        if (!tenant?._id) {
-            throw new Error('Tenant not found to create user');
-        }
-
-        const existingUser = await usersCollection.findOne({
-            email: normalizedEmail,
-            tenantId: tenant._id,
-        });
-        if (existingUser) {
-            throw new Error('User already exists');
-        }
-
-        const docToInsert: UserDoc = {
-            email: normalizedEmail,
-            password: input.password,
-            name: input.name?.trim(),
-            isAdmin: input.isAdmin ?? false,
-            tenantId: tenant._id,
-            moduleAccess: input.moduleAccess,
-            credits,
-        };
-
-        const result = await usersCollection.insertOne(docToInsert as UserDoc);
-
-        return {
-            _id: result.insertedId.toString(),
-            email: docToInsert.email,
-            name: docToInsert.name,
-            isAdmin: docToInsert.isAdmin,
-            tenantId: input.tenantId,
-            password: '',
-            moduleAccess: docToInsert.moduleAccess,
-            credits,
-        };
-    });
-};
-
 export const updateUser = async (input: User): Promise<ALApiResponse<User>> => {
     if (!input._id) {
         throw new Error('User ID is required');
@@ -147,11 +96,24 @@ export const deleteUser = async (id: string): Promise<ALApiResponse<boolean>> =>
         throw new Error('User ID is required');
     }
     return runAuthenticatedAction(async function deleteUser() {
+        await assertCallerIsAdmin();
         assertValidObjectId(id, 'User ID');
 
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
-        const result = await usersCollection.deleteOne({ _id: new MongoObjectId(id) });
+        const user = await usersCollection.findOne({ _id: new MongoObjectId(id) });
+        if (!user) {
+            throw new Error('User not found');
+        }
 
+        if (user.firebaseUid) {
+            try {
+                await getFirebaseAdminAuth().deleteUser(user.firebaseUid);
+            } catch (error) {
+                console.error('Failed to delete Firebase user:', error);
+            }
+        }
+
+        const result = await usersCollection.deleteOne({ _id: new MongoObjectId(id) });
         if (result.deletedCount !== 1) {
             throw new Error('User not found');
         }
@@ -173,7 +135,7 @@ export type BulkUpdateUsersModuleAccessResult = {
 };
 
 async function assertCallerIsAdmin(): Promise<void> {
-    const session = await auth();
+    const session = await getAppSession();
     if (!session?.user?.isAdmin) {
         throw new Error('Unauthorized: admin access required');
     }

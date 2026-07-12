@@ -1,13 +1,13 @@
 import PageLayout from '@/components/common/PageLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
 import { ProfileNameForm } from './_components/ProfileNameForm';
 import { AppearanceSettings } from './_components/AppearanceSettings';
 import { CreditsBalanceCard } from './_components/CreditsBalanceCard';
 
 export default async function AccountSettingsPage() {
-    const session = await auth();
+    const session = await getAppSession();
     if (!session?.user) {
         redirect('/sign-in');
     }

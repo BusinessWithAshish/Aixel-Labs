@@ -1,4 +1,4 @@
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 import { CreditsIcon } from '@/components/common/credits/CreditsBadge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getUserCredits } from '@/app/actions/credit-db';
@@ -6,7 +6,7 @@ import { creditsToneClassName } from '@/helpers/credits';
 import { cn } from '@/lib/utils';
 
 export async function CreditsBalanceCard() {
-    const session = await auth();
+    const session = await getAppSession();
     if (!session?.user?.id || session.user.isAdmin) {
         return null;
     }

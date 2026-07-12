@@ -110,6 +110,11 @@ export function UserCard({ user, onEdit, onDelete, selected, onSelectedChange, c
                 <p className="text-xs sm:text-sm text-muted-foreground truncate" title={user.email}>
                     {user.email}
                 </p>
+                {user.phoneNumber && (
+                    <p className="text-xs text-muted-foreground truncate" title={user.phoneNumber}>
+                        {user.phoneNumber}
+                    </p>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">
                     Credits: {user.credits ?? 0}
                 </p>

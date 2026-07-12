@@ -1,9 +1,9 @@
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 import { redirect } from 'next/navigation';
 import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
-    const session = await auth();
+    const session = await getAppSession();
 
     if (session?.user) {
         redirect(DEFAULT_HOME_PAGE_ROUTE);

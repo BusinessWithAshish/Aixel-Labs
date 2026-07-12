@@ -1,4 +1,4 @@
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 import { redirect, notFound } from 'next/navigation';
 
 /**
@@ -14,7 +14,7 @@ import { redirect, notFound } from 'next/navigation';
  */
 export function withAdminOnly<P extends object>(Component: React.ComponentType<P>) {
     return async function AdminProtectedPage(props: P) {
-        const session = await auth();
+        const session = await getAppSession();
 
         if (!session?.user) {
             redirect('/sign-in');

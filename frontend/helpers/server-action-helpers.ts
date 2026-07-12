@@ -1,4 +1,4 @@
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { MongoObjectId } from '@aixellabs/backend/db';
 import { isValidObjectId } from '@/helpers/object-id';
@@ -10,7 +10,7 @@ export function getActionErrorMessage(error: unknown, fallback = 'Request failed
 }
 
 export async function getCurrentUserId(): Promise<string | null> {
-    const session = await auth();
+    const session = await getAppSession();
     return session?.user?.id ?? null;
 }
 

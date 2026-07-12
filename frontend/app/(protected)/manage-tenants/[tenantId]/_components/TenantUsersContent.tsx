@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { UserCard } from './UserCard';
-import { AddUserCard } from './AddUserCard';
 import { UserDialog } from './EditUserDialog';
 import { DeleteUserConfirmDialog } from './DeleteUserConfirmDialog';
 import { UserBulkActionsToolbar } from './UserBulkActionsToolbar';
@@ -46,7 +45,8 @@ export function TenantUsersContent() {
             const matchesSearch =
                 !normalizedQuery ||
                 user.email.toLowerCase().includes(normalizedQuery) ||
-                user.name?.toLowerCase().includes(normalizedQuery);
+                user.name?.toLowerCase().includes(normalizedQuery) ||
+                user.phoneNumber?.toLowerCase().includes(normalizedQuery);
             const matchesAdminFilter = !showAdminsOnly || user.isAdmin;
             return matchesSearch && matchesAdminFilter;
         });
@@ -61,10 +61,6 @@ export function TenantUsersContent() {
 
     const handleEditUser = (user: (typeof users)[0]) => {
         setEditingUser(user);
-    };
-
-    const handleAddUser = () => {
-        setEditingUser(null);
     };
 
     const handleDialogClose = () => {
@@ -102,7 +98,7 @@ export function TenantUsersContent() {
         setIsDeleting(false);
     };
 
-    const isDialogOpen = editingUser !== undefined;
+    const isDialogOpen = editingUser !== undefined && editingUser !== null;
 
     return (
         <>
@@ -143,6 +139,10 @@ export function TenantUsersContent() {
                     </div>
                 </div>
 
+                <p className="text-muted-foreground text-sm">
+                    Users join by signing in with Google and verifying a phone number. Edit permissions below.
+                </p>
+
                 <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {filteredUsers.map((user) => {
                         const userId = user._id as string;
@@ -162,7 +162,6 @@ export function TenantUsersContent() {
                             />
                         );
                     })}
-                    <AddUserCard onClick={handleAddUser} />
                 </div>
 
                 {filteredUsers.length === 0 && (
@@ -174,7 +173,9 @@ export function TenantUsersContent() {
 
             <UserDialog
                 open={isDialogOpen}
-                onOpenChange={handleDialogClose}
+                onOpenChange={(open) => {
+                    if (!open) handleDialogClose();
+                }}
                 user={editingUser ?? null}
                 tenantId={tenantId}
                 onSuccess={handleSuccess}

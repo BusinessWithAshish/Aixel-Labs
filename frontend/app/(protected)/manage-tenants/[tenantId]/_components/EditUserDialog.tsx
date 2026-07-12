@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { User, ModuleAccess } from '@aixellabs/backend/db/types';
-import { createUser, updateUser } from '@/app/actions/user-actions';
+import { updateUser } from '@/app/actions/user-actions';
 import { ModuleAccessCard } from './ModuleAccessCard';
 import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 import {
@@ -19,8 +19,6 @@ import {
 import { ZodMetaType } from '@/components/common/zod-form-builder/zod-meta-types';
 
 const userSchema = z.object({
-    email: z.string().email('Invalid email address').optional().or(z.literal('')),
-    password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
     name: z.string().max(100, 'Name must be less than 100 characters').optional().or(z.literal('')),
     isAdmin: z.boolean(),
     credits: z.coerce
@@ -39,75 +37,51 @@ type UserDialogProps = {
     onSuccess?: () => void;
 };
 
-export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: UserDialogProps) {
-    const isEditMode = !!user;
+export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogProps) {
     const [moduleAccess, setModuleAccess] = useState<ModuleAccess>(getDefaultModuleAccess());
 
     const form = useForm<UserFormData>({
         resolver: zodResolver(userSchema),
-        defaultValues: { email: '', password: '', name: '', isAdmin: false, credits: 0 },
+        defaultValues: { name: '', isAdmin: false, credits: 0 },
     });
 
     const { handleSubmit, reset, formState: { isSubmitting } } = form;
 
     useEffect(() => {
-        if (open) {
-            if (isEditMode && user) {
-                reset({
-                    email: user.email || '',
-                    password: '',
-                    name: user.name || '',
-                    isAdmin: user.isAdmin ?? false,
-                    credits: user.credits ?? 0,
-                });
-                setModuleAccess(user.moduleAccess || getDefaultModuleAccess());
-            } else {
-                reset({ email: '', password: '', name: '', isAdmin: false, credits: 0 });
-                setModuleAccess(getDefaultModuleAccess());
-            }
+        if (open && user) {
+            reset({
+                name: user.name || '',
+                isAdmin: user.isAdmin ?? false,
+                credits: user.credits ?? 0,
+            });
+            setModuleAccess(user.moduleAccess || getDefaultModuleAccess());
         }
-    }, [user, open, isEditMode, reset]);
+    }, [user, open, reset]);
 
     const onSubmit = async (data: UserFormData) => {
+        if (!user) return;
         try {
-            if (isEditMode) {
-                if (!user) return;
-                const result = await updateUser({
-                    ...user,
-                    name: data.name?.trim(),
-                    isAdmin: data.isAdmin,
-                    credits: data.credits,
-                    moduleAccess,
-                });
-                if (!result.success) throw new Error(result.error || 'Failed to update user');
-                toast.success('User updated successfully');
-            } else {
-                if (!data.email || !data.password) throw new Error('Email and password are required');
-                const newUser: User = {
-                    email: data.email.trim().toLowerCase(),
-                    password: data.password,
-                    name: data.name?.trim(),
-                    isAdmin: data.isAdmin,
-                    tenantId,
-                    credits: data.credits,
-                    moduleAccess,
-                };
-                const result = await createUser(newUser);
-                if (!result.success) throw new Error(result.error || 'Failed to create user');
-                toast.success('User created successfully');
-            }
+            const result = await updateUser({
+                ...user,
+                name: data.name?.trim(),
+                isAdmin: data.isAdmin,
+                credits: data.credits,
+                moduleAccess,
+            });
+            if (!result.success) throw new Error(result.error || 'Failed to update user');
+            toast.success('User updated successfully');
             onOpenChange(false);
             onSuccess?.();
         } catch (error) {
-            const msg = error instanceof Error ? error.message : `An error occurred while ${isEditMode ? 'updating' : 'creating'} user`;
+            const msg = error instanceof Error ? error.message : 'An error occurred while updating user';
             toast.error(msg);
-            console.error(`${isEditMode ? 'Update' : 'Create'} user error:`, error);
+            console.error('Update user error:', error);
         }
     };
 
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
-            reset({ email: '', password: '', name: '', isAdmin: false, credits: 0 });
+            reset({ name: '', isAdmin: false, credits: 0 });
             setModuleAccess(getDefaultModuleAccess());
         }
         onOpenChange(newOpen);
@@ -119,34 +93,27 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                 <FormProvider {...form}>
                     <form onSubmit={handleSubmit(onSubmit)}>
                         <DialogHeader>
-                            <DialogTitle>{isEditMode ? 'Edit User' : 'Add User'}</DialogTitle>
+                            <DialogTitle>Edit User</DialogTitle>
                             <DialogDescription>
-                                {isEditMode ? 'Update user details. Click save when you\'re done.' : 'Create a new user for this tenant. Click create when you\'re done.'}
+                                Update permissions and credits. Users sign up via Google and phone verification.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
-                            <StringControlledField
-                                name="email"
-                                label="Email"
-                                type="email"
-                                placeholder="Enter user email"
-                                disabled={isEditMode}
-                                description={isEditMode ? 'User email cannot be changed' : undefined}
-                                classNames={isEditMode ? { input: 'bg-muted' } : undefined}
-                            />
-                            {!isEditMode && (
-                                <StringControlledField
-                                    name="password"
-                                    label="Password"
-                                    type="password"
-                                    placeholder="Enter password (min 8 characters)"
-                                />
+                            <div className="grid gap-1">
+                                <p className="text-sm font-medium">Email</p>
+                                <p className="text-muted-foreground text-sm">{user?.email}</p>
+                            </div>
+                            {user?.phoneNumber && (
+                                <div className="grid gap-1">
+                                    <p className="text-sm font-medium">Phone</p>
+                                    <p className="text-muted-foreground text-sm">{user.phoneNumber}</p>
+                                </div>
                             )}
                             <StringControlledField
                                 name="name"
                                 label="Name"
                                 placeholder="Enter user name"
-                                description={isEditMode ? 'Display name for this user' : undefined}
+                                description="Display name for this user"
                             />
                             <BooleanControlledField
                                 name="isAdmin"
@@ -167,8 +134,8 @@ export function UserDialog({ open, onOpenChange, user, tenantId, onSuccess }: Us
                             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? (isEditMode ? 'Saving...' : 'Creating...') : isEditMode ? 'Save changes' : 'Create user'}
+                            <Button type="submit" disabled={isSubmitting || !user}>
+                                {isSubmitting ? 'Saving...' : 'Save changes'}
                             </Button>
                         </DialogFooter>
                     </form>

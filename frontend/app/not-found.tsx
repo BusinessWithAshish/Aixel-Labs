@@ -18,7 +18,7 @@
  */
 
 import type { Metadata } from 'next';
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 import PageLayout from '@/components/common/PageLayout';
 import { CommonNotFound } from "@/components/common/CommonNotFound";
 import { SidebarAppShell } from '@/components/layout/sidebar-app-shell';
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 
 export default async function NotFound() {
     // Check if user is authenticated to determine layout
-    const session = await auth();
+    const session = await getAppSession();
 
     // If authenticated, render with sidebar (like protected routes)
     if (session?.user) {

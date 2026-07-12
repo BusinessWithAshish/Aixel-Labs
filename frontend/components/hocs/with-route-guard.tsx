@@ -1,4 +1,4 @@
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 import { validateAndGetTenant } from '@/helpers/validate-tenant';
 import { isPathAccessible } from '@/helpers/sidebar-config-helpers';
 import { headers } from 'next/headers';
@@ -18,7 +18,7 @@ import { DEFAULT_HOME_PAGE_ROUTE, PATHNAME_HEADER_KEY } from '@/config/app-confi
  */
 export function withRouteGuard<P extends object>(Component: React.ComponentType<P>) {
     return async function RouteGuardLayout(props: P) {
-        const session = await auth();
+        const session = await getAppSession();
 
         if (!session?.user) {
             redirect('/sign-in');

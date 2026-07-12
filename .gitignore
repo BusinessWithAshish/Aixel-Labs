@@ -123,3 +123,5 @@ Thumbs.db
 # Python packaging metadata (setuptools local install)
 *.egg-info/
 *.egg
+
+/frontend/app/firebase-service.json

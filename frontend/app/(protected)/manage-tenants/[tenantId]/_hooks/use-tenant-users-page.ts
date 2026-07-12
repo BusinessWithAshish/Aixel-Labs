@@ -20,12 +20,8 @@ export type UseTenantUsersPageReturn = {
 };
 
 /**
- * Hook for managing tenant users page state and interactions
- * Accepts tenantId from server as initial data
- * editingUser can be:
- * - null: Add mode (dialog open, no user selected)
- * - undefined: Dialog closed
- * - User: Edit mode (dialog open, user selected)
+ * Hook for managing tenant users page state and interactions.
+ * editingUser: undefined = dialog closed; User = edit dialog open.
  */
 export function useTenantUsersPage(users: User[]): UseTenantUsersPageReturn {
     const [editingUser, setEditingUser] = useState<User | null | undefined>(undefined);

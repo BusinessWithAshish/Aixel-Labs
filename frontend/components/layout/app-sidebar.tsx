@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { auth } from '@/auth';
+import { getAppSession } from '@/lib/auth/session';
 import { NavMain } from '@/components/layout/nav-main';
 import { NavUser } from '@/components/layout/nav-user';
 import { TenantSwitcher } from '@/components/layout/tenant-switcher';
@@ -19,7 +19,7 @@ import { Tenant } from '@aixellabs/backend/db/types';
 import { validateAndGetTenant } from '@/helpers/validate-tenant';
 
 export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-    const session = await auth();
+    const session = await getAppSession();
 
     const isAdmin = session?.user?.isAdmin ?? false;
     const moduleAccess = session?.user?.moduleAccess;
