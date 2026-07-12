@@ -197,10 +197,20 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
                         <Field>
                             <Button
                                 type="button"
+                                variant="outline"
                                 disabled={isLoading}
-                                className="w-full"
+                                className="w-full gap-2"
                                 onClick={handleGoogleSignIn}
                             >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src="/google-logo.png"
+                                    alt=""
+                                    width={18}
+                                    height={18}
+                                    className="size-[18px] shrink-0"
+                                    aria-hidden
+                                />
                                 {isLoading ? 'Signing in...' : 'Continue with Google'}
                             </Button>
                         </Field>

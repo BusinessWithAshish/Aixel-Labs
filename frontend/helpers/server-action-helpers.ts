@@ -1,4 +1,3 @@
-import { getAppSession } from '@/lib/auth/session';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { MongoObjectId } from '@aixellabs/backend/db';
 import { isValidObjectId } from '@/helpers/object-id';
@@ -9,7 +8,29 @@ export function getActionErrorMessage(error: unknown, fallback = 'Request failed
     return error instanceof Error ? error.message : fallback;
 }
 
+/**
+ * Public actions must not import auth/session (firebase-admin).
+ * That keeps middleware/tenant routes free of the firebase/jwks-rsa module graph.
+ */
+export async function runPublicAction<T>(
+    operation: () => Promise<T>,
+    options?: { logLabel?: string; fallbackError?: string },
+): Promise<ALApiResponse<T>> {
+    try {
+        const data = await operation();
+        return { success: true, data };
+    } catch (error) {
+        console.error(options?.logLabel ?? 'Public action failed', error);
+        return {
+            success: false,
+            error: getActionErrorMessage(error, options?.fallbackError),
+        };
+    }
+}
+
 export async function getCurrentUserId(): Promise<string | null> {
+    // Lazy import so public callers of this module don't load firebase-admin at module eval time.
+    const { getAppSession } = await import('@/lib/auth/session');
     const session = await getAppSession();
     return session?.user?.id ?? null;
 }
@@ -35,22 +56,6 @@ export async function runAuthenticatedAction<T>(operation: (userId: string) => P
         return {
             success: false,
             error: getActionErrorMessage(error),
-        };
-    }
-}
-
-export async function runPublicAction<T>(
-    operation: () => Promise<T>,
-    options?: { logLabel?: string; fallbackError?: string },
-): Promise<ALApiResponse<T>> {
-    try {
-        const data = await operation();
-        return { success: true, data };
-    } catch (error) {
-        console.error(options?.logLabel ?? 'Public action failed', error);
-        return {
-            success: false,
-            error: getActionErrorMessage(error, options?.fallbackError),
         };
     }
 }

@@ -102,11 +102,12 @@ export type Tenant = TenantDoc<string>;
 
 export type UserDoc<Id = ObjectId> = {
   _id?: Id;
+  firebaseUid: string;
   email: string;
+  phoneNumber: string;
   name?: string;
   isAdmin: boolean;
   tenantId: Id;
-  password: string;
   moduleAccess?: ModuleAccess;
   credits?: number;
 };
