@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { getFirebaseAdminAuth } from '@/lib/firebase/admin';
-import {
-    exchangeIdTokenForSessionCookie,
-    sessionCookieOptions,
-} from '@/lib/auth/create-session';
-import { SESSION_COOKIE_NAME } from '@/lib/auth/types';
+import { SESSION_COOKIE_NAME } from '@/lib/auth/constants';
+import { sessionCookieClearOptions, sessionCookieSetOptions } from '@/lib/auth/cookies';
+import { exchangeIdTokenForSessionCookie, revokeSessionCookie } from '@/server/auth';
 
-/**
- * Exchange a Firebase ID token for an httpOnly session cookie.
- * @see https://firebase.google.com/docs/auth/admin/manage-cookies
- */
 export async function POST(request: NextRequest) {
     const body = (await request.json()) as { idToken?: string };
     const result = await exchangeIdTokenForSessionCookie(body.idToken?.toString() ?? '', request.headers);
@@ -20,38 +13,20 @@ export async function POST(request: NextRequest) {
     }
 
     const response = NextResponse.json({ status: 'success' });
-    response.cookies.set({
-        ...sessionCookieOptions,
-        name: SESSION_COOKIE_NAME,
-        value: result.sessionCookie,
-    });
+    response.cookies.set(sessionCookieSetOptions(result.sessionCookie));
     return response;
 }
 
-/**
- * Clear the session cookie and revoke refresh tokens when possible.
- */
 export async function DELETE() {
     try {
         const cookieStore = await cookies();
         const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-
         if (sessionCookie) {
-            try {
-                const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie);
-                await getFirebaseAdminAuth().revokeRefreshTokens(decoded.sub);
-            } catch {
-                // Cookie may already be invalid; still clear it.
-            }
+            await revokeSessionCookie(sessionCookie);
         }
 
         const response = NextResponse.json({ status: 'success' });
-        response.cookies.set({
-            ...sessionCookieOptions,
-            name: SESSION_COOKIE_NAME,
-            value: '',
-            maxAge: 0,
-        });
+        response.cookies.set(sessionCookieClearOptions());
         return response;
     } catch (error) {
         console.error('Session delete failed:', error);

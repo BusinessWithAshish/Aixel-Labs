@@ -6,16 +6,35 @@ import { useRouter } from 'next/navigation';
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
-import { APP_NAME, DEFAULT_HOME_PAGE_ROUTE } from "@/config/app-config";
+import { APP_NAME, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
 import { AppLogo } from '../common/AppLogo';
-import { Tenant } from '@aixellabs/backend/db/types';
+import { Tenant, TenantType } from '@aixellabs/backend/db/types';
 import { getTenantMaskedUrl } from '@/helpers/get-tenant-masked-url';
+
+const TENANT_TYPE_GROUPS = [
+    { key: 'default', label: 'Default', match: (t: Tenant) => !t.type },
+    { key: TenantType.PRODUCT, label: 'Product', match: (t: Tenant) => t.type === TenantType.PRODUCT },
+    { key: TenantType.IFRAME, label: 'Iframe', match: (t: Tenant) => t.type === TenantType.IFRAME },
+    { key: TenantType.EXTERNAL, label: 'External', match: (t: Tenant) => t.type === TenantType.EXTERNAL },
+] as const;
+
+function tenantDisplayName(tenant: Tenant) {
+    return tenant.label || tenant.name || 'Unnamed Tenant';
+}
+
+function groupTenantsByType(tenants: Tenant[]) {
+    return TENANT_TYPE_GROUPS.map((group) => ({
+        ...group,
+        tenants: tenants.filter(group.match),
+    })).filter((group) => group.tenants.length > 0);
+}
 
 export function TenantSwitcher({
     tenants,
@@ -28,20 +47,6 @@ export function TenantSwitcher({
 }) {
     const { isMobile } = useSidebar();
     const router = useRouter();
-
-    const handleTenantClick = (e: React.MouseEvent, tenant: Tenant) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.location.href = getTenantMaskedUrl(tenant) || DEFAULT_HOME_PAGE_ROUTE;
-    };
-
-    const handleManageTenantsClick = () => {
-        router.push('/manage-tenants');
-    };
-
-    const getTenantDisplayName = (tenant: Tenant) => {
-        return tenant.label || tenant.name || 'Unnamed Tenant';
-    };
 
     if (!currentTenant) {
         return (
@@ -58,7 +63,7 @@ export function TenantSwitcher({
         );
     }
 
-    const activeTenantName = getTenantDisplayName(currentTenant);
+    const activeTenantName = tenantDisplayName(currentTenant);
 
     if (!isAdmin) {
         return (
@@ -74,6 +79,8 @@ export function TenantSwitcher({
             </SidebarMenu>
         );
     }
+
+    const groupedTenants = groupTenantsByType(tenants);
 
     return (
         <SidebarMenu>
@@ -97,23 +104,36 @@ export function TenantSwitcher({
                         side={isMobile ? 'bottom' : 'right'}
                         sideOffset={4}
                     >
-                        <DropdownMenuLabel className="text-muted-foreground text-xs">Tenants</DropdownMenuLabel>
-                        {tenants.map((tenant) => {
-                            const tenantDisplayName = getTenantDisplayName(tenant);
-
-                            return (
-                                <DropdownMenuItem
-                                    key={tenant._id}
-                                    onClick={(e) => handleTenantClick(e, tenant)}
-                                    className="gap-2 p-2"
-                                >
-                                    <AppLogo src={tenant.app_logo_url} alt={tenantDisplayName} />
-                                    {tenantDisplayName}
-                                </DropdownMenuItem>
-                            );
-                        })}
+                        {groupedTenants.map((group, index) => (
+                            <DropdownMenuGroup key={group.key}>
+                                {index > 0 && <DropdownMenuSeparator />}
+                                <DropdownMenuLabel className="text-muted-foreground text-xs">
+                                    {group.label}
+                                </DropdownMenuLabel>
+                                {group.tenants.map((tenant) => {
+                                    const name = tenantDisplayName(tenant);
+                                    return (
+                                        <DropdownMenuItem
+                                            key={tenant._id}
+                                            className="gap-2 p-2"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                window.location.href =
+                                                    getTenantMaskedUrl(tenant) || DEFAULT_HOME_PAGE_ROUTE;
+                                            }}
+                                        >
+                                            <AppLogo src={tenant.app_logo_url} alt={name} />
+                                            {name}
+                                        </DropdownMenuItem>
+                                    );
+                                })}
+                            </DropdownMenuGroup>
+                        ))}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="gap-2 p-2" onClick={handleManageTenantsClick}>
+                        <DropdownMenuItem
+                            className="gap-2 p-2"
+                            onClick={() => router.push('/manage-tenants')}
+                        >
                             <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
                                 <Plus className="size-4" />
                             </div>

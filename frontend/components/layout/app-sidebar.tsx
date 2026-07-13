@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { getAppSession } from '@/lib/auth/session';
+import { getAppSession } from '@/server/auth';
 import { NavMain } from '@/components/layout/nav-main';
 import { NavUser } from '@/components/layout/nav-user';
 import { TenantSwitcher } from '@/components/layout/tenant-switcher';

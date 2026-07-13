@@ -1,6 +1,6 @@
 'use server';
 
-import { getAppSession } from '@/lib/auth/session';
+import { getAppSession } from '@/server/auth';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import {
     getCollection,
@@ -105,17 +105,21 @@ export const deleteUser = async (id: string): Promise<ALApiResponse<boolean>> =>
             throw new Error('User not found');
         }
 
-        if (user.firebaseUid) {
-            try {
-                await getFirebaseAdminAuth().deleteUser(user.firebaseUid);
-            } catch (error) {
-                console.error('Failed to delete Firebase user:', error);
-            }
-        }
-
         const result = await usersCollection.deleteOne({ _id: new MongoObjectId(id) });
         if (result.deletedCount !== 1) {
             throw new Error('User not found');
+        }
+
+        // Firebase identity is shared across tenant memberships — only delete when none remain.
+        if (user.firebaseUid) {
+            const remaining = await usersCollection.countDocuments({ firebaseUid: user.firebaseUid });
+            if (remaining === 0) {
+                try {
+                    await getFirebaseAdminAuth().deleteUser(user.firebaseUid);
+                } catch (error) {
+                    console.error('Failed to delete Firebase user:', error);
+                }
+            }
         }
 
         return true;

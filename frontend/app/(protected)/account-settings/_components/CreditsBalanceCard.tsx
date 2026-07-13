@@ -1,4 +1,4 @@
-import { getAppSession } from '@/lib/auth/session';
+import { getAppSession } from '@/server/auth';
 import { CreditsIcon } from '@/components/common/credits/CreditsBadge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getUserCredits } from '@/app/actions/credit-db';

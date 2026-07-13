@@ -1,4 +1,4 @@
-import { getAppSession } from '@/lib/auth/session';
+import { getAppSession } from '@/server/auth';
 import { redirect, notFound } from 'next/navigation';
 
 /**

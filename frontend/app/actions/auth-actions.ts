@@ -1,62 +1,32 @@
 'use server';
 
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { getFirebaseAdminAuth } from '@/lib/firebase/admin';
-import {
-    exchangeIdTokenForSessionCookieFromHeaders,
-    sessionCookieOptions,
-} from '@/lib/auth/create-session';
-import { SESSION_COOKIE_NAME } from '@/lib/auth/types';
+import { SESSION_COOKIE_NAME } from '@/lib/auth/constants';
+import { sessionCookieClearOptions, sessionCookieSetOptions } from '@/lib/auth/cookies';
+import type { CreateSessionActionResult } from '@/lib/auth/types';
+import { exchangeIdTokenForSessionCookieFromHeaders, revokeSessionCookie } from '@/server/auth';
 
-export type CreateSessionActionResult = { success: true } | { success: false; error: string };
+export type { CreateSessionActionResult } from '@/lib/auth/types';
 
-/**
- * Exchange a Firebase ID token for an httpOnly session cookie.
- * Sensitive tenant/user upsert logic stays on the server.
- */
 export async function createSession(idToken: string): Promise<CreateSessionActionResult> {
     const result = await exchangeIdTokenForSessionCookieFromHeaders(idToken);
     if (!result.ok) {
         return { success: false, error: result.error };
     }
 
-    const cookieStore = await cookies();
-    cookieStore.set({
-        ...sessionCookieOptions,
-        name: SESSION_COOKIE_NAME,
-        value: result.sessionCookie,
-    });
-
+    (await cookies()).set(sessionCookieSetOptions(result.sessionCookie));
     return { success: true };
 }
 
 /**
- * Sign out: revoke refresh tokens, clear session cookie, stay on tenant host.
+ * Clear session cookie and revoke refresh tokens.
+ * Caller should hard-navigate to sign-in so tenant branding reloads with the current host.
  */
-export async function handleSignOut() {
-    const host = (await headers()).get('host');
-    const redirectTo = host ? `${process.env.NODE_ENV === 'production' ? 'https' : 'http'}://${host}/sign-in` : '/sign-in';
-
+export async function handleSignOut(): Promise<void> {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-
     if (sessionCookie) {
-        try {
-            const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie);
-            await getFirebaseAdminAuth().revokeRefreshTokens(decoded.sub);
-        } catch {
-            // Cookie may already be invalid.
-        }
+        await revokeSessionCookie(sessionCookie);
     }
-
-    cookieStore.set({
-        ...sessionCookieOptions,
-        name: SESSION_COOKIE_NAME,
-        value: '',
-        maxAge: 0,
-    });
-
-    redirect(redirectTo);
+    cookieStore.set(sessionCookieClearOptions());
 }

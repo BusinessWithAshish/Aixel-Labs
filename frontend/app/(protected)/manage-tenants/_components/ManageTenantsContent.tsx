@@ -5,7 +5,7 @@ import { TenantCard } from './TenantCard';
 import { CreateTenantCard } from './CreateTenantCard';
 import { CreateTenantDialog } from './CreateTenantDialog';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
-import { deleteTenant } from '@/app/actions/tenant-actions';
+import { deleteTenant, getTenantDeletePreview } from '@/app/actions/tenant-actions';
 import type { Tenant } from '@aixellabs/backend/db/types';
 import { usePage } from '@/contexts/PageStore';
 import { toast } from 'sonner';
@@ -25,6 +25,7 @@ export function ManageTenantsContent() {
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
+    const [deleteUserCount, setDeleteUserCount] = useState<number | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -43,8 +44,15 @@ export function ManageTenantsContent() {
         setEditingTenant(tenant);
     };
 
-    const handleDeleteClick = (tenant: Tenant) => {
+    const handleDeleteClick = async (tenant: Tenant) => {
+        const preview = await getTenantDeletePreview(tenant._id as string);
+        if (!preview.success || !preview.data) {
+            toast.error(preview.error ?? 'Failed to load tenant delete preview');
+            return;
+        }
+
         setTenantToDelete(tenant);
+        setDeleteUserCount(preview.data.userCount);
         setDeleteDialogOpen(true);
     };
 
@@ -55,9 +63,15 @@ export function ManageTenantsContent() {
         const res = await deleteTenant(tenantToDelete._id as string);
 
         if (res.success && res.data) {
-            toast.success('Tenant deleted successfully');
+            const { deletedUsers } = res.data;
+            toast.success(
+                deletedUsers > 0
+                    ? `Tenant deleted (${deletedUsers} user${deletedUsers === 1 ? '' : 's'} removed)`
+                    : 'Tenant deleted successfully',
+            );
             setDeleteDialogOpen(false);
             setTenantToDelete(null);
+            setDeleteUserCount(null);
             router.refresh();
         } else {
             toast.error(res.error ?? 'Failed to delete tenant');
@@ -110,8 +124,15 @@ export function ManageTenantsContent() {
 
             <DeleteConfirmDialog
                 open={deleteDialogOpen}
-                onOpenChange={setDeleteDialogOpen}
+                onOpenChange={(open) => {
+                    setDeleteDialogOpen(open);
+                    if (!open) {
+                        setTenantToDelete(null);
+                        setDeleteUserCount(null);
+                    }
+                }}
                 tenantName={tenantToDelete?.name || ''}
+                userCount={deleteUserCount}
                 onConfirm={handleConfirmDelete}
                 isDeleting={isDeleting}
             />

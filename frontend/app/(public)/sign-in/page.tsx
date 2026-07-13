@@ -3,6 +3,8 @@ import { AppLogo } from '@/components/common/AppLogo';
 import { APP_DESCRIPTION, APP_NAME, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
 import { validateAndGetTenant } from '@/helpers/validate-tenant';
 
+export const dynamic = 'force-dynamic';
+
 const LogoWithText = ({ tenantLabel }: { tenantLabel: string }) => {
     return (
         <div className="flex items-center gap-2">

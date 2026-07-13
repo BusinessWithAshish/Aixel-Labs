@@ -1,4 +1,4 @@
-import { getAppSession } from '@/lib/auth/session';
+import { getAppSession } from '@/server/auth';
 import { redirect } from 'next/navigation';
 import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
 

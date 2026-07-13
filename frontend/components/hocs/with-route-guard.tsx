@@ -1,4 +1,4 @@
-import { getAppSession } from '@/lib/auth/session';
+import { getAppSession } from '@/server/auth';
 import { validateAndGetTenant } from '@/helpers/validate-tenant';
 import { isPathAccessible } from '@/helpers/sidebar-config-helpers';
 import { headers } from 'next/headers';

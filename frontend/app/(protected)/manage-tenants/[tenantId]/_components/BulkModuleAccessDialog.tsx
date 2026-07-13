@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { ModuleAccess } from '@aixellabs/backend/db/types';
 import { bulkUpdateUsersModuleAccess } from '@/app/actions/user-actions';
-import { ModuleAccessCard } from './ModuleAccessCard';
+import { ModuleAccessCard } from '../../_components/ModuleAccessCard';
 import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 import type { BulkModuleAccessTarget } from '../_hooks/use-tenant-users-page';
 

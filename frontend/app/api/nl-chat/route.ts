@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAppSession } from '@/lib/auth/session';
+import { getAppSession } from '@/server/auth';
 import { NL_CHAT_MAX_TURNS, NL_CHAT_MODULES } from '@/hooks/use-nl-chat/constants';
 import { checkRateLimit } from './rate-limiter';
 import { runAgentTurn, type AgentRequest } from './agent';

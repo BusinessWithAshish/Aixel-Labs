@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { User, ModuleAccess } from '@aixellabs/backend/db/types';
 import { updateUser } from '@/app/actions/user-actions';
-import { ModuleAccessCard } from './ModuleAccessCard';
+import { ModuleAccessCard } from '../../_components/ModuleAccessCard';
 import { ResetUserFormDialog } from './ResetUserFormDialog';
 import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 import { MAX_USER_CREDITS } from '@/helpers/credits';
@@ -42,7 +42,7 @@ type UserDialogProps = {
 
 function getInitialModuleAccess(user: User): ModuleAccess {
     if (user.isAdmin) return getDefaultModuleAccess();
-    return user.moduleAccess || getDefaultModuleAccess();
+    return user.moduleAccess ?? {};
 }
 
 function getFormValues(user: User): UserFormData {

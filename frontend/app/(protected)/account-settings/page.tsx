@@ -1,6 +1,6 @@
 import PageLayout from '@/components/common/PageLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getAppSession } from '@/lib/auth/session';
+import { getAppSession } from '@/server/auth';
 import { redirect } from 'next/navigation';
 import { ProfileNameForm } from './_components/ProfileNameForm';
 import { AppearanceSettings } from './_components/AppearanceSettings';

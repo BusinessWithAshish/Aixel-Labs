@@ -18,7 +18,7 @@
  */
 
 import type { Metadata } from 'next';
-import { getAppSession } from '@/lib/auth/session';
+import { getAppSession } from '@/server/auth';
 import PageLayout from '@/components/common/PageLayout';
 import { CommonNotFound } from "@/components/common/CommonNotFound";
 import { SidebarAppShell } from '@/components/layout/sidebar-app-shell';

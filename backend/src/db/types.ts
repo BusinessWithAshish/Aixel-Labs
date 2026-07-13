@@ -96,6 +96,7 @@ export type TenantDoc<Id = ObjectId> = {
   app_logo_url?: string;
   app_theme_color?: string;
   app_description?: string;
+  defaultModuleAccess?: ModuleAccess;
 };
 
 export type Tenant = TenantDoc<string>;
@@ -108,6 +109,7 @@ export type UserDoc<Id = ObjectId> = {
   name?: string;
   isAdmin: boolean;
   tenantId: Id;
+  tenantName: string;
   moduleAccess?: ModuleAccess;
   credits?: number;
 };

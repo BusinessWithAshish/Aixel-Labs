@@ -30,7 +30,7 @@ export async function runPublicAction<T>(
 
 export async function getCurrentUserId(): Promise<string | null> {
     // Lazy import so public callers of this module don't load firebase-admin at module eval time.
-    const { getAppSession } = await import('@/lib/auth/session');
+    const { getAppSession } = await import('@/server/auth');
     const session = await getAppSession();
     return session?.user?.id ?? null;
 }

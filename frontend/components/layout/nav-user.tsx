@@ -25,7 +25,8 @@ import { Button } from '@/components/ui/button';
 import type { SidebarUser } from '@/config/sidebar.config';
 import { handleSignOut } from '@/app/actions/auth-actions';
 import { UserRoleBadge } from '@/components/common/UserRoleBadge';
-import {useRouter} from "next/navigation";
+import { SIGN_IN_PATH } from '@/lib/auth/constants';
+import { useRouter } from 'next/navigation';
 
 export function NavUser({ user }: { user: SidebarUser }) {
     const { isMobile } = useSidebar();
@@ -41,10 +42,11 @@ export function NavUser({ user }: { user: SidebarUser }) {
         setIsLoggingOut(true);
         try {
             await handleSignOut();
+            // Full reload keeps the current tenant host so sign-in branding resolves correctly.
+            window.location.assign(SIGN_IN_PATH);
         } catch (error) {
             console.error('Logout error:', error);
             setShowLogoutDialog(false);
-        } finally {
             setIsLoggingOut(false);
         }
     };

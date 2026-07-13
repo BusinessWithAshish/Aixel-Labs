@@ -1,16 +1,22 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import z from 'zod';
-import { ColorPickerControlledField, SelectControlledField, StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
+import {
+    ColorPickerControlledField,
+    SelectControlledField,
+    StringControlledField,
+} from '@/components/common/zod-form-builder/ZodControlledFields';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { createTenant, updateTenant } from '@/app/actions/tenant-actions';
-import type { Tenant } from '@aixellabs/backend/db/types';
+import type { ModuleAccess, Tenant } from '@aixellabs/backend/db/types';
 import { TenantType } from '@aixellabs/backend/db/types';
 import { toast } from 'sonner';
 import { TENANT_TYPE_OPTIONS } from '@/config/app-config';
+import { ModuleAccessCard } from './ModuleAccessCard';
 
 type CreateTenantDialogProps = {
     open: boolean;
@@ -32,7 +38,12 @@ const tenantSchema = z.object({
 export const createTenantFormName = 'create-tenant-form';
 type TenantFormValues = z.infer<typeof tenantSchema>;
 
+const emptyModuleAccess = (): ModuleAccess => ({});
+
 export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSuccess }: CreateTenantDialogProps) {
+    const isEditing = Boolean(editingTenant);
+    const [defaultModuleAccess, setDefaultModuleAccess] = useState<ModuleAccess>(emptyModuleAccess());
+
     const form = useForm<TenantFormValues>({
         resolver: zodResolver(tenantSchema),
         values: {
@@ -46,8 +57,21 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
         },
     });
 
-    const { handleSubmit, watch, formState: { isSubmitting } } = form;
+    const { handleSubmit, watch, formState: { isSubmitting }, reset } = form;
     const watchedType = watch('type');
+
+    useEffect(() => {
+        if (!open) return;
+        setDefaultModuleAccess(editingTenant?.defaultModuleAccess ?? emptyModuleAccess());
+    }, [open, editingTenant]);
+
+    const handleOpenChange = (nextOpen: boolean) => {
+        if (!nextOpen) {
+            reset();
+            setDefaultModuleAccess(emptyModuleAccess());
+        }
+        onOpenChange(nextOpen);
+    };
 
     const onSubmit = async (values: TenantFormValues) => {
         const payload = {
@@ -62,22 +86,26 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
 
         try {
             if (editingTenant) {
+                // defaultModuleAccess is create-only; edits do not change it.
                 const res = await updateTenant({ _id: editingTenant._id, ...payload });
 
                 if (res.success && res.data) {
                     toast.success('Tenant updated successfully');
                     onSuccess?.();
-                    onOpenChange(false);
+                    handleOpenChange(false);
                 } else {
                     toast.error(res.error ?? 'Failed to update tenant');
                 }
             } else {
-                const res = await createTenant(payload);
+                const res = await createTenant({
+                    ...payload,
+                    defaultModuleAccess,
+                });
 
                 if (res.success && res.data) {
                     toast.success('Tenant created successfully');
                     onSuccess?.();
-                    onOpenChange(false);
+                    handleOpenChange(false);
                 } else {
                     toast.error(res.error ?? 'Failed to create tenant');
                 }
@@ -89,17 +117,19 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogContent className="flex max-h-[min(90vh,calc(100svh-2rem))] flex-col gap-4 overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>{editingTenant ? 'Edit tenant' : 'Create a new tenant'}</DialogTitle>
+                    <DialogTitle>{isEditing ? 'Edit tenant' : 'Create a new tenant'}</DialogTitle>
                     <DialogDescription>
-                        {editingTenant ? 'Update the tenant details below.' : 'Add a new tenant to your organization.'}
+                        {isEditing
+                            ? 'Update tenant details.'
+                            : 'Add a new tenant and choose the default module access for users who sign up.'}
                     </DialogDescription>
                 </DialogHeader>
 
                 <FormProvider {...form}>
-                    <form id={createTenantFormName} onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+                    <form id={createTenantFormName} onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         <StringControlledField
                             name="name"
                             disabled={!!editingTenant?.name}
@@ -150,12 +180,21 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
                             description="Hex color for the tenant's primary theme. Users can still override this in their account settings."
                         />
 
+                        {!isEditing && (
+                            <ModuleAccessCard
+                                moduleAccess={defaultModuleAccess}
+                                onChange={setDefaultModuleAccess}
+                                title="Default module access"
+                                description="Applied to every new user who signs up under this tenant. You can still override individuals later."
+                            />
+                        )}
+
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
                                 Cancel
                             </Button>
                             <Button type="submit" form={createTenantFormName} disabled={isSubmitting}>
-                                {isSubmitting ? 'Saving...' : editingTenant ? 'Update' : 'Create'}
+                                {isSubmitting ? 'Saving...' : isEditing ? 'Update' : 'Create'}
                             </Button>
                         </DialogFooter>
                     </form>
