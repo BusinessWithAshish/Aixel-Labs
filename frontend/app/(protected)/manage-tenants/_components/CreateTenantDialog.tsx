@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import z from 'zod';
 import {
     ColorPickerControlledField,
+    NumberControlledField,
     SelectControlledField,
     StringControlledField,
 } from '@/components/common/zod-form-builder/ZodControlledFields';
@@ -16,6 +17,7 @@ import type { ModuleAccess, Tenant } from '@aixellabs/backend/db/types';
 import { TenantType } from '@aixellabs/backend/db/types';
 import { toast } from 'sonner';
 import { TENANT_TYPE_OPTIONS } from '@/config/app-config';
+import { MAX_USER_CREDITS } from '@/helpers/credits';
 import { ModuleAccessCard } from './ModuleAccessCard';
 
 type CreateTenantDialogProps = {
@@ -33,6 +35,11 @@ const tenantSchema = z.object({
     label: z.string().optional(),
     app_logo_url: z.string().optional(),
     app_theme_color: z.string().optional(),
+    defaultCredits: z.coerce
+        .number({ invalid_type_error: 'Default credits must be a number' })
+        .int('Default credits must be a whole number')
+        .min(0, 'Default credits cannot be below zero')
+        .max(MAX_USER_CREDITS, `Default credits cannot exceed ${MAX_USER_CREDITS.toLocaleString()}`),
 });
 
 export const createTenantFormName = 'create-tenant-form';
@@ -54,11 +61,14 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
             label: editingTenant?.label ?? '',
             app_logo_url: editingTenant?.app_logo_url ?? '',
             app_theme_color: editingTenant?.app_theme_color ?? '',
+            defaultCredits: editingTenant?.defaultCredits ?? 0,
         },
     });
 
     const { handleSubmit, watch, formState: { isSubmitting }, reset } = form;
     const watchedType = watch('type');
+    const isNormalTenant = !watchedType;
+    const showNormalDefaults = !isEditing && isNormalTenant;
 
     useEffect(() => {
         if (!open) return;
@@ -74,6 +84,7 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
     };
 
     const onSubmit = async (values: TenantFormValues) => {
+        const isNormal = !values.type;
         const payload = {
             name: values.name.trim(),
             label: values.label?.trim() ?? '',
@@ -86,7 +97,7 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
 
         try {
             if (editingTenant) {
-                // defaultModuleAccess is create-only; edits do not change it.
+                // defaultModuleAccess / defaultCredits are create-only; edits do not change them.
                 const res = await updateTenant({ _id: editingTenant._id, ...payload });
 
                 if (res.success && res.data) {
@@ -99,7 +110,12 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
             } else {
                 const res = await createTenant({
                     ...payload,
-                    defaultModuleAccess,
+                    ...(isNormal
+                        ? {
+                              defaultModuleAccess,
+                              defaultCredits: values.defaultCredits,
+                          }
+                        : {}),
                 });
 
                 if (res.success && res.data) {
@@ -124,7 +140,7 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
                     <DialogDescription>
                         {isEditing
                             ? 'Update tenant details.'
-                            : 'Add a new tenant and choose the default module access for users who sign up.'}
+                            : 'Add a new tenant. For normal tenants, set default module access and credits for new signups.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -180,13 +196,24 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
                             description="Hex color for the tenant's primary theme. Users can still override this in their account settings."
                         />
 
-                        {!isEditing && (
-                            <ModuleAccessCard
-                                moduleAccess={defaultModuleAccess}
-                                onChange={setDefaultModuleAccess}
-                                title="Default module access"
-                                description="Applied to every new user who signs up under this tenant. You can still override individuals later."
-                            />
+                        {showNormalDefaults && (
+                            <>
+                                <NumberControlledField
+                                    name="defaultCredits"
+                                    label="Default credits"
+                                    description={`Applied to every new user who signs up under this tenant (0–${MAX_USER_CREDITS.toLocaleString()}). Cannot be changed after create.`}
+                                    required
+                                    min={0}
+                                    max={MAX_USER_CREDITS}
+                                    step={1}
+                                />
+                                <ModuleAccessCard
+                                    moduleAccess={defaultModuleAccess}
+                                    onChange={setDefaultModuleAccess}
+                                    title="Default module access"
+                                    description="Applied to every new user who signs up under this tenant. You can still override individuals later."
+                                />
+                            </>
                         )}
 
                         <DialogFooter>

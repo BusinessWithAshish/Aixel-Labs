@@ -68,7 +68,7 @@ export async function getOrCreateMembership(
             tenantId: tenant._id,
             tenantName,
             moduleAccess: decision.isAdmin ? {} : (tenant.defaultModuleAccess ?? {}),
-            credits: 0,
+            credits: tenant.defaultCredits ?? 0,
         };
         await users.insertOne(doc);
         return { ok: true };

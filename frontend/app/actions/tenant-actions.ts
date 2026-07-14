@@ -3,6 +3,7 @@
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import type { Tenant, TenantDoc, UserDoc, UserLeadDoc, UserLeadListDoc } from '@aixellabs/backend/db/types';
 import { MongoCollections, MongoObjectId, getCollection } from '@aixellabs/backend/db';
+import { parseCreditsInput } from '@/helpers/credits';
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { assertValidObjectId, runAuthenticatedAction, runPublicAction } from '@/helpers/server-action-helpers';
 import { getAppSession } from '@/server/auth';
@@ -50,9 +51,7 @@ export const createTenant = async (tenant: Tenant): Promise<ALApiResponse<Tenant
         await assertCallerIsAdmin();
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
 
-        if (tenant.defaultModuleAccess === undefined) {
-            throw new Error('Default module access is required when creating a tenant');
-        }
+        const isNormalTenant = !tenant.type;
 
         const docToInsert: TenantDoc = {
             name: tenant.name,
@@ -62,8 +61,15 @@ export const createTenant = async (tenant: Tenant): Promise<ALApiResponse<Tenant
             app_description: tenant.app_description,
             app_logo_url: tenant.app_logo_url,
             app_theme_color: tenant.app_theme_color,
-            defaultModuleAccess: tenant.defaultModuleAccess,
         };
+
+        if (isNormalTenant) {
+            if (tenant.defaultModuleAccess === undefined) {
+                throw new Error('Default module access is required when creating a normal tenant');
+            }
+            docToInsert.defaultModuleAccess = tenant.defaultModuleAccess;
+            docToInsert.defaultCredits = parseCreditsInput(tenant.defaultCredits);
+        }
 
         if (await tenantsCollection.findOne({ name: docToInsert.name })) {
             throw new Error('Tenant already exists');
@@ -90,7 +96,7 @@ export const updateTenant = async (tenant: Tenant): Promise<ALApiResponse<Tenant
             app_description: tenant.app_description,
             app_logo_url: tenant.app_logo_url,
             app_theme_color: tenant.app_theme_color,
-            // defaultModuleAccess is immutable after create — change users via bulk/user edit.
+            // defaultModuleAccess / defaultCredits are immutable after create.
         };
 
         const updatedTenant = await tenantsCollection.findOneAndUpdate(

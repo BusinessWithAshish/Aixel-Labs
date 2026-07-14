@@ -97,6 +97,7 @@ export type TenantDoc<Id = ObjectId> = {
   app_theme_color?: string;
   app_description?: string;
   defaultModuleAccess?: ModuleAccess;
+  defaultCredits?: number;
 };
 
 export type Tenant = TenantDoc<string>;
