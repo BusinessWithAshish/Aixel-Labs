@@ -78,6 +78,12 @@ export function getCreditCostPerItem(subModule: LEAD_GENERATION_SUB_MODULES): nu
     return cost;
 }
 
+/** Short label for form UI, e.g. "1 credit per result". */
+export function formatCreditCostPerItemLabel(subModule: LEAD_GENERATION_SUB_MODULES): string {
+    const cost = getCreditCostPerItem(subModule);
+    return cost === 1 ? '1 credit per result' : `${cost} credits per result`;
+}
+
 export function computeLeadGenCreditCost(subModule: LEAD_GENERATION_SUB_MODULES, itemCount: number): number {
     if (itemCount <= 0) return 0;
     return itemCount * getCreditCostPerItem(subModule);

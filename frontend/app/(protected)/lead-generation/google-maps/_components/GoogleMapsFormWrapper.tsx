@@ -28,6 +28,7 @@ export const GoogleMapsFormWrapper = () => {
                     description: 'Find leads on Google Maps by using the query or by direct URLs',
                     icon: { src: '/google-maps.svg', alt: 'Google Maps' },
                 }}
+                creditModule={LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS}
                 actions={
                     <FormPresetScraperActions
                         module={LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS}

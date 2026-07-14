@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
+import { CreditCostNotice } from '@/components/common/credits/CreditCostNotice';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +16,7 @@ export type LeadFormWrapperProps = {
             fallback?: ReactNode;
         };
     };
+    creditModule?: LEAD_GENERATION_SUB_MODULES;
     actions?: ReactNode;
     children: ReactNode;
     classNames?: {
@@ -27,11 +30,13 @@ export type LeadFormWrapperProps = {
         description?: string;
         action?: string;
         content?: string;
+        creditNotice?: string;
     };
 };
 
 export function LeadFormWrapper({
     config,
+    creditModule,
     actions,
     children,
     classNames,
@@ -52,6 +57,9 @@ export function LeadFormWrapper({
                 </CardTitle>
                 {config.description ? (
                     <CardDescription className={classNames?.description}>{config.description}</CardDescription>
+                ) : null}
+                {creditModule ? (
+                    <CreditCostNotice module={creditModule} className={classNames?.creditNotice} />
                 ) : null}
                 {actions ? (
                     <CardAction className={cn('flex item-center flex-row w-full gap-2', classNames?.action)}>

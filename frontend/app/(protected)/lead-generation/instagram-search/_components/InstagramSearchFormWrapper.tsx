@@ -28,6 +28,7 @@ export const InstagramSearchFormWrapper = () => {
                     description: 'Enter search parameters to find leads on Instagram',
                     icon: { src: '/instagram-logo.svg', alt: 'Instagram' },
                 }}
+                creditModule={LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH}
                 actions={
                     <FormPresetScraperActions
                         module={LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH}

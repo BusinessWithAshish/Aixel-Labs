@@ -32,6 +32,7 @@ export const LinkedInFormWrapperClient = ({ children }: LinkedInFormWrapperClien
                 description: 'Search linkedin leads by people or by company',
                 icon: { src: '/linkedin-logo-svg.png', alt: 'LinkedIn' },
             }}
+            creditModule={LEAD_GENERATION_SUB_MODULES.LINKEDIN}
             actions={
                 formMode === LinkedInFormMode.BY_PEOPLE ? (
                     <FormProvider {...peopleForm}>
