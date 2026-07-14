@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Field, FieldGroup } from '@/components/ui/field';
+import { LegalAgreementNotice } from '@/components/common/LegalAgreementNotice';
 import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { createSession } from '@/app/actions/auth-actions';
 import { getFirebaseAuth } from '@/lib/firebase/client';
@@ -282,6 +283,8 @@ export function LoginForm({ className, callbackUrl, ...props }: LoginFormProps) 
                         </>
                     )}
                 </FieldGroup>
+
+                <LegalAgreementNotice className="text-center" />
 
                 <div id="recaptcha-container" />
             </div>

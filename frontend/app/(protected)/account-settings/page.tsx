@@ -1,4 +1,5 @@
 import PageLayout from '@/components/common/PageLayout';
+import { LegalAgreementNotice } from '@/components/common/LegalAgreementNotice';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getAppSession } from '@/server/auth';
 import { redirect } from 'next/navigation';
@@ -31,6 +32,8 @@ export default async function AccountSettingsPage() {
                         <AppearanceSettings />
                     </CardContent>
                 </Card>
+
+                <LegalAgreementNotice />
             </div>
         </PageLayout>
     );

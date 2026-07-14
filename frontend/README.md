@@ -371,7 +371,7 @@ This frontend is part of a monorepo workspace with:
 ## 📄 License & Contact
 
 - **Organization**: Aixel Labs
-- **Email**: hello@aixellabs.com
+- **Email**: hello@aixellabs.in
 - **Version**: 0.1.0
 - **License**: Private
 
