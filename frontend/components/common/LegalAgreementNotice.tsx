@@ -4,14 +4,31 @@ import { cn } from '@/lib/utils';
 
 type LegalAgreementNoticeProps = {
     className?: string;
+    /** `continue` for sign-in CTAs; `account` for account settings. */
+    variant?: 'continue' | 'account';
 };
 
-export function LegalAgreementNotice({ className }: LegalAgreementNoticeProps) {
+function LegalLinks() {
+    return (
+        <>
+            <Link href="/terms">Terms of Service</Link> and{' '}
+            <Link href="/privacy">Privacy Policy</Link>
+        </>
+    );
+}
+
+export function LegalAgreementNotice({ className, variant = 'continue' }: LegalAgreementNoticeProps) {
     return (
         <FieldDescription className={cn('text-balance', className)}>
-            By clicking continue, you agree to our{' '}
-            <Link href="/terms">Terms of Service</Link> and{' '}
-            <Link href="/privacy">Privacy Policy</Link>.
+            {variant === 'account' ? (
+                <>
+                    Your use of this application is governed by our <LegalLinks />.
+                </>
+            ) : (
+                <>
+                    By clicking continue, you agree to our <LegalLinks />.
+                </>
+            )}
         </FieldDescription>
     );
 }

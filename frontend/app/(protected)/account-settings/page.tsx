@@ -33,7 +33,7 @@ export default async function AccountSettingsPage() {
                     </CardContent>
                 </Card>
 
-                <LegalAgreementNotice />
+                <LegalAgreementNotice variant="account" />
             </div>
         </PageLayout>
     );
