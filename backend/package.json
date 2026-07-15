@@ -22,6 +22,14 @@
       "types": "./src/api/gmaps/schemas.ts",
       "default": "./src/api/gmaps/schemas.ts"
     },
+    "./gmaps/filters": {
+      "types": "./src/api/gmaps/filters/index.ts",
+      "default": "./src/api/gmaps/filters/index.ts"
+    },
+    "./gmaps/place-types": {
+      "types": "./src/api/gmaps/place-types/index.ts",
+      "default": "./src/api/gmaps/place-types/index.ts"
+    },
     "./gmaps/internal/types": {
       "types": "./src/api/gmaps/internal/types.ts",
       "default": "./src/api/gmaps/internal/types.ts"

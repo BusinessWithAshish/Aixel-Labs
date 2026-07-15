@@ -27,6 +27,12 @@ import {
 import type { GMAPS_INTERNAL_RESPONSE } from "./types";
 import { ALApiResponse } from "../../types";
 import { GMAPS_REQUEST_SCHEMA } from "../schemas";
+import {
+  GMAPS_ENRICHMENT_DEFAULTS,
+  GMAPS_REQUEST_LIMIT_DEFAULT,
+  filterGmapsPlaces,
+} from "../filters";
+import { GMAPS_EMPTY, buildGmapsSearchQuery } from "../place-types";
 
 // ─────────────────────────────────────────────────────────────
 
@@ -44,8 +50,8 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
     return;
   }
 
-  if (!parsed.data.query) {
-    res.status(400).json({ success: false, error: "Query is required" });
+  if (!parsed.data.query && !parsed.data.placeType) {
+    res.status(400).json({ success: false, error: "Query or placeType is required" });
     return;
   }
 
@@ -56,15 +62,24 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
 
   const {
     query,
+    placeType,
     cities = [],
-    state = "",
-    country = "",
+    state = GMAPS_EMPTY,
+    country = GMAPS_EMPTY,
     countryCode,
+    enrichment = GMAPS_ENRICHMENT_DEFAULTS,
+    limit = GMAPS_REQUEST_LIMIT_DEFAULT,
   } = parsed.data;
   const resolvedHl = GMAPS.DEFAULT_HL;
   const resolvedGl = countryCode.toLowerCase();
 
-  const queries = generateQueries(query, cities, state, country);
+  const searchQuery = buildGmapsSearchQuery({ placeType, query });
+  if (!searchQuery) {
+    res.status(400).json({ success: false, error: "Query or placeType is required" });
+    return;
+  }
+
+  const queries = generateQueries(searchQuery, cities, state, country);
 
   if (!queries.length) {
     res.status(400).json({
@@ -218,15 +233,17 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
     }
   }
   const unique = Array.from(byPlaceId.values());
+  const filtered = filterGmapsPlaces(unique, enrichment);
+  const limited = filtered.slice(0, limit);
 
   const duplicatesRemoved = allPlaces.length - unique.length;
   console.log(
-    `[gmaps] Done — ${allPlaces.length} fetched, ${unique.length} unique, ${duplicatesRemoved} dupes removed`,
+    `[gmaps] Done — ${allPlaces.length} fetched, ${unique.length} unique, ${duplicatesRemoved} dupes removed, ${filtered.length} after enrichment, ${limited.length} after limit`,
   );
 
   const response: ALApiResponse<GMAPS_INTERNAL_RESPONSE[]> = {
     success: true,
-    data: unique,
+    data: limited,
   };
 
   res.status(200).json(response);

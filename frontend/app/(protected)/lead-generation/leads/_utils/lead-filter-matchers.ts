@@ -1,4 +1,4 @@
-import type { GoogleMapsFilters, InstagramFilters, LinkedInFilters } from './lead-filter-constants';
+import type { InstagramFilters, LinkedInFilters } from './lead-filter-constants';
 import { INSTAGRAM_ACCOUNT_TYPE } from './lead-filter-constants';
 
 type D = Record<string, unknown>;
@@ -32,31 +32,7 @@ export function toNum(v: unknown): number | null {
     return null;
 }
 
-// ─── Matchers ───────────────────────────────────────────────────────────────
-
-export function matchGoogleMaps(data: unknown, f: GoogleMapsFilters): boolean {
-    if (typeof data !== 'object' || data === null) return true;
-    const d = data as D;
-
-    if (f.requirePhone && !nonEmpty(d.phoneNumber) && !nonEmpty(d.phone)) return false;
-    if (f.requireWebsite && !nonEmpty(d.website)) return false;
-
-    const catText = Array.isArray(d.categories)
-        ? (d.categories as unknown[]).filter((x): x is string => typeof x === 'string').join(' ')
-        : '';
-    if (!contains(catText, f.categoryContains)) return false;
-
-    if (f.minStarRatings.length > 0) {
-        const rating = toNum(d.rating ?? d.overAllRating);
-        if (rating === null) return false;
-        const meets = f.minStarRatings.some((s) => rating >= Number(s));
-        if (!meets) return false;
-    }
-
-    if (!inRange(toNum(d.reviewCount ?? d.numberOfReviews), f.minReviews, f.maxReviews)) return false;
-
-    return true;
-}
+// ─── Matchers (Instagram / LinkedIn stay FE-local; Google Maps uses backend SSOT) ─
 
 export function matchLinkedIn(data: unknown, f: LinkedInFilters): boolean {
     if (typeof data !== 'object' || data === null) return true;

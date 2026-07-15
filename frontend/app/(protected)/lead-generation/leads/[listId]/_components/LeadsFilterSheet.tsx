@@ -2,10 +2,9 @@
 
 import { LeadSource } from '@aixellabs/backend/db/types';
 import { type ReactNode } from 'react';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Field, FieldLegend, FieldSet, FieldTitle } from '@/components/ui/field';
+import { FieldLegend, FieldSet } from '@/components/ui/field';
 import {
     Sheet,
     SheetContent,
@@ -22,17 +21,17 @@ import {
     ZodSwitchField,
 } from '@/components/common/zod-form-builder/ZodFieldComponents';
 import {
+    GMAPS_MIN_RATING_SELECT_OPTIONS,
     INSTAGRAM_ACCOUNT_OPTIONS,
     LINKEDIN_COMPANY_SIZE_OPTIONS,
     SHOW_LINKEDIN_FILTERS_UI,
     SOURCE_FILTER_OPTIONS,
-    STAR_RATING_OPTIONS,
     type FilterSource,
     type GoogleMapsFilters,
     type InstagramFilters,
     type LinkedInFilters,
 } from '../../_utils/lead-filter-constants';
-import Image from "next/image";
+import Image from 'next/image';
 
 // ─── Primitive filter widgets ───────────────────────────────────────────────
 
@@ -152,51 +151,6 @@ function SourceMultiSelect({
     );
 }
 
-// ─── Star rating toggle pills ───────────────────────────────────────────────
-
-function StarRatingPills({
-    selected,
-    onChange,
-}: {
-    selected: string[];
-    onChange: (v: string[]) => void;
-}) {
-    const toggle = (value: string) =>
-        onChange(
-            selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value],
-        );
-
-    return (
-        <Field className="gap-1.5">
-            <FieldTitle>Minimum rating</FieldTitle>
-            <div
-                className="flex flex-wrap gap-1.5"
-                role="group"
-                aria-label="Minimum star rating"
-            >
-                {STAR_RATING_OPTIONS.map(({ value, label }) => {
-                    const active = selected.includes(value);
-                    return (
-                        <Button
-                            key={value}
-                            type="button"
-                            variant={active ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => toggle(value)}
-                            className={cn(
-                                'h-auto min-h-0 rounded-full px-3 py-1 text-sm font-normal shadow-none',
-                                !active && 'border-border text-foreground hover:bg-accent',
-                            )}
-                        >
-                            {label}
-                        </Button>
-                    );
-                })}
-            </div>
-        </Field>
-    );
-}
-
 // ─── Per-source filter sections ─────────────────────────────────────────────
 
 function GoogleMapsSection({
@@ -208,17 +162,20 @@ function GoogleMapsSection({
 }) {
     return (
         <FilterGroup title="Google Maps" imageSrc="/google-maps.svg">
-            <StarRatingPills
-                selected={f.minStarRatings}
-                onChange={(v) => patch({ minStarRatings: v })}
+            <ZodSelectField
+                name="filter_gmaps_min_rating"
+                label="Minimum rating"
+                options={GMAPS_MIN_RATING_SELECT_OPTIONS}
+                value={String(f.minRating)}
+                onChange={(v) => patch({ minRating: Number(v) })}
             />
             <RangeRow
                 namePrefix="filter_gmaps_review_count"
                 label="Review count"
-                min={f.minReviews}
-                max={f.maxReviews}
-                onMinChange={(v) => patch({ minReviews: v })}
-                onMaxChange={(v) => patch({ maxReviews: v })}
+                min={f.minReviews > 0 ? f.minReviews : undefined}
+                max={f.maxReviews ?? undefined}
+                onMinChange={(v) => patch({ minReviews: v ?? 0 })}
+                onMaxChange={(v) => patch({ maxReviews: v ?? null })}
             />
             <ZodStringField
                 name="filter_gmaps_category_contains"
