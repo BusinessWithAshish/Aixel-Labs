@@ -128,10 +128,12 @@ export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
                     return false;
                 }
 
-                const { leads, remainingCredits } = result.data;
-                setCreditsBadgeCache(remainingCredits);
+                const { leads, remainingCredits, creditsExempt } = result.data;
+                if (!creditsExempt) {
+                    setCreditsBadgeCache(remainingCredits);
+                }
 
-                if (remainingCredits === 0) {
+                if (!creditsExempt && remainingCredits === 0) {
                     showCreditsExhaustedDialog(leads.length);
                 } else {
                     toast.success(defaultSuccessToast.message, {

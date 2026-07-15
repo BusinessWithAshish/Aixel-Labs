@@ -19,6 +19,8 @@ export type CreateUserLeadsResult = {
     leads: UserLead[];
     /** Balance after debit (admins keep their stored balance; never charged). */
     remainingCredits: number;
+    /** Admins are outside the credits system — UI must not show cost/exhausted messaging. */
+    creditsExempt: boolean;
 };
 
 export async function createUserLeads<TRequest>(
@@ -107,7 +109,7 @@ export async function createUserLeads<TRequest>(
             });
         }
 
-        return { leads: userLeads, remainingCredits };
+        return { leads: userLeads, remainingCredits, creditsExempt: exempt };
     });
 }
 
