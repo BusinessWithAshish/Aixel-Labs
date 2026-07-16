@@ -11,7 +11,7 @@ import type { User, ModuleAccess } from '@aixellabs/backend/db/types';
 import { updateUser } from '@/app/actions/user-actions';
 import { ModuleAccessCard } from '../../_components/ModuleAccessCard';
 import { ResetUserFormDialog } from './ResetUserFormDialog';
-import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
+import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { MAX_USER_CREDITS } from '@/helpers/credits';
 import {
     StringControlledField,
@@ -37,12 +37,16 @@ type UserDialogProps = {
     onOpenChange: (open: boolean) => void;
     user: User | null;
     tenantId: string;
+    /** Tenant default modules — applied when demoting an admin. */
+    defaultModuleAccess: ModuleAccess;
+    /** Signed-in admin Mongo id — used to warn on self-demotion. */
+    currentUserId: string;
     onSuccess?: () => void;
 };
 
-function getInitialModuleAccess(user: User): ModuleAccess {
-    if (user.isAdmin) return getDefaultModuleAccess();
-    return user.moduleAccess ?? {};
+function getInitialModuleAccess(user: User, defaultModuleAccess: ModuleAccess): ModuleAccess {
+    if (user.isAdmin) return {};
+    return user.moduleAccess ?? defaultModuleAccess ?? {};
 }
 
 function getFormValues(user: User): UserFormData {
@@ -53,9 +57,18 @@ function getFormValues(user: User): UserFormData {
     };
 }
 
-export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogProps) {
-    const [moduleAccess, setModuleAccess] = useState<ModuleAccess>(getDefaultModuleAccess());
+export function UserDialog({
+    open,
+    onOpenChange,
+    user,
+    defaultModuleAccess,
+    currentUserId,
+    onSuccess,
+}: UserDialogProps) {
+    const [moduleAccess, setModuleAccess] = useState<ModuleAccess>({});
     const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+    const [selfDemoteConfirmOpen, setSelfDemoteConfirmOpen] = useState(false);
+    const [pendingSubmit, setPendingSubmit] = useState<UserFormData | null>(null);
     const previousIsAdminRef = useRef(false);
 
     const form = useForm<UserFormData>({
@@ -68,7 +81,7 @@ export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogPr
 
     const applyUserState = (nextUser: User) => {
         reset(getFormValues(nextUser));
-        setModuleAccess(getInitialModuleAccess(nextUser));
+        setModuleAccess(getInitialModuleAccess(nextUser, defaultModuleAccess));
         previousIsAdminRef.current = nextUser.isAdmin ?? false;
     };
 
@@ -79,28 +92,32 @@ export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogPr
         if (!open) {
             previousIsAdminRef.current = false;
             setResetConfirmOpen(false);
+            setSelfDemoteConfirmOpen(false);
+            setPendingSubmit(null);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when dialog opens for a user
-    }, [user, open, reset]);
+    }, [user, open, reset, defaultModuleAccess]);
 
-    // Admins always get full module access: on load (already admin) and when isAdmin is checked.
+    // Promote → clear modules (stored as {}). Demote → tenant defaults.
     useEffect(() => {
         if (!open) return;
         if (isAdmin && !previousIsAdminRef.current) {
-            setModuleAccess(getDefaultModuleAccess());
+            setModuleAccess({});
+        } else if (!isAdmin && previousIsAdminRef.current) {
+            setModuleAccess(defaultModuleAccess ?? {});
         }
         previousIsAdminRef.current = Boolean(isAdmin);
-    }, [isAdmin, open]);
+    }, [isAdmin, open, defaultModuleAccess]);
 
-    const onSubmit = async (data: UserFormData) => {
+    const saveUser = async (data: UserFormData) => {
         if (!user) return;
         try {
             const result = await updateUser({
                 ...user,
                 name: data.name?.trim(),
                 isAdmin: data.isAdmin,
-                credits: data.credits,
-                moduleAccess: data.isAdmin ? getDefaultModuleAccess() : moduleAccess,
+                ...(data.isAdmin ? {} : { credits: data.credits }),
+                moduleAccess: data.isAdmin ? {} : moduleAccess,
             });
             if (!result.success) throw new Error(result.error || 'Failed to update user');
             toast.success('User updated successfully');
@@ -113,11 +130,30 @@ export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogPr
         }
     };
 
+    const onSubmit = async (data: UserFormData) => {
+        if (!user) return;
+        const isSelfDemotion =
+            Boolean(user.isAdmin) &&
+            !data.isAdmin &&
+            Boolean(currentUserId) &&
+            user._id === currentUserId;
+
+        if (isSelfDemotion) {
+            setPendingSubmit(data);
+            setSelfDemoteConfirmOpen(true);
+            return;
+        }
+
+        await saveUser(data);
+    };
+
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
             reset({ name: '', isAdmin: false, credits: 0 });
-            setModuleAccess(getDefaultModuleAccess());
+            setModuleAccess({});
             setResetConfirmOpen(false);
+            setSelfDemoteConfirmOpen(false);
+            setPendingSubmit(null);
         }
         onOpenChange(newOpen);
     };
@@ -136,7 +172,8 @@ export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogPr
                             <DialogHeader>
                                 <DialogTitle>Edit User</DialogTitle>
                                 <DialogDescription>
-                                    Update permissions and credits. Users sign up via Google and phone verification.
+                                    Update permissions{isAdmin ? '' : ' and credits'}. Users sign up via Google and
+                                    phone verification.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-4 py-4">
@@ -162,15 +199,27 @@ export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogPr
                                     description="Grant administrative access to this user"
                                     metadata={ZodMetaType.CHECKBOX}
                                 />
-                                <NumberControlledField
-                                    name="credits"
-                                    label="Credits"
-                                    description={`Absolute credit balance (0–${MAX_USER_CREDITS.toLocaleString()})`}
-                                    min={0}
-                                    max={MAX_USER_CREDITS}
-                                    step={1}
-                                />
-                                <ModuleAccessCard moduleAccess={moduleAccess} onChange={setModuleAccess} />
+                                {!isAdmin ? (
+                                    <NumberControlledField
+                                        name="credits"
+                                        label="Credits"
+                                        description={`Absolute credit balance (0–${MAX_USER_CREDITS.toLocaleString()})`}
+                                        min={0}
+                                        max={MAX_USER_CREDITS}
+                                        step={1}
+                                    />
+                                ) : (
+                                    <p className="text-muted-foreground text-sm">
+                                        Admins are exempt from credits — balance is not edited here.
+                                    </p>
+                                )}
+                                {!isAdmin ? (
+                                    <ModuleAccessCard moduleAccess={moduleAccess} onChange={setModuleAccess} />
+                                ) : (
+                                    <p className="text-muted-foreground text-sm">
+                                        Admins get the full module set automatically. The stored access map stays empty.
+                                    </p>
+                                )}
                             </div>
                             <DialogFooter className="sm:justify-between">
                                 <Button
@@ -205,6 +254,32 @@ export function UserDialog({ open, onOpenChange, user, onSuccess }: UserDialogPr
                 onOpenChange={setResetConfirmOpen}
                 userEmail={user?.email ?? 'this user'}
                 onConfirm={handleResetConfirm}
+            />
+
+            <ConfirmDialog
+                open={selfDemoteConfirmOpen}
+                onOpenChange={(next) => {
+                    setSelfDemoteConfirmOpen(next);
+                    if (!next) setPendingSubmit(null);
+                }}
+                title="Remove your own admin access?"
+                description="This only affects your membership on this tenant."
+                variant="destructive"
+                confirmText="Become a normal user"
+                alertMessage={
+                    <>
+                        You will become a <strong>normal user</strong> on this tenant (module access resets to the
+                        tenant defaults, and credits will apply). You will lose access to Manage Tenants and other
+                        admin tools here. To get admin back, another admin must promote you — or recover via Mongo if
+                        no admins remain.
+                    </>
+                }
+                onConfirm={() => {
+                    const data = pendingSubmit;
+                    setSelfDemoteConfirmOpen(false);
+                    setPendingSubmit(null);
+                    if (data) void saveUser(data);
+                }}
             />
         </>
     );

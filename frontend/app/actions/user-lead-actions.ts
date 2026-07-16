@@ -1,7 +1,7 @@
 'use server';
 
 import { Lead, LeadDoc, MongoCollections, MongoObjectId, UserLead, getCollection } from '@aixellabs/backend/db';
-import { LEAD_GENERATION_SUB_MODULES, UserLeadDoc, UserLeadListDoc } from '@aixellabs/backend/db';
+import { LEAD_GENERATION_SUB_MODULES, Modules, UserLeadDoc, UserLeadListDoc } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import {
     assertRequiredTrimmedString,
@@ -14,6 +14,8 @@ import { buildDefaultLeadListName, generateLeads, getLeadSoruceFromSubModule } f
 import { computeLeadGenCreditCost, getCreditCostPerItem } from '@/helpers/credits';
 import { assertAndDebitCredits, getUserCreditsState } from '@/app/actions/credit-db';
 import { createUserLeadList } from './user-lead-lists-actions';
+import { getAppSession } from '@/server/auth';
+import { hasSubModuleAccess } from '@/helpers/module-access-helpers';
 
 export type CreateUserLeadsResult = {
     leads: UserLead[];
@@ -29,10 +31,21 @@ export async function createUserLeads<TRequest>(
 ): Promise<ALApiResponse<CreateUserLeadsResult>> {
     return runAuthenticatedAction(async function createUserLeads(userId: string) {
         const uid = requireUserObjectId(userId);
+        const session = await getAppSession();
+        if (!session?.user) {
+            throw new Error('Unauthorized');
+        }
 
         const { credits: availableCredits, exempt } = await getUserCreditsState(uid);
-        if (!exempt && availableCredits < 1) {
-            throw new Error('Insufficient credits');
+        if (!exempt) {
+            if (
+                !hasSubModuleAccess(session.user.moduleAccess, Modules.LEAD_GENERATION, subModule)
+            ) {
+                throw new Error('Unauthorized: no access to this lead generation module');
+            }
+            if (availableCredits < 1) {
+                throw new Error('Insufficient credits');
+            }
         }
 
         const leadsResponse = await generateLeads({ subModule, body });

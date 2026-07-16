@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { UserCard } from './UserCard';
 import { UserDialog } from './EditUserDialog';
 import { DeleteUserConfirmDialog } from './DeleteUserConfirmDialog';
 import { UserBulkActionsToolbar } from './UserBulkActionsToolbar';
 import { BulkModuleAccessDialog } from './BulkModuleAccessDialog';
+import { SwitchTenantConfirmDialog } from '../../_components/SwitchTenantConfirmDialog';
 import { usePage } from '@/contexts/PageStore';
 import type { UseTenantUsersPageReturn } from '../_hooks/use-tenant-users-page';
 import type { User } from '@aixellabs/backend/db/types';
@@ -15,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { MANAGE_TENANTS_PREFIX } from '@/config/app-config';
+import { getTenantHostPathUrl } from '@/helpers/get-tenant-masked-url';
 
 export function TenantUsersContent() {
     const router = useRouter();
@@ -22,6 +25,10 @@ export function TenantUsersContent() {
     const tenantId = params?.tenantId as string;
     const {
         users,
+        defaultModuleAccess,
+        currentUserId,
+        isForeignTenant,
+        tenantSlug,
         editingUser,
         setEditingUser,
         selectedUserIds,
@@ -38,6 +45,15 @@ export function TenantUsersContent() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [switchDialogOpen, setSwitchDialogOpen] = useState(false);
+
+    useEffect(() => {
+        if (isForeignTenant) {
+            setSwitchDialogOpen(true);
+        }
+    }, [isForeignTenant]);
+
+    const nonAdminUsers = useMemo(() => users.filter((user) => !user.isAdmin), [users]);
 
     const filteredUsers = useMemo(() => {
         const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -52,8 +68,12 @@ export function TenantUsersContent() {
         });
     }, [searchQuery, showAdminsOnly, users]);
 
-    const filteredUserIds = useMemo(
-        () => filteredUsers.map((user) => user._id as string).filter(Boolean),
+    const selectableFilteredIds = useMemo(
+        () =>
+            filteredUsers
+                .filter((user) => !user.isAdmin)
+                .map((user) => user._id as string)
+                .filter(Boolean),
         [filteredUsers],
     );
 
@@ -100,6 +120,23 @@ export function TenantUsersContent() {
 
     const isDialogOpen = editingUser !== undefined && editingUser !== null;
 
+    if (isForeignTenant) {
+        return (
+            <SwitchTenantConfirmDialog
+                open={switchDialogOpen}
+                onOpenChange={(open) => {
+                    setSwitchDialogOpen(open);
+                    if (!open) {
+                        router.push('/manage-tenants');
+                    }
+                }}
+                targetTenantName={tenantSlug}
+                targetUrl={getTenantHostPathUrl(tenantSlug, `${MANAGE_TENANTS_PREFIX}${tenantSlug}`)}
+                description={`You are signed into a different tenant. Switch to ${tenantSlug} to manage its users.`}
+            />
+        );
+    }
+
     return (
         <>
             <div className="flex flex-col gap-4 p-4 sm:p-6">
@@ -129,9 +166,9 @@ export function TenantUsersContent() {
                         </div>
                         <UserBulkActionsToolbar
                             selectedCount={selectedUserIds.size}
-                            filteredCount={filteredUserIds.length}
-                            totalCount={users.length}
-                            onSelectAll={() => selectAll(filteredUserIds)}
+                            filteredCount={selectableFilteredIds.length}
+                            totalCount={nonAdminUsers.length}
+                            onSelectAll={() => selectAll(selectableFilteredIds)}
                             onDeselectAll={clearSelection}
                             onEditSelectedModuleAccess={() => openBulkModuleAccess('selected')}
                             onApplyToAllUsers={() => openBulkModuleAccess('all')}
@@ -140,7 +177,8 @@ export function TenantUsersContent() {
                 </div>
 
                 <p className="text-muted-foreground text-sm">
-                    Users join by signing in with Google and verifying a phone number. Edit permissions below.
+                    Users join by signing in with Google and verifying a phone number. Edit permissions below. Bulk
+                    module updates skip admins.
                 </p>
 
                 <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -151,12 +189,16 @@ export function TenantUsersContent() {
                                 key={userId}
                                 user={user}
                                 selected={selectedUserIds.has(userId)}
-                                onSelectedChange={(selected) => {
-                                    const isSelected = selectedUserIds.has(userId);
-                                    if (selected !== isSelected) {
-                                        toggleUserSelection(userId);
-                                    }
-                                }}
+                                onSelectedChange={
+                                    user.isAdmin
+                                        ? undefined
+                                        : (selected) => {
+                                              const isSelected = selectedUserIds.has(userId);
+                                              if (selected !== isSelected) {
+                                                  toggleUserSelection(userId);
+                                              }
+                                          }
+                                }
                                 onEdit={() => handleEditUser(user)}
                                 onDelete={() => handleDeleteClick(user)}
                             />
@@ -178,6 +220,8 @@ export function TenantUsersContent() {
                 }}
                 user={editingUser ?? null}
                 tenantId={tenantId}
+                defaultModuleAccess={defaultModuleAccess}
+                currentUserId={currentUserId}
                 onSuccess={handleSuccess}
             />
 
@@ -189,7 +233,7 @@ export function TenantUsersContent() {
                 tenantName={tenantId}
                 target={bulkTarget}
                 selectedUserIds={selectedUserIdList}
-                totalUserCount={users.length}
+                totalUserCount={nonAdminUsers.length}
                 onSuccess={handleBulkSuccess}
             />
 

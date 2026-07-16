@@ -31,7 +31,12 @@ export function getSubModulesForModule(module: Modules): SubModule[] {
 }
 
 /**
- * Get default module access (all modules and submodules enabled)
+ * Full module/submodule grant map — SSOT for:
+ * - admin sidebar + path ACL (`generateSidebarConfig(isAdmin: true)`)
+ * - ModuleAccessCard “select all” / promote templates
+ * - demotion fallback when tenant has no defaultModuleAccess
+ *
+ * Admin Mongo docs still store `moduleAccess: {}`; runtime uses this helper instead of the stored map.
  */
 export function getDefaultModuleAccess(): ModuleAccess {
     return {

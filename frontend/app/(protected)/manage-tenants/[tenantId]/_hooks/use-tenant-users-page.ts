@@ -1,12 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import type { User } from '@aixellabs/backend/db/types';
+import type { ModuleAccess, User } from '@aixellabs/backend/db/types';
 
 export type BulkModuleAccessTarget = 'selected' | 'all';
 
+export type TenantUsersPageData = {
+    users: User[];
+    sessionTenantName: string;
+    tenantSlug: string;
+    defaultModuleAccess: ModuleAccess;
+    /** Mongo user id of the signed-in admin (for self-demotion warnings). */
+    currentUserId: string;
+};
+
 export type UseTenantUsersPageReturn = {
     users: User[];
+    sessionTenantName: string;
+    tenantSlug: string;
+    defaultModuleAccess: ModuleAccess;
+    currentUserId: string;
+    isForeignTenant: boolean;
     editingUser: User | null | undefined;
     setEditingUser: (user: User | null | undefined) => void;
     selectedUserIds: Set<string>;
@@ -23,7 +37,10 @@ export type UseTenantUsersPageReturn = {
  * Hook for managing tenant users page state and interactions.
  * editingUser: undefined = dialog closed; User = edit dialog open.
  */
-export function useTenantUsersPage(users: User[]): UseTenantUsersPageReturn {
+export function useTenantUsersPage(data: TenantUsersPageData): UseTenantUsersPageReturn {
+    const { users, sessionTenantName, tenantSlug, defaultModuleAccess, currentUserId } = data;
+    const isForeignTenant = sessionTenantName !== tenantSlug;
+
     const [editingUser, setEditingUser] = useState<User | null | undefined>(undefined);
     const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
     const [bulkModuleAccessOpen, setBulkModuleAccessOpen] = useState(false);
@@ -60,6 +77,11 @@ export function useTenantUsersPage(users: User[]): UseTenantUsersPageReturn {
 
     return {
         users,
+        sessionTenantName,
+        tenantSlug,
+        defaultModuleAccess,
+        currentUserId,
+        isForeignTenant,
         editingUser,
         setEditingUser,
         selectedUserIds,

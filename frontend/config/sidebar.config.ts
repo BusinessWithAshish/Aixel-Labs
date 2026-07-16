@@ -1,4 +1,4 @@
-import { SubModuleUrls, MANAGE_TENANTS_ROUTE } from './app-config';
+import { MANAGE_TENANTS_ROUTE } from './app-config';
 
 /** Admin-only paths (not in sidebar nav). Exact match or nested routes (e.g. /manage-tenants/[tenantId]) require admin. */
 export const ADMIN_ONLY_PATHS = [MANAGE_TENANTS_ROUTE] as const;
@@ -130,81 +130,7 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
     },
 };
 
-export const sidebarConfig: SidebarConfig = {
-    navMain: [
-        {
-            title: Modules.LEAD_GENERATION,
-            items: [
-                {
-                    title: LEAD_GENERATION_SUB_MODULES.LEADS,
-                    url: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.LEADS],
-                },
-                {
-                    title: LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS,
-                    url: SubModuleUrls.GOOGLE_MAPS,
-                },
-                // FOR NOW, WE ARE NOT USING THE ADVANCED SEARCH
-                // {
-                //     title: LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH,
-                //     url: SubModuleUrls.GOOGLE_ADVANCED_SEARCH,
-                // },
-                {
-                    title: LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH,
-                    url: SubModuleUrls.INSTAGRAM_SEARCH,
-                },
-                {
-                    title: LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH,
-                    url: SubModuleUrls.INSTAGRAM_ADVANCED_SEARCH,
-                },
-                {
-                    title: LEAD_GENERATION_SUB_MODULES.FACEBOOK,
-                    url: SubModuleUrls.FACEBOOK,
-                },
-                {
-                    title: LEAD_GENERATION_SUB_MODULES.LINKEDIN,
-                    url: SubModuleUrls.LINKEDIN,
-                },
-            ],
-        },
-        {
-            title: Modules.LEAD_ENRICHMENT,
-            items: [
-                { title: LEAD_ENRICHMENT_SUB_MODULES.EMAIL_VERIFICATION, url: SubModuleUrls.EMAIL_VERIFICATION },
-                { title: LEAD_ENRICHMENT_SUB_MODULES.PHONE_VERIFICATION, url: SubModuleUrls.PHONE_VERIFICATION },
-            ],
-        },
-        {
-            title: Modules.VOICE_AGENT,
-            items: [
-                {
-                    title: VOICE_AGENT_SUB_MODULES.WEB_DIALER,
-                    url: SubModuleUrls.WEB_DIALER,
-                },
-                {
-                    title: VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS,
-                    url: SubModuleUrls.INQUIRY_BOOKINGS,
-                },
-                {
-                    title: VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS,
-                    url: SubModuleUrls.CUSTOM_AGENT_ANALYTICS,
-                },
-            ],
-        },
-        {
-            title: Modules.MESSAGING,
-            items: [
-                { title: MESSAGING_SUB_MODULES.WHATSAPP, url: SubModuleUrls.WHATSAPP },
-                { title: MESSAGING_SUB_MODULES.SMS, url: SubModuleUrls.SMS },
-            ],
-        },
-        {
-            title: Modules.EMAIL,
-            items: [
-                { title: EMAIL_SUB_MODULES.COLD_OUTREACH, url: SubModuleUrls.COLD_OUTREACH },
-                { title: EMAIL_SUB_MODULES.WARM_OUTREACH, url: SubModuleUrls.WARM_OUTREACH },
-                { title: EMAIL_SUB_MODULES.TEMPLATES, url: SubModuleUrls.TEMPLATES },
-                { title: EMAIL_SUB_MODULES.AI_REPLIES, url: SubModuleUrls.AI_REPLIES },
-            ],
-        },
-    ],
-};
+/**
+ * Nav items are not listed here. Full / admin nav is built from
+ * `getDefaultModuleAccess()` in `helpers/sidebar-config-helpers.ts` (SSOT).
+ */

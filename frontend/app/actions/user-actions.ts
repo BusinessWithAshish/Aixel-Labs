@@ -1,6 +1,5 @@
 'use server';
 
-import { getAppSession } from '@/server/auth';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import {
     getCollection,
@@ -10,6 +9,8 @@ import {
     type TenantDoc,
     type User,
     type UserDoc,
+    type UserLeadDoc,
+    type UserLeadListDoc,
 } from '@aixellabs/backend/db';
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
@@ -17,6 +18,11 @@ import { parseUserName } from '@/helpers/user-name';
 import { normalizeCredits, parseCreditsInput, type UserCreditsState } from '@/helpers/credits';
 import { getUserCreditsState } from '@/app/actions/credit-db';
 import { getFirebaseAdminAuth } from '@/lib/firebase/admin';
+import {
+    assertTenantNameIsSessionTenant,
+    assertUserInSessionTenant,
+    requireAdminSessionContext,
+} from '@/server/auth';
 import type { Filter } from 'mongodb';
 
 const mapUserDocToUser = (user: UserDoc): User => ({
@@ -25,31 +31,29 @@ const mapUserDocToUser = (user: UserDoc): User => ({
     credits: normalizeCredits(user.credits),
 });
 
+/** Lists users for the caller's current session tenant only. */
 export const getAllUsers = async (): Promise<ALApiResponse<User[]>> =>
     runAuthenticatedAction(async function getAllUsers() {
+        const { tenantObjectId } = await requireAdminSessionContext();
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
-        const users = await usersCollection.find({}).toArray();
+        const users = await usersCollection.find({ tenantId: tenantObjectId }).toArray();
         return users.map(mapUserDocToUser);
     });
 
-/** `tenantId` is the tenant document `name` (see legacy query on tenants collection). */
+/** `tenantId` is the tenant document `name` (slug). Must match the session tenant. */
 export const getAllUsersByTenant = async (tenantId: string): Promise<ALApiResponse<User[]>> =>
-    runAuthenticatedAction(async function getAllUsersByTenant(_userId: string) {
-        assertValidObjectId(_userId, 'User ID');
+    runAuthenticatedAction(async function getAllUsersByTenant() {
+        const { tenantObjectId, tenantName } = await requireAdminSessionContext();
+        assertTenantNameIsSessionTenant(tenantId, tenantName);
+
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
-
-        const tenant = await tenantsCollection.findOne({ name: tenantId });
-        if (!tenant?._id) {
-            throw new Error('Tenant not found to query users');
-        }
-
-        const users = await usersCollection.find({ tenantId: tenant._id }).toArray();
+        const users = await usersCollection.find({ tenantId: tenantObjectId }).toArray();
         return users.map(mapUserDocToUser);
     });
 
 export const getUserById = async (id: string): Promise<ALApiResponse<User>> =>
     runAuthenticatedAction(async function getUserById() {
+        const { tenantObjectId } = await requireAdminSessionContext();
         assertValidObjectId(id, 'User ID');
 
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
@@ -57,6 +61,7 @@ export const getUserById = async (id: string): Promise<ALApiResponse<User>> =>
         if (!user) {
             throw new Error('User not found');
         }
+        assertUserInSessionTenant(user, tenantObjectId);
 
         return mapUserDocToUser(user);
     });
@@ -66,16 +71,37 @@ export const updateUser = async (input: User): Promise<ALApiResponse<User>> => {
         throw new Error('User ID is required');
     }
     return runAuthenticatedAction(async function updateUser() {
-        await assertCallerIsAdmin();
+        const { tenantObjectId } = await requireAdminSessionContext();
         assertValidObjectId(input._id as string, 'User ID');
 
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
+        const existing = await usersCollection.findOne({ _id: new MongoObjectId(input._id) });
+        if (!existing) {
+            throw new Error('User not found');
+        }
+        assertUserInSessionTenant(existing, tenantObjectId);
 
         const updateFields: Partial<UserDoc> = {};
         if (input.name !== undefined) updateFields.name = input.name;
-        if (input.isAdmin !== undefined) updateFields.isAdmin = input.isAdmin;
-        if (input.moduleAccess !== undefined) updateFields.moduleAccess = input.moduleAccess;
         if (input.credits !== undefined) updateFields.credits = parseCreditsInput(input.credits);
+
+        const nextIsAdmin = input.isAdmin !== undefined ? input.isAdmin : existing.isAdmin;
+        if (input.isAdmin !== undefined) {
+            updateFields.isAdmin = input.isAdmin;
+        }
+
+        if (nextIsAdmin) {
+            updateFields.moduleAccess = {};
+        } else if (existing.isAdmin && !nextIsAdmin) {
+            const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
+            const tenant = await tenantsCollection.findOne(
+                { _id: tenantObjectId },
+                { projection: { defaultModuleAccess: 1 } },
+            );
+            updateFields.moduleAccess = tenant?.defaultModuleAccess ?? {};
+        } else if (input.moduleAccess !== undefined) {
+            updateFields.moduleAccess = input.moduleAccess;
+        }
 
         const updatedUser = await usersCollection.findOneAndUpdate(
             { _id: new MongoObjectId(input._id) },
@@ -96,7 +122,7 @@ export const deleteUser = async (id: string): Promise<ALApiResponse<boolean>> =>
         throw new Error('User ID is required');
     }
     return runAuthenticatedAction(async function deleteUser() {
-        await assertCallerIsAdmin();
+        const { tenantObjectId } = await requireAdminSessionContext();
         assertValidObjectId(id, 'User ID');
 
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
@@ -104,13 +130,19 @@ export const deleteUser = async (id: string): Promise<ALApiResponse<boolean>> =>
         if (!user) {
             throw new Error('User not found');
         }
+        assertUserInSessionTenant(user, tenantObjectId);
 
-        const result = await usersCollection.deleteOne({ _id: new MongoObjectId(id) });
+        const userOid = new MongoObjectId(id);
+        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
+        const leadListsCollection = await getCollection<UserLeadListDoc>(MongoCollections.LEAD_LISTS);
+        await userLeadsCollection.deleteMany({ userId: userOid });
+        await leadListsCollection.deleteMany({ userId: userOid });
+
+        const result = await usersCollection.deleteOne({ _id: userOid });
         if (result.deletedCount !== 1) {
             throw new Error('User not found');
         }
 
-        // Firebase identity is shared across tenant memberships — only delete when none remain.
         if (user.firebaseUid) {
             const remaining = await usersCollection.countDocuments({ firebaseUid: user.firebaseUid });
             if (remaining === 0) {
@@ -137,13 +169,6 @@ export type BulkUpdateUsersModuleAccessResult = {
     matchedCount: number;
     modifiedCount: number;
 };
-
-async function assertCallerIsAdmin(): Promise<void> {
-    const session = await getAppSession();
-    if (!session?.user?.isAdmin) {
-        throw new Error('Unauthorized: admin access required');
-    }
-}
 
 /** Updates the authenticated user's own display name. */
 export const updateCurrentUserName = async (name: string): Promise<ALApiResponse<{ name: string }>> =>
@@ -181,7 +206,7 @@ export const getCurrentUserCredits = async (): Promise<ALApiResponse<UserCredits
         return getUserCreditsState(userId);
     });
 
-/** Replaces `moduleAccess` for selected users (or all users) within a tenant. */
+/** Replaces `moduleAccess` for selected non-admin users (or all non-admins) within the session tenant. */
 export const bulkUpdateUsersModuleAccess = async (
     input: BulkUpdateUsersModuleAccessInput,
 ): Promise<ALApiResponse<BulkUpdateUsersModuleAccessResult>> => {
@@ -194,15 +219,13 @@ export const bulkUpdateUsersModuleAccess = async (
     }
 
     return runAuthenticatedAction(async function bulkUpdateUsersModuleAccess() {
-        await assertCallerIsAdmin();
+        const { tenantObjectId, tenantName: sessionTenantName } = await requireAdminSessionContext();
+        assertTenantNameIsSessionTenant(tenantName, sessionTenantName);
 
-        const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
-        const tenant = await tenantsCollection.findOne({ name: tenantName });
-        if (!tenant?._id) {
-            throw new Error('Tenant not found');
-        }
-
-        const filter: Filter<UserDoc> = { tenantId: tenant._id };
+        const filter: Filter<UserDoc> = {
+            tenantId: tenantObjectId,
+            isAdmin: { $ne: true },
+        };
 
         if (!input.applyToAll) {
             for (const id of input.userIds) {

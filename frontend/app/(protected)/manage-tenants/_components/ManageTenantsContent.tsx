@@ -5,6 +5,7 @@ import { TenantCard } from './TenantCard';
 import { CreateTenantCard } from './CreateTenantCard';
 import { CreateTenantDialog } from './CreateTenantDialog';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
+import { SwitchTenantConfirmDialog } from './SwitchTenantConfirmDialog';
 import { deleteTenant, getTenantDeletePreview } from '@/app/actions/tenant-actions';
 import type { Tenant } from '@aixellabs/backend/db/types';
 import { usePage } from '@/contexts/PageStore';
@@ -12,10 +13,11 @@ import { toast } from 'sonner';
 import type { UseManageTenantsPageReturn } from '@/app/(protected)/manage-tenants/_hooks/use-manage-tenants-page';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
-import { MANAGE_TENANTS_PREFIX } from '@/config/app-config';
+import { MANAGE_TENANTS_PREFIX, MANAGE_TENANTS_ROUTE } from '@/config/app-config';
+import { getTenantHostPathUrl } from '@/helpers/get-tenant-masked-url';
 
 export function ManageTenantsContent() {
-    const { isCreateDialogOpen, setIsCreateDialogOpen, tenants, editingTenant, setEditingTenant } =
+    const { isCreateDialogOpen, setIsCreateDialogOpen, tenants, sessionTenantName, editingTenant, setEditingTenant } =
         usePage<UseManageTenantsPageReturn>();
     const router = useRouter();
 
@@ -28,6 +30,7 @@ export function ManageTenantsContent() {
     const [deleteUserCount, setDeleteUserCount] = useState<number | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [switchTarget, setSwitchTarget] = useState<{ tenant: Tenant; path: string } | null>(null);
 
     const filteredTenants = useMemo(() => {
         const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -36,15 +39,35 @@ export function ManageTenantsContent() {
         return tenants.filter((tenant) => tenant.name.toLowerCase().includes(normalizedQuery));
     }, [searchQuery, tenants]);
 
+    const isSessionTenant = (tenant: Tenant) => tenant.name === sessionTenantName;
+
+    const promptSwitch = (tenant: Tenant, path: string) => {
+        setSwitchTarget({ tenant, path });
+    };
+
     const handleTenantClick = (tenant: Tenant) => {
-        router.push(`${MANAGE_TENANTS_PREFIX}${tenant.name}`);
+        const path = `${MANAGE_TENANTS_PREFIX}${tenant.name}`;
+        if (isSessionTenant(tenant)) {
+            router.push(path);
+            return;
+        }
+        promptSwitch(tenant, path);
     };
 
     const handleEditTenant = (tenant: Tenant) => {
-        setEditingTenant(tenant);
+        if (isSessionTenant(tenant)) {
+            setEditingTenant(tenant);
+            return;
+        }
+        promptSwitch(tenant, MANAGE_TENANTS_ROUTE);
     };
 
     const handleDeleteClick = async (tenant: Tenant) => {
+        if (!isSessionTenant(tenant)) {
+            promptSwitch(tenant, MANAGE_TENANTS_ROUTE);
+            return;
+        }
+
         const preview = await getTenantDeletePreview(tenant._id as string);
         if (!preview.success || !preview.data) {
             toast.error(preview.error ?? 'Failed to load tenant delete preview');
@@ -135,6 +158,19 @@ export function ManageTenantsContent() {
                 userCount={deleteUserCount}
                 onConfirm={handleConfirmDelete}
                 isDeleting={isDeleting}
+            />
+
+            <SwitchTenantConfirmDialog
+                open={switchTarget != null}
+                onOpenChange={(open) => {
+                    if (!open) setSwitchTarget(null);
+                }}
+                targetTenantName={switchTarget?.tenant.name ?? ''}
+                targetUrl={
+                    switchTarget
+                        ? getTenantHostPathUrl(switchTarget.tenant.name, switchTarget.path)
+                        : ''
+                }
             />
         </>
     );

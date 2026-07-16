@@ -92,7 +92,8 @@ export function BulkModuleAccessDialog({
                             : `Update ${affectedCount} selected user${affectedCount === 1 ? '' : 's'}`}
                     </DialogTitle>
                     <DialogDescription>
-                        This will overwrite each user&apos;s current module access with the template below.
+                        This will overwrite each non-admin user&apos;s current module access with the template below.
+                        Admins are skipped.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">

@@ -1,43 +1,27 @@
 import { type ModuleAccess, Modules } from '@aixellabs/backend/db/types';
 import { SubModuleUrls, ALWAYS_ALLOWED_PATHS, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
-import { sidebarConfig, SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS } from '@/config/sidebar.config';
+import { SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS } from '@/config/sidebar.config';
+import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 
 /**
- * Generate sidebar config based on user's module access
- * If user is admin or has no moduleAccess defined, return full config
+ * Build sidebar nav from a ModuleAccess map (shared by admin full-access and non-admin grants).
  */
-export function generateSidebarConfig(isAdmin: boolean, moduleAccess?: ModuleAccess): SidebarConfig {
-    // Admins get full access
-    if (isAdmin) {
-        return getFullSidebarConfig();
-    }
-
-    // If no module access defined, return empty config (no access)
-    if (!moduleAccess) {
-        return { navMain: [] };
-    }
-
+function buildSidebarFromModuleAccess(moduleAccess: ModuleAccess): SidebarConfig {
     const navMain: SidebarNavItem[] = [];
 
-    // Process each module
     // eslint-disable-next-line @next/next/no-assign-module-variable
     for (const module of Object.values(Modules)) {
         const subModules = moduleAccess[module];
-
-        // Skip if module has no submodules enabled
         if (!subModules || subModules.length === 0) {
             continue;
         }
 
-        // Build submodule items
-        const items = subModules.map((subModule) => ({
-            title: subModule,
-            url: SubModuleUrls[subModule],
-        }));
-
         navMain.push({
             title: module,
-            items,
+            items: subModules.map((subModule) => ({
+                title: subModule,
+                url: SubModuleUrls[subModule],
+            })),
         });
     }
 
@@ -45,10 +29,20 @@ export function generateSidebarConfig(isAdmin: boolean, moduleAccess?: ModuleAcc
 }
 
 /**
- * Get full sidebar config with all modules and submodules
+ * Sidebar + path ACL from module access.
+ * Admins ignore stored `moduleAccess` and use {@link getDefaultModuleAccess} (SSOT for “all modules”).
+ * Non-admins with missing/empty map get no module nav.
  */
-function getFullSidebarConfig(): SidebarConfig {
-    return sidebarConfig;
+export function generateSidebarConfig(isAdmin: boolean, moduleAccess?: ModuleAccess): SidebarConfig {
+    if (isAdmin) {
+        return buildSidebarFromModuleAccess(getDefaultModuleAccess());
+    }
+
+    if (!moduleAccess) {
+        return { navMain: [] };
+    }
+
+    return buildSidebarFromModuleAccess(moduleAccess);
 }
 
 /**
@@ -69,7 +63,7 @@ export function getAccessiblePaths(isAdmin: boolean, moduleAccess?: ModuleAccess
 
 /**
  * Check if pathname is accessible (reuses sidebar config logic).
- * Admins bypass; always-allowed paths pass; module paths checked via getAccessiblePaths.
+ * Admins get paths from getDefaultModuleAccess(); always-allowed + admin-only paths still apply.
  */
 function isAdminOnlyPathAccessible(normalized: string, isAdmin: boolean): boolean {
     if (!isAdmin) return false;
@@ -92,7 +86,6 @@ export function isPathAccessible(pathname: string, isAdmin: boolean, moduleAcces
     const allowedPaths = getAccessiblePaths(isAdmin, moduleAccess);
     if (allowedPaths.has(normalized)) return true;
 
-    // Allow nested routes under an accessible path (e.g. /lead-generation/google-maps/...)
     for (const allowed of allowedPaths) {
         if (normalized === allowed || normalized.startsWith(`${allowed}/`)) {
             return true;

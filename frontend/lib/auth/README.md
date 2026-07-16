@@ -1,6 +1,6 @@
 # Auth: Firebase ↔ Mongo
 
-SSOT for humans and AI agents. Policies are enforced in `frontend/server/auth/policy.ts`.
+SSOT for humans and AI agents. Policies are enforced in `frontend/server/auth/policy.ts` and admin/tenant scope in `frontend/server/auth/admin-guards.ts`.
 
 ## Mental model
 
@@ -20,13 +20,29 @@ SSOT for humans and AI agents. Policies are enforced in `frontend/server/auth/po
 
 Admin is granted only via Mongo/console or another admin — never auto on first signup.
 
+## Admin powers (current host membership)
+
+When `isAdmin` on the **session tenant**:
+
+- Full module access for sidebar/routes via `getDefaultModuleAccess()` (SSOT) — stored `moduleAccess` is ignored and kept as `{}`
+- Credits exempt (no credits field when editing an admin user)
+- `/manage-tenants` + tenant switcher
+- Sensitive user/tenant reads and mutations (**scoped to that session tenant only**)
+
+**Tenant-scoped mutations:** an admin signed into tenant A cannot update/delete users or the tenant document for tenant B. Switch host (subdomain) first. Listing all tenants for navigation (`getAllTenants`) remains allowed for admins.
+
+**Demotion on A only:** set `isAdmin: false` and `moduleAccess = tenant.defaultModuleAccess` on A; leave other memberships unchanged (may stay admin on B). Same Firebase UID — no extra accounts.
+
+**Bulk module update:** skips admins (UI + server).
+
 ## Ownership
 
 | Path | Role |
 | --- | --- |
-| `frontend/lib/auth/` | Client-safe helpers: constants, types, schema, Firebase error copy, cookie option builders. **No Mongo / Admin writes.** |
-| `frontend/server/auth/` | Policy, Firebase Admin, Mongo membership, session read, create-session orchestration |
+| `lib/auth/` | Client-safe helpers: constants, types, schema, Firebase error copy, cookie option builders. **No Mongo / Admin writes.** |
+| `server/auth/` | Policy, Firebase Admin, Mongo membership, session read, create-session orchestration, admin/tenant guards |
 | `app/actions/auth-actions.ts` / `app/api/auth/session` | Thin entrypoints (cookies, redirect) |
+| `app/actions/user-actions.ts` / `tenant-actions.ts` | Admin-gated, session-tenant-scoped CRUD |
 
 ## Login flow
 
@@ -45,12 +61,17 @@ LoginForm (Google → phone if needed)
 Find membership (uid, thisTenant)
   → found → update profile
   → missing → list memberships for uid
-       → none → create (isAdmin: false)
-       → any isAdmin → create (isAdmin: true)
+       → none → create (isAdmin: false, moduleAccess: tenant.defaultModuleAccess)
+       → any isAdmin → create (isAdmin: true, moduleAccess: {})
        → only non-admin elsewhere → deny WRONG_TENANT
 ```
 
 Session never falls back to another tenant’s membership. New tenant host requires sign-in once (phone already linked → skip OTP).
+
+## Hard delete
+
+- **User:** membership + that user’s `user_leads` + `lead_lists`; Firebase Auth when no memberships remain.
+- **Tenant:** cascade users + lead lists/links; Firebase Auth for UIDs with no remaining memberships.
 
 ## Indexes
 
@@ -99,6 +120,7 @@ Session never falls back to another tenant’s membership. New tenant host requi
 | `lib/auth/firebase-errors.ts` | Firebase code → user message |
 | `lib/auth/login-schema.ts` | Zod phone/OTP |
 | `server/auth/policy.ts` | Pure allow/deny |
+| `server/auth/admin-guards.ts` | Admin + session-tenant scope helpers |
 | `server/auth/membership/get-or-create.ts` | Mongo path |
 | `server/auth/create-session.ts` | Orchestration |
 | `server/auth/session/get-app-session.ts` | Cookie → `AppSession` |

@@ -6,17 +6,16 @@ import { MongoCollections, MongoObjectId, getCollection } from '@aixellabs/backe
 import { parseCreditsInput } from '@/helpers/credits';
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { assertValidObjectId, runAuthenticatedAction, runPublicAction } from '@/helpers/server-action-helpers';
-import { getAppSession } from '@/server/auth';
-
-async function assertCallerIsAdmin(): Promise<void> {
-    const session = await getAppSession();
-    if (!session?.user?.isAdmin) {
-        throw new Error('Unauthorized: admin access required');
-    }
-}
+import {
+    assertCallerIsAdmin,
+    assertTenantIsSessionTenant,
+    requireAdminSessionContext,
+} from '@/server/auth';
+import { getFirebaseAdminAuth } from '@/lib/firebase/admin';
 
 export const getAllTenants = async (): Promise<ALApiResponse<Tenant[]>> =>
     runAuthenticatedAction(async function getAllTenants() {
+        await assertCallerIsAdmin();
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
         const tenants = await tenantsCollection.find({}).toArray();
         return tenants.map(mapMongoDocToClient);
@@ -41,6 +40,7 @@ export const getTenantByNamePublic = async (name: string): Promise<ALApiResponse
 
 export const getTenantByName = async (name: string): Promise<ALApiResponse<Tenant | null>> =>
     runAuthenticatedAction(async function getTenantByName() {
+        await assertCallerIsAdmin();
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
         const tenant = await tenantsCollection.findOne({ name });
         return tenant ? mapMongoDocToClient(tenant) : null;
@@ -85,8 +85,14 @@ export const createTenant = async (tenant: Tenant): Promise<ALApiResponse<Tenant
 
 export const updateTenant = async (tenant: Tenant): Promise<ALApiResponse<Tenant>> =>
     runAuthenticatedAction(async function updateTenant() {
-        await assertCallerIsAdmin();
+        const ctx = await requireAdminSessionContext();
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
+
+        const existing = await tenantsCollection.findOne({ _id: new MongoObjectId(tenant._id) });
+        if (!existing) {
+            throw new Error('Tenant not found');
+        }
+        assertTenantIsSessionTenant(existing, ctx);
 
         const updateFields: Partial<TenantDoc> = {
             name: tenant.name,
@@ -117,15 +123,16 @@ export type TenantDeletePreview = {
 /** Count users that would be removed if this tenant is deleted. */
 export const getTenantDeletePreview = async (id: string): Promise<ALApiResponse<TenantDeletePreview>> =>
     runAuthenticatedAction(async function getTenantDeletePreview() {
-        await assertCallerIsAdmin();
+        const ctx = await requireAdminSessionContext();
         assertValidObjectId(id, 'Tenant ID');
 
         const tenantObjectId = new MongoObjectId(id);
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
-        const tenant = await tenantsCollection.findOne({ _id: tenantObjectId }, { projection: { _id: 1 } });
+        const tenant = await tenantsCollection.findOne({ _id: tenantObjectId });
         if (!tenant) {
             throw new Error('Tenant not found');
         }
+        assertTenantIsSessionTenant(tenant, ctx);
 
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
         const userCount = await usersCollection.countDocuments({ tenantId: tenantObjectId });
@@ -139,13 +146,12 @@ export type DeleteTenantResult = {
 };
 
 /**
- * Deletes a tenant and cascades to its users and user-owned lead data.
- * Shared `leads` documents are kept. Firebase Auth accounts are not deleted
- * (the same identity may join another tenant later).
+ * Deletes the session tenant and cascades to its users and user-owned lead data.
+ * Shared `leads` documents are kept. Firebase Auth is deleted when no memberships remain.
  */
 export const deleteTenant = async (id: string): Promise<ALApiResponse<DeleteTenantResult>> =>
     runAuthenticatedAction(async function deleteTenant() {
-        await assertCallerIsAdmin();
+        const ctx = await requireAdminSessionContext();
         assertValidObjectId(id, 'Tenant ID');
 
         const tenantObjectId = new MongoObjectId(id);
@@ -154,13 +160,19 @@ export const deleteTenant = async (id: string): Promise<ALApiResponse<DeleteTena
         const leadListsCollection = await getCollection<UserLeadListDoc>(MongoCollections.LEAD_LISTS);
         const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
 
-        const tenant = await tenantsCollection.findOne({ _id: tenantObjectId }, { projection: { _id: 1 } });
+        const tenant = await tenantsCollection.findOne({ _id: tenantObjectId });
         if (!tenant) {
             throw new Error('Tenant not found');
         }
+        assertTenantIsSessionTenant(tenant, ctx);
 
-        const users = await usersCollection.find({ tenantId: tenantObjectId }, { projection: { _id: 1 } }).toArray();
+        const users = await usersCollection
+            .find({ tenantId: tenantObjectId }, { projection: { _id: 1, firebaseUid: 1 } })
+            .toArray();
         const userIds = users.map((user) => user._id).filter((userId): userId is MongoObjectId => Boolean(userId));
+        const firebaseUids = [
+            ...new Set(users.map((user) => user.firebaseUid).filter((uid): uid is string => Boolean(uid))),
+        ];
 
         let deletedUserLeads = 0;
         let deletedLeadLists = 0;
@@ -176,6 +188,18 @@ export const deleteTenant = async (id: string): Promise<ALApiResponse<DeleteTena
         const tenantResult = await tenantsCollection.deleteOne({ _id: tenantObjectId });
         if (tenantResult.deletedCount < 1) {
             throw new Error('Failed to delete tenant');
+        }
+
+        const auth = getFirebaseAdminAuth();
+        for (const firebaseUid of firebaseUids) {
+            const remaining = await usersCollection.countDocuments({ firebaseUid });
+            if (remaining === 0) {
+                try {
+                    await auth.deleteUser(firebaseUid);
+                } catch (error) {
+                    console.error('Failed to delete Firebase user after tenant delete:', error);
+                }
+            }
         }
 
         return {
