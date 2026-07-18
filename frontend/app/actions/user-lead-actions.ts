@@ -22,6 +22,7 @@ import { assertAndDebitCredits, getUserCreditsState } from '@/app/actions/credit
 import { createUserLeadList } from './user-lead-lists-actions';
 import { getAppSession } from '@/server/auth';
 import { hasSubModuleAccess } from '@/helpers/module-access-helpers';
+import { ensureUserLeadIndexes } from '@/server/leads/indexes';
 
 export type CreateUserLeadsResult = {
     leads: UserLead[];
@@ -99,6 +100,7 @@ export async function createUserLeads(
 
         const listId = new MongoObjectId(userLeadListResponse.data._id);
         const now = new Date();
+        await ensureUserLeadIndexes();
         const leadsCollection = await getCollection<LeadDoc>(MongoCollections.LEADS);
         const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
 
@@ -215,6 +217,7 @@ export const createUserLeadListFromLeadIds = async (input: {
         const leadOids = input.leadIds.map((id) => toObjectId(id, 'Lead ID'));
         const now = new Date();
 
+        await ensureUserLeadIndexes();
         const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
         const owned = await userLeadsCollection
             .find({ userId: uid, leadId: { $in: leadOids } })
