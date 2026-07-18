@@ -18,7 +18,6 @@ import {
     ZodSearchableMultiSelectField,
     ZodSelectField,
     ZodStringField,
-    ZodSwitchField,
 } from '@/components/common/zod-form-builder/ZodFieldComponents';
 import {
     GMAPS_MIN_RATING_SELECT_OPTIONS,
@@ -26,35 +25,49 @@ import {
     LINKEDIN_COMPANY_SIZE_OPTIONS,
     SHOW_LINKEDIN_FILTERS_UI,
     SOURCE_FILTER_OPTIONS,
+    TRI_STATE_FILTER_OPTIONS,
     type FilterSource,
     type GoogleMapsFilters,
     type InstagramFilters,
     type LinkedInFilters,
+    type TriStateFilter,
 } from '../../_utils/lead-filter-constants';
+import {
+    GMAPS_SORT_OPTIONS,
+    INSTAGRAM_SORT_OPTIONS,
+    LINKEDIN_SORT_OPTIONS,
+    SORT_BY_NONE,
+    defaultDirectionForSortBy,
+    sortDirectionOptions,
+    type GmapsSortBy,
+    type InstagramSortBy,
+    type LeadSortState,
+    type LinkedInSortBy,
+    type SortDirection,
+    type SourceSortConfig,
+} from '../../_utils/lead-sort-constants';
 import Image from 'next/image';
 
 // ─── Primitive filter widgets ───────────────────────────────────────────────
 
-function SwitchRow({
+function TriStateSelectRow({
     name,
     label,
-    description,
-    checked,
-    onCheckedChange,
+    value,
+    onValueChange,
 }: {
     name: string;
     label: string;
-    description?: string;
-    checked: boolean;
-    onCheckedChange: (v: boolean) => void;
+    value: TriStateFilter;
+    onValueChange: (v: TriStateFilter) => void;
 }) {
     return (
-        <ZodSwitchField
+        <ZodSelectField
             name={name}
             label={label}
-            description={description}
-            value={checked}
-            onChange={onCheckedChange}
+            options={TRI_STATE_FILTER_OPTIONS}
+            value={value}
+            onChange={(v) => onValueChange(v as TriStateFilter)}
         />
     );
 }
@@ -99,6 +112,48 @@ function RangeRow({
                 />
             </div>
         </FieldSet>
+    );
+}
+
+function SortRow<T extends string>({
+    namePrefix,
+    options,
+    value,
+    onChange,
+}: {
+    namePrefix: string;
+    options: { value: T | typeof SORT_BY_NONE; label: string }[];
+    value: SourceSortConfig<T>;
+    onChange: (next: SourceSortConfig<T>) => void;
+}) {
+    const active = value.by !== SORT_BY_NONE;
+
+    return (
+        <div className="flex flex-col gap-3">
+            <ZodSelectField
+                name={`${namePrefix}_sort_by`}
+                label="Sort by"
+                options={options}
+                value={value.by}
+                onChange={(v) => {
+                    const by = (v || SORT_BY_NONE) as T | typeof SORT_BY_NONE;
+                    onChange({
+                        by,
+                        direction:
+                            by === SORT_BY_NONE ? value.direction : defaultDirectionForSortBy(by),
+                    });
+                }}
+            />
+            {active ? (
+                <ZodSelectField
+                    name={`${namePrefix}_sort_dir`}
+                    label="Order"
+                    options={sortDirectionOptions(value.by)}
+                    value={value.direction}
+                    onChange={(v) => onChange({ ...value, direction: v as SortDirection })}
+                />
+            ) : null}
+        </div>
     );
 }
 
@@ -155,13 +210,23 @@ function SourceMultiSelect({
 
 function GoogleMapsSection({
     f,
+    sort,
     patch,
+    patchSort,
 }: {
     f: GoogleMapsFilters;
+    sort: SourceSortConfig<GmapsSortBy>;
     patch: (p: Partial<GoogleMapsFilters>) => void;
+    patchSort: (p: Partial<SourceSortConfig<GmapsSortBy>>) => void;
 }) {
     return (
         <FilterGroup title="Google Maps" imageSrc="/google-maps.svg">
+            <SortRow
+                namePrefix="filter_gmaps"
+                options={GMAPS_SORT_OPTIONS}
+                value={sort}
+                onChange={(next) => patchSort(next)}
+            />
             <ZodSelectField
                 name="filter_gmaps_min_rating"
                 label="Minimum rating"
@@ -184,17 +249,17 @@ function GoogleMapsSection({
                 value={f.categoryContains}
                 onChange={(v) => patch({ categoryContains: v })}
             />
-            <SwitchRow
+            <TriStateSelectRow
                 name="filter_gmaps_require_phone"
                 label="Has phone number"
-                checked={f.requirePhone}
-                onCheckedChange={(v) => patch({ requirePhone: v })}
+                value={f.requirePhone}
+                onValueChange={(v) => patch({ requirePhone: v })}
             />
-            <SwitchRow
+            <TriStateSelectRow
                 name="filter_gmaps_require_website"
                 label="Has website"
-                checked={f.requireWebsite}
-                onCheckedChange={(v) => patch({ requireWebsite: v })}
+                value={f.requireWebsite}
+                onValueChange={(v) => patch({ requireWebsite: v })}
             />
         </FilterGroup>
     );
@@ -202,13 +267,23 @@ function GoogleMapsSection({
 
 function InstagramSection({
     f,
+    sort,
     patch,
+    patchSort,
 }: {
     f: InstagramFilters;
+    sort: SourceSortConfig<InstagramSortBy>;
     patch: (p: Partial<InstagramFilters>) => void;
+    patchSort: (p: Partial<SourceSortConfig<InstagramSortBy>>) => void;
 }) {
     return (
         <FilterGroup title="Instagram" imageSrc="/instagram-logo.svg">
+            <SortRow
+                namePrefix="filter_ig"
+                options={INSTAGRAM_SORT_OPTIONS}
+                value={sort}
+                onChange={(next) => patchSort(next)}
+            />
             <ZodSelectField
                 name="filter_ig_account_type"
                 label="Account type"
@@ -240,23 +315,23 @@ function InstagramSection({
                 onMinChange={(v) => patch({ minPosts: v })}
                 onMaxChange={(v) => patch({ maxPosts: v })}
             />
-            <SwitchRow
+            <TriStateSelectRow
                 name="filter_ig_require_email"
                 label="Has business email"
-                checked={f.requireEmail}
-                onCheckedChange={(v) => patch({ requireEmail: v })}
+                value={f.requireEmail}
+                onValueChange={(v) => patch({ requireEmail: v })}
             />
-            <SwitchRow
+            <TriStateSelectRow
                 name="filter_ig_require_phone"
                 label="Has business phone"
-                checked={f.requirePhone}
-                onCheckedChange={(v) => patch({ requirePhone: v })}
+                value={f.requirePhone}
+                onValueChange={(v) => patch({ requirePhone: v })}
             />
-            <SwitchRow
+            <TriStateSelectRow
                 name="filter_ig_require_website"
                 label="Has website"
-                checked={f.requireWebsite}
-                onCheckedChange={(v) => patch({ requireWebsite: v })}
+                value={f.requireWebsite}
+                onValueChange={(v) => patch({ requireWebsite: v })}
             />
         </FilterGroup>
     );
@@ -264,13 +339,23 @@ function InstagramSection({
 
 function LinkedInSection({
     f,
+    sort,
     patch,
+    patchSort,
 }: {
     f: LinkedInFilters;
+    sort: SourceSortConfig<LinkedInSortBy>;
     patch: (p: Partial<LinkedInFilters>) => void;
+    patchSort: (p: Partial<SourceSortConfig<LinkedInSortBy>>) => void;
 }) {
     return (
         <FilterGroup title="LinkedIn" imageSrc="/linkedin-logo-svg.png">
+            <SortRow
+                namePrefix="filter_li"
+                options={LINKEDIN_SORT_OPTIONS}
+                value={sort}
+                onChange={(next) => patchSort(next)}
+            />
             <ZodStringField
                 name="filter_li_industry_contains"
                 label="Industry"
@@ -318,17 +403,17 @@ function LinkedInSection({
                     patch({ minFundingRounds: Number.isFinite(n) ? n : undefined })
                 }
             />
-            <SwitchRow
+            <TriStateSelectRow
                 name="filter_li_require_hiring"
                 label="Actively hiring"
-                checked={f.requireHiring}
-                onCheckedChange={(v) => patch({ requireHiring: v })}
+                value={f.requireHiring}
+                onValueChange={(v) => patch({ requireHiring: v })}
             />
-            <SwitchRow
+            <TriStateSelectRow
                 name="filter_li_require_website"
                 label="Has website"
-                checked={f.requireWebsite}
-                onCheckedChange={(v) => patch({ requireWebsite: v })}
+                value={f.requireWebsite}
+                onValueChange={(v) => patch({ requireWebsite: v })}
             />
         </FilterGroup>
     );
@@ -342,11 +427,17 @@ type FilterPanelShape = {
         googleMaps: GoogleMapsFilters;
         instagram: InstagramFilters;
         linkedin: LinkedInFilters;
+        sort: LeadSortState;
     };
     setSources: (sources: FilterSource[]) => void;
     patchGoogleMaps: (patch: Partial<GoogleMapsFilters>) => void;
     patchInstagram: (patch: Partial<InstagramFilters>) => void;
     patchLinkedIn: (patch: Partial<LinkedInFilters>) => void;
+    patchSort: (patch: {
+        googleMaps?: Partial<SourceSortConfig<GmapsSortBy>>;
+        instagram?: Partial<SourceSortConfig<InstagramSortBy>>;
+        linkedin?: Partial<SourceSortConfig<LinkedInSortBy>>;
+    }) => void;
     resetFilters: () => void;
 };
 
@@ -357,9 +448,16 @@ type Props = {
 };
 
 export const LeadsFilterSheet = ({ open, onOpenChange, filterPanel }: Props) => {
-    const { filters, setSources, patchGoogleMaps, patchInstagram, patchLinkedIn, resetFilters } =
-        filterPanel;
-    const { sources, googleMaps, instagram, linkedin } = filters;
+    const {
+        filters,
+        setSources,
+        patchGoogleMaps,
+        patchInstagram,
+        patchLinkedIn,
+        patchSort,
+        resetFilters,
+    } = filterPanel;
+    const { sources, googleMaps, instagram, linkedin, sort } = filters;
 
     const displayedSources = SHOW_LINKEDIN_FILTERS_UI
         ? sources
@@ -388,19 +486,34 @@ export const LeadsFilterSheet = ({ open, onOpenChange, filterPanel }: Props) => 
                 <div className="flex-1 overflow-y-auto px-4 py-5">
                     <div className="flex flex-col gap-6">
                         {showGoogleMaps ? (
-                            <GoogleMapsSection f={googleMaps} patch={patchGoogleMaps} />
+                            <GoogleMapsSection
+                                f={googleMaps}
+                                sort={sort.googleMaps}
+                                patch={patchGoogleMaps}
+                                patchSort={(p) => patchSort({ googleMaps: p })}
+                            />
                         ) : null}
 
                         {showGoogleMaps && showInstagram ? <Separator /> : null}
 
                         {showInstagram ? (
-                            <InstagramSection f={instagram} patch={patchInstagram} />
+                            <InstagramSection
+                                f={instagram}
+                                sort={sort.instagram}
+                                patch={patchInstagram}
+                                patchSort={(p) => patchSort({ instagram: p })}
+                            />
                         ) : null}
 
                         {(showGoogleMaps || showInstagram) && showLinkedIn ? <Separator /> : null}
 
                         {showLinkedIn ? (
-                            <LinkedInSection f={linkedin} patch={patchLinkedIn} />
+                            <LinkedInSection
+                                f={linkedin}
+                                sort={sort.linkedin}
+                                patch={patchLinkedIn}
+                                patchSort={(p) => patchSort({ linkedin: p })}
+                            />
                         ) : null}
                     </div>
                 </div>

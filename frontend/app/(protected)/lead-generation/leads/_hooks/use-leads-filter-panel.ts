@@ -1,7 +1,6 @@
 'use client';
 
 import { LeadSource, type Lead } from '@aixellabs/backend/db/types';
-import { matchGmapsPlace, toGmapsPlace } from '@aixellabs/backend/gmaps/filters';
 import useLocalStorageState from 'use-local-storage-state';
 import { useCallback, useMemo } from 'react';
 import { generateLocalStorageKey } from '@/helpers/generate-local-storage-key';
@@ -14,7 +13,8 @@ import {
     type LeadFilterState,
     type LinkedInFilters,
 } from '../_utils/lead-filter-constants';
-import { matchInstagram, matchLinkedIn } from '../_utils/lead-filter-matchers';
+import { matchGoogleMaps, matchInstagram, matchLinkedIn } from '../_utils/lead-filter-matchers';
+import type { LeadSortState } from '../_utils/lead-sort-constants';
 
 export function useLeadsFilterPanel() {
     const [rawFilters, setFilters] = useLocalStorageState<LeadFilterState>(
@@ -40,6 +40,23 @@ export function useLeadsFilterPanel() {
     const patchLinkedIn = (patch: Partial<LinkedInFilters>) =>
         setFilters((prev) => ({ ...prev, linkedin: { ...prev.linkedin, ...patch } }));
 
+    const patchSort = (patch: {
+        googleMaps?: Partial<LeadSortState['googleMaps']>;
+        instagram?: Partial<LeadSortState['instagram']>;
+        linkedin?: Partial<LeadSortState['linkedin']>;
+    }) =>
+        setFilters((prev) => {
+            const sort = normalizeLeadFilterState(prev).sort;
+            return {
+                ...prev,
+                sort: {
+                    googleMaps: { ...sort.googleMaps, ...patch.googleMaps },
+                    instagram: { ...sort.instagram, ...patch.instagram },
+                    linkedin: { ...sort.linkedin, ...patch.linkedin },
+                },
+            };
+        });
+
     // ─── Match function ─────────────────────────────────────────────────────
 
     const matchesLead = useCallback(
@@ -50,7 +67,7 @@ export function useLeadsFilterPanel() {
 
             switch (lead.source) {
                 case LeadSource.GOOGLE_MAPS:
-                    return matchGmapsPlace(toGmapsPlace(lead.data), googleMaps);
+                    return matchGoogleMaps(lead.data, googleMaps);
                 case LeadSource.INSTAGRAM:
                     return matchInstagram(lead.data, instagram);
                 case LeadSource.LINKEDIN:
@@ -77,6 +94,7 @@ export function useLeadsFilterPanel() {
         patchGoogleMaps,
         patchInstagram,
         patchLinkedIn,
+        patchSort,
         matchesLead,
         filtersActive,
         resetFilters,
