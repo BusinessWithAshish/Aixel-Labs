@@ -22,7 +22,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuGroup,
-    DropdownMenuItem,
+    DropdownMenuItems,
     DropdownMenuPortal,
     DropdownMenuSub,
     DropdownMenuSubContent,
@@ -325,41 +325,53 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
 
                 <DropdownMenuContent align="end" side="bottom">
                     <DropdownMenuGroup>
-                        <DropdownMenuItem
-                            className="text-primary"
-                            disabled={busy}
-                            onSelect={() => openSaveDialog('save-only')}
-                        >
-                            <BookmarkPlusIcon />
-                            Save only
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            className="text-destructive/50"
-                            disabled={busy || !loadedPresetName}
-                            onSelect={() => runForm()}
-                        >
-                            <PlayIcon />
-                            Run without saving
-                        </DropdownMenuItem>
+                        <DropdownMenuItems
+                            options={[
+                                {
+                                    key: 'save-only',
+                                    label: 'Save only',
+                                    icon: BookmarkPlusIcon,
+                                    variant: 'primary',
+                                    disabled: busy,
+                                    onSelect: () => openSaveDialog('save-only'),
+                                },
+                                {
+                                    key: 'run-without-saving',
+                                    label: 'Run without saving',
+                                    icon: PlayIcon,
+                                    variant: 'destructive',
+                                    className: 'opacity-50',
+                                    disabled: busy || !loadedPresetName,
+                                    onSelect: () => runForm(),
+                                },
+                            ]}
+                        />
                         <DropdownMenuSub>
                             <DropdownMenuSubTrigger disabled={busy}>
                                 Saved presets
                             </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
                                 <DropdownMenuSubContent>
-                                    {presetNames.length === 0 ? (
-                                        <DropdownMenuItem disabled>
-                                            <InboxIcon />
-                                            No saved presets
-                                        </DropdownMenuItem>
-                                    ) : (
-                                        presetNames.map((name) => (
-                                            <DropdownMenuItem key={name} disabled={busy} onSelect={() => loadPreset(name)}>
-                                                <BookmarkIcon />
-                                                {name}
-                                            </DropdownMenuItem>
-                                        ))
-                                    )}
+                                    <DropdownMenuItems
+                                        options={
+                                            presetNames.length === 0
+                                                ? [
+                                                      {
+                                                          key: 'empty',
+                                                          label: 'No saved presets',
+                                                          icon: InboxIcon,
+                                                          disabled: true,
+                                                      },
+                                                  ]
+                                                : presetNames.map((name) => ({
+                                                      key: name,
+                                                      label: name,
+                                                      icon: BookmarkIcon,
+                                                      disabled: busy,
+                                                      onSelect: () => loadPreset(name),
+                                                  }))
+                                        }
+                                    />
                                 </DropdownMenuSubContent>
                             </DropdownMenuPortal>
                         </DropdownMenuSub>

@@ -11,9 +11,9 @@ import {
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
+    DropdownMenuItems,
     DropdownMenuTrigger,
+    type DropdownMenuOption,
 } from "@/components/ui/dropdown-menu"
 import {
     SidebarGroup,
@@ -24,6 +24,13 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar"
+
+const PROJECT_MENU_OPTIONS: DropdownMenuOption[] = [
+    { key: "view", label: "View Project", icon: Folder },
+    { key: "share", label: "Share Project", icon: Forward },
+    { type: "separator", key: "sep" },
+    { key: "delete", label: "Delete Project", icon: Trash2, variant: "destructive" },
+]
 
 export function NavProjects({
     projects,
@@ -60,19 +67,7 @@ export function NavProjects({
                                 side={isMobile ? "bottom" : "right"}
                                 align={isMobile ? "end" : "start"}
                             >
-                                <DropdownMenuItem>
-                                    <Folder className="text-muted-foreground" />
-                                    <span>View Project</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                    <Forward className="text-muted-foreground" />
-                                    <span>Share Project</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem>
-                                    <Trash2 className="text-muted-foreground" />
-                                    <span>Delete Project</span>
-                                </DropdownMenuItem>
+                                <DropdownMenuItems options={PROJECT_MENU_OPTIONS} />
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </SidebarMenuItem>

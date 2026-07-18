@@ -13,8 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
+    DropdownMenuItems,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
@@ -98,25 +97,27 @@ export function NavUser({ user }: { user: SidebarUser }) {
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                                <DropdownMenuItem onClick={() => router.push('/account-settings')}>
-                                    <BadgeCheck />
-                                    Account
-                                </DropdownMenuItem>
-                                {/* <DropdownMenuItem>
-                                    <CreditCard />
-                                    Billing
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                    <Bell />
-                                    Notifications
-                                </DropdownMenuItem> */}
-                            </DropdownMenuGroup>
+                            <DropdownMenuItems
+                                options={[
+                                    {
+                                        key: 'account',
+                                        label: 'Account',
+                                        icon: BadgeCheck,
+                                        onSelect: () => router.push('/account-settings'),
+                                    },
+                                ]}
+                            />
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={handleLogoutClick}>
-                                <LogOut />
-                                Log out
-                            </DropdownMenuItem>
+                            <DropdownMenuItems
+                                options={[
+                                    {
+                                        key: 'logout',
+                                        label: 'Log out',
+                                        icon: LogOut,
+                                        onSelect: handleLogoutClick,
+                                    },
+                                ]}
+                            />
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </SidebarMenuItem>

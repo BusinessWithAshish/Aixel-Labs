@@ -6,11 +6,9 @@ import { useRouter } from 'next/navigation';
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
+    DropdownMenuItems,
     DropdownMenuTrigger,
+    type DropdownMenuOption,
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { APP_NAME, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
@@ -82,6 +80,49 @@ export function TenantSwitcher({
 
     const groupedTenants = groupTenantsByType(tenants);
 
+    const options: DropdownMenuOption[] = [
+        ...groupedTenants.flatMap((group, index) => {
+            const groupOptions: DropdownMenuOption[] = [];
+            if (index > 0) {
+                groupOptions.push({ type: 'separator', key: `sep-${group.key}` });
+            }
+            groupOptions.push({
+                type: 'label',
+                key: `label-${group.key}`,
+                label: group.label,
+                className: 'text-muted-foreground text-xs',
+            });
+            for (const tenant of group.tenants) {
+                const name = tenantDisplayName(tenant);
+                groupOptions.push({
+                    key: tenant._id,
+                    label: name,
+                    icon: <AppLogo src={tenant.app_logo_url} alt={name} />,
+                    className: 'gap-2 p-2',
+                    onSelect: () => {
+                        window.location.href =
+                            getTenantMaskedUrl(tenant) || DEFAULT_HOME_PAGE_ROUTE;
+                    },
+                });
+            }
+            return groupOptions;
+        }),
+        { type: 'separator', key: 'sep-manage' },
+        {
+            key: 'manage-tenants',
+            className: 'gap-2 p-2',
+            label: (
+                <>
+                    <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+                        <Plus className="size-4" />
+                    </div>
+                    <div className="text-muted-foreground font-medium">Manage Tenants</div>
+                </>
+            ),
+            onSelect: () => router.push('/manage-tenants'),
+        },
+    ];
+
     return (
         <SidebarMenu>
             <SidebarMenuItem>
@@ -104,41 +145,7 @@ export function TenantSwitcher({
                         side={isMobile ? 'bottom' : 'right'}
                         sideOffset={4}
                     >
-                        {groupedTenants.map((group, index) => (
-                            <DropdownMenuGroup key={group.key}>
-                                {index > 0 && <DropdownMenuSeparator />}
-                                <DropdownMenuLabel className="text-muted-foreground text-xs">
-                                    {group.label}
-                                </DropdownMenuLabel>
-                                {group.tenants.map((tenant) => {
-                                    const name = tenantDisplayName(tenant);
-                                    return (
-                                        <DropdownMenuItem
-                                            key={tenant._id}
-                                            className="gap-2 p-2"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                window.location.href =
-                                                    getTenantMaskedUrl(tenant) || DEFAULT_HOME_PAGE_ROUTE;
-                                            }}
-                                        >
-                                            <AppLogo src={tenant.app_logo_url} alt={name} />
-                                            {name}
-                                        </DropdownMenuItem>
-                                    );
-                                })}
-                            </DropdownMenuGroup>
-                        ))}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                            className="gap-2 p-2"
-                            onClick={() => router.push('/manage-tenants')}
-                        >
-                            <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
-                                <Plus className="size-4" />
-                            </div>
-                            <div className="text-muted-foreground font-medium">Manage Tenants</div>
-                        </DropdownMenuItem>
+                        <DropdownMenuItems options={options} />
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>
