@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
+import { type LeadData, LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
 import {
     createUserLeads,
     type CreateUserLeadsResult,
@@ -12,6 +12,8 @@ import useLocalStorageState from 'use-local-storage-state';
 import { generateLocalStorageKey } from '@/helpers/generate-local-storage-key';
 import { showCreditsExhaustedDialog } from '@/components/common/credits/CreditsExhaustedDialog';
 import { setCreditsBadgeCache } from '@/components/common/credits/CreditsBadge';
+import appApiClient, { isAbortOrCancel } from '@/lib/app-api-client';
+import { LEAD_GEN_SCRAPE_API_ROUTE } from '@/config/app-config';
 
 const LEADS_OVERVIEW_PATH = '/lead-generation/leads';
 
@@ -65,42 +67,9 @@ export type SubmitLeadGenScraperFormOptions<TRequest> = {
     onSuccess?: (result: ALApiResponse<CreateUserLeadsResult>) => void;
 };
 
-function isAbortError(error: unknown): boolean {
-    return (
-        (error instanceof DOMException && error.name === 'AbortError') ||
-        (error instanceof Error && error.name === 'AbortError')
-    );
-}
-
-/** Rejects as soon as `signal` aborts so the UI can unblock while the server action may still finish. */
-function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-    if (signal.aborted) {
-        return Promise.reject(new DOMException('Aborted', 'AbortError'));
-    }
-    return new Promise<T>((resolve, reject) => {
-        const onAbort = () => {
-            reject(new DOMException('Aborted', 'AbortError'));
-        };
-        signal.addEventListener('abort', onAbort, { once: true });
-        promise.then(
-            (value) => {
-                signal.removeEventListener('abort', onAbort);
-                if (signal.aborted) {
-                    reject(new DOMException('Aborted', 'AbortError'));
-                    return;
-                }
-                resolve(value);
-            },
-            (err) => {
-                signal.removeEventListener('abort', onAbort);
-                reject(err);
-            },
-        );
-    });
-}
-
 /**
  * Lead-gen scraper forms: in-memory loading state scoped by submodule hook instance.
+ * Scrape uses `LEAD_GEN_SCRAPE_API_ROUTE` (abortable); debit/save uses `createUserLeads` only after scrape succeeds.
  */
 export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
     const key = generateLocalStorageKey('lead-gen-scraper-loading', subModule);
@@ -147,10 +116,27 @@ export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
 
             setLoading(true);
             try {
-                const result = await abortable(
-                    createUserLeads(subModule, body, { listName }),
-                    controller.signal,
+                const scrapeResult = await appApiClient.post<LeadData[]>(
+                    LEAD_GEN_SCRAPE_API_ROUTE,
+                    { subModule, body },
+                    { signal: controller.signal },
                 );
+
+                if (controller.signal.aborted) {
+                    return false;
+                }
+
+                if (!scrapeResult.success || !scrapeResult.data?.length) {
+                    toast.error(scrapeResult.error ?? errorMessage ?? 'Failed to generate leads');
+                    return false;
+                }
+
+                // Skip debit/save if the user aborted after scrape finished.
+                if (controller.signal.aborted) {
+                    return false;
+                }
+
+                const result = await createUserLeads(subModule, scrapeResult.data, { listName });
 
                 if (controller.signal.aborted) {
                     return false;
@@ -179,7 +165,7 @@ export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
 
                 return true;
             } catch (error) {
-                if (isAbortError(error) || controller.signal.aborted) {
+                if (isAbortOrCancel(error) || controller.signal.aborted) {
                     return false;
                 }
                 toast.error(error instanceof Error ? error.message : (errorMessage ?? 'Failed to generate leads'));

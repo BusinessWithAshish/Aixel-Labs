@@ -1,0 +1,50 @@
+---
+description: Lead generation — scrape, credits fairness, lists/memberships, abort, gaps
+globs: frontend/app/(protected)/lead-generation/**/*,frontend/hooks/use-lead-gen-scraper.ts,frontend/app/actions/user-lead-actions.ts,frontend/app/actions/user-lead-lists-actions.ts,frontend/helpers/lead-gen-api.ts,frontend/helpers/credits.ts,frontend/components/common/LeadFormWrappers.tsx,frontend/components/common/FormPresetScraperActions.tsx,frontend/app/api/lead-gen/scrape/route.ts,.cursor/skills/lead-generation-form-pages/**
+alwaysApply: false
+---
+
+# Lead generation
+
+Form playbook: `.cursor/skills/lead-generation-form-pages/SKILL.md`. Credits UI: `.cursor/rules/credits-system.mdc`. Auth/module gates: `.cursor/rules/auth-roles-users.mdc`.
+
+## Implemented scrapers (product)
+
+| FE route | Submodule | Backend |
+|----------|-----------|---------|
+| `google-maps` | Google Maps | `POST /gmaps/internal` |
+| `instagram-search` | Instagram Search | `POST /instagram` |
+| `linkedin` | LinkedIn | `POST /linkedin` |
+
+YouTube / other intelligence APIs are **not** lead-gen. Stub modules in `getDefaultModuleAccess` (Facebook, IG Advanced, Google Advanced) stay **Coming Soon** — do not remove from ACL.
+
+## Credits & fairness
+
+- Non-admins: debit via `assertAndDebitCredits`; truncate results to what balance allows; show exhausted modal when balance hits 0 after save. Admins: no debit, no cost/exhausted UI.
+- **Abort must not debit.** Scrape runs through `POST /api/lead-gen/scrape` with `request.signal` / client `AbortSignal`. Debit + Mongo save happen only in `createUserLeads` after the client receives leads. Do not put scrape inside the save server action.
+- Do not invent a parallel cost map — `helpers/credits.ts`.
+
+## Leads & lists data model
+
+- Canonical lead: `LEADS` upsert by `(source, sourceId)`.
+- User membership: `USER_LEADS` upsert by `(userId, leadId, listId)` — **same lead may exist on multiple lists** for one user (duplicates across lists). Do not `$set listId` to “move” on re-scrape.
+- Delete lead from a list: scope by `listId` (`deleteUserLeads(listId, leadIds)`). Do not delete memberships on other lists.
+- “Create list from filters”: **copy** selected leads into a new list (`createUserLeadListFromLeadIds`); do not move.
+- Empty list that exists: return `[]` and show `NoDataFound` — **not** `notFound()`. `notFound()` only when the list document is missing.
+
+## List delete UX
+
+- Copy is **permanent delete** (hard delete today). Soft-delete / 30-day retention = **future gap** — do not claim archive retention in UI.
+
+## Future gaps (stop & ask — do not silent-fix)
+
+- Express scraper routes: no end-user auth (secret / shared auth) — same stop-and-ask as auth domain
+- LinkedIn soft limit / people cards FE (partial BE)
+- Google Maps URLs mode if still unimplemented
+- Soft-delete + retention for lists
+
+## Form skill alignment
+
+- Outer page tabs: **Form + AI Chat only** (no Results tab).
+- Preset keys: `formPresetLocalStorageKey(module, segment?)` — not a `FORM_PRESET_STORAGE_KEYS` enum.
+- Use `LeadFormWrapper` + `creditModule` for billed scrapers.

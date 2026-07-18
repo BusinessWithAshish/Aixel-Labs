@@ -1,7 +1,13 @@
 'use server';
 
 import { Lead, LeadDoc, MongoCollections, MongoObjectId, UserLead, getCollection } from '@aixellabs/backend/db';
-import { LEAD_GENERATION_SUB_MODULES, Modules, UserLeadDoc, UserLeadListDoc } from '@aixellabs/backend/db';
+import {
+    type LeadData,
+    LEAD_GENERATION_SUB_MODULES,
+    Modules,
+    UserLeadDoc,
+    UserLeadListDoc,
+} from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import {
     assertRequiredTrimmedString,
@@ -10,7 +16,7 @@ import {
     runAuthenticatedAction,
     toObjectId,
 } from '@/helpers/server-action-helpers';
-import { buildLeadListNameFromPreset, generateLeads, getLeadSoruceFromSubModule } from '@/helpers/lead-gen-api';
+import { buildLeadListNameFromPreset, getLeadSoruceFromSubModule } from '@/helpers/lead-gen-api';
 import { computeLeadGenCreditCost, getCreditCostPerItem } from '@/helpers/credits';
 import { assertAndDebitCredits, getUserCreditsState } from '@/app/actions/credit-db';
 import { createUserLeadList } from './user-lead-lists-actions';
@@ -30,9 +36,10 @@ export type CreateUserLeadsOptions = {
     listName: string;
 };
 
-export async function createUserLeads<TRequest>(
+/** Debit + Mongo save for already-scraped leads. Scrape happens via `LEAD_GEN_SCRAPE_API_ROUTE`. */
+export async function createUserLeads(
     subModule: LEAD_GENERATION_SUB_MODULES,
-    body: TRequest,
+    scrapedLeads: LeadData[],
     options: CreateUserLeadsOptions,
 ): Promise<ALApiResponse<CreateUserLeadsResult>> {
     assertRequiredTrimmedString(options.listName, 'listName');
@@ -47,9 +54,7 @@ export async function createUserLeads<TRequest>(
 
         const { credits: availableCredits, exempt } = await getUserCreditsState(uid);
         if (!exempt) {
-            if (
-                !hasSubModuleAccess(session.user.moduleAccess, Modules.LEAD_GENERATION, subModule)
-            ) {
+            if (!hasSubModuleAccess(session.user.moduleAccess, Modules.LEAD_GENERATION, subModule)) {
                 throw new Error('Unauthorized: no access to this lead generation module');
             }
             if (availableCredits < 1) {
@@ -57,14 +62,12 @@ export async function createUserLeads<TRequest>(
             }
         }
 
-        const leadsResponse = await generateLeads({ subModule, body });
-
-        if (!leadsResponse.success || !leadsResponse.data?.length) {
-            throw new Error(leadsResponse.error ?? 'Failed to generate leads');
+        if (!scrapedLeads.length) {
+            throw new Error('Failed to generate leads');
         }
 
         const uniqueLeads = [
-            ...new Map(leadsResponse.data.filter((lead) => lead.id != null).map((lead) => [lead.id!, lead])).values(),
+            ...new Map(scrapedLeads.filter((lead) => lead.id != null).map((lead) => [lead.id!, lead])).values(),
         ];
         if (!uniqueLeads.length) {
             throw new Error('[CRITICAL] No leads to save');

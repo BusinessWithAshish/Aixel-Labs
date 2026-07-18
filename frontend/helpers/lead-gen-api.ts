@@ -33,23 +33,29 @@ export function buildLeadListNameFromPreset(presetName: string): string {
 export type GenerateLeadsProps<TRequest> = {
     subModule: LEAD_GENERATION_SUB_MODULES;
     body: TRequest;
+    signal?: AbortSignal;
 };
 
-const getLeads = <TRequest>(source: LEAD_GENERATION_SUB_MODULES, body: TRequest): Promise<ALApiResponse<LeadData[]>> => {
+const getLeads = <TRequest>(
+    source: LEAD_GENERATION_SUB_MODULES,
+    body: TRequest,
+    signal?: AbortSignal,
+): Promise<ALApiResponse<LeadData[]>> => {
+    const options = signal ? { signal } : undefined;
     switch (source) {
         case LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS:
-            return apiClient.post(API_ENDPOINTS.GMAPS.INTERNAL.full, body);
+            return apiClient.post(API_ENDPOINTS.GMAPS.INTERNAL.full, body, options);
         case LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH:
-            return apiClient.post(API_ENDPOINTS.INSTAGRAM.API.full, body);
+            return apiClient.post(API_ENDPOINTS.INSTAGRAM.API.full, body, options);
         case LEAD_GENERATION_SUB_MODULES.LINKEDIN:
-            return apiClient.post(API_ENDPOINTS.LINKEDIN.API.full, body);
+            return apiClient.post(API_ENDPOINTS.LINKEDIN.API.full, body, options);
         default:
             throw new Error('Method not implemented');
     }
 };
 
 export function generateLeads<TRequest>(options: GenerateLeadsProps<TRequest>): Promise<ALApiResponse<LeadData[]>> {
-    const { subModule, body } = options;
+    const { subModule, body, signal } = options;
 
-    return getLeads(subModule, body);
+    return getLeads(subModule, body, signal);
 }

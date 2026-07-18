@@ -48,6 +48,7 @@ export const TENANT_TYPE_OPTIONS = [
 export const DEFAULT_HOME_PAGE_ROUTE = '/';
 export const PATHNAME_HEADER_KEY = 'x-pathname';
 export const API_ROUTE_PREFIX = '/api';
+export const LEAD_GEN_SCRAPE_API_ROUTE = `${API_ROUTE_PREFIX}/lead-gen/scrape`;
 export const TENANT_API_ROUTE_PREFIX = '/tenant';
 export const SUBDOMAIN_PARAM_NAME = 'name';
 export const IFRAME_TENANTS_ROUTE_PREFIX = '/iframe';
