@@ -21,7 +21,12 @@ function buildFilteredListName(): string {
     return `Filtered leads ${weekday} ${time} ${now.getFullYear()}`;
 }
 
-export const useAllLeadsPage = (leads: Lead[]) => {
+export type AllLeadsPageData = {
+    listId: string;
+    leads: Lead[];
+};
+
+export const useAllLeadsPage = ({ listId, leads }: AllLeadsPageData) => {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
     const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -63,7 +68,7 @@ export const useAllLeadsPage = (leads: Lead[]) => {
 
         setIsDeleting(true);
         try {
-            const result = await deleteUserLeads(ids);
+            const result = await deleteUserLeads(listId, ids);
             if (result.success && result.data) {
                 toast.success(`${ids.length} lead(s) deleted successfully`);
                 setBulkDeleteOpen(false);
@@ -75,7 +80,7 @@ export const useAllLeadsPage = (leads: Lead[]) => {
         } finally {
             setIsDeleting(false);
         }
-    }, [selectedLeadIds, router]);
+    }, [selectedLeadIds, listId, router]);
 
     const createListFromSelection = useCallback(async () => {
         const ids = [...selectedLeadIds];
@@ -88,7 +93,7 @@ export const useAllLeadsPage = (leads: Lead[]) => {
                 toast.error(result.error ?? 'Failed to create list');
                 return;
             }
-            toast.success(`Created list with ${result.data.movedCount} lead(s)`);
+            toast.success(`Created list with ${result.data.copiedCount} lead(s)`);
             setSelectedLeadIds(new Set());
             router.push(`/lead-generation/leads/${result.data.listId}`);
         } finally {

@@ -100,11 +100,17 @@ export async function createUserLeads<TRequest>(
                 throw new Error('Failed to upsert lead');
             }
 
+            // Membership is per list: same lead may appear in multiple lists for one user.
             const userLeadDoc = await userLeadsCollection.findOneAndUpdate(
-                { userId: uid, leadId: leadDoc._id },
+                { userId: uid, leadId: leadDoc._id, listId },
                 {
-                    $set: { listId, updatedAt: now },
-                    $setOnInsert: { userId: uid, leadId: leadDoc._id, createdAt: now },
+                    $set: { updatedAt: now },
+                    $setOnInsert: {
+                        userId: uid,
+                        leadId: leadDoc._id,
+                        listId,
+                        createdAt: now,
+                    },
                 },
                 { upsert: true, returnDocument: 'after' },
             );
@@ -143,7 +149,7 @@ export const getUserLeadsForList = async (listId: string): Promise<ALApiResponse
         const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
         const userLeadDocs = await userLeadsCollection.find({ userId: uid, listId: lid }).toArray();
         if (!userLeadDocs.length) {
-            throw new Error('No leads found for list');
+            return [];
         }
 
         const leadIds = userLeadDocs.map((userLeadDoc) => userLeadDoc.leadId);
@@ -159,22 +165,33 @@ export const getUserLeadsForList = async (listId: string): Promise<ALApiResponse
     });
 };
 
-export const deleteUserLeads = async (leadIds: string[]): Promise<ALApiResponse<boolean>> =>
-    runAuthenticatedAction(async function deleteUserLeads(userId: string) {
+/** Removes lead memberships from one list only (other lists keep their copies). */
+export const deleteUserLeads = async (
+    listId: string,
+    leadIds: string[],
+): Promise<ALApiResponse<boolean>> => {
+    assertRequiredTrimmedString(listId, 'List ID');
+    assertValidObjectId(listId, 'List ID');
+
+    return runAuthenticatedAction(async function deleteUserLeads(userId: string) {
         const uid = requireUserObjectId(userId);
+        const lid = toObjectId(listId, 'List ID');
         const leadOids = leadIds.map((id) => toObjectId(id, 'Lead ID'));
         const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
         await userLeadsCollection.deleteMany({
             userId: uid,
+            listId: lid,
             leadId: { $in: leadOids },
         });
         return true;
     });
+};
 
+/** Copies selected leads into a new list (does not remove them from existing lists). */
 export const createUserLeadListFromLeadIds = async (input: {
     name: string;
     leadIds: string[];
-}): Promise<ALApiResponse<{ listId: string; movedCount: number }>> => {
+}): Promise<ALApiResponse<{ listId: string; copiedCount: number }>> => {
     const name = input.name?.trim() ?? '';
     if (!name) throw new Error('Name is required');
     if (!input.leadIds.length) throw new Error('Select at least one lead');
@@ -184,6 +201,17 @@ export const createUserLeadListFromLeadIds = async (input: {
         const leadOids = input.leadIds.map((id) => toObjectId(id, 'Lead ID'));
         const now = new Date();
 
+        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
+        const owned = await userLeadsCollection
+            .find({ userId: uid, leadId: { $in: leadOids } })
+            .project({ leadId: 1 })
+            .toArray();
+        const ownedLeadIdStrings = new Set(owned.map((doc) => doc.leadId.toString()));
+        const leadsToCopy = leadOids.filter((oid) => ownedLeadIdStrings.has(oid.toString()));
+        if (!leadsToCopy.length) {
+            throw new Error('No matching leads to copy');
+        }
+
         const listsCollection = await getCollection<UserLeadListDoc>(MongoCollections.LEAD_LISTS);
         const listInsert = await listsCollection.insertOne({
             userId: uid,
@@ -191,16 +219,31 @@ export const createUserLeadListFromLeadIds = async (input: {
             createdAt: now,
             updatedAt: now,
         });
+        const newListId = listInsert.insertedId;
 
-        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
-        const updateResult = await userLeadsCollection.updateMany(
-            { userId: uid, leadId: { $in: leadOids } },
-            { $set: { listId: listInsert.insertedId, updatedAt: now } },
-        );
+        let copiedCount = 0;
+        for (const leadId of leadsToCopy) {
+            const result = await userLeadsCollection.updateOne(
+                { userId: uid, leadId, listId: newListId },
+                {
+                    $set: { updatedAt: now },
+                    $setOnInsert: {
+                        userId: uid,
+                        leadId,
+                        listId: newListId,
+                        createdAt: now,
+                    },
+                },
+                { upsert: true },
+            );
+            if (result.upsertedCount > 0 || result.modifiedCount > 0) {
+                copiedCount += 1;
+            }
+        }
 
         return {
-            listId: listInsert.insertedId.toString(),
-            movedCount: updateResult.modifiedCount,
+            listId: newListId.toString(),
+            copiedCount,
         };
     });
 };

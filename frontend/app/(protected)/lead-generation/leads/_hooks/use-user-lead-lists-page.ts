@@ -156,7 +156,7 @@ export function useUserLeadListsPage(apiLeadLists: UserLeadList[]) {
 
     const requestDeleteFromMenu = useCallback(() => {
         if (lists.length === 0) {
-            toast.message('No lists to archive');
+            toast.message('No lists to delete');
             return;
         }
         if (selectedIds.size > 0) {
@@ -196,7 +196,7 @@ export function useUserLeadListsPage(apiLeadLists: UserLeadList[]) {
                     return next;
                 });
                 const n = removedIds.size;
-                toast.success(n === 1 ? 'List archived' : `${n} lists archived`);
+                toast.success(n === 1 ? 'List deleted' : `${n} lists deleted`);
             }
 
             if (failedMongoIds.length > 0) {

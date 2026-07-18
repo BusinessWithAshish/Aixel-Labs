@@ -11,22 +11,22 @@ async function LeadsListPage({ params }: { params: Promise<{ listId: string }> }
     const { listId } = await params;
 
     const userLeadListResponse = await getUserLeadListById(listId);
-    const userLeadsResponse = await getUserLeadsForList(listId);
-
-    if (!userLeadListResponse.success || !userLeadListResponse.data || !userLeadsResponse.success || !userLeadsResponse.data) {
+    if (!userLeadListResponse.success || !userLeadListResponse.data) {
         return notFound();
     }
 
-    const { list, leads } = {
-        list: userLeadListResponse.data,
-        leads: userLeadsResponse.data,
-    };
+    const userLeadsResponse = await getUserLeadsForList(listId);
+    if (!userLeadsResponse.success) {
+        return notFound();
+    }
 
+    const list = userLeadListResponse.data;
+    const leads = userLeadsResponse.data ?? [];
     const pageTitle = list.name ?? 'Leads';
 
     return (
         <PageLayout title={pageTitle}>
-            <PageProvider data={leads} usePageHook={useAllLeadsPage}>
+            <PageProvider data={{ listId, leads }} usePageHook={useAllLeadsPage}>
                 <AllUserLeads />
             </PageProvider>
         </PageLayout>

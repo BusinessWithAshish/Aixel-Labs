@@ -7,8 +7,8 @@ import { usePage } from '@/contexts/PageStore';
 import type { TUseUserLeadListsPageReturn } from '../_hooks/use-user-lead-lists-page';
 import { LeadListDialogShell } from './LeadListDialogShell';
 
-const ARCHIVE_POLICY_COPY =
-    'Lists are archived for 30 days. After 30 days they are permanently deleted automatically.';
+const DELETE_POLICY_COPY =
+    'This permanently deletes the list and its lead memberships. Soft-delete / retention is not available yet.';
 
 function AddLeadListDialog() {
     const {
@@ -109,7 +109,7 @@ function EditLeadListDialog() {
     );
 }
 
-function ArchiveLeadListsDialog() {
+function DeleteLeadListsDialog() {
     const {
         deleteDialogOpen,
         cancelDelete,
@@ -126,10 +126,10 @@ function ArchiveLeadListsDialog() {
         <DialogDescription className="space-y-2">
             <span className="block">
                 {isSelected
-                    ? `You selected ${count} list${count === 1 ? '' : 's'}. Those lists will be archived.`
-                    : `All ${count} list${count === 1 ? '' : 's'} in this view will be archived.`}
+                    ? `You selected ${count} list${count === 1 ? '' : 's'}. Those lists will be permanently deleted.`
+                    : `All ${count} list${count === 1 ? '' : 's'} in this view will be permanently deleted.`}
             </span>
-            <span className="block">{ARCHIVE_POLICY_COPY}</span>
+            <span className="block">{DELETE_POLICY_COPY}</span>
         </DialogDescription>
     );
 
@@ -142,7 +142,7 @@ function ArchiveLeadListsDialog() {
                     cancelDelete();
                 }
             }}
-            title={isSelected ? 'Archive selected lead lists?' : 'Archive all lead lists?'}
+            title={isSelected ? 'Permanently delete selected lead lists?' : 'Permanently delete all lead lists?'}
             description={description}
             footer={
                 <>
@@ -155,7 +155,7 @@ function ArchiveLeadListsDialog() {
                         disabled={deleteSubmitting}
                         onClick={() => void confirmDelete()}
                     >
-                        {deleteSubmitting ? 'Deleting…' : 'Archive'}
+                        {deleteSubmitting ? 'Deleting…' : 'Delete permanently'}
                     </Button>
                 </>
             }
@@ -168,7 +168,7 @@ export function LeadListDialogs() {
         <>
             <AddLeadListDialog />
             <EditLeadListDialog />
-            <ArchiveLeadListsDialog />
+            <DeleteLeadListsDialog />
         </>
     );
 }
