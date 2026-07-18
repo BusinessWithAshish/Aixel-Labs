@@ -162,6 +162,7 @@
   * {
     @apply border-border outline-ring/50;
     @apply transition-colors duration-300;
+    @apply selection:bg-primary selection:text-primary-foreground;
     scrollbar-width: thin;
     scrollbar-color: var(--primary) color-mix(in oklch, var(--muted) 55%, transparent);
   }
