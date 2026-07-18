@@ -2,9 +2,81 @@
 
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
-import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
+import { cva, type VariantProps } from "class-variance-authority"
+import { CheckIcon, ChevronRightIcon, CircleIcon, type LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+
+const dropdownMenuItemVariants = cva(
+  "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  {
+    variants: {
+      variant: {
+        default:
+          "focus:bg-accent focus:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground",
+        primary:
+          "text-primary focus:text-primary focus:bg-primary/10 data-highlighted:text-primary data-highlighted:bg-primary/10 dark:focus:bg-primary/15 dark:data-highlighted:bg-primary/15 [&_svg:not([class*='text-'])]:text-primary",
+        warning:
+          "text-amber-700 focus:text-amber-900 focus:bg-amber-500/15 data-highlighted:text-amber-900 data-highlighted:bg-amber-500/15 dark:text-amber-500 dark:focus:text-amber-100 dark:data-highlighted:text-amber-100 dark:focus:bg-amber-500/20 dark:data-highlighted:bg-amber-500/20 [&_svg:not([class*='text-'])]:text-amber-600 dark:[&_svg:not([class*='text-'])]:text-amber-500",
+        destructive:
+          "text-destructive focus:text-destructive focus:bg-destructive/10 data-highlighted:text-destructive data-highlighted:bg-destructive/10 dark:focus:bg-destructive/20 dark:data-highlighted:bg-destructive/20 [&_svg:not([class*='text-'])]:text-destructive",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+type DropdownMenuItemVariant = NonNullable<
+  VariantProps<typeof dropdownMenuItemVariants>["variant"]
+>
+
+type DropdownMenuIcon = LucideIcon | React.ReactNode
+
+type DropdownMenuOptionItem = {
+  type?: "item"
+  /** Stable key; falls back to index when omitted. */
+  key?: string
+  label: React.ReactNode
+  icon?: DropdownMenuIcon
+  variant?: DropdownMenuItemVariant
+  disabled?: boolean
+  inset?: boolean
+  shortcut?: React.ReactNode
+  className?: string
+  /** Skip rendering this option. */
+  hidden?: boolean
+  onSelect?: (event: Event) => void
+}
+
+type DropdownMenuOptionSeparator = {
+  type: "separator"
+  key?: string
+  hidden?: boolean
+  className?: string
+}
+
+type DropdownMenuOptionLabel = {
+  type: "label"
+  key?: string
+  label: React.ReactNode
+  inset?: boolean
+  hidden?: boolean
+  className?: string
+}
+
+type DropdownMenuOption =
+  | DropdownMenuOptionItem
+  | DropdownMenuOptionSeparator
+  | DropdownMenuOptionLabel
+
+function renderDropdownMenuIcon(icon?: DropdownMenuIcon) {
+  if (!icon) return null
+  if (React.isValidElement(icon)) return icon
+  const Icon = icon as LucideIcon
+  return <Icon className="size-4" />
+}
 
 function DropdownMenu({
   ...props
@@ -67,23 +139,71 @@ function DropdownMenuItem({
   className,
   inset,
   variant = "default",
+  icon,
+  children,
   ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & {
-  inset?: boolean
-  variant?: "default" | "destructive"
-}) {
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Item> &
+  VariantProps<typeof dropdownMenuItemVariants> & {
+    inset?: boolean
+    icon?: DropdownMenuIcon
+  }) {
   return (
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       data-inset={inset}
       data-variant={variant}
-      className={cn(
-        "focus:bg-accent focus:text-accent-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:*:[svg]:!text-destructive [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
+      className={cn(dropdownMenuItemVariants({ variant }), className)}
       {...props}
-    />
+    >
+      {renderDropdownMenuIcon(icon)}
+      {children}
+    </DropdownMenuPrimitive.Item>
   )
+}
+
+/**
+ * Renders menu entries from option descriptors (items, labels, separators).
+ * Keep special cases (e.g. submenus) composed beside this in the content tree.
+ */
+function DropdownMenuItems({ options }: { options: DropdownMenuOption[] }) {
+  return options.map((option, index) => {
+    if (option.hidden) return null
+
+    const key = option.key ?? String(index)
+
+    if (option.type === "separator") {
+      return <DropdownMenuSeparator key={key} className={option.className} />
+    }
+
+    if (option.type === "label") {
+      return (
+        <DropdownMenuLabel
+          key={key}
+          inset={option.inset}
+          className={option.className}
+        >
+          {option.label}
+        </DropdownMenuLabel>
+      )
+    }
+
+    return (
+      <DropdownMenuItem
+        key={key}
+        variant={option.variant}
+        icon={option.icon}
+        disabled={option.disabled}
+        inset={option.inset}
+        className={option.className}
+        onSelect={option.onSelect}
+      >
+        {option.label}
+        {option.shortcut ? (
+          <DropdownMenuShortcut>{option.shortcut}</DropdownMenuShortcut>
+        ) : null}
+      </DropdownMenuItem>
+    )
+  })
 }
 
 function DropdownMenuCheckboxItem({
@@ -250,6 +370,7 @@ export {
   DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuItem,
+  DropdownMenuItems,
   DropdownMenuCheckboxItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -258,4 +379,11 @@ export {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  dropdownMenuItemVariants,
+  type DropdownMenuIcon,
+  type DropdownMenuItemVariant,
+  type DropdownMenuOption,
+  type DropdownMenuOptionItem,
+  type DropdownMenuOptionLabel,
+  type DropdownMenuOptionSeparator,
 }
