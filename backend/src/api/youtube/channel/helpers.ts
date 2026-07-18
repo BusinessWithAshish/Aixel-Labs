@@ -400,14 +400,38 @@ function parsePlaylistGridItems(
   return playlists;
 }
 
-function channelHasPlaylistsTab(
+function normalizeTabTitle(title: string | undefined): string {
+  return title?.trim().toLowerCase() ?? "";
+}
+
+function channelHasTab(
   data: YOUTUBE_CHANNEL_BROWSE_RESPONSE,
+  tabTitle: string,
 ): boolean {
+  const want = normalizeTabTitle(tabTitle);
   const tabs = data.contents?.twoColumnBrowseResultsRenderer?.tabs ?? [];
 
   return tabs.some(
-    (tab) => tab.tabRenderer?.title?.trim().toLowerCase() === "playlists",
+    (tab) => normalizeTabTitle(tab.tabRenderer?.title) === want,
   );
+}
+
+function expectedTabTitle(contentType: YT_CHANNEL_CONTENT_TYPE): string {
+  switch (contentType) {
+    case YT_CHANNEL_CONTENT_TYPE.SHORTS:
+      return "shorts";
+    case YT_CHANNEL_CONTENT_TYPE.PLAYLISTS:
+      return "playlists";
+    case YT_CHANNEL_CONTENT_TYPE.VIDEOS:
+    default:
+      return "videos";
+  }
+}
+
+function channelHasPlaylistsTab(
+  data: YOUTUBE_CHANNEL_BROWSE_RESPONSE,
+): boolean {
+  return channelHasTab(data, "playlists");
 }
 
 function findPlaylistGridItems(
@@ -517,7 +541,48 @@ function findContentGrid(
     if (contents?.length) return contents;
   }
 
-  throw new Error("Could not find content grid in channel browse response");
+  // Missing tab / Home sectionListRenderer fallback — soft-empty like playlists.
+  return [];
+}
+
+function selectedTabTitle(
+  data: YOUTUBE_CHANNEL_BROWSE_RESPONSE,
+): string | null {
+  const tabs = data.contents?.twoColumnBrowseResultsRenderer?.tabs ?? [];
+  for (const tab of tabs) {
+    if (!tab.tabRenderer?.selected) continue;
+    const title = normalizeTabTitle(tab.tabRenderer.title);
+    return title || null;
+  }
+  return null;
+}
+
+function emptyChannelContentResponse(
+  channelId: string,
+  channelInfo: YOUTUBE_CHANNEL_INFO | null,
+  contentType: YT_CHANNEL_CONTENT_TYPE,
+): YOUTUBE_CHANNEL_RESPONSE {
+  return {
+    channelId,
+    channelInfo,
+    contentType,
+    items: [],
+    totalResults: 0,
+  };
+}
+
+function shouldSoftEmptyContentTab(
+  data: YOUTUBE_CHANNEL_BROWSE_RESPONSE,
+  contentType: YT_CHANNEL_CONTENT_TYPE,
+): boolean {
+  const tabName = expectedTabTitle(contentType);
+  if (!channelHasTab(data, tabName)) return true;
+
+  const selected = selectedTabTitle(data);
+  // YouTube ignored browse params (e.g. shorts request → Home selected).
+  if (selected && selected !== tabName) return true;
+
+  return false;
 }
 
 function parseContinuationResponse(
@@ -715,7 +780,23 @@ export async function fetchYoutubeChannel(
     }
 
     if (resolvedContentType === YT_CHANNEL_CONTENT_TYPE.SHORTS) {
+      if (shouldSoftEmptyContentTab(firstPage, resolvedContentType)) {
+        return emptyChannelContentResponse(
+          channelId,
+          channelInfo,
+          resolvedContentType,
+        );
+      }
+
       const firstGrid = findContentGrid(firstPage);
+      if (firstGrid.length === 0) {
+        return emptyChannelContentResponse(
+          channelId,
+          channelInfo,
+          resolvedContentType,
+        );
+      }
+
       const { items: firstItems, continuationToken: firstToken } =
         parseGridItems(firstGrid, YT_CHANNEL_CONTENT_TYPE.SHORTS);
 
@@ -748,7 +829,23 @@ export async function fetchYoutubeChannel(
       };
     }
 
+    if (shouldSoftEmptyContentTab(firstPage, resolvedContentType)) {
+      return emptyChannelContentResponse(
+        channelId,
+        channelInfo,
+        resolvedContentType,
+      );
+    }
+
     const firstGrid = findContentGrid(firstPage);
+    if (firstGrid.length === 0) {
+      return emptyChannelContentResponse(
+        channelId,
+        channelInfo,
+        resolvedContentType,
+      );
+    }
+
     const { items: firstItems, continuationToken: firstToken } = parseGridItems(
       firstGrid,
       resolvedContentType,

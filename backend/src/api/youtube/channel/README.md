@@ -42,3 +42,4 @@ Validated by `schemas.ts` → `YOUTUBE_CHANNEL_REQUEST_SCHEMA` (extends `YOUTUBE
 
 - `channelInfo.country` in the response is the channel's listed country from YouTube About — not the request `country` param.
 - `posts` tab is not supported; it is commented out in `constants.ts` (`YT_CHANNEL_CONTENT_TYPE`).
+- If the requested tab is absent (e.g. no Shorts tab), the response is soft-empty: `items: []` with `channelInfo` still populated — same pattern as a missing Playlists tab. YouTube may also ignore shorts browse params and return Home (`sectionListRenderer`); that is treated as empty, not an error.
