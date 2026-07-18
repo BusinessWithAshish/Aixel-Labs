@@ -22,9 +22,15 @@ Fields not implemented yet. Revisit when raw harvest exposes new data or a new e
 - Raw `/youtube/search` video items still only expose `publishedTimeText` — intelligence does **not** parse relative publish text.
 - `velocityScore` and `channelTier` are null when video-meta cannot resolve `publishedAt` or `channelSubscribers` for that video.
 
-## Search — channel items
+## Search — channel items (`POST /youtube/intelligence/search`)
 
-Channel-specific intelligence not specified yet. Raw item already has `subscribers` for future `channelTier`, etc.
+No deferred per-item fields.
+
+### Search channel caveats (implemented fields)
+
+- `channelTier` is derived from the raw search channel item's `subscribers` field — no video-meta batch call is needed for channel items.
+- `channelTier` is `null` when `subscribers` is missing on the raw search channel item.
+- Search channel items do **not** receive the richer channel-info fields available on `/youtube/intelligence/channel` (e.g. `channelAgeInDays`, `uploadsPerWeek`) — those require a channel browse harvest.
 
 ## Channel — video items (`POST /youtube/intelligence/channel`, `contentType: videos`)
 
@@ -48,6 +54,24 @@ Channel-specific intelligence not specified yet. Raw item already has `subscribe
 
 `uploadsLast30Days`, `uploadsLast90Days`, and `recentVelocityTrend` are computed from the **videos tab sample** with video-meta `publishedAt`. Counts are `null` when no publish dates resolve. `recentVelocityTrend` compares mean `viewsPerDay` for videos published in the last 30 days vs 31–90 days (`>10%` change → accelerating/decelerating, otherwise stable); `null` when either window lacks computable velocity data.
 
+| Field | Blocked by | Path forward |
+|-------|------------|--------------|
+| `isKidsChannel` | InnerTube only exposes `isFamilySafe`, not `madeForKids` | Harvest MFK if available, or Data API `status.madeForKids`; **do not** alias family-safe (returns `null` today) |
+
+`shortCount` / `videoOnlyCount` are **sizes of harvested tab samples** (capped by `limit`), not full catalog totals unless the sample is shorter than `limit`.
+
+`shortRatio` is:
+- exact when both tabs finish under `limit`
+- anchored to `channelInfo.videoCount` when exactly one tab is complete
+- **`null` when both samples are limit-censored** (avoids a misleading `0.5` artifact)
+- `0` when Shorts tab is absent/empty and videos are present
+
+Channels without a Shorts tab soft-empty the shorts harvest (`items: []`) so videos intelligence still succeeds.
+
 ## Suggested video items (`POST /youtube/intelligence/video/suggested`)
 
 No deferred per-item fields. `publishedAt` and `channelSubscribers` are merged onto intelligence response items via batched video-meta (`get_watch`). Raw `/youtube/video/suggested` items still only expose relative `publishedText`.
+
+## Handle (`POST /youtube/intelligence/handle`)
+
+No intelligence fields implemented yet. The handler returns the raw handle response with an empty `intelligence: {}` placeholder.
