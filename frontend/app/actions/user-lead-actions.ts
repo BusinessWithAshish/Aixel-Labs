@@ -10,7 +10,7 @@ import {
     runAuthenticatedAction,
     toObjectId,
 } from '@/helpers/server-action-helpers';
-import { buildDefaultLeadListName, generateLeads, getLeadSoruceFromSubModule } from '@/helpers/lead-gen-api';
+import { buildLeadListNameFromPreset, generateLeads, getLeadSoruceFromSubModule } from '@/helpers/lead-gen-api';
 import { computeLeadGenCreditCost, getCreditCostPerItem } from '@/helpers/credits';
 import { assertAndDebitCredits, getUserCreditsState } from '@/app/actions/credit-db';
 import { createUserLeadList } from './user-lead-lists-actions';
@@ -25,10 +25,19 @@ export type CreateUserLeadsResult = {
     creditsExempt: boolean;
 };
 
+export type CreateUserLeadsOptions = {
+    /** Form preset name used as the lead list title base. Required. */
+    listName: string;
+};
+
 export async function createUserLeads<TRequest>(
     subModule: LEAD_GENERATION_SUB_MODULES,
     body: TRequest,
+    options: CreateUserLeadsOptions,
 ): Promise<ALApiResponse<CreateUserLeadsResult>> {
+    assertRequiredTrimmedString(options.listName, 'listName');
+    const listName = options.listName.trim();
+
     return runAuthenticatedAction(async function createUserLeads(userId: string) {
         const uid = requireUserObjectId(userId);
         const session = await getAppSession();
@@ -78,7 +87,9 @@ export async function createUserLeads<TRequest>(
 
         const leadSource = getLeadSoruceFromSubModule(subModule);
 
-        const userLeadListResponse = await createUserLeadList({ name: buildDefaultLeadListName(subModule) });
+        const userLeadListResponse = await createUserLeadList({
+            name: buildLeadListNameFromPreset(listName),
+        });
         if (!userLeadListResponse.success || !userLeadListResponse.data) {
             throw new Error('Failed to create user lead list');
         }

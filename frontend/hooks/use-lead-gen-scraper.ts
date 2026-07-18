@@ -19,6 +19,30 @@ const LEADS_OVERVIEW_PATH = '/lead-generation/leads';
 const abortControllers = new Map<LEAD_GENERATION_SUB_MODULES, AbortController>();
 /** Set when abort is clicked before the in-flight submit has created a controller. */
 const abortRequested = new Set<LEAD_GENERATION_SUB_MODULES>();
+/**
+ * Preset list title for the next scrape, set by FormPresetScraperActions before submit.
+ * Scoped by submodule so concurrent modules do not clash.
+ */
+const pendingListNames = new Map<LEAD_GENERATION_SUB_MODULES, string>();
+
+/** Call before `submitLeadGenScraperForm` so the new lead list is named from the form preset. */
+export function prepareLeadGenListName(
+    subModule: LEAD_GENERATION_SUB_MODULES,
+    listName: string,
+): void {
+    const trimmed = listName.trim();
+    if (!trimmed) {
+        pendingListNames.delete(subModule);
+        return;
+    }
+    pendingListNames.set(subModule, trimmed);
+}
+
+function takePendingListName(subModule: LEAD_GENERATION_SUB_MODULES): string | undefined {
+    const name = pendingListNames.get(subModule);
+    pendingListNames.delete(subModule);
+    return name;
+}
 
 const defaultSuccessToast = {
     message: 'Your leads are ready.',
@@ -104,6 +128,12 @@ export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
     const submitLeadGenScraperForm = useCallback(
         async <TRequest>(options: SubmitLeadGenScraperFormOptions<TRequest>): Promise<boolean> => {
             const { body, errorMessage } = options;
+            const listName = takePendingListName(subModule);
+
+            if (!listName) {
+                toast.error('Save a preset before running.');
+                return false;
+            }
 
             if (abortRequested.has(subModule)) {
                 abortRequested.delete(subModule);
@@ -117,7 +147,10 @@ export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
 
             setLoading(true);
             try {
-                const result = await abortable(createUserLeads(subModule, body), controller.signal);
+                const result = await abortable(
+                    createUserLeads(subModule, body, { listName }),
+                    controller.signal,
+                );
 
                 if (controller.signal.aborted) {
                     return false;

@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
 import useLocalStorageState from 'use-local-storage-state';
 import { generateLocalStorageKey } from '@/helpers/generate-local-storage-key';
-import { useLeadGenScraper } from '@/hooks/use-lead-gen-scraper';
+import { prepareLeadGenListName, useLeadGenScraper } from '@/hooks/use-lead-gen-scraper';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -144,9 +144,15 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
         };
     }, [loadedPresetName, form]);
 
-    const runForm = () => {
+    const runForm = (presetName: string | null = loadedPresetName) => {
+        if (!presetName) {
+            toast.error('Save a preset before running.');
+            return;
+        }
+        prepareLeadGenListName(module, presetName);
         clearPendingAbort();
         void form.handleSubmit(onSubmit, () => {
+            prepareLeadGenListName(module, '');
             clearPendingAbort();
             toast.error('Form validation failed. Please check your inputs.');
         })();
@@ -241,7 +247,7 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
         setLoadedPresetName(trimmed);
 
         if (mode === 'save-and-run') {
-            runForm();
+            runForm(trimmed);
         }
     };
 
@@ -329,8 +335,8 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             className="text-destructive/50"
-                            disabled={busy}
-                            onSelect={runForm}
+                            disabled={busy || !loadedPresetName}
+                            onSelect={() => runForm()}
                         >
                             <PlayIcon />
                             Run without saving

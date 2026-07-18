@@ -3,7 +3,6 @@ import 'server-only';
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
 import { type LeadData, LEAD_GENERATION_SUB_MODULES, LeadSource } from '@aixellabs/backend/db/types';
 import apiClient from '@/lib/api-client';
-import { enumToTitleCase } from '@/helpers/string-helpers';
 import { API_ENDPOINTS } from '@aixellabs/backend/config';
 
 export function getLeadSoruceFromSubModule(subModule: LEAD_GENERATION_SUB_MODULES): LeadSource {
@@ -19,17 +18,16 @@ export function getLeadSoruceFromSubModule(subModule: LEAD_GENERATION_SUB_MODULE
     }
 }
 
-export function buildDefaultLeadListName(subModule: LEAD_GENERATION_SUB_MODULES): string {
-    const label = enumToTitleCase(subModule);
+/** `{presetName} · Sat 6:10 PM` — preset name is required; no submodule fallback. */
+export function buildLeadListNameFromPreset(presetName: string): string {
     const now = new Date();
-    const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
+    const weekday = now.toLocaleDateString(undefined, { weekday: 'short' });
     const time = now.toLocaleTimeString(undefined, {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
     });
-    const year = now.getFullYear();
-    return `${label} ${weekday} ${time} ${year}`;
+    return `${presetName.trim()} · ${weekday} ${time}`;
 }
 
 export type GenerateLeadsProps<TRequest> = {
