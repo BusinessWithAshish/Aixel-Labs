@@ -18,7 +18,10 @@ export const YOUTUBE_COUNTRY_SCHEMA = z
     "Two-letter ISO 3166-1 alpha-2 country code (e.g. US, GB). Routes requests through a country-targeted proxy.",
   );
 
-/** Optional region/state for finer-grained proxy routing — not sent to YouTube InnerTube. */
+/**
+ * Optional city/state/region hint. Not used for Evomi proxy (country-only).
+ * For search, folded into the YouTube search query text.
+ */
 export const YOUTUBE_REGION_SCHEMA = z
   .string()
   .trim()
@@ -26,7 +29,7 @@ export const YOUTUBE_REGION_SCHEMA = z
   .max(100)
   .optional()
   .describe(
-    "Optional region or state for geo-targeted proxy routing (not sent to YouTube InnerTube).",
+    "Optional city/state/region hint. Appended to search query text; not used for proxy routing (Evomi is country-scoped only).",
   );
 
 /** Shared geo fields included on every YouTube API request body. */

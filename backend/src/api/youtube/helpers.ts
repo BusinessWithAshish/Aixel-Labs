@@ -14,7 +14,7 @@ import { evomiConfigured } from "../../utils/fetch-session-common";
 
 // ─── Geo routing (proxy + InnerTube gl) ──────────────────────────────────────
 
-/** Resolves country/region into InnerTube `gl` and proxy routing params. */
+/** Resolves country/region into InnerTube `gl`. Region is never used for proxy. */
 export function resolveYoutubeGeo(geo: Partial<YOUTUBE_GEO_REQUEST> = {}): {
   country: string;
   region: string | undefined;
@@ -25,16 +25,30 @@ export function resolveYoutubeGeo(geo: Partial<YOUTUBE_GEO_REQUEST> = {}): {
   return { country, region, gl: country };
 }
 
-/** Creates a TLS session with country/region-targeted Evomi proxy when configured. */
+/**
+ * Appends optional region to a free-text search query.
+ * Evomi only supports selected `_region-*` tokens, so region is query text — not proxy config.
+ */
+export function composeYoutubeSearchQuery(
+  query: string,
+  region?: string,
+): string {
+  const q = query.trim();
+  const r = region?.trim();
+  if (!r) return q;
+  if (q.toLowerCase().includes(r.toLowerCase())) return q;
+  return `${q} ${r}`;
+}
+
+/** Creates a TLS session with country-targeted Evomi proxy when configured (no proxy region). */
 export async function createYoutubeFetchSession(
   geo: Partial<YOUTUBE_GEO_REQUEST> = {},
 ): Promise<UrlFetchSession> {
-  const { country, region } = resolveYoutubeGeo(geo);
+  const { country } = resolveYoutubeGeo(geo);
 
   return createUrlFetchSession({
     useProxy: evomiConfigured(),
     proxyCountry: country,
-    proxyRegion: region,
     proxySessionSuffix: randomUUID().replace(/-/g, "").slice(0, 12),
   });
 }

@@ -11,6 +11,7 @@ import {
 import {
   abbreviatedCountTextToNumber,
   buildInnertubeContext,
+  composeYoutubeSearchQuery,
   createYoutubeFetchSession,
   durationTextToSeconds,
   extractInnertubeClientVersion,
@@ -231,16 +232,18 @@ export async function fetchYoutubeSearch(
   } = params;
 
   const { gl } = resolveYoutubeGeo({ country, region });
+  const searchQuery = composeYoutubeSearchQuery(query, region);
 
   const url = new URL(YOUTUBE_SEARCH_RESULTS_PATH, YOUTUBE_BASE_URL);
-  url.searchParams.set(YOUTUBE_SEARCH_QUERY_PARAM, query);
+  url.searchParams.set(YOUTUBE_SEARCH_QUERY_PARAM, searchQuery);
 
   const sp = YOUTUBE_SEARCH_FILTER_SP[filter];
   if (sp) {
     url.searchParams.set("sp", decodeURIComponent(sp));
   }
 
-  const session = await createYoutubeFetchSession({ country, region });
+  // Proxy is country-scoped only; region is in searchQuery above.
+  const session = await createYoutubeFetchSession({ country });
 
   try {
     const { initdata, clientVersion } = await fetchYoutubeSearchPage(
@@ -278,7 +281,7 @@ export async function fetchYoutubeSearch(
     return {
       resultType: filter,
       items: limitedItems,
-      searchQuery: query,
+      searchQuery,
       estimatedResults: Number.isNaN(estimatedResults)
         ? null
         : estimatedResults,
