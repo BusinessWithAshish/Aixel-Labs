@@ -199,12 +199,11 @@ export function SearchableGroupedMultiSelect({
                                                 } else {
                                                     onChange?.([...(values || []), option.value]);
                                                 }
-                                                setOpen(false);
                                             }}
                                         >
                                             <CheckIcon
                                                 className={cn(
-                                                    'mr-2 h-4 w-4',
+                                                    'mr-2 h-4 w-4 text-primary',
                                                     values?.includes(option.value) ? 'opacity-100' : 'opacity-0',
                                                 )}
                                             />
