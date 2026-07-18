@@ -1,5 +1,11 @@
-import type { InstagramFilters, LinkedInFilters } from './lead-filter-constants';
-import { INSTAGRAM_ACCOUNT_TYPE } from './lead-filter-constants';
+import type {
+    GoogleMapsFilters,
+    InstagramFilters,
+    LinkedInFilters,
+    TriStateFilter,
+} from './lead-filter-constants';
+import { INSTAGRAM_ACCOUNT_TYPE, TRI_STATE_FILTER } from './lead-filter-constants';
+import { matchGmapsPlace, toGmapsPlace } from '@aixellabs/backend/gmaps/filters';
 
 type D = Record<string, unknown>;
 
@@ -32,7 +38,27 @@ export function toNum(v: unknown): number | null {
     return null;
 }
 
+/** Apply tri-state presence: any → pass; has → must be present; missing → must be absent. */
+export function matchesTriState(hasValue: boolean, filter: TriStateFilter): boolean {
+    if (filter === TRI_STATE_FILTER.HAS) return hasValue;
+    if (filter === TRI_STATE_FILTER.MISSING) return !hasValue;
+    return true;
+}
+
 // ─── Matchers (Instagram / LinkedIn stay FE-local; Google Maps uses backend SSOT) ─
+
+export function matchGoogleMaps(data: unknown, f: GoogleMapsFilters): boolean {
+    const place = toGmapsPlace(data);
+    if (!matchesTriState(nonEmpty(place.phone), f.requirePhone)) return false;
+    if (!matchesTriState(nonEmpty(place.website), f.requireWebsite)) return false;
+
+    // Backend matcher still uses boolean require*; force inactive so presence is owned here.
+    return matchGmapsPlace(place, {
+        ...f,
+        requirePhone: false,
+        requireWebsite: false,
+    });
+}
 
 export function matchLinkedIn(data: unknown, f: LinkedInFilters): boolean {
     if (typeof data !== 'object' || data === null) return true;
@@ -50,8 +76,8 @@ export function matchLinkedIn(data: unknown, f: LinkedInFilters): boolean {
     if (!inRange(toNum(d.employee_count), f.minEmployees, f.maxEmployees)) return false;
     if (!inRange(toNum(isPeople ? d.follower_count : d.followers), f.minFollowers, f.maxFollowers)) return false;
 
-    if (f.requireHiring && d.is_hiring !== true) return false;
-    if (f.requireWebsite && !nonEmpty(d.website)) return false;
+    if (!matchesTriState(d.is_hiring === true, f.requireHiring)) return false;
+    if (!matchesTriState(nonEmpty(d.website), f.requireWebsite)) return false;
 
     if (f.minFundingRounds !== undefined) {
         const fi = isPeople ? (d.funding as D | undefined)?.total_rounds : (d.funding_info as D | undefined)?.total_rounds;
@@ -88,17 +114,15 @@ export function matchInstagram(data: unknown, f: InstagramFilters): boolean {
             break;
     }
 
-    if (f.requireEmail && !nonEmpty(d.businessEmail)) return false;
-    if (f.requirePhone) {
-        const hasPhone =
-            Array.isArray(d.businessPhoneNumber) &&
-            d.businessPhoneNumber.some((x) => nonEmpty(x));
-        if (!hasPhone) return false;
-    }
-    if (f.requireWebsite) {
-        const has = Array.isArray(d.websites) && d.websites.some((x) => nonEmpty(x));
-        if (!has) return false;
-    }
+    const hasEmail = nonEmpty(d.businessEmail);
+    const hasPhone =
+        Array.isArray(d.businessPhoneNumber) &&
+        d.businessPhoneNumber.some((x) => nonEmpty(x));
+    const hasWebsite = Array.isArray(d.websites) && d.websites.some((x) => nonEmpty(x));
+
+    if (!matchesTriState(hasEmail, f.requireEmail)) return false;
+    if (!matchesTriState(hasPhone, f.requirePhone)) return false;
+    if (!matchesTriState(hasWebsite, f.requireWebsite)) return false;
 
     return true;
 }

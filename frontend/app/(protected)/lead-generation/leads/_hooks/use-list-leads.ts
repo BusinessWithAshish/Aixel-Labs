@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useLeadsFilterPanel } from './use-leads-filter-panel';
+import { sortLeads } from '../_utils/lead-sort';
 
 function leadMatchesSearchQuery(lead: Lead, rawQuery: string): boolean {
     const q = rawQuery.trim().toLowerCase();
@@ -36,10 +37,12 @@ export const useAllLeadsPage = ({ listId, leads }: AllLeadsPageData) => {
 
     const filterPanel = useLeadsFilterPanel();
 
-    const filteredLeads = useMemo(
-        () => leads.filter((lead) => leadMatchesSearchQuery(lead, searchQuery) && filterPanel.matchesLead(lead)),
-        [leads, searchQuery, filterPanel.matchesLead],
-    );
+    const filteredLeads = useMemo(() => {
+        const matched = leads.filter(
+            (lead) => leadMatchesSearchQuery(lead, searchQuery) && filterPanel.matchesLead(lead),
+        );
+        return sortLeads(matched, filterPanel.filters.sort);
+    }, [leads, filterPanel, searchQuery]);
 
     useEffect(() => setSelectedLeadIds(new Set()), [leads]);
 

@@ -5,13 +5,40 @@ import {
     GMAPS_MIN_RATING_OPTIONS,
     type GMAPS_ENRICHMENT,
 } from '@aixellabs/backend/gmaps/filters';
+import { LEAD_SORT_DEFAULTS, normalizeLeadSortState, type LeadSortState } from './lead-sort-constants';
 
 // ─── Source type ────────────────────────────────────────────────────────────
 
 export type FilterSource = LeadSource.GOOGLE_MAPS | LeadSource.LINKEDIN | LeadSource.INSTAGRAM;
 
-/** Alias: Google Maps sheet filters share the API enrichment SSOT. */
-export type GoogleMapsFilters = GMAPS_ENRICHMENT;
+/**
+ * Tri-state presence filter for the leads sheet.
+ * - `any` — no filter (bidirectional switch center; default)
+ * - `has` — must have the field (switch right)
+ * - `missing` — must not have the field (switch left)
+ *
+ * Legacy boolean `true` migrates to `has`; legacy `false` migrates to `any`
+ * (old off meant “unset”, not “exclude”).
+ */
+export const TRI_STATE_FILTER = {
+    ANY: 'any',
+    HAS: 'has',
+    MISSING: 'missing',
+} as const;
+
+export type TriStateFilter = (typeof TRI_STATE_FILTER)[keyof typeof TRI_STATE_FILTER];
+
+export const TRI_STATE_FILTER_OPTIONS: { value: TriStateFilter; label: string }[] = [
+    { value: TRI_STATE_FILTER.ANY, label: 'Default' },
+    { value: TRI_STATE_FILTER.HAS, label: 'Yes' },
+    { value: TRI_STATE_FILTER.MISSING, label: 'No' },
+];
+
+/** Google Maps sheet filters: enrichment SSOT + tri-state presence fields. */
+export type GoogleMapsFilters = Omit<GMAPS_ENRICHMENT, 'requirePhone' | 'requireWebsite'> & {
+    requirePhone: TriStateFilter;
+    requireWebsite: TriStateFilter;
+};
 
 export const INSTAGRAM_ACCOUNT_TYPE = {
     ANY: 'ANY',
@@ -32,9 +59,9 @@ export type InstagramFilters = {
     maxFollowing?: number;
     minPosts?: number;
     maxPosts?: number;
-    requireEmail: boolean;
-    requirePhone: boolean;
-    requireWebsite: boolean;
+    requireEmail: TriStateFilter;
+    requirePhone: TriStateFilter;
+    requireWebsite: TriStateFilter;
 };
 
 export type LinkedInFilters = {
@@ -45,8 +72,8 @@ export type LinkedInFilters = {
     maxEmployees?: number;
     minFollowers?: number;
     maxFollowers?: number;
-    requireHiring: boolean;
-    requireWebsite: boolean;
+    requireHiring: TriStateFilter;
+    requireWebsite: TriStateFilter;
     minFundingRounds?: number;
 };
 
@@ -55,13 +82,18 @@ export type LeadFilterState = {
     googleMaps: GoogleMapsFilters;
     instagram: InstagramFilters;
     linkedin: LinkedInFilters;
+    sort: LeadSortState;
 };
 
 // ─── Defaults ───────────────────────────────────────────────────────────────
 
 export const LEAD_FILTER_DEFAULTS: LeadFilterState = {
     sources: [],
-    googleMaps: { ...GMAPS_ENRICHMENT_DEFAULTS },
+    googleMaps: {
+        ...GMAPS_ENRICHMENT_DEFAULTS,
+        requirePhone: TRI_STATE_FILTER.ANY,
+        requireWebsite: TRI_STATE_FILTER.ANY,
+    },
     instagram: {
         accountFilter: INSTAGRAM_ACCOUNT_TYPE.ANY,
         minFollowers: undefined,
@@ -70,9 +102,9 @@ export const LEAD_FILTER_DEFAULTS: LeadFilterState = {
         maxFollowing: undefined,
         minPosts: undefined,
         maxPosts: undefined,
-        requireEmail: false,
-        requirePhone: false,
-        requireWebsite: false,
+        requireEmail: TRI_STATE_FILTER.ANY,
+        requirePhone: TRI_STATE_FILTER.ANY,
+        requireWebsite: TRI_STATE_FILTER.ANY,
     },
     linkedin: {
         industryContains: '',
@@ -82,11 +114,23 @@ export const LEAD_FILTER_DEFAULTS: LeadFilterState = {
         maxEmployees: undefined,
         minFollowers: undefined,
         maxFollowers: undefined,
-        requireHiring: false,
-        requireWebsite: false,
+        requireHiring: TRI_STATE_FILTER.ANY,
+        requireWebsite: TRI_STATE_FILTER.ANY,
         minFundingRounds: undefined,
     },
+    sort: {
+        googleMaps: { ...LEAD_SORT_DEFAULTS.googleMaps },
+        instagram: { ...LEAD_SORT_DEFAULTS.instagram },
+        linkedin: { ...LEAD_SORT_DEFAULTS.linkedin },
+    },
 };
+
+/** Coerce legacy boolean / unknown stored values into TriStateFilter. */
+export function migrateTriStateFilter(raw: unknown): TriStateFilter {
+    if (raw === true || raw === TRI_STATE_FILTER.HAS) return TRI_STATE_FILTER.HAS;
+    if (raw === TRI_STATE_FILTER.MISSING) return TRI_STATE_FILTER.MISSING;
+    return TRI_STATE_FILTER.ANY;
+}
 
 // ─── Option arrays ─────────────────────────────────────────────────────────
 
@@ -130,11 +174,11 @@ export const SHOW_LINKEDIN_FILTERS_UI = false;
 
 /**
  * Migrate legacy sheet state (`minStarRatings: string[]`) to enrichment SSOT.
- * Safe to call on every read — already-new shapes pass through Zod defaults.
+ * Safe to call on every read — already-new shapes pass through.
  */
 export function migrateGoogleMapsFilters(raw: unknown): GoogleMapsFilters {
     if (typeof raw !== 'object' || raw === null) {
-        return { ...GMAPS_ENRICHMENT_DEFAULTS };
+        return { ...LEAD_FILTER_DEFAULTS.googleMaps };
     }
 
     const record = raw as Record<string, unknown>;
@@ -147,8 +191,8 @@ export function migrateGoogleMapsFilters(raw: unknown): GoogleMapsFilters {
             minRating: stars.length > 0 ? Math.min(...stars) : 0,
             minReviews: typeof record.minReviews === 'number' ? record.minReviews : 0,
             maxReviews: typeof record.maxReviews === 'number' ? record.maxReviews : null,
-            requirePhone: record.requirePhone === true,
-            requireWebsite: record.requireWebsite === true,
+            requirePhone: migrateTriStateFilter(record.requirePhone),
+            requireWebsite: migrateTriStateFilter(record.requireWebsite),
             categoryContains: typeof record.categoryContains === 'string' ? record.categoryContains : '',
         };
     }
@@ -157,9 +201,36 @@ export function migrateGoogleMapsFilters(raw: unknown): GoogleMapsFilters {
         minRating: typeof record.minRating === 'number' ? record.minRating : 0,
         minReviews: typeof record.minReviews === 'number' ? record.minReviews : 0,
         maxReviews: typeof record.maxReviews === 'number' ? record.maxReviews : null,
-        requirePhone: record.requirePhone === true,
-        requireWebsite: record.requireWebsite === true,
+        requirePhone: migrateTriStateFilter(record.requirePhone),
+        requireWebsite: migrateTriStateFilter(record.requireWebsite),
         categoryContains: typeof record.categoryContains === 'string' ? record.categoryContains : '',
+    };
+}
+
+function migrateInstagramFilters(raw: unknown): InstagramFilters {
+    if (typeof raw !== 'object' || raw === null) {
+        return { ...LEAD_FILTER_DEFAULTS.instagram };
+    }
+    const record = raw as Record<string, unknown>;
+    const base = { ...LEAD_FILTER_DEFAULTS.instagram, ...record } as InstagramFilters;
+    return {
+        ...base,
+        requireEmail: migrateTriStateFilter(record.requireEmail),
+        requirePhone: migrateTriStateFilter(record.requirePhone),
+        requireWebsite: migrateTriStateFilter(record.requireWebsite),
+    };
+}
+
+function migrateLinkedInFilters(raw: unknown): LinkedInFilters {
+    if (typeof raw !== 'object' || raw === null) {
+        return { ...LEAD_FILTER_DEFAULTS.linkedin };
+    }
+    const record = raw as Record<string, unknown>;
+    const base = { ...LEAD_FILTER_DEFAULTS.linkedin, ...record } as LinkedInFilters;
+    return {
+        ...base,
+        requireHiring: migrateTriStateFilter(record.requireHiring),
+        requireWebsite: migrateTriStateFilter(record.requireWebsite),
     };
 }
 
@@ -167,5 +238,8 @@ export function normalizeLeadFilterState(state: LeadFilterState): LeadFilterStat
     return {
         ...state,
         googleMaps: migrateGoogleMapsFilters(state.googleMaps),
+        instagram: migrateInstagramFilters(state.instagram),
+        linkedin: migrateLinkedInFilters(state.linkedin),
+        sort: normalizeLeadSortState(state.sort),
     };
 }
