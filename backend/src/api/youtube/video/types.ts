@@ -55,6 +55,36 @@ export type YOUTUBE_VIDEO_WATCH_NEXT_RESULTS = {
   };
 };
 
+export type YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM = {
+  videoSecondaryInfoRenderer?: {
+    owner?: {
+      videoOwnerRenderer?: {
+        subscriberCountText?: { simpleText?: string };
+      };
+    };
+  };
+  itemSectionRenderer?: {
+    header?: {
+      commentsHeaderRenderer?: {
+        countText?: { runs?: Array<{ text?: string }> };
+      };
+    };
+  };
+  videoPrimaryInfoRenderer?: Record<string, unknown>;
+  contents?: YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[];
+};
+
+/**
+ * InnerTube sometimes returns `results.results` as an array of panels
+ * (`{ contents: [...] }[]`) and sometimes as a single object
+ * (`{ contents: [...] }`). Callers must normalize before iterating.
+ */
+export type YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_RESULTS =
+  | YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[]
+  | {
+      contents?: YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[];
+    };
+
 export type YOUTUBE_VIDEO_GET_WATCH_RESPONSE = [
   {
     playerResponse?: {
@@ -77,24 +107,7 @@ export type YOUTUBE_VIDEO_GET_WATCH_RESPONSE = [
       contents?: YOUTUBE_VIDEO_WATCH_NEXT_RESULTS & {
         twoColumnWatchNextResults?: {
           results?: {
-            results?: Array<{
-              contents?: Array<{
-                videoSecondaryInfoRenderer?: {
-                  owner?: {
-                    videoOwnerRenderer?: {
-                      subscriberCountText?: { simpleText?: string };
-                    };
-                  };
-                };
-                itemSectionRenderer?: {
-                  header?: {
-                    commentsHeaderRenderer?: {
-                      countText?: { runs?: Array<{ text?: string }> };
-                    };
-                  };
-                };
-              }>;
-            }>;
+            results?: YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_RESULTS;
           };
         };
       };

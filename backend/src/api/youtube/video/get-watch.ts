@@ -16,6 +16,7 @@ import type {
   YOUTUBE_VIDEO_DETAILS_RESPONSE,
   YOUTUBE_VIDEO_ENGAGEMENT_PANEL,
   YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+  YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM,
 } from "./types";
 
 function extractFactoidCount(
@@ -110,23 +111,41 @@ function extractCommentCountFromEngagementPanels(
   return null;
 }
 
+function extractWatchNextPrimaryItems(
+  data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+): YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[] {
+  const nested =
+    data[1]?.watchNextResponse?.contents?.twoColumnWatchNextResults?.results
+      ?.results;
+
+  if (!nested) return [];
+
+  // Shape A (current): { contents: [...] }
+  if (!Array.isArray(nested)) {
+    return Array.isArray(nested.contents) ? nested.contents : [];
+  }
+
+  // Shape B (legacy): array of panels each with contents
+  const items: YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[] = [];
+  for (const panel of nested) {
+    if (Array.isArray(panel.contents)) {
+      items.push(...panel.contents);
+    }
+  }
+  return items;
+}
+
 function extractCommentsHeaderCount(
   data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
 ): number | null {
-  const panels =
-    data[1]?.watchNextResponse?.contents?.twoColumnWatchNextResults?.results
-      ?.results ?? [];
+  for (const item of extractWatchNextPrimaryItems(data)) {
+    const runs =
+      item.itemSectionRenderer?.header?.commentsHeaderRenderer?.countText
+        ?.runs;
+    const text = joinYoutubeTextRuns(runs);
+    if (!text || text === "Comments") continue;
 
-  for (const panel of panels) {
-    for (const item of panel.contents ?? []) {
-      const runs =
-        item.itemSectionRenderer?.header?.commentsHeaderRenderer?.countText
-          ?.runs;
-      const text = joinYoutubeTextRuns(runs);
-      if (!text || text === "Comments") continue;
-
-      return abbreviatedCountTextToNumber(text) ?? parseNumericString(text);
-    }
+    return abbreviatedCountTextToNumber(text) ?? parseNumericString(text);
   }
 
   return null;
@@ -136,21 +155,28 @@ function extractCommentCount(
   data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
   initialData?: Record<string, unknown>,
 ): number | null {
-  if (areCommentsDisabled([data[1], initialData])) return null;
-
+  // Prefer real counts before the disabled marker. get_watch often injects
+  // "Comments are turned off" under UNPLAYABLE even when ytInitialData still
+  // has engagement-panel-comments-section with a contextual count.
   const fromWatch = extractCommentCountFromEngagementPanels(
     data[1]?.watchNextResponse?.engagementPanels,
   );
   if (fromWatch !== null) return fromWatch;
 
   const fromPage = extractCommentCountFromEngagementPanels(
-    initialData?.engagementPanels as YOUTUBE_VIDEO_ENGAGEMENT_PANEL[] | undefined,
+    initialData?.engagementPanels as
+      | YOUTUBE_VIDEO_ENGAGEMENT_PANEL[]
+      | undefined,
   );
   if (fromPage !== null) return fromPage;
 
-  return (
-    extractFactoidCount(data, "Comments") ?? extractCommentsHeaderCount(data)
-  );
+  const fromFactoidOrHeader =
+    extractFactoidCount(data, "Comments") ?? extractCommentsHeaderCount(data);
+  if (fromFactoidOrHeader !== null) return fromFactoidOrHeader;
+
+  if (areCommentsDisabled([initialData, data[1]])) return null;
+
+  return null;
 }
 
 function extractPublishedAt(
@@ -184,12 +210,9 @@ export function isVideoResolvable(
   const playerResponse = data[0]?.playerResponse;
   if (!playerResponse) return false;
 
-  const playabilityStatus = playerResponse.playabilityStatus?.status;
-  if (
-    playabilityStatus === "ERROR" ||
-    playabilityStatus === "UNPLAYABLE" ||
-    playabilityStatus === "LOGIN_REQUIRED"
-  ) {
+  // Only hard ERROR means deleted/invalid. UNPLAYABLE / LOGIN_REQUIRED often
+  // still carry full videoDetails + microformat (proxy/geo soft-blocks).
+  if (playerResponse.playabilityStatus?.status === "ERROR") {
     return false;
   }
 
@@ -210,8 +233,9 @@ export function extractLikeCountFromGetWatch(
 
 export function extractCommentCountFromGetWatch(
   data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+  initialData?: Record<string, unknown>,
 ): number | null {
-  return extractCommentCount(data);
+  return extractCommentCount(data, initialData);
 }
 
 export function extractPublishedAtFromGetWatch(
@@ -233,17 +257,11 @@ export function extractLengthSecondsFromGetWatch(
 export function extractChannelSubscriberCountText(
   data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
 ): string | null {
-  const panels =
-    data[1]?.watchNextResponse?.contents?.twoColumnWatchNextResults?.results
-      ?.results ?? [];
-
-  for (const panel of panels) {
-    for (const item of panel.contents ?? []) {
-      const text =
-        item.videoSecondaryInfoRenderer?.owner?.videoOwnerRenderer
-          ?.subscriberCountText?.simpleText;
-      if (text?.trim()) return text.trim();
-    }
+  for (const item of extractWatchNextPrimaryItems(data)) {
+    const text =
+      item.videoSecondaryInfoRenderer?.owner?.videoOwnerRenderer
+        ?.subscriberCountText?.simpleText;
+    if (text?.trim()) return text.trim();
   }
 
   return null;

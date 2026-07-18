@@ -9,6 +9,7 @@ import {
   abbreviatedCountTextToNumber,
   createYoutubeFetchSession,
   fetchInnertubeClientVersion,
+  fetchYoutubeWatchPageContext,
   resolveYoutubeGeo,
 } from "../helpers";
 import type { YOUTUBE_VIDEO_WATCH_META } from "../types";
@@ -59,6 +60,25 @@ async function fetchVideoMetaForVideo(
     const data = await fetchGetWatch(session, clientVersion, gl, videoId);
     const channelSubscriberCountText = extractChannelSubscriberCountText(data);
 
+    let commentCount = extractCommentCountFromGetWatch(data);
+    // When get_watch is UNPLAYABLE it often omits the comments engagement
+    // panel; the real count lives on watch-page ytInitialData.
+    if (commentCount === null) {
+      try {
+        const { initialData } = await fetchYoutubeWatchPageContext(
+          session,
+          YOUTUBE_VIDEO_URL(videoId),
+        );
+        commentCount = extractCommentCountFromGetWatch(data, initialData);
+      } catch (err) {
+        console.warn(
+          `[${YOUTUBE_HANDLER_LABELS.VIDEO_META}] Comment fallback failed:`,
+          videoId,
+          err,
+        );
+      }
+    }
+
     return {
       videoId,
       publishedAt: extractPublishedAtFromGetWatch(data),
@@ -67,7 +87,7 @@ async function fetchVideoMetaForVideo(
         channelSubscriberCountText,
       ),
       likeCount: extractLikeCountFromGetWatch(data),
-      commentCount: extractCommentCountFromGetWatch(data),
+      commentCount,
     };
   } catch (err) {
     console.warn(

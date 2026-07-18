@@ -66,9 +66,10 @@ Fetches video metadata and suggested (related) videos via InnerTube `get_watch` 
 ## How it works
 
 1. `createYoutubeFetchSession({ country, region })`.
-2. GET `/watch?v={videoId}` for `INNERTUBE_CLIENT_VERSION`.
+2. GET `/watch?v={videoId}` for `INNERTUBE_CLIENT_VERSION` (+ `ytInitialData` for comment counts).
 3. POST `/youtubei/v1/get_watch` with `gl` = `country`.
-4. Suggested: parse watch-next lockups; paginate via `/youtubei/v1/next`.
+4. Resolvability: only `playabilityStatus: ERROR` (or missing `videoDetails`) is treated as not found. `UNPLAYABLE` / `LOGIN_REQUIRED` still yield metadata when `videoDetails` is present.
+5. Suggested: parse watch-next lockups; paginate via `/youtubei/v1/next`.
 
 ## Shared dependencies
 
@@ -76,3 +77,7 @@ Fetches video metadata and suggested (related) videos via InnerTube `get_watch` 
 - `../constants` — limits, InnerTube URLs
 - `../helpers` — session, geo, parsers
 - `../types` — `YT_THUMBNAIL`, lockup shapes
+
+## Notes for agents
+
+- `likeCount` comes from get_watch microformat; `commentCount` often requires watch-page `ytInitialData` engagement-panel contextualInfo when get_watch is UNPLAYABLE and omits the comments panel.
