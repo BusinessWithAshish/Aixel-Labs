@@ -53,9 +53,13 @@ export function computeChannelTier(
   return YOUTUBE_CHANNEL_TIER.LARGE;
 }
 
+/**
+ * InnerTube channel/video harvest only exposes `isFamilySafe`, not
+ * made-for-kids (`status.madeForKids`). Family-safe ≠ kids — return null
+ * until a real MFK signal is harvested.
+ */
 export function computeIsKidsChannel(
-  isFamilySafe: boolean | null,
+  _isFamilySafe: boolean | null,
 ): boolean | null {
-  if (isFamilySafe === null) return null;
-  return isFamilySafe;
+  return null;
 }
