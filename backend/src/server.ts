@@ -66,7 +66,11 @@ app.use(
       "Authorization",
       "Cache-Control",
       "X-Requested-With",
+      "Accept",
+      "mcp-session-id",
+      "mcp-protocol-version",
     ],
+    exposedHeaders: ["mcp-session-id"],
     credentials: true,
   }),
 );

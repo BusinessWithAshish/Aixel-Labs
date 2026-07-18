@@ -7,6 +7,7 @@ import homeRoutes from "./api/home/index";
 import linkedinRoutes from "./api/linkedin";
 import youtubeRoutes from "./api/youtube/index";
 import gsearchRoutes from "./api/gsearch/index";
+import mcpRoutes from "./mcp/router";
 
 export function registerRoutes(app: Express) {
   app.use(ENDPOINTS.HOME, homeRoutes);
@@ -15,4 +16,5 @@ export function registerRoutes(app: Express) {
   app.use(ENDPOINTS.LINKEDIN, linkedinRoutes);
   app.use(ENDPOINTS.YOUTUBE, youtubeRoutes);
   app.use(ENDPOINTS.GSEARCH, gsearchRoutes);
+  app.use(ENDPOINTS.MCP, mcpRoutes);
 }

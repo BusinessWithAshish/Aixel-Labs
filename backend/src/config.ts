@@ -8,6 +8,7 @@ export enum ENDPOINTS {
   LINKEDIN = "/linkedin",
   YOUTUBE = "/youtube",
   GSEARCH = "/gsearch",
+  MCP = "/mcp",
   SAMPLE = "/sample",
 }
 
@@ -81,6 +82,10 @@ export const API_ENDPOINTS = {
   },
   GSEARCH: {
     SEARCH: { route: "/", full: `${ENDPOINTS.GSEARCH}` },
+  },
+  MCP: {
+    ROOT: { route: "/", full: `${ENDPOINTS.MCP}` },
+    HEALTH: { route: "/health", full: `${ENDPOINTS.MCP}/health` },
   },
   SAMPLE: {
     API: { route: "/api", full: `${ENDPOINTS.SAMPLE}/api` },
