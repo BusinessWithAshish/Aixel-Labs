@@ -175,11 +175,7 @@ export async function fetchUrlsImpit<T = unknown>(
 
           try {
             const response = await withTimeout(
-              (
-                session as unknown as {
-                  fetch: (u: string, init?: unknown) => Promise<Response>;
-                }
-              ).fetch(url, { method: "GET" } as unknown),
+              session.fetch(url, { method: "GET" }),
               FETCH_URLS_REQUEST_TIMEOUT_MS,
               `${pos} attempt ${attempt}`,
             );
