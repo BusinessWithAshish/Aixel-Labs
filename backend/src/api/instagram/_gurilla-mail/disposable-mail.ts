@@ -47,7 +47,7 @@ async function gmRequest<T = any>(
     if (match) newSession = match[1];
   }
 
-  const json = await res.json();
+  const json = (await res.json()) as GMResponse<T>;
 
   return {
     data: json,
