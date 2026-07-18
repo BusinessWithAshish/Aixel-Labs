@@ -46,7 +46,7 @@ export async function enrichChannelResults(
   harvestedAt: Date = new Date(),
   geo: YOUTUBE_INTELLIGENCE_GEO_INPUT,
 ): Promise<YOUTUBE_CHANNEL_INTELLIGENCE_RESPONSE> {
-  const { primary, videosTab, shortsTab } = harvest;
+  const { primary, videosTab, shortsTab, fetchLimit } = harvest;
   const videoIds = collectWatchMetaVideoIds(harvest);
   const watchMetaByVideoId =
     videoIds.length > 0
@@ -58,6 +58,8 @@ export async function enrichChannelResults(
     shortsTab: shortsTab.items as YOUTUBE_CHANNEL_SHORT_ITEM[],
     watchMetaByVideoId,
     harvestedAt,
+    fetchLimit,
+    channelVideoCount: primary.channelInfo?.videoCount ?? null,
   };
 
   const intelligence = enrichChannelInfoFields(

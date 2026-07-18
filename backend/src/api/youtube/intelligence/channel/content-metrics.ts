@@ -29,6 +29,10 @@ export type ChannelIntelligenceContext = {
   shortsTab: YOUTUBE_CHANNEL_SHORT_ITEM[];
   watchMetaByVideoId: Map<string, YOUTUBE_VIDEO_WATCH_META>;
   harvestedAt: Date;
+  /** Cap used when fetching each tab — samples at this size are censored. */
+  fetchLimit: number;
+  /** channelInfo.videoCount — total uploads when available. */
+  channelVideoCount: number | null;
 };
 
 function collectVelocityItems(
@@ -181,11 +185,40 @@ export function computeChannelContentMetrics(
 > {
   const shortCount = context.shortsTab.length;
   const videoOnlyCount = context.videosTab.length;
-  const catalogSampleTotal = shortCount + videoOnlyCount;
-  const shortRatio =
-    catalogSampleTotal > 0
-      ? computeRatio(shortCount, catalogSampleTotal)
-      : null;
+  const { fetchLimit, channelVideoCount } = context;
+
+  // Sample is complete when we did not hit the fetch cap.
+  const shortsComplete = shortCount < fetchLimit;
+  const videosComplete = videoOnlyCount < fetchLimit;
+
+  let shortRatio: number | null = null;
+
+  if (shortCount === 0 && videoOnlyCount === 0) {
+    shortRatio = null;
+  } else if (shortsComplete && videosComplete) {
+    // Both tabs fully enumerated within limit.
+    shortRatio = computeRatio(shortCount, shortCount + videoOnlyCount);
+  } else if (
+    shortsComplete &&
+    channelVideoCount != null &&
+    channelVideoCount > 0
+  ) {
+    // Exact shorts count; videoCount ≈ total uploads (includes shorts).
+    shortRatio = computeRatio(shortCount, channelVideoCount);
+  } else if (
+    videosComplete &&
+    channelVideoCount != null &&
+    channelVideoCount > 0
+  ) {
+    // Exact long-form count; remainder attributed to shorts.
+    shortRatio = computeRatio(
+      Math.max(channelVideoCount - videoOnlyCount, 0),
+      channelVideoCount,
+    );
+  } else {
+    // Both samples censored at `fetchLimit` — refuse the misleading 0.5 artifact.
+    shortRatio = null;
+  }
 
   const viewCounts = context.videosTab
     .map((item) => item.views)
