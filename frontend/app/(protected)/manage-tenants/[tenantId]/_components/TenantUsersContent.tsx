@@ -7,6 +7,7 @@ import { UserDialog } from './EditUserDialog';
 import { DeleteUserConfirmDialog } from './DeleteUserConfirmDialog';
 import { UserBulkActionsToolbar } from './UserBulkActionsToolbar';
 import { BulkModuleAccessDialog } from './BulkModuleAccessDialog';
+import { CouponsSection } from './CouponsSection';
 import { SwitchTenantConfirmDialog } from '../../_components/SwitchTenantConfirmDialog';
 import { usePage } from '@/contexts/PageStore';
 import type { UseTenantUsersPageReturn } from '../_hooks/use-tenant-users-page';
@@ -25,6 +26,7 @@ export function TenantUsersContent() {
     const tenantId = params?.tenantId as string;
     const {
         users,
+        coupons,
         defaultModuleAccess,
         currentUserId,
         isForeignTenant,
@@ -210,6 +212,8 @@ export function TenantUsersContent() {
                         No users found{searchQuery.trim() ? ` for "${searchQuery.trim()}"` : ''}.
                     </p>
                 )}
+
+                <CouponsSection coupons={coupons} />
             </div>
 
             <UserDialog

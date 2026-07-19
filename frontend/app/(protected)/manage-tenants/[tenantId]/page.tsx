@@ -4,10 +4,11 @@ import { TenantUsersContent } from './_components/TenantUsersContent';
 import { useTenantUsersPage } from './_hooks/use-tenant-users-page';
 import { withAdminOnly } from '@/components/hocs/with-admin';
 import { getAllUsersByTenant } from '@/app/actions/user-actions';
+import { listCoupons } from '@/app/actions/coupon-actions';
 import { getTenantByName } from '@/app/actions/tenant-actions';
 import { PageProvider } from '@/contexts/PageStore';
 import { getAppSession } from '@/server/auth';
-import type { ModuleAccess, User } from '@aixellabs/backend/db/types';
+import type { Coupon, ModuleAccess, User } from '@aixellabs/backend/db/types';
 
 async function TenantUsersPage({ params }: { params: Promise<{ tenantId: string }> }) {
     const { tenantId } = await params;
@@ -16,12 +17,17 @@ async function TenantUsersPage({ params }: { params: Promise<{ tenantId: string 
     const isForeignTenant = sessionTenantName !== tenantId;
 
     let users: User[] = [];
+    let coupons: Coupon[] = [];
     let defaultModuleAccess: ModuleAccess = {};
 
     if (!isForeignTenant) {
-        const usersResponse = await getAllUsersByTenant(tenantId);
+        const [usersResponse, couponsResponse, tenantRes] = await Promise.all([
+            getAllUsersByTenant(tenantId),
+            listCoupons(),
+            getTenantByName(tenantId),
+        ]);
         users = usersResponse.success && usersResponse.data ? usersResponse.data : [];
-        const tenantRes = await getTenantByName(tenantId);
+        coupons = couponsResponse.success && couponsResponse.data ? couponsResponse.data : [];
         defaultModuleAccess = tenantRes.data?.defaultModuleAccess ?? {};
     }
 
@@ -31,6 +37,7 @@ async function TenantUsersPage({ params }: { params: Promise<{ tenantId: string 
         <PageProvider
             data={{
                 users,
+                coupons,
                 sessionTenantName,
                 tenantSlug: tenantId,
                 defaultModuleAccess,

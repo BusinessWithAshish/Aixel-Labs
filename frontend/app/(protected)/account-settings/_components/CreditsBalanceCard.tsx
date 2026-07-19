@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { getUserCredits } from '@/app/actions/credit-db';
 import { creditsToneClassName } from '@/helpers/credits';
 import { cn } from '@/lib/utils';
+import { RedeemCouponForm } from './RedeemCouponForm';
 
 export async function CreditsBalanceCard() {
     const session = await getAppSession();
@@ -41,6 +42,7 @@ export async function CreditsBalanceCard() {
                 <p className="mt-1 text-xs text-muted-foreground">
                     {credits === 1 ? '1 credit available' : `${credits} credits available`}
                 </p>
+                <RedeemCouponForm />
             </CardContent>
         </Card>
     );

@@ -23,6 +23,8 @@ export enum MongoCollections {
   LEADS = "leads",
   USER_LEADS = "user_leads",
   LEAD_LISTS = "lead_lists",
+  COUPONS = "coupons",
+  COUPON_REDEMPTIONS = "coupon_redemptions",
 }
 
 export enum Modules {
@@ -159,3 +161,40 @@ export type UserLeadListDoc<Id = ObjectId> = {
 
 /** List row for UI/API: `leadCount` is derived from `user_leads`, not stored on the list document. */
 export type UserLeadList = UserLeadListDoc<string> & { leadCount: number };
+
+/** Tenant-scoped coupon that grants bonus credits on redeem. */
+export type CouponDoc<Id = ObjectId> = {
+  _id?: Id;
+  tenantId: Id;
+  /** Normalized uppercase code, unique per tenant. */
+  code: string;
+  creditAmount: number;
+  /** Total redemption cap; `null` = unlimited. */
+  maxRedemptions: number | null;
+  redemptionCount: number;
+  expiresAt?: Date | null;
+  isActive: boolean;
+  createdByUserId: Id;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type Coupon = Omit<CouponDoc<string>, "expiresAt" | "createdAt" | "updatedAt"> & {
+  expiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CouponRedemptionDoc<Id = ObjectId> = {
+  _id?: Id;
+  tenantId: Id;
+  couponId: Id;
+  userId: Id;
+  code: string;
+  creditAmount: number;
+  createdAt: Date;
+};
+
+export type CouponRedemption = Omit<CouponRedemptionDoc<string>, "createdAt"> & {
+  createdAt: string;
+};

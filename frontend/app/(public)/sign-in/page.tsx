@@ -28,15 +28,16 @@ function resolveCallbackUrl(raw: string | string[] | undefined): string {
 export default async function SignInPage({
     searchParams,
 }: {
-    searchParams: Promise<{ callbackUrl?: string | string[] }>;
+    searchParams: Promise<{ callbackUrl?: string | string[]; coupon?: string | string[] }>;
 }) {
-    const [{ callbackUrl: rawCallbackUrl }, tenantData] = await Promise.all([
+    const [{ callbackUrl: rawCallbackUrl, coupon: rawCoupon }, tenantData] = await Promise.all([
         searchParams,
         validateAndGetTenant(),
     ]);
     const tenantLabel = tenantData?.label ?? APP_NAME;
     const tenantDescription = tenantData?.app_description ?? APP_DESCRIPTION;
     const callbackUrl = resolveCallbackUrl(rawCallbackUrl);
+    const initialCouponCode = Array.isArray(rawCoupon) ? rawCoupon[0] ?? '' : rawCoupon ?? '';
 
     return (
         <div className="grid min-h-svh lg:grid-cols-2">
@@ -45,7 +46,7 @@ export default async function SignInPage({
                     <LogoWithText tenantLabel={tenantLabel} />
                 </div>
                 <div className="flex flex-1 items-center justify-center">
-                    <LoginForm callbackUrl={callbackUrl} />
+                    <LoginForm callbackUrl={callbackUrl} initialCouponCode={initialCouponCode} />
                 </div>
             </div>
             <div className="bg-muted relative hidden md:block">

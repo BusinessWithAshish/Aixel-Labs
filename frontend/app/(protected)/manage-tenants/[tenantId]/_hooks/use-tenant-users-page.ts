@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import type { ModuleAccess, User } from '@aixellabs/backend/db/types';
+import type { Coupon, ModuleAccess, User } from '@aixellabs/backend/db/types';
 
 export type BulkModuleAccessTarget = 'selected' | 'all';
 
 export type TenantUsersPageData = {
     users: User[];
+    coupons: Coupon[];
     sessionTenantName: string;
     tenantSlug: string;
     defaultModuleAccess: ModuleAccess;
@@ -16,6 +17,7 @@ export type TenantUsersPageData = {
 
 export type UseTenantUsersPageReturn = {
     users: User[];
+    coupons: Coupon[];
     sessionTenantName: string;
     tenantSlug: string;
     defaultModuleAccess: ModuleAccess;
@@ -38,7 +40,7 @@ export type UseTenantUsersPageReturn = {
  * editingUser: undefined = dialog closed; User = edit dialog open.
  */
 export function useTenantUsersPage(data: TenantUsersPageData): UseTenantUsersPageReturn {
-    const { users, sessionTenantName, tenantSlug, defaultModuleAccess, currentUserId } = data;
+    const { users, coupons, sessionTenantName, tenantSlug, defaultModuleAccess, currentUserId } = data;
     const isForeignTenant = sessionTenantName !== tenantSlug;
 
     const [editingUser, setEditingUser] = useState<User | null | undefined>(undefined);
@@ -77,6 +79,7 @@ export function useTenantUsersPage(data: TenantUsersPageData): UseTenantUsersPag
 
     return {
         users,
+        coupons,
         sessionTenantName,
         tenantSlug,
         defaultModuleAccess,
