@@ -6,8 +6,6 @@ import { sessionCookieClearOptions, sessionCookieSetOptions } from '@/lib/auth/c
 import type { CreateSessionActionResult } from '@/lib/auth/types';
 import { exchangeIdTokenForSessionCookieFromHeaders, revokeSessionCookie } from '@/server/auth';
 
-export type { CreateSessionActionResult } from '@/lib/auth/types';
-
 export async function createSession(
     idToken: string,
     deviceFingerprint: string,

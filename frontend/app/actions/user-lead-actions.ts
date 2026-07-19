@@ -77,7 +77,7 @@ export async function createUserLeads(
         // Cap to what the balance can cover (e.g. 250 credits + 255 leads → keep 250).
         // Debit before creating a list so a failed charge cannot leave an orphan list.
         const costPerItem = getCreditCostPerItem(subModule);
-        const balance = exempt ? availableCredits : (await getUserCreditsState(uid)).credits;
+        const balance = availableCredits;
         const maxItems = exempt ? uniqueLeads.length : Math.floor(balance / costPerItem);
         const leads = uniqueLeads.slice(0, Math.max(0, maxItems));
         if (!leads.length) {

@@ -9,20 +9,19 @@ import {
     type TenantDoc,
     type User,
     type UserDoc,
-    type UserLeadDoc,
-    type UserLeadListDoc,
 } from '@aixellabs/backend/db';
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
 import { parseUserName } from '@/helpers/user-name';
 import { normalizeCredits, parseCreditsInput, type UserCreditsState } from '@/helpers/credits';
 import { getUserCreditsState } from '@/app/actions/credit-db';
-import { getFirebaseAdminAuth } from '@/lib/firebase/admin';
 import {
     assertTenantNameIsSessionTenant,
     assertUserInSessionTenant,
     requireAdminSessionContext,
 } from '@/server/auth';
+import { deleteOrphanedFirebaseUsers } from '@/server/auth/firebase-cleanup';
+import { deleteUserOwnedLeadData } from '@/server/leads/cascade-delete';
 import type { Filter } from 'mongodb';
 
 const mapUserDocToUser = (user: UserDoc): User => ({
@@ -30,15 +29,6 @@ const mapUserDocToUser = (user: UserDoc): User => ({
     tenantId: user.tenantId.toString(),
     credits: normalizeCredits(user.credits),
 });
-
-/** Lists users for the caller's current session tenant only. */
-export const getAllUsers = async (): Promise<ALApiResponse<User[]>> =>
-    runAuthenticatedAction(async function getAllUsers() {
-        const { tenantObjectId } = await requireAdminSessionContext();
-        const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
-        const users = await usersCollection.find({ tenantId: tenantObjectId }).toArray();
-        return users.map(mapUserDocToUser);
-    });
 
 /** `tenantId` is the tenant document `name` (slug). Must match the session tenant. */
 export const getAllUsersByTenant = async (tenantId: string): Promise<ALApiResponse<User[]>> =>
@@ -49,21 +39,6 @@ export const getAllUsersByTenant = async (tenantId: string): Promise<ALApiRespon
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
         const users = await usersCollection.find({ tenantId: tenantObjectId }).toArray();
         return users.map(mapUserDocToUser);
-    });
-
-export const getUserById = async (id: string): Promise<ALApiResponse<User>> =>
-    runAuthenticatedAction(async function getUserById() {
-        const { tenantObjectId } = await requireAdminSessionContext();
-        assertValidObjectId(id, 'User ID');
-
-        const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
-        const user = await usersCollection.findOne({ _id: new MongoObjectId(id) });
-        if (!user) {
-            throw new Error('User not found');
-        }
-        assertUserInSessionTenant(user, tenantObjectId);
-
-        return mapUserDocToUser(user);
     });
 
 export const updateUser = async (input: User): Promise<ALApiResponse<User>> => {
@@ -133,26 +108,14 @@ export const deleteUser = async (id: string): Promise<ALApiResponse<boolean>> =>
         assertUserInSessionTenant(user, tenantObjectId);
 
         const userOid = new MongoObjectId(id);
-        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
-        const leadListsCollection = await getCollection<UserLeadListDoc>(MongoCollections.LEAD_LISTS);
-        await userLeadsCollection.deleteMany({ userId: userOid });
-        await leadListsCollection.deleteMany({ userId: userOid });
+        await deleteUserOwnedLeadData([userOid]);
 
         const result = await usersCollection.deleteOne({ _id: userOid });
         if (result.deletedCount !== 1) {
             throw new Error('User not found');
         }
 
-        if (user.firebaseUid) {
-            const remaining = await usersCollection.countDocuments({ firebaseUid: user.firebaseUid });
-            if (remaining === 0) {
-                try {
-                    await getFirebaseAdminAuth().deleteUser(user.firebaseUid);
-                } catch (error) {
-                    console.error('Failed to delete Firebase user:', error);
-                }
-            }
-        }
+        await deleteOrphanedFirebaseUsers(user.firebaseUid ? [user.firebaseUid] : []);
 
         return true;
     });

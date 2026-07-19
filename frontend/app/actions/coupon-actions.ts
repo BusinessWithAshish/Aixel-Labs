@@ -14,9 +14,8 @@ import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { normalizeCredits, parseCreditsInput } from '@/helpers/credits';
 import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
 import { requireAdminSessionContext, requireAppSession } from '@/server/auth';
+import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key';
 import { ensureCouponIndexes } from '@/server/coupons/indexes';
-
-const DUPLICATE_KEY_CODE = 11000;
 
 export type CreateCouponInput = {
     code: string;
@@ -72,10 +71,6 @@ function parseOptionalExpiresAt(value: string | null | undefined): Date | null {
         throw new Error('Invalid expiry date');
     }
     return date;
-}
-
-function isDuplicateKeyError(error: unknown): boolean {
-    return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code: number }).code === DUPLICATE_KEY_CODE);
 }
 
 function mapCouponDocToCoupon(doc: CouponDoc): Coupon {
@@ -148,7 +143,7 @@ export const createCoupon = async (input: CreateCouponInput): Promise<ALApiRespo
             const result = await coupons.insertOne(doc);
             return mapCouponDocToCoupon({ ...doc, _id: result.insertedId });
         } catch (error) {
-            if (isDuplicateKeyError(error)) {
+            if (isMongoDuplicateKeyError(error)) {
                 throw new Error('A coupon with this code already exists');
             }
             throw error;
@@ -197,10 +192,6 @@ export const updateCoupon = async (input: UpdateCouponInput): Promise<ALApiRespo
         }
         return mapCouponDocToCoupon(updated);
     });
-
-/** Soft-deactivates a coupon so it can no longer be redeemed. */
-export const deactivateCoupon = async (id: string): Promise<ALApiResponse<Coupon>> =>
-    updateCoupon({ id, isActive: false });
 
 /**
  * Redeems a tenant-scoped coupon for the current non-admin user.
@@ -289,7 +280,7 @@ export const redeemCoupon = async (code: string): Promise<ALApiResponse<RedeemCo
             await redemptions.insertOne(redemptionDoc);
         } catch (error) {
             await coupons.updateOne({ _id: coupon._id }, { $inc: { redemptionCount: -1 }, $set: { updatedAt: new Date() } });
-            if (isDuplicateKeyError(error)) {
+            if (isMongoDuplicateKeyError(error)) {
                 throw new Error('You have already redeemed this coupon');
             }
             throw error;

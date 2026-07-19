@@ -1,7 +1,7 @@
 'use server';
 
 import { ALApiResponse } from '@aixellabs/backend/api/types';
-import type { Tenant, TenantDoc, UserDoc, UserLeadDoc, UserLeadListDoc } from '@aixellabs/backend/db/types';
+import type { Tenant, TenantDoc, UserDoc } from '@aixellabs/backend/db/types';
 import { MongoCollections, MongoObjectId, getCollection } from '@aixellabs/backend/db';
 import { parseCreditsInput } from '@/helpers/credits';
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
@@ -11,7 +11,8 @@ import {
     assertTenantIsSessionTenant,
     requireAdminSessionContext,
 } from '@/server/auth';
-import { getFirebaseAdminAuth } from '@/lib/firebase/admin';
+import { deleteOrphanedFirebaseUsers } from '@/server/auth/firebase-cleanup';
+import { deleteUserOwnedLeadData } from '@/server/leads/cascade-delete';
 
 export const getAllTenants = async (): Promise<ALApiResponse<Tenant[]>> =>
     runAuthenticatedAction(async function getAllTenants() {
@@ -157,8 +158,6 @@ export const deleteTenant = async (id: string): Promise<ALApiResponse<DeleteTena
         const tenantObjectId = new MongoObjectId(id);
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
-        const leadListsCollection = await getCollection<UserLeadListDoc>(MongoCollections.LEAD_LISTS);
-        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
 
         const tenant = await tenantsCollection.findOne({ _id: tenantObjectId });
         if (!tenant) {
@@ -170,19 +169,9 @@ export const deleteTenant = async (id: string): Promise<ALApiResponse<DeleteTena
             .find({ tenantId: tenantObjectId }, { projection: { _id: 1, firebaseUid: 1 } })
             .toArray();
         const userIds = users.map((user) => user._id).filter((userId): userId is MongoObjectId => Boolean(userId));
-        const firebaseUids = [
-            ...new Set(users.map((user) => user.firebaseUid).filter((uid): uid is string => Boolean(uid))),
-        ];
+        const firebaseUids = users.map((user) => user.firebaseUid).filter((uid): uid is string => Boolean(uid));
 
-        let deletedUserLeads = 0;
-        let deletedLeadLists = 0;
-
-        if (userIds.length > 0) {
-            const userLeadsResult = await userLeadsCollection.deleteMany({ userId: { $in: userIds } });
-            deletedUserLeads = userLeadsResult.deletedCount;
-            const leadListsResult = await leadListsCollection.deleteMany({ userId: { $in: userIds } });
-            deletedLeadLists = leadListsResult.deletedCount;
-        }
+        const { deletedUserLeads, deletedLeadLists } = await deleteUserOwnedLeadData(userIds);
 
         const usersResult = await usersCollection.deleteMany({ tenantId: tenantObjectId });
         const tenantResult = await tenantsCollection.deleteOne({ _id: tenantObjectId });
@@ -190,17 +179,7 @@ export const deleteTenant = async (id: string): Promise<ALApiResponse<DeleteTena
             throw new Error('Failed to delete tenant');
         }
 
-        const auth = getFirebaseAdminAuth();
-        for (const firebaseUid of firebaseUids) {
-            const remaining = await usersCollection.countDocuments({ firebaseUid });
-            if (remaining === 0) {
-                try {
-                    await auth.deleteUser(firebaseUid);
-                } catch (error) {
-                    console.error('Failed to delete Firebase user after tenant delete:', error);
-                }
-            }
-        }
+        await deleteOrphanedFirebaseUsers(firebaseUids);
 
         return {
             deletedUsers: usersResult.deletedCount,

@@ -1,23 +1,18 @@
-import { getAppSession } from '@/server/auth';
 import { CreditsIcon } from '@/components/common/credits/CreditsBadge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getUserCredits } from '@/app/actions/credit-db';
+import { getCurrentUserCredits } from '@/app/actions/user-actions';
 import { creditsToneClassName } from '@/helpers/credits';
 import { cn } from '@/lib/utils';
 import { RedeemCouponForm } from './RedeemCouponForm';
 
 export async function CreditsBalanceCard() {
-    const session = await getAppSession();
-    if (!session?.user?.id || session.user.isAdmin) {
+    // Card is only rendered for non-admins (admins are exempt — see credits-system rule).
+    // On a failed read we fall back to 0, matching the previous try/catch behavior.
+    const result = await getCurrentUserCredits();
+    if (result.success && result.data?.exempt) {
         return null;
     }
-
-    let credits = 0;
-    try {
-        credits = await getUserCredits(session.user.id);
-    } catch {
-        credits = 0;
-    }
+    const credits = result.success && result.data ? result.data.credits : 0;
 
     return (
         <Card>

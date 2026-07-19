@@ -23,6 +23,10 @@ export async function ensureUserLeadIndexes(): Promise<void> {
     }
 
     await userLeads.createIndex({ userId: 1, leadId: 1, listId: 1 }, { unique: true });
+    // List-scoped reads (e.g. getUserLeadsForList, countDocuments) and the
+    // getUserLeadLists aggregation group by (userId, listId); a dedicated
+    // non-unique compound index serves those without forcing a collection scan.
+    await userLeads.createIndex({ userId: 1, listId: 1 });
 
     indexesEnsured = true;
 }
