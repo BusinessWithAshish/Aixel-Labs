@@ -12,13 +12,13 @@ const nextConfig: NextConfig = {
         unoptimized: true,
     },
     // Keep native/server-only packages out of the webpack bundle entirely
-    serverExternalPackages: ['mongodb', 'impit'],
+    serverExternalPackages: ['mongodb', 'node-tls-client'],
     webpack: (config, { isServer }) => {
         if (!isServer) {
             config.resolve.alias = {
                 ...config.resolve.alias,
                 mongodb: false,
-                impit: false,
+                'node-tls-client': false,
             };
         }
         return config;

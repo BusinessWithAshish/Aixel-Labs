@@ -95,12 +95,19 @@ export type CreateUrlFetchSessionOptions = {
   headers?: Record<string, string>;
   clientIdentifier?: ClientIdentifier;
   useProxy?: boolean;
-  /** Evomi sticky suffix; random when omitted. */
+  /** Evomi sticky suffix; random when omitted. Ignored when `proxyUrl` is set. */
   proxySessionSuffix?: string;
   /** ISO 3166-1 alpha-2 code for `_country-XX` proxy routing. */
   proxyCountry?: string;
   /** Optional region for `_region-*` proxy routing. */
   proxyRegion?: string;
+  /**
+   * Full proxy URL override (e.g. already-built Evomi URL). When set, skips
+   * `buildEvomiProxyUrl` and forces proxy on.
+   */
+  proxyUrl?: string;
+  /** Per-session request timeout; defaults to `FETCH_URLS_REQUEST_TIMEOUT_MS`. */
+  timeoutMs?: number;
 };
 
 /** One TLS session (cookie jar + optional Evomi sticky proxy) for a caller batch. */
@@ -116,16 +123,23 @@ export async function createUrlFetchSession(
     proxySessionSuffix = randomUUID().replace(/-/g, "").slice(0, 12),
     proxyCountry,
     proxyRegion,
+    proxyUrl: proxyUrlOverride,
+    timeoutMs = FETCH_URLS_REQUEST_TIMEOUT_MS,
   } = options;
 
-  const resolvedUseProxy = useProxy ?? evomiConfigured();
-  const proxyUrl = resolvedUseProxy
-    ? buildEvomiProxyUrl({
-        sessionId: proxySessionSuffix,
-        countryCode: proxyCountry,
-        region: proxyRegion,
-      })
-    : undefined;
+  const resolvedUseProxy =
+    proxyUrlOverride !== undefined
+      ? true
+      : (useProxy ?? evomiConfigured());
+  const proxyUrl =
+    proxyUrlOverride ??
+    (resolvedUseProxy
+      ? buildEvomiProxyUrl({
+          sessionId: proxySessionSuffix,
+          countryCode: proxyCountry,
+          region: proxyRegion,
+        })
+      : undefined);
 
   if (shouldDebugProxy()) {
     console.log(proxyDebugLine("tls", proxySessionSuffix, Boolean(proxyUrl)));
@@ -133,7 +147,7 @@ export async function createUrlFetchSession(
 
   const sessionOpts: SessionOptions = {
     clientIdentifier,
-    timeout: FETCH_URLS_REQUEST_TIMEOUT_MS,
+    timeout: timeoutMs,
     headers: mergeHttpHeaderRecords(DEFAULT_HTML_HEADERS, headers),
     insecureSkipVerify: true,
     randomTlsExtensionOrder: true,
@@ -330,4 +344,58 @@ export async function fetchUrls<T = unknown>(
 
   console.log(`${tag} Done — ${results.length}/${totalUrls} succeeded.`);
   return results;
+}
+
+export type TlsGetOptions = {
+  /** Full proxy URL; when omitted, uses Evomi if configured unless `useProxy: false`. */
+  proxyUrl?: string;
+  useProxy?: boolean;
+  headers?: Record<string, string>;
+  timeoutMs?: number;
+  followRedirects?: boolean;
+};
+
+export type TlsGetResult = {
+  status: number;
+  body: string;
+  headers: IncomingHttpHeaders;
+  /** Request URL (node-tls-client does not expose a final redirect URL). */
+  url: string;
+};
+
+/** One-shot GET via node-tls-client (opens and closes a session). */
+export async function tlsGet(
+  url: string,
+  options: TlsGetOptions = {},
+): Promise<TlsGetResult> {
+  const {
+    proxyUrl,
+    useProxy,
+    headers = {},
+    timeoutMs,
+    followRedirects = true,
+  } = options;
+
+  const session = await createUrlFetchSession({
+    headers,
+    timeoutMs,
+    ...(proxyUrl !== undefined
+      ? { proxyUrl }
+      : useProxy !== undefined
+        ? { useProxy }
+        : {}),
+  });
+
+  try {
+    const response = await session.get(url, { followRedirects });
+    const body = await response.text();
+    return {
+      status: response.status,
+      body,
+      headers: response.headers,
+      url,
+    };
+  } finally {
+    await closeUrlFetchSession(session);
+  }
 }

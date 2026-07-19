@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
-import { Impit } from "impit";
-
+import {
+  closeUrlFetchSession,
+  createUrlFetchSession,
+} from "../../utils/node-tls-client-session-handler";
 import {
   GSEARCH_ACCEPT_LANGUAGE,
   GSEARCH_REQUEST_TIMEOUT_MS,
@@ -19,22 +21,22 @@ export async function gsearchProxiedGet(
   url: string,
   opts: { proxyUrl: string; referer?: string },
 ): Promise<{ status: number; body: string }> {
-  const headers: Record<string, string> = {
-    "user-agent": GSEARCH_USER_AGENT,
-    accept: "*/*",
-    "accept-language": GSEARCH_ACCEPT_LANGUAGE,
-    ...(opts.referer ? { referer: opts.referer } : {}),
-  };
-
-  const impit = new Impit({
-    browser: "chrome131",
-    followRedirects: true,
-    timeout: GSEARCH_REQUEST_TIMEOUT_MS,
-    headers,
+  const session = await createUrlFetchSession({
     proxyUrl: opts.proxyUrl,
+    timeoutMs: GSEARCH_REQUEST_TIMEOUT_MS,
+    headers: {
+      "user-agent": GSEARCH_USER_AGENT,
+      accept: "*/*",
+      "accept-language": GSEARCH_ACCEPT_LANGUAGE,
+      ...(opts.referer ? { referer: opts.referer } : {}),
+    },
   });
 
-  const res = await impit.fetch(url, { headers });
-  const body = await res.text();
-  return { status: res.status, body };
+  try {
+    const res = await session.get(url, { followRedirects: true });
+    const body = await res.text();
+    return { status: res.status, body };
+  } finally {
+    await closeUrlFetchSession(session);
+  }
 }

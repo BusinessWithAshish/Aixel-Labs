@@ -6,7 +6,7 @@ import {
 } from "../types";
 import { fetchGsearch } from "../../gsearch";
 import { GSEARCH_MAX_PAGES, GSEARCH_PAGE_SIZE } from "../../gsearch/constants";
-import { fetchUrlsImpit } from "../../../utils/impit-session-handler";
+import { fetchUrls } from "../../../utils/node-tls-client-session-handler";
 import { LINKEDIN_BY_PEOPLE_ADVANCED_SEARCH_QUERY } from "../constants";
 import {
   attr,
@@ -692,9 +692,8 @@ export const fetchLinkedInByPeople = async (
     return canonical ? [canonical] : [];
   });
 
-  // Use Impit for LinkedIn fetching (more resilient to LinkedIn bot-blocks vs TLS client).
   const linkedInPeopleDataResults =
-    await fetchUrlsImpit<LINKEDIN_BY_PEOPLE_RESPONSE>({
+    await fetchUrls<LINKEDIN_BY_PEOPLE_RESPONSE>({
       targets: profileUrls,
       mapper: (html) => parseLinkedInPeoplePage(html),
     });

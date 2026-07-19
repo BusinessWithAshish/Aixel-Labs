@@ -1,4 +1,9 @@
-import { Impit } from 'impit';
+import {
+  ClientIdentifier,
+  Session,
+  destroyTLS,
+  initTLS,
+} from 'node-tls-client';
 import type { FetchInstagramProfileResult, InstagramResponse } from './types';
 
 export const IG_APP_ID = '936619743392459';
@@ -32,15 +37,67 @@ export const IG_HEADERS: Record<string, string> = {
     referer: INSTAGRAM_BASE_URL,
 };
 
-export function createIgClient() {
-    return new Impit({});
+let tlsReady: Promise<void> | null = null;
+
+async function ensureTls(): Promise<void> {
+  if (!tlsReady) {
+    tlsReady = initTLS().catch((err) => {
+      tlsReady = null;
+      throw err;
+    });
+  }
+  await tlsReady;
 }
 
-export async function igFetch(url: string, extraHeaders?: Record<string, string>) {
-    const client = createIgClient();
-    return client.fetch(url, {
-        headers: { ...IG_HEADERS, ...extraHeaders },
-    });
+export type IgFetchResponse = {
+  status: number;
+  ok: boolean;
+  headers: { get(name: string): string | null };
+  text(): Promise<string>;
+  json(): Promise<unknown>;
+};
+
+export async function igFetch(
+  url: string,
+  extraHeaders?: Record<string, string>,
+): Promise<IgFetchResponse> {
+  await ensureTls();
+
+  const session = new Session({
+    clientIdentifier: ClientIdentifier.chrome_131,
+    timeout: REQUEST_TIMEOUT_MS,
+    headers: { ...IG_HEADERS, ...extraHeaders },
+    insecureSkipVerify: true,
+    randomTlsExtensionOrder: true,
+  });
+
+  try {
+    const response = await session.get(url, { followRedirects: true });
+    const body = await response.text();
+    const headers = response.headers;
+
+    return {
+      status: response.status,
+      ok: response.status >= 200 && response.status < 300,
+      headers: {
+        get(name: string) {
+          const raw = headers[name.toLowerCase()];
+          if (Array.isArray(raw)) return raw[0] ?? null;
+          return typeof raw === 'string' ? raw : null;
+        },
+      },
+      text: async () => body,
+      json: async () => JSON.parse(body) as unknown,
+    };
+  } finally {
+    await session.close().catch(() => {});
+  }
+}
+
+for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(sig, () => {
+    void destroyTLS().catch(() => {});
+  });
 }
 
 export function sleep(ms: number) {

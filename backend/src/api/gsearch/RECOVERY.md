@@ -141,7 +141,7 @@ backend/src/api/gsearch/
 ```
 
 Proxy: always on via `buildEvomiProxyUrl({ sessionId, countryCode })` (country only —
-`_region-*` fails the tunnel for unsupported cities). Transport: `impit` (`chrome131`).
+`_region-*` fails the tunnel for unsupported cities). Transport: `node-tls-client` (`chrome_131`).
 
 ---
 

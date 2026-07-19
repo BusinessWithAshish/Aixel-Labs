@@ -63,7 +63,7 @@ export function shouldDebugProxy(): boolean {
 }
 
 export function proxyDebugLine(
-  engine: "tls" | "impit",
+  engine: "tls",
   sessionSuffix: string,
   enabled: boolean,
 ): string {

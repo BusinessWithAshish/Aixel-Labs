@@ -119,7 +119,7 @@ gsearch/
 │   ├── map-result.ts # mapCseResult (CSE row → GSEARCH_RESULT)
 │   └── index.ts
 ├── helpers.ts        # barrel re-export of compute/
-├── http.ts           # proxied GET (Impit + Evomi)
+├── http.ts           # proxied GET (node-tls-client + Evomi)
 ├── token.ts          # cse.js token cache + search URL builder
 ├── client.ts         # fetchGsearch orchestration
 └── handler.ts        # gsearchApiHandler (403 if no proxy → fetch → respond)
