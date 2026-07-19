@@ -8,8 +8,11 @@ import { exchangeIdTokenForSessionCookieFromHeaders, revokeSessionCookie } from 
 
 export type { CreateSessionActionResult } from '@/lib/auth/types';
 
-export async function createSession(idToken: string): Promise<CreateSessionActionResult> {
-    const result = await exchangeIdTokenForSessionCookieFromHeaders(idToken);
+export async function createSession(
+    idToken: string,
+    deviceFingerprint: string,
+): Promise<CreateSessionActionResult> {
+    const result = await exchangeIdTokenForSessionCookieFromHeaders(idToken, deviceFingerprint);
     if (!result.ok) {
         return { success: false, error: result.error };
     }

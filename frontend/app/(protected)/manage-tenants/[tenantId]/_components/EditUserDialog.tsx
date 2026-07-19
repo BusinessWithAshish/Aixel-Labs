@@ -172,8 +172,7 @@ export function UserDialog({
                             <DialogHeader>
                                 <DialogTitle>Edit User</DialogTitle>
                                 <DialogDescription>
-                                    Update permissions{isAdmin ? '' : ' and credits'}. Users sign up via Google and
-                                    phone verification.
+                                    Update permissions{isAdmin ? '' : ' and credits'}. Users sign up via Google.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-4 py-4">
@@ -181,12 +180,6 @@ export function UserDialog({
                                     <p className="text-sm font-medium">Email</p>
                                     <p className="text-muted-foreground text-sm">{user?.email}</p>
                                 </div>
-                                {user?.phoneNumber && (
-                                    <div className="grid gap-1">
-                                        <p className="text-sm font-medium">Phone</p>
-                                        <p className="text-muted-foreground text-sm">{user.phoneNumber}</p>
-                                    </div>
-                                )}
                                 <StringControlledField
                                     name="name"
                                     label="Name"

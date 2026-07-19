@@ -15,8 +15,14 @@ export type { CreateSessionResult } from '@/lib/auth/types';
  */
 export async function exchangeIdTokenForSessionCookie(
     idToken: string,
+    deviceFingerprint: string,
     requestHeaders: Headers,
 ): Promise<CreateSessionResult> {
+    const fingerprint = deviceFingerprint.trim();
+    if (!fingerprint) {
+        return { ok: false, error: AUTH_ERRORS.MISSING_DEVICE_FINGERPRINT, status: 400 };
+    }
+
     const { subdomain: tenantSlug } = extractSubdomain(requestHeaders);
     if (!tenantSlug) {
         return { ok: false, error: AUTH_ERRORS.TENANT_NOT_FOUND, status: 400 };
@@ -27,7 +33,7 @@ export async function exchangeIdTokenForSessionCookie(
         return verified;
     }
 
-    const membership = await getOrCreateMembership(verified.identity, tenantSlug);
+    const membership = await getOrCreateMembership(verified.identity, tenantSlug, fingerprint);
     if (!membership.ok) {
         return membership;
     }
@@ -41,6 +47,9 @@ export async function exchangeIdTokenForSessionCookie(
     }
 }
 
-export async function exchangeIdTokenForSessionCookieFromHeaders(idToken: string): Promise<CreateSessionResult> {
-    return exchangeIdTokenForSessionCookie(idToken, await headers());
+export async function exchangeIdTokenForSessionCookieFromHeaders(
+    idToken: string,
+    deviceFingerprint: string,
+): Promise<CreateSessionResult> {
+    return exchangeIdTokenForSessionCookie(idToken, deviceFingerprint, await headers());
 }

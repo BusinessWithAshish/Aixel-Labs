@@ -13,6 +13,5 @@ export function mapUserDocToAppSessionUser(
         tenantId: tenantName,
         tenantName,
         moduleAccess: user.moduleAccess,
-        phoneNumber: user.phoneNumber,
     };
 }

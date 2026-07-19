@@ -5,8 +5,12 @@ import { sessionCookieClearOptions, sessionCookieSetOptions } from '@/lib/auth/c
 import { exchangeIdTokenForSessionCookie, revokeSessionCookie } from '@/server/auth';
 
 export async function POST(request: NextRequest) {
-    const body = (await request.json()) as { idToken?: string };
-    const result = await exchangeIdTokenForSessionCookie(body.idToken?.toString() ?? '', request.headers);
+    const body = (await request.json()) as { idToken?: string; deviceFingerprint?: string };
+    const result = await exchangeIdTokenForSessionCookie(
+        body.idToken?.toString() ?? '',
+        body.deviceFingerprint?.toString() ?? '',
+        request.headers,
+    );
 
     if (!result.ok) {
         return NextResponse.json({ error: result.error }, { status: result.status });

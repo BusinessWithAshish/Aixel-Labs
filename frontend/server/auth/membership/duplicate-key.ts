@@ -14,8 +14,8 @@ export function mapDuplicateKeyError(error: unknown): ConflictResult | null {
             ? (error.keyPattern as Record<string, unknown>)
             : {};
 
-    if ('phoneNumber' in keyPattern) {
-        return { ok: false, error: AUTH_ERRORS.PHONE_IN_USE_ON_TENANT, status: 409 };
+    if ('deviceFingerprint' in keyPattern) {
+        return { ok: false, error: AUTH_ERRORS.DEVICE_IN_USE_ON_TENANT, status: 409 };
     }
     if ('email' in keyPattern) {
         return { ok: false, error: AUTH_ERRORS.EMAIL_IN_USE_ON_TENANT, status: 409 };

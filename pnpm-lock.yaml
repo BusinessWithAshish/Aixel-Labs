@@ -209,6 +209,9 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.13.23
         version: 3.13.23(react-dom@19.2.4)(react@19.2.4)
+      '@thumbmarkjs/thumbmarkjs':
+        specifier: ^1.10.1
+        version: 1.10.1
       '@twilio/voice-sdk':
         specifier: ^2.15.0
         version: 2.18.1
@@ -3332,6 +3335,10 @@ packages:
 
   /@tanstack/virtual-core@3.13.23:
     resolution: {integrity: sha512-zSz2Z2HNyLjCplANTDyl3BcdQJc2k1+yyFoKhNRmCr7V7dY8o8q5m8uFTI1/Pg1kL+Hgrz6u3Xo6eFUB7l66cg==}
+    dev: false
+
+  /@thumbmarkjs/thumbmarkjs@1.10.1:
+    resolution: {integrity: sha512-BH7HP3g+NeIXgcYDxtNjx2wfO5cHaH6DjkoDzi4adYe0fknkQZABtKag+2j75p5p8mGMhl9mq2Ee5m1UosYPUw==}
     dev: false
 
   /@tootallnate/once@2.0.1:

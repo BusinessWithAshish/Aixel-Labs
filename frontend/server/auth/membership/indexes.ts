@@ -9,14 +9,21 @@ export async function ensureMembershipIndexes(): Promise<void> {
     if (indexesEnsured) return;
 
     const users = await getCollection<UserDoc>(MongoCollections.USERS);
+
+    try {
+        await users.dropIndex('phoneNumber_1_tenantId_1');
+    } catch {
+        // Index may not exist (fresh DB or already dropped).
+    }
+
     await Promise.all([
         users.createIndex(
             { firebaseUid: 1, tenantId: 1 },
             { unique: true, partialFilterExpression: { firebaseUid: { $type: 'string' } } },
         ),
         users.createIndex(
-            { phoneNumber: 1, tenantId: 1 },
-            { unique: true, partialFilterExpression: { phoneNumber: { $type: 'string' } } },
+            { deviceFingerprint: 1, tenantId: 1 },
+            { unique: true, partialFilterExpression: { deviceFingerprint: { $type: 'string' } } },
         ),
         users.createIndex({ email: 1, tenantId: 1 }, { unique: true }),
         users.createIndex({ firebaseUid: 1, tenantName: 1 }),

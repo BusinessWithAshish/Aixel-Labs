@@ -61,8 +61,7 @@ export function TenantUsersContent() {
             const matchesSearch =
                 !normalizedQuery ||
                 user.email.toLowerCase().includes(normalizedQuery) ||
-                user.name?.toLowerCase().includes(normalizedQuery) ||
-                user.phoneNumber?.toLowerCase().includes(normalizedQuery);
+                user.name?.toLowerCase().includes(normalizedQuery);
             const matchesAdminFilter = !showAdminsOnly || user.isAdmin;
             return matchesSearch && matchesAdminFilter;
         });

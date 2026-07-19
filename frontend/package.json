@@ -34,6 +34,7 @@
     "@radix-ui/react-toggle": "^1.1.6",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-virtual": "^3.13.23",
+    "@thumbmarkjs/thumbmarkjs": "^1.10.1",
     "@twilio/voice-sdk": "^2.15.0",
     "ai": "^6.0.105",
     "aws-sdk": "^2.1691.0",

@@ -7,7 +7,6 @@ import { AUTH_ERRORS } from '@/lib/auth/constants';
 export type VerifiedIdentity = {
     uid: string;
     email: string;
-    phoneNumber: string;
     name?: string;
 };
 
@@ -23,9 +22,6 @@ export async function verifyIdToken(idToken: string): Promise<VerifyIdTokenResul
     try {
         const decoded = await getFirebaseAdminAuth().verifyIdToken(idToken);
 
-        if (!decoded.phone_number) {
-            return { ok: false, error: AUTH_ERRORS.PHONE_REQUIRED, status: 403 };
-        }
         if (!decoded.email) {
             return { ok: false, error: AUTH_ERRORS.EMAIL_REQUIRED, status: 403 };
         }
@@ -36,7 +32,6 @@ export async function verifyIdToken(idToken: string): Promise<VerifyIdTokenResul
             identity: {
                 uid: decoded.uid,
                 email: decoded.email,
-                phoneNumber: decoded.phone_number,
                 name: decoded.name,
             },
         };

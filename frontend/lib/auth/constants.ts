@@ -12,12 +12,13 @@ export const SIGN_IN_PATH = '/sign-in';
  */
 export const AUTH_ERRORS = {
     MISSING_ID_TOKEN: 'Sign-in session was incomplete. Please try again.',
+    MISSING_DEVICE_FINGERPRINT: 'Could not identify this device. Refresh the page and try again.',
     TENANT_NOT_FOUND: 'This organization could not be found. Check the URL and try again.',
-    PHONE_REQUIRED: 'Phone verification is required before you can continue.',
     EMAIL_REQUIRED: 'A Google account with an email address is required.',
     WRONG_TENANT:
         'This account belongs to a different organization. Sign in from that organization, or ask an admin for access.',
-    PHONE_IN_USE_ON_TENANT: 'This phone number is already used by another account on this organization.',
+    DEVICE_IN_USE_ON_TENANT:
+        'Looks like you already signed up from this device with a different account. Sign in with that account instead.',
     EMAIL_IN_USE_ON_TENANT: 'This email is already used by another account on this organization.',
     MEMBERSHIP_CONFLICT:
         'This sign-in conflicts with an existing account on this organization. Try a different Google account or contact support.',
@@ -30,13 +31,7 @@ export type AuthErrorCode = keyof typeof AUTH_ERRORS;
 /** Toast titles by login step (client). */
 export const AUTH_TOAST = {
     GOOGLE_FAILED: 'Google sign-in failed',
-    PHONE_FAILED: 'Phone verification failed',
-    OTP_FAILED: 'Code verification failed',
     SESSION_FAILED: 'Could not finish sign-in',
-    SESSION_EXPIRED: 'Session expired',
-    NO_OTP: 'No verification in progress',
-    CODE_SENT: 'Code sent',
-    VERIFY_PHONE: 'Verify your phone',
     WELCOME: 'Welcome!',
 } as const;
 

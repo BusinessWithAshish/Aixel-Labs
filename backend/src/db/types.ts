@@ -106,7 +106,7 @@ export type UserDoc<Id = ObjectId> = {
   _id?: Id;
   firebaseUid: string;
   email: string;
-  phoneNumber: string;
+  deviceFingerprint: string;
   name?: string;
   isAdmin: boolean;
   tenantId: Id;
