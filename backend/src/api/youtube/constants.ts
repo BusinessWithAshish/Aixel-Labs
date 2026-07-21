@@ -64,6 +64,34 @@ export const YOUTUBE_INNERTUBE_SEARCH_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/sea
 export const YOUTUBE_INNERTUBE_GET_WATCH_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/get_watch`;
 export const YOUTUBE_INNERTUBE_NEXT_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/next`;
 export const YOUTUBE_INNERTUBE_BROWSE_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/browse`;
+export const YOUTUBE_INNERTUBE_PLAYER_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/player`;
+
+/**
+ * InnerTube API key harvested from the YouTube embed page.
+ * Verified live as of 2026-07-21; rotates occasionally.
+ */
+export const YOUTUBE_INNERTUBE_API_KEY =
+  "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+
+/**
+ * iOS InnerTube client config.
+ *
+ * As of 2026, the WEB and ANDROID clients require attestation (PO Token /
+ * BotGuard) for transcript-related requests, which cannot be generated
+ * server-side without executing YouTube's obfuscated JavaScript. The iOS
+ * client is exempt from this requirement, making it the reliable path for
+ * fetching caption tracks and timedtext.
+ */
+export const YOUTUBE_INNERTUBE_IOS_CLIENT = {
+  clientName: "IOS",
+  clientVersion: "20.10.38",
+  userAgent:
+    "com.google.ios.youtube/20.10.38 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)",
+  deviceMake: "Apple",
+  deviceModel: "iPhone16,2",
+  osName: "iOS",
+  osVersion: "17.5.1.21F90",
+} as const;
 
 // ─── Shared route paths (method is always POST) ────────────────────────────────
 
@@ -72,6 +100,7 @@ export const YOUTUBE_API_ROUTES = {
   VIDEO: "/video",
   VIDEO_SUGGESTED: "/video/suggested",
   VIDEO_META: "/video-meta",
+  VIDEO_TRANSCRIPT: "/video/transcript",
   CHANNEL: "/channel",
   HANDLE: "/handle",
 } as const;
@@ -87,6 +116,7 @@ export const YOUTUBE_HANDLER_LABELS = {
   VIDEO: "YOUTUBE/VIDEO",
   VIDEO_SUGGESTED: "YOUTUBE/VIDEO/SUGGESTED",
   VIDEO_META: "YOUTUBE/VIDEO-META",
+  VIDEO_TRANSCRIPT: "YOUTUBE/VIDEO/TRANSCRIPT",
   CHANNEL: "YOUTUBE/CHANNEL",
   HANDLE: "YOUTUBE/HANDLE",
 } as const;
