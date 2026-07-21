@@ -37,7 +37,20 @@ export type YOUTUBE_KEYWORD_SIGNAL = {
   avgVelocityScore: number | null;
   topQuartileFrequency: number;
   bottomQuartileFrequency: number;
-  velocityLift: number;
+  /**
+   * `topQuartileFrequency / bottomQuartileFrequency`. `null` when the keyword
+   * never appears in the bottom quartile (the ratio is undefined, not capped).
+   * Use `topQuartileExclusive` to find those keywords instead of the old
+   * misleading `Math.max(bottom, 1)` cap that treated 5/0 the same as 5/1.
+   */
+  velocityLift: number | null;
+  /**
+   * `true` when the keyword appears in the top velocity quartile but never in
+   * the bottom quartile. These are the strongest "lift" signals but have no
+   * computable ratio, so they are surfaced separately and ranked just after
+   * computable lifts in the sort order.
+   */
+  topQuartileExclusive: boolean;
 };
 
 export type YOUTUBE_KEYWORD_TITLE_PATTERNS = {

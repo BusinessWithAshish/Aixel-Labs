@@ -217,7 +217,13 @@ export function aggregateKeywordSignalsService(
   const keywords: YOUTUBE_KEYWORD_SIGNAL[] = [...keywordStats.entries()]
     .map(([keyword, stats]) => {
       const topFreq = stats.topQuartileFrequency;
-      const bottomFreq = Math.max(stats.bottomQuartileFrequency, 1);
+      const bottomFreq = stats.bottomQuartileFrequency;
+      // Real lift ratio. null when the keyword never appears in the bottom
+      // quartile (undefined, not "capped to topFreq") — exposed separately as
+      // `topQuartileExclusive` so consumers can still rank exclusive-to-top
+      // keywords without conflating them with 5/1 == 5/0 artifacts.
+      const velocityLift =
+        bottomFreq === 0 ? null : topFreq / bottomFreq;
       return {
         keyword,
         frequency: stats.frequency,
@@ -226,11 +232,28 @@ export function aggregateKeywordSignalsService(
             ? stats.velocitySum / stats.velocityCount
             : null,
         topQuartileFrequency: topFreq,
-        bottomQuartileFrequency: stats.bottomQuartileFrequency,
-        velocityLift: topFreq / bottomFreq,
+        bottomQuartileFrequency: bottomFreq,
+        velocityLift,
+        topQuartileExclusive: bottomFreq === 0 && topFreq > 0,
       };
     })
-    .sort((a, b) => b.velocityLift - a.velocityLift)
+    .sort((a, b) => {
+      // Rank real lift first (nulls last), then exclusive-to-top keywords,
+      // then raw frequency as a tiebreaker.
+      if (a.velocityLift !== null && b.velocityLift !== null) {
+        if (a.velocityLift !== b.velocityLift) {
+          return b.velocityLift - a.velocityLift;
+        }
+      } else if (a.velocityLift !== null) {
+        return -1;
+      } else if (b.velocityLift !== null) {
+        return 1;
+      }
+      if (a.topQuartileExclusive !== b.topQuartileExclusive) {
+        return a.topQuartileExclusive ? -1 : 1;
+      }
+      return b.frequency - a.frequency;
+    })
     .slice(0, input.maxKeywords);
 
   const topTitleLengths = top
