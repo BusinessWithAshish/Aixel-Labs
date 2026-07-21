@@ -41,7 +41,7 @@ intelligence/
 ├── constants.ts              # Routes, handler labels, thresholds, regex patterns
 ├── types.ts                  # WithIntelligence<T,I> + shared field building blocks
 ├── helpers.ts                # Re-exports math, distributions, watch-meta utilities
-├── math.ts                   # mean/max/min, ratios, percentiles (simple-statistics)
+├── math.ts                   # mean/max/min, ratios, percentiles (simple-statistics + custom percentile)
 ├── distributions.ts          # Duration-bucket & channel-tier counters
 ├── watch-meta.ts             # EMPTY_YOUTUBE_VIDEO_WATCH_META, resolveWatchMeta
 ├── type-guards.ts            # Search/channel item shape guards
@@ -56,7 +56,7 @@ intelligence/
 │   ├── ranking.ts            # rankOnChannel helper
 │   └── index.ts
 ├── search/                   # handler → enrich → compute (search-specific)
-├── video/                    # handler → enrich; compute re-exports ../compute
+├── video/                    # handler → enrich (imports shared compute/)
 ├── video/suggested/
 ├── channel/                  # handler → harvest → enrich → compute + content-metrics
 ├── handle/
@@ -82,7 +82,7 @@ Intelligence layer **must not** duplicate schemas, fetch, or geo/session logic.
 | Thresholds & patterns    | `constants.ts`             | Derive bucket/tier logic from constants              |
 | Shared computed fields   | `compute/`                 | Import — never reimplement                           |
 | Shared field types       | `types.ts`                 | Compose resource types from building blocks          |
-| Math / aggregates        | `math.ts`                  | Percentiles, averages, ratios, dominant-map          |
+| Math / aggregates        | `math.ts`                  | `percentile`, percentiles, averages, ratios, dominant-map/record |
 | Watch-meta defaults      | `watch-meta.ts`            | `EMPTY_YOUTUBE_VIDEO_WATCH_META`, `resolveWatchMeta` |
 | Computed fields          | `{resource}/enrich.ts`     | Orchestration only — delegate to `compute/`          |
 | Intelligence field types | `{resource}/types.ts`      | Compose from shared type building blocks             |

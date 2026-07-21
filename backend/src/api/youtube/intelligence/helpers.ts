@@ -4,11 +4,13 @@ export {
   computeMin,
   computeRatio,
   safeDivide,
+  percentile,
   computePercentiles,
   extractNonNullValues,
   extractIntelligenceValues,
   computeTruthyRatio,
   findDominantMapEntry,
+  findDominantRecordEntry,
 } from "./math";
 
 export {

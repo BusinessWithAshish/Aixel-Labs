@@ -82,6 +82,7 @@ export const YOUTUBE_PERCENTILE_LEVELS = {
   P25: 0.25,
   P50: 0.5,
   P75: 0.75,
+  P90: 0.9,
 } as const;
 
 // ─── Text patterns ───────────────────────────────────────────────────────────

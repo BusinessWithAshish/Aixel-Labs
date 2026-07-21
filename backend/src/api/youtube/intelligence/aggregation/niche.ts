@@ -10,7 +10,10 @@ import {
   computeAverage,
   computeRatio,
   extractIntelligenceValues,
+  findDominantRecordEntry,
+  percentile,
 } from "../math";
+import { YOUTUBE_PERCENTILE_LEVELS } from "../constants";
 import type { YOUTUBE_SEARCH_VIDEO_ITEM_INTELLIGENCE } from "../search/types";
 import type { AGGREGATE_NICHE_SIGNALS_SCHEMA } from "./schemas";
 import type {
@@ -23,39 +26,17 @@ export type AggregateNicheSignalsInput = z.infer<
   typeof AGGREGATE_NICHE_SIGNALS_SCHEMA
 >;
 
-function percentile(sorted: number[], p: number): number {
-  const index = (sorted.length - 1) * p;
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  if (lower === upper) return sorted[lower]!;
-  return sorted[lower]! + (sorted[upper]! - sorted[lower]!) * (index - lower);
-}
-
 function computeVelocityDistributionWithP90(
   values: number[],
 ): YOUTUBE_NICHE_VELOCITY_DISTRIBUTION | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
   return {
-    p25: percentile(sorted, 0.25),
-    p50: percentile(sorted, 0.5),
-    p75: percentile(sorted, 0.75),
-    p90: percentile(sorted, 0.9),
+    p25: percentile(sorted, YOUTUBE_PERCENTILE_LEVELS.P25),
+    p50: percentile(sorted, YOUTUBE_PERCENTILE_LEVELS.P50),
+    p75: percentile(sorted, YOUTUBE_PERCENTILE_LEVELS.P75),
+    p90: percentile(sorted, YOUTUBE_PERCENTILE_LEVELS.P90),
   };
-}
-
-function dominantFromDistribution<T extends string>(
-  distribution: Record<T, number>,
-): T | null {
-  let bestKey: T | null = null;
-  let bestCount = 0;
-  for (const [key, count] of Object.entries(distribution) as Array<[T, number]>) {
-    if (count > bestCount) {
-      bestKey = key;
-      bestCount = count;
-    }
-  }
-  return bestCount > 0 ? bestKey : null;
 }
 
 function classifyLifecycleStage(input: {
@@ -136,12 +117,12 @@ export function aggregateNicheSignalsService(
       ? videoItems.length / avgViewsPerDay
       : null;
 
-  const dominantDurationBucket = dominantFromDistribution(
+  const dominantDurationBucket = findDominantRecordEntry(
     durationBucketDistribution,
-  ) as YOUTUBE_DURATION_BUCKET | null;
-  const dominantChannelTier = dominantFromDistribution(
+  ).key as YOUTUBE_DURATION_BUCKET | null;
+  const dominantChannelTier = findDominantRecordEntry(
     channelTierDistribution,
-  ) as YOUTUBE_CHANNEL_TIER | null;
+  ).key as YOUTUBE_CHANNEL_TIER | null;
 
   return {
     nicheLabel: input.nicheLabel ?? null,

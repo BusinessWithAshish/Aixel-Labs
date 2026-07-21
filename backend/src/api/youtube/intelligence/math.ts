@@ -30,7 +30,7 @@ export function safeDivide(
   return numerator / Math.max(denominator, minDenominator);
 }
 
-function percentile(sorted: number[], p: number): number {
+export function percentile(sorted: number[], p: number): number {
   const index = (sorted.length - 1) * p;
   const lower = Math.floor(index);
   const upper = Math.ceil(index);
@@ -81,6 +81,22 @@ export function findDominantMapEntry(counts: Map<string, number>): {
   let dominantCount = 0;
 
   for (const [key, count] of counts) {
+    if (count > dominantCount) {
+      dominantKey = key;
+      dominantCount = count;
+    }
+  }
+
+  return { key: dominantKey, count: dominantCount };
+}
+
+export function findDominantRecordEntry<T extends string>(
+  counts: Record<T, number>,
+): { key: T | null; count: number } {
+  let dominantKey: T | null = null;
+  let dominantCount = 0;
+
+  for (const [key, count] of Object.entries(counts) as Array<[T, number]>) {
     if (count > dominantCount) {
       dominantKey = key;
       dominantCount = count;

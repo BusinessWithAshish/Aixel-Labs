@@ -2,7 +2,10 @@ import type {
   YOUTUBE_CHANNEL_TIER,
   YOUTUBE_DURATION_BUCKET,
 } from "../../constants";
-import type { YOUTUBE_RECENT_VELOCITY_TREND_VALUE } from "../types";
+import type {
+  YOUTUBE_INTELLIGENCE_PERCENTILES,
+  YOUTUBE_RECENT_VELOCITY_TREND_VALUE,
+} from "../types";
 
 export type YOUTUBE_NICHE_LIFECYCLE_STAGE =
   | "emerging"
@@ -10,10 +13,7 @@ export type YOUTUBE_NICHE_LIFECYCLE_STAGE =
   | "mature"
   | "saturated";
 
-export type YOUTUBE_NICHE_VELOCITY_DISTRIBUTION = {
-  p25: number;
-  p50: number;
-  p75: number;
+export type YOUTUBE_NICHE_VELOCITY_DISTRIBUTION = YOUTUBE_INTELLIGENCE_PERCENTILES & {
   p90: number;
 };
 
