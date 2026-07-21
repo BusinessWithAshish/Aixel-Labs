@@ -18,15 +18,41 @@ export type YOUTUBE_SEARCH_RAW_VIDEO_ITEM = {
   videoId: string;
   viewCountText?: YT_SIMPLE_TEXT;
   thumbnail: YT_THUMBNAIL_LIST;
-  channelThumbnailSupportedRenderers: {
-    channelThumbnailWithLinkRenderer: { thumbnail: YT_THUMBNAIL_LIST };
+  channelThumbnailSupportedRenderers?: {
+    channelThumbnailWithLinkRenderer: {
+      thumbnail: YT_THUMBNAIL_LIST;
+      navigationEndpoint?: { browseEndpoint?: YT_BROWSE_ENDPOINT };
+    };
   };
   detailedMetadataSnippets: Array<{ snippetText: YT_TEXT_RUNS }>;
-  ownerText: {
+  ownerText?: {
     runs: Array<{
       text: string;
       navigationEndpoint: { browseEndpoint: YT_BROWSE_ENDPOINT };
     }>;
+  };
+  longBylineText?: {
+    runs: Array<{
+      text: string;
+      navigationEndpoint: { browseEndpoint: YT_BROWSE_ENDPOINT };
+    }>;
+  };
+  shortBylineText?: {
+    runs: Array<{
+      text: string;
+      navigationEndpoint: { browseEndpoint: YT_BROWSE_ENDPOINT };
+    }>;
+  };
+  avatar?: {
+    decoratedAvatarViewModel?: {
+      rendererContext?: {
+        commandContext?: {
+          onTap?: {
+            innertubeCommand?: { browseEndpoint?: YT_BROWSE_ENDPOINT };
+          };
+        };
+      };
+    };
   };
   title: YT_TEXT_RUNS;
   publishedTimeText: YT_SIMPLE_TEXT;

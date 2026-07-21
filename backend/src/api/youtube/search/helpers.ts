@@ -72,8 +72,21 @@ function mapVideoSearchItem(
   item: YOUTUBE_SEARCH_RAW_VIDEO_ITEM,
 ): YOUTUBE_SEARCH_VIDEO_ITEM {
   const lengthText = item.lengthText?.simpleText ?? null;
-  const ownerRun = item.ownerText?.runs?.[0];
-  const browseEndpoint = ownerRun?.navigationEndpoint?.browseEndpoint;
+
+  // YouTube's `videoRenderer` exposes the channel browse endpoint (browseId +
+  // canonicalBaseUrl) across several fields depending on the response layout.
+  // `ownerText` is the legacy primary, but newer layouts omit its browseId and
+  // only surface it via `longBylineText`, `shortBylineText`, the channel
+  // thumbnail link, or the `avatar.decoratedAvatarViewModel` command. Try each
+  // in order and use the first that carries a `browseId`.
+  const browseEndpoint =
+    item.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint ??
+    item.longBylineText?.runs?.[0]?.navigationEndpoint?.browseEndpoint ??
+    item.shortBylineText?.runs?.[0]?.navigationEndpoint?.browseEndpoint ??
+    item.channelThumbnailSupportedRenderers?.channelThumbnailWithLinkRenderer
+      ?.navigationEndpoint?.browseEndpoint ??
+    item.avatar?.decoratedAvatarViewModel?.rendererContext?.commandContext
+      ?.onTap?.innertubeCommand?.browseEndpoint;
 
   const description = item.detailedMetadataSnippets?.[0]?.snippetText?.runs
     ? joinYoutubeTextRuns(item.detailedMetadataSnippets[0].snippetText.runs)
