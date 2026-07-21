@@ -64,8 +64,8 @@ const UNIVERSAL_EXTRACTION_RULES = `
 Extraction rules (apply to EVERY turn):
 
 1. ALWAYS separate the business/search type from the location.
-   - "dentists in miami"   → query:"dentists", city/cities:"Miami"  (NOT query:"dentists in miami")
-   - "Italian restaurants near Times Square" → query:"Italian restaurants", city:"New York City"
+   - "dentists in miami"   → business type in the module's type/query field(s), city/cities:"Miami"  (NOT a single combined "dentists in miami" string)
+   - "Italian restaurants near Times Square" → business type/keywords without the location; city:"New York City"
 
 2. ALWAYS infer full geographic context from any city or region mentioned.
    When a city is identified, also populate country, state/province (where applicable), and countryCode.
@@ -140,17 +140,21 @@ export const TASK_REGISTRY: Record<NlChatModule, TaskConfig> = {
         turnSchema: createTurnSchema(GMAPS_REQUEST_FIELDS_SCHEMA),
         label: 'Google Maps Lead Search',
         description: `Search Google Maps for businesses. Fields:
-- query: the business TYPE only — never include city/location here (e.g. "dentists", "Italian restaurants", "emergency plumbers")
+- placeType: preferred when the user names a known Places category (Table A leaf ids such as dentist, plumber, restaurant, cafe, gym). Use the id, not a free-text label.
+- query: optional keywords/modifiers only (e.g. "emergency", "24 hour"), OR custom search text when no placeType fits. NEVER include city/location in query.
 - country + state + cities: geographic scope — always infer all three from any location the user mentions
 - countryCode: ISO 3166-1 alpha-2, always derived from country, never asked
-- urls: only when the user pastes a Google Maps URL; when urls are provided, omit query/country/state/cities
+- urls: only when the user pastes a Google Maps URL; when urls are provided, omit placeType/query/country/state/cities
+- enrichment / limit: only if the user asks for quality filters or a max result count
 
 Worked examples:
-  "dentists in miami"          → query:"dentists",      cities:["Miami"],      state:"Florida",          country:"United States",       countryCode:"us"
-  "restaurants in london"      → query:"restaurants",   cities:["London"],                               country:"United Kingdom",      countryCode:"gb"
-  "plumbers in dubai"          → query:"plumbers",      cities:["Dubai"],                                country:"United Arab Emirates", countryCode:"ae"
-  "cafes in mumbai"            → query:"cafes",         cities:["Mumbai"],     state:"Maharashtra",      country:"India",               countryCode:"in"
-  "gyms in toronto"            → query:"gyms",          cities:["Toronto"],    state:"Ontario",          country:"Canada",              countryCode:"ca"`,
+  "dentists in miami"          → placeType:"dentist",   cities:["Miami"],      state:"Florida",          country:"United States",       countryCode:"us"
+  "emergency dentists in miami"→ placeType:"dentist",   query:"emergency",     cities:["Miami"],         state:"Florida",              country:"United States", countryCode:"us"
+  "restaurants in london"      → placeType:"restaurant",cities:["London"],                               country:"United Kingdom",      countryCode:"gb"
+  "plumbers in dubai"          → placeType:"plumber",   cities:["Dubai"],                                country:"United Arab Emirates", countryCode:"ae"
+  "cafes in mumbai"            → placeType:"cafe",      cities:["Mumbai"],     state:"Maharashtra",      country:"India",               countryCode:"in"
+  "gyms in toronto"            → placeType:"gym",       cities:["Toronto"],    state:"Ontario",          country:"Canada",              countryCode:"ca"
+  "italian bakeries in rome"   → placeType:"bakery",    query:"italian",       cities:["Rome"],                                    country:"Italy",               countryCode:"it"`,
     },
 
     [LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH]: {
@@ -160,15 +164,16 @@ Worked examples:
         description: `Search for Instagram profiles. Fields:
 - entities: specific Instagram usernames or profile URLs the user names (strip the @ prefix from usernames)
 - query: free-text description of the type of profiles to find (e.g. "fitness coaches in London")
-- country / city: geographic scope — infer country from any city or region mentioned (apply universal geo rules)
+- country: REQUIRED ISO 3166-1 alpha-2 code (e.g. "US", "IN", "GB") — never a full country name
+- state / city: optional free-text names (e.g. state:"Maharashtra", city:"Mumbai")
 - hashtags: topics the profiles post about — strip the # prefix (e.g. ["fitness","yoga"])
 - keywords: words that should appear in bios (e.g. ["certified coach","personal trainer"])
 - excludeKeywords / excludeHashtags: topics or words to filter out
 
 Worked examples:
   "@nike and @adidas"                  → entities:["nike","adidas"]
-  "#fitness influencers in London"     → hashtags:["fitness"],  city:"London",  country:"United Kingdom"
-  "personal trainers in Mumbai"        → query:"personal trainers", city:"Mumbai", country:"India"
+  "#fitness influencers in London"     → hashtags:["fitness"],  city:"London",  country:"GB"
+  "personal trainers in Mumbai"        → query:"personal trainers", city:"Mumbai", state:"Maharashtra", country:"IN"
   "exclude bots and spam accounts"     → excludeKeywords:["bot","spam"]`,
     },
 
@@ -176,9 +181,10 @@ Worked examples:
         requestSchema: LINKEDIN_BY_PEOPLE_REQUEST_SCHEMA,
         turnSchema: createTurnSchema(LINKEDIN_BY_PEOPLE_REQUEST_SCHEMA),
         label: 'LinkedIn People Search',
-        description: `Search for LinkedIn profiles (people). All fields live inside discovery_filters or enrichment. Fields:
-- discovery_filters.country: REQUIRED — always infer from any city or region mentioned
-- discovery_filters.state / city: infer from location mentions (apply universal geo rules)
+        description: `Search for LinkedIn profiles (people). Always set searchType:"people". All other fields live inside discovery_filters or enrichment. Fields:
+- searchType: always "people"
+- discovery_filters.country: REQUIRED ISO 3166-1 alpha-2 code (e.g. "US", "IN", "GB") — never a full country name
+- discovery_filters.state / city: optional free-text names (e.g. state:"California", city:"San Francisco")
 - discovery_filters.job_titles: list of job titles (e.g. ["CTO","VP Engineering"])
 - discovery_filters.companies: current or past companies (e.g. ["Google","Meta"])
 - discovery_filters.keywords: general keywords related to skills or background
@@ -187,9 +193,9 @@ Worked examples:
 - limit: number of results requested (default 100, max 250)
 
 Worked examples:
-  "software engineers in California"    → discovery_filters:{ country:"United States", state:"California", job_titles:["Software Engineer"] }
-  "CTOs at Google or Meta"              → discovery_filters:{ companies:["Google","Meta"], job_titles:["CTO"] }
-  "finance professionals with 10+ years" → discovery_filters:{ }, enrichment:{ experience_years:{ min:10 }, industry:["Finance"] }
-  "marketers in London"                 → discovery_filters:{ country:"United Kingdom", city:"London", job_titles:["Marketing Manager","Marketing Director","CMO"] }`,
+  "software engineers in California"    → searchType:"people", discovery_filters:{ country:"US", state:"California", job_titles:["Software Engineer"] }
+  "CTOs at Google or Meta"              → searchType:"people", discovery_filters:{ companies:["Google","Meta"], job_titles:["CTO"] }
+  "finance professionals with 10+ years" → searchType:"people", discovery_filters:{ }, enrichment:{ experience_years:{ min:10 }, industry:["Finance"] }
+  "marketers in London"                 → searchType:"people", discovery_filters:{ country:"GB", city:"London", job_titles:["Marketing Manager","Marketing Director","CMO"] }`,
     },
 };
