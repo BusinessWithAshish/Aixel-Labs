@@ -1,5 +1,6 @@
 import { type IRouter, Router } from "express";
 import { registerYoutubeSearchRoutes } from "./search";
+import { registerYoutubeSuggestRoutes } from "./suggest";
 import { registerYoutubeVideoRoutes } from "./video";
 import { registerYoutubeVideoMetaRoutes } from "./video-meta";
 import { registerYoutubeVideoTranscriptRoutes } from "./transcript";
@@ -10,6 +11,7 @@ import { registerYoutubeIntelligenceRoutes } from "./intelligence";
 const youtubeRoutes: IRouter = Router();
 
 registerYoutubeSearchRoutes(youtubeRoutes);
+registerYoutubeSuggestRoutes(youtubeRoutes);
 registerYoutubeVideoRoutes(youtubeRoutes);
 registerYoutubeVideoMetaRoutes(youtubeRoutes);
 registerYoutubeVideoTranscriptRoutes(youtubeRoutes);

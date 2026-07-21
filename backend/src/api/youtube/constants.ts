@@ -66,6 +66,31 @@ export const YOUTUBE_INNERTUBE_NEXT_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/next`
 export const YOUTUBE_INNERTUBE_BROWSE_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/browse`;
 export const YOUTUBE_INNERTUBE_PLAYER_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/player`;
 
+// ─── Suggest (autocomplete) API ───────────────────────────────────────────────
+
+/**
+ * YouTube autocomplete suggestions endpoint. The same one the YouTube web
+ * search box calls as the user types. Returns JSONP wrapped in
+ * `window.google.ac.h([...])` when `client=youtube`.
+ *
+ * Host `suggestqueries-clients6.youtube.com` is the in-page host used by
+ * youtube.com; `suggestqueries.google.com` is the legacy host that also works.
+ */
+export const YOUTUBE_SUGGEST_URL =
+  "https://suggestqueries-clients6.youtube.com/complete/search";
+
+/** Dataset identifier — `yt` scopes suggestions to YouTube videos. */
+export const YOUTUBE_SUGGEST_DATASET = "yt";
+
+/** Client identifier that yields the JSONP `window.google.ac.h(...)` payload. */
+export const YOUTUBE_SUGGEST_CLIENT = "youtube";
+
+/** Default BCP-47 language for suggestions. */
+export const YOUTUBE_SUGGEST_DEFAULT_HL = "en";
+
+/** Maximum query length accepted by the suggestions endpoint. */
+export const YOUTUBE_SUGGEST_MAX_QUERY_LENGTH = 500;
+
 /**
  * InnerTube API key harvested from the YouTube embed page.
  * Verified live as of 2026-07-21; rotates occasionally.
@@ -97,6 +122,7 @@ export const YOUTUBE_INNERTUBE_IOS_CLIENT = {
 
 export const YOUTUBE_API_ROUTES = {
   SEARCH: "/search",
+  SUGGEST: "/suggest",
   VIDEO: "/video",
   VIDEO_SUGGESTED: "/video/suggested",
   VIDEO_META: "/video-meta",
@@ -113,6 +139,7 @@ export const YOUTUBE_VIDEO_META_CONCURRENCY = 10;
 
 export const YOUTUBE_HANDLER_LABELS = {
   SEARCH: "YOUTUBE/SEARCH",
+  SUGGEST: "YOUTUBE/SUGGEST",
   VIDEO: "YOUTUBE/VIDEO",
   VIDEO_SUGGESTED: "YOUTUBE/VIDEO/SUGGESTED",
   VIDEO_META: "YOUTUBE/VIDEO-META",
