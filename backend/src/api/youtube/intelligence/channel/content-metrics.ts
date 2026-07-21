@@ -175,6 +175,7 @@ export function computeChannelContentMetrics(
   | "shortCount"
   | "videoOnlyCount"
   | "shortRatio"
+  | "shortRatioCensored"
   | "avgVideoDuration"
   | "topVideoViewCount"
   | "bottomVideoViewCount"
@@ -192,6 +193,10 @@ export function computeChannelContentMetrics(
   const videosComplete = videoOnlyCount < fetchLimit;
 
   let shortRatio: number | null = null;
+  // True when both tab samples hit the fetch cap, so `shortRatio` is null
+  // purely because of sampling censorship (not because the channel is empty).
+  // Lets consumers distinguish "unknown" from "zero/missing".
+  let shortRatioCensored = false;
 
   if (shortCount === 0 && videoOnlyCount === 0) {
     shortRatio = null;
@@ -218,6 +223,7 @@ export function computeChannelContentMetrics(
   } else {
     // Both samples censored at `fetchLimit` — refuse the misleading 0.5 artifact.
     shortRatio = null;
+    shortRatioCensored = true;
   }
 
   const viewCounts = context.videosTab
@@ -237,6 +243,7 @@ export function computeChannelContentMetrics(
     shortCount,
     videoOnlyCount,
     shortRatio,
+    shortRatioCensored,
     avgVideoDuration: computeAverage(durationValues),
     topVideoViewCount: computeMax(viewCounts),
     bottomVideoViewCount: computeMin(viewCounts),

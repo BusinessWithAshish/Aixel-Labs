@@ -2,11 +2,12 @@ import type { YOUTUBE_VIDEO_SUGGESTION_ITEM } from "../../../video/types";
 import type { YOUTUBE_VIDEO_WATCH_META } from "../../../video-meta";
 import {
   computeChannelTier,
+  computeDescriptionLength,
   computeDurationBucket,
   computeIsShort,
   computePublishingVelocityFields,
-  computeTitleLengthField,
-  computeTitlePatternFields,
+  computeTitleTextFields,
+  computeVelocityScore,
 } from "../../compute";
 import { computeTruthyRatio, findDominantMapEntry } from "../../math";
 import {
@@ -35,18 +36,27 @@ export function enrichSuggestionItemFields(
     harvestedAt: Date;
   },
 ) {
+  const { publishedDaysAgo, viewsPerDay } = computePublishingVelocityFields(
+    context.watchMeta.publishedAt,
+    item.views,
+    context.harvestedAt,
+  );
+  const channelSubscribers = context.watchMeta.channelSubscribers;
+
   return {
     suggestionPosition: context.suggestionPosition,
-    ...computePublishingVelocityFields(
-      context.watchMeta.publishedAt,
+    publishedDaysAgo,
+    viewsPerDay,
+    velocityScore: computeVelocityScore(
       item.views,
-      context.harvestedAt,
+      publishedDaysAgo,
+      channelSubscribers,
     ),
     durationBucket: computeDurationBucket(item.duration),
     isShort: computeIsShort(item.duration),
-    ...computeTitleLengthField(item.title),
-    ...computeTitlePatternFields(item.title),
-    channelTier: computeChannelTier(context.watchMeta.channelSubscribers),
+    ...computeTitleTextFields(item.title),
+    descriptionLength: computeDescriptionLength(context.watchMeta.description),
+    channelTier: computeChannelTier(channelSubscribers),
     isSameChannel: computeIsSameChannel(
       item.channelId,
       context.sourceChannelId,

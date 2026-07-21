@@ -7,6 +7,7 @@ import type { YOUTUBE_VIDEO_WATCH_META } from "../../video-meta";
 import {
   computeChannelAgeInDays,
   computeChannelTier,
+  computeDescriptionLength,
   computeDurationBucket,
   computeEngagementRatio,
   computeIsKidsChannel,
@@ -15,9 +16,9 @@ import {
   computeAvgViewsPerVideo,
   computePublishingVelocityFields,
   computeRankByViews,
-  computeTitleLengthField,
-  computeTitlePatternFields,
+  computeTitleTextFields,
   computeUploadsPerWeek,
+  computeVelocityScore,
   computeViewsPerSubscriber,
   computeViewsVsChannelAvg,
 } from "../compute";
@@ -95,21 +96,33 @@ export function enrichChannelVideoItemFields(
     videoItems: YOUTUBE_CHANNEL_VIDEO_ITEM[];
     channelAvgViews: number | null;
     watchMeta: YOUTUBE_VIDEO_WATCH_META;
+    channelSubscribers: number | null;
     harvestedAt: Date;
   },
 ) {
   const duration = context.watchMeta.lengthSeconds;
+  const { publishedDaysAgo, viewsPerDay } = computePublishingVelocityFields(
+    context.watchMeta.publishedAt,
+    item.views,
+    context.harvestedAt,
+  );
+  // Prefer the per-video subscriber count from get_watch; fall back to the
+  // channel-level subscriber count (all videos on this channel share it).
+  const channelSubscribers =
+    context.watchMeta.channelSubscribers ?? context.channelSubscribers;
 
   return {
-    ...computeTitleLengthField(item.title),
-    ...computeTitlePatternFields(item.title),
-    ...computePublishingVelocityFields(
-      context.watchMeta.publishedAt,
+    ...computeTitleTextFields(item.title),
+    publishedDaysAgo,
+    viewsPerDay,
+    velocityScore: computeVelocityScore(
       item.views,
-      context.harvestedAt,
+      publishedDaysAgo,
+      channelSubscribers,
     ),
     durationBucket: computeDurationBucket(duration),
     isShort: computeIsShort(duration),
+    descriptionLength: computeDescriptionLength(context.watchMeta.description),
     engagementRatio: computeEngagementRatio(
       context.watchMeta.likeCount,
       context.watchMeta.commentCount,
@@ -138,15 +151,18 @@ export function enrichChannelShortItemFields(
     harvestedAt: Date;
   },
 ) {
+  const duration = context.watchMeta.lengthSeconds;
+
   return {
     ...computePublishingVelocityFields(
       context.watchMeta.publishedAt,
       item.views,
       context.harvestedAt,
     ),
-    isShort: true as const,
-    ...computeTitleLengthField(item.title),
-    titleHasNumber: computeTitlePatternFields(item.title).titleHasNumber,
+    durationBucket: computeDurationBucket(duration),
+    isShort: computeIsShort(duration),
+    ...computeTitleTextFields(item.title),
+    descriptionLength: computeDescriptionLength(context.watchMeta.description),
     rankOnChannel: computeRankByViews(
       item.shortId,
       context.shortItems.map((short) => ({

@@ -50,6 +50,14 @@ export type YOUTUBE_INTELLIGENCE_DURATION_FIELDS = {
   isShort: boolean | null;
 };
 
+export type YOUTUBE_INTELLIGENCE_DESCRIPTION_LENGTH_FIELD = {
+  descriptionLength: number | null;
+};
+
+export type YOUTUBE_INTELLIGENCE_VELOCITY_SCORE_FIELD = {
+  velocityScore: number | null;
+};
+
 export type YOUTUBE_INTELLIGENCE_CHANNEL_TIER_FIELD = {
   channelTier: YOUTUBE_CHANNEL_TIER | null;
 };

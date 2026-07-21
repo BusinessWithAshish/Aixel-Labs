@@ -73,7 +73,13 @@ export async function enrichChannelResults(
       : enrichContext.videosTab;
 
   const channelAvgViews = computeChannelAvgViews(videoItems);
-  const videoContext = { videoItems, channelAvgViews, harvestedAt };
+  const channelSubscribers = primary.channelInfo?.subscribers ?? null;
+  const videoContext = {
+    videoItems,
+    channelAvgViews,
+    channelSubscribers,
+    harvestedAt,
+  };
 
   const shortItems =
     primary.contentType === YT_CHANNEL_CONTENT_TYPE.SHORTS
