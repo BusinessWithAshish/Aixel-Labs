@@ -135,10 +135,10 @@ function extractWatchNextPrimaryItems(
   return items;
 }
 
-function extractCommentsHeaderCount(
-  data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+function extractCommentsHeaderCountFromItems(
+  items: YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[],
 ): number | null {
-  for (const item of extractWatchNextPrimaryItems(data)) {
+  for (const item of items) {
     const runs =
       item.itemSectionRenderer?.header?.commentsHeaderRenderer?.countText
         ?.runs;
@@ -149,6 +149,106 @@ function extractCommentsHeaderCount(
   }
 
   return null;
+}
+
+/**
+ * Walk ytInitialData's `contents.twoColumnWatchNextResults.results.results`
+ * and normalize into the same primary-item shape as `extractWatchNextPrimaryItems`.
+ * Used as a fallback when the InnerTube `get_watch` POST omits a section that the
+ * watch-page HTML still carries (comments, view-count text, etc.).
+ */
+function extractWatchNextPrimaryItemsFromInitialData(
+  initialData: Record<string, unknown> | undefined,
+): YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[] {
+  if (!initialData) return [];
+
+  const contents =
+    (initialData as {
+      contents?: {
+        twoColumnWatchNextResults?: {
+          results?: {
+            results?:
+              | { contents?: unknown[] }
+              | Array<{ contents?: unknown[] }>;
+          };
+        };
+      };
+    })?.contents?.twoColumnWatchNextResults?.results?.results;
+
+  if (!contents) return [];
+
+  if (Array.isArray(contents)) {
+    // Shape B (legacy): array of panels each with contents
+    const items: YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[] = [];
+    for (const panel of contents) {
+      if (panel && typeof panel === "object" && "contents" in panel) {
+        const panelContents = (panel as { contents?: unknown[] }).contents;
+        if (Array.isArray(panelContents)) {
+          items.push(...(panelContents as YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[]));
+        }
+      }
+    }
+    return items;
+  }
+
+  return Array.isArray(contents.contents)
+    ? (contents.contents as YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[])
+    : [];
+}
+
+/**
+ * Extract YouTube's formatted view-count text (e.g. `"11,997 views"`) from the
+ * watch-next primary info. `playerResponse.videoDetails.viewCount` is just the
+ * raw numeric string (e.g. `"11997"`), so we walk the `videoPrimaryInfoRenderer`
+ * for the human-readable `simpleText` that YouTube actually renders on the page.
+ */
+function extractViewCountTextFromItems(
+  items: YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[],
+): string | null {
+  for (const item of items) {
+    const simple =
+      item.videoPrimaryInfoRenderer?.viewCount?.videoViewCountRenderer?.viewCount
+        ?.simpleText;
+    if (simple?.trim()) return simple.trim();
+  }
+  return null;
+}
+
+function extractViewCountText(
+  data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+  initialData?: Record<string, unknown>,
+): string | null {
+  const fromWatchNext = extractViewCountTextFromItems(
+    extractWatchNextPrimaryItems(data),
+  );
+  if (fromWatchNext) return fromWatchNext;
+
+  const fromInitial = extractViewCountTextFromItems(
+    extractWatchNextPrimaryItemsFromInitialData(initialData),
+  );
+  return fromInitial;
+}
+
+function extractCommentsHeaderCount(
+  data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+): number | null {
+  return extractCommentsHeaderCountFromItems(extractWatchNextPrimaryItems(data));
+}
+
+/**
+ * Walk ytInitialData's `contents.twoColumnWatchNextResults.results.results`
+ * for a comments header. The watch-page HTML always carries the comments
+ * section even when `get_watch` omits it, so this is a more reliable
+ * fallback than the engagement-panel path for videos where the InnerTube
+ * `get_watch` response has no comments panel at all.
+ */
+function extractCommentsHeaderCountFromInitialData(
+  initialData: Record<string, unknown> | undefined,
+): number | null {
+  if (!initialData) return null;
+  return extractCommentsHeaderCountFromItems(
+    extractWatchNextPrimaryItemsFromInitialData(initialData),
+  );
 }
 
 function extractCommentCount(
@@ -173,6 +273,14 @@ function extractCommentCount(
   const fromFactoidOrHeader =
     extractFactoidCount(data, "Comments") ?? extractCommentsHeaderCount(data);
   if (fromFactoidOrHeader !== null) return fromFactoidOrHeader;
+
+  // Last resort: the watch-page ytInitialData carries the comments section
+  // header even when get_watch omits it entirely (common for multi-author /
+  // collaborator videos). Walk its `contents.twoColumnWatchNextResults.results`
+  // path for a commentsHeaderRenderer.countText.
+  const fromInitialDataHeader =
+    extractCommentsHeaderCountFromInitialData(initialData);
+  if (fromInitialDataHeader !== null) return fromInitialDataHeader;
 
   if (areCommentsDisabled([initialData, data[1]])) return null;
 
@@ -254,14 +362,94 @@ export function extractLengthSecondsFromGetWatch(
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+export function extractDescriptionFromGetWatch(
+  data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+): string | null {
+  return data[0]?.playerResponse?.videoDetails?.shortDescription?.trim() ?? null;
+}
+
+/**
+ * Extract the subscriber-count text from a Collaborators dialog's first list
+ * item. YouTube returns this inline in `get_watch` for multi-author videos
+ * where the legacy `subscriberCountText.simpleText` path is empty.
+ *
+ * Subtitle shape: `"@freecodecamp • 11.8M subscribers"`
+ * Accessibility label shape: `"freeCodeCamp.org - 11.8M subscribers. Go to channel"`
+ *
+ * Returns the count token (e.g. `"11.8M"`) so `abbreviatedCountTextToNumber`
+ * can parse it, or null if no subscriber text is found.
+ */
+function extractSubscriberCountFromCollaboratorsDialog(
+  dialog:
+    | {
+        panelLoadingStrategy?: {
+          inlineContent?: {
+            dialogViewModel?: {
+              customContent?: {
+                listViewModel?: {
+                  listItems?: Array<{
+                    listItemViewModel?: {
+                      subtitle?: { content?: string };
+                      rendererContext?: {
+                        accessibilityContext?: { label?: string };
+                      };
+                    };
+                  }>;
+                };
+              };
+            };
+          };
+        };
+      }
+    | undefined,
+): string | null {
+  const items =
+    dialog?.panelLoadingStrategy?.inlineContent?.dialogViewModel
+      ?.customContent?.listViewModel?.listItems ?? [];
+
+  const subscriberRegex = /([\d,.]+\s*[KMB]?)\s*subscribers/i;
+  for (const item of items) {
+    const subtitle = item.listItemViewModel?.subtitle?.content ?? "";
+    const label =
+      item.listItemViewModel?.rendererContext?.accessibilityContext?.label ??
+      "";
+
+    const subtitleMatch = subtitle.match(subscriberRegex);
+    if (subtitleMatch) return subtitleMatch[1].trim();
+
+    const labelMatch = label.match(subscriberRegex);
+    if (labelMatch) return labelMatch[1].trim();
+  }
+
+  return null;
+}
+
 export function extractChannelSubscriberCountText(
   data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
 ): string | null {
   for (const item of extractWatchNextPrimaryItems(data)) {
-    const text =
-      item.videoSecondaryInfoRenderer?.owner?.videoOwnerRenderer
-        ?.subscriberCountText?.simpleText;
-    if (text?.trim()) return text.trim();
+    const owner = item.videoSecondaryInfoRenderer?.owner?.videoOwnerRenderer;
+    if (!owner) continue;
+
+    // Legacy path: subscriberCountText.simpleText (single-author videos)
+    const simple = owner.subscriberCountText?.simpleText;
+    if (simple?.trim()) return simple.trim();
+
+    // Newer "collaborators" layout: subscriber count is only inside the
+    // inline Collaborators dialog attached to the owner navigation endpoint
+    // or the attributed title commandRuns. The first list item is the
+    // primary channel.
+    const fromNav = extractSubscriberCountFromCollaboratorsDialog(
+      owner.navigationEndpoint?.showDialogCommand,
+    );
+    if (fromNav) return fromNav;
+
+    for (const run of owner.attributedTitle?.commandRuns ?? []) {
+      const fromTitle = extractSubscriberCountFromCollaboratorsDialog(
+        run.onTap?.innertubeCommand?.showDialogCommand,
+      );
+      if (fromTitle) return fromTitle;
+    }
   }
 
   return null;
@@ -273,8 +461,19 @@ export function parsePlayerResponse(
   initialData?: Record<string, unknown>,
 ): YOUTUBE_VIDEO_DETAILS_RESPONSE {
   const details = data[0]?.playerResponse?.videoDetails;
-  const viewCountText = details?.viewCount ?? null;
+  const rawViewCount = details?.viewCount ?? null;
+  const numericViewCount = rawViewCount ? Number(rawViewCount) : null;
   const id = details?.videoId ?? fallbackVideoId;
+
+  // Prefer YouTube's own formatted text ("11,997 views") from the watch-next
+  // primary info; fall back to a locale-formatted string built from the raw
+  // numeric count so the field is never just a bare number like "11997".
+  const extractedViewCountText = extractViewCountText(data, initialData);
+  const viewCountText =
+    extractedViewCountText ??
+    (numericViewCount !== null
+      ? `${numericViewCount.toLocaleString("en-US")} views`
+      : rawViewCount);
 
   return {
     id,
@@ -285,7 +484,7 @@ export function parsePlayerResponse(
     channel: details?.author ?? null,
     channelId: details?.channelId ?? "",
     description: details?.shortDescription ?? null,
-    viewCount: viewCountText ? Number(viewCountText) : null,
+    viewCount: numericViewCount,
     viewCountText,
     lengthSeconds: details?.lengthSeconds
       ? Number(details.lengthSeconds)

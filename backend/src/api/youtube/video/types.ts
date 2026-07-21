@@ -60,6 +60,60 @@ export type YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM = {
     owner?: {
       videoOwnerRenderer?: {
         subscriberCountText?: { simpleText?: string };
+        // Newer "collaborators" layout: subscriber count is only available
+        // inside the inline Collaborators dialog shown when clicking the
+        // owner navigation endpoint or attributed title. The first list item
+        // is the primary channel; its subtitle carries "@handle • 11.8M subscribers".
+        navigationEndpoint?: {
+          showDialogCommand?: {
+            panelLoadingStrategy?: {
+              inlineContent?: {
+                dialogViewModel?: {
+                  customContent?: {
+                    listViewModel?: {
+                      listItems?: Array<{
+                        listItemViewModel?: {
+                          subtitle?: { content?: string };
+                          rendererContext?: {
+                            accessibilityContext?: { label?: string };
+                          };
+                        };
+                      }>;
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
+        attributedTitle?: {
+          commandRuns?: Array<{
+            onTap?: {
+              innertubeCommand?: {
+                showDialogCommand?: {
+                  panelLoadingStrategy?: {
+                    inlineContent?: {
+                      dialogViewModel?: {
+                        customContent?: {
+                          listViewModel?: {
+                            listItems?: Array<{
+                              listItemViewModel?: {
+                                subtitle?: { content?: string };
+                                rendererContext?: {
+                                  accessibilityContext?: { label?: string };
+                                };
+                              };
+                            }>;
+                          };
+                        };
+                      };
+                    };
+                  };
+                };
+              };
+            };
+          }>;
+        };
       };
     };
   };
@@ -70,7 +124,14 @@ export type YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM = {
       };
     };
   };
-  videoPrimaryInfoRenderer?: Record<string, unknown>;
+  videoPrimaryInfoRenderer?: {
+    viewCount?: {
+      videoViewCountRenderer?: {
+        viewCount?: { simpleText?: string };
+        shortViewCount?: { simpleText?: string; runs?: Array<{ text?: string }> };
+      };
+    };
+  };
   contents?: YOUTUBE_VIDEO_WATCH_NEXT_PRIMARY_ITEM[];
 };
 

@@ -19,6 +19,7 @@ export { YoutubeVideoError } from "./errors";
 export {
   extractChannelSubscriberCountText,
   extractCommentCountFromGetWatch,
+  extractDescriptionFromGetWatch,
   extractLengthSecondsFromGetWatch,
   extractLikeCountFromGetWatch,
   extractPublishedAtFromGetWatch,
