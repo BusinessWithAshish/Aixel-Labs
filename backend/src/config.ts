@@ -1,5 +1,6 @@
 import { YOUTUBE_API_ROUTES } from "./api/youtube/constants";
 import { YOUTUBE_INTELLIGENCE_ROUTES } from "./api/youtube/intelligence/constants";
+import { GOOGLE_TRENDS_API_ROUTES } from "./api/google-trends/constants";
 
 export enum ENDPOINTS {
   HOME = "/",
@@ -8,6 +9,7 @@ export enum ENDPOINTS {
   LINKEDIN = "/linkedin",
   YOUTUBE = "/youtube",
   GSEARCH = "/gsearch",
+  GOOGLE_TRENDS = "/google-trends",
   MCP = "/mcp",
   SAMPLE = "/sample",
 }
@@ -90,6 +92,12 @@ export const API_ENDPOINTS = {
   },
   GSEARCH: {
     SEARCH: { route: "/", full: `${ENDPOINTS.GSEARCH}` },
+  },
+  GOOGLE_TRENDS: {
+    TRENDING: {
+      route: GOOGLE_TRENDS_API_ROUTES.TRENDING,
+      full: `${ENDPOINTS.GOOGLE_TRENDS}${GOOGLE_TRENDS_API_ROUTES.TRENDING}`,
+    },
   },
   MCP: {
     ROOT: { route: "/", full: `${ENDPOINTS.MCP}` },
