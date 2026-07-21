@@ -20,6 +20,7 @@ import {
 import {
   extractChannelSubscriberCountText,
   extractCommentCountFromGetWatch,
+  extractDescriptionFromGetWatch,
   extractLengthSecondsFromGetWatch,
   extractLikeCountFromGetWatch,
   extractPublishedAtFromGetWatch,
@@ -88,6 +89,7 @@ async function fetchVideoMetaForVideo(
       ),
       likeCount: extractLikeCountFromGetWatch(data),
       commentCount,
+      description: extractDescriptionFromGetWatch(data),
     };
   } catch (err) {
     console.warn(
@@ -102,6 +104,7 @@ async function fetchVideoMetaForVideo(
       channelSubscribers: null,
       likeCount: null,
       commentCount: null,
+      description: null,
     };
   } finally {
     await closeUrlFetchSession(session);
@@ -169,6 +172,7 @@ export function videoMetaItemsToWatchMetaMap(
         channelSubscribers: item.channelSubscribers,
         likeCount: item.likeCount,
         commentCount: item.commentCount,
+        description: item.description,
       },
     ]),
   );

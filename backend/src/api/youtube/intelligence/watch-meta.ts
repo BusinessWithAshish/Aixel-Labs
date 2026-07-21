@@ -6,6 +6,7 @@ export const EMPTY_YOUTUBE_VIDEO_WATCH_META: YOUTUBE_VIDEO_WATCH_META = {
   channelSubscribers: null,
   likeCount: null,
   commentCount: null,
+  description: null,
 };
 
 export function resolveWatchMeta(

@@ -66,4 +66,5 @@ export type YOUTUBE_VIDEO_WATCH_META = {
   channelSubscribers: number | null;
   likeCount: number | null;
   commentCount: number | null;
+  description: string | null;
 };

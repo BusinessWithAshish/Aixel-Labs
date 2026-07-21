@@ -12,6 +12,7 @@ export type YOUTUBE_VIDEO_META_ITEM = {
   channelSubscribers: number | null;
   likeCount: number | null;
   commentCount: number | null;
+  description: string | null;
 };
 
 export type YOUTUBE_VIDEO_META_RESPONSE = {
