@@ -8,21 +8,33 @@ export type YOUTUBE_HANDLE_REQUEST = z.infer<
 type YTHandlePageMetadata = {
   channelMetadataRenderer?: {
     externalId?: string;
+    title?: string;
   };
 };
 
 export type YOUTUBE_HANDLE_PAGE_INIT_DATA = {
   metadata?: YTHandlePageMetadata;
   header?: {
-    c4TabbedHeaderRenderer?: { channelId?: string };
+    c4TabbedHeaderRenderer?: {
+      channelId?: string;
+      title?: string;
+      subscriberCountText?: { simpleText?: string };
+    };
     pageHeaderRenderer?: {
+      pageTitle?: string;
       content?: {
         pageHeaderViewModel?: {
+          title?: {
+            dynamicTextViewModel?: { text?: { content?: string } };
+          };
           metadata?: {
             contentMetadataViewModel?: {
               metadataRows?: Array<{
                 metadataParts?: Array<{
-                  text?: { commandRuns?: Array<{ onTap?: unknown }> };
+                  text?: {
+                    content?: string;
+                    commandRuns?: Array<{ onTap?: unknown }>;
+                  };
                 }>;
               }>;
             };
@@ -34,6 +46,7 @@ export type YOUTUBE_HANDLE_PAGE_INIT_DATA = {
   microformat?: {
     microformatDataRenderer?: {
       urlCanonical?: string;
+      title?: string;
     };
   };
 };
@@ -41,4 +54,6 @@ export type YOUTUBE_HANDLE_PAGE_INIT_DATA = {
 export type YOUTUBE_HANDLE_RESPONSE = {
   handle: string;
   channelId: string;
+  title: string | null;
+  subscribers: number | null;
 };
