@@ -164,6 +164,14 @@ export const GOOGLE_TRENDS_USER_AGENT =
 export const GOOGLE_TRENDS_ACCEPT_HEADER =
   "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
 
+/** Accept header for interest/explore API JSON responses. */
+export const GOOGLE_TRENDS_INTEREST_ACCEPT_HEADER =
+  "application/json,text/plain,*/*";
+
+/** Referer sent with interest/explore API requests. */
+export const GOOGLE_TRENDS_INTEREST_REFERER =
+  "https://trends.google.com/trends/explore";
+
 // ─── Limits ───────────────────────────────────────────────────────────────────
 
 /** Maximum number of trending entries to return. The page can return 2000+ for 7-day windows. */
@@ -174,8 +182,101 @@ export const GOOGLE_TRENDS_DEFAULT_LIMIT = 500;
 
 export const GOOGLE_TRENDS_API_ROUTES = {
   TRENDING: "/trending",
+  INTEREST: "/interest",
+  INTELLIGENCE_INTEREST: "/intelligence/interest",
+  INTELLIGENCE_COMPARE: "/intelligence/compare",
 } as const;
 
 export const GOOGLE_TRENDS_HANDLER_LABELS = {
   TRENDING: "GOOGLE_TRENDS/TRENDING",
+  INTEREST: "GOOGLE_TRENDS/INTEREST",
+  INTELLIGENCE_INTEREST: "GOOGLE_TRENDS/INTELLIGENCE/INTEREST",
+  INTELLIGENCE_COMPARE: "GOOGLE_TRENDS/INTELLIGENCE/COMPARE",
 } as const;
+
+// ─── Interest-over-time API (explore + widgetdata) ─────────────────────────────
+
+/**
+ * `/trends/api/explore` returns the widget tokens needed to call the
+ * widgetdata endpoints. The response is JSON prefixed with `)]}'\n` to
+ * prevent JSON hijacking — we strip it before parsing.
+ */
+export const GOOGLE_TRENDS_EXPLORE_PATH = "/trends/api/explore";
+export const GOOGLE_TRENDS_EXPLORE_RESPONSE_PREFIX = ")]}'";
+
+/**
+ * Widgetdata base path. Each widget type appends its own suffix:
+ *   TIMESERIES       → /trends/api/widgetdata/multiline/timeseries/json
+ *   RELATED_QUERIES  → /trends/api/widgetdata/relatedsearches/json
+ *   GEO_MAP          → /trends/api/widgetdata/relatedsearches/geo/json
+ */
+export const GOOGLE_TRENDS_WIDGETDATA_BASE_PATH =
+  "/trends/api/widgetdata";
+
+export const GOOGLE_TRENDS_WIDGET_ID = {
+  TIMESERIES: "TIMESERIES",
+  RELATED_QUERIES: "RELATED_QUERIES",
+  RELATED_TOPICS: "RELATED_TOPICS",
+  GEO_MAP: "GEO_MAP",
+} as const;
+
+/**
+ * `gprop` (Google property) values for the explore `req.comparisonItems[].gprop`
+ * field. Empty string = Google web search; `"youtube"` = YouTube search.
+ */
+export const GOOGLE_TRENDS_PROPERTY = {
+  WEB: "",
+  YOUTUBE: "youtube",
+  NEWS: "news",
+  IMAGES: "images",
+  SHOPPING: "froogle",
+} as const;
+
+export const GOOGLE_TRENDS_PROPERTY_VALUES = [
+  GOOGLE_TRENDS_PROPERTY.WEB,
+  GOOGLE_TRENDS_PROPERTY.YOUTUBE,
+  GOOGLE_TRENDS_PROPERTY.NEWS,
+  GOOGLE_TRENDS_PROPERTY.IMAGES,
+  GOOGLE_TRENDS_PROPERTY.SHOPPING,
+] as const;
+
+/**
+ * Timeframe presets mapped to the Google Trends `time` string format used in
+ * the explore `req.comparisonItems[].time` field.
+ *
+ * - `now 7-d`  → last 7 days (hourly granularity)
+ * - `today 1-m` → last 30 days (daily)
+ * - `today 3-m` → last 90 days (daily)
+ * - `today 12-m` → last 12 months (weekly)
+ * - `today 5-y` → last 5 years (monthly)
+ */
+export const GOOGLE_TRENDS_TIMEFRAME = {
+  LAST_7_DAYS: "now 7-d",
+  LAST_30_DAYS: "today 1-m",
+  LAST_90_DAYS: "today 3-m",
+  LAST_12_MONTHS: "today 12-m",
+  LAST_5_YEARS: "today 5-y",
+} as const;
+
+export const GOOGLE_TRENDS_TIMEFRAME_VALUES = [
+  GOOGLE_TRENDS_TIMEFRAME.LAST_7_DAYS,
+  GOOGLE_TRENDS_TIMEFRAME.LAST_30_DAYS,
+  GOOGLE_TRENDS_TIMEFRAME.LAST_90_DAYS,
+  GOOGLE_TRENDS_TIMEFRAME.LAST_12_MONTHS,
+  GOOGLE_TRENDS_TIMEFRAME.LAST_5_YEARS,
+] as const;
+
+export const GOOGLE_TRENDS_TIMEFRAME_LABELS: Record<string, string> = {
+  [GOOGLE_TRENDS_TIMEFRAME.LAST_7_DAYS]: "last 7 days",
+  [GOOGLE_TRENDS_TIMEFRAME.LAST_30_DAYS]: "last 30 days",
+  [GOOGLE_TRENDS_TIMEFRAME.LAST_90_DAYS]: "last 90 days",
+  [GOOGLE_TRENDS_TIMEFRAME.LAST_12_MONTHS]: "last 12 months",
+  [GOOGLE_TRENDS_TIMEFRAME.LAST_5_YEARS]: "last 5 years",
+};
+
+/** Timezone offset (minutes) sent as the `tz` query param. -300 = America/New_York. */
+export const GOOGLE_TRENDS_DEFAULT_TZ = -300;
+
+/** Maximum number of queries Google Trends can compare in a single explore call. */
+export const GOOGLE_TRENDS_MAX_COMPARE_QUERIES = 5;
+export const GOOGLE_TRENDS_MIN_COMPARE_QUERIES = 2;

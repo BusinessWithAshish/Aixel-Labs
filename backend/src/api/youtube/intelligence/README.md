@@ -4,13 +4,15 @@ Derived endpoints that return **raw API responses + a nested `intelligence` bloc
 
 ## Routes
 
-| Sub-API         | Method | Route                                   | Raw counterpart            |
-| --------------- | ------ | --------------------------------------- | -------------------------- |
-| Search          | `POST` | `/youtube/intelligence/search`          | `/youtube/search`          |
-| Video           | `POST` | `/youtube/intelligence/video`           | `/youtube/video`           |
-| Video suggested | `POST` | `/youtube/intelligence/video/suggested` | `/youtube/video/suggested` |
-| Channel         | `POST` | `/youtube/intelligence/channel`         | `/youtube/channel`         |
-| Handle          | `POST` | `/youtube/intelligence/handle`          | `/youtube/handle`          |
+| Sub-API            | Method | Route                                      | Raw counterpart              |
+| ------------------ | ------ | ------------------------------------------ | ---------------------------- |
+| Search             | `POST` | `/youtube/intelligence/search`             | `/youtube/search`            |
+| Video              | `POST` | `/youtube/intelligence/video`              | `/youtube/video`             |
+| Video suggested    | `POST` | `/youtube/intelligence/video/suggested`    | `/youtube/video/suggested`   |
+| Video transcript   | `POST` | `/youtube/intelligence/video/transcript`   | `/youtube/video/transcript`  |
+| Suggest            | `POST` | `/youtube/intelligence/suggest`            | `/youtube/suggest`           |
+| Channel            | `POST` | `/youtube/intelligence/channel`            | `/youtube/channel`           |
+| Handle             | `POST` | `/youtube/intelligence/handle`             | `/youtube/handle`            |
 
 Route paths live in `constants.ts` → `YOUTUBE_INTELLIGENCE_ROUTES` and are mirrored in `backend/src/config.ts` → `API_ENDPOINTS.YOUTUBE.INTELLIGENCE`.
 
@@ -58,6 +60,13 @@ intelligence/
 ├── search/                   # handler → enrich → compute (search-specific)
 ├── video/                    # handler → enrich (imports shared compute/)
 ├── video/suggested/
+├── suggest/                  # recursive keyword tree (depth 0+1, parallel)
+├── transcript/               # zones / hook / CTA / keywords / title alignment
+│   ├── schemas.ts            # extends raw transcript schema + optional title
+│   ├── compute/              # zones, hook, cta, keywords, title-alignment, intro
+│   ├── enrich.ts
+│   ├── service.ts
+│   └── handler.ts
 ├── channel/                  # handler → harvest → enrich → compute + content-metrics
 ├── handle/
 └── video-meta/
@@ -121,9 +130,11 @@ Channel raw handler resolves `handle` → `channelId` before fetch. Intelligence
 3. ✅ Search intelligence fields (video items — see SKIPPED_FIELDS.md)
 4. ✅ Channel intelligence fields (video tab items — see SKIPPED_FIELDS.md)
 5. ✅ Video suggested intelligence fields
-6. ⬜ Handle intelligence fields
-7. ⬜ Unit tests per compute module
-8. ⬜ OpenAPI documentation
+6. ✅ Handle intelligence fields
+7. ✅ Suggest intelligence (niche keyword tree)
+8. ✅ Transcript intelligence (zones, hooks, CTAs, title alignment)
+9. ⬜ Unit tests per compute module
+10. ⬜ OpenAPI documentation
 
 ## Deferred fields
 

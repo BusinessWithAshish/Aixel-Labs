@@ -43,5 +43,8 @@ export {
   computeHashtagCount,
   parseChannelKeywords,
   computeKeywordCount,
+  tokenisePreservingCase,
+  tokeniseWords,
 } from "./text";
+export type { TokenWithCasing } from "./text";
 export { computeRankByViews } from "./ranking";

@@ -8,6 +8,8 @@ import {
 } from "../api/youtube/channel/schemas";
 import { YOUTUBE_HANDLE_REQUEST_SCHEMA } from "../api/youtube/handle/schemas";
 import { YOUTUBE_VIDEO_META_REQUEST_SCHEMA } from "../api/youtube/video-meta/schemas";
+import { YOUTUBE_SUGGEST_REQUEST_SCHEMA } from "../api/youtube/suggest/schemas";
+import { YOUTUBE_TRANSCRIPT_INTELLIGENCE_REQUEST_SCHEMA } from "../api/youtube/intelligence/transcript/schemas";
 import {
   AGGREGATE_NICHE_SIGNALS_SCHEMA,
   AGGREGATE_KEYWORD_SIGNALS_SCHEMA,
@@ -22,11 +24,17 @@ import { videoSuggestionsIntelligenceService } from "../api/youtube/intelligence
 import { channelIntelligenceService } from "../api/youtube/intelligence/channel/service";
 import { resolveHandleService } from "../api/youtube/intelligence/handle/service";
 import { bulkEnrichVideosService } from "../api/youtube/intelligence/video-meta/service";
+import { suggestIntelligenceService } from "../api/youtube/intelligence/suggest/service";
+import { transcriptIntelligenceService } from "../api/youtube/intelligence/transcript/service";
+import { GOOGLE_TRENDS_INTEREST_REQUEST_SCHEMA } from "../api/google-trends/interest/schemas";
+import { GOOGLE_TRENDS_COMPARE_REQUEST_SCHEMA } from "../api/google-trends/interest/schemas";
+import { googleTrendsInterestIntelligenceService } from "../api/google-trends/intelligence/single/service";
+import { googleTrendsCompareIntelligenceService } from "../api/google-trends/intelligence/compare/service";
 import { fail, ok } from "./tool-result";
 
 export const MCP_SERVER_NAME = "aixel-youtube-intelligence";
 export const MCP_SERVER_VERSION = "1.0.0";
-export const MCP_TOOL_COUNT = 9;
+export const MCP_TOOL_COUNT = 13;
 
 export function createYoutubeIntelligenceMcpServer(): McpServer {
   const server = new McpServer({
@@ -173,6 +181,70 @@ export function createYoutubeIntelligenceMcpServer(): McpServer {
     async (args) => {
       try {
         return ok(await resolveHandleService(args));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_niche_keyword_tree",
+    {
+      description:
+        "Map the complete search vocabulary of a niche by recursively seeding YouTube autocomplete. Takes a seed query, fetches its suggestions (depth 0), then for each suggestion fetches its own suggestions (depth 1) — one level of recursion only. Deduplicates across the full result set and computes per-suggestion intelligence (depth, year-recency flag, language/geo modifier flag, brand/proper-noun detection) plus aggregate intelligence (total unique count, detected competitors, detected language modifiers, keyword clusters grouping suggestions sharing a common 2–3 word phrase).\n\nCall this EARLY in any niche exploration or topic validation flow, before running search queries — it reveals exactly how real users phrase their searches and what sub-topics and competitors are embedded in the niche's search behavior. The keyword clusters field shows the main sub-topic buckets within the niche; the competitors field surfaces brand/channel names that appear in suggestions; the language modifiers field reveals localized sub-niches (e.g. Hindi, Spanish, UK) worth dedicated content. All depth-1 fetches run in parallel so latency stays low.",
+      inputSchema: YOUTUBE_SUGGEST_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        return ok(await suggestIntelligenceService(args));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_video_transcript_intelligence",
+    {
+      description:
+        "Fetch a YouTube video's transcript and compute deep content-level intelligence: four-zone pacing (intro / early / mid / outro with raw text + words-per-minute per zone), hook classification (question / bold_claim / story / direct_address / shock_stat / demonstration / standard), call-to-action detection with position (early / mid / late) and timestamp, top-30 keyword frequency, an optional title-alignment score (0–1) measuring how well the title's significant words appear in the transcript (intro zone weighted 2x), and an intro-length estimate of when setup language transitions into substantive content.\n\nThis tool is EXPENSIVE — use it selectively, only on confirmed top performers AFTER velocity scores and engagement ratios have already identified them as worth studying deeply. It gives you the ability to understand WHY a video worked at the content level, not just the metadata level. Particularly useful for identifying the hook pattern and CTA strategy that high-performing videos in a niche use. Pass the optional `title` field to get the titleAlignmentScore; omit it and that field is null. The `language` field defaults to English but accepts any BCP-47 code for future use.",
+      inputSchema: YOUTUBE_TRANSCRIPT_INTELLIGENCE_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        return ok(await transcriptIntelligenceService(args));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_trend_intelligence",
+    {
+      description:
+        "Fetch Google Trends interest-over-time data for a single keyword and compute the time dimension that no other tool in the system has: trend direction (rising / falling / stable) from linear-regression slope + consistency, lifecycle stage classification (emerging / growing / mature / declining), seasonal pattern detection (peak month, trough month, peak-to-trough ratio, optimal publish window — only runs on timeframes of 12+ months), breakout detection (rising queries Google flagged as Breakout, surfaced separately as the earliest acceleration signals), platform comparison (web vs YouTube demand-gap score — high web interest + low YouTube interest = content opportunity), geographic concentration (whether demand is globally spread or concentrated in 1–2 regions), and the top-10 rising related queries with parsed growth percentages.\n\nCall this whenever you need to validate whether a topic is growing or shrinking before recommending it. MANDATORY in trend detection mode. The lifecycle stage field alone often determines whether further research is worth doing — a DECLINING lifecycle stage on a topic means you should immediately suggest adjacent rising alternatives rather than going deeper on a dying niche. When the requested property is web (default) or youtube, the platform comparison fetches the other property in parallel and computes the demand gap; for other properties (news / images / shopping) platform comparison is null.",
+      inputSchema: GOOGLE_TRENDS_INTEREST_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        return ok(await googleTrendsInterestIntelligenceService(args));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compare_trend_topics",
+    {
+      description:
+        "Compare 2–5 keywords on Google Trends against each other in a single call. Google Trends normalises interest values onto a shared 0–100 scale so direct comparison is meaningful. Computes per-query trend direction + lifecycle stage (same classifier as get_trend_intelligence), a relative dominance ranking (which query has the highest average interest, ranked 1–N), a momentum comparison (which query has the strongest positive recent slope regardless of absolute interest — a smaller topic with strong momentum is often a better bet than a larger topic that is flat or declining), and crossover points (when two queries trending in opposite directions had their interest lines cross during the timeframe — a significant signal in competitive niche analysis).\n\nUse this when you have identified multiple potential content angles or competing sub-niches and need to determine which one has better momentum right now, OR when a user asks you to compare two niches or topic ideas directly. The MOMENTUM comparison field is more important than the dominance ranking — a smaller but faster-growing topic is usually the better strategic choice. All queries share the same geo, timeframe, category, and property.",
+      inputSchema: GOOGLE_TRENDS_COMPARE_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        return ok(await googleTrendsCompareIntelligenceService(args));
       } catch (err) {
         return fail(err);
       }

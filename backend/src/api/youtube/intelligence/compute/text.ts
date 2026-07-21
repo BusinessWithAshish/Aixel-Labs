@@ -50,3 +50,23 @@ export function parseChannelKeywords(keywords: string | null): string[] {
 export function computeKeywordCount(keywords: string | null): number {
   return parseChannelKeywords(keywords).length;
 }
+
+export type TokenWithCasing = { lower: string; original: string };
+
+/** Unicode-aware tokeniser preserving original casing (suggest intelligence). */
+export function tokenisePreservingCase(text: string): TokenWithCasing[] {
+  return text
+    .split(/\s+/)
+    .map((raw) => raw.replace(YOUTUBE_INTELLIGENCE_PATTERNS.WORD_TOKEN, ""))
+    .filter((tok) => tok.length > 0)
+    .map((tok) => ({ lower: tok.toLowerCase(), original: tok }));
+}
+
+/** Lower-cased ASCII-oriented tokeniser (transcript keywords). */
+export function tokeniseWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(YOUTUBE_INTELLIGENCE_PATTERNS.ASCII_WORD_SPLIT)
+    .map((t) => t.replace(YOUTUBE_INTELLIGENCE_PATTERNS.ASCII_WORD_STRIP, ""))
+    .filter((t) => t.length > 0);
+}
