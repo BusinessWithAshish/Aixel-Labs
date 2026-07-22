@@ -35,8 +35,11 @@ export async function gsearchApiHandler(
   }
 
   try {
-    const data = await fetchGsearch(parsed.data);
-    const response: ALApiResponse<GSEARCH_RESPONSE> = { success: true, data };
+    const { results } = await fetchGsearch(parsed.data);
+    const response: ALApiResponse<GSEARCH_RESPONSE[]> = {
+      success: true,
+      data: results,
+    };
     res.status(200).json(response);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

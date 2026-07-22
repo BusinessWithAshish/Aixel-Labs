@@ -38,6 +38,22 @@
       "types": "./src/api/gmaps/scrape/types.ts",
       "default": "./src/api/gmaps/scrape/types.ts"
     },
+    "./gsearch": {
+      "types": "./src/api/gsearch/index.ts",
+      "default": "./src/api/gsearch/index.ts"
+    },
+    "./gsearch/schemas": {
+      "types": "./src/api/gsearch/schemas.ts",
+      "default": "./src/api/gsearch/schemas.ts"
+    },
+    "./gsearch/types": {
+      "types": "./src/api/gsearch/types.ts",
+      "default": "./src/api/gsearch/types.ts"
+    },
+    "./gsearch/constants": {
+      "types": "./src/api/gsearch/constants.ts",
+      "default": "./src/api/gsearch/constants.ts"
+    },
     "./instagram": {
       "types": "./src/api/instagram/types.ts",
       "default": "./src/api/instagram/types.ts"

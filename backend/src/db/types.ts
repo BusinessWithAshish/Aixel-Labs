@@ -3,7 +3,7 @@
  * No "mongodb" or Node built-ins here so this file is safe for the client bundle.
  */
 import { type GMAPS_INTERNAL_RESPONSE } from "../api/gmaps/internal/types";
-
+import type { GSEARCH_RESPONSE } from "../api/gsearch/types";
 import { INSTAGRAM_RESPONSE } from "../api/instagram";
 import { ObjectId } from "mongodb";
 import {
@@ -86,6 +86,7 @@ export type ModuleAccess = {
 export type LeadData =
   | INSTAGRAM_RESPONSE
   | GMAPS_INTERNAL_RESPONSE
+  | GSEARCH_RESPONSE
   | LINKEDIN_BY_COMPANY_RESPONSE
   | LINKEDIN_BY_PEOPLE_RESPONSE;
 
@@ -121,6 +122,7 @@ export type User = UserDoc<string>;
 
 export enum LeadSource {
   GOOGLE_MAPS = "GOOGLE_MAPS",
+  GOOGLE_ADVANCED_SEARCH = "GOOGLE_ADVANCED_SEARCH",
   INSTAGRAM = "INSTAGRAM",
   LINKEDIN = "LINKEDIN",
   FACEBOOK = "FACEBOOK",

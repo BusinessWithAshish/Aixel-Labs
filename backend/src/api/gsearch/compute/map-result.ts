@@ -14,7 +14,10 @@ const firstDefined = (...vals: (string | undefined)[]): string | null => {
 export function mapCseResult(
   row: GSEARCH_RAW_CSE_RESULT,
   index: number,
-): GSEARCH_RESULT {
+): GSEARCH_RESULT | null {
+  const url = firstDefined(row.unescapedUrl, row.url);
+  if (!url) return null;
+
   const rich = row.richSnippet ?? {};
   const meta: GSEARCH_RAW_METATAGS = rich.metatags ?? {};
   const person = rich.person;
@@ -40,9 +43,10 @@ export function mapCseResult(
     : null;
 
   return {
+    id: url,
     index,
     title: row.titleNoFormatting ?? row.title ?? null,
-    url: row.unescapedUrl ?? row.url ?? null,
+    url,
     displayUrl: row.visibleUrl ?? null,
     formattedUrl:
       row.formattedUrl?.replace(GSEARCH_FORMATTED_URL_HIGHLIGHT_PATTERN, "") ??

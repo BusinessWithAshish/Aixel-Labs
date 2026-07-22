@@ -20,7 +20,7 @@ import { buildGsearchSearchUrl, fetchGsearchToken } from "./token";
 import type {
   GSEARCH_RAW_CSE_RESULT,
   GSEARCH_REQUEST,
-  GSEARCH_RESPONSE,
+  GSEARCH_FETCH_RESPONSE,
   GSEARCH_RESULT,
 } from "./types";
 
@@ -31,7 +31,7 @@ import type {
  */
 export async function fetchGsearch(
   input: GSEARCH_REQUEST,
-): Promise<GSEARCH_RESPONSE> {
+): Promise<GSEARCH_FETCH_RESPONSE> {
   const {
     searchQuery,
     country,
@@ -127,9 +127,11 @@ export async function fetchGsearch(
     if (rows.length === 0) break;
 
     for (const row of rows) {
-      results.push(
-        mapCseResult(row as GSEARCH_RAW_CSE_RESULT, results.length + 1),
+      const mapped = mapCseResult(
+        row as GSEARCH_RAW_CSE_RESULT,
+        results.length + 1,
       );
+      if (mapped) results.push(mapped);
     }
     pagesFetched++;
   }

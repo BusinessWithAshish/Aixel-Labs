@@ -9,6 +9,8 @@ export function getLeadSoruceFromSubModule(subModule: LEAD_GENERATION_SUB_MODULE
     switch (subModule) {
         case LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS:
             return LeadSource.GOOGLE_MAPS;
+        case LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH:
+            return LeadSource.GOOGLE_ADVANCED_SEARCH;
         case LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH:
             return LeadSource.INSTAGRAM;
         case LEAD_GENERATION_SUB_MODULES.LINKEDIN:
@@ -45,6 +47,8 @@ const getLeads = <TRequest>(
     switch (source) {
         case LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS:
             return apiClient.post(API_ENDPOINTS.GMAPS.INTERNAL.full, body, options);
+        case LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH:
+            return apiClient.post(API_ENDPOINTS.GSEARCH.SEARCH.full, body, options);
         case LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH:
             return apiClient.post(API_ENDPOINTS.INSTAGRAM.API.full, body, options);
         case LEAD_GENERATION_SUB_MODULES.LINKEDIN:

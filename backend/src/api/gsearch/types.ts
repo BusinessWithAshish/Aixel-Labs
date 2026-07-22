@@ -28,10 +28,14 @@ export type GSEARCH_AUTHOR = {
 };
 
 /**
- * A single organic web result. Superset of the browser-worker's
- * `{ url, title, snippet, index }`, enriched with CSE richSnippet metadata.
+ * A single organic web result (also the lead-gen persistable shape).
+ * `id` is the canonical result URL (`createUserLeads` / Mongo `sourceId`).
+ * Superset of the browser-worker's `{ url, title, snippet, index }`, enriched
+ * with CSE richSnippet metadata.
  */
 export type GSEARCH_RESULT = {
+  /** Canonical URL — required for lead persistence. */
+  id: string;
   /** 1-based position across all requested pages. */
   index: number;
   title: string | null;
@@ -69,7 +73,8 @@ export type GSEARCH_RESULT = {
   clickUrl: string | null;
 };
 
-export type GSEARCH_RESPONSE = {
+/** Envelope returned by `fetchGsearch` (internal IG/LI discovery). */
+export type GSEARCH_FETCH_RESPONSE = {
   query: string;
   /** Query actually sent to Google (with location appended when city/state set). */
   resolvedQuery: string;
@@ -83,6 +88,12 @@ export type GSEARCH_RESPONSE = {
   pagesFetched: number;
   results: GSEARCH_RESULT[];
 };
+
+/**
+ * Product lead-gen item — same shape as a CSE result row.
+ * Naming matches `INSTAGRAM_RESPONSE` / `GMAPS_INTERNAL_RESPONSE`.
+ */
+export type GSEARCH_RESPONSE = GSEARCH_RESULT;
 
 // ─── Raw CSE payload shapes (internal) ───────────────────────────────────────
 

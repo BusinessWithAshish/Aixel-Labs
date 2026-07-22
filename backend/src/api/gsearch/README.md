@@ -66,35 +66,32 @@ trick `browser-worker` uses) plus country proxy routing. Both city and state →
 Schema: `schemas.ts` → `GSEARCH_REQUEST_SCHEMA` (country via shared
 `utils/location-schema`). Constants/limits: `constants.ts`.
 
-## Response — `ALApiResponse<GSEARCH_RESPONSE>`
+## Response — `ALApiResponse<GSEARCH_RESPONSE[]>`
+
+Product lead-gen shape (same pattern as Instagram / GMaps / LinkedIn): an array of
+result rows. Each row includes `id` (canonical URL) for `createUserLeads`.
+
+`fetchGsearch()` still returns the richer `GSEARCH_FETCH_RESPONSE` envelope
+(query metadata + `results`) for internal Instagram/LinkedIn discovery.
 
 ```jsonc
 {
   "success": true,
-  "data": {
-    "query": "emergency plumber",
-    "resolvedQuery": "emergency plumber in Austin, Texas",
-    "country": "US",
-    "region": "Austin",
-    "state": "Texas",
-    "language": "en",
-    "estimatedResultCount": "13400000",
-    "pagesFetched": 1,
-    "results": [
-      {
-        "index": 1,
-        "title": "…",
-        "url": "https://…",
-        "displayUrl": "example.com",
-        "snippet": "…",
-        "thumbnail": "https://encrypted-tbn0.gstatic.com/…",
-        "image": "https://example.com/hero.jpg",
-        "siteName": "Example",
-        "metaDescription": "…",
-        "modifiedTime": "2026-07-07T14:53:11+00:00",
-      },
-    ],
-  },
+  "data": [
+    {
+      "id": "https://…",
+      "index": 1,
+      "title": "…",
+      "url": "https://…",
+      "displayUrl": "example.com",
+      "snippet": "…",
+      "thumbnail": "https://encrypted-tbn0.gstatic.com/…",
+      "image": "https://example.com/hero.jpg",
+      "siteName": "Example",
+      "metaDescription": "…",
+      "modifiedTime": "2026-07-07T14:53:11+00:00",
+    },
+  ],
 }
 ```
 
@@ -112,7 +109,7 @@ gsearch/
 ├── index.ts          # Router (POST /) + public exports
 ├── constants.ts      # URLs, limits, enums, handler labels, patterns
 ├── schemas.ts        # GSEARCH_REQUEST_SCHEMA (country required, region optional)
-├── types.ts          # GSEARCH_REQUEST/RESPONSE/RESULT + raw CSE payload types
+├── types.ts          # GSEARCH_REQUEST / RESULT / RESPONSE / FETCH_RESPONSE + raw CSE types
 ├── compute/
 │   ├── query.ts      # buildLocationQuery, buildTimeSort
 │   ├── parse.ts      # parseJsonp, parseCseJsToken

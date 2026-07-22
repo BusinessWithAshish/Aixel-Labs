@@ -9,7 +9,11 @@ import { LEAD_SORT_DEFAULTS, normalizeLeadSortState, type LeadSortState } from '
 
 // ─── Source type ────────────────────────────────────────────────────────────
 
-export type FilterSource = LeadSource.GOOGLE_MAPS | LeadSource.LINKEDIN | LeadSource.INSTAGRAM;
+export type FilterSource =
+    | LeadSource.GOOGLE_MAPS
+    | LeadSource.GOOGLE_ADVANCED_SEARCH
+    | LeadSource.LINKEDIN
+    | LeadSource.INSTAGRAM;
 
 /**
  * Tri-state presence filter for the leads sheet.
@@ -158,11 +162,20 @@ export type SourceMeta = { label: string; imageSrc: string };
 
 export const SOURCE_META: Record<FilterSource, SourceMeta> = {
     [LeadSource.GOOGLE_MAPS]: { label: 'Google Maps', imageSrc: '/google-maps.svg' },
+    [LeadSource.GOOGLE_ADVANCED_SEARCH]: {
+        label: 'Google Advanced Search',
+        imageSrc: '/google-logo.png',
+    },
     [LeadSource.LINKEDIN]: { label: 'LinkedIn', imageSrc: '/linkedin-logo-svg.png' },
     [LeadSource.INSTAGRAM]: { label: 'Instagram', imageSrc: '/instagram-logo.svg' },
 };
 
-export const FILTERABLE_SOURCES: FilterSource[] = [LeadSource.GOOGLE_MAPS, LeadSource.LINKEDIN, LeadSource.INSTAGRAM];
+export const FILTERABLE_SOURCES: FilterSource[] = [
+    LeadSource.GOOGLE_MAPS,
+    LeadSource.GOOGLE_ADVANCED_SEARCH,
+    LeadSource.LINKEDIN,
+    LeadSource.INSTAGRAM,
+];
 
 export const SOURCE_FILTER_OPTIONS: { value: FilterSource; label: string }[] = FILTERABLE_SOURCES.map((s) => ({
     value: s,
