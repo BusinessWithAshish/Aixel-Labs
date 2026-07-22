@@ -79,10 +79,9 @@ export const GoogleAdvancedSearchQueryForm = () => {
             <SelectControlledField
                 name="timeFilter"
                 label="Time filter"
-                description="Restrict results to a recent time window"
+                description="Restrict results to a recent time window (defaults to last 24 hours for fresher leads)"
                 options={GSEARCH_TIME_FILTER_OPTIONS}
                 required={false}
-                isClearable
             />
 
             <StringControlledField

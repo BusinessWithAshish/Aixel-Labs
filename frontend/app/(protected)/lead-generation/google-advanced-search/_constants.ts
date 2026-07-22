@@ -1,6 +1,7 @@
 import {
     GSEARCH_DEFAULT_LANGUAGE,
     GSEARCH_DEFAULT_PAGES,
+    GSEARCH_DEFAULT_TIME_FILTER,
     GSEARCH_SAFE,
     GSEARCH_TIME_FILTER,
 } from '@aixellabs/backend/gsearch/constants';
@@ -15,7 +16,7 @@ export const DEFAULT_GOOGLE_ADVANCED_SEARCH_FORM_VALUES: GSEARCH_REQUEST = {
     pages: GSEARCH_DEFAULT_PAGES,
     language: GSEARCH_DEFAULT_LANGUAGE,
     safe: GSEARCH_SAFE.OFF,
-    timeFilter: undefined,
+    timeFilter: GSEARCH_DEFAULT_TIME_FILTER,
 };
 
 export const GOOGLE_ADVANCED_SEARCH_FORM_NAME = 'google-advanced-search-form';
