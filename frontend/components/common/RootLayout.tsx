@@ -1,4 +1,4 @@
-import { poppinsFont } from '@/helpers/fonts';
+import { interFont } from '@/helpers/fonts';
 import { Toaster } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
@@ -38,7 +38,7 @@ export const RootLayoutUI = async ({
             <head>
                 <style dangerouslySetInnerHTML={{ __html: buildThemeStyleTag(activeColor) }} />
             </head>
-            <body className={cn(`${poppinsFont.variable} h-dvh w-full`, className)} suppressHydrationWarning>
+            <body className={cn(interFont.className, 'h-dvh w-full', className)} suppressHydrationWarning>
 
                 <TenantBrandingProvider
                     appLogoUrl={tenantLogoUrl}
