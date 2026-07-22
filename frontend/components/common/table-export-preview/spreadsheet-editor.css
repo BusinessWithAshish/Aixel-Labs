@@ -1,0 +1,105 @@
+/**
+ * Theme bridge for jspreadsheet-ce.
+ * Base package CSS hardcodes light colors; themes.css reads these vars.
+ * Map them to app design tokens so light/dark both stay readable.
+ */
+.spreadsheet-editor-host {
+    --jss-border-color: var(--border);
+    --border_color: var(--border);
+    --border_color_highlighted: var(--foreground);
+    --header_background: var(--muted);
+    --header_color: var(--foreground);
+    --header_background_highlighted: color-mix(in oklch, var(--primary) 22%, var(--muted));
+    --header_color_highlighted: var(--foreground);
+    --content_background: var(--background);
+    --content_color: var(--foreground);
+    --content_background_highlighted: var(--muted);
+    --content_color_highlighted: var(--foreground);
+    --selection: color-mix(in oklch, var(--primary) 14%, transparent);
+    --cursor: color-mix(in oklch, var(--primary) 22%, var(--muted));
+    --menu_background: var(--popover);
+    --menu_color: var(--popover-foreground);
+    --menu_background_highlighted: var(--accent);
+    --menu_color_highlighted: var(--accent-foreground);
+    --menu_box_shadow: 0 8px 24px color-mix(in oklch, var(--foreground) 18%, transparent);
+    color: var(--foreground);
+}
+
+/* Base jspreadsheet.css hardcodes #fff / #f3f3f3 — beat those after themes.css. */
+.spreadsheet-editor-host .jss_worksheet {
+    background-color: var(--content_background);
+    color: var(--content_color);
+    border-right-color: var(--border_color);
+    border-bottom-color: var(--border_color);
+}
+
+.spreadsheet-editor-host .jss_worksheet > thead > tr > td {
+    background-color: var(--header_background) !important;
+    color: var(--header_color) !important;
+    border-top-color: var(--border_color);
+    border-left-color: var(--border_color);
+}
+
+.spreadsheet-editor-host .jss_worksheet > thead > tr > td.selected {
+    background-color: var(--header_background_highlighted) !important;
+    color: var(--header_color_highlighted) !important;
+}
+
+.spreadsheet-editor-host .jss_worksheet > tbody > tr > td {
+    background-color: var(--content_background) !important;
+    color: var(--content_color) !important;
+    border-top-color: var(--border_color);
+    border-left-color: var(--border_color);
+}
+
+.spreadsheet-editor-host .jss_worksheet > tbody > tr > td:first-child {
+    background-color: var(--header_background) !important;
+    color: var(--header_color) !important;
+}
+
+.spreadsheet-editor-host .jss_worksheet > tbody > tr.selected > td:first-child {
+    background-color: var(--header_background_highlighted) !important;
+    color: var(--header_color_highlighted) !important;
+}
+
+.spreadsheet-editor-host .jss_worksheet > tbody > tr > td > select,
+.spreadsheet-editor-host .jss_worksheet > tbody > tr > td > input,
+.spreadsheet-editor-host .jss_worksheet > tbody > tr > td > textarea {
+    color: var(--content_color);
+    background-color: var(--content_background);
+}
+
+.spreadsheet-editor-host .jss_worksheet .highlight {
+    background-color: var(--selection) !important;
+}
+
+.spreadsheet-editor-host .jss_worksheet .highlight-selected {
+    background-color: var(--cursor) !important;
+}
+
+.spreadsheet-editor-host .jss_content {
+    scrollbar-color: var(--primary) transparent;
+}
+
+.spreadsheet-editor-host .jss_content::-webkit-scrollbar-track {
+    background: color-mix(in oklch, var(--muted) 45%, transparent);
+}
+
+.spreadsheet-editor-host .jss_content::-webkit-scrollbar-thumb {
+    background: var(--primary);
+}
+
+.spreadsheet-editor-host td.export-col-deleted {
+    color: var(--destructive) !important;
+    text-decoration: line-through;
+    background-color: color-mix(in oklch, var(--destructive) 12%, transparent) !important;
+}
+
+.spreadsheet-editor-host td.export-col-selected {
+    background-color: color-mix(in oklch, var(--primary) 12%, var(--content_background)) !important;
+}
+
+.spreadsheet-editor-host thead td.export-col-selected {
+    background-color: color-mix(in oklch, var(--primary) 22%, var(--header_background)) !important;
+    font-weight: 600;
+}

@@ -16,7 +16,9 @@ import {
 import { toast } from 'sonner';
 import { RenameColumnDialog } from './RenameColumnDialog';
 import 'jspreadsheet-ce/dist/jspreadsheet.css';
+import 'jspreadsheet-ce/dist/jspreadsheet.themes.css';
 import 'jsuites/dist/jsuites.css';
+import './spreadsheet-editor.css';
 
 export type SpreadsheetDataEditorHandle = {
     getRows: () => Record<string, unknown>[];
@@ -28,9 +30,6 @@ export type SpreadsheetDataEditorProps = {
 };
 
 type Worksheet = ReturnType<typeof jspreadsheet>[number];
-
-const DELETED_CELL_STYLE =
-    'color:#dc2626;text-decoration:line-through;background-color:rgba(220,38,38,0.08)';
 
 function cellToValue(value: unknown): string | number | boolean | null {
     if (value == null || value === '') return null;
@@ -52,23 +51,8 @@ function headerList(worksheet: Worksheet): string[] {
 
 function paintColumnClasses(host: HTMLElement, worksheet: Worksheet, deleted: Set<string>, selectedCol: number | null) {
     const headers = headerList(worksheet);
-    const data = worksheet.getData(false, true) as unknown[][];
-    const styles: Record<string, string> = {};
-    const resets: Record<string, true> = {};
 
-    headers.forEach((header, x) => {
-        const marked = deleted.has(header);
-        for (let y = 0; y < data.length; y++) {
-            const cell = jspreadsheet.helpers.getCellNameFromCoords(x, y);
-            if (marked) styles[cell] = DELETED_CELL_STYLE;
-            else resets[cell] = true;
-        }
-    });
-
-    if (Object.keys(resets).length) worksheet.resetStyle(resets, true);
-    if (Object.keys(styles).length) worksheet.setStyle(styles, null, null, true);
-
-    host.querySelectorAll<HTMLElement>('.jexcel td[data-x]').forEach((td) => {
+    host.querySelectorAll<HTMLElement>('.jss_worksheet td[data-x]').forEach((td) => {
         const x = Number(td.dataset.x);
         if (!Number.isFinite(x) || headers[x] == null) return;
         td.classList.toggle('export-col-deleted', deleted.has(headers[x]));
@@ -389,9 +373,8 @@ export const SpreadsheetDataEditor = forwardRef<
             <div
                 ref={hostRef}
                 className={cn(
-                    'min-h-0 flex-1 overflow-auto [&_.jexcel]:relative [&_.jexcel_content]:overflow-auto',
-                    '[&_td.export-col-deleted]:text-destructive [&_td.export-col-deleted]:line-through [&_td.export-col-deleted]:bg-destructive/10',
-                    '[&_td.export-col-selected]:bg-primary/10 [&_thead_td.export-col-selected]:bg-primary/20 [&_thead_td.export-col-selected]:font-semibold',
+                    'spreadsheet-editor-host min-h-0 flex-1 overflow-auto',
+                    '[&_.jss_worksheet]:relative [&_.jss_content]:overflow-auto',
                 )}
             />
 
