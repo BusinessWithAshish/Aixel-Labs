@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   GSEARCH_DEFAULT_LANGUAGE,
   GSEARCH_DEFAULT_PAGES,
+  GSEARCH_DEFAULT_TIME_FILTER,
   GSEARCH_MAX_PAGES,
   GSEARCH_MAX_QUERY_CHARS,
   GSEARCH_SAFE,
@@ -44,8 +45,8 @@ export const GSEARCH_REQUEST_SCHEMA = z.object({
     .int()
     .min(1)
     .max(GSEARCH_MAX_PAGES)
-    .default(GSEARCH_DEFAULT_PAGES)
     .optional()
+    .default(GSEARCH_DEFAULT_PAGES)
     .describe(
       `Number of result pages (20 results each). Default ${GSEARCH_DEFAULT_PAGES}, ` +
         `max ${GSEARCH_MAX_PAGES} (~120 results — Google's hard CSE ceiling).`,
@@ -55,16 +56,21 @@ export const GSEARCH_REQUEST_SCHEMA = z.object({
     .trim()
     .min(2)
     .max(5)
-    .default(GSEARCH_DEFAULT_LANGUAGE)
     .optional()
+    .default(GSEARCH_DEFAULT_LANGUAGE)
     .describe("Interface/results language (`hl`). Default 'en'."),
   safe: z
     .nativeEnum(GSEARCH_SAFE)
-    .default(GSEARCH_SAFE.OFF)
     .optional()
+    .default(GSEARCH_SAFE.OFF)
     .describe("Safe-search level: off | medium | high. Default off."),
   timeFilter: z
     .nativeEnum(GSEARCH_TIME_FILTER)
     .optional()
-    .describe("Restrict to results from the last day/week/month/year."),
+    .default(GSEARCH_DEFAULT_TIME_FILTER)
+    .describe(
+      "Restrict to recent results (day | week | month | year). " +
+        `Default '${GSEARCH_DEFAULT_TIME_FILTER}' (last 24 hours). ` +
+        "Applied via Google `after:YYYY-MM-DD` plus CSE `sort=date:r`.",
+    ),
 });

@@ -40,23 +40,58 @@ export function buildLocationQuery(
   return `${q} in ${loc}`;
 }
 
-function formatDate(d: Date): string {
+function formatSortDate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}${m}${day}`;
 }
 
+function formatAfterDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function timeFilterWindow(
+  timeFilter: GSEARCH_TIME_FILTER,
+): { start: Date; end: Date } {
+  const days = GSEARCH_TIME_FILTER_DAYS[timeFilter];
+  const end = new Date();
+  const start = new Date(end.getTime() - days * MS_PER_DAY);
+  return { start, end };
+}
+
 /**
  * Translate a time filter into the CSE `sort` value. The element endpoint has no
  * `tbs`; it uses `sort=date:r:<start>:<end>` (per SearXNG's google_cse engine).
+ *
+ * Note: on whole-web CSE this alone is weak — pair with `applyTimeFilterToQuery`
+ * (`after:YYYY-MM-DD`), which is what actually shifts results toward freshness.
  */
 export function buildTimeSort(
   timeFilter: GSEARCH_TIME_FILTER | undefined,
 ): string | null {
   if (!timeFilter) return null;
-  const days = GSEARCH_TIME_FILTER_DAYS[timeFilter];
-  const end = new Date();
-  const start = new Date(end.getTime() - days * MS_PER_DAY);
-  return `date:r:${formatDate(start)}:${formatDate(end)}`;
+  const { start, end } = timeFilterWindow(timeFilter);
+  return `date:r:${formatSortDate(start)}:${formatSortDate(end)}`;
+}
+
+const AFTER_OPERATOR_PATTERN = /\bafter:\d{4}-\d{2}-\d{2}\b/i;
+
+/**
+ * Append Google's `after:YYYY-MM-DD` operator so CSE returns recently indexed /
+ * published pages. Without this, relevance ranking floods results with stale
+ * hub pages even when `sort=date:r:…` is set.
+ */
+export function applyTimeFilterToQuery(
+  query: string,
+  timeFilter: GSEARCH_TIME_FILTER | undefined,
+): string {
+  if (!timeFilter) return query;
+  const q = query.trim();
+  if (AFTER_OPERATOR_PATTERN.test(q)) return q;
+  const { start } = timeFilterWindow(timeFilter);
+  return `${q} after:${formatAfterDate(start)}`;
 }

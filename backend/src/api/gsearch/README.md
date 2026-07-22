@@ -8,6 +8,12 @@ This is the **productionized** version of the research in
 `backend/src/experiments/google-search/` (see its `FINDINGS.md`). It mirrors the
 `browser-worker` `gsearch` handler's request shape but fetches results over HTTP.
 
+> **Competitor analysis:** See [`COMPETITORS_FINDINGS.md`](./COMPETITORS_FINDINGS.md) for a
+> deep-dive into how Serper.dev and SearchApi.io scrape Google (full browser farms + 100M+
+> proxies + CAPTCHA solving) and a 5-phase roadmap to combine their feature sets into this
+> engine. Short version: our CSE path is browserless and organic-only; they run real browsers
+> to return the full SERP (KG, PAA, AI Overview, verticals).
+
 ## How it works (source of truth)
 
 Google's HTML `www.google.com/search` is gated behind the **knitsail / SG_SS** JS
@@ -59,9 +65,13 @@ trick `browser-worker` uses) plus country proxy routing. Both city and state →
   "pages": 1, // optional — 1..6, 20 results/page (~120 max, default 1)
   "language": "en", // optional — hl (default "en")
   "safe": "off", // optional — off | medium | high (default off)
-  "timeFilter": "week", // optional — day | week | month | year
+  "timeFilter": "day", // optional — day | week | month | year (default "day" / last 24h)
 }
 ```
+
+`timeFilter` appends Google's `after:YYYY-MM-DD` to the query (primary freshness
+lever) and sets CSE `sort=date:r:<start>:<end>` (secondary). Omit/`undefined`
+defaults to last 24 hours.
 
 Schema: `schemas.ts` → `GSEARCH_REQUEST_SCHEMA` (country via shared
 `utils/location-schema`). Constants/limits: `constants.ts`.
@@ -111,7 +121,7 @@ gsearch/
 ├── schemas.ts        # GSEARCH_REQUEST_SCHEMA (country required, region optional)
 ├── types.ts          # GSEARCH_REQUEST / RESULT / RESPONSE / FETCH_RESPONSE + raw CSE types
 ├── compute/
-│   ├── query.ts      # buildLocationQuery, buildTimeSort
+│   ├── query.ts      # buildLocationQuery, buildTimeSort, applyTimeFilterToQuery
 │   ├── parse.ts      # parseJsonp, parseCseJsToken
 │   ├── map-result.ts # mapCseResult (CSE row → GSEARCH_RESULT)
 │   └── index.ts

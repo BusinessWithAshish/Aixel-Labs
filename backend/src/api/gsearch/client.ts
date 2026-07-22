@@ -2,6 +2,7 @@ import { buildEvomiProxyUrl } from "../../utils/fetch-session-common";
 import {
   buildLocationQuery,
   buildTimeSort,
+  applyTimeFilterToQuery,
   mapCseResult,
   parseJsonp,
 } from "./compute";
@@ -57,7 +58,10 @@ export async function fetchGsearch(
     throw new Error("Evomi proxy is not configured");
   }
 
-  const resolvedQuery = buildLocationQuery(searchQuery, region, state);
+  const resolvedQuery = applyTimeFilterToQuery(
+    buildLocationQuery(searchQuery, region, state),
+    timeFilter,
+  );
   const sort = buildTimeSort(timeFilter);
   const token = await fetchGsearchToken(cx, proxyUrl);
 

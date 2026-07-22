@@ -2,7 +2,8 @@ import type { z } from "zod";
 
 import type { GSEARCH_REQUEST_SCHEMA } from "./schemas";
 
-export type GSEARCH_REQUEST = z.infer<typeof GSEARCH_REQUEST_SCHEMA>;
+/** Incoming request body / `fetchGsearch` args (defaults applied by Zod on parse). */
+export type GSEARCH_REQUEST = z.input<typeof GSEARCH_REQUEST_SCHEMA>;
 
 /** Short-lived token pair required by the CSE element endpoint. */
 export type GSEARCH_TOKEN = {

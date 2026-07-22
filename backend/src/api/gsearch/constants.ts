@@ -64,8 +64,10 @@ export enum GSEARCH_SAFE {
 }
 
 /**
- * Time filter → number of days back. The CSE element endpoint has **no `tbs`**;
- * it uses a `sort=date:r:<start>:<end>` date range instead (see compute/query).
+ * Time filter → number of days back.
+ * Applied via Google's `after:YYYY-MM-DD` query operator (primary) plus CSE
+ * `sort=date:r:<start>:<end>` (secondary). Plain `sort=date:r` alone is weak on
+ * whole-web CSE — see compute/query.
  */
 export enum GSEARCH_TIME_FILTER {
   LAST_24_HOURS = "day",
@@ -80,6 +82,9 @@ export const GSEARCH_TIME_FILTER_DAYS: Record<GSEARCH_TIME_FILTER, number> = {
   [GSEARCH_TIME_FILTER.LAST_MONTH]: 30,
   [GSEARCH_TIME_FILTER.LAST_YEAR]: 365,
 };
+
+/** Prefer fresh results — CSE relevance ranking alone surfaces stale hub pages. */
+export const GSEARCH_DEFAULT_TIME_FILTER = GSEARCH_TIME_FILTER.LAST_24_HOURS;
 
 // ─── Patterns ────────────────────────────────────────────────────────────────
 
