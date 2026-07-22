@@ -16,6 +16,7 @@ import {
 import {
     ChevronDown,
     Download,
+    Eye,
     FolderPlus,
     ListChecks,
     ListOrdered,
@@ -38,6 +39,7 @@ export type LeadBulkActionsDropdownProps = {
     onDeselectAll: () => void;
     onDelete: () => void;
     onExport?: (format: LeadExportFormat) => void;
+    onPreviewExport?: () => void;
     onCreateListFromFilters?: () => void;
     createListFromFiltersDisabled?: boolean;
     deselectAllLabel?: string;
@@ -51,12 +53,14 @@ export function LeadBulkActionsDropdown({
     onDeselectAll,
     onDelete,
     onExport,
+    onPreviewExport,
     onCreateListFromFilters,
     createListFromFiltersDisabled,
     deselectAllLabel = 'Deselect all',
     deleteLabel = 'Delete',
 }: LeadBulkActionsDropdownProps) {
     const hasSelection = selectedCount > 0;
+    const showExport = Boolean(onExport || onPreviewExport);
 
     const primaryOptions: DropdownMenuOption[] = [
         {
@@ -120,6 +124,28 @@ export function LeadBulkActionsDropdown({
         },
     ];
 
+    const exportOptions: DropdownMenuOption[] = [
+        {
+            key: 'preview-edit',
+            label: 'Preview & edit…',
+            icon: Eye,
+            hidden: !onPreviewExport,
+            onSelect: () => onPreviewExport?.(),
+        },
+        {
+            type: 'separator',
+            key: 'sep-export-formats',
+            hidden: !onPreviewExport || !onExport,
+        },
+        ...(onExport
+            ? LEAD_EXPORT_FORMATS.map((format) => ({
+                  key: format.value,
+                  label: format.label,
+                  onSelect: () => onExport(format.value),
+              }))
+            : []),
+    ];
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -131,7 +157,7 @@ export function LeadBulkActionsDropdown({
             <DropdownMenuContent align="end">
                 <DropdownMenuGroup>
                     <DropdownMenuItems options={primaryOptions} />
-                    {onExport ? (
+                    {showExport ? (
                         <DropdownMenuSub>
                             <DropdownMenuSubTrigger
                                 className={
@@ -146,13 +172,7 @@ export function LeadBulkActionsDropdown({
                             </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
                                 <DropdownMenuSubContent>
-                                    <DropdownMenuItems
-                                        options={LEAD_EXPORT_FORMATS.map((format) => ({
-                                            key: format.value,
-                                            label: format.label,
-                                            onSelect: () => onExport(format.value),
-                                        }))}
-                                    />
+                                    <DropdownMenuItems options={exportOptions} />
                                 </DropdownMenuSubContent>
                             </DropdownMenuPortal>
                         </DropdownMenuSub>

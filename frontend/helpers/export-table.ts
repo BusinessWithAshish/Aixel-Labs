@@ -39,6 +39,20 @@ export type DownloadTableRowsOptions = {
     sheetName?: string;
 };
 
+/** Stable column order: first-seen key across rows. */
+export function columnKeysFromRows(rows: Record<string, unknown>[]): string[] {
+    const keys: string[] = [];
+    const seen = new Set<string>();
+    for (const row of rows) {
+        for (const key of Object.keys(row)) {
+            if (seen.has(key)) continue;
+            seen.add(key);
+            keys.push(key);
+        }
+    }
+    return keys;
+}
+
 function stripExtension(fileName: string): string {
     return fileName.replace(/\.[^.]+$/, '');
 }

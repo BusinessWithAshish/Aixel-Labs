@@ -4,8 +4,9 @@ import { ListFilter } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePage } from '@/contexts/PageStore';
+import { TableExportPreviewDialog } from '@/components/common/table-export-preview/TableExportPreviewDialog';
 import type { TUseAllLeadsPageReturn } from '../../_hooks/use-list-leads';
-import { exportLeads, type LeadExportFormat } from '../../_utils/export-leads';
+import { exportLeads, flattenLeadForExport, type LeadExportFormat } from '../../_utils/export-leads';
 import { DeleteLeadsDialog } from './DeleteLeadsDialog';
 import { LeadsFilterSheet } from './LeadsFilterSheet';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
@@ -17,6 +18,8 @@ import { NoDataFound } from '@/components/common/NoDataFound';
 
 export const AllUserLeads = () => {
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+    const [exportPreviewOpen, setExportPreviewOpen] = useState(false);
+    const [exportPreviewRows, setExportPreviewRows] = useState<Record<string, unknown>[]>([]);
 
     const {
         listId,
@@ -39,6 +42,15 @@ export const AllUserLeads = () => {
 
     const hasLeads = leads.length > 0;
     const showGrid = hasLeads && filteredLeads.length > 0;
+    const exportFileName = `leads-${listId}-${new Date().toISOString().slice(0, 10)}`;
+
+    const selectedLeads = useMemo(
+        () =>
+            filteredLeads.filter(
+                (lead) => typeof lead._id === 'string' && selectedLeadIds.has(lead._id),
+            ),
+        [filteredLeads, selectedLeadIds],
+    );
 
     const allFilteredSelected = useMemo(() => {
         const ids = filteredLeads
@@ -49,22 +61,28 @@ export const AllUserLeads = () => {
 
     const handleExport = useCallback(
         (format: LeadExportFormat) => {
-            const selected = filteredLeads.filter(
-                (lead) => typeof lead._id === 'string' && selectedLeadIds.has(lead._id),
-            );
-            if (selected.length === 0) {
+            if (selectedLeads.length === 0) {
                 toast.error('No leads selected to export');
                 return;
             }
             try {
-                exportLeads(selected, format, `leads-${listId}-${new Date().toISOString().slice(0, 10)}`);
-                toast.success(`Exported ${selected.length} lead(s)`);
+                exportLeads(selectedLeads, format, exportFileName);
+                toast.success(`Exported ${selectedLeads.length} lead(s)`);
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : 'Failed to export leads');
             }
         },
-        [filteredLeads, selectedLeadIds, listId],
+        [selectedLeads, exportFileName],
     );
+
+    const handlePreviewExport = useCallback(() => {
+        if (selectedLeads.length === 0) {
+            toast.error('No leads selected to export');
+            return;
+        }
+        setExportPreviewRows(selectedLeads.map(flattenLeadForExport));
+        setExportPreviewOpen(true);
+    }, [selectedLeads]);
 
     const emptyCopy = hasLeads
         ? { title: 'No matching leads', subtitle: 'Try a different search term or adjust the filters' }
@@ -85,6 +103,7 @@ export const AllUserLeads = () => {
                         onDeselectAll={deselectAll}
                         onDelete={() => setBulkDeleteOpen(true)}
                         onExport={handleExport}
+                        onPreviewExport={handlePreviewExport}
                         onCreateListFromFilters={filterPanel.filtersActive ? createListFromSelection : undefined}
                         createListFromFiltersDisabled={isCreatingList}
                         deleteLabel="Delete selected"
@@ -148,6 +167,14 @@ export const AllUserLeads = () => {
                 open={filterSheetOpen}
                 onOpenChange={setFilterSheetOpen}
                 filterPanel={filterPanel}
+            />
+
+            <TableExportPreviewDialog
+                open={exportPreviewOpen}
+                onOpenChange={setExportPreviewOpen}
+                rows={exportPreviewRows}
+                fileName={exportFileName}
+                sheetName="Leads"
             />
         </Card>
     );
