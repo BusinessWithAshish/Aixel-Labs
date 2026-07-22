@@ -63,6 +63,7 @@
     "twilio": "^5.8.2",
     "use-local-storage-state": "^19.5.0",
     "vaul": "^1.1.2",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.25.76"
   },
   "devDependencies": {

@@ -293,6 +293,9 @@ importers:
       vaul:
         specifier: ^1.1.2
         version: 1.1.2(@types/react-dom@19.2.3)(@types/react@19.2.14)(react-dom@19.2.4)(react@19.2.4)
+      xlsx:
+        specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+        version: '@cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz'
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -9109,3 +9112,11 @@ packages:
 
   /zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
+  '@cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz':
+    resolution: {tarball: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz}
+    name: xlsx
+    version: 0.20.3
+    engines: {node: '>=0.8'}
+    hasBin: true
+    dev: false

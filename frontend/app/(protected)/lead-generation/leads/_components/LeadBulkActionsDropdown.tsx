@@ -4,12 +4,28 @@ import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItems,
+    DropdownMenuPortal,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     type DropdownMenuOption,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, FolderPlus, ListChecks, ListOrdered, ListX, Send, Sparkles, Trash2 } from 'lucide-react';
+import {
+    ChevronDown,
+    Download,
+    FolderPlus,
+    ListChecks,
+    ListOrdered,
+    ListX,
+    Send,
+    Sparkles,
+    Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import { LEAD_EXPORT_FORMATS, type LeadExportFormat } from '../_utils/export-leads';
 
 function notifyActionComingSoon() {
     toast.info("This action is coming soon — we're still working on it.");
@@ -21,6 +37,7 @@ export type LeadBulkActionsDropdownProps = {
     selectAllDisabled?: boolean;
     onDeselectAll: () => void;
     onDelete: () => void;
+    onExport?: (format: LeadExportFormat) => void;
     onCreateListFromFilters?: () => void;
     createListFromFiltersDisabled?: boolean;
     deselectAllLabel?: string;
@@ -33,12 +50,15 @@ export function LeadBulkActionsDropdown({
     selectAllDisabled,
     onDeselectAll,
     onDelete,
+    onExport,
     onCreateListFromFilters,
     createListFromFiltersDisabled,
     deselectAllLabel = 'Deselect all',
     deleteLabel = 'Delete',
 }: LeadBulkActionsDropdownProps) {
-    const options: DropdownMenuOption[] = [
+    const hasSelection = selectedCount > 0;
+
+    const primaryOptions: DropdownMenuOption[] = [
         {
             key: 'select-all',
             label: 'Select all',
@@ -53,6 +73,7 @@ export function LeadBulkActionsDropdown({
             label: deselectAllLabel,
             icon: ListX,
             variant: 'warning',
+            disabled: !hasSelection,
             onSelect: () => onDeselectAll(),
         },
         { type: 'separator', key: 'sep-selection' },
@@ -61,33 +82,40 @@ export function LeadBulkActionsDropdown({
             label: 'Create list from filters',
             icon: FolderPlus,
             hidden: !onCreateListFromFilters,
-            disabled: createListFromFiltersDisabled,
+            disabled: !hasSelection || createListFromFiltersDisabled,
             onSelect: () => onCreateListFromFilters?.(),
         },
         {
             key: 'send-to-crm',
             label: 'Send to CRM',
             icon: Send,
+            disabled: !hasSelection,
             onSelect: notifyActionComingSoon,
         },
         {
             key: 'move-to-sequence',
             label: 'Move to sequence',
             icon: ListOrdered,
+            disabled: !hasSelection,
             onSelect: notifyActionComingSoon,
         },
         {
             key: 'enrich',
             label: 'Enrich',
             icon: Sparkles,
+            disabled: !hasSelection,
             onSelect: notifyActionComingSoon,
         },
+    ];
+
+    const deleteOptions: DropdownMenuOption[] = [
         { type: 'separator', key: 'sep-delete' },
         {
             key: 'delete',
             label: deleteLabel,
             icon: Trash2,
             variant: 'destructive',
+            disabled: !hasSelection,
             onSelect: () => onDelete(),
         },
     ];
@@ -95,13 +123,42 @@ export function LeadBulkActionsDropdown({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button className="gap-2" aria-haspopup="menu" disabled={selectedCount === 0}>
-                    {`Actions${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
+                <Button className="gap-2" aria-haspopup="menu">
+                    {`Actions${hasSelection ? ` (${selectedCount})` : ''}`}
                     <ChevronDown className="size-4" />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItems options={options} />
+                <DropdownMenuGroup>
+                    <DropdownMenuItems options={primaryOptions} />
+                    {onExport ? (
+                        <DropdownMenuSub>
+                            <DropdownMenuSubTrigger
+                                className={
+                                    hasSelection
+                                        ? 'gap-2'
+                                        : 'gap-2 opacity-50 pointer-events-none'
+                                }
+                                disabled={!hasSelection}
+                            >
+                                <Download className="size-4 text-muted-foreground" />
+                                Export
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                                <DropdownMenuSubContent>
+                                    <DropdownMenuItems
+                                        options={LEAD_EXPORT_FORMATS.map((format) => ({
+                                            key: format.value,
+                                            label: format.label,
+                                            onSelect: () => onExport(format.value),
+                                        }))}
+                                    />
+                                </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
+                    ) : null}
+                    <DropdownMenuItems options={deleteOptions} />
+                </DropdownMenuGroup>
             </DropdownMenuContent>
         </DropdownMenu>
     );

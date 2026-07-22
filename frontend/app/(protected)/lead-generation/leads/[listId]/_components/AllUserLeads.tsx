@@ -1,9 +1,11 @@
 'use client';
 
 import { ListFilter } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { usePage } from '@/contexts/PageStore';
 import type { TUseAllLeadsPageReturn } from '../../_hooks/use-list-leads';
+import { exportLeads, type LeadExportFormat } from '../../_utils/export-leads';
 import { DeleteLeadsDialog } from './DeleteLeadsDialog';
 import { LeadsFilterSheet } from './LeadsFilterSheet';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
@@ -17,6 +19,7 @@ export const AllUserLeads = () => {
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
     const {
+        listId,
         leads,
         filteredLeads,
         searchQuery,
@@ -43,6 +46,26 @@ export const AllUserLeads = () => {
             .filter((id): id is string => typeof id === 'string' && id.length > 0);
         return ids.length > 0 && ids.every((id) => selectedLeadIds.has(id));
     }, [filteredLeads, selectedLeadIds]);
+
+    const handleExport = useCallback(
+        (format: LeadExportFormat) => {
+            const selected = filteredLeads.filter(
+                (lead) => typeof lead._id === 'string' && selectedLeadIds.has(lead._id),
+            );
+            if (selected.length === 0) {
+                toast.error('No leads selected to export');
+                return;
+            }
+            try {
+                exportLeads(selected, format, `leads-${listId}-${new Date().toISOString().slice(0, 10)}`);
+                toast.success(`Exported ${selected.length} lead(s)`);
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : 'Failed to export leads');
+            }
+        },
+        [filteredLeads, selectedLeadIds, listId],
+    );
+
     const emptyCopy = hasLeads
         ? { title: 'No matching leads', subtitle: 'Try a different search term or adjust the filters' }
         : { title: 'No leads found', subtitle: 'Start scraping and save leads to see them here' };
@@ -61,6 +84,7 @@ export const AllUserLeads = () => {
                         selectAllDisabled={allFilteredSelected}
                         onDeselectAll={deselectAll}
                         onDelete={() => setBulkDeleteOpen(true)}
+                        onExport={handleExport}
                         onCreateListFromFilters={filterPanel.filtersActive ? createListFromSelection : undefined}
                         createListFromFiltersDisabled={isCreatingList}
                         deleteLabel="Delete selected"

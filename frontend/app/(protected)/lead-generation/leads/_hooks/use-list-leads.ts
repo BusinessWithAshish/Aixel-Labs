@@ -105,6 +105,7 @@ export const useAllLeadsPage = ({ listId, leads }: AllLeadsPageData) => {
     }, [selectedLeadIds, filterPanel.filtersActive, isCreatingList, router]);
 
     return {
+        listId,
         leads,
         filteredLeads,
         searchQuery,
