@@ -3,6 +3,7 @@ import {
   INSTAGRAM_USERNAME_REGEX,
   INSTAGRAM_URL_REGEX,
   INSTAGRAM_QUERY_LIMITS,
+  INSTAGRAM_ERROR_MESSAGES,
 } from "./constants";
 import {
   ISO_COUNTRY_CODE_SCHEMA,
@@ -25,8 +26,7 @@ export const INSTAGRAM_REQUEST_SCHEMA = z.object({
             INSTAGRAM_URL_REGEX.test(entity),
         ),
       {
-        message:
-          "Invalid entity format. Only Instagram usernames or URLs are allowed.",
+        message: INSTAGRAM_ERROR_MESSAGES.INVALID_ENTITY_FORMAT,
       },
     )
     .describe(
