@@ -42,7 +42,7 @@ export default function PageLayout({ children, className, title, headerEnd }: Pa
                         onClick={handleGoBack}
                     />
                 )}
-                {typeof title === 'string' ? <span>{title}</span> : title}
+                {typeof title === 'string' ? <span className="truncate">{title}</span> : title}
                 {end ? <div className="ml-auto flex items-center gap-2 shrink-0">{end}</div> : null}
             </header>
             <div id="page-children-container" className={cn('flex-1 overflow-auto', className)}>
