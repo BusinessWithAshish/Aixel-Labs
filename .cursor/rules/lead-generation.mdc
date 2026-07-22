@@ -1,0 +1,19 @@
+---
+description: Lead-generation scraper forms, credits, and FE↔BE wiring conventions
+globs: frontend/app/(protected)/lead-generation/**/*,frontend/helpers/lead-gen-api.ts,frontend/helpers/credits.ts,frontend/components/common/lead-card/**/*,frontend/components/common/LeadFormWrappers.tsx,frontend/components/common/FormPresetScraperActions.tsx
+alwaysApply: false
+---
+
+# Lead generation
+
+Follow `.cursor/skills/lead-generation-form-pages/SKILL.md` when adding or editing lead-gen scrapers.
+
+## Hard rules
+
+- Product BE handlers return `ALApiResponse<LeadItem[]>` with `id` on each item — no FE response mappers in `lead-gen-api.ts`.
+- `lead-gen-api` switch cases are direct `apiClient.post` calls (same shape as Maps / Instagram / LinkedIn).
+- Always pass `creditModule` into `LeadFormWrapper`.
+- Register costs only in `CREDIT_COST_PER_ITEM` / `getCreditCostPerItem`.
+- Debit only in `createUserLeads` after a successful scrape.
+- Hide credits UI for admins / `creditsExempt` users.
+- Colocate form defaults and select option arrays in the route `_constants.ts`.
