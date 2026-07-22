@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import type { GSEARCH_RESPONSE } from '@aixellabs/backend/gsearch/types';
-import { CalendarDays, ExternalLink, Trash2, User } from 'lucide-react';
+import { CalendarDays, ExternalLink, PlayCircle, RefreshCw, Trash2, User } from 'lucide-react';
 import Image from 'next/image';
 import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -29,7 +29,7 @@ type GoogleAdvancedSearchLeadCardProps = {
     isSelected?: boolean;
 };
 
-function formatPublishedTime(value: string | null | undefined): string | null {
+function formatDateTime(value: string | null | undefined): string | null {
     if (!value?.trim()) return null;
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value.trim();
@@ -40,6 +40,19 @@ function formatPublishedTime(value: string | null | undefined): string | null {
     });
 }
 
+function normalizeTwitterHandle(value: string | null | undefined): string | null {
+    const raw = value?.trim();
+    if (!raw) return null;
+    const handle = raw.replace(/^@/, '');
+    return handle || null;
+}
+
+function formatLocale(value: string | null | undefined): string | null {
+    const raw = value?.trim();
+    if (!raw) return null;
+    return raw.replace(/_/g, '-');
+}
+
 export const GoogleAdvancedSearchLeadCard = (props: GoogleAdvancedSearchLeadCardProps) => {
     const { lead, className, actions, showCheckbox, onDelete, onSelect, isSelected } = props;
 
@@ -47,16 +60,31 @@ export const GoogleAdvancedSearchLeadCard = (props: GoogleAdvancedSearchLeadCard
         const title = lead.title?.trim() || DEFAULT_DISPLAY_VALUE;
         const displayHost = lead.displayUrl?.trim() || lead.siteName?.trim() || null;
         const snippet = lead.metaDescription?.trim() || lead.snippet?.trim() || DEFAULT_DISPLAY_VALUE;
+        const twitterHandle = normalizeTwitterHandle(lead.twitterHandle);
+        const videoUrl = lead.video?.secureUrl?.trim() || lead.video?.url?.trim() || null;
+        const authorUrl = lead.author?.url?.trim() || null;
+        const url = lead.url?.trim() || lead.id;
+        const linkLabel = lead.formattedUrl?.trim() || url;
+
         return {
+            index: Number.isFinite(lead.index) && lead.index > 0 ? lead.index : null,
             title,
-            url: lead.url?.trim() || lead.id,
+            url,
+            linkLabel,
             displayHost,
             snippet,
             siteName: lead.siteName?.trim() || null,
             type: lead.type?.trim() || null,
+            locale: formatLocale(lead.locale),
             authorName: lead.author?.name?.trim() || null,
-            publishedTime: formatPublishedTime(lead.publishedTime),
-            thumbnail: lead.thumbnail || lead.image || null,
+            authorUrl,
+            publishedTime: formatDateTime(lead.publishedTime),
+            modifiedTime: formatDateTime(lead.modifiedTime),
+            twitterHandle,
+            twitterUrl: twitterHandle ? `https://x.com/${twitterHandle}` : null,
+            videoUrl,
+            // Prefer the larger OG/source image; fall back to the small CSE thumbnail.
+            thumbnail: lead.image || lead.thumbnail || null,
             keywords: (lead.keywords ?? '')
                 .split(',')
                 .map((k: string) => k.trim())
@@ -90,6 +118,13 @@ export const GoogleAdvancedSearchLeadCard = (props: GoogleAdvancedSearchLeadCard
             window.open(leadInfo.url, '_blank', 'noopener,noreferrer');
         }
     };
+
+    const hasMetaRow =
+        leadInfo.authorName ||
+        leadInfo.publishedTime ||
+        leadInfo.modifiedTime ||
+        leadInfo.twitterHandle ||
+        leadInfo.videoUrl;
 
     return (
         <Card
@@ -150,6 +185,11 @@ export const GoogleAdvancedSearchLeadCard = (props: GoogleAdvancedSearchLeadCard
                 </CardTitle>
 
                 <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    {leadInfo.index != null && (
+                        <Badge size="sm" variant="outline" className="rounded-full tabular-nums">
+                            #{leadInfo.index}
+                        </Badge>
+                    )}
                     {leadInfo.type && (
                         <Badge size="sm" variant="secondary" className="rounded-full">
                             {leadInfo.type}
@@ -158,6 +198,11 @@ export const GoogleAdvancedSearchLeadCard = (props: GoogleAdvancedSearchLeadCard
                     {leadInfo.siteName && leadInfo.siteName !== leadInfo.displayHost && (
                         <Badge size="sm" variant="blue" className="rounded-full">
                             {leadInfo.siteName}
+                        </Badge>
+                    )}
+                    {leadInfo.locale && (
+                        <Badge size="sm" variant="outline" className="rounded-full">
+                            {leadInfo.locale}
                         </Badge>
                     )}
                     {leadInfo.keywords.map((keyword: string) => (
@@ -204,19 +249,67 @@ export const GoogleAdvancedSearchLeadCard = (props: GoogleAdvancedSearchLeadCard
                     )}
                 </div>
 
-                {(leadInfo.authorName || leadInfo.publishedTime) && (
+                {hasMetaRow && (
                     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        {leadInfo.authorName && (
-                            <span className="inline-flex min-w-0 items-center gap-1">
-                                <User className="size-3.5 shrink-0" />
-                                <span className="truncate">{leadInfo.authorName}</span>
-                            </span>
-                        )}
+                        {leadInfo.authorName &&
+                            (leadInfo.authorUrl ? (
+                                <a
+                                    href={leadInfo.authorUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex min-w-0 items-center gap-1 hover:text-foreground hover:underline"
+                                    title={leadInfo.authorUrl}
+                                >
+                                    <User className="size-3.5 shrink-0" />
+                                    <span className="truncate">{leadInfo.authorName}</span>
+                                </a>
+                            ) : (
+                                <span className="inline-flex min-w-0 items-center gap-1">
+                                    <User className="size-3.5 shrink-0" />
+                                    <span className="truncate">{leadInfo.authorName}</span>
+                                </span>
+                            ))}
                         {leadInfo.publishedTime && (
-                            <span className="inline-flex items-center gap-1">
+                            <span
+                                className="inline-flex items-center gap-1"
+                                title={`Published ${leadInfo.publishedTime}`}
+                            >
                                 <CalendarDays className="size-3.5 shrink-0" />
                                 {leadInfo.publishedTime}
                             </span>
+                        )}
+                        {leadInfo.modifiedTime &&
+                            leadInfo.modifiedTime !== leadInfo.publishedTime && (
+                                <span
+                                    className="inline-flex items-center gap-1"
+                                    title={`Updated ${leadInfo.modifiedTime}`}
+                                >
+                                    <RefreshCw className="size-3.5 shrink-0" />
+                                    Updated {leadInfo.modifiedTime}
+                                </span>
+                            )}
+                        {leadInfo.twitterHandle && leadInfo.twitterUrl && (
+                            <a
+                                href={leadInfo.twitterUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
+                                title={`@${leadInfo.twitterHandle} on X`}
+                            >
+                                @{leadInfo.twitterHandle}
+                            </a>
+                        )}
+                        {leadInfo.videoUrl && (
+                            <a
+                                href={leadInfo.videoUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
+                                title="Open video"
+                            >
+                                <PlayCircle className="size-3.5 shrink-0" />
+                                Video
+                            </a>
                         )}
                     </div>
                 )}
@@ -228,7 +321,7 @@ export const GoogleAdvancedSearchLeadCard = (props: GoogleAdvancedSearchLeadCard
                     className="inline-flex min-w-0 max-w-full items-center gap-1 truncate text-sm text-blue-600 hover:underline"
                     title={leadInfo.url}
                 >
-                    <span className="truncate">{leadInfo.url}</span>
+                    <span className="truncate">{leadInfo.linkLabel}</span>
                     <ExternalLink className="size-3.5 shrink-0" />
                 </a>
 
