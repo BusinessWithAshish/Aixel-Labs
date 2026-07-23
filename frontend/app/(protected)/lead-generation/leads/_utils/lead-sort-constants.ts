@@ -62,6 +62,14 @@ export const LINKEDIN_SORT_BY = {
 
 export type LinkedInSortBy = (typeof LINKEDIN_SORT_BY)[keyof typeof LINKEDIN_SORT_BY];
 
+export const FACEBOOK_SORT_BY = {
+    FOLLOWERS: 'followers',
+    LIKES: 'likes',
+    NAME: 'name',
+} as const;
+
+export type FacebookSortBy = (typeof FACEBOOK_SORT_BY)[keyof typeof FACEBOOK_SORT_BY];
+
 export type SourceSortConfig<T extends string> = {
     by: T | typeof SORT_BY_NONE;
     direction: SortDirection;
@@ -70,12 +78,14 @@ export type SourceSortConfig<T extends string> = {
 export type LeadSortState = {
     googleMaps: SourceSortConfig<GmapsSortBy>;
     instagram: SourceSortConfig<InstagramSortBy>;
+    facebook: SourceSortConfig<FacebookSortBy>;
     linkedin: SourceSortConfig<LinkedInSortBy>;
 };
 
 export const LEAD_SORT_DEFAULTS: LeadSortState = {
     googleMaps: { by: SORT_BY_NONE, direction: SORT_DIRECTION.DESC },
     instagram: { by: SORT_BY_NONE, direction: SORT_DIRECTION.DESC },
+    facebook: { by: SORT_BY_NONE, direction: SORT_DIRECTION.DESC },
     linkedin: { by: SORT_BY_NONE, direction: SORT_DIRECTION.DESC },
 };
 
@@ -103,6 +113,13 @@ export const LINKEDIN_SORT_OPTIONS: { value: LinkedInSortBy | typeof SORT_BY_NON
     { value: LINKEDIN_SORT_BY.NAME, label: 'Name' },
 ];
 
+export const FACEBOOK_SORT_OPTIONS: { value: FacebookSortBy | typeof SORT_BY_NONE; label: string }[] = [
+    { value: SORT_BY_NONE, label: 'Default' },
+    { value: FACEBOOK_SORT_BY.FOLLOWERS, label: 'Followers' },
+    { value: FACEBOOK_SORT_BY.LIKES, label: 'Likes' },
+    { value: FACEBOOK_SORT_BY.NAME, label: 'Name' },
+];
+
 /**
  * Tie-breakers after the primary field (same direction for numbers; name/username last as A→Z).
  * Final fallback is always `sourceId` in the sorter.
@@ -126,6 +143,12 @@ export const LINKEDIN_SORT_CHAIN: Record<LinkedInSortBy, LinkedInSortBy[]> = {
     [LINKEDIN_SORT_BY.NAME]: [LINKEDIN_SORT_BY.EMPLOYEES, LINKEDIN_SORT_BY.FOLLOWERS],
 };
 
+export const FACEBOOK_SORT_CHAIN: Record<FacebookSortBy, FacebookSortBy[]> = {
+    [FACEBOOK_SORT_BY.FOLLOWERS]: [FACEBOOK_SORT_BY.LIKES, FACEBOOK_SORT_BY.NAME],
+    [FACEBOOK_SORT_BY.LIKES]: [FACEBOOK_SORT_BY.FOLLOWERS, FACEBOOK_SORT_BY.NAME],
+    [FACEBOOK_SORT_BY.NAME]: [FACEBOOK_SORT_BY.FOLLOWERS, FACEBOOK_SORT_BY.LIKES],
+};
+
 /** Fill missing/legacy sort shape from stored filter state. */
 export function normalizeLeadSortState(raw: unknown): LeadSortState {
     if (typeof raw !== 'object' || raw === null) return { ...LEAD_SORT_DEFAULTS };
@@ -134,6 +157,7 @@ export function normalizeLeadSortState(raw: unknown): LeadSortState {
     return {
         googleMaps: normalizeSourceSort(r.googleMaps, GMAPS_SORT_OPTIONS.map((o) => o.value)),
         instagram: normalizeSourceSort(r.instagram, INSTAGRAM_SORT_OPTIONS.map((o) => o.value)),
+        facebook: normalizeSourceSort(r.facebook, FACEBOOK_SORT_OPTIONS.map((o) => o.value)),
         linkedin: normalizeSourceSort(r.linkedin, LINKEDIN_SORT_OPTIONS.map((o) => o.value)),
     };
 }

@@ -14,7 +14,8 @@ export type FilterSource =
     | LeadSource.GOOGLE_MAPS_ADVANCED
     | LeadSource.GOOGLE_ADVANCED_SEARCH
     | LeadSource.LINKEDIN
-    | LeadSource.INSTAGRAM;
+    | LeadSource.INSTAGRAM
+    | LeadSource.FACEBOOK;
 
 /**
  * Tri-state presence filter for the leads sheet.
@@ -69,6 +70,17 @@ export type InstagramFilters = {
     requireWebsite: TriStateFilter;
 };
 
+export type FacebookFilters = {
+    minFollowers?: number;
+    maxFollowers?: number;
+    minLikes?: number;
+    maxLikes?: number;
+    requireVerified: TriStateFilter;
+    requireEmail: TriStateFilter;
+    requirePhone: TriStateFilter;
+    requireWebsite: TriStateFilter;
+};
+
 export type LinkedInFilters = {
     industryContains: string;
     countryContains: string;
@@ -86,6 +98,7 @@ export type LeadFilterState = {
     sources: FilterSource[];
     googleMaps: GoogleMapsFilters;
     instagram: InstagramFilters;
+    facebook: FacebookFilters;
     linkedin: LinkedInFilters;
     sort: LeadSortState;
 };
@@ -111,6 +124,16 @@ export const LEAD_FILTER_DEFAULTS: LeadFilterState = {
         requirePhone: TRI_STATE_FILTER.ANY,
         requireWebsite: TRI_STATE_FILTER.ANY,
     },
+    facebook: {
+        minFollowers: undefined,
+        maxFollowers: undefined,
+        minLikes: undefined,
+        maxLikes: undefined,
+        requireVerified: TRI_STATE_FILTER.ANY,
+        requireEmail: TRI_STATE_FILTER.ANY,
+        requirePhone: TRI_STATE_FILTER.ANY,
+        requireWebsite: TRI_STATE_FILTER.ANY,
+    },
     linkedin: {
         industryContains: '',
         countryContains: '',
@@ -126,6 +149,7 @@ export const LEAD_FILTER_DEFAULTS: LeadFilterState = {
     sort: {
         googleMaps: { ...LEAD_SORT_DEFAULTS.googleMaps },
         instagram: { ...LEAD_SORT_DEFAULTS.instagram },
+        facebook: { ...LEAD_SORT_DEFAULTS.facebook },
         linkedin: { ...LEAD_SORT_DEFAULTS.linkedin },
     },
 };
@@ -173,6 +197,7 @@ export const SOURCE_META: Record<FilterSource, SourceMeta> = {
     },
     [LeadSource.LINKEDIN]: { label: 'LinkedIn', imageSrc: '/linkedin-logo-svg.png' },
     [LeadSource.INSTAGRAM]: { label: 'Instagram', imageSrc: '/instagram-logo.svg' },
+    [LeadSource.FACEBOOK]: { label: 'Facebook', imageSrc: '/facebook-logo.svg' },
 };
 
 export const FILTERABLE_SOURCES: FilterSource[] = [
@@ -181,6 +206,7 @@ export const FILTERABLE_SOURCES: FilterSource[] = [
     LeadSource.GOOGLE_ADVANCED_SEARCH,
     LeadSource.LINKEDIN,
     LeadSource.INSTAGRAM,
+    LeadSource.FACEBOOK,
 ];
 
 export const SOURCE_FILTER_OPTIONS: { value: FilterSource; label: string }[] = FILTERABLE_SOURCES.map((s) => ({
@@ -240,6 +266,21 @@ function migrateInstagramFilters(raw: unknown): InstagramFilters {
     };
 }
 
+function migrateFacebookFilters(raw: unknown): FacebookFilters {
+    if (typeof raw !== 'object' || raw === null) {
+        return { ...LEAD_FILTER_DEFAULTS.facebook };
+    }
+    const record = raw as Record<string, unknown>;
+    const base = { ...LEAD_FILTER_DEFAULTS.facebook, ...record } as FacebookFilters;
+    return {
+        ...base,
+        requireVerified: migrateTriStateFilter(record.requireVerified),
+        requireEmail: migrateTriStateFilter(record.requireEmail),
+        requirePhone: migrateTriStateFilter(record.requirePhone),
+        requireWebsite: migrateTriStateFilter(record.requireWebsite),
+    };
+}
+
 function migrateLinkedInFilters(raw: unknown): LinkedInFilters {
     if (typeof raw !== 'object' || raw === null) {
         return { ...LEAD_FILTER_DEFAULTS.linkedin };
@@ -258,6 +299,7 @@ export function normalizeLeadFilterState(state: LeadFilterState): LeadFilterStat
         ...state,
         googleMaps: migrateGoogleMapsFilters(state.googleMaps),
         instagram: migrateInstagramFilters(state.instagram),
+        facebook: migrateFacebookFilters(state.facebook ?? LEAD_FILTER_DEFAULTS.facebook),
         linkedin: migrateLinkedInFilters(state.linkedin),
         sort: normalizeLeadSortState(state.sort),
     };

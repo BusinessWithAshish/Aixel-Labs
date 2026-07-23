@@ -33,6 +33,7 @@ Lead APIs must return `ALApiResponse<LeadItem[]>` where each item has `id: strin
 | `GOOGLE_MAPS_ADVANCED` | `GMAPS.ADVANCED` | `GMAPS_DETAILS_RESPONSE` |
 | `GOOGLE_ADVANCED_SEARCH` | `GSEARCH.SEARCH` | `GSEARCH_RESPONSE` (= `GSEARCH_RESULT` with `id`) |
 | `INSTAGRAM_SEARCH` | `INSTAGRAM.API` | `INSTAGRAM_RESPONSE` |
+| `FACEBOOK` | `FACEBOOK.API` | `FACEBOOK_RESPONSE` |
 | `LINKEDIN` | `LINKEDIN.API` | LinkedIn company/people response |
 
 - Put `id` on the result/response type itself — do **not** add a FE mapper that unwraps envelopes.

@@ -5,12 +5,14 @@ import type { GMAPS_INTERNAL_RESPONSE } from '@aixellabs/backend/gmaps/internal/
 import type { GMAPS_DETAILS_RESPONSE } from '@aixellabs/backend/gmaps/details/types';
 import type { GSEARCH_RESPONSE } from '@aixellabs/backend/gsearch/types';
 import type { INSTAGRAM_RESPONSE } from '@aixellabs/backend/instagram';
+import type { FACEBOOK_RESPONSE } from '@aixellabs/backend/facebook';
 import { LINKEDIN_SEARCH_TYPE } from '@aixellabs/backend/linkedin/schemas';
 import type { LINKEDIN_BY_COMPANY_RESPONSE } from '@aixellabs/backend/linkedin/types';
 import { GoogleAdvancedSearchLeadCard } from '@/components/common/lead-card/GoogleAdvancedSearchLeadCard';
 import { GoogleMapLead } from '@/components/common/lead-card/GoogleMapLead';
 import { GoogleMapsAdvancedLeadCard } from '@/components/common/lead-card/GoogleMapsAdvancedLeadCard';
 import { InstagramLeadCard } from '@/components/common/lead-card/InstagramLeadCard';
+import { FacebookLeadCard } from '@/components/common/lead-card/FacebookLeadCard';
 import { LinkedInByCompanyLeadCard } from '@/components/common/lead-card/LinkedInByCompanyLeadCard';
 
 export type LeadListItemProps = {
@@ -59,6 +61,17 @@ export function LeadListItem({ lead, isSelected, onToggleSelect }: LeadListItemP
         return (
             <InstagramLeadCard
                 lead={lead.data as INSTAGRAM_RESPONSE}
+                showCheckbox
+                isSelected={isSelected}
+                onSelect={(checked) => onToggleSelect(id, checked)}
+            />
+        );
+    }
+
+    if (lead.source === LeadSource.FACEBOOK) {
+        return (
+            <FacebookLeadCard
+                lead={lead.data as FACEBOOK_RESPONSE}
                 showCheckbox
                 isSelected={isSelected}
                 onSelect={(checked) => onToggleSelect(id, checked)}

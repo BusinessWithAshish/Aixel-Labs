@@ -1,14 +1,14 @@
 'use client';
 
-import { FormProvider } from "react-hook-form";
-import { Tabs, TabsTrigger, TabsList, TabsContent } from "@/components/ui/tabs";
+import { FormProvider } from 'react-hook-form';
+import { Tabs, TabsTrigger, TabsList, TabsContent } from '@/components/ui/tabs';
 import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
-import { UseGoogleMapsFormReturn } from "../_hooks/use-google-maps-form";
-import { usePage } from "@/contexts/PageStore";
-import { GoogleMapsQueryForm } from "./GoogleMapsQueryForm";
-import { GoogleMapsUrlsForm } from "./GoogleMapsUrlsForm";
-import { LeadFormWrapper } from "@/components/common/LeadFormWrappers";
-import { FormPresetScraperActions } from "@/components/common/FormPresetScraperActions";
+import { UseGoogleMapsFormReturn } from '../_hooks/use-google-maps-form';
+import { usePage } from '@/contexts/PageStore';
+import { GoogleMapsQueryForm } from './GoogleMapsQueryForm';
+import { GoogleMapsUrlsForm } from './GoogleMapsUrlsForm';
+import { LeadFormWrapper } from '@/components/common/LeadFormWrappers';
+import { FormPresetScraperActions } from '@/components/common/FormPresetScraperActions';
 
 enum GoogleMapsFormInputMode {
     QUERY = 'Query',
@@ -21,40 +21,45 @@ export const GoogleMapsFormWrapper = () => {
     const { form, onSubmit } = usePage<UseGoogleMapsFormReturn>();
 
     return (
-        <FormProvider {...form}>
-            <LeadFormWrapper
-                config={{
-                    title: 'Google Maps Form',
-                    description: 'Find leads on Google Maps by using the query or by direct URLs',
-                    icon: { src: '/google-maps.svg', alt: 'Google Maps' },
-                }}
-                creditModule={LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS}
-                actions={
-                    <FormPresetScraperActions
-                        module={LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS}
-                        onSubmit={onSubmit}
-                    />
-                }
-            >
-                <Tabs defaultValue={GoogleMapsFormInputMode.QUERY}>
-                    <TabsList className="w-full">
-                        <TabsTrigger value={GoogleMapsFormInputMode.QUERY}>{GoogleMapsFormInputMode.QUERY}</TabsTrigger>
-                        <TabsTrigger value={GoogleMapsFormInputMode.URLS}>{GoogleMapsFormInputMode.URLS}</TabsTrigger>
-                    </TabsList>
-                    <form
-                        className="h-full w-full"
-                        id={GOOGLE_MAPS_FORM_NAME}
-                        onSubmit={form.handleSubmit(onSubmit)}
+        <Tabs defaultValue={GoogleMapsFormInputMode.QUERY}>
+            <TabsList className="w-full">
+                <TabsTrigger value={GoogleMapsFormInputMode.QUERY}>
+                    {GoogleMapsFormInputMode.QUERY}
+                </TabsTrigger>
+                <TabsTrigger value={GoogleMapsFormInputMode.URLS}>
+                    {GoogleMapsFormInputMode.URLS}
+                </TabsTrigger>
+            </TabsList>
+            <TabsContent className="space-y-3" value={GoogleMapsFormInputMode.QUERY}>
+                <FormProvider {...form}>
+                    <LeadFormWrapper
+                        config={{
+                            title: 'Google Maps Form',
+                            description:
+                                'Find leads on Google Maps by using the query or by direct URLs',
+                            icon: { src: '/google-maps.svg', alt: 'Google Maps' },
+                        }}
+                        creditModule={LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS}
+                        actions={
+                            <FormPresetScraperActions
+                                module={LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS}
+                                onSubmit={onSubmit}
+                            />
+                        }
                     >
-                        <TabsContent className='space-y-3' value={GoogleMapsFormInputMode.QUERY}>
+                        <form
+                            className="h-full w-full space-y-3"
+                            id={GOOGLE_MAPS_FORM_NAME}
+                            onSubmit={form.handleSubmit(onSubmit)}
+                        >
                             <GoogleMapsQueryForm />
-                        </TabsContent>
-                        <TabsContent className='space-y-3' value={GoogleMapsFormInputMode.URLS}>
-                            <GoogleMapsUrlsForm />
-                        </TabsContent>
-                    </form>
-                </Tabs>
-            </LeadFormWrapper>
-        </FormProvider>
+                        </form>
+                    </LeadFormWrapper>
+                </FormProvider>
+            </TabsContent>
+            <TabsContent className="space-y-3" value={GoogleMapsFormInputMode.URLS}>
+                <GoogleMapsUrlsForm />
+            </TabsContent>
+        </Tabs>
     );
 };

@@ -7,13 +7,19 @@ import { generateLocalStorageKey } from '@/helpers/generate-local-storage-key';
 import {
     LEAD_FILTER_DEFAULTS,
     normalizeLeadFilterState,
+    type FacebookFilters,
     type FilterSource,
     type GoogleMapsFilters,
     type InstagramFilters,
     type LeadFilterState,
     type LinkedInFilters,
 } from '../_utils/lead-filter-constants';
-import { matchGoogleMaps, matchInstagram, matchLinkedIn } from '../_utils/lead-filter-matchers';
+import {
+    matchFacebook,
+    matchGoogleMaps,
+    matchInstagram,
+    matchLinkedIn,
+} from '../_utils/lead-filter-matchers';
 import type { LeadSortState } from '../_utils/lead-sort-constants';
 
 export function useLeadsFilterPanel() {
@@ -37,12 +43,22 @@ export function useLeadsFilterPanel() {
     const patchInstagram = (patch: Partial<InstagramFilters>) =>
         setFilters((prev) => ({ ...prev, instagram: { ...prev.instagram, ...patch } }));
 
+    const patchFacebook = (patch: Partial<FacebookFilters>) =>
+        setFilters((prev) => ({
+            ...prev,
+            facebook: {
+                ...normalizeLeadFilterState(prev).facebook,
+                ...patch,
+            },
+        }));
+
     const patchLinkedIn = (patch: Partial<LinkedInFilters>) =>
         setFilters((prev) => ({ ...prev, linkedin: { ...prev.linkedin, ...patch } }));
 
     const patchSort = (patch: {
         googleMaps?: Partial<LeadSortState['googleMaps']>;
         instagram?: Partial<LeadSortState['instagram']>;
+        facebook?: Partial<LeadSortState['facebook']>;
         linkedin?: Partial<LeadSortState['linkedin']>;
     }) =>
         setFilters((prev) => {
@@ -52,6 +68,7 @@ export function useLeadsFilterPanel() {
                 sort: {
                     googleMaps: { ...sort.googleMaps, ...patch.googleMaps },
                     instagram: { ...sort.instagram, ...patch.instagram },
+                    facebook: { ...sort.facebook, ...patch.facebook },
                     linkedin: { ...sort.linkedin, ...patch.linkedin },
                 },
             };
@@ -61,7 +78,7 @@ export function useLeadsFilterPanel() {
 
     const matchesLead = useCallback(
         (lead: Lead) => {
-            const { sources, googleMaps, instagram, linkedin } = filters;
+            const { sources, googleMaps, instagram, facebook, linkedin } = filters;
 
             if (sources.length > 0 && !sources.includes(lead.source as FilterSource)) return false;
 
@@ -71,6 +88,8 @@ export function useLeadsFilterPanel() {
                     return matchGoogleMaps(lead.data, googleMaps);
                 case LeadSource.INSTAGRAM:
                     return matchInstagram(lead.data, instagram);
+                case LeadSource.FACEBOOK:
+                    return matchFacebook(lead.data, facebook);
                 case LeadSource.LINKEDIN:
                     return matchLinkedIn(lead.data, linkedin);
                 default:
@@ -94,6 +113,7 @@ export function useLeadsFilterPanel() {
         setSources,
         patchGoogleMaps,
         patchInstagram,
+        patchFacebook,
         patchLinkedIn,
         patchSort,
         matchesLead,

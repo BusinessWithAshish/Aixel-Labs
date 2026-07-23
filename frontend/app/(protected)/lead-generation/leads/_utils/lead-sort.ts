@@ -1,6 +1,8 @@
 import { LeadSource, type Lead } from '@aixellabs/backend/db/types';
 import { toNum } from './lead-filter-matchers';
 import {
+    FACEBOOK_SORT_BY,
+    FACEBOOK_SORT_CHAIN,
     GMAPS_SORT_BY,
     GMAPS_SORT_CHAIN,
     INSTAGRAM_SORT_BY,
@@ -10,6 +12,7 @@ import {
     SORT_BY_NONE,
     SORT_DIRECTION,
     isTextSortField,
+    type FacebookSortBy,
     type GmapsSortBy,
     type InstagramSortBy,
     type LeadSortState,
@@ -35,7 +38,7 @@ function linkedInFollowers(d: D): number | null {
 function fieldValue(lead: Lead, field: string): number | string | null {
     const d = asData(lead.data);
 
-    switch (lead.source) {
+        switch (lead.source) {
         case LeadSource.GOOGLE_MAPS:
         case LeadSource.GOOGLE_MAPS_ADVANCED:
             if (field === GMAPS_SORT_BY.RATING) return toNum(d.rating);
@@ -47,6 +50,11 @@ function fieldValue(lead: Lead, field: string): number | string | null {
             if (field === INSTAGRAM_SORT_BY.FOLLOWING) return toNum(d.following);
             if (field === INSTAGRAM_SORT_BY.POSTS) return toNum(d.posts);
             if (field === INSTAGRAM_SORT_BY.USERNAME) return textValue(d.username) ?? textValue(d.fullName);
+            break;
+        case LeadSource.FACEBOOK:
+            if (field === FACEBOOK_SORT_BY.FOLLOWERS) return toNum(d.followers);
+            if (field === FACEBOOK_SORT_BY.LIKES) return toNum(d.likes);
+            if (field === FACEBOOK_SORT_BY.NAME) return textValue(d.name);
             break;
         case LeadSource.LINKEDIN:
             if (field === LINKEDIN_SORT_BY.EMPLOYEES) return toNum(d.employee_count);
@@ -108,6 +116,11 @@ function compareSameSource(a: Lead, b: Lead, sort: LeadSortState): number {
             const { by, direction } = sort.instagram;
             if (by === SORT_BY_NONE) return 0;
             return compareByChain(a, b, by, INSTAGRAM_SORT_CHAIN[by as InstagramSortBy], direction);
+        }
+        case LeadSource.FACEBOOK: {
+            const { by, direction } = sort.facebook;
+            if (by === SORT_BY_NONE) return 0;
+            return compareByChain(a, b, by, FACEBOOK_SORT_CHAIN[by as FacebookSortBy], direction);
         }
         case LeadSource.LINKEDIN: {
             const { by, direction } = sort.linkedin;

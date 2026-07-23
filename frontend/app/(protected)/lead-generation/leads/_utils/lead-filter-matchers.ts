@@ -1,4 +1,5 @@
 import type {
+    FacebookFilters,
     GoogleMapsFilters,
     InstagramFilters,
     LinkedInFilters,
@@ -119,6 +120,27 @@ export function matchInstagram(data: unknown, f: InstagramFilters): boolean {
         Array.isArray(d.businessPhoneNumber) &&
         d.businessPhoneNumber.some((x) => nonEmpty(x));
     const hasWebsite = Array.isArray(d.websites) && d.websites.some((x) => nonEmpty(x));
+
+    if (!matchesTriState(hasEmail, f.requireEmail)) return false;
+    if (!matchesTriState(hasPhone, f.requirePhone)) return false;
+    if (!matchesTriState(hasWebsite, f.requireWebsite)) return false;
+
+    return true;
+}
+
+export function matchFacebook(data: unknown, f: FacebookFilters): boolean {
+    if (typeof data !== 'object' || data === null) return true;
+    const d = data as D;
+
+    if (!inRange(toNum(d.followers), f.minFollowers, f.maxFollowers)) return false;
+    if (!inRange(toNum(d.likes), f.minLikes, f.maxLikes)) return false;
+
+    if (!matchesTriState(d.verified === true, f.requireVerified)) return false;
+
+    const hasEmail =
+        Array.isArray(d.emails) && d.emails.some((x) => nonEmpty(x));
+    const hasPhone = nonEmpty(d.phone);
+    const hasWebsite = nonEmpty(d.website);
 
     if (!matchesTriState(hasEmail, f.requireEmail)) return false;
     if (!matchesTriState(hasPhone, f.requirePhone)) return false;

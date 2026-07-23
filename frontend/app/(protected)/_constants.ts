@@ -48,7 +48,7 @@ export const DASHBOARD_SOURCE_META: Record<
         shortLabel: string;
         href: string;
         chartKey: string;
-        /** CSS color token from `globals.css` (`--chart-*`). */
+        /** Platform brand color for dashboard charts / badges. */
         color: string;
         imageSrc: string;
         imageAlt: string;
@@ -60,7 +60,8 @@ export const DASHBOARD_SOURCE_META: Record<
         shortLabel: 'Maps',
         href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS],
         chartKey: 'maps',
-        color: 'var(--chart-1)',
+        // Blend of Maps logo green (#34A853) + yellow/orange (#FBBC04)
+        color: '#85B32E',
         imageSrc: '/google-maps.svg',
         imageAlt: 'Google Maps',
         subModule: LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS,
@@ -70,7 +71,7 @@ export const DASHBOARD_SOURCE_META: Record<
         shortLabel: 'Search',
         href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH],
         chartKey: 'search',
-        color: 'var(--chart-2)',
+        color: '#4285F4',
         imageSrc: '/google-logo.png',
         imageAlt: 'Google',
         subModule: LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH,
@@ -80,7 +81,8 @@ export const DASHBOARD_SOURCE_META: Record<
         shortLabel: 'Instagram',
         href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH],
         chartKey: 'instagram',
-        color: 'var(--chart-3)',
+        // Purple–pink from Instagram gradient
+        color: '#C13584',
         imageSrc: '/instagram-logo.svg',
         imageAlt: 'Instagram',
         subModule: LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH,
@@ -90,7 +92,7 @@ export const DASHBOARD_SOURCE_META: Record<
         shortLabel: 'Facebook',
         href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.FACEBOOK],
         chartKey: 'facebook',
-        color: 'var(--chart-5)',
+        color: '#1877F2',
         imageSrc: '/facebook-logo.svg',
         imageAlt: 'Facebook',
         subModule: LEAD_GENERATION_SUB_MODULES.FACEBOOK,
@@ -100,7 +102,7 @@ export const DASHBOARD_SOURCE_META: Record<
         shortLabel: 'LinkedIn',
         href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.LINKEDIN],
         chartKey: 'linkedin',
-        color: 'var(--chart-4)',
+        color: '#0A66C2',
         imageSrc: '/linkedin-logo-svg.png',
         imageAlt: 'LinkedIn',
         subModule: LEAD_GENERATION_SUB_MODULES.LINKEDIN,

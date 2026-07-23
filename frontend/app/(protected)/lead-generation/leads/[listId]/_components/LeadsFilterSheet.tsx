@@ -26,6 +26,7 @@ import {
     SHOW_LINKEDIN_FILTERS_UI,
     SOURCE_FILTER_OPTIONS,
     TRI_STATE_FILTER_OPTIONS,
+    type FacebookFilters,
     type FilterSource,
     type GoogleMapsFilters,
     type InstagramFilters,
@@ -33,12 +34,14 @@ import {
     type TriStateFilter,
 } from '../../_utils/lead-filter-constants';
 import {
+    FACEBOOK_SORT_OPTIONS,
     GMAPS_SORT_OPTIONS,
     INSTAGRAM_SORT_OPTIONS,
     LINKEDIN_SORT_OPTIONS,
     SORT_BY_NONE,
     defaultDirectionForSortBy,
     sortDirectionOptions,
+    type FacebookSortBy,
     type GmapsSortBy,
     type InstagramSortBy,
     type LeadSortState,
@@ -337,6 +340,69 @@ function InstagramSection({
     );
 }
 
+function FacebookSection({
+    f,
+    sort,
+    patch,
+    patchSort,
+}: {
+    f: FacebookFilters;
+    sort: SourceSortConfig<FacebookSortBy>;
+    patch: (p: Partial<FacebookFilters>) => void;
+    patchSort: (p: Partial<SourceSortConfig<FacebookSortBy>>) => void;
+}) {
+    return (
+        <FilterGroup title="Facebook" imageSrc="/facebook-logo.svg">
+            <SortRow
+                namePrefix="filter_fb"
+                options={FACEBOOK_SORT_OPTIONS}
+                value={sort}
+                onChange={(next) => patchSort(next)}
+            />
+            <RangeRow
+                namePrefix="filter_fb_followers"
+                label="Followers"
+                min={f.minFollowers}
+                max={f.maxFollowers}
+                onMinChange={(v) => patch({ minFollowers: v })}
+                onMaxChange={(v) => patch({ maxFollowers: v })}
+            />
+            <RangeRow
+                namePrefix="filter_fb_likes"
+                label="Likes"
+                min={f.minLikes}
+                max={f.maxLikes}
+                onMinChange={(v) => patch({ minLikes: v })}
+                onMaxChange={(v) => patch({ maxLikes: v })}
+            />
+            <TriStateSelectRow
+                name="filter_fb_require_verified"
+                label="Verified Page"
+                value={f.requireVerified}
+                onValueChange={(v) => patch({ requireVerified: v })}
+            />
+            <TriStateSelectRow
+                name="filter_fb_require_email"
+                label="Has email"
+                value={f.requireEmail}
+                onValueChange={(v) => patch({ requireEmail: v })}
+            />
+            <TriStateSelectRow
+                name="filter_fb_require_phone"
+                label="Has phone"
+                value={f.requirePhone}
+                onValueChange={(v) => patch({ requirePhone: v })}
+            />
+            <TriStateSelectRow
+                name="filter_fb_require_website"
+                label="Has website"
+                value={f.requireWebsite}
+                onValueChange={(v) => patch({ requireWebsite: v })}
+            />
+        </FilterGroup>
+    );
+}
+
 function LinkedInSection({
     f,
     sort,
@@ -426,16 +492,19 @@ type FilterPanelShape = {
         sources: FilterSource[];
         googleMaps: GoogleMapsFilters;
         instagram: InstagramFilters;
+        facebook: FacebookFilters;
         linkedin: LinkedInFilters;
         sort: LeadSortState;
     };
     setSources: (sources: FilterSource[]) => void;
     patchGoogleMaps: (patch: Partial<GoogleMapsFilters>) => void;
     patchInstagram: (patch: Partial<InstagramFilters>) => void;
+    patchFacebook: (patch: Partial<FacebookFilters>) => void;
     patchLinkedIn: (patch: Partial<LinkedInFilters>) => void;
     patchSort: (patch: {
         googleMaps?: Partial<SourceSortConfig<GmapsSortBy>>;
         instagram?: Partial<SourceSortConfig<InstagramSortBy>>;
+        facebook?: Partial<SourceSortConfig<FacebookSortBy>>;
         linkedin?: Partial<SourceSortConfig<LinkedInSortBy>>;
     }) => void;
     resetFilters: () => void;
@@ -453,11 +522,12 @@ export const LeadsFilterSheet = ({ open, onOpenChange, filterPanel }: Props) => 
         setSources,
         patchGoogleMaps,
         patchInstagram,
+        patchFacebook,
         patchLinkedIn,
         patchSort,
         resetFilters,
     } = filterPanel;
-    const { sources, googleMaps, instagram, linkedin, sort } = filters;
+    const { sources, googleMaps, instagram, facebook, linkedin, sort } = filters;
 
     const displayedSources = SHOW_LINKEDIN_FILTERS_UI
         ? sources
@@ -468,6 +538,7 @@ export const LeadsFilterSheet = ({ open, onOpenChange, filterPanel }: Props) => 
         sources.includes(LeadSource.GOOGLE_MAPS) ||
         sources.includes(LeadSource.GOOGLE_MAPS_ADVANCED);
     const showInstagram = sources.length === 0 || sources.includes(LeadSource.INSTAGRAM);
+    const showFacebook = sources.length === 0 || sources.includes(LeadSource.FACEBOOK);
     const showLinkedIn =
         SHOW_LINKEDIN_FILTERS_UI &&
         (sources.length === 0 || sources.includes(LeadSource.LINKEDIN));
@@ -508,7 +579,20 @@ export const LeadsFilterSheet = ({ open, onOpenChange, filterPanel }: Props) => 
                             />
                         ) : null}
 
-                        {(showGoogleMaps || showInstagram) && showLinkedIn ? <Separator /> : null}
+                        {(showGoogleMaps || showInstagram) && showFacebook ? <Separator /> : null}
+
+                        {showFacebook ? (
+                            <FacebookSection
+                                f={facebook}
+                                sort={sort.facebook}
+                                patch={patchFacebook}
+                                patchSort={(p) => patchSort({ facebook: p })}
+                            />
+                        ) : null}
+
+                        {(showGoogleMaps || showInstagram || showFacebook) && showLinkedIn ? (
+                            <Separator />
+                        ) : null}
 
                         {showLinkedIn ? (
                             <LinkedInSection
