@@ -5,6 +5,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useState } from "react";
+import { instagramProxiedImageUrl } from "@/helpers/instagram-image";
 
 const INSTAGRAM_USERNAME_REGEX = /^[a-zA-Z0-9_.]+$/;
 const INSTAGRAM_URL_REGEX = /https:\/\/www\.instagram\.com\/[a-zA-Z0-9_.]+/;
@@ -98,7 +99,7 @@ export default function InstagramProductsPage() {
                     {accountProfile?.latestPostUrls?.map((url, i) => (
                         <img
                             key={i}
-                            src={`/api/instagram/image?url=${encodeURIComponent(url)}`}
+                            src={instagramProxiedImageUrl(url)}
                             alt={`Post ${i + 1}`}
                             className="w-full aspect-square object-cover rounded-md"
                             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}

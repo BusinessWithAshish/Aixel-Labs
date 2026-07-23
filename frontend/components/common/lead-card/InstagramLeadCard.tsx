@@ -1,7 +1,6 @@
 'use client';
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BadgeCheck, LucideIcon, Trash2 } from "lucide-react";
@@ -12,6 +11,7 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import type { INSTAGRAM_RESPONSE } from "@aixellabs/backend/instagram";
 import { Checkbox } from "@/components/ui/checkbox";
+import { InstagramAvatar } from "@/components/common/lead-card/InstagramAvatar";
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
 
@@ -69,24 +69,10 @@ export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
         };
     }, [lead]);
 
-    const getInitials = (name: string) => {
-        if (name === DEFAULT_DISPLAY_VALUE) return "?";
-        return name
-            .split(" ")
-            .map((n) => n[0])
-            .join("")
-            .toUpperCase()
-            .slice(0, 2);
-    };
-
     const formatNumber = (num: number) => {
         if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
         if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
         return num.toString();
-    };
-
-    const getProfilePicture = (lead: typeof leadInfo) => {
-        return lead.profilePictureHd || lead.profilePicture;
     };
 
     const [bioExpanded, setBioExpanded] = useState(false);
@@ -140,13 +126,11 @@ export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
                         {showCheckbox && onSelect && (
                             <Checkbox className="shrink-0" checked={isSelected} onCheckedChange={onSelect} />
                         )}
-                        <Avatar className="size-10 shrink-0">
-                            <AvatarImage
-                                src={getProfilePicture(leadInfo) ?? undefined}
-                                alt={leadInfo.fullName}
-                            />
-                            <AvatarFallback className="text-lg">{getInitials(leadInfo.fullName)}</AvatarFallback>
-                        </Avatar>
+                        <InstagramAvatar
+                            fullName={leadInfo.fullName}
+                            profilePicture={leadInfo.profilePicture}
+                            profilePictureHd={leadInfo.profilePictureHd}
+                        />
                         <div className="flex items-start flex-col min-w-0 flex-1 overflow-hidden">
                             <CardTitle className="flex w-full min-w-0 max-w-full items-center gap-1.5">
                                 <span className="min-w-0 flex-1 truncate">{leadInfo.fullName}</span>
