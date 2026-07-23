@@ -1,6 +1,7 @@
 import { YOUTUBE_API_ROUTES } from "./api/youtube/constants";
 import { YOUTUBE_INTELLIGENCE_ROUTES } from "./api/youtube/intelligence/constants";
 import { GOOGLE_TRENDS_API_ROUTES } from "./api/google-trends/constants";
+import { IG_ADVANCED_ROUTES } from "./api/instagram/advanced/constants";
 import { GMAPS_DETAILS_ROUTES } from "./api/gmaps/details/constants";
 import { GMAPS_ADVANCED_ROUTES } from "./api/gmaps/advanced/constants";
 
@@ -51,6 +52,18 @@ export const API_ENDPOINTS = {
   },
   INSTAGRAM: {
     API: { route: "/", full: `${ENDPOINTS.INSTAGRAM}` },
+    ADVANCED_POSTS: {
+      route: IG_ADVANCED_ROUTES.POSTS,
+      full: `${ENDPOINTS.INSTAGRAM}${IG_ADVANCED_ROUTES.POSTS}`,
+    },
+    ADVANCED_SEARCH: {
+      route: IG_ADVANCED_ROUTES.SEARCH,
+      full: `${ENDPOINTS.INSTAGRAM}${IG_ADVANCED_ROUTES.SEARCH}`,
+    },
+    ADVANCED_POPULAR: {
+      route: IG_ADVANCED_ROUTES.POPULAR,
+      full: `${ENDPOINTS.INSTAGRAM}${IG_ADVANCED_ROUTES.POPULAR}`,
+    },
   },
   YOUTUBE: {
     SEARCH: {

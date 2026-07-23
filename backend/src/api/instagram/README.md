@@ -14,6 +14,10 @@ See [`advanced/README.md`](./advanced/README.md).
 `/p/` + `/reel/` URLs, resolve owners from `og:url`, return handles (+ optional
 profile enrich). See [`advanced/search/README.md`](./advanced/search/README.md).
 
+`POST /instagram/advanced/popular` — **native IG topic search (no GSearch)**:
+`/popular/{query}/` public reels grid → handles. See
+[`advanced/popular/README.md`](./advanced/popular/README.md).
+
 ## How discovery works
 
 1. `generateInstagramSearchQuery` builds a profile-biased Google query:
