@@ -118,6 +118,7 @@ Thumbs.db
 /frontend/.clerk
 /backend/node_modules
 /backend/scripts/
+/backend/src/experiments/
 /scraper/venv
 /scraper/output/
 
