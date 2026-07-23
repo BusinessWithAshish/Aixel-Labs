@@ -463,7 +463,10 @@ export const LeadsFilterSheet = ({ open, onOpenChange, filterPanel }: Props) => 
         ? sources
         : sources.filter((s) => s !== LeadSource.LINKEDIN);
 
-    const showGoogleMaps = sources.length === 0 || sources.includes(LeadSource.GOOGLE_MAPS);
+    const showGoogleMaps =
+        sources.length === 0 ||
+        sources.includes(LeadSource.GOOGLE_MAPS) ||
+        sources.includes(LeadSource.GOOGLE_MAPS_ADVANCED);
     const showInstagram = sources.length === 0 || sources.includes(LeadSource.INSTAGRAM);
     const showLinkedIn =
         SHOW_LINKEDIN_FILTERS_UI &&

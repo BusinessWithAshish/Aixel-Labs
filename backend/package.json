@@ -34,6 +34,22 @@
       "types": "./src/api/gmaps/internal/types.ts",
       "default": "./src/api/gmaps/internal/types.ts"
     },
+    "./gmaps/details/types": {
+      "types": "./src/api/gmaps/details/types.ts",
+      "default": "./src/api/gmaps/details/types.ts"
+    },
+    "./gmaps/advanced": {
+      "types": "./src/api/gmaps/advanced/index.ts",
+      "default": "./src/api/gmaps/advanced/index.ts"
+    },
+    "./gmaps/advanced/schemas": {
+      "types": "./src/api/gmaps/advanced/schemas.ts",
+      "default": "./src/api/gmaps/advanced/schemas.ts"
+    },
+    "./gmaps/advanced/constants": {
+      "types": "./src/api/gmaps/advanced/constants.ts",
+      "default": "./src/api/gmaps/advanced/constants.ts"
+    },
     "./gmaps/scrape/types": {
       "types": "./src/api/gmaps/scrape/types.ts",
       "default": "./src/api/gmaps/scrape/types.ts"

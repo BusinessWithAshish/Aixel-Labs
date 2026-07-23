@@ -37,6 +37,7 @@ function fieldValue(lead: Lead, field: string): number | string | null {
 
     switch (lead.source) {
         case LeadSource.GOOGLE_MAPS:
+        case LeadSource.GOOGLE_MAPS_ADVANCED:
             if (field === GMAPS_SORT_BY.RATING) return toNum(d.rating);
             if (field === GMAPS_SORT_BY.REVIEW_COUNT) return toNum(d.reviewCount);
             if (field === GMAPS_SORT_BY.NAME) return textValue(d.name);
@@ -97,7 +98,8 @@ function compareByChain(
 
 function compareSameSource(a: Lead, b: Lead, sort: LeadSortState): number {
     switch (a.source) {
-        case LeadSource.GOOGLE_MAPS: {
+        case LeadSource.GOOGLE_MAPS:
+        case LeadSource.GOOGLE_MAPS_ADVANCED: {
             const { by, direction } = sort.googleMaps;
             if (by === SORT_BY_NONE) return 0;
             return compareByChain(a, b, by, GMAPS_SORT_CHAIN[by as GmapsSortBy], direction);

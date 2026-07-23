@@ -1,6 +1,8 @@
 import { YOUTUBE_API_ROUTES } from "./api/youtube/constants";
 import { YOUTUBE_INTELLIGENCE_ROUTES } from "./api/youtube/intelligence/constants";
 import { GOOGLE_TRENDS_API_ROUTES } from "./api/google-trends/constants";
+import { GMAPS_DETAILS_ROUTES } from "./api/gmaps/details/constants";
+import { GMAPS_ADVANCED_ROUTES } from "./api/gmaps/advanced/constants";
 
 export enum ENDPOINTS {
   HOME = "/",
@@ -38,6 +40,14 @@ export const API_ENDPOINTS = {
   PING: "/v1/ping",
   GMAPS: {
     INTERNAL: { route: "/internal", full: `${ENDPOINTS.GMAPS}/internal` },
+    DETAILS: {
+      route: GMAPS_DETAILS_ROUTES.DETAILS,
+      full: `${ENDPOINTS.GMAPS}${GMAPS_DETAILS_ROUTES.DETAILS}`,
+    },
+    ADVANCED: {
+      route: GMAPS_ADVANCED_ROUTES.ADVANCED,
+      full: `${ENDPOINTS.GMAPS}${GMAPS_ADVANCED_ROUTES.ADVANCED}`,
+    },
   },
   INSTAGRAM: {
     API: { route: "/", full: `${ENDPOINTS.INSTAGRAM}` },

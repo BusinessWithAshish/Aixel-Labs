@@ -3,6 +3,7 @@ import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
 /** Credits charged per returned lead item for each lead-gen submodule. */
 export const CREDIT_COST_PER_ITEM: Partial<Record<LEAD_GENERATION_SUB_MODULES, number>> = {
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS]: 1,
+    [LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS_ADVANCED]: 1,
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH]: 1,
     [LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH]: 1,
     [LEAD_GENERATION_SUB_MODULES.FACEBOOK]: 1,

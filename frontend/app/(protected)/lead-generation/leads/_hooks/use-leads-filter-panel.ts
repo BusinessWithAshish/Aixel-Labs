@@ -67,6 +67,7 @@ export function useLeadsFilterPanel() {
 
             switch (lead.source) {
                 case LeadSource.GOOGLE_MAPS:
+                case LeadSource.GOOGLE_MAPS_ADVANCED:
                     return matchGoogleMaps(lead.data, googleMaps);
                 case LeadSource.INSTAGRAM:
                     return matchInstagram(lead.data, instagram);
@@ -101,4 +102,4 @@ export function useLeadsFilterPanel() {
     };
 }
 
-export type TUseLeadsFilterPanelReturn = ReturnType<typeof useLeadsFilterPanel>;
+export type UseLeadsFilterPanelReturn = ReturnType<typeof useLeadsFilterPanel>;

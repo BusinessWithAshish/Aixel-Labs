@@ -64,6 +64,10 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
         icon: MapPinIcon,
         color: '!text-red-500',
     },
+    [LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS_ADVANCED]: {
+        icon: MapPinIcon,
+        color: '!text-orange-500',
+    },
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH]: {
         icon: SearchIcon,
         color: '!text-blue-500',

@@ -2,12 +2,14 @@
 
 import { LeadSource, type Lead } from '@aixellabs/backend/db/types';
 import type { GMAPS_INTERNAL_RESPONSE } from '@aixellabs/backend/gmaps/internal/types';
+import type { GMAPS_DETAILS_RESPONSE } from '@aixellabs/backend/gmaps/details/types';
 import type { GSEARCH_RESPONSE } from '@aixellabs/backend/gsearch/types';
 import type { INSTAGRAM_RESPONSE } from '@aixellabs/backend/instagram';
 import { LINKEDIN_SEARCH_TYPE } from '@aixellabs/backend/linkedin/schemas';
 import type { LINKEDIN_BY_COMPANY_RESPONSE } from '@aixellabs/backend/linkedin/types';
 import { GoogleAdvancedSearchLeadCard } from '@/components/common/lead-card/GoogleAdvancedSearchLeadCard';
 import { GoogleMapLead } from '@/components/common/lead-card/GoogleMapLead';
+import { GoogleMapsAdvancedLeadCard } from '@/components/common/lead-card/GoogleMapsAdvancedLeadCard';
 import { InstagramLeadCard } from '@/components/common/lead-card/InstagramLeadCard';
 import { LinkedInByCompanyLeadCard } from '@/components/common/lead-card/LinkedInByCompanyLeadCard';
 
@@ -24,6 +26,17 @@ export function LeadListItem({ lead, isSelected, onToggleSelect }: LeadListItemP
         return (
             <GoogleMapLead
                 data={lead.data as GMAPS_INTERNAL_RESPONSE}
+                showCheckbox
+                isSelected={isSelected}
+                onSelect={(checked) => onToggleSelect(id, checked)}
+            />
+        );
+    }
+
+    if (lead.source === LeadSource.GOOGLE_MAPS_ADVANCED) {
+        return (
+            <GoogleMapsAdvancedLeadCard
+                data={lead.data as GMAPS_DETAILS_RESPONSE}
                 showCheckbox
                 isSelected={isSelected}
                 onSelect={(checked) => onToggleSelect(id, checked)}

@@ -3,7 +3,8 @@
  * No "mongodb" or Node built-ins here so this file is safe for the client bundle.
  */
 import { type GMAPS_INTERNAL_RESPONSE } from "../api/gmaps/internal/types";
-import type { GSEARCH_RESPONSE } from "../api/gsearch/types";
+import type { GMAPS_DETAILS_RESPONSE } from "../api/gmaps/details";
+import type { GSEARCH_RESPONSE } from "../api/gsearch";
 import { INSTAGRAM_RESPONSE } from "../api/instagram";
 import type { FACEBOOK_RESPONSE } from "../api/facebook";
 import { ObjectId } from "mongodb";
@@ -39,6 +40,7 @@ export enum Modules {
 export enum LEAD_GENERATION_SUB_MODULES {
   LEADS = "LEADS",
   GOOGLE_MAPS = "GOOGLE_MAPS",
+  GOOGLE_MAPS_ADVANCED = "GOOGLE_MAPS_ADVANCED",
   GOOGLE_ADVANCED_SEARCH = "GOOGLE_ADVANCED_SEARCH",
   INSTAGRAM_SEARCH = "INSTAGRAM_SEARCH",
   INSTAGRAM_ADVANCED_SEARCH = "INSTAGRAM_ADVANCED_SEARCH",
@@ -88,6 +90,7 @@ export type LeadData =
   | INSTAGRAM_RESPONSE
   | FACEBOOK_RESPONSE
   | GMAPS_INTERNAL_RESPONSE
+  | GMAPS_DETAILS_RESPONSE
   | GSEARCH_RESPONSE
   | LINKEDIN_BY_COMPANY_RESPONSE
   | LINKEDIN_BY_PEOPLE_RESPONSE;
@@ -124,6 +127,7 @@ export type User = UserDoc<string>;
 
 export enum LeadSource {
   GOOGLE_MAPS = "GOOGLE_MAPS",
+  GOOGLE_MAPS_ADVANCED = "GOOGLE_MAPS_ADVANCED",
   GOOGLE_ADVANCED_SEARCH = "GOOGLE_ADVANCED_SEARCH",
   INSTAGRAM = "INSTAGRAM",
   LINKEDIN = "LINKEDIN",

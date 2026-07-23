@@ -11,6 +11,7 @@ import { LEAD_SORT_DEFAULTS, normalizeLeadSortState, type LeadSortState } from '
 
 export type FilterSource =
     | LeadSource.GOOGLE_MAPS
+    | LeadSource.GOOGLE_MAPS_ADVANCED
     | LeadSource.GOOGLE_ADVANCED_SEARCH
     | LeadSource.LINKEDIN
     | LeadSource.INSTAGRAM;
@@ -162,6 +163,10 @@ export type SourceMeta = { label: string; imageSrc: string };
 
 export const SOURCE_META: Record<FilterSource, SourceMeta> = {
     [LeadSource.GOOGLE_MAPS]: { label: 'Google Maps', imageSrc: '/google-maps.svg' },
+    [LeadSource.GOOGLE_MAPS_ADVANCED]: {
+        label: 'Google Maps Advanced',
+        imageSrc: '/google-maps.svg',
+    },
     [LeadSource.GOOGLE_ADVANCED_SEARCH]: {
         label: 'Google Advanced Search',
         imageSrc: '/google-logo.png',
@@ -172,6 +177,7 @@ export const SOURCE_META: Record<FilterSource, SourceMeta> = {
 
 export const FILTERABLE_SOURCES: FilterSource[] = [
     LeadSource.GOOGLE_MAPS,
+    LeadSource.GOOGLE_MAPS_ADVANCED,
     LeadSource.GOOGLE_ADVANCED_SEARCH,
     LeadSource.LINKEDIN,
     LeadSource.INSTAGRAM,
