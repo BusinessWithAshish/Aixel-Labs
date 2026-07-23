@@ -5,12 +5,14 @@ import { fetchGsearch } from "../gsearch";
 import {
   GSEARCH_MAX_PAGES,
   GSEARCH_MAX_QUERY_CHARS,
+  GSEARCH_PAGE_SIZE,
 } from "../gsearch/constants";
 import {
   IG_HEADERS,
   INSTAGRAM_BASE_URL,
   INSTAGRAM_ERROR_MESSAGES,
   INSTAGRAM_QUERY_LIMITS,
+  INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT,
   INSTAGRAM_WEB_PROFILE_INFO_PATH,
 } from "./constants";
 import {
@@ -24,15 +26,20 @@ export function instagramWebProfileInfoUrl(username: string): string {
   return `${INSTAGRAM_BASE_URL}${INSTAGRAM_WEB_PROFILE_INFO_PATH}?username=${encodeURIComponent(username)}`;
 }
 
+function resolveLimit(limit: number | undefined): number {
+  return limit ?? INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT;
+}
+
 export async function fetchFromEntities(
   entities: string[] | (string | null)[],
   country: string,
+  limit: number = INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT,
 ): Promise<INSTAGRAM_RESPONSE[]> {
   if (!Array.isArray(entities)) {
     throw new Error(INSTAGRAM_ERROR_MESSAGES.ENTITIES_NOT_ARRAY);
   }
 
-  const usernames = uniqueUsernames(entities);
+  const usernames = uniqueUsernames(entities).slice(0, resolveLimit(limit));
   const urls = usernames.map(instagramWebProfileInfoUrl);
 
   if (urls.length === 0) {
@@ -53,6 +60,7 @@ export async function fetchFromQuery(
   data: INSTAGRAM_REQUEST,
 ): Promise<INSTAGRAM_RESPONSE[]> {
   const { country, city, state } = data;
+  const limit = resolveLimit(data.limit);
 
   const { searchQuery, words, chars } = generateInstagramSearchQuery(data);
 
@@ -64,10 +72,14 @@ export async function fetchFromQuery(
   }
 
   const countryCode = country as CountryCode;
+  const pages = Math.min(
+    Math.ceil(limit / GSEARCH_PAGE_SIZE),
+    GSEARCH_MAX_PAGES,
+  );
 
   const { results: searchResultsData } = await fetchGsearch({
     searchQuery,
-    pages: GSEARCH_MAX_PAGES,
+    pages,
     country: countryCode,
     region: city,
     state,
@@ -81,11 +93,11 @@ export async function fetchFromQuery(
   // from the first path segment via `extractUsername` (same path as fetchFromEntities).
   const entities = uniqueUsernames(
     searchResultsData.map((row) => row.url ?? null),
-  );
+  ).slice(0, limit);
 
   console.log(
-    `[instagram] SERP rows=${searchResultsData.length} → unique profile handles=${entities.length}`,
+    `[instagram] SERP rows=${searchResultsData.length} → unique profile handles=${entities.length} (limit=${limit})`,
   );
 
-  return await fetchFromEntities(entities, countryCode);
+  return await fetchFromEntities(entities, countryCode, limit);
 }

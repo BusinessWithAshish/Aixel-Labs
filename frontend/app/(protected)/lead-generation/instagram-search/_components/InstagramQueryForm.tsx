@@ -1,10 +1,21 @@
-import { StringControlledField, StringArrayControlledField, SearchableSelectControlledField } from "@/components/common/zod-form-builder/ZodControlledFields";
-import { usePage } from "@/contexts/PageStore";
-import { UseInstagramFormReturn } from "../_hooks/use-instagram-form";
+import {
+    StringControlledField,
+    StringArrayControlledField,
+    SearchableSelectControlledField,
+    NumberControlledField,
+} from '@/components/common/zod-form-builder/ZodControlledFields';
+import { usePage } from '@/contexts/PageStore';
+import { INSTAGRAM_REQUEST_RESULT_LIMIT_MAX } from '@aixellabs/backend/instagram/constants';
+import { UseInstagramFormReturn } from '../_hooks/use-instagram-form';
 
 export const InstagramQueryForm = () => {
-
-    const { countryOptions, cityOptions, stateOptions, isStateFieldDisabled, isCityFieldDisabled } = usePage<UseInstagramFormReturn>();
+    const {
+        countryOptions,
+        cityOptions,
+        stateOptions,
+        isStateFieldDisabled,
+        isCityFieldDisabled,
+    } = usePage<UseInstagramFormReturn>();
     return (
         <>
             <StringControlledField
@@ -57,6 +68,13 @@ export const InstagramQueryForm = () => {
             <StringArrayControlledField
                 name="excludeHashtags"
                 description="Enter the hashtags to exclude from the search"
+                required={false}
+            />
+
+            <NumberControlledField
+                name="limit"
+                label="Limit"
+                description={`Maximum number of profiles to return (1–${INSTAGRAM_REQUEST_RESULT_LIMIT_MAX}, integer). Defaults to 100.`}
                 required={false}
             />
         </>

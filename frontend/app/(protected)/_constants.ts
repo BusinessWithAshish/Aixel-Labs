@@ -1,11 +1,12 @@
 import { LeadSource, LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { SubModuleUrls } from '@/config/app-config';
 
-/** Lead sources shown on the home dashboard (excludes Facebook / people-only tracks for now). */
+/** Lead sources shown on the home dashboard. */
 export const DASHBOARD_LEAD_SOURCES = [
     LeadSource.GOOGLE_MAPS,
     LeadSource.GOOGLE_ADVANCED_SEARCH,
     LeadSource.INSTAGRAM,
+    LeadSource.FACEBOOK,
     LeadSource.LINKEDIN,
 ] as const;
 
@@ -83,6 +84,16 @@ export const DASHBOARD_SOURCE_META: Record<
         imageSrc: '/instagram-logo.svg',
         imageAlt: 'Instagram',
         subModule: LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH,
+    },
+    [LeadSource.FACEBOOK]: {
+        label: 'Facebook',
+        shortLabel: 'Facebook',
+        href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.FACEBOOK],
+        chartKey: 'facebook',
+        color: 'var(--chart-5)',
+        imageSrc: '/facebook-logo.svg',
+        imageAlt: 'Facebook',
+        subModule: LEAD_GENERATION_SUB_MODULES.FACEBOOK,
     },
     [LeadSource.LINKEDIN]: {
         label: 'LinkedIn',

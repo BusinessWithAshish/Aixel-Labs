@@ -4,6 +4,8 @@ import {
   INSTAGRAM_URL_REGEX,
   INSTAGRAM_QUERY_LIMITS,
   INSTAGRAM_ERROR_MESSAGES,
+  INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT,
+  INSTAGRAM_REQUEST_RESULT_LIMIT_MAX,
 } from "./constants";
 import {
   ISO_COUNTRY_CODE_SCHEMA,
@@ -62,5 +64,14 @@ export const INSTAGRAM_REQUEST_SCHEMA = z.object({
     .optional()
     .describe(
       "Hashtags that should NOT be associated with the profiles (e.g. ['nsfw', 'ads']).",
+    ),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(INSTAGRAM_REQUEST_RESULT_LIMIT_MAX)
+    .default(INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT)
+    .describe(
+      `Maximum number of results to return (1–${INSTAGRAM_REQUEST_RESULT_LIMIT_MAX}). Defaults to ${INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT}.`,
     ),
 });

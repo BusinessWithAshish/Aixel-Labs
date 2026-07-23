@@ -49,6 +49,10 @@ export const INSTAGRAM_QUERY_LIMITS = {
   maxQueryWords: 30,
 } as const;
 
+/** Upper bound for `limit` on Instagram scraper request payloads. */
+export const INSTAGRAM_REQUEST_RESULT_LIMIT_MAX = 250;
+export const INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT = 100;
+
 /**
  * First path segment values that are Instagram site sections, not usernames.
  * Profile URLs use `/{handle}` as the first segment.

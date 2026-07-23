@@ -7,6 +7,13 @@ Browserless Instagram profile lookup + discovery via Google CSE (`gsearch`).
 `POST /instagram` — look up profiles by username/URL (`entities`) and/or discover
 handles via Google advanced search (`query` + optional keywords/hashtags).
 
+`POST /instagram/advanced/posts` — public profile **Posts** tab (grid + scroll).
+See [`advanced/README.md`](./advanced/README.md).
+
+`POST /instagram/advanced/search` — **content search → leads**: GSearch for
+`/p/` + `/reel/` URLs, resolve owners from `og:url`, return handles (+ optional
+profile enrich). See [`advanced/search/README.md`](./advanced/search/README.md).
+
 ## How discovery works
 
 1. `generateInstagramSearchQuery` builds a profile-biased Google query:
