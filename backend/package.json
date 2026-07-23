@@ -62,6 +62,22 @@
       "types": "./src/api/instagram/schemas.ts",
       "default": "./src/api/instagram/schemas.ts"
     },
+    "./instagram/constants": {
+      "types": "./src/api/instagram/constants.ts",
+      "default": "./src/api/instagram/constants.ts"
+    },
+    "./facebook": {
+      "types": "./src/api/facebook/types.ts",
+      "default": "./src/api/facebook/types.ts"
+    },
+    "./facebook/schemas": {
+      "types": "./src/api/facebook/schemas.ts",
+      "default": "./src/api/facebook/schemas.ts"
+    },
+    "./facebook/constants": {
+      "types": "./src/api/facebook/constants.ts",
+      "default": "./src/api/facebook/constants.ts"
+    },
     "./linkedin/constants": {
       "types": "./src/api/linkedin/constants.ts",
       "default": "./src/api/linkedin/constants.ts"

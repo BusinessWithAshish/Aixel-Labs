@@ -5,6 +5,7 @@
 import { type GMAPS_INTERNAL_RESPONSE } from "../api/gmaps/internal/types";
 import type { GSEARCH_RESPONSE } from "../api/gsearch/types";
 import { INSTAGRAM_RESPONSE } from "../api/instagram";
+import type { FACEBOOK_RESPONSE } from "../api/facebook";
 import { ObjectId } from "mongodb";
 import {
   LINKEDIN_BY_COMPANY_RESPONSE,
@@ -85,6 +86,7 @@ export type ModuleAccess = {
 
 export type LeadData =
   | INSTAGRAM_RESPONSE
+  | FACEBOOK_RESPONSE
   | GMAPS_INTERNAL_RESPONSE
   | GSEARCH_RESPONSE
   | LINKEDIN_BY_COMPANY_RESPONSE

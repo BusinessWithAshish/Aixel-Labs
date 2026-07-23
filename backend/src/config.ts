@@ -6,6 +6,7 @@ export enum ENDPOINTS {
   HOME = "/",
   GMAPS = "/gmaps",
   INSTAGRAM = "/instagram",
+  FACEBOOK = "/facebook",
   LINKEDIN = "/linkedin",
   YOUTUBE = "/youtube",
   GSEARCH = "/gsearch",
@@ -27,6 +28,9 @@ export const ALLOWED_ORIGINS_PROD_REGEX = [/^https:\/\/.*\.aixellabs\.com$/];
 export const API_ENDPOINTS = {
   LINKEDIN: {
     API: { route: "/", full: `${ENDPOINTS.LINKEDIN}` },
+  },
+  FACEBOOK: {
+    API: { route: "/", full: `${ENDPOINTS.FACEBOOK}` },
   },
   HOME: {
     API: { route: "/", full: `${ENDPOINTS.HOME}` },

@@ -13,6 +13,8 @@ export function getLeadSoruceFromSubModule(subModule: LEAD_GENERATION_SUB_MODULE
             return LeadSource.GOOGLE_ADVANCED_SEARCH;
         case LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH:
             return LeadSource.INSTAGRAM;
+        case LEAD_GENERATION_SUB_MODULES.FACEBOOK:
+            return LeadSource.FACEBOOK;
         case LEAD_GENERATION_SUB_MODULES.LINKEDIN:
             return LeadSource.LINKEDIN;
         default:
@@ -51,6 +53,8 @@ const getLeads = <TRequest>(
             return apiClient.post(API_ENDPOINTS.GSEARCH.SEARCH.full, body, options);
         case LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH:
             return apiClient.post(API_ENDPOINTS.INSTAGRAM.API.full, body, options);
+        case LEAD_GENERATION_SUB_MODULES.FACEBOOK:
+            return apiClient.post(API_ENDPOINTS.FACEBOOK.API.full, body, options);
         case LEAD_GENERATION_SUB_MODULES.LINKEDIN:
             return apiClient.post(API_ENDPOINTS.LINKEDIN.API.full, body, options);
         default:
