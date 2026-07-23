@@ -117,6 +117,7 @@ Thumbs.db
 /frontend/.next
 /frontend/.clerk
 /backend/node_modules
+/backend/scripts/
 /scraper/venv
 /scraper/output/
 
