@@ -106,7 +106,7 @@ export const LinkedInByPeopleForm = () => {
 
             <NumberControlledField
                 name="limit"
-                description={`Maximum number of people to return (1–${LINKEDIN_REQUEST_RESULT_LIMIT_MAX}, integer). The form defaults to 100.`}
+                description={`Maximum number of LinkedIn people to return (1–${LINKEDIN_REQUEST_RESULT_LIMIT_MAX}, integer). Defaults to 100.`}
                 required={false}
             />
         </div>

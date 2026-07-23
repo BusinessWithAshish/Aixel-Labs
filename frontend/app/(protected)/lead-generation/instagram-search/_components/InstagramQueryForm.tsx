@@ -74,7 +74,7 @@ export const InstagramQueryForm = () => {
             <NumberControlledField
                 name="limit"
                 label="Limit"
-                description={`Maximum number of profiles to return (1–${INSTAGRAM_REQUEST_RESULT_LIMIT_MAX}, integer). Defaults to 100.`}
+                description={`Maximum number of Instagram profiles to return (1–${INSTAGRAM_REQUEST_RESULT_LIMIT_MAX}, integer). Defaults to 100.`}
                 required={false}
             />
         </>

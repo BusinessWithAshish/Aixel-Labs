@@ -60,8 +60,8 @@ export const GoogleAdvancedSearchQueryForm = () => {
 
             <NumberControlledField
                 name="pages"
-                label="Pages"
-                description={`Number of result pages to fetch (1–${GSEARCH_MAX_PAGES}, ~20 results each)`}
+                label="Result pages"
+                description={`Number of Google result pages to fetch (1–${GSEARCH_MAX_PAGES}, ~20 results each)`}
                 required={false}
                 min={1}
                 max={GSEARCH_MAX_PAGES}

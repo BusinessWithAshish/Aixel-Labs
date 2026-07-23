@@ -63,7 +63,7 @@ export const FacebookQueryForm = () => {
             <NumberControlledField
                 name="limit"
                 label="Limit"
-                description={`Maximum number of Pages to return (1–${FACEBOOK_REQUEST_RESULT_LIMIT_MAX}, integer). Defaults to 100.`}
+                description={`Maximum number of Facebook pages to return (1–${FACEBOOK_REQUEST_RESULT_LIMIT_MAX}, integer). Defaults to 100.`}
                 required={false}
             />
         </>

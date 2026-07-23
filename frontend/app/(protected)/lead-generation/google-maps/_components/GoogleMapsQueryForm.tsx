@@ -128,7 +128,7 @@ export const GoogleMapsQueryForm = () => {
             <NumberControlledField
                 name="limit"
                 label="Max results"
-                description={`Maximum places to return after filters (1–${GMAPS_REQUEST_LIMIT_MAX}).`}
+                description={`Maximum Google Maps places to return after filters (1–${GMAPS_REQUEST_LIMIT_MAX}).`}
                 required={false}
                 min={1}
                 max={GMAPS_REQUEST_LIMIT_MAX}

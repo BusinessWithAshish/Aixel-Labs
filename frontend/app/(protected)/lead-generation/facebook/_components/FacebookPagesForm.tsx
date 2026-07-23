@@ -8,7 +8,7 @@ import { FACEBOOK_REQUEST_RESULT_LIMIT_MAX } from '@aixellabs/backend/facebook/c
 import { UseFacebookFormReturn } from '../_hooks/use-facebook-form';
 
 const COUNTRY_FIELD_DESCRIPTION =
-    'Country is required so we can correctly parse phone numbers found on Pages and match location details when looking up each Page.';
+    'Country is required so we can correctly parse phone numbers found on Facebook pages and match location details when looking up each page.';
 
 export const FacebookPagesForm = () => {
     const { countryOptions } = usePage<UseFacebookFormReturn>();
@@ -30,7 +30,7 @@ export const FacebookPagesForm = () => {
             <NumberControlledField
                 name="limit"
                 label="Limit"
-                description={`Maximum number of Pages to return (1–${FACEBOOK_REQUEST_RESULT_LIMIT_MAX}, integer). Defaults to 100.`}
+                description={`Maximum number of Facebook pages to return (1–${FACEBOOK_REQUEST_RESULT_LIMIT_MAX}, integer). Defaults to 100.`}
                 required={false}
             />
         </>

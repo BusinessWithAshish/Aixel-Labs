@@ -209,12 +209,12 @@ export const LinkedInByCompanyForm = () => {
 
             <FieldSet className="min-w-0">
                 <FieldLegend variant="legend">Controls</FieldLegend>
-                <FieldDescription>How many companies to return from this run.</FieldDescription>
+                <FieldDescription>How many LinkedIn companies to return from this run.</FieldDescription>
 
                 <NumberControlledField
                     name="limit"
                     label="Limit"
-                    description={`Maximum number of companies to return (1–${LINKEDIN_REQUEST_RESULT_LIMIT_MAX}, integer). The form defaults to 100.`}
+                    description={`Maximum number of LinkedIn companies to return (1–${LINKEDIN_REQUEST_RESULT_LIMIT_MAX}, integer). Defaults to 100.`}
                     required={false}
                 />
             </FieldSet>
