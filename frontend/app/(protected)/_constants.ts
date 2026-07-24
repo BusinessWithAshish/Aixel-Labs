@@ -48,8 +48,10 @@ export const DASHBOARD_SOURCE_META: Record<
         shortLabel: string;
         href: string;
         chartKey: string;
-        /** Platform brand color for dashboard charts / badges. */
+        /** Solid brand color for badges / tooltips. */
         color: string;
+        /** Brand gradient stops for chart bars (left → right). */
+        gradient: readonly string[];
         imageSrc: string;
         imageAlt: string;
         subModule: LEAD_GENERATION_SUB_MODULES;
@@ -60,8 +62,9 @@ export const DASHBOARD_SOURCE_META: Record<
         shortLabel: 'Maps',
         href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS],
         chartKey: 'maps',
-        // Blend of Maps logo green (#34A853) + yellow/orange (#FBBC04)
-        color: '#85B32E',
+        color: '#34A853',
+        // Maps-forward: green → yellow/orange → red
+        gradient: ['#34A853', '#FBBC04', '#EA4335'],
         imageSrc: '/google-maps.svg',
         imageAlt: 'Google Maps',
         subModule: LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS,
@@ -72,6 +75,8 @@ export const DASHBOARD_SOURCE_META: Record<
         href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH],
         chartKey: 'search',
         color: '#4285F4',
+        // Google four-color, blue-led (distinct from Maps)
+        gradient: ['#4285F4', '#EA4335', '#FBBC04', '#34A853'],
         imageSrc: '/google-logo.png',
         imageAlt: 'Google',
         subModule: LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH,
@@ -81,8 +86,8 @@ export const DASHBOARD_SOURCE_META: Record<
         shortLabel: 'Instagram',
         href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH],
         chartKey: 'instagram',
-        // Purple–pink from Instagram gradient
-        color: '#C13584',
+        color: '#E1306C',
+        gradient: ['#FCAF45', '#E1306C', '#833AB4'],
         imageSrc: '/instagram-logo.svg',
         imageAlt: 'Instagram',
         subModule: LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH,
@@ -93,6 +98,8 @@ export const DASHBOARD_SOURCE_META: Record<
         href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.FACEBOOK],
         chartKey: 'facebook',
         color: '#1877F2',
+        // Soft blue variant around Facebook blue
+        gradient: ['#4BA0FF', '#1877F2', '#0B5FCC'],
         imageSrc: '/facebook-logo.svg',
         imageAlt: 'Facebook',
         subModule: LEAD_GENERATION_SUB_MODULES.FACEBOOK,
@@ -103,6 +110,7 @@ export const DASHBOARD_SOURCE_META: Record<
         href: SubModuleUrls[LEAD_GENERATION_SUB_MODULES.LINKEDIN],
         chartKey: 'linkedin',
         color: '#0A66C2',
+        gradient: ['#378FE9', '#0A66C2', '#004182'],
         imageSrc: '/linkedin-logo-svg.png',
         imageAlt: 'LinkedIn',
         subModule: LEAD_GENERATION_SUB_MODULES.LINKEDIN,

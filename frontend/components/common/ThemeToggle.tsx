@@ -35,9 +35,9 @@ export const ThemeToggle = () => {
     };
 
     const options: DropdownMenuOption[] = [
-        { key: 'light', label: 'Light', icon: Sun, variant: 'primary', onSelect: () => setTheme('light') },
-        { key: 'dark', label: 'Dark', icon: Moon, onSelect: () => setTheme('dark') },
-        { key: 'system', label: 'System', icon: Monitor, onSelect: () => setTheme('system') },
+        { key: 'light', label: 'Light', icon: Sun, variant: theme === 'light' ? 'primary' : undefined, onSelect: () => setTheme('light') },
+        { key: 'dark', label: 'Dark', icon: Moon, variant: theme === 'dark' ? 'primary' : undefined, onSelect: () => setTheme('dark') },
+        { key: 'system', label: 'System', icon: Monitor, variant: theme === 'system' ? 'primary' : undefined, onSelect: () => setTheme('system') },
     ];
 
     return (
