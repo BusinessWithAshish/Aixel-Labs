@@ -167,8 +167,10 @@ export type UserLeadListDoc<Id = ObjectId> = {
   updatedAt: Date;
 };
 
-/** List row for UI/API: `leadCount` is derived from `user_leads`, not stored on the list document. */
-export type UserLeadList = UserLeadListDoc<string> & { leadCount: number };
+export type UserLeadList = UserLeadListDoc<string> & {
+  leadCount: number;
+  sources: LeadSource[];
+};
 
 /** Tenant-scoped coupon that grants bonus credits on redeem. */
 export type CouponDoc<Id = ObjectId> = {

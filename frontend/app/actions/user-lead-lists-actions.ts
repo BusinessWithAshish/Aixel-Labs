@@ -2,6 +2,7 @@
 
 import {
     getCollection,
+    LeadSource,
     MongoCollections,
     MongoObjectId,
     type UserLeadDoc,
@@ -17,34 +18,69 @@ import {
     toObjectId,
 } from '@/helpers/server-action-helpers';
 
-const mapUserLeadListDocToUserLeadList = (list: UserLeadListDoc, leadCount: number): UserLeadList => {
+const mapUserLeadListDocToUserLeadList = (
+    list: UserLeadListDoc,
+    leadCount = 0,
+    sources: LeadSource[] = [],
+): UserLeadList => {
     const { _id, userId, ...rest } = list;
     return {
         ...rest,
         _id: _id?.toString(),
         userId: userId.toString(),
         leadCount,
+        sources,
     };
 };
+
+/** Derived leadCount + distinct sources, keyed by listId. */
+async function getListStatsByListId(uid: MongoObjectId, listId?: MongoObjectId) {
+    const rows = await (
+        await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS)
+    )
+        .aggregate<{ _id: MongoObjectId; n: number; sources: (LeadSource | null)[] }>([
+            { $match: listId ? { userId: uid, listId } : { userId: uid } },
+            {
+                $lookup: {
+                    from: MongoCollections.LEADS,
+                    localField: 'leadId',
+                    foreignField: '_id',
+                    as: 'lead',
+                },
+            },
+            { $unwind: { path: '$lead', preserveNullAndEmptyArrays: true } },
+            {
+                $group: {
+                    _id: '$listId',
+                    n: { $sum: 1 },
+                    sources: { $addToSet: '$lead.source' },
+                },
+            },
+        ])
+        .toArray();
+
+    return new Map(
+        rows.map((r) => [
+            r._id.toString(),
+            {
+                leadCount: r.n,
+                sources: r.sources.filter((s): s is LeadSource => s != null),
+            },
+        ]),
+    );
+}
 
 export const getUserLeadLists = async (): Promise<ALApiResponse<UserLeadList[]>> =>
     runAuthenticatedAction(async function getUserLeadLists(userId) {
         const uid = requireUserObjectId(userId);
         const collection = await getCollection<UserLeadListDoc>(MongoCollections.LEAD_LISTS);
         const docs = await collection.find({ userId: uid }).sort({ createdAt: -1 }).toArray();
+        const statsByListId = await getListStatsByListId(uid);
 
-        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
-        const countRows = await userLeadsCollection
-            .aggregate<{
-                _id: MongoObjectId;
-                n: number;
-            }>([{ $match: { userId: uid } }, { $group: { _id: '$listId', n: { $sum: 1 } } }])
-            .toArray();
-        const countByListId = new Map(countRows.map((r) => [r._id.toString(), r.n]));
-
-        return docs.map((doc) =>
-            mapUserLeadListDocToUserLeadList(doc, doc._id ? (countByListId.get(doc._id.toString()) ?? 0) : 0),
-        );
+        return docs.map((doc) => {
+            const stats = doc._id ? statsByListId.get(doc._id.toString()) : undefined;
+            return mapUserLeadListDocToUserLeadList(doc, stats?.leadCount ?? 0, stats?.sources ?? []);
+        });
     });
 
 export const getUserLeadListById = async (listId: string): Promise<ALApiResponse<UserLeadList>> => {
@@ -61,10 +97,8 @@ export const getUserLeadListById = async (listId: string): Promise<ALApiResponse
             throw new Error('List not found');
         }
 
-        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
-        const leadCount = await userLeadsCollection.countDocuments({ userId: uid, listId: lid });
-
-        return mapUserLeadListDocToUserLeadList(listDoc, leadCount);
+        const stats = (await getListStatsByListId(uid, lid)).get(lid.toString());
+        return mapUserLeadListDocToUserLeadList(listDoc, stats?.leadCount ?? 0, stats?.sources ?? []);
     });
 };
 
@@ -140,13 +174,8 @@ export const updateUserLeadListById = async (input: {
             throw new Error('List not found or update failed');
         }
 
-        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
-        const leadCount = await userLeadsCollection.countDocuments({
-            userId: uid,
-            listId: updated._id,
-        });
-
-        return mapUserLeadListDocToUserLeadList(updated, leadCount);
+        const stats = (await getListStatsByListId(uid, updated._id)).get(updated._id.toString());
+        return mapUserLeadListDocToUserLeadList(updated, stats?.leadCount ?? 0, stats?.sources ?? []);
     });
 };
 

@@ -8,9 +8,11 @@ import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import type { UserLeadList } from '@aixellabs/backend/db/types';
 import { Pencil, Users } from 'lucide-react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import type { TUseUserLeadListsPageReturn } from '../_hooks/use-user-lead-lists-page';
+import { FILTERABLE_SOURCES, SOURCE_META } from '../_utils/lead-filter-constants';
 
 type LeadListItemCardProps = {
     list: UserLeadList;
@@ -24,6 +26,9 @@ export function LeadListItemCard({ list, selected, onToggleSelect }: LeadListIte
     const titleLabel = list.name.trim() || 'Untitled list';
 
     const listId = list._id ?? '';
+    const sourceIcons = FILTERABLE_SOURCES.filter((source) => list.sources?.includes(source)).map(
+        (source) => ({ source, ...SOURCE_META[source] }),
+    );
 
     const onClick = useCallback(() => {
         if (!listId) return;
@@ -49,6 +54,28 @@ export function LeadListItemCard({ list, selected, onToggleSelect }: LeadListIte
                     {list.name}
                 </CardTitle>
                 <CardAction className="flex items-center gap-1">
+                    {sourceIcons.length > 0 ? (
+                        <div
+                            className="mr-0.5 flex items-center -space-x-1.5"
+                            aria-label={sourceIcons.map((s) => s.label).join(', ')}
+                        >
+                            {sourceIcons.map((meta) => (
+                                <span
+                                    key={meta.source}
+                                    title={meta.label}
+                                    className="bg-background relative inline-flex size-6 items-center justify-center rounded-full border-2 border-background shadow-sm"
+                                >
+                                    <Image
+                                        src={meta.imageSrc}
+                                        alt={meta.label}
+                                        width={14}
+                                        height={14}
+                                        className="size-3.5 object-contain"
+                                    />
+                                </span>
+                            ))}
+                        </div>
+                    ) : null}
                     <Button
                         type="button"
                         variant="ghost"
