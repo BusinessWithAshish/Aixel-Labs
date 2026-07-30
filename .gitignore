@@ -119,6 +119,7 @@ Thumbs.db
 /backend/node_modules
 /backend/scripts/
 /backend/experiments/
+/backend/_temp/
 /scraper/venv
 /scraper/output/
 

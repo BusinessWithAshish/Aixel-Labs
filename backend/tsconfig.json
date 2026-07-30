@@ -17,7 +17,11 @@
     "sourceMap": true
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "src/**/_temp_files",
-    "experiments/**"
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/_temp_files",
+    "experiments/**",
+    "_temp"
   ]
 }
