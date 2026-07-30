@@ -123,6 +123,36 @@ export const FACEBOOK_VANITY_REGEX = /^[a-zA-Z0-9._-]+$/;
 export const FACEBOOK_URL_REGEX =
   /https?:\/\/(?:www\.|m\.|mbasic\.)?facebook\.com\/[a-zA-Z0-9._%-]+/i;
 
+/**
+ * Hosts that appear as "external" links on Pages but are Meta surfaces —
+ * never treat these as a business website.
+ */
+export const FACEBOOK_META_WEBSITE_HOST_SUFFIXES = [
+  "facebook.com",
+  "fb.com",
+  "fb.me",
+  "meta.com",
+  "messenger.com",
+  "instagram.com",
+  "whatsapp.com",
+  "threads.net",
+  "oculus.com",
+] as const;
+
+/** About-section Relay `field_type` values we map into lead fields. */
+export const FACEBOOK_ABOUT_FIELD_TYPES = {
+  website: ["website"],
+  phone: ["profile_phone", "phone", "mobile_phone"],
+  email: ["profile_email", "email"],
+  category: ["category"],
+  address: [
+    "address",
+    "profile_address",
+    "single_line_address",
+    "location",
+  ],
+} as const;
+
 export const FACEBOOK_ERROR_MESSAGES = {
   INVALID_PARAMS: "Invalid query parameters",
   MISSING_QUERY_OR_ENTITIES:

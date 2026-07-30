@@ -18,7 +18,7 @@ import {
   generateFacebookSearchQuery,
   isSparseFacebookLead,
   mapFacebookPageHtml,
-  preferRicherLead,
+  mergeFacebookLeads,
   uniquePageVanities,
 } from "./compute";
 import type { FACEBOOK_REQUEST, FACEBOOK_RESPONSE } from "./types";
@@ -31,8 +31,56 @@ function resolveLimit(limit: number | undefined): number {
   return limit ?? FACEBOOK_REQUEST_RESULT_LIMIT_DEFAULT;
 }
 
+function leadMatchesVanity(
+  lead: FACEBOOK_RESPONSE,
+  vanity: string,
+): boolean {
+  const key = vanity.toLowerCase();
+  const url = (lead.facebookUrl ?? "").toLowerCase();
+  return (
+    url.includes(`/${key}`) ||
+    url.includes(`/${key}/`) ||
+    lead.id?.toLowerCase() === key
+  );
+}
+
+function mergeLeadIntoVanityMap(
+  vanity: string,
+  lead: FACEBOOK_RESPONSE,
+  into: Map<string, FACEBOOK_RESPONSE>,
+): void {
+  const key = vanity.toLowerCase();
+  const existing = into.get(key);
+  into.set(key, existing ? mergeFacebookLeads(existing, lead) : lead);
+}
+
+function mergeLeadListIntoVanityMap(
+  vanities: string[],
+  leads: FACEBOOK_RESPONSE[],
+  into: Map<string, FACEBOOK_RESPONSE>,
+): void {
+  const vanitySet = new Set(vanities.map((v) => v.toLowerCase()));
+
+  for (const lead of leads) {
+    const parsed =
+      uniquePageVanities([lead.facebookUrl, lead.id])[0]?.toLowerCase() ??
+      null;
+    if (parsed && vanitySet.has(parsed)) {
+      mergeLeadIntoVanityMap(parsed, lead, into);
+      continue;
+    }
+
+    for (const v of vanities) {
+      if (!leadMatchesVanity(lead, v)) continue;
+      mergeLeadIntoVanityMap(v, lead, into);
+      break;
+    }
+  }
+}
+
 /**
- * Enrich Page vanity names: try www `/about`, then mbasic fallback when sparse.
+ * Enrich Page vanity names: try www `/about`, then home + mbasic when sparse,
+ * then one more `/about` retry for intermittent thin shells.
  */
 export async function fetchFromEntities(
   entities: string[] | (string | null)[],
@@ -47,25 +95,14 @@ export async function fetchFromEntities(
     return [];
   }
 
-  const aboutUrls = vanities.map(facebookAboutUrl);
+  const byVanity = new Map<string, FACEBOOK_RESPONSE>();
+
   const primary = await fetchUrls<FACEBOOK_RESPONSE>({
-    targets: aboutUrls,
+    targets: vanities.map(facebookAboutUrl),
     headers: FB_HEADERS,
     mapper: (text, ctx) => mapPageBody(text, ctx.url),
   });
-
-  // Index primary by vanity order (fetchUrls preserves successful order; align by vanity)
-  const byVanity = new Map<string, FACEBOOK_RESPONSE>();
-  for (let i = 0; i < vanities.length; i++) {
-    const vanity = vanities[i];
-    const lead =
-      primary.find(
-        (p) =>
-          p.facebookUrl?.toLowerCase().includes(`/${vanity.toLowerCase()}`) ||
-          p.id?.toLowerCase() === vanity.toLowerCase(),
-      ) ?? primary[i];
-    if (lead) byVanity.set(vanity.toLowerCase(), lead);
-  }
+  mergeLeadListIntoVanityMap(vanities, primary, byVanity);
 
   const needFallback = vanities.filter((v) => {
     const lead = byVanity.get(v.toLowerCase());
@@ -73,76 +110,41 @@ export async function fetchFromEntities(
   });
 
   if (needFallback.length > 0) {
-    // Also try desktop page home + mbasic
-    const fallbackTargets = needFallback.flatMap((v) => [
-      facebookPageUrl(v),
-      facebookMbasicPageUrl(v),
-    ]);
     const fallbackResults = await fetchUrls<FACEBOOK_RESPONSE>({
-      targets: fallbackTargets,
+      targets: needFallback.flatMap((v) => [
+        facebookPageUrl(v),
+        facebookMbasicPageUrl(v),
+      ]),
       headers: FB_HEADERS,
       mapper: (text, ctx) => mapPageBody(text, ctx.url),
     });
+    mergeLeadListIntoVanityMap(needFallback, fallbackResults, byVanity);
+  }
 
-    for (const lead of fallbackResults) {
-      const vanity =
-        uniquePageVanities([lead.facebookUrl, lead.id])[0] ?? null;
-      if (!vanity) continue;
-      const key = vanity.toLowerCase();
-      const existing = byVanity.get(key);
-      byVanity.set(
-        key,
-        existing ? preferRicherLead(existing, lead) : lead,
-      );
-    }
+  // Soft-blocked /about responses are intermittent — one retry often recovers
+  // website / email / phone field_type payloads.
+  const needAboutRetry = vanities.filter((v) => {
+    const lead = byVanity.get(v.toLowerCase());
+    return !lead || isSparseFacebookLead(lead);
+  });
 
-    // Map remaining sparse by positional pairing when vanity missing on parse
-    for (const v of needFallback) {
-      const key = v.toLowerCase();
-      if (byVanity.has(key) && !isSparseFacebookLead(byVanity.get(key)!)) {
-        continue;
-      }
-      const guessed = fallbackResults.find((r) =>
-        (r.facebookUrl ?? "").toLowerCase().includes(`/${key}`),
-      );
-      if (guessed) {
-        const existing = byVanity.get(key);
-        byVanity.set(
-          key,
-          existing ? preferRicherLead(existing, guessed) : guessed,
-        );
-      } else if (!byVanity.has(key)) {
-        // Ensure we still emit a stub with id = vanity for dedupe
-        byVanity.set(key, {
-          id: key,
-          name: null,
-          facebookUrl: facebookPageUrl(v),
-          category: null,
-          website: null,
-          phone: null,
-          emails: null,
-          address: null,
-          followers: null,
-          likes: null,
-          verified: null,
-          profileImageUrl: null,
-          bio: null,
-        });
-      }
-    }
+  if (needAboutRetry.length > 0) {
+    const retryResults = await fetchUrls<FACEBOOK_RESPONSE>({
+      targets: needAboutRetry.map(facebookAboutUrl),
+      headers: FB_HEADERS,
+      mapper: (text, ctx) => mapPageBody(text, ctx.url),
+    });
+    mergeLeadListIntoVanityMap(needAboutRetry, retryResults, byVanity);
   }
 
   const out: FACEBOOK_RESPONSE[] = [];
   for (const v of vanities) {
     const lead = byVanity.get(v.toLowerCase());
     if (!lead) continue;
-    // Ensure stable id + url
     if (!lead.id) lead.id = v.toLowerCase();
     if (!lead.facebookUrl) lead.facebookUrl = facebookPageUrl(v);
-    if (isSparseFacebookLead(lead) && !lead.name) {
-      // Drop completely empty parses (no name) — not useful as leads
-      continue;
-    }
+    // Drop shells with no usable page identity
+    if (!lead.name) continue;
     out.push(lead);
   }
   return out;

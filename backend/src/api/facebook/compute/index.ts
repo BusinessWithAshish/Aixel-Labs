@@ -15,5 +15,6 @@ export {
 export {
   isSparseFacebookLead,
   mapFacebookPageHtml,
+  mergeFacebookLeads,
   preferRicherLead,
 } from "./map-page";

@@ -1,5 +1,9 @@
 import * as cheerio from "cheerio";
 import type { FACEBOOK_RESPONSE } from "../types";
+import {
+  FACEBOOK_ABOUT_FIELD_TYPES,
+  FACEBOOK_META_WEBSITE_HOST_SUFFIXES,
+} from "../constants";
 import { extractPageVanity, facebookPageUrl } from "./page";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -108,14 +112,139 @@ function unwrapFacebookRedirect(href: string | null): string | null {
   }
 }
 
+function hostMatchesSuffix(host: string, suffix: string): boolean {
+  return host === suffix || host.endsWith(`.${suffix}`);
+}
+
 function isExternalWebsite(url: string | null): boolean {
   if (!url) return false;
   try {
-    const host = new URL(url).hostname.toLowerCase();
-    return !host.endsWith("facebook.com") && !host.endsWith("fb.com");
+    const normalized =
+      url.startsWith("http://") || url.startsWith("https://")
+        ? url
+        : `https://${url}`;
+    const host = new URL(normalized).hostname.toLowerCase();
+    return !FACEBOOK_META_WEBSITE_HOST_SUFFIXES.some((s) =>
+      hostMatchesSuffix(host, s),
+    );
   } catch {
     return false;
   }
+}
+
+function normalizeWebsiteUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const withProtocol =
+    trimmed.startsWith("http://") || trimmed.startsWith("https://")
+      ? trimmed
+      : `https://${trimmed}`;
+  if (!isExternalWebsite(withProtocol)) return null;
+  try {
+    return new URL(withProtocol).href;
+  } catch {
+    return null;
+  }
+}
+
+function decodeFbJsonString(escaped: string): string {
+  try {
+    return JSON.parse(`"${escaped}"`) as string;
+  } catch {
+    return escaped
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) =>
+        String.fromCharCode(parseInt(hex, 16)),
+      )
+      .replace(/\\\//g, "/")
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, "\\");
+  }
+}
+
+type AboutFieldMap = {
+  websites: string[];
+  phones: string[];
+  emails: string[];
+  category: string | null;
+  address: string | null;
+};
+
+function pushUnique(list: string[], value: string): void {
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  if (list.some((x) => x.toLowerCase() === trimmed.toLowerCase())) return;
+  list.push(trimmed);
+}
+
+function isPlausibleEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+/**
+ * Facebook About pages embed contact rows as Relay JSON:
+ * `{ "text":"…", "field_type":"website"|"profile_phone"|"profile_email"|… }`.
+ * Emails often use `\u0040` instead of `@`.
+ */
+function extractAboutFields(html: string): AboutFieldMap {
+  const websites: string[] = [];
+  const phones: string[] = [];
+  const emails: string[] = [];
+  let category: string | null = null;
+  let address: string | null = null;
+
+  const pairs: Array<{ type: string; text: string }> = [];
+
+  const textThenType =
+    /"text"\s*:\s*"((?:\\.|[^"\\])*)"[\s\S]{0,240}?"field_type"\s*:\s*"([^"]+)"/g;
+  const typeThenText =
+    /"field_type"\s*:\s*"([^"]+)"[\s\S]{0,240}?"text"\s*:\s*"((?:\\.|[^"\\])*)"/g;
+
+  let m: RegExpExecArray | null;
+  while ((m = textThenType.exec(html)) !== null) {
+    pairs.push({ text: decodeFbJsonString(m[1]), type: m[2] });
+  }
+  while ((m = typeThenText.exec(html)) !== null) {
+    pairs.push({ type: m[1], text: decodeFbJsonString(m[2]) });
+  }
+
+  for (const { type, text } of pairs) {
+    const value = text.trim();
+    if (!value) continue;
+
+    if (
+      (FACEBOOK_ABOUT_FIELD_TYPES.website as readonly string[]).includes(type)
+    ) {
+      const url = normalizeWebsiteUrl(value);
+      if (url) pushUnique(websites, url);
+      continue;
+    }
+    if (
+      (FACEBOOK_ABOUT_FIELD_TYPES.phone as readonly string[]).includes(type)
+    ) {
+      pushUnique(phones, value);
+      continue;
+    }
+    if (
+      (FACEBOOK_ABOUT_FIELD_TYPES.email as readonly string[]).includes(type)
+    ) {
+      // `\u0040` already decoded by decodeFbJsonString; skip UI labels
+      if (isPlausibleEmail(value)) pushUnique(emails, value);
+      continue;
+    }
+    if (
+      (FACEBOOK_ABOUT_FIELD_TYPES.category as readonly string[]).includes(type)
+    ) {
+      if (!category) category = value;
+      continue;
+    }
+    if (
+      (FACEBOOK_ABOUT_FIELD_TYPES.address as readonly string[]).includes(type)
+    ) {
+      if (!address) address = value;
+    }
+  }
+
+  return { websites, phones, emails, category, address };
 }
 
 function extractEmailsFromText(text: string): string[] {
@@ -155,7 +284,6 @@ function formatAddress(addr: unknown): string | null {
 }
 
 function parseCountNearLabel(html: string, label: RegExp): number | null {
-  // e.g. "34M followers", "34,000,000 followers", "Liked by 1.2M"
   const re = new RegExp(
     `([\\d,.]+\\s*[KMB]?)\\s*${label.source}`,
     "i",
@@ -191,32 +319,71 @@ function extractPageId($: cheerio.CheerioAPI, html: string): string | null {
   return null;
 }
 
-function scoreRichness(lead: FACEBOOK_RESPONSE): number {
-  let s = 0;
-  if (lead.id) s += 2;
-  if (lead.name) s += 2;
-  if (lead.facebookUrl) s += 1;
-  if (lead.category) s += 1;
-  if (lead.website) s += 2;
-  if (lead.phone) s += 2;
-  if (lead.emails?.length) s += 2;
-  if (lead.address) s += 1;
-  if (lead.followers != null) s += 1;
-  if (lead.likes != null) s += 1;
-  if (lead.bio) s += 1;
-  if (lead.profileImageUrl) s += 1;
-  return s;
+function pickPreferNumericId(
+  a: string | null,
+  b: string | null,
+): string | null {
+  if (a && /^\d+$/.test(a)) return a;
+  if (b && /^\d+$/.test(b)) return b;
+  return a ?? b;
 }
 
+function pickLongerBio(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a.length >= b.length ? a : b;
+}
+
+/** Merge two parses — fill nulls so /about + home/mbasic don't clobber each other. */
+export function mergeFacebookLeads(
+  a: FACEBOOK_RESPONSE,
+  b: FACEBOOK_RESPONSE,
+): FACEBOOK_RESPONSE {
+  const emails = [
+    ...new Set(
+      [...(a.emails ?? []), ...(b.emails ?? [])]
+        .map((e) => e.trim())
+        .filter(isPlausibleEmail),
+    ),
+  ];
+  return {
+    id: pickPreferNumericId(a.id, b.id),
+    name: a.name ?? b.name,
+    facebookUrl: a.facebookUrl ?? b.facebookUrl,
+    category: a.category ?? b.category,
+    website: a.website ?? b.website,
+    phone: a.phone ?? b.phone,
+    emails: emails.length ? emails : null,
+    address: a.address ?? b.address,
+    followers: a.followers ?? b.followers,
+    likes: a.likes ?? b.likes,
+    verified: a.verified ?? b.verified,
+    profileImageUrl: a.profileImageUrl ?? b.profileImageUrl,
+    bio: pickLongerBio(a.bio, b.bio),
+  };
+}
+
+/**
+ * Thin / login-shell parses: missing page name, or name without any About
+ * contact/category signals (worth retrying home + mbasic + about).
+ */
 export function isSparseFacebookLead(lead: FACEBOOK_RESPONSE): boolean {
-  return !lead.name && !lead.id;
+  if (!lead.name) return true;
+  const hasAboutSignal = Boolean(
+    lead.website ||
+      lead.phone ||
+      (lead.emails && lead.emails.length > 0) ||
+      lead.address ||
+      lead.category,
+  );
+  return !hasAboutSignal;
 }
 
 export function preferRicherLead(
   a: FACEBOOK_RESPONSE,
   b: FACEBOOK_RESPONSE,
 ): FACEBOOK_RESPONSE {
-  return scoreRichness(b) > scoreRichness(a) ? b : a;
+  return mergeFacebookLeads(a, b);
 }
 
 /**
@@ -228,6 +395,7 @@ export function mapFacebookPageHtml(
 ): FACEBOOK_RESPONSE {
   const $ = cheerio.load(html);
   const text = $("body").text().replace(/\s+/g, " ");
+  const about = extractAboutFields(html);
 
   const jsonLdNodes = extractAllJsonLdNodes($);
   const business = findBusinessNode(jsonLdNodes);
@@ -263,34 +431,32 @@ export function mapFacebookPageHtml(
         : null;
   const ldAddress = business ? formatAddress(business.address) : null;
 
-  // Category: often in intro / about text "Page · Food and drink company"
   const categoryFromText =
     text.match(/Page\s*[·•|-]\s*([^·•|\n]{2,80})/i)?.[1]?.trim() ?? null;
 
-  // Phone from tel: links
   const telHref = $('a[href^="tel:"]')
     .first()
     .attr("href")
     ?.replace(/^tel:/i, "")
     .trim();
 
-  // Website candidates
-  const websiteCandidates: string[] = [];
-  if (ldSameAs && isExternalWebsite(ldSameAs)) {
-    websiteCandidates.push(ldSameAs);
+  const websiteCandidates: string[] = [...about.websites];
+  if (ldSameAs) {
+    const url = normalizeWebsiteUrl(ldSameAs);
+    if (url) websiteCandidates.push(url);
   }
-  if (ldUrl && isExternalWebsite(ldUrl)) {
-    websiteCandidates.push(ldUrl);
+  if (ldUrl) {
+    const url = normalizeWebsiteUrl(ldUrl);
+    if (url) websiteCandidates.push(url);
   }
   $("a[href]").each((_, el) => {
     const href = unwrapFacebookRedirect($(el).attr("href") ?? null);
-    if (href && isExternalWebsite(href)) {
-      websiteCandidates.push(href);
-    }
+    const url = href ? normalizeWebsiteUrl(href) : null;
+    if (url) websiteCandidates.push(url);
   });
 
-  const emails = new Set<string>();
-  if (ldEmail) emails.add(ldEmail);
+  const emails = new Set<string>(about.emails.filter(isPlausibleEmail));
+  if (ldEmail && isPlausibleEmail(ldEmail)) emails.add(ldEmail);
   for (const e of extractEmailsFromText(html)) emails.add(e);
   $('a[href^="mailto:"]').each((_, el) => {
     const mail = $(el)
@@ -298,7 +464,7 @@ export function mapFacebookPageHtml(
       ?.replace(/^mailto:/i, "")
       .split("?")[0]
       ?.trim();
-    if (mail) emails.add(mail);
+    if (mail && isPlausibleEmail(mail)) emails.add(mail);
   });
 
   const followers =
@@ -336,11 +502,10 @@ export function mapFacebookPageHtml(
         ? pageUrlHint
         : null;
 
-  const website = websiteCandidates.find(isExternalWebsite) ?? null;
-  const phone = ldPhone ?? telHref ?? null;
+  const website = websiteCandidates.find((u) => isExternalWebsite(u)) ?? null;
+  const phone = about.phones[0] ?? ldPhone ?? telHref ?? null;
   const emailList = [...emails];
 
-  // Strip login-wall boilerplate from bio when possible
   let bio = ldDesc ?? ogDesc ?? null;
   if (
     bio &&
@@ -350,15 +515,19 @@ export function mapFacebookPageHtml(
     bio = ldDesc ?? null;
   }
 
+  // Generic Facebook shell titles are not page names
+  const resolvedName =
+    name && !/^facebook$/i.test(name.trim()) ? name : null;
+
   return {
     id,
-    name: name || null,
+    name: resolvedName,
     facebookUrl,
-    category: categoryFromText,
+    category: about.category ?? categoryFromText,
     website,
     phone,
     emails: emailList.length ? emailList : null,
-    address: ldAddress,
+    address: about.address ?? ldAddress,
     followers,
     likes,
     verified: verified === true ? true : verified === false ? false : null,
