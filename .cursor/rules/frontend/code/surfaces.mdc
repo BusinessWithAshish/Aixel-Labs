@@ -1,0 +1,28 @@
+---
+description: FE surfaces — API BFF routes, SubModuleUrls, tenant middleware
+globs: frontend/app/api/**/*,frontend/config/**/*,frontend/middleware.ts
+alwaysApply: false
+---
+
+# Frontend surfaces
+
+Shared governor for Next API routes and app routing config. Skills: `.cursor/skills/frontend/code/frontend-code-api-routes/SKILL.md`, `.cursor/skills/frontend/code/frontend-code-config/SKILL.md`.
+
+## Hard rules
+
+### API routes
+
+- Prefer server actions for UI CRUD/debit; routes for abortable fetch, proxies, middleware, or streaming.
+- Authenticated JSON: `getAppSession` → 401 if missing; honor `AbortSignal` on long BE calls.
+- `lead-gen/scrape` must not debit — debit only in `createUserLeads` (`mutations.mdc` / lead-gen business).
+- Public routes (`tenant`, image proxies, health) must not import firebase-admin / break middleware.
+- Image proxies: allowlist CDN URLs only (no open proxy / SSRF).
+- Browser calls go through `appApiClient` + `app-config` path constants.
+
+### Config / middleware
+
+- `SubModuleUrls` is the URL SSOT — sidebar/ACL must not invent parallel path maps.
+- New product submodule → URL in `app-config` + icon in `sidebar.config` (+ feature skill for the page).
+- Middleware skips `/api`; tenant lookup must stay on public `getTenantByNamePublic` (no firebase-admin).
+- Use `app-config` constants for prefixes — no hardcoded path strings in middleware.
+- `ALWAYS_ALLOWED_PATHS` / `ADMIN_ONLY_PATHS` only for intentional ACL exceptions.

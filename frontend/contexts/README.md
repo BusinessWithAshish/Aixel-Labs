@@ -1,5 +1,8 @@
 # PageStore Pattern
 
+> **Agent entrypoint:** when wiring a new page, follow `.cursor/skills/frontend/code/frontend-code-page-shell/SKILL.md`
+> (governor: `.cursor/rules/frontend/code/page-shell.mdc`). This README is the deeper reference.
+
 A Higher-Order Component (HoC) pattern for managing page-level state and business logic using React Context API.
 
 ## Overview

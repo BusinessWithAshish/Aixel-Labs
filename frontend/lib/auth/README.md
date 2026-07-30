@@ -1,6 +1,8 @@
 # Auth: Firebase ↔ Mongo
 
-SSOT for humans and AI agents. Policies are enforced in `frontend/server/auth/policy.ts` and admin/tenant scope in `frontend/server/auth/admin-guards.ts`.
+SSOT for humans and AI agents. **Build/change via** `.cursor/skills/frontend/auth/frontend-auth-session/SKILL.md`
+(governor: `.cursor/rules/frontend/auth.mdc`). Policies are enforced in
+`frontend/server/auth/policy.ts` and admin/tenant scope in `frontend/server/auth/admin-guards.ts`.
 
 ## Mental model
 

@@ -1,0 +1,20 @@
+---
+description: Server mutations — ALApiResponse actions, debit, cascade
+globs: frontend/app/actions/user-actions.ts,frontend/app/actions/tenant-actions.ts,frontend/app/actions/user-lead-actions.ts,frontend/app/actions/user-lead-lists-actions.ts,frontend/app/actions/lead-dashboard-actions.ts,frontend/app/actions/credit-db.ts,frontend/app/actions/coupon-actions.ts,frontend/app/actions/theme-actions.ts,frontend/server/leads/**/*,frontend/server/coupons/**/*
+alwaysApply: false
+---
+
+# Frontend mutations
+
+Shared governor for DB-backed server actions and lead/coupon server helpers. Executor: `.cursor/skills/frontend/mutations/frontend-mutations-server-actions/SKILL.md`. `auth-actions.ts` is owned by `auth.mdc`.
+
+## Hard rules
+
+- DB actions return `ALApiResponse<T>` via `runAuthenticatedAction` / `runPublicAction`.
+- **Schema SSOT** is `backend/src/db` (`@aixellabs/backend/db`) — do not redefine `*Doc`, `LeadData`, `MongoCollections`, or module enums on the FE. See `.cursor/skills/backend/backend-db/SKILL.md`.
+- `credit-db.ts` stays `server-only` — never `'use server'`, never import from client.
+- Debit only through `assertAndDebitCredits` (or coupon redeem’s atomic path).
+- Admin mutations: session-tenant scope via `@/server/auth` guards.
+- Public actions must not import firebase-admin / `@/server/auth` at top level.
+- Cascade deletes use `deleteUserOwnedLeadData` — never delete shared `leads` docs.
+- Scrape HTTP stays on `POST /api/lead-gen/scrape`; actions only debit + persist.

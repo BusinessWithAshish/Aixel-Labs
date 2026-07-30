@@ -1,0 +1,20 @@
+---
+description: Shared FE UI — components, FeatureFlagGate placement, composition
+globs: frontend/components/**/*,frontend/components/common/FeatureFlagGate.tsx
+alwaysApply: false
+---
+
+# Frontend UI
+
+Shared governor for presentational UI. Executor skill: `.cursor/skills/frontend/code/frontend-code-components/SKILL.md`. Feature-flag **registry** (`flags.ts`) is skill-owned (`.cursor/skills/frontend/code/frontend-code-feature-flags/SKILL.md`); this rule only covers gate placement in shared components.
+
+## Hard rules
+
+- Route-only UI stays in `app/(…)/_components/` — promote to `components/common/` only when reused.
+- Prefer named exports; PascalCase product files; kebab-case `ui/` + `layout/`; HOCs as `with-*.tsx`.
+- Compose `ui/` primitives; merge classes with `cn()`; optional `className` / `classNames` slots.
+- Add `'use client'` only when hooks/events/browser APIs are required.
+- No debit / auth mutation logic in presentational components.
+- New Dialog/Input compositions that wrap `ui/` → `wrappers/`; access gates → `hocs/`.
+- Gate unfinished UI with `FeatureFlagGate` (server), not ad-hoc client stubs.
+- Credits / scrape / debit product rules live in `.cursor/rules/frontend/business/lead-generation.mdc` — do not restate them here.

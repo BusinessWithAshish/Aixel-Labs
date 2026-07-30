@@ -1,0 +1,41 @@
+---
+description: FE modules — hooks, helpers, non-auth lib client boundaries
+globs: frontend/hooks/**/*,frontend/helpers/export-table.ts,frontend/helpers/gmaps-image.ts,frontend/helpers/server-action-helpers.ts,frontend/helpers/instagram-avatar-loader.ts,frontend/helpers/generate-local-storage-key.ts,frontend/helpers/instagram-cdn-fetch.ts,frontend/helpers/fonts.ts,frontend/helpers/module-access-helpers.ts,frontend/helpers/theme-color-utils.ts,frontend/helpers/gmaps-cdn-fetch.ts,frontend/helpers/sidebar-config-helpers.ts,frontend/helpers/object-id.ts,frontend/helpers/user-name.ts,frontend/helpers/instagram-image.ts,frontend/helpers/string-helpers.ts,frontend/helpers/get-tenant-masked-url.ts,frontend/helpers/validate-tenant.ts,frontend/helpers/get-current-tenant-by-url.ts,frontend/helpers/normalize-helpers.ts,frontend/lib/api-client.ts,frontend/lib/app-api-client.ts,frontend/lib/utils.ts,frontend/lib/clipboard.ts,frontend/lib/event-bus.ts,frontend/lib/gemini-client.ts
+alwaysApply: false
+---
+
+# Frontend modules
+
+Shared governor for hooks, pure helpers, and non-auth `lib/` clients. Related skills: `.cursor/skills/frontend/code/frontend-code-hooks/SKILL.md`. `credits.ts` / `lead-gen-api.ts` are owned by `.cursor/rules/frontend/business/lead-generation.mdc` only. `lib/auth` + `lib/firebase` are owned by `.cursor/rules/frontend/auth.mdc` only.
+
+## Hard rules
+
+### Hooks
+
+- Route-only logic stays in `app/(…)/_hooks/` — promote to `hooks/` only when reused.
+- Files: `use-*.ts` or folder `use-<name>/`; export named hooks + `Use*Return` when needed.
+- `'use client'` required for state/effects/browser APIs.
+- Browser → Next `/api/*` via `appApiClient`; never import server-only `api-client` from hooks.
+- No Mongo / session policy / credit debit inside hooks — call server actions instead.
+- `use-lead-gen-scraper` pipeline ownership: lead-gen skill + `.cursor/rules/frontend/business/lead-generation.mdc` (no parallel debit path).
+
+### Helpers
+
+- Pure, serializable, framework-light utilities only — **no React hooks**.
+- No Mongo debit/write orchestration here — debit stays in `credit-db.ts` / actions.
+- Prefer kebab-case filenames; named exports.
+- localStorage keys via `generateLocalStorageKey`.
+- Feature-owned helpers defer to product governors/skills (do not duplicate their hard rules here).
+- `Modules` / submodule enums / `ModuleAccess` shapes: import from `@aixellabs/backend/db/types` only — schema SSOT is `backend/src/db` (`.cursor/skills/backend/backend-db/SKILL.md`). `getDefaultModuleAccess()` is the full-grant helper, not a second type definition.
+
+### Lib (non-auth)
+
+| Module | Runtime | Use for |
+|--------|---------|---------|
+| `app-api-client.ts` | Browser / isomorphic | Same-origin Next `/api/*` |
+| `api-client.ts` | **Server only** (`server-only`) | Backend `BE_API` product calls |
+| `utils.ts` | Shared | `cn()` only |
+
+- Never import `api-client` (or `firebase/admin`) from client components or `hooks/`.
+- Keep `cn()` as the className merge SSOT.
+- New HTTP helpers: extend existing clients; do not add a third Axios wrapper without a clear runtime boundary.

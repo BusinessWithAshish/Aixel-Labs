@@ -1,0 +1,16 @@
+---
+description: PageProvider and app contexts — no parallel page-state systems
+globs: frontend/contexts/**/*
+alwaysApply: false
+---
+
+# Frontend page shell
+
+Shared governor for page-level client state. Executor: `.cursor/skills/frontend/code/frontend-code-page-shell/SKILL.md`. Docs: `frontend/contexts/README.md`.
+
+## Hard rules
+
+- Page business state → `PageProvider` + route `_hooks` + `usePage<T>` — do not invent another page context.
+- Export hook return types; mark page hooks `'use client'`.
+- `TenantBranding` / `NavigationLoader` are app-shell only — do not overload them with feature state.
+- New React context files here only for true app-wide concerns (not single-route state).
