@@ -35,10 +35,12 @@ export function computeDecayAdjustedVelocity(
 ): number | null {
   if (velocityScore === null || publishedDaysAgo === null) return null;
 
-  const decayFactor =
-    1 /
-    (1 +
-      Math.log(safeDivide(publishedDaysAgo, YOUTUBE_DECAY_VELOCITY_BASE_DAYS)));
+  // days < BASE → factor 1; older videos get log-decayed.
+  const ageRatio = Math.max(
+    1,
+    safeDivide(publishedDaysAgo, YOUTUBE_DECAY_VELOCITY_BASE_DAYS),
+  );
+  const decayFactor = 1 / (1 + Math.log(ageRatio));
 
   return velocityScore * decayFactor;
 }
