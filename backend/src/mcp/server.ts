@@ -26,8 +26,10 @@ import { resolveHandleService } from "../api/youtube/intelligence/handle/service
 import { bulkEnrichVideosService } from "../api/youtube/intelligence/video-meta/service";
 import { suggestIntelligenceService } from "../api/youtube/intelligence/suggest/service";
 import { transcriptIntelligenceService } from "../api/youtube/intelligence/transcript/service";
-import { GOOGLE_TRENDS_INTEREST_REQUEST_SCHEMA } from "../api/google-trends/interest/schemas";
-import { GOOGLE_TRENDS_COMPARE_REQUEST_SCHEMA } from "../api/google-trends/interest/schemas";
+import {
+  GOOGLE_TRENDS_COMPARE_REQUEST_OBJECT_SCHEMA,
+  GOOGLE_TRENDS_INTEREST_REQUEST_SCHEMA,
+} from "../api/google-trends/interest/schemas";
 import { googleTrendsInterestIntelligenceService } from "../api/google-trends/intelligence/single/service";
 import { googleTrendsCompareIntelligenceService } from "../api/google-trends/intelligence/compare/service";
 import { fail, ok } from "./tool-result";
@@ -240,7 +242,7 @@ export function createYoutubeIntelligenceMcpServer(): McpServer {
     {
       description:
         "Compare 2–5 keywords on Google Trends against each other in a single call. Google Trends normalises interest values onto a shared 0–100 scale so direct comparison is meaningful. Computes per-query trend direction + lifecycle stage (same classifier as get_trend_intelligence), a relative dominance ranking (which query has the highest average interest, ranked 1–N), a momentum comparison (which query has the strongest positive recent slope regardless of absolute interest — a smaller topic with strong momentum is often a better bet than a larger topic that is flat or declining), and crossover points (when two queries trending in opposite directions had their interest lines cross during the timeframe — a significant signal in competitive niche analysis).\n\nUse this when you have identified multiple potential content angles or competing sub-niches and need to determine which one has better momentum right now, OR when a user asks you to compare two niches or topic ideas directly. The MOMENTUM comparison field is more important than the dominance ranking — a smaller but faster-growing topic is usually the better strategic choice. All queries share the same geo, timeframe, category, and property.",
-      inputSchema: GOOGLE_TRENDS_COMPARE_REQUEST_SCHEMA,
+      inputSchema: GOOGLE_TRENDS_COMPARE_REQUEST_OBJECT_SCHEMA,
     },
     async (args) => {
       try {

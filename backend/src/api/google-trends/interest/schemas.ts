@@ -124,31 +124,36 @@ export const GOOGLE_TRENDS_INTEREST_REQUEST_SCHEMA = z.object({
  * Multi-query comparison request. 2–5 keywords compared on the same
  * normalised 0–100 scale. Geo, timeframe, category, and property are shared
  * across all keywords.
+ *
+ * Use `GOOGLE_TRENDS_COMPARE_REQUEST_OBJECT_SCHEMA` for MCP / JSON Schema
+ * discovery — `.superRefine()` wraps the object in ZodEffects, which the MCP
+ * SDK cannot convert (it falls back to empty `properties: {}`).
  */
-export const GOOGLE_TRENDS_COMPARE_REQUEST_SCHEMA = z
-  .object({
-    keywords: z
-      .array(GOOGLE_TRENDS_KEYWORD_SCHEMA)
-      .min(2)
-      .max(GOOGLE_TRENDS_MAX_COMPARE_QUERIES)
-      .describe(
-        `Array of 2–5 keywords to compare. Google Trends normalises them onto a shared 0–100 scale so direct comparison is meaningful.`,
-      ),
-    geo: GOOGLE_TRENDS_INTEREST_GEO_SCHEMA,
-    hl: GOOGLE_TRENDS_INTEREST_HL_SCHEMA,
-    timeframe: GOOGLE_TRENDS_TIMEFRAME_SCHEMA,
-    category: GOOGLE_TRENDS_INTEREST_CATEGORY_SCHEMA,
-    property: GOOGLE_TRENDS_PROPERTY_SCHEMA,
-    limit: GOOGLE_TRENDS_INTEREST_LIMIT_SCHEMA,
-    tz: z
-      .number()
-      .int()
-      .min(-720)
-      .max(840)
-      .default(GOOGLE_TRENDS_DEFAULT_TZ)
-      .describe("Timezone offset in minutes. Defaults to -300."),
-  })
-  .superRefine((data, ctx) => {
+export const GOOGLE_TRENDS_COMPARE_REQUEST_OBJECT_SCHEMA = z.object({
+  keywords: z
+    .array(GOOGLE_TRENDS_KEYWORD_SCHEMA)
+    .min(2)
+    .max(GOOGLE_TRENDS_MAX_COMPARE_QUERIES)
+    .describe(
+      `Array of 2–5 keywords to compare. Google Trends normalises them onto a shared 0–100 scale so direct comparison is meaningful.`,
+    ),
+  geo: GOOGLE_TRENDS_INTEREST_GEO_SCHEMA,
+  hl: GOOGLE_TRENDS_INTEREST_HL_SCHEMA,
+  timeframe: GOOGLE_TRENDS_TIMEFRAME_SCHEMA,
+  category: GOOGLE_TRENDS_INTEREST_CATEGORY_SCHEMA,
+  property: GOOGLE_TRENDS_PROPERTY_SCHEMA,
+  limit: GOOGLE_TRENDS_INTEREST_LIMIT_SCHEMA,
+  tz: z
+    .number()
+    .int()
+    .min(-720)
+    .max(840)
+    .default(GOOGLE_TRENDS_DEFAULT_TZ)
+    .describe("Timezone offset in minutes. Defaults to -300."),
+});
+
+export const GOOGLE_TRENDS_COMPARE_REQUEST_SCHEMA =
+  GOOGLE_TRENDS_COMPARE_REQUEST_OBJECT_SCHEMA.superRefine((data, ctx) => {
     const seen = new Set<string>();
     for (const kw of data.keywords) {
       const key = kw.toLowerCase();

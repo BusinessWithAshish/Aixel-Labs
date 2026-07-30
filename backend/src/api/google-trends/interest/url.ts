@@ -16,11 +16,12 @@ export function buildExploreRequestPayload(
   category: number,
   property: GOOGLE_TRENDS_PROPERTY_VALUE,
 ): {
-  comparisonItems: GOOGLE_TRENDS_COMPARISON_ITEM[];
+  /** Google expects singular `comparisonItem`, not `comparisonItems`. */
+  comparisonItem: GOOGLE_TRENDS_COMPARISON_ITEM[];
   category: number;
   property: GOOGLE_TRENDS_PROPERTY_VALUE;
 } {
-  return { comparisonItems, category, property };
+  return { comparisonItem: comparisonItems, category, property };
 }
 
 /** Builds the `/trends/api/explore` URL with the encoded `req` payload. */
@@ -55,46 +56,34 @@ function buildWidgetdataUrl(
   return url.toString();
 }
 
-/** `/trends/api/widgetdata/multiline/timeseries/json` URL. */
+/** `/trends/api/widgetdata/multiline` URL. */
 export function buildTimeseriesUrl(
   token: string,
   reqJson: string,
   hl: string,
   tz: number,
 ): string {
-  return buildWidgetdataUrl(
-    "/multiline/timeseries/json",
-    token,
-    reqJson,
-    hl,
-    tz,
-  );
+  return buildWidgetdataUrl("/multiline", token, reqJson, hl, tz);
 }
 
-/** `/trends/api/widgetdata/relatedsearches/json` URL (related queries). */
+/** `/trends/api/widgetdata/relatedsearches` URL (related queries). */
 export function buildRelatedSearchesUrl(
   token: string,
   reqJson: string,
   hl: string,
   tz: number,
 ): string {
-  return buildWidgetdataUrl("/relatedsearches/json", token, reqJson, hl, tz);
+  return buildWidgetdataUrl("/relatedsearches", token, reqJson, hl, tz);
 }
 
-/** `/trends/api/widgetdata/relatedsearches/geo/json` URL (geo distribution). */
+/** `/trends/api/widgetdata/comparedgeo` URL (geo distribution). */
 export function buildGeoMapUrl(
   token: string,
   reqJson: string,
   hl: string,
   tz: number,
 ): string {
-  return buildWidgetdataUrl(
-    "/relatedsearches/geo/json",
-    token,
-    reqJson,
-    hl,
-    tz,
-  );
+  return buildWidgetdataUrl("/comparedgeo", token, reqJson, hl, tz);
 }
 
 /** Builds comparison items for a single-query interest request. */

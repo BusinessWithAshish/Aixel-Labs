@@ -205,10 +205,11 @@ export const GOOGLE_TRENDS_EXPLORE_PATH = "/trends/api/explore";
 export const GOOGLE_TRENDS_EXPLORE_RESPONSE_PREFIX = ")]}'";
 
 /**
- * Widgetdata base path. Each widget type appends its own suffix:
- *   TIMESERIES       → /trends/api/widgetdata/multiline/timeseries/json
- *   RELATED_QUERIES  → /trends/api/widgetdata/relatedsearches/json
- *   GEO_MAP          → /trends/api/widgetdata/relatedsearches/geo/json
+ * Widgetdata base path. Each widget type appends its own suffix
+ * (matches the live Trends frontend / pytrends):
+ *   TIMESERIES       → /trends/api/widgetdata/multiline
+ *   RELATED_QUERIES  → /trends/api/widgetdata/relatedsearches
+ *   GEO_MAP          → /trends/api/widgetdata/comparedgeo
  */
 export const GOOGLE_TRENDS_WIDGETDATA_BASE_PATH =
   "/trends/api/widgetdata";
@@ -221,8 +222,8 @@ export const GOOGLE_TRENDS_WIDGET_ID = {
 } as const;
 
 /**
- * `gprop` (Google property) values for the explore `req.comparisonItems[].gprop`
- * field. Empty string = Google web search; `"youtube"` = YouTube search.
+ * Google property values for the explore `req.property` field (UI label: gprop).
+ * Empty string = Google web search; `"youtube"` = YouTube search.
  */
 export const GOOGLE_TRENDS_PROPERTY = {
   WEB: "",
@@ -242,7 +243,7 @@ export const GOOGLE_TRENDS_PROPERTY_VALUES = [
 
 /**
  * Timeframe presets mapped to the Google Trends `time` string format used in
- * the explore `req.comparisonItems[].time` field.
+ * the explore `req.comparisonItem[].time` field.
  *
  * - `now 7-d`  → last 7 days (hourly granularity)
  * - `today 1-m` → last 30 days (daily)
