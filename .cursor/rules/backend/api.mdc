@@ -1,0 +1,22 @@
+---
+description: Backend Express API modules — scrape handlers, Zod, ALApiResponse, no Mongo in api/
+globs: backend/src/api/**/*
+alwaysApply: false
+---
+
+# Backend API modules
+
+Governor for `backend/src/api`. Executor: `.cursor/skills/backend/backend-api-module/SKILL.md`.
+
+Mounts / boot → `.cursor/rules/backend/platform.mdc`. Utils → `.cursor/rules/backend/utils.mdc`. MCP → `.cursor/rules/backend/mcp.mdc`.
+
+## Hard rules
+
+- Handlers return `ALApiResponse<T>` (`backend/src/api/types.ts`).
+- Validate with Zod `safeParse(req.body)` in the handler (or shared create-handler factory).
+- Request Zod lives in `schemas.ts` as `*_REQUEST_SCHEMA`; response shapes are TS types in `types.ts` (no response Zod by default).
+- **No Mongo** in `backend/src/api/**` — no `getCollection` / `mongo-client` in scrapers.
+- Lead product items expose stable `id`; extend `LeadData` / `LeadSource` / submodule enums in **`backend/src/db/types.ts`** (schema SSOT — `.cursor/skills/backend/backend-db/SKILL.md`) when shipping a lead API.
+- New mounts: follow **platform** skill (`config.ts` + `routes.ts`) — don’t hardcode bases only in the module.
+- Prefer shared **utils** (TLS + Evomi, `location-schema`) over inventing a new browser stack; follow the module README if it already uses something else.
+- Optional MCP: same services as HTTP — see **mcp** skill (no loopback).

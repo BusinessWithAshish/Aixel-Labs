@@ -1,0 +1,21 @@
+---
+description: Backend platform — config ENDPOINTS, routes mounts, server middleware/boot
+globs: backend/src/config.ts,backend/src/routes.ts,backend/src/server.ts
+alwaysApply: false
+---
+
+# Backend platform
+
+Governor for process wiring. Executor: `.cursor/skills/backend/backend-platform/SKILL.md`.
+
+Any backend change that adds/renames a mount, ping, CORS, rate limit, or boot
+behavior must follow this file.
+
+## Hard rules
+
+- Product mounts: `ENDPOINTS` + `API_ENDPOINTS` in `config.ts`, then `app.use` in `routes.ts` — never mount-only in a module without config.
+- `API_ENDPOINTS.*.route` = Express subpath; `*.full` = FE/`apiClient` path — keep them consistent.
+- `server.ts` loads `dotenv/config` first; do not reorder above env-dependent imports.
+- On Vercel: export the app only — do not `listen` when `VERCEL` is set.
+- CORS / MCP headers stay in `server.ts`; origin allowlists stay in `config.ts`.
+- Do not invent parallel backend path constants on the frontend — import `@aixellabs/backend/config`.

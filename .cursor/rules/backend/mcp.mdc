@@ -1,0 +1,18 @@
+---
+description: Backend MCP — Streamable HTTP /mcp, tools call services, no loopback
+globs: backend/src/mcp/**/*
+alwaysApply: false
+---
+
+# Backend MCP
+
+Governor for `backend/src/mcp`. Executor: `.cursor/skills/backend/backend-mcp/SKILL.md`.
+
+## Hard rules
+
+- Tools call the same TypeScript **services** as HTTP intelligence handlers — **no HTTP loopback**.
+- Reuse API Zod `*_REQUEST_SCHEMA` as `inputSchema` — do not fork parallel MCP schemas.
+- Prefer object schemas without `.superRefine` for MCP JSON Schema compatibility.
+- Wrap handlers with `ok` / `fail` from `tool-result.ts`.
+- Keep `MCP_TOOL_COUNT` equal to registered tools.
+- New base paths go through `ENDPOINTS` + `routes.ts` (platform skill) — don’t hardcode mounts only in the router.

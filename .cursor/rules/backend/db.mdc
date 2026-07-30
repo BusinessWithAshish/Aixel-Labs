@@ -1,0 +1,20 @@
+---
+description: Backend DB schema SSOT — collections, Doc types, LeadData, module enums
+globs: backend/src/db/**/*
+alwaysApply: false
+---
+
+# Backend DB (`backend/src/db`)
+
+**Schema SSOT** for the monorepo. Executor: `.cursor/skills/backend/backend-db/SKILL.md`.
+
+Frontend mutations, auth, lead-gen, and tenants **consume** these types — they must not redefine Doc / `LeadData` / module enums. Scraper APIs under `src/api` must not call Mongo.
+
+## Hard rules
+
+- All collection names go through `MongoCollections` in `types.ts`.
+- Document shapes (`TenantDoc`, `UserDoc`, `LeadDoc`, …), `LeadData`, `LeadSource`, `Modules` / submodule enums, and `ModuleAccess` are defined **only** here.
+- New persisted fields/collections/modules: edit `types.ts` first, then FE writers/indexes/UI (and API response types for leads).
+- Prefer `@aixellabs/backend/db/types` in client code; `@aixellabs/backend/db` on the server for `getCollection` / ObjectId Docs.
+- Do not add ensure-index helpers in this folder — indexes live beside FE writers (`server/auth`, `server/leads`, `server/coupons`).
+- Shared `leads` are deduped by `(source, sourceId)` and are never cascade-deleted with user/tenant cleanup.

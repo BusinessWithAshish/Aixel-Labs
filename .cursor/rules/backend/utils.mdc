@@ -1,0 +1,17 @@
+---
+description: Backend utils — TLS/proxy/location shared by api scrapers; not for FE
+globs: backend/src/utils/**/*
+alwaysApply: false
+---
+
+# Backend utils
+
+Governor for `backend/src/utils`. Executor: `.cursor/skills/backend/backend-utils/SKILL.md`.
+
+## Hard rules
+
+- Utils are **backend-only** — do not add `@aixellabs/backend/utils` exports for the frontend.
+- Default scrape I/O is TLS + Evomi (`node-tls-client-session-handler` + `PROXY_CONFIG`) — don’t invent a new browser stack without an existing module precedent.
+- Shared location Zod lives in `location-schema.ts` — reuse it; don’t fork country/state/city schemas per module.
+- Only promote helpers here when reused across modules; keep product-specific logic in `api/<module>/`.
+- Do not revive `browser-worker` / `guerrilla-mail` without a live importer and docs.
