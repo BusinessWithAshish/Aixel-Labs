@@ -17,7 +17,7 @@ export const ThemeProvider = ({
         <NextThemesProvider
             attribute="class"
             themes={['light', 'dark']}
-            disableTransitionOnChange={true}
+            disableTransitionOnChange={false}
             defaultTheme={defaultTheme}
             storageKey={storageKey}
             enableSystem

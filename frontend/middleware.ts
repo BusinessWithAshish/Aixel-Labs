@@ -7,9 +7,10 @@ import {
     NOT_FOUND_ROUTE,
     PATHNAME_HEADER_KEY,
     PRODUCT_TENANTS_ROUTE_PREFIX,
+    SUBDOMAIN_PARAM_NAME,
     TENANT_API_ROUTE_PREFIX,
+    TENANT_HOME_PAGE_ROUTE,
 } from '@/config/app-config';
-import { SUBDOMAIN_PARAM_NAME } from '@/config/app-config';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 
 export const extractSubdomain = (request: NextRequest | Headers) => {
@@ -107,7 +108,14 @@ export async function middleware(req: NextRequest) {
         }
 
         default: {
-            // Normal tenant: pass through to (protected)/(public) routes
+            // Normal tenant: `/` → protected dashboard; other paths pass through
+            if (pathname === DEFAULT_HOME_PAGE_ROUTE) {
+                return rewriteWithPathname(
+                    req,
+                    new URL(TENANT_HOME_PAGE_ROUTE, req.url),
+                    pathname,
+                );
+            }
             return nextWithPathname(req, pathname);
         }
     }

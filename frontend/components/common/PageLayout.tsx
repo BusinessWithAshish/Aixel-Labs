@@ -5,7 +5,7 @@ import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { ChevronLeft } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
+import { DEFAULT_HOME_PAGE_ROUTE, TENANT_HOME_PAGE_ROUTE } from '@/config/app-config';
 import { CreditsBadge } from '@/components/common/credits/CreditsBadge';
 
 type PageLayoutProps = {
@@ -24,7 +24,7 @@ export default function PageLayout({ children, className, title, headerEnd }: Pa
     }, [router]);
 
     const isBackButtonVisible = useMemo(() => {
-        return pathname !== DEFAULT_HOME_PAGE_ROUTE;
+        return pathname !== TENANT_HOME_PAGE_ROUTE;
     }, [pathname]);
 
     const end = headerEnd === undefined ? <CreditsBadge /> : headerEnd;

@@ -19,7 +19,7 @@ import { ReactNode, useCallback, useEffect } from 'react';
 import { Modules, SubModule } from '@aixellabs/backend/db/types';
 import { modulesIconMap, subModuleIconMap } from '@/config/sidebar.config';
 import { enumToTitleCase } from '@/helpers/string-helpers';
-import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
+import { DEFAULT_HOME_PAGE_ROUTE, TENANT_HOME_PAGE_ROUTE } from '@/config/app-config';
 import { eventBus } from '@/lib/event-bus';
 
 export function NavMain({ items }: { items: SidebarNavItem[] }) {
@@ -49,7 +49,12 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
 
     return (
         <SidebarGroup>
-            <SidebarMenuButton tooltip="Home" className='cursor-pointer' asChild active={pathname === DEFAULT_HOME_PAGE_ROUTE}>
+            <SidebarMenuButton
+                tooltip="Home"
+                className="cursor-pointer"
+                asChild
+                active={pathname === TENANT_HOME_PAGE_ROUTE}
+            >
                 <Link prefetch={true} href={DEFAULT_HOME_PAGE_ROUTE}>
                     <LinkItem>
                         <HomeIcon className="size-4 shrink-0" />

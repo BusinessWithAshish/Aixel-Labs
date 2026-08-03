@@ -47,6 +47,7 @@ export const TENANT_TYPE_OPTIONS = [
 ];
 
 export const DEFAULT_HOME_PAGE_ROUTE = '/';
+export const TENANT_HOME_PAGE_ROUTE = '/home';
 export const PATHNAME_HEADER_KEY = 'x-pathname';
 export const API_ROUTE_PREFIX = '/api';
 export const LEAD_GEN_SCRAPE_API_ROUTE = `${API_ROUTE_PREFIX}/lead-gen/scrape`;
@@ -58,6 +59,10 @@ export const NOT_FOUND_ROUTE = '/not-found';
 export const ACCOUNT_SETTINGS_ROUTE = '/account-settings';
 export const MANAGE_TENANTS_ROUTE = '/manage-tenants';
 
-export const ALWAYS_ALLOWED_PATHS = [DEFAULT_HOME_PAGE_ROUTE, ACCOUNT_SETTINGS_ROUTE] as const;
+export const ALWAYS_ALLOWED_PATHS = [
+    DEFAULT_HOME_PAGE_ROUTE,
+    TENANT_HOME_PAGE_ROUTE,
+    ACCOUNT_SETTINGS_ROUTE,
+] as const;
 
 export const MANAGE_TENANTS_PREFIX = `${MANAGE_TENANTS_ROUTE}/`;
