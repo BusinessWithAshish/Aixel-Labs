@@ -17,7 +17,8 @@ export const ThemeProvider = ({
         <NextThemesProvider
             attribute="class"
             themes={['light', 'dark']}
-            disableTransitionOnChange={false}
+            /* Let View Transitions own the wipe — per-element color tweens feel sticky. */
+            disableTransitionOnChange
             defaultTheme={defaultTheme}
             storageKey={storageKey}
             enableSystem

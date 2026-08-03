@@ -161,7 +161,8 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    @apply transition-colors duration-300;
+    /* Do NOT put transition-colors on * — it makes every theme swap feel sticky
+       as CSS variables tween across the whole tree (fights View Transitions). */
     @apply selection:bg-primary selection:text-primary-foreground;
     scrollbar-width: thin;
     scrollbar-color: var(--primary) color-mix(in oklch, var(--muted) 55%, transparent);
@@ -398,18 +399,13 @@
   }
 }
 
-/* Theme switch: circular wipe from the toggle (Chromium View Transitions).
-   Always expand the *new* theme in — shrinking the old root (dark→light) flickers. */
-@keyframes theme-circle-in {
-  from {
-    clip-path: circle(0px at var(--theme-tx, 90%) var(--theme-ty, 5%));
-  }
-  to {
-    clip-path: circle(150vmax at var(--theme-tx, 90%) var(--theme-ty, 5%));
-  }
-}
-
+/* Theme switch — View Transitions wipe (WAAPI clip-path on ::view-transition-new).
+   Default VT animations must be off so the JS clip-path owns the motion. */
 @supports (view-transition-name: root) {
+  html {
+    view-transition-name: root;
+  }
+
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation: none;
@@ -421,34 +417,19 @@
   }
 
   html[data-theme-transition]::view-transition-new(root) {
-    z-index: 9999;
-    animation: theme-circle-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+    z-index: 2147483646;
   }
 }
 
-/* Fallback soft color fade when View Transitions are unavailable */
-html.theme-animating,
-html.theme-animating *,
-html.theme-animating *::before,
-html.theme-animating *::after {
-  transition:
-    background-color 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-    color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    fill 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    stroke 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 0.35s ease !important;
+/* Kill leftover color/bg transitions while the theme wipe runs */
+html[data-theme-transition],
+html[data-theme-transition] *,
+html[data-theme-transition] *::before,
+html[data-theme-transition] *::after {
+  transition: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html.theme-animating,
-  html.theme-animating *,
-  html.theme-animating *::before,
-  html.theme-animating *::after {
-    transition: none !important;
-  }
-
   .animate-hero-mote {
     animation: none !important;
   }

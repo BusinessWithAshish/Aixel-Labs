@@ -3,12 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { flushSync } from 'react-dom';
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'motion/react';
 import { ArrowRight, Menu, Moon, Sun, X } from 'lucide-react';
-import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
+import { useSmoothThemeToggle } from '@/hooks/use-smooth-theme-toggle';
 import { AIXEL_WORDMARK, LABELS, NAV_LINKS, SIGN_IN_URL } from '../constants';
 import { StartFreeLink } from './booking';
 
@@ -167,54 +166,18 @@ export function MarketingNav() {
     );
 }
 
-type DocumentWithViewTransition = Document & {
-    startViewTransition?: (update: () => void) => { finished: Promise<void> };
+type LandingThemeToggleProps = {
+    className?: string;
 };
 
-/** One-click light ↔ dark with a circular wipe (View Transitions) or soft color fade. */
-function LandingThemeToggle({ className }: { className?: string }) {
-    const { resolvedTheme, setTheme } = useTheme();
+/** One-click light ↔ dark with a circular View Transition wipe. */
+function LandingThemeToggle({ className }: LandingThemeToggleProps) {
     const [mounted, setMounted] = useState(false);
-    const buttonRef = useRef<HTMLButtonElement>(null);
+    const { isDark, toggleTheme } = useSmoothThemeToggle();
 
     useEffect(() => {
         setMounted(true);
     }, []);
-
-    const isDark = resolvedTheme === 'dark';
-
-    function switchTheme() {
-        const next = isDark ? 'light' : 'dark';
-        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const doc = document as DocumentWithViewTransition;
-
-        const apply = () => {
-            flushSync(() => setTheme(next));
-        };
-
-        if (reduceMotion || typeof doc.startViewTransition !== 'function') {
-            document.documentElement.classList.add('theme-animating');
-            apply();
-            window.setTimeout(() => {
-                document.documentElement.classList.remove('theme-animating');
-            }, 480);
-            return;
-        }
-
-        const rect = buttonRef.current?.getBoundingClientRect();
-        if (rect) {
-            document.documentElement.style.setProperty('--theme-tx', `${rect.left + rect.width / 2}px`);
-            document.documentElement.style.setProperty('--theme-ty', `${rect.top + rect.height / 2}px`);
-        }
-        document.documentElement.dataset.themeTransition = next;
-
-        const transition = doc.startViewTransition!(apply);
-        void transition.finished.finally(() => {
-            requestAnimationFrame(() => {
-                delete document.documentElement.dataset.themeTransition;
-            });
-        });
-    }
 
     if (!mounted) {
         return (
@@ -232,10 +195,9 @@ function LandingThemeToggle({ className }: { className?: string }) {
 
     return (
         <button
-            ref={buttonRef}
             type="button"
             aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            onClick={switchTheme}
+            onClick={(e) => toggleTheme(e.currentTarget)}
             className={cn(
                 'inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-border/70 bg-card/70 text-foreground transition-colors hover:border-primary/35 hover:bg-accent hover:text-foreground',
                 className,
