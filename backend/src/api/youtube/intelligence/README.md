@@ -69,7 +69,8 @@ intelligence/
 │   └── handler.ts
 ├── channel/                  # handler → harvest → enrich → compute + content-metrics
 ├── handle/
-└── video-meta/
+├── video-meta/
+└── aggregation/          # niche / keyword aggregates + channel compare (MCP + HTTP services)
 ```
 
 Raw layer (`../search`, `../video`, etc.) remains the **single source of truth** for:

@@ -17,6 +17,10 @@ with author handles + view counts. **No login required** in a real browser.
 | `/api/v1/tags/search/?q=` | Works (hashtag names only) |
 | TLS HTML of `/popular/` | Shell only — grid needs browser/GraphQL |
 
+**Production path:** `popular/client.ts` uses **Puppeteer + Evomi** (headless
+Chrome). Plain TLS fetch of `/popular/` is shell-only and is not enough for the
+grid.
+
 Captured GraphQL (pagination of related chips):
 
 - `POST /api/graphql`

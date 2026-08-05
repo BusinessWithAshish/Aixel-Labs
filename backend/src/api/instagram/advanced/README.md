@@ -1,11 +1,17 @@
 # Instagram Advanced API
 
-Public Instagram profile enrichment beyond lead lookup. Starts with the
-**Posts** tab (grid + infinite scroll); reels/tagged/etc. come later.
+Public Instagram enrichment beyond basic lead lookup. Router mounts **posts**,
+**search**, and **popular** (see nested READMEs).
 
-## Endpoint
+## Endpoints
 
-`POST /instagram/advanced/posts`
+| Route | README |
+|-------|--------|
+| `POST /instagram/advanced/posts` | This page (posts section) |
+| `POST /instagram/advanced/search` | [search/README.md](./search/README.md) |
+| `POST /instagram/advanced/popular` | [popular/README.md](./popular/README.md) |
+
+### Posts — `POST /instagram/advanced/posts`
 
 ```json
 {
@@ -39,15 +45,12 @@ This module uses the **REST feed/user** path (stable cursor = GraphQL `page_info
 
 ```
 instagram/advanced/
-├── index.ts          # Router + exports
+├── index.ts          # Router (posts + search + popular)
 ├── constants.ts      # Routes, doc_ids, limits, errors
 ├── schemas.ts        # IG_ADVANCED_POSTS_REQUEST_SCHEMA
-├── types.ts          # Request / response / raw feed types
-├── client.ts         # Session seed + feed pagination
-├── handler.ts        # Express handler
-├── compute/
-│   ├── map-post.ts   # IgFeedItem → IG_ADVANCED_POST
-│   └── index.ts
+├── types.ts / client.ts / handler.ts / compute/
+├── search/           # keyword / content search
+├── popular/          # /popular/{q}/ topic reels (Puppeteer)
 └── README.md
 ```
 

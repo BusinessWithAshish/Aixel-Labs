@@ -1,7 +1,7 @@
 {
   "name": "@aixellabs/backend",
   "version": "1.0.0",
-  "description": "Internal Google Maps scraping API server",
+  "description": "Express scrapers, intelligence APIs, MCP, and Mongo schema SSOT",
   "type": "commonjs",
   "main": "dist/server.js",
   "exports": {

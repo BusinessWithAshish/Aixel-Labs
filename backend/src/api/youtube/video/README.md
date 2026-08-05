@@ -28,6 +28,7 @@ Fetches video metadata and suggested (related) videos via InnerTube `get_watch` 
 ```ts
 {
   id: string;
+  videoUrl: string;
   title: string | null;
   thumbnail: YT_THUMBNAIL[] | null;
   isLive: boolean;
@@ -38,6 +39,10 @@ Fetches video metadata and suggested (related) videos via InnerTube `get_watch` 
   viewCountText: string | null;
   lengthSeconds: number | null;
   keywords: string[];
+  publishedAt: string | null;
+  channelSubscribers: number | null;
+  likeCount: number | null;
+  commentCount: number | null;
 }
 ```
 

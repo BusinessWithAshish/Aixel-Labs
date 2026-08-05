@@ -1,6 +1,6 @@
 # Marketing home — module layout
 
-Apex marketing landing at `/` (`http://localhost:3003`). Tenant app home stays on `{tenant}.localhost:3003` via middleware rewrite to `/home`.
+Aixel marketing landing at `/` (`http://localhost:3003`). Tenant app home stays on `{tenant}.localhost:3003` via middleware rewrite to `/home`.
 
 ## Layout
 
@@ -10,6 +10,7 @@ Apex marketing landing at `/` (`http://localhost:3003`). Tenant app home stays o
 ├── types.ts              # Shared TS building blocks
 ├── page.tsx / layout.tsx
 ├── README.md
+├── email-templates/      # Transactional HTML (see email-templates/README.md)
 └── _components/
     ├── primitives.tsx        # LandingSection, Reveal, Stagger*, CountUp
     ├── booking.tsx           # BookingProvider, drawer, StartFreeLink, BookCallButton

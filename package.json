@@ -9,9 +9,9 @@
         "installAll": "pnpm installFE && pnpm installBE && pnpm installBW",
         "devAll": "pnpm devFE && pnpm devBE && pnpm devBW",
         "devFE": "pnpm --filter frontend dev",
-        "devBE": "pnpm --filter backend run start",
+        "devBE": "pnpm --filter backend run dev",
         "devBW": "pnpm --filter browser-worker run dev",
-        "prodBE": "pnpm --filter backend run start:prod",
+        "prodBE": "pnpm --filter backend run prod",
         "prodBW": "pnpm --filter browser-worker run prod",
         "prodFE": "pnpm --filter frontend run prod"
     },

@@ -1,18 +1,17 @@
 # Google Search (web) API
 
 Browserless organic **google.com web results** — no Puppeteer/Playwright, no TLS
-knitsail/SG_SS solving. One `POST /gsearch` endpoint. Every request is routed through
-the Evomi residential proxy (country-targeted; region best-effort).
+knitsail/SG_SS solving. **v1** is `POST /gsearch` (this doc). Every request is routed
+through the Evomi residential proxy (country-targeted; region best-effort).
 
 This is the **productionized** version of the research in
-`backend/src/experiments/google-search/` (see its `FINDINGS.md`). It mirrors the
+`backend/experiments/google-search/` (see its `FINDINGS.md`). It mirrors the
 `browser-worker` `gsearch` handler's request shape but fetches results over HTTP.
 
 > **Competitor analysis:** See [`COMPETITORS_FINDINGS.md`](./COMPETITORS_FINDINGS.md) for a
-> deep-dive into how Serper.dev and SearchApi.io scrape Google (full browser farms + 100M+
-> proxies + CAPTCHA solving) and a 5-phase roadmap to combine their feature sets into this
-> engine. Short version: our CSE path is browserless and organic-only; they run real browsers
-> to return the full SERP (KG, PAA, AI Overview, verticals).
+> deep-dive into how Serper.dev and SearchApi.io scrape Google. **v2** (`POST /gsearch/v2`)
+> uses the Docs Explore endpoint (KG + organic) — see [`v2/README.md`](./v2/README.md).
+> This page documents **v1** (CSE, organic-only).
 
 ## How it works (source of truth)
 

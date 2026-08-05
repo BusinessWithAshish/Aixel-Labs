@@ -104,9 +104,11 @@ Session never falls back to another tenant’s membership. New tenant host requi
 | `WRONG_TENANT` | Non-admin already belongs to another org |
 | `DEVICE_IN_USE_ON_TENANT` | Another account already signed up from this device on this tenant |
 | `EMAIL_IN_USE_ON_TENANT` | Mongo unique email conflict on this tenant |
-| `EMAIL_REQUIRED` / `MISSING_DEVICE_FINGERPRINT` | Missing Google email or fingerprint |
+| `EMAIL_REQUIRED` / `MISSING_DEVICE_FINGERPRINT` / `MISSING_ID_TOKEN` | Missing Google email, fingerprint, or id token |
 | `TENANT_NOT_FOUND` | Unknown host subdomain |
+| `MEMBERSHIP_CONFLICT` | Sign-in conflicts with an existing membership on this tenant |
 | `AUTH_FAILED` | Token/session failure |
+| `UNAUTHORIZED` | Generic unauthorized |
 
 **Agent rule:** Same device + different Google account on signup → `DEVICE_IN_USE_ON_TENANT`, not a Firebase phone error.
 
@@ -115,8 +117,12 @@ Session never falls back to another tenant’s membership. New tenant host requi
 | File | Role |
 | --- | --- |
 | `lib/auth/constants.ts` | Cookie TTL, `AUTH_ERRORS`, toasts |
+| `lib/auth/types.ts` | Re-exports + shared auth types |
+| `lib/auth/cookies.ts` | Cookie option builders |
 | `lib/auth/firebase-errors.ts` | Firebase code → user message |
 | `lib/auth/device-fingerprint.ts` | ThumbmarkJS OSS `thumbmark` helper |
+| `lib/auth/device-fingerprint-config.ts` | Skip-fingerprint / env gates |
+| `lib/auth/pending-coupon.ts` | Pending coupon cookie helpers |
 | `server/auth/policy.ts` | Pure allow/deny |
 | `server/auth/admin-guards.ts` | Admin + session-tenant scope helpers |
 | `server/auth/membership/get-or-create.ts` | Mongo path |

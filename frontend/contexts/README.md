@@ -3,7 +3,7 @@
 > **Agent entrypoint:** when wiring a new page, follow `.cursor/skills/frontend/code/frontend-code-page-shell/SKILL.md`
 > (governor: `.cursor/rules/frontend/code/page-shell.mdc`). This README is the deeper reference.
 
-A Higher-Order Component (HoC) pattern for managing page-level state and business logic using React Context API.
+A page-shell pattern for managing page-level state and business logic using React Context (`PageProvider` + route hook + `usePage`).
 
 ## Overview
 
@@ -157,7 +157,7 @@ export function useMyPageLogic(serverData: ServerData): UseMyPageLogicReturn {
 import { PageProvider } from "@/contexts/PageStore";
 import { useMyPageLogic } from "./_hooks/useMyPageLogic";
 import { MyPageContent } from "./_components/MyPageContent";
-import { fetchServerData } from "@/helpers/data-operations";
+import { fetchServerData } from "@/app/actions/…"; // or another server fetch
 
 export default async function MyPage() {
   // Fetch data on the server
@@ -234,14 +234,14 @@ export function MyPageContent() {
 ## Example Implementations
 
 ### Client-Only Pattern
-- Hook: `app/voice-agent/web-dialer/_hooks/useWebDialerPage.ts`
-- Page: `app/voice-agent/web-dialer/page.tsx`
-- Content: `app/voice-agent/web-dialer/_components/WebDialerContent.tsx`
+- Hook: `app/(protected)/voice-agent/web-dialer/_hooks/useWebDialerPage.ts`
+- Page: `app/(protected)/voice-agent/web-dialer/page.tsx`
+- Content: `app/(protected)/voice-agent/web-dialer/_components/WebDialerContent.tsx`
 
 ### Server Data Pattern
-- Hook: `app/manage-tenants/[tenantId]/_hooks/useTenantUsersPage.ts`
-- Page: `app/manage-tenants/[tenantId]/page.tsx`
-- Content: `app/manage-tenants/[tenantId]/_components/TenantUsersContent.tsx`
+- Hook: `app/(protected)/manage-tenants/[tenantId]/_hooks/use-tenant-users-page.ts`
+- Page: `app/(protected)/manage-tenants/[tenantId]/page.tsx`
+- Content: `app/(protected)/manage-tenants/[tenantId]/_components/TenantUsersContent.tsx`
 
 ## Best Practices
 

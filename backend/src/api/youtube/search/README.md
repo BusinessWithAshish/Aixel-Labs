@@ -15,14 +15,13 @@ Scrapes YouTube search results for a query, with optional content-type filter an
 Validated by `schemas.ts` → `YOUTUBE_SEARCH_REQUEST_SCHEMA` (extends shared `YOUTUBE_GEO_REQUEST_SCHEMA`).
 
 
-| Field          | Type               | Default   | Notes                                               |
-| -------------- | ------------------ | --------- | --------------------------------------------------- |
-| `country`      | `string`           | `"US"`    | 2-letter ISO code — proxy routing + InnerTube `gl`  |
-| `region`       | `string`           | —         | Optional proxy region (not sent to YouTube)         |
-| `query`        | `string`           | required  | 1–500 chars                                         |
-| `filter`       | `YT_SEARCH_FILTER` | `"video"` | `video` or `channel` only                           |
-| `limit`        | `number`           | `1000`    | Max results (1–1000)                                |
-| `withPlaylist` | `boolean`          | `false`   | **Declared in schema but not used in `helpers.ts`** |
+| Field     | Type               | Default   | Notes                                              |
+| --------- | ------------------ | --------- | -------------------------------------------------- |
+| `country` | `string`           | `"US"`    | 2-letter ISO code — proxy routing + InnerTube `gl` |
+| `region`  | `string`           | —         | Optional proxy region (not sent to YouTube)        |
+| `query`   | `string`           | required  | 1–500 chars                                        |
+| `filter`  | `YT_SEARCH_FILTER` | `"video"` | `video` or `channel` only                          |
+| `limit`   | `number`           | `1000`    | Max results (1–1000)                               |
 
 
 Filter `sp` query values live in `../constants.ts` → `YOUTUBE_SEARCH_FILTER_SP`.

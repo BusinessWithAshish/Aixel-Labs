@@ -26,7 +26,8 @@ See also: [PLACE_DETAILS_FINDINGS.md](../PLACE_DETAILS_FINDINGS.md)
 }
 ```
 
-At least one of `placeId`, `featureId`, or `url` is required. `countryCode` is required.
+At least one of `placeId`, `featureId`, or `url` is required. `countryCode` is
+optional (default `gl` = `us`); provide it when not recoverable from a place `url`.
 
 | `richness` | Size | Notes |
 |------------|------|--------|

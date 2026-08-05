@@ -36,7 +36,7 @@ write Mongo; the Next.js app persists leads/credits/tenants.
 - Credited lead scrapers listed above + lead lists / dashboard
 - Multi-tenant admin (users, coupons, module access)
 - Backend mounts: gmaps, instagram, facebook, linkedin, youtube, gsearch, google-trends, website-contacts, mcp
-- MCP server `aixel-youtube-intelligence` (niche/video/channel/transcript/trends tools)
+- MCP server `aixel-youtube-intelligence` (YouTube niche/video/channel/transcript, Trends, and `google_web_search`)
 
 ## Incomplete / future scope
 
@@ -73,16 +73,19 @@ Agent conventions: [`AGENTS.md`](AGENTS.md), [`.cursor/`](.cursor/).
 pnpm installAll
 
 # Preferred per-package (align BE_API with backend port)
-pnpm --filter frontend dev          # http://localhost:3003
-pnpm --filter backend run dev       # http://localhost:8002
-pnpm --filter browser-worker run dev  # optional
+pnpm --filter frontend dev            # http://localhost:3003
+pnpm --filter backend run dev         # http://localhost:8002
+pnpm --filter browser-worker run dev  # optional (:8080)
 ```
 
-Root scripts `devBE` / `prodBE` may not match current backend script names (`dev` /
-`prod`) — prefer `pnpm --filter backend run …`.
+Root shortcuts: `pnpm devFE` / `devBE` / `devBW` (and `prodFE` / `prodBE` /
+`prodBW`) call the same filter scripts. Package READMEs:
+[`frontend/`](frontend/README.md), [`backend/`](backend/README.md),
+[`browser-worker/`](browser-worker/README.md), [`scraper/`](scraper/README.md).
 
 **Secrets:** Firebase + Mongo for the app; backend needs scrape/proxy env (e.g.
-`EVOMI_PROXY_*`). See `frontend/.env.example` and backend local `.env`.
+`EVOMI_PROXY_*`). See `frontend/.env.example`, `browser-worker/.env.example`,
+`scraper/.env.example`, and local `backend/.env`.
 
 ## Stack
 

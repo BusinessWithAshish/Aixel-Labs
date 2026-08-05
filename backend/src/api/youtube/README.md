@@ -9,7 +9,9 @@ Express router mounting scraper sub-APIs under `/youtube`. All endpoints use **P
 | Sub-API | README | Method | Route |
 |---------|--------|--------|-------|
 | Search | [search/README.md](./search/README.md) | `POST` | `/search` |
+| Suggest | [suggest/README.md](./suggest/README.md) | `POST` | `/suggest` |
 | Video | [video/README.md](./video/README.md) | `POST` | `/video`, `/video/suggested` |
+| Transcript | [transcript/README.md](./transcript/README.md) | `POST` | `/video/transcript` |
 | Video meta | — | `POST` | `/video-meta` |
 | Handle | — | `POST` | `/handle` |
 | Channel | [channel/README.md](./channel/README.md) | `POST` | `/channel` |
