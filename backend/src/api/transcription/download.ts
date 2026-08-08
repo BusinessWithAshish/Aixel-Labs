@@ -61,7 +61,7 @@ export async function downloadToTempFile(url: string): Promise<string> {
   const destPath = join(dir, `source-${randomUUID()}`);
   const token = process.env.BLOB_READ_WRITE_TOKEN;
 
-  let res: Response | undefined;
+  let res: Awaited<ReturnType<typeof fetch>> | undefined;
   let fetchError: unknown;
   try {
     res = await fetch(url, {
