@@ -128,6 +128,7 @@ export const API_ENDPOINTS = {
   },
   GSEARCH: {
     SEARCH: { route: "/", full: `${ENDPOINTS.GSEARCH}` },
+    SEARCH_V2: { route: "/v2", full: `${ENDPOINTS.GSEARCH}/v2` },
   },
   GOOGLE_TRENDS: {
     TRENDING: {

@@ -40,3 +40,35 @@ export async function gsearchProxiedGet(
     await closeUrlFetchSession(session);
   }
 }
+
+export async function gsearchProxiedPost(
+  url: string,
+  opts: {
+    proxyUrl: string;
+    body: string;
+    contentType: string;
+    acceptLanguage?: string;
+  },
+): Promise<{ status: number; body: string }> {
+  const session = await createUrlFetchSession({
+    proxyUrl: opts.proxyUrl,
+    timeoutMs: GSEARCH_REQUEST_TIMEOUT_MS,
+    headers: {
+      "user-agent": GSEARCH_USER_AGENT,
+      accept: "*/*",
+      "accept-language": opts.acceptLanguage ?? GSEARCH_ACCEPT_LANGUAGE,
+      "content-type": opts.contentType,
+    },
+  });
+
+  try {
+    const res = await session.post(url, {
+      body: opts.body,
+      followRedirects: true,
+    });
+    const body = await res.text();
+    return { status: res.status, body };
+  } finally {
+    await closeUrlFetchSession(session);
+  }
+}

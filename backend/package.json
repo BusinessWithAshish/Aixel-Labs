@@ -70,6 +70,22 @@
       "types": "./src/api/gsearch/constants.ts",
       "default": "./src/api/gsearch/constants.ts"
     },
+    "./gsearch/v2": {
+      "types": "./src/api/gsearch/v2/index.ts",
+      "default": "./src/api/gsearch/v2/index.ts"
+    },
+    "./gsearch/v2/schemas": {
+      "types": "./src/api/gsearch/v2/schemas.ts",
+      "default": "./src/api/gsearch/v2/schemas.ts"
+    },
+    "./gsearch/v2/types": {
+      "types": "./src/api/gsearch/v2/types.ts",
+      "default": "./src/api/gsearch/v2/types.ts"
+    },
+    "./gsearch/v2/constants": {
+      "types": "./src/api/gsearch/v2/constants.ts",
+      "default": "./src/api/gsearch/v2/constants.ts"
+    },
     "./transcription": {
       "types": "./src/api/transcription/index.ts",
       "default": "./src/api/transcription/index.ts"
