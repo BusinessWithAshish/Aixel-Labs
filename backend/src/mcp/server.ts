@@ -32,13 +32,15 @@ import {
 } from "../api/google-trends/interest/schemas";
 import { googleTrendsInterestIntelligenceService } from "../api/google-trends/intelligence/single/service";
 import { googleTrendsCompareIntelligenceService } from "../api/google-trends/intelligence/compare/service";
+import { fetchGsearch } from "../api/gsearch";
+import { GSEARCH_REQUEST_SCHEMA } from "../api/gsearch/schemas";
 import { transcribe } from "../api/transcription/client";
 import { TRANSCRIPTION_REQUEST_SCHEMA } from "../api/transcription/schemas";
 import { fail, ok } from "./tool-result";
 
 export const MCP_SERVER_NAME = "aixel-youtube-intelligence";
 export const MCP_SERVER_VERSION = "1.0.0";
-export const MCP_TOOL_COUNT = 14;
+export const MCP_TOOL_COUNT = 15;
 
 export function createYoutubeIntelligenceMcpServer(): McpServer {
   const server = new McpServer({
@@ -265,6 +267,23 @@ export function createYoutubeIntelligenceMcpServer(): McpServer {
     async (args) => {
       try {
         return ok(await transcribe(args));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "google_web_search",
+    {
+      description:
+        "Search the live web via Google (organic CSE results) and return ranked pages with title, URL, snippet, display host, site name, thumbnails, and optional publish/modified times.\n\nUse this whenever you need current web evidence: find company/site URLs, discover lead pages, verify claims, research competitors, or gather sources outside YouTube. Prefer Google operators inside searchQuery when useful (e.g. site:linkedin.com/in \"plumber\" Austin, OR, quotes, -exclude). country is required (ISO alpha-2) and routes geo; optional region/state append \"in City, State\" for local intent.\n\nIMPORTANT: timeFilter defaults to day (last 24 hours). Pass week | month | year when you need a wider window — year is usually right for evergreen research. pages defaults to 1 (20 results); max 6 (~120 — Google's hard CSE ceiling). Returns query metadata (resolvedQuery, estimatedResultCount, pagesFetched) plus results — not AI Overview, PAA, knowledge panel, or Maps.\n\nDo NOT use this for YouTube niche research (use search_niche_intelligence) or Trends demand curves (use get_trend_intelligence).",
+      inputSchema: GSEARCH_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        const parsed = GSEARCH_REQUEST_SCHEMA.parse(args);
+        return ok(await fetchGsearch(parsed));
       } catch (err) {
         return fail(err);
       }
