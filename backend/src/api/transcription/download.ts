@@ -22,6 +22,21 @@ function isGatedStatus(status: number): boolean {
 }
 
 /**
+ * Local shape for the bits of `fetch()`'s result we actually use. Deliberately
+ * not named `Response` / typed off `ReturnType<typeof fetch>` — this monorepo
+ * has multiple conflicting `@types/node` versions in its dependency graph, and
+ * builds have failed with the ambient global `Response` interface resolving
+ * incomplete (missing `status`/`ok`/`body`/etc). Casting into this local type
+ * sidesteps that ambient lookup entirely.
+ */
+type FetchResponseLike = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  body: unknown;
+};
+
+/**
  * Fallback for sources that block a plain `fetch()` (bot detection, WAF
  * challenges, rate limiting) — same browser-fingerprint TLS client used
  * elsewhere in this backend for scraping (`gsearch/http.ts`,
@@ -61,12 +76,12 @@ export async function downloadToTempFile(url: string): Promise<string> {
   const destPath = join(dir, `source-${randomUUID()}`);
   const token = process.env.BLOB_READ_WRITE_TOKEN;
 
-  let res: Awaited<ReturnType<typeof fetch>> | undefined;
+  let res: FetchResponseLike | undefined;
   let fetchError: unknown;
   try {
-    res = await fetch(url, {
+    res = (await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
+    })) as unknown as FetchResponseLike;
   } catch (err) {
     fetchError = err;
   }
@@ -99,6 +114,9 @@ export async function downloadToTempFile(url: string): Promise<string> {
     throw new Error(`${TRANSCRIPTION_ERROR_MESSAGES.DOWNLOAD_FAILED}: ${detail}`);
   }
 
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(destPath));
+  await pipeline(
+    Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
+    createWriteStream(destPath),
+  );
   return destPath;
 }

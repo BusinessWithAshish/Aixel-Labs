@@ -12,6 +12,19 @@ export type GroqTranscribeOptions = {
   language?: string;
 };
 
+/**
+ * Local shape for the bits of `fetch()`'s result we actually use — see the
+ * matching note in `download.ts` for why this avoids the ambient `Response`
+ * name (multiple conflicting `@types/node` versions in this monorepo's
+ * dependency graph have caused it to resolve incomplete during Vercel builds).
+ */
+type FetchResponseLike = {
+  ok: boolean;
+  status: number;
+  text: () => Promise<string>;
+  json: () => Promise<unknown>;
+};
+
 /** Calls Groq's `/audio/transcriptions` with `response_format: verbose_json` — the only
  * format that returns segment timestamps, which we need to build srt/vtt ourselves
  * (Groq has no native srt/vtt output). */
@@ -33,11 +46,11 @@ export async function transcribeWithGroq(
   form.set("temperature", "0");
   if (language) form.set("language", language);
 
-  const res = await fetch(GROQ_TRANSCRIPTIONS_URL, {
+  const res = (await fetch(GROQ_TRANSCRIPTIONS_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
-  });
+  })) as unknown as FetchResponseLike;
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
