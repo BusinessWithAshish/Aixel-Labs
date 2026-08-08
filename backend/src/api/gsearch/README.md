@@ -8,7 +8,7 @@ This is the **productionized** version of the research in
 `backend/experiments/google-search/` (see its `FINDINGS.md`). It mirrors the
 `browser-worker` `gsearch` handler's request shape but fetches results over HTTP.
 
-> **Competitor analysis:** See [`COMPETITORS_FINDINGS.md`](./COMPETITORS_FINDINGS.md) for a
+> **Competitor analysis:** See [`COMPETITORS_FINDINGS.md`](../../../experiments/google-search/COMPETITORS_FINDINGS.md) for a
 > deep-dive into how Serper.dev and SearchApi.io scrape Google. **v2** (`POST /gsearch/v2`)
 > uses the Docs Explore endpoint (KG + organic) — see [`v2/README.md`](./v2/README.md).
 > This page documents **v1** (CSE, organic-only).
