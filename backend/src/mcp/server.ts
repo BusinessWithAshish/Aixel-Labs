@@ -32,11 +32,13 @@ import {
 } from "../api/google-trends/interest/schemas";
 import { googleTrendsInterestIntelligenceService } from "../api/google-trends/intelligence/single/service";
 import { googleTrendsCompareIntelligenceService } from "../api/google-trends/intelligence/compare/service";
+import { transcribe } from "../api/transcription/client";
+import { TRANSCRIPTION_REQUEST_SCHEMA } from "../api/transcription/schemas";
 import { fail, ok } from "./tool-result";
 
 export const MCP_SERVER_NAME = "aixel-youtube-intelligence";
 export const MCP_SERVER_VERSION = "1.0.0";
-export const MCP_TOOL_COUNT = 13;
+export const MCP_TOOL_COUNT = 14;
 
 export function createYoutubeIntelligenceMcpServer(): McpServer {
   const server = new McpServer({
@@ -247,6 +249,22 @@ export function createYoutubeIntelligenceMcpServer(): McpServer {
     async (args) => {
       try {
         return ok(await googleTrendsCompareIntelligenceService(args));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "transcribe_media",
+    {
+      description:
+        "Transcribe a video or audio file at a given URL into a plain transcript using Groq Whisper — no summarization, just the raw transcript. Downloads the file server-side, extracts + normalizes its audio via ffmpeg (16kHz mono), then calls Groq's speech-to-text API.\n\nAccepts any publicly-reachable URL (a blob URL from POST /transcription/blob-upload, or any other hosted link — S3, a CDN, Google Drive's direct-download URL, etc.). It does NOT accept raw file bytes — MCP tool calls can't carry large binary payloads, so the caller must already have a URL.\n\n`format` controls the output shape: txt (plain text, default), json (full Groq verbose_json with segment timestamps), srt/vtt (caption files built from those segment timestamps — Groq has no native srt/vtt output, so these are generated here). Optional `language` (ISO-639-1) improves accuracy; optional `model` overrides the default whisper-large-v3-turbo.\n\nDo NOT use this for YouTube video URLs — use get_video_transcript_intelligence instead, which fetches YouTube's own caption track rather than re-transcribing audio. The downloaded file and its source blob are deleted after transcribing — nothing is persisted.",
+      inputSchema: TRANSCRIPTION_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        return ok(await transcribe(args));
       } catch (err) {
         return fail(err);
       }

@@ -9,6 +9,7 @@ import linkedinRoutes from "./api/linkedin";
 import youtubeRoutes from "./api/youtube/index";
 import gsearchRoutes from "./api/gsearch/index";
 import googleTrendsRoutes from "./api/google-trends/index";
+import transcriptionRoutes from "./api/transcription/index";
 import mcpRoutes from "./mcp/router";
 
 export function registerRoutes(app: Express) {
@@ -20,5 +21,6 @@ export function registerRoutes(app: Express) {
   app.use(ENDPOINTS.YOUTUBE, youtubeRoutes);
   app.use(ENDPOINTS.GSEARCH, gsearchRoutes);
   app.use(ENDPOINTS.GOOGLE_TRENDS, googleTrendsRoutes);
+  app.use(ENDPOINTS.TRANSCRIPTION, transcriptionRoutes);
   app.use(ENDPOINTS.MCP, mcpRoutes);
 }

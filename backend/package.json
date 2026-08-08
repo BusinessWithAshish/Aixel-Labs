@@ -70,6 +70,22 @@
       "types": "./src/api/gsearch/constants.ts",
       "default": "./src/api/gsearch/constants.ts"
     },
+    "./transcription": {
+      "types": "./src/api/transcription/index.ts",
+      "default": "./src/api/transcription/index.ts"
+    },
+    "./transcription/schemas": {
+      "types": "./src/api/transcription/schemas.ts",
+      "default": "./src/api/transcription/schemas.ts"
+    },
+    "./transcription/types": {
+      "types": "./src/api/transcription/types.ts",
+      "default": "./src/api/transcription/types.ts"
+    },
+    "./transcription/constants": {
+      "types": "./src/api/transcription/constants.ts",
+      "default": "./src/api/transcription/constants.ts"
+    },
     "./instagram": {
       "types": "./src/api/instagram/types.ts",
       "default": "./src/api/instagram/types.ts"
@@ -124,12 +140,14 @@
     "@cemalgnlts/mailjs": "^3.1.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/cheerio": "^1.0.0",
+    "@vercel/blob": "^2.7.0",
     "cheerio": "^1.2.0",
     "cors": "^2.8.5",
     "cycletls": "^2.0.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-rate-limit": "^8.0.1",
+    "ffmpeg-static": "^5.3.0",
     "helmet": "^8.0.0",
     "i18n-iso-countries": "^7.14.0",
     "jsdom": "^26.1.0",

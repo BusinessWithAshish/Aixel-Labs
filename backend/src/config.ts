@@ -14,6 +14,7 @@ export enum ENDPOINTS {
   YOUTUBE = "/youtube",
   GSEARCH = "/gsearch",
   GOOGLE_TRENDS = "/google-trends",
+  TRANSCRIPTION = "/transcription",
   MCP = "/mcp",
   SAMPLE = "/sample",
 }
@@ -152,5 +153,12 @@ export const API_ENDPOINTS = {
   },
   SAMPLE: {
     API: { route: "/api", full: `${ENDPOINTS.SAMPLE}/api` },
+  },
+  TRANSCRIPTION: {
+    BLOB_UPLOAD: {
+      route: "/blob-upload",
+      full: `${ENDPOINTS.TRANSCRIPTION}/blob-upload`,
+    },
+    TRANSCRIBE: { route: "/", full: `${ENDPOINTS.TRANSCRIPTION}` },
   },
 } as const;
