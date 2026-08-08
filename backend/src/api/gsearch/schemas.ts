@@ -31,7 +31,14 @@ export const GSEARCH_REQUEST_SCHEMA = z.object({
     .trim()
     .min(1)
     .max(GSEARCH_MAX_QUERY_CHARS)
-    .describe("The web search query."),
+    .describe(
+      "The web search query — plain keywords work like a normal Google search box query. " +
+        'Operators confirmed working on this endpoint: "exact phrase", site:domain.com, ' +
+        "filetype:pdf, intitle:word, -exclude, OR, ( ) grouping, before:/after:YYYY-MM-DD, " +
+        "* wildcard in quotes. Avoid allintitle:/allinurl:/allintext:/intext:/cache:/related:/" +
+        "link:/AROUND(n)/define:/weather:/stocks:/movie:/map:/source: — tested unreliable or " +
+        "non-functional on this endpoint. See the tool description for details.",
+    ),
   country: ISO_COUNTRY_CODE_SCHEMA.describe(
     "Required. Two-letter ISO 3166-1 alpha-2 country code (e.g. US, GB, IN). " +
       "Routes the request through a country-targeted Evomi proxy and sets Google `gl`.",
