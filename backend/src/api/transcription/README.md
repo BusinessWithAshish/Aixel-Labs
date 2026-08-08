@@ -53,7 +53,7 @@ Limits/allow-lists: `constants.ts` → `TRANSCRIPTION`, `TRANSCRIPTION_ALLOWED_C
    and `website-contacts/crawl.ts` use for scraping) with `byteResponse: true`,
    decoding the returned `data:<mime>;base64,...` payload back to bytes. This
    matters once a source is anything other than our own Blob URL — e.g. a
-   third-party CDN link passed to `transcribe_media` over MCP.
+   third-party CDN link passed to `transcription_transcribe_media` over MCP.
 2. `ffmpeg -y -i <input> -vn -ac 1 -ar 16000 -c:a flac <output>.flac`
    (`ffmpeg.ts`) — extracts audio from video (or just re-encodes audio
    input), downsampled to 16kHz mono. Lossless relative to what Groq does
@@ -93,7 +93,7 @@ transcription/
 
 ## MCP
 
-`transcribe_media` (`backend/src/mcp/server.ts`) wraps `transcribe()` from
+`transcription_transcribe_media` (`backend/src/mcp/server.ts`) wraps `transcribe()` from
 `client.ts` directly — same function the HTTP handler calls, no loopback —
 and reuses `TRANSCRIPTION_REQUEST_SCHEMA` unchanged. It takes a URL, not raw
 bytes: MCP tool calls carry JSON args only, so there's no MCP equivalent of

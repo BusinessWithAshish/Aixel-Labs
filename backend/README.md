@@ -30,7 +30,7 @@ Registered in `src/routes.ts` from `ENDPOINTS` in `src/config.ts`:
 | `/gsearch` | CSE organic search (v1); `/gsearch/v2` Docs Explore |
 | `/google-trends` | Trends + intelligence |
 | `/website-contacts` | Crawl site for emails/phones |
-| `/mcp` | Streamable HTTP MCP (`aixel-youtube-intelligence`) |
+| `/mcp` | Streamable HTTP MCP (`aixel-intelligence`) |
 
 `ENDPOINTS.SAMPLE` exists in config but is **not** mounted.
 

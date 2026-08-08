@@ -16,13 +16,14 @@ How MCP is attached to the Express backend and how to add tools/servers.
 ```
 Cursor / MCP client
   → POST/GET /mcp  (Streamable HTTP)
-  → mcp/router.ts  → createYoutubeIntelligenceMcpServer()
+  → mcp/router.ts  → createAixelIntelligenceMcpServer()
   → registerTool → *IntelligenceService / aggregation (same as HTTP)
   → ok(result) | fail(err)
 ```
 
 **No HTTP loopback.** Tools call the same TypeScript services that intelligence
-HTTP handlers use (`api/youtube/intelligence/*`, `api/google-trends/intelligence/*`).
+HTTP handlers use (`api/youtube/intelligence/*`, `api/google-trends/intelligence/*`,
+`api/instagram/*`).
 
 Mount: `ENDPOINTS.MCP` (`/mcp`) via `routes.ts` — platform skill owns that wire-up.
 
@@ -39,13 +40,15 @@ Mount: `ENDPOINTS.MCP` (`/mcp`) via `routes.ts` — platform skill owns that wir
 
 | Constant | Value |
 |----------|--------|
-| Name | `aixel-youtube-intelligence` |
+| Name | `aixel-intelligence` |
 | Version | `1.0.0` |
 | Tools | `MCP_TOOL_COUNT` (keep in sync with registrations) |
 | Package | `@modelcontextprotocol/sdk` |
 
-One server factory: `createYoutubeIntelligenceMcpServer()`. Name is YouTube-centric;
-tools also cover Google Trends intelligence.
+One server factory: `createAixelIntelligenceMcpServer()`. Covers YouTube,
+Google Trends, GSearch, transcription, and Instagram tools. Tool names are
+domain-prefixed (`youtube_*`, `trends_*`, `gsearch_*`, `transcription_*`,
+`instagram_*`) — keep any new tool's name prefixed to match its domain.
 
 Health: `GET /mcp/health` → `{ status, server, tools }`.
 
@@ -73,8 +76,8 @@ server.registerTool(
 
 | Kind | Examples |
 |------|----------|
-| Fetch + enrich | `search_niche_intelligence`, `get_video_intelligence`, `get_trend_intelligence` |
-| Pure aggregate (sync) | `aggregate_niche_signals`, `compare_channels` |
+| Fetch + enrich | `youtube_search_niche_intelligence`, `youtube_get_video_intelligence`, `trends_get_trend_intelligence`, `instagram_get_profile` |
+| Pure aggregate (sync) | `youtube_aggregate_niche_signals`, `youtube_compare_channels` |
 
 Prefer Zod **object** schemas without `.superRefine` for MCP JSON Schema (see Trends
 `*_REQUEST_OBJECT_SCHEMA` vs refined HTTP schema). Channel tools may `.parse` with

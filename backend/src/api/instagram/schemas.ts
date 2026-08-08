@@ -75,3 +75,53 @@ export const INSTAGRAM_REQUEST_SCHEMA = z.object({
       `Maximum number of results to return (1–${INSTAGRAM_REQUEST_RESULT_LIMIT_MAX}). Defaults to ${INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT}.`,
     ),
 });
+
+/**
+ * MCP-facing: direct profile lookup by handle/URL only (no discovery fields).
+ * Mirrors `fetchFromEntities`'s params 1:1.
+ */
+export const INSTAGRAM_PROFILE_LOOKUP_SCHEMA = z.object({
+  entities: z
+    .array(z.string())
+    .min(1)
+    .max(INSTAGRAM_QUERY_LIMITS.maxEntities)
+    .refine(
+      (entities) =>
+        entities.every(
+          (entity) =>
+            INSTAGRAM_USERNAME_REGEX.test(entity) ||
+            INSTAGRAM_URL_REGEX.test(entity),
+        ),
+      { message: INSTAGRAM_ERROR_MESSAGES.INVALID_ENTITY_FORMAT },
+    )
+    .describe(
+      "Instagram usernames (e.g. 'adidas') or full profile URLs (e.g. 'https://www.instagram.com/adidas') to look up. At least one required; batch up to 100 in a single call instead of calling this tool once per handle.",
+    ),
+  country: ISO_COUNTRY_CODE_SCHEMA.describe(
+    "ISO alpha-2 country used to parse the profile's business phone number into an international format (e.g. IN, US). Does not filter or restrict which profiles are returned.",
+  ),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(INSTAGRAM_REQUEST_RESULT_LIMIT_MAX)
+    .optional()
+    .describe(
+      `Max profiles to fetch when more entities are supplied than needed (default ${INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT}).`,
+    ),
+});
+
+/**
+ * MCP-facing: discovery-only variant of `INSTAGRAM_REQUEST_SCHEMA` (drops
+ * `entities`, requires `query`). Mirrors `fetchFromQuery`'s params 1:1.
+ */
+export const INSTAGRAM_PROFILE_SEARCH_SCHEMA = INSTAGRAM_REQUEST_SCHEMA.omit({
+  entities: true,
+}).extend({
+  query: z
+    .string()
+    .min(1)
+    .describe(
+      "Free-text description of the type of Instagram profiles to find (e.g. 'fitness coaches in London', 'vegan food bloggers'). Biased toward matching profile page titles, not post/caption content — use search_instagram_content_leads instead when this comes back thin.",
+    ),
+});

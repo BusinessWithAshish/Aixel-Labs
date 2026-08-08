@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
-  createYoutubeIntelligenceMcpServer,
+  createAixelIntelligenceMcpServer,
   MCP_SERVER_NAME,
   MCP_TOOL_COUNT,
 } from "./server";
@@ -22,7 +22,7 @@ async function handleMcpRequest(req: Request, res: Response) {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });
-    const server = createYoutubeIntelligenceMcpServer();
+    const server = createAixelIntelligenceMcpServer();
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
   } catch (err) {

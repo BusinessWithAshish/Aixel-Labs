@@ -21,7 +21,7 @@ export const AGGREGATE_KEYWORD_SIGNALS_SCHEMA = z.object({
   topQuartileThreshold: z
     .number()
     .describe(
-      "Velocity score threshold above which a video is top-quartile. Use velocityDistribution.p75 from aggregate_niche_signals output.",
+      "Velocity score threshold above which a video is top-quartile. Use velocityDistribution.p75 from youtube_aggregate_niche_signals output.",
     ),
   maxKeywords: z
     .number()

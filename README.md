@@ -36,7 +36,7 @@ write Mongo; the Next.js app persists leads/credits/tenants.
 - Credited lead scrapers listed above + lead lists / dashboard
 - Multi-tenant admin (users, coupons, module access)
 - Backend mounts: gmaps, instagram, facebook, linkedin, youtube, gsearch, google-trends, website-contacts, mcp
-- MCP server `aixel-youtube-intelligence` (YouTube niche/video/channel/transcript, Trends, and `google_web_search`)
+- MCP server `aixel-intelligence` (YouTube, Trends, `gsearch_web_search`, transcription, and Instagram — domain-prefixed tool names)
 
 ## Incomplete / future scope
 

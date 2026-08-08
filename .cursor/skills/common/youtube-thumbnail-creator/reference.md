@@ -6,11 +6,11 @@ running the AixelLabs YouTube Intelligence MCP against the
 
 ## Research method
 
-- 10 search queries run through `search_niche_intelligence` (US, 50 results each)
+- 10 search queries run through `youtube_search_niche_intelligence` (US, 50 results each)
 - 406 unique videos after dedup
-- `aggregate_niche_signals` computed across the full set
+- `youtube_aggregate_niche_signals` computed across the full set
 - Top 8 by `velocityScore` (filtered to >4 min duration) deep-read via
-  `get_video_transcript_intelligence` — 4-zone transcript + hook type +
+  `youtube_get_video_transcript_intelligence` — 4-zone transcript + hook type +
   CTA detection + keyword frequency
 
 Queries:

@@ -15,4 +15,5 @@ Governor for `backend/src/mcp`. Executor: `.cursor/skills/backend/backend-mcp/SK
 - Prefer object schemas without `.superRefine` for MCP JSON Schema compatibility.
 - Wrap handlers with `ok` / `fail` from `tool-result.ts`.
 - Keep `MCP_TOOL_COUNT` equal to registered tools.
+- Prefix every tool name with its domain (`youtube_*`, `trends_*`, `gsearch_*`, `transcription_*`, `instagram_*`) — new domains get a new prefix.
 - New base paths go through `ENDPOINTS` + `routes.ts` (platform skill) — don’t hardcode mounts only in the router.
