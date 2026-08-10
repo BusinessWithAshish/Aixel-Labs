@@ -188,14 +188,16 @@ function FilterGroup({
 
 function SourceMultiSelect({
     selected,
+    availableSources,
     onChange,
 }: {
     selected: FilterSource[];
+    availableSources: FilterSource[];
     onChange: (sources: FilterSource[]) => void;
 }) {
-    const options = SHOW_LINKEDIN_FILTERS_UI
-        ? SOURCE_FILTER_OPTIONS
-        : SOURCE_FILTER_OPTIONS.filter((o) => o.value !== LeadSource.LINKEDIN);
+    const options = SOURCE_FILTER_OPTIONS.filter(
+        (o) => availableSources.includes(o.value) && (SHOW_LINKEDIN_FILTERS_UI || o.value !== LeadSource.LINKEDIN),
+    );
 
     return (
         <ZodSearchableMultiSelectField
@@ -514,9 +516,11 @@ type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     filterPanel: FilterPanelShape;
+    /** Distinct lead sources actually present in this list — gates which sections/options render. */
+    listSources: FilterSource[];
 };
 
-export const LeadsFilterSheet = ({ open, onOpenChange, filterPanel }: Props) => {
+export const LeadsFilterSheet = ({ open, onOpenChange, filterPanel, listSources }: Props) => {
     const {
         filters,
         setSources,
@@ -529,19 +533,25 @@ export const LeadsFilterSheet = ({ open, onOpenChange, filterPanel }: Props) => 
     } = filterPanel;
     const { sources, googleMaps, instagram, facebook, linkedin, sort } = filters;
 
-    const displayedSources = SHOW_LINKEDIN_FILTERS_UI
-        ? sources
-        : sources.filter((s) => s !== LeadSource.LINKEDIN);
+    // A list only ever mixes sources when it was assembled from a filtered selection;
+    // the common case is a single source, so the sheet only surfaces methods that apply here.
+    const availableSources = SHOW_LINKEDIN_FILTERS_UI
+        ? listSources
+        : listSources.filter((s) => s !== LeadSource.LINKEDIN);
 
-    const showGoogleMaps =
-        sources.length === 0 ||
-        sources.includes(LeadSource.GOOGLE_MAPS) ||
-        sources.includes(LeadSource.GOOGLE_MAPS_ADVANCED);
-    const showInstagram = sources.length === 0 || sources.includes(LeadSource.INSTAGRAM);
-    const showFacebook = sources.length === 0 || sources.includes(LeadSource.FACEBOOK);
-    const showLinkedIn =
-        SHOW_LINKEDIN_FILTERS_UI &&
-        (sources.length === 0 || sources.includes(LeadSource.LINKEDIN));
+    const displayedSources = sources.filter((s) => availableSources.includes(s));
+    const showSourcePicker = availableSources.length > 1;
+
+    const isSourceActive = (...candidates: FilterSource[]) => {
+        const present = candidates.some((c) => availableSources.includes(c));
+        if (!present) return false;
+        return sources.length === 0 || candidates.some((c) => sources.includes(c));
+    };
+
+    const showGoogleMaps = isSourceActive(LeadSource.GOOGLE_MAPS, LeadSource.GOOGLE_MAPS_ADVANCED);
+    const showInstagram = isSourceActive(LeadSource.INSTAGRAM);
+    const showFacebook = isSourceActive(LeadSource.FACEBOOK);
+    const showLinkedIn = SHOW_LINKEDIN_FILTERS_UI && isSourceActive(LeadSource.LINKEDIN);
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -553,9 +563,15 @@ export const LeadsFilterSheet = ({ open, onOpenChange, filterPanel }: Props) => 
                     </SheetDescription>
                 </SheetHeader>
 
-                <div className="shrink-0 border-b bg-background px-4 py-3">
-                    <SourceMultiSelect selected={displayedSources} onChange={setSources} />
-                </div>
+                {showSourcePicker ? (
+                    <div className="shrink-0 border-b bg-background px-4 py-3">
+                        <SourceMultiSelect
+                            selected={displayedSources}
+                            availableSources={availableSources}
+                            onChange={setSources}
+                        />
+                    </div>
+                ) : null}
 
                 <div className="flex-1 overflow-y-auto px-4 py-5">
                     <div className="flex flex-col gap-6">

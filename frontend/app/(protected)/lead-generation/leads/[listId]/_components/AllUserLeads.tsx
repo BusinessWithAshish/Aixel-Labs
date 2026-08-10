@@ -24,6 +24,7 @@ export const AllUserLeads = () => {
     const {
         listId,
         leads,
+        listSources,
         filteredLeads,
         searchQuery,
         setSearchQuery,
@@ -167,6 +168,7 @@ export const AllUserLeads = () => {
                 open={filterSheetOpen}
                 onOpenChange={setFilterSheetOpen}
                 filterPanel={filterPanel}
+                listSources={listSources}
             />
 
             <TableExportPreviewDialog

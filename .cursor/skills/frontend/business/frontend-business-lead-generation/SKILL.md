@@ -144,7 +144,7 @@ Dual-form modules (LinkedIn): pass `moduleSegment` (`"people"` / `"company"`) so
 
 9. Route folder as above; always pass `creditModule` into `LeadFormWrapper`.
 10. Result card in `components/common/lead-card/` + switch branch in `LeadListItem.tsx`.
-11. Filters (optional): `FilterSource` / `SOURCE_META` / `FILTERABLE_SOURCES` (+ matchers/sort) under `leads/_utils/`.
+11. Filters (optional): `FilterSource` / `SOURCE_META` / `FILTERABLE_SOURCES` (+ matchers/sort) under `leads/_utils/`. `LeadsFilterSheet` scopes which source sections/source-picker render to `UserLeadList.sources` (server-aggregated distinct sources for that list — see `getListStatsByListId` in `user-lead-lists-actions.ts`), not just the sheet's own multi-select — a list is normally single-source, so the sheet should only ever surface filter methods for sources actually present in it.
 
 ## Credits rules
 

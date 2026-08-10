@@ -1,7 +1,7 @@
 'use client';
 
 import { createUserLeadListFromLeadIds, deleteUserLeads } from '@/app/actions/user-lead-actions';
-import type { Lead } from '@aixellabs/backend/db/types';
+import type { Lead, LeadSource } from '@aixellabs/backend/db/types';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -25,9 +25,11 @@ function buildFilteredListName(): string {
 export type AllLeadsPageData = {
     listId: string;
     leads: Lead[];
+    /** Distinct lead sources actually present in this list (drives which filter sections show). */
+    listSources: LeadSource[];
 };
 
-export const useAllLeadsPage = ({ listId, leads }: AllLeadsPageData) => {
+export const useAllLeadsPage = ({ listId, leads, listSources }: AllLeadsPageData) => {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
     const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -107,6 +109,7 @@ export const useAllLeadsPage = ({ listId, leads }: AllLeadsPageData) => {
     return {
         listId,
         leads,
+        listSources,
         filteredLeads,
         searchQuery,
         setSearchQuery,

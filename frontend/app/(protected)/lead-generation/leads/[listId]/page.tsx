@@ -26,7 +26,7 @@ async function LeadsListPage({ params }: { params: Promise<{ listId: string }> }
 
     return (
         <PageLayout title={pageTitle}>
-            <PageProvider data={{ listId, leads }} usePageHook={useAllLeadsPage}>
+            <PageProvider data={{ listId, leads, listSources: list.sources }} usePageHook={useAllLeadsPage}>
                 <AllUserLeads />
             </PageProvider>
         </PageLayout>
