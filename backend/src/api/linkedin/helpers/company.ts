@@ -4,6 +4,7 @@ import {
   LINKEDIN_BY_COMPANY_REQUEST,
   LINKEDIN_BY_COMPANY_RESPONSE,
 } from "../types";
+import { TRI_STATE_FILTER, matchesTriState } from "../../types";
 import { fetchGsearch } from "../../gsearch";
 import { GSEARCH_MAX_PAGES, GSEARCH_PAGE_SIZE } from "../../gsearch/constants";
 import { fetchUrls } from "../../../utils/node-tls-client-session-handler";
@@ -293,6 +294,17 @@ function hasRangeBounds(range?: { min?: number; max?: number }): boolean {
   return hasFiniteBound(range?.min) || hasFiniteBound(range?.max);
 }
 
+/** Window used to decide whether a company's last post counts as "recently active". */
+const RECENTLY_ACTIVE_WINDOW_DAYS = 90;
+
+function isRecentlyActive(lastPostDate: string | null): boolean {
+  if (!lastPostDate) return false;
+  const posted = new Date(lastPostDate).getTime();
+  if (Number.isNaN(posted)) return false;
+  const ageDays = (Date.now() - posted) / (1000 * 60 * 60 * 24);
+  return ageDays >= 0 && ageDays <= RECENTLY_ACTIVE_WINDOW_DAYS;
+}
+
 function filterLinkedInCompaniesByEnrichment(
   companies: LINKEDIN_BY_COMPANY_RESPONSE[],
   enrichment: LINKEDIN_BY_COMPANY_REQUEST["enrichment"],
@@ -302,6 +314,7 @@ function filterLinkedInCompaniesByEnrichment(
     funding,
     is_hiring,
     recently_funded,
+    is_recently_active,
     follower_count,
     description_include,
     description_exclude,
@@ -314,10 +327,14 @@ function filterLinkedInCompaniesByEnrichment(
   const hasFollowerCountFilter = hasRangeBounds(follower_count);
   const hasDescriptionInclude = Boolean(description_include?.length);
   const hasDescriptionExclude = Boolean(description_exclude?.length);
-  // Form switches write `false` when turned off. Labels are "only if …", so
-  // only `true` activates the filter — `false`/`undefined` means no filter.
-  const requireHiring = is_hiring === true;
-  const requireRecentlyFunded = recently_funded === true;
+  // Tri-state: 'has' requires the condition, 'missing' requires its absence,
+  // 'any' (default, including when enrichment itself is omitted) is inactive.
+  const isHiringFilter = is_hiring ?? TRI_STATE_FILTER.ANY;
+  const recentlyFundedFilter = recently_funded ?? TRI_STATE_FILTER.ANY;
+  const isRecentlyActiveFilter = is_recently_active ?? TRI_STATE_FILTER.ANY;
+  const hasHiringFilter = isHiringFilter !== TRI_STATE_FILTER.ANY;
+  const hasRecentlyFundedFilter = recentlyFundedFilter !== TRI_STATE_FILTER.ANY;
+  const hasRecentlyActiveFilter = isRecentlyActiveFilter !== TRI_STATE_FILTER.ANY;
 
   if (
     !hasEmployeeCountFilter &&
@@ -325,8 +342,9 @@ function filterLinkedInCompaniesByEnrichment(
     !hasFollowerCountFilter &&
     !hasDescriptionInclude &&
     !hasDescriptionExclude &&
-    !requireHiring &&
-    !requireRecentlyFunded
+    !hasHiringFilter &&
+    !hasRecentlyFundedFilter &&
+    !hasRecentlyActiveFilter
   ) {
     return companies;
   }
@@ -348,9 +366,12 @@ function filterLinkedInCompaniesByEnrichment(
     // only exposes round metadata). Presence of a funding section is the signal.
     if (hasFundingFilter && !item.funding_info) return false;
 
-    if (requireHiring && item.is_hiring !== true) return false;
+    if (!matchesTriState(isHiringFilter, item.is_hiring === true)) return false;
 
-    if (requireRecentlyFunded && !item.funding_info) return false;
+    if (!matchesTriState(recentlyFundedFilter, Boolean(item.funding_info))) return false;
+
+    if (!matchesTriState(isRecentlyActiveFilter, isRecentlyActive(item.last_post_date)))
+      return false;
 
     if (hasFollowerCountFilter) {
       const min = hasFiniteBound(follower_count?.min)

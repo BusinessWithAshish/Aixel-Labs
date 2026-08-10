@@ -1,3 +1,5 @@
+import { TRI_STATE_FILTER, type TriStateFilter } from "../../types";
+
 /** Upper bound for `limit` on Google Maps scraper request payloads. */
 export const GMAPS_REQUEST_LIMIT_MAX = 500;
 
@@ -13,15 +15,15 @@ export const GMAPS_ENRICHMENT_DEFAULTS: {
   minRating: number;
   minReviews: number;
   maxReviews: number | null;
-  requirePhone: boolean;
-  requireWebsite: boolean;
+  requirePhone: TriStateFilter;
+  requireWebsite: TriStateFilter;
   categoryContains: string;
 } = {
   minRating: 0,
   minReviews: 0,
   maxReviews: null,
-  requirePhone: false,
-  requireWebsite: false,
+  requirePhone: TRI_STATE_FILTER.ANY,
+  requireWebsite: TRI_STATE_FILTER.ANY,
   categoryContains: "",
 };
 
@@ -44,8 +46,10 @@ export const GMAPS_ENRICHMENT_FIELD_DESCRIPTIONS = {
     "Minimum review count. 0 means no minimum. Places without a review count fail when minReviews > 0.",
   maxReviews:
     "Maximum review count, or null for no upper bound. Places without a review count fail when maxReviews is set.",
-  requirePhone: "When true, only places with a non-empty phone number are returned.",
-  requireWebsite: "When true, only places with a non-empty website are returned.",
+  requirePhone:
+    "Tri-state: 'has' returns only places with a non-empty phone number, 'missing' returns only places without one, 'any' (default) applies no filter.",
+  requireWebsite:
+    "Tri-state: 'has' returns only places with a non-empty website, 'missing' returns only places without one, 'any' (default) applies no filter.",
   categoryContains:
     "Case-insensitive substring that must appear in at least one category label. Empty string means no category filter.",
   limit: `Maximum number of places to return after enrichment (1–${GMAPS_REQUEST_LIMIT_MAX}). Defaults to ${GMAPS_REQUEST_LIMIT_DEFAULT}.`,

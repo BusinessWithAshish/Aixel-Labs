@@ -5,7 +5,14 @@ import {
     GMAPS_MIN_RATING_OPTIONS,
     type GMAPS_ENRICHMENT,
 } from '@aixellabs/backend/gmaps/filters';
+import {
+    TRI_STATE_FILTER,
+    TRI_STATE_FILTER_OPTIONS,
+    type TriStateFilter,
+} from '@aixellabs/backend/api/types';
 import { LEAD_SORT_DEFAULTS, normalizeLeadSortState, type LeadSortState } from './lead-sort-constants';
+
+export { TRI_STATE_FILTER, TRI_STATE_FILTER_OPTIONS, type TriStateFilter };
 
 // ─── Source type ────────────────────────────────────────────────────────────
 
@@ -17,34 +24,8 @@ export type FilterSource =
     | LeadSource.INSTAGRAM
     | LeadSource.FACEBOOK;
 
-/**
- * Tri-state presence filter for the leads sheet.
- * - `any` — no filter (bidirectional switch center; default)
- * - `has` — must have the field (switch right)
- * - `missing` — must not have the field (switch left)
- *
- * Legacy boolean `true` migrates to `has`; legacy `false` migrates to `any`
- * (old off meant “unset”, not “exclude”).
- */
-export const TRI_STATE_FILTER = {
-    ANY: 'any',
-    HAS: 'has',
-    MISSING: 'missing',
-} as const;
-
-export type TriStateFilter = (typeof TRI_STATE_FILTER)[keyof typeof TRI_STATE_FILTER];
-
-export const TRI_STATE_FILTER_OPTIONS: { value: TriStateFilter; label: string }[] = [
-    { value: TRI_STATE_FILTER.ANY, label: 'Default' },
-    { value: TRI_STATE_FILTER.HAS, label: 'Yes' },
-    { value: TRI_STATE_FILTER.MISSING, label: 'No' },
-];
-
-/** Google Maps sheet filters: enrichment SSOT + tri-state presence fields. */
-export type GoogleMapsFilters = Omit<GMAPS_ENRICHMENT, 'requirePhone' | 'requireWebsite'> & {
-    requirePhone: TriStateFilter;
-    requireWebsite: TriStateFilter;
-};
+/** Google Maps sheet filters — same shape as the scrape-request enrichment SSOT. */
+export type GoogleMapsFilters = GMAPS_ENRICHMENT;
 
 export const INSTAGRAM_ACCOUNT_TYPE = {
     ANY: 'ANY',

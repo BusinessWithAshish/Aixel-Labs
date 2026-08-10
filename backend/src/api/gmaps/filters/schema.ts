@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRI_STATE_FILTER_SCHEMA } from "../../types";
 import {
   GMAPS_ENRICHMENT_DEFAULTS,
   GMAPS_ENRICHMENT_FIELD_DESCRIPTIONS,
@@ -30,14 +31,12 @@ export const GMAPS_ENRICHMENT_SCHEMA = z
     maxReviews: nullableNonNegInt
       .default(GMAPS_ENRICHMENT_DEFAULTS.maxReviews)
       .describe(GMAPS_ENRICHMENT_FIELD_DESCRIPTIONS.maxReviews),
-    requirePhone: z
-      .boolean()
-      .default(GMAPS_ENRICHMENT_DEFAULTS.requirePhone)
-      .describe(GMAPS_ENRICHMENT_FIELD_DESCRIPTIONS.requirePhone),
-    requireWebsite: z
-      .boolean()
-      .default(GMAPS_ENRICHMENT_DEFAULTS.requireWebsite)
-      .describe(GMAPS_ENRICHMENT_FIELD_DESCRIPTIONS.requireWebsite),
+    requirePhone: TRI_STATE_FILTER_SCHEMA.default(
+      GMAPS_ENRICHMENT_DEFAULTS.requirePhone,
+    ).describe(GMAPS_ENRICHMENT_FIELD_DESCRIPTIONS.requirePhone),
+    requireWebsite: TRI_STATE_FILTER_SCHEMA.default(
+      GMAPS_ENRICHMENT_DEFAULTS.requireWebsite,
+    ).describe(GMAPS_ENRICHMENT_FIELD_DESCRIPTIONS.requireWebsite),
     categoryContains: z
       .string()
       .trim()

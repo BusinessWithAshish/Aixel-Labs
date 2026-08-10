@@ -3,13 +3,14 @@
 import { usePage } from '@/contexts/PageStore';
 import { UseGoogleMapsFormReturn } from '../_hooks/use-google-maps-form';
 import {
-    BooleanControlledField,
     NumberControlledField,
     SearchableMultiSelectControlledField,
     SearchableSelectControlledField,
+    SelectControlledField,
     StringControlledField,
 } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { ZodSearchableSelectField } from '@/components/common/zod-form-builder/ZodFieldComponents';
+import { TRI_STATE_FILTER_OPTIONS } from '@aixellabs/backend/api/types';
 import { GMAPS_EMPTY, GMAPS_REQUEST_LIMIT_MAX } from '../_constants';
 
 export const GoogleMapsQueryForm = () => {
@@ -112,16 +113,18 @@ export const GoogleMapsQueryForm = () => {
                 required={false}
             />
 
-            <BooleanControlledField
+            <SelectControlledField
                 name="enrichment.requirePhone"
-                label="Require phone"
-                description="Only return places that have a phone number."
+                label="Phone number"
+                description="Filter by whether the place has a phone number listed. Default returns both."
+                options={TRI_STATE_FILTER_OPTIONS}
                 required={false}
             />
-            <BooleanControlledField
+            <SelectControlledField
                 name="enrichment.requireWebsite"
-                label="Require website"
-                description="Only return places that have a website."
+                label="Website"
+                description="Filter by whether the place has a website listed. Default returns both."
+                options={TRI_STATE_FILTER_OPTIONS}
                 required={false}
             />
 

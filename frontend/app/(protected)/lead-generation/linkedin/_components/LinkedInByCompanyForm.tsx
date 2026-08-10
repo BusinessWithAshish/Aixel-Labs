@@ -1,15 +1,16 @@
 'use client';
 
 import {
-    BooleanControlledField,
     NumberControlledField,
     SearchableGroupedMultiSelectControlledField,
     SearchableSelectControlledField,
+    SelectControlledField,
     StringArrayControlledField,
     StringControlledField,
 } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { FieldDescription, FieldGroup, FieldLegend, FieldSet } from '@/components/ui/field';
 import { LINKEDIN_REQUEST_RESULT_LIMIT_MAX } from '@aixellabs/backend/linkedin/constants';
+import { TRI_STATE_FILTER_OPTIONS } from '@aixellabs/backend/api/types';
 import { LINKEDIN_COMPANY_SIZE_OPTIONS, LINKEDIN_COMPANY_TYPE_OPTIONS } from '../_constants';
 import { linkedInIndustries } from '../_static-data/linkedin-industry-options';
 import { LinkedInLocationFields } from './LinkedInLocationFields';
@@ -171,10 +172,11 @@ export const LinkedInByCompanyForm = () => {
                     />
                 </FieldGroup>
 
-                <BooleanControlledField
+                <SelectControlledField
                     name="enrichment.is_recently_active"
                     label="Recently active"
-                    description="Only companies with recent activity on LinkedIn."
+                    description="Filter by whether the company has posted on LinkedIn in the last 90 days. Default returns both."
+                    options={TRI_STATE_FILTER_OPTIONS}
                     required={false}
                 />
 
@@ -192,16 +194,18 @@ export const LinkedInByCompanyForm = () => {
                 />
 
                 <FieldGroup className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:gap-x-8 sm:gap-y-4">
-                    <BooleanControlledField
+                    <SelectControlledField
                         name="enrichment.is_hiring"
                         label="Hiring"
-                        description="Only companies that are actively posting jobs on LinkedIn."
+                        description="Filter by whether the company is actively posting jobs on LinkedIn. Default returns both."
+                        options={TRI_STATE_FILTER_OPTIONS}
                         required={false}
                     />
-                    <BooleanControlledField
+                    <SelectControlledField
                         name="enrichment.recently_funded"
                         label="Recently funded"
-                        description="Only companies that have raised funding recently (per LinkedIn signals)."
+                        description="Filter by whether the company has raised funding recently (per LinkedIn signals). Default returns both."
+                        options={TRI_STATE_FILTER_OPTIONS}
                         required={false}
                     />
                 </FieldGroup>

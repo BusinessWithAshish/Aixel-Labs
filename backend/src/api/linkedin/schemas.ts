@@ -5,6 +5,7 @@ import {
   LINKEDIN_REQUEST_RESULT_LIMIT_MAX,
 } from "./constants";
 import { LOCATION_FIELDS_SCHEMA } from "../../utils/location-schema";
+import { TRI_STATE_FILTER, TRI_STATE_FILTER_SCHEMA } from "../types";
 
 /**
  * Discriminator so people vs company payloads cannot both `safeParse` successfully.
@@ -171,12 +172,9 @@ export const LINKEDIN_BY_COMPANY_REQUEST_SCHEMA = z.object({
         })
         .optional()
         .describe("Filter by total funding amount in USD (optional)."),
-      is_recently_active: z
-        .boolean()
-        .optional()
-        .describe(
-          "Only include companies that have posted recently on LinkedIn (optional).",
-        ),
+      is_recently_active: TRI_STATE_FILTER_SCHEMA.default(TRI_STATE_FILTER.ANY).describe(
+        "Tri-state: 'has' includes only companies that have posted recently on LinkedIn (within the last 90 days), 'missing' excludes them, 'any' (default) applies no filter.",
+      ),
       company_engagement_rate: z
         .object({
           min_likes: z.number().optional(),
@@ -188,18 +186,12 @@ export const LINKEDIN_BY_COMPANY_REQUEST_SCHEMA = z.object({
         .describe(
           "Filter by post engagement metrics — likes and comments (optional).",
         ),
-      is_hiring: z
-        .boolean()
-        .optional()
-        .describe(
-          "Only include companies that are actively hiring on LinkedIn (optional).",
-        ),
-      recently_funded: z
-        .boolean()
-        .optional()
-        .describe(
-          "Only include companies that recently received funding (optional).",
-        ),
+      is_hiring: TRI_STATE_FILTER_SCHEMA.default(TRI_STATE_FILTER.ANY).describe(
+        "Tri-state: 'has' includes only companies actively hiring on LinkedIn, 'missing' excludes them, 'any' (default) applies no filter.",
+      ),
+      recently_funded: TRI_STATE_FILTER_SCHEMA.default(TRI_STATE_FILTER.ANY).describe(
+        "Tri-state: 'has' includes only companies that recently received funding, 'missing' excludes them, 'any' (default) applies no filter.",
+      ),
       follower_count: z
         .object({
           min: z

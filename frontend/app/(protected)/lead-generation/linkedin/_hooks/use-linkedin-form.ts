@@ -12,6 +12,7 @@ import {
 import type { LINKEDIN_BY_COMPANY_REQUEST, LINKEDIN_BY_PEOPLE_REQUEST } from '@aixellabs/backend/linkedin/types';
 import type { OptionType } from '@/components/ui/searchable-select';
 import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
+import { TRI_STATE_FILTER } from '@aixellabs/backend/api/types';
 import { useLeadGenScraper } from '@/hooks/use-lead-gen-scraper';
 
 const LINKEDIN_BY_PEOPLE_DEFAULTS: LINKEDIN_BY_PEOPLE_REQUEST = {
@@ -52,10 +53,10 @@ const LINKEDIN_BY_COMPANY_DEFAULTS: LINKEDIN_BY_COMPANY_REQUEST = {
     enrichment: {
         employee_count: undefined,
         funding: undefined,
-        is_recently_active: undefined,
+        is_recently_active: TRI_STATE_FILTER.ANY,
         company_engagement_rate: undefined,
-        is_hiring: undefined,
-        recently_funded: undefined,
+        is_hiring: TRI_STATE_FILTER.ANY,
+        recently_funded: TRI_STATE_FILTER.ANY,
         follower_count: undefined,
         description_include: undefined,
         description_exclude: undefined,

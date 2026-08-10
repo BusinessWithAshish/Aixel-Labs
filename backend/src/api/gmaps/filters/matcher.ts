@@ -1,6 +1,7 @@
 import type { GMAPS_INTERNAL_RESPONSE } from "../internal/types";
 import type { GMAPS_ENRICHMENT } from "./schema";
 import { GMAPS_ENRICHMENT_DEFAULTS } from "./constants";
+import { TRI_STATE_FILTER, matchesTriState } from "../../types";
 
 type GmapsPlaceFields = Pick<
   GMAPS_INTERNAL_RESPONSE,
@@ -27,8 +28,8 @@ export const isEnrichmentActive = (f: GMAPS_ENRICHMENT): boolean =>
   f.minRating > 0 ||
   f.minReviews > 0 ||
   f.maxReviews !== null ||
-  f.requirePhone ||
-  f.requireWebsite ||
+  f.requirePhone !== TRI_STATE_FILTER.ANY ||
+  f.requireWebsite !== TRI_STATE_FILTER.ANY ||
   f.categoryContains.length > 0;
 
 /** Inclusive bounds; `max === null` means no upper bound. Missing values fail when a bound is active. */
@@ -81,8 +82,8 @@ export const matchGmapsPlace = (
   place: GmapsPlaceFields,
   enrichment: GMAPS_ENRICHMENT,
 ): boolean => {
-  if (enrichment.requirePhone && !nonEmpty(place.phone)) return false;
-  if (enrichment.requireWebsite && !nonEmpty(place.website)) return false;
+  if (!matchesTriState(enrichment.requirePhone, nonEmpty(place.phone))) return false;
+  if (!matchesTriState(enrichment.requireWebsite, nonEmpty(place.website))) return false;
 
   if (enrichment.categoryContains.length > 0) {
     const needle = enrichment.categoryContains.toLowerCase();
