@@ -2,6 +2,7 @@ import { IRouter, Router } from "express";
 import { API_ENDPOINTS } from "../../config";
 import { instagramApiHandler } from "./handler";
 import advancedRoutes from "./advanced";
+import { registerInstagramIntelligenceRoutes } from "./intelligence";
 export type { INSTAGRAM_RESPONSE } from "./types";
 export { INSTAGRAM_REQUEST_SCHEMA } from "./schemas";
 export {
@@ -20,5 +21,6 @@ const instagramRoutes: IRouter = Router();
 
 instagramRoutes.post(API_ENDPOINTS.INSTAGRAM.API.route, instagramApiHandler);
 instagramRoutes.use(advancedRoutes);
+registerInstagramIntelligenceRoutes(instagramRoutes);
 
 export default instagramRoutes;

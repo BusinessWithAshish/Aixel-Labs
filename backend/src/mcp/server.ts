@@ -51,11 +51,17 @@ import {
   fetchInstagramPopularSearch,
   IG_POPULAR_REQUEST_SCHEMA,
 } from "../api/instagram/advanced/popular";
+import { instagramAccountIntelligenceService } from "../api/instagram/intelligence/account/service";
+import { INSTAGRAM_ACCOUNT_INTELLIGENCE_REQUEST_SCHEMA } from "../api/instagram/intelligence/account/schemas";
+import {
+  AGGREGATE_ACCOUNT_SIGNALS_SCHEMA,
+  aggregateAccountSignalsService,
+} from "../api/instagram/intelligence/aggregation";
 import { fail, ok } from "./tool-result";
 
 export const MCP_SERVER_NAME = "aixel-intelligence";
 export const MCP_SERVER_VERSION = "1.0.0";
-export const MCP_TOOL_COUNT = 20;
+export const MCP_TOOL_COUNT = 22;
 
 export function createAixelIntelligenceMcpServer(): McpServer {
   const server = new McpServer({
@@ -390,6 +396,39 @@ export function createAixelIntelligenceMcpServer(): McpServer {
       try {
         const parsed = IG_POPULAR_REQUEST_SCHEMA.parse(args);
         return ok(await fetchInstagramPopularSearch(parsed));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "instagram_get_account_intelligence",
+    {
+      description:
+        "Fetch an Instagram account's profile stats and recent posts together, then compute per-post intelligence: engagement score (likes + 3×comments + 0.1×views), follower-normalized score (per 1,000 followers), recency-weighted velocity, engagement ratio, caption length, hashtag count, and a simple CTA-presence flag.\n\nUse this as the entry point for Instagram account/competitor research instead of calling instagram_get_profile and instagram_get_posts separately and computing these by hand — it does the arithmetic instagram_get_posts alone doesn't provide. Returns a lean post shape (no CDN rendition arrays) to stay well under response size limits. Private accounts return profile stats with an empty posts array.\n\nPass the returned `posts` array straight into instagram_aggregate_account_signals to get outlier detection, posting cadence, and score distribution for this account.",
+      inputSchema: INSTAGRAM_ACCOUNT_INTELLIGENCE_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        const parsed = INSTAGRAM_ACCOUNT_INTELLIGENCE_REQUEST_SCHEMA.parse(args);
+        return ok(await instagramAccountIntelligenceService(parsed));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "instagram_aggregate_account_signals",
+    {
+      description:
+        "Compute account-level intelligence signals from an array of intelligence-enriched Instagram posts (the `posts` array from instagram_get_account_intelligence). Pure in-memory aggregation — makes no API calls.\n\nReturns average engagement/normalized scores, a score percentile distribution, an outlier threshold (mean + 2×stddev of follower-normalized score — needs at least 8 posts, otherwise null), the outlier posts themselves already filtered and sorted by velocity descending, posting cadence in days, media type distribution, and the ratio of posts that are Reels (eligible for transcription/hook analysis).\n\nAlways pass posts from a single account only — never mix accounts, since follower counts differ too much for one outlier threshold to mean anything across them.",
+      inputSchema: AGGREGATE_ACCOUNT_SIGNALS_SCHEMA,
+    },
+    async (args) => {
+      try {
+        return ok(aggregateAccountSignalsService(args));
       } catch (err) {
         return fail(err);
       }
