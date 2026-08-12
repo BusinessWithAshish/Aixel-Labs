@@ -59,6 +59,25 @@ async function scrapePopularDom(
 
   try {
     const page = await browser.newPage();
+
+    // The scraper only reads anchor hrefs/textContent from the rendered DOM —
+    // images, video posters, fonts, and stylesheets on Instagram's
+    // thumbnail-heavy explore grid are pure Evomi bandwidth with zero signal.
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      const type = req.resourceType();
+      if (
+        type === "image" ||
+        type === "media" ||
+        type === "font" ||
+        type === "stylesheet"
+      ) {
+        req.abort().catch(() => {});
+      } else {
+        req.continue().catch(() => {});
+      }
+    });
+
     await page.authenticate({
       username: USERNAME,
       password: `${PASSWORD}_session-${sessionId}_country-US`,
@@ -199,6 +218,11 @@ export async function fetchInstagramPopularSearch(
   const country = input.country ?? "IN";
   const pageUrl = popularPageUrl(query);
 
+  // Live-tested (2026-08-12): a plain TLS GET of this route never carries the
+  // reel grid, with or without the Evomi proxy — Instagram gates the SSR
+  // media payload behind real-browser/JS-execution detection specifically for
+  // `PolarisLoggedOutPopularSearchRoute`. See README for the full writeup.
+  // Puppeteer is the only path that gets real data here, not a fallback.
   const scraped = await scrapePopularDom(pageUrl, maxReels);
   if (scraped.reels.length === 0) {
     throw new Error(IG_POPULAR_ERROR_MESSAGES.EMPTY);

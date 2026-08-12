@@ -31,6 +31,17 @@ function resolveLimit(limit: number | undefined): number {
   return limit ?? FACEBOOK_REQUEST_RESULT_LIMIT_DEFAULT;
 }
 
+/** Vanities still missing a lead, or whose lead lacks any About contact/category signal. */
+function sparseVanities(
+  vanities: string[],
+  byVanity: Map<string, FACEBOOK_RESPONSE>,
+): string[] {
+  return vanities.filter((v) => {
+    const lead = byVanity.get(v.toLowerCase());
+    return !lead || isSparseFacebookLead(lead);
+  });
+}
+
 function leadMatchesVanity(
   lead: FACEBOOK_RESPONSE,
   vanity: string,
@@ -104,29 +115,34 @@ export async function fetchFromEntities(
   });
   mergeLeadListIntoVanityMap(vanities, primary, byVanity);
 
-  const needFallback = vanities.filter((v) => {
-    const lead = byVanity.get(v.toLowerCase());
-    return !lead || isSparseFacebookLead(lead);
-  });
+  const needFallback = sparseVanities(vanities, byVanity);
 
   if (needFallback.length > 0) {
-    const fallbackResults = await fetchUrls<FACEBOOK_RESPONSE>({
-      targets: needFallback.flatMap((v) => [
-        facebookPageUrl(v),
-        facebookMbasicPageUrl(v),
-      ]),
+    // mbasic first — it's a lightweight text-only shell, while the full www
+    // page ships megabytes of inline state. Only escalate to www for
+    // vanities still sparse after mbasic instead of always fetching both.
+    const mbasicResults = await fetchUrls<FACEBOOK_RESPONSE>({
+      targets: needFallback.map(facebookMbasicPageUrl),
       headers: FB_HEADERS,
       mapper: (text, ctx) => mapPageBody(text, ctx.url),
     });
-    mergeLeadListIntoVanityMap(needFallback, fallbackResults, byVanity);
+    mergeLeadListIntoVanityMap(needFallback, mbasicResults, byVanity);
+
+    const stillSparseAfterMbasic = sparseVanities(needFallback, byVanity);
+
+    if (stillSparseAfterMbasic.length > 0) {
+      const wwwResults = await fetchUrls<FACEBOOK_RESPONSE>({
+        targets: stillSparseAfterMbasic.map(facebookPageUrl),
+        headers: FB_HEADERS,
+        mapper: (text, ctx) => mapPageBody(text, ctx.url),
+      });
+      mergeLeadListIntoVanityMap(stillSparseAfterMbasic, wwwResults, byVanity);
+    }
   }
 
   // Soft-blocked /about responses are intermittent — one retry often recovers
   // website / email / phone field_type payloads.
-  const needAboutRetry = vanities.filter((v) => {
-    const lead = byVanity.get(v.toLowerCase());
-    return !lead || isSparseFacebookLead(lead);
-  });
+  const needAboutRetry = sparseVanities(vanities, byVanity);
 
   if (needAboutRetry.length > 0) {
     const retryResults = await fetchUrls<FACEBOOK_RESPONSE>({
