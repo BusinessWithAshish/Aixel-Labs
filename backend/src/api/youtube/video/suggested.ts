@@ -9,11 +9,11 @@ import {
   buildInnertubeContext,
   createYoutubeFetchSession,
   durationTextToSeconds,
-  fetchInnertubeClientVersion,
   postInnertube,
   resolveYoutubeGeo,
   viewsTextToNumber,
 } from "../helpers";
+import { withSharedClientVersion } from "../client-version-cache";
 import { extractLastContinuationToken } from "../innertube-continuation";
 import {
   hasContinuationItemRenderer,
@@ -268,11 +268,10 @@ async function fetchSuggestedVideosAttempt(
   const session = await createYoutubeFetchSession({ country, region });
 
   try {
-    const clientVersion = await fetchInnertubeClientVersion(
-      session,
-      YOUTUBE_VIDEO_URL(videoId),
+    const { result: data, clientVersion } = await withSharedClientVersion(
+      () => createYoutubeFetchSession({ country, region }),
+      (cv) => fetchGetWatch(session, cv, gl, videoId),
     );
-    const data = await fetchGetWatch(session, clientVersion, gl, videoId);
     assertVideoResolvable(data, videoId);
 
     return collectSuggestedVideos(

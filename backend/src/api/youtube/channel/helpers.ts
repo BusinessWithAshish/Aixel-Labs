@@ -1,5 +1,4 @@
 import {
-  YOUTUBE_CHANNEL_PAGE_URL,
   YOUTUBE_DEFAULT_LIMIT,
   YOUTUBE_INNERTUBE_BROWSE_URL,
   YOUTUBE_VERIFIED_ACCESSIBILITY_MARKER,
@@ -9,13 +8,13 @@ import {
   buildInnertubeContext,
   createYoutubeFetchSession,
   emptyToNull,
-  fetchInnertubeClientVersion,
   postInnertube,
   resolveRedirectUrl,
   resolveYoutubeGeo,
   videoCountTextToNumber,
   viewsTextToNumber,
 } from "../helpers";
+import { withSharedClientVersion } from "../client-version-cache";
 import { extractLastContinuationToken } from "../innertube-continuation";
 import {
   closeUrlFetchSession,
@@ -199,16 +198,6 @@ function mapChannelInfo(
     keywords: emptyToNull(channel?.keywords),
     links: about ? parseAboutLinks(about) : null,
   };
-}
-
-async function fetchInnertubeClientVersionForChannel(
-  session: UrlFetchSession,
-  channelId: string,
-): Promise<string> {
-  return fetchInnertubeClientVersion(
-    session,
-    YOUTUBE_CHANNEL_PAGE_URL(channelId),
-  );
 }
 
 function parseShortsAccessibilityText(accessibilityText: string | undefined): {
@@ -746,17 +735,9 @@ export async function fetchYoutubeChannel(
   const session = await createYoutubeFetchSession({ country, region });
 
   try {
-    const clientVersion = await fetchInnertubeClientVersionForChannel(
-      session,
-      channelId,
-    );
-
-    const firstPage = await fetchBrowseFirstPage(
-      session,
-      channelId,
-      clientVersion,
-      gl,
-      browseParams,
+    const { result: firstPage, clientVersion } = await withSharedClientVersion(
+      () => createYoutubeFetchSession({ country, region }),
+      (cv) => fetchBrowseFirstPage(session, channelId, cv, gl, browseParams),
     );
 
     const aboutToken = extractAboutContinuationToken(firstPage);

@@ -4,10 +4,12 @@ import {
   fetchYoutubeWatchPageContext,
   resolveYoutubeGeo,
 } from "../helpers";
+import { withSharedClientVersion } from "../client-version-cache";
 import { closeUrlFetchSession } from "../../../utils/node-tls-client-session-handler";
 import type { YOUTUBE_GEO_REQUEST } from "../types";
 import type { YOUTUBE_VIDEO_DETAILS_RESPONSE } from "./types";
 import {
+  extractCommentCountFromGetWatch,
   fetchGetWatch,
   isVideoResolvable,
   parsePlayerResponse,
@@ -54,12 +56,24 @@ export async function fetchYoutubeVideoDetails(
 
   try {
     const pageUrl = YOUTUBE_VIDEO_URL(videoId);
-    const { clientVersion, initialData } = await fetchYoutubeWatchPageContext(
-      session,
-      pageUrl,
+    const { result: data } = await withSharedClientVersion(
+      () => createYoutubeFetchSession({ country, region }),
+      (clientVersion) => fetchGetWatch(session, clientVersion, gl, videoId),
     );
-    const data = await fetchGetWatch(session, clientVersion, gl, videoId);
     assertVideoResolvable(data, videoId);
+
+    // get_watch alone carries the comment count most of the time; only pay
+    // for the full watch-page HTML (several hundred KB) when it doesn't —
+    // same fallback `fetchYoutubeVideoMeta` already relies on for bulk enrich.
+    let initialData: Record<string, unknown> | undefined;
+    if (extractCommentCountFromGetWatch(data) === null) {
+      try {
+        ({ initialData } = await fetchYoutubeWatchPageContext(session, pageUrl));
+      } catch {
+        // Best-effort — parsePlayerResponse tolerates missing initialData.
+      }
+    }
+
     return parsePlayerResponse(data, videoId, initialData);
   } finally {
     await closeUrlFetchSession(session);

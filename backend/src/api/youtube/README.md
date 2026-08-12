@@ -41,6 +41,7 @@ youtube/
 ├── type-guards.ts            # Shared InnerTube renderer guards
 ├── innertube-continuation.ts # Continuation token extraction (flat + nested)
 ├── concurrency.ts            # runWithConcurrency for batch scrapers
+├── client-version-cache.ts   # Shared TTL cache for INNERTUBE_CLIENT_VERSION
 ├── search/
 ├── video/
 │   ├── errors.ts             # YoutubeVideoError
@@ -71,6 +72,14 @@ youtube/
 | Continuation tokens | `innertube-continuation.ts` |
 | Express handler boilerplate | `create-handler.ts` → `createYoutubeHandler` |
 | Batch concurrency | `concurrency.ts` → `runWithConcurrency` |
+| `INNERTUBE_CLIENT_VERSION` (6h TTL, self-healing) | `client-version-cache.ts` → `withSharedClientVersion`, `getSharedInnertubeClientVersion` |
+
+`INNERTUBE_CLIENT_VERSION` is a WEB-client build id identical across every
+video/channel/country — scraping it fresh via a full watch/channel-page HTML
+load on every call was the largest Evomi proxy bandwidth cost in this module.
+Every call site that needs it goes through `client-version-cache.ts` instead
+of calling `fetchInnertubeClientVersion` directly — see that file for the
+retry/invalidate contract before adding a new consumer.
 
 Sub-module schemas **extend** `YOUTUBE_GEO_REQUEST_SCHEMA` — never redefine `country`/`region` locally.
 
