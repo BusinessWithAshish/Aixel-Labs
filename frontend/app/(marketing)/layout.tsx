@@ -10,6 +10,9 @@ export const metadata: Metadata = {
             'Find, enrich, and act on leads across Maps, search, and social with a lead-management platform, plus a done-for-you AI automation consultancy.',
         siteName: 'Aixel Labs',
     },
+    other: {
+        'p:domain_verify': 'ed069598c639ed2485f5a7b2d00a2d0b',
+    },
 };
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
