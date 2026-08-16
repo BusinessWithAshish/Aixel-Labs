@@ -232,6 +232,60 @@ worth.
 - Never cross-post identical copy to multiple subreddits. Never link-drop
   without context.
 
+### Pinterest
+- **Search, not social.** Pins surface for months via query intent, so write
+  evergreen — never "today we shipped." The pin title *is* a search query
+  someone typed: *"lead scraping workflow for agencies"*, not *"Our new update."*
+- **Format:** 1000×1500 (2:3). Vertical is non-negotiable; 1:1 is buried.
+- **Visual:** one legible claim in bold Inter at the top third, one real
+  screenshot or clean diagram below, "A." mark bottom-right, 32px margin.
+  Text must be readable at thumbnail size — assume 200px wide.
+- **Board discipline:** one board per intent (e.g. "Lead gen workflows",
+  "B2B sales automation"), not one board per campaign.
+- **Description:** 2–3 plain sentences with the query terms said naturally.
+  No hashtag blocks — Pinterest ranks description text, not tags.
+- **API note:** `PINTEREST_CREATE_PIN` takes the image inline
+  (`image_base64` / `image_url`); there is no separate upload step.
+
+### LinkedIn
+- **Format:** plain text post, 3–8 short paragraphs, no image for most posts.
+  A screenshot only when it *is* the point. Never a designed "carousel PDF"
+  unless it carries a genuine multi-step walkthrough.
+- **Framing:** business outcome first — hours saved, leads found, cost avoided.
+  The reader is a founder or an ops lead, not an engineer.
+- **First line decides everything** — it is the only line shown before "…more".
+  Make it a concrete claim or a number, never "Excited to share…".
+- No LinkedIn-voice throat-clearing: no "Thrilled to announce", no lone-word
+  paragraphs for drama, no "Agree?" closers.
+- Comment in first person and answer every reply yourself.
+
+### Facebook
+- **Audience differs from X/LinkedIn** — assume a business owner, not a
+  technical buyer. Explain the problem before the mechanism.
+- **Format:** short post (2–4 sentences) plus one image. 1200×630 for link
+  posts, 1080×1080 for standalone.
+- Lead with the pain the reader already has; the product is the second beat.
+- Groups follow the same self-promo discipline as Reddit — read the group's
+  rules, contribute before posting, never paste identical copy across groups.
+
+---
+
+## 3a. Which platforms take a generated image
+
+| Platform | Visual | Notes |
+|---|---|---|
+| Reddit | **never** | text-native; a designed card reads as an ad |
+| X / Twitter | rarely | text threads outperform; image only for a real screenshot |
+| LinkedIn | rarely | screenshot when it *is* the point, otherwise plain text |
+| Facebook | usually | one image per post |
+| Instagram | always | the feed is the product |
+| Pinterest | always | the pin *is* the image |
+
+**Prefer a real product screenshot over generated art whenever the post is about
+the product.** For B2B, a real UI outperforms illustration — generated imagery
+earns its place mainly on Instagram and Pinterest, where the visual is the
+medium rather than the evidence.
+
 ---
 
 ## 4. Reusable prompt templates (paste into Claude, adapt the bracket)

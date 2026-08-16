@@ -9,7 +9,8 @@ Also attach (or `@`-reference) the files in `assets/` so the agent can see the l
 | `assets/aixellabs-full-logo.png` | Full lockup: mark + wordmark “Aixel Labs” |
 | `assets/aixellabs-logo.svg` | Vector mark (same icon as PNG) |
 
-In-app public URLs (Next.js): `/aixellabs-logo.png`, `/aixellabs-full-logo.png`, `/aixellabs-logo.svg`.
+In-app public URLs (Next.js): `/aixellabs-logo.svg` (the only mark served today) and `/aixellabs-wordmark.png`.
+`aixellabs-logo.png` and `aixellabs-full-logo.png` exist in `assets/` for agents but are **not** served from `public/` — do not link to them as URLs.
 
 ---
 
@@ -27,6 +28,26 @@ In-app public URLs (Next.js): `/aixellabs-logo.png`, `/aixellabs-full-logo.png`,
 | **Default theme hex (tenant fallback)** | `#4f46e5` (indigo) |
 
 **Name note:** Spelled **Aixel** (not “Pixel”). The logo mark is a stylized **“A.”** (folded ribbon “A” + period/dot). Do not rebrand as Pixel Labs.
+
+### Resolved palette (derived from `../app/globals.css`, sRGB hex)
+
+These are the **only** brand colours. Any generated creative must use them; do
+not invent a palette. Source tokens are `oklch()` in `globals.css` — these are
+the converted hex values, safe to paste into an image prompt or a Pillow script.
+
+| Role | Hex | Source token |
+|---|---|---|
+| **Primary (violet)** | `#8E51FF` | `--primary` (light) |
+| **Primary deep** | `#7F22FE` | `--primary` (dark theme) |
+| **Ink / foreground** | `#09090B` | `--foreground` |
+| **Muted text** | `#71717B` | `--muted-foreground` |
+| **Border / hairline** | `#E4E4E7` | `--border` |
+| **Surface** | `#FFFFFF` | `--background` (light) |
+| **Surface dark** | `#09090B` | `--background` (dark) |
+| **Legacy tenant fallback** | `#4F46E5` | `app-config.ts` default theme |
+
+**Type:** Inter (see `../helpers/fonts.ts`). Headlines bold/semibold, tight
+tracking. No other typeface.
 
 ### Voice & personality
 

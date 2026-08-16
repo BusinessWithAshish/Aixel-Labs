@@ -20,4 +20,5 @@ Paste-ready brand kit for **any** AI agent (Cursor, ChatGPT, Claude, CLI, etc.).
 | [`BRAND.md`](BRAND.md) | **Copy-paste brief** — product, logo, colors, type, UI rules |
 | [`assets/`](assets/) | Logo files bundled with the brief |
 
-Live app tokens remain in `../app/globals.css` and `../config/app-config.ts`. Served logos also live in `../public/`.
+Live app tokens remain in `../app/globals.css` and `../config/app-config.ts`.
+Served logos in `../public/`: `aixellabs-logo.svg`, `aixellabs-wordmark.png` — that is the complete list. `DEFAULT_LOGO_SRC` in `../config/app-config.ts` points at `/aixellabs-logo.svg`.
