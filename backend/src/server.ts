@@ -133,7 +133,7 @@ export = app;
 // For local/dev or traditional servers, keep `listen`.
 if (!process.env.VERCEL) {
   const PORT = process.env.PORT || 8002;
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     const timestamp = new Date().toLocaleString("en-US", {
       weekday: "long",
       month: "long",
@@ -146,4 +146,18 @@ if (!process.env.VERCEL) {
       `Aixel Labs backend running on port ${PORT} [${process.env.NODE_ENV}] - Started at ${timestamp}...`,
     );
   });
+
+  /**
+   * Node's `server.requestTimeout` defaults to 300_000ms (5 min) since v18 —
+   * too short for long-running upstream calls. Raised app-wide since several
+   * scrape/AI routes here can legitimately run long — in particular,
+   * viral-clipper's chunked diarization (see viral-clipper/diarize.ts) makes
+   * several sequential Gemini calls for long episodes (one per ~15min
+   * chunk), so a single `/viral-clipper/diarize` or `/viral-clipper/pipeline`
+   * request on a long episode can itself run considerably longer than any
+   * one Gemini call.
+   * `headersTimeout` stays under this per Node's requirement.
+   */
+  server.requestTimeout = 60 * 60 * 1000;
+  server.headersTimeout = 60 * 60 * 1000 - 1000;
 }

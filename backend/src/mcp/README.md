@@ -8,10 +8,10 @@ HTTP intelligence handlers — **no HTTP loopback**.
 | Mount | `ENDPOINTS.MCP` → `/mcp` |
 | Server name | `aixel-intelligence` |
 | Factory | `createAixelIntelligenceMcpServer()` in `server.ts` |
-| Tool count | `MCP_TOOL_COUNT` (**20**) in `server.ts` |
+| Tool count | `MCP_TOOL_COUNT` (**24**) in `server.ts` |
 
 Tool names are domain-prefixed (`youtube_*`, `trends_*`, `gsearch_*`,
-`transcription_*`, `instagram_*`) so tools group by name alone even though
+`transcription_*`, `instagram_*`, `viral_clipper_*`) so tools group by name alone even though
 they all live on one `McpServer` instance — a possible follow-up is actually
 splitting these into separate mounted server instances per domain.
 
@@ -39,6 +39,10 @@ splitting these into separate mounted server instances per domain.
 | `instagram_search_profiles` | Query → profile-title-biased GSearch discovery |
 | `instagram_search_content_leads` | Query → content-first (`/p/`, `/reel/`) GSearch discovery |
 | `instagram_get_popular_topic` | Topic → native IG `/popular/{q}/` reels (Puppeteer) |
+| `instagram_get_account_intelligence` | Profile + posts → per-post engagement/velocity intelligence |
+| `instagram_aggregate_account_signals` | Post-array → outlier detection, cadence, score distribution |
+| `viral_clipper_get_youtube_comment_highlights` | Video → audience-flagged timestamps from top comments (yt-dlp, no API key) |
+| `viral_clipper_get_youtube_chapters` | Video → creator's own chapter markers (yt-dlp, no API key) |
 
 ### Instagram discovery tool — which one to call
 

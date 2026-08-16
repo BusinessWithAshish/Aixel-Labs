@@ -16,6 +16,7 @@ export enum ENDPOINTS {
   GSEARCH = "/gsearch",
   GOOGLE_TRENDS = "/google-trends",
   TRANSCRIPTION = "/transcription",
+  VIRAL_CLIPPER = "/viral-clipper",
   MCP = "/mcp",
   SAMPLE = "/sample",
 }
@@ -168,5 +169,31 @@ export const API_ENDPOINTS = {
       full: `${ENDPOINTS.TRANSCRIPTION}/blob-upload`,
     },
     TRANSCRIBE: { route: "/", full: `${ENDPOINTS.TRANSCRIPTION}` },
+  },
+  VIRAL_CLIPPER: {
+    DIARIZE: {
+      route: "/diarize",
+      full: `${ENDPOINTS.VIRAL_CLIPPER}/diarize`,
+    },
+    VIRAL_MOMENTS: {
+      route: "/viral-moments",
+      full: `${ENDPOINTS.VIRAL_CLIPPER}/viral-moments`,
+    },
+    PIPELINE: {
+      route: "/pipeline",
+      full: `${ENDPOINTS.VIRAL_CLIPPER}/pipeline`,
+    },
+    CUT: {
+      route: "/cut",
+      full: `${ENDPOINTS.VIRAL_CLIPPER}/cut`,
+    },
+    YOUTUBE_COMMENTS: {
+      route: "/youtube-comments",
+      full: `${ENDPOINTS.VIRAL_CLIPPER}/youtube-comments`,
+    },
+    YOUTUBE_CHAPTERS: {
+      route: "/youtube-chapters",
+      full: `${ENDPOINTS.VIRAL_CLIPPER}/youtube-chapters`,
+    },
   },
 } as const;
