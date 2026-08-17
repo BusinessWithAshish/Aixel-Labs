@@ -1,14 +1,11 @@
 import { rm } from "node:fs/promises";
-import { dirname } from "node:path";
-
-import { del } from "@vercel/blob";
 
 import {
   TRANSCRIPTION,
   TRANSCRIPTION_ERROR_MESSAGES,
   TRANSCRIPTION_FORMAT,
 } from "./constants";
-import { downloadToTempFile } from "./download";
+import { cleanupResolvedMediaSource, resolveMediaSource } from "./download";
 import { normalizeToFlac } from "./ffmpeg";
 import { toJson, toSrt, toText, toVtt } from "./formatters";
 import { transcribeWithGroq } from "./groq-client";
@@ -36,18 +33,20 @@ function formatResponse(
   }
 }
 
-/** Download blob -> ffmpeg-normalize -> Groq transcribe -> format -> cleanup. */
+/** Resolve source -> ffmpeg-normalize -> Groq transcribe -> format -> cleanup. */
 export async function transcribe(
   request: TRANSCRIPTION_REQUEST_PARSED,
 ): Promise<TRANSCRIPTION_RESPONSE> {
-  const { blobUrl, format, language, model } = request;
+  const { mediaSource, format, language, model } = request;
 
-  const sourcePath = await downloadToTempFile(blobUrl);
-  const tempDir = dirname(sourcePath);
+  const resolved = await resolveMediaSource(mediaSource);
 
   try {
-    const normalized = await normalizeToFlac(sourcePath);
-    await rm(sourcePath, { force: true });
+    const normalized = await normalizeToFlac(resolved.path);
+    /** Only ever the downloaded copy — a caller-supplied local path is never deleted, see `ownsSource`. */
+    if (resolved.ownsSource) {
+      await rm(resolved.path, { force: true });
+    }
 
     if (normalized.sizeBytes > TRANSCRIPTION.GROQ_MAX_FILE_SIZE_BYTES) {
       throw new Error(TRANSCRIPTION_ERROR_MESSAGES.TOO_LARGE_AFTER_NORMALIZE);
@@ -65,7 +64,6 @@ export async function transcribe(
       durationSeconds: groqResponse.duration,
     };
   } finally {
-    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    await del(blobUrl).catch(() => {});
+    await cleanupResolvedMediaSource(resolved);
   }
 }

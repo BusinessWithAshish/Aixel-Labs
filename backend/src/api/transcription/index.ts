@@ -1,15 +1,9 @@
 import { type IRouter, Router } from "express";
 
 import { API_ENDPOINTS } from "../../config";
-import { transcriptionBlobUploadHandler } from "./blob-upload-handler";
 import { transcriptionApiHandler } from "./handler";
 
 const transcriptionRoutes: IRouter = Router();
-
-transcriptionRoutes.post(
-  API_ENDPOINTS.TRANSCRIPTION.BLOB_UPLOAD.route,
-  transcriptionBlobUploadHandler,
-);
 
 transcriptionRoutes.post(
   API_ENDPOINTS.TRANSCRIPTION.TRANSCRIBE.route,

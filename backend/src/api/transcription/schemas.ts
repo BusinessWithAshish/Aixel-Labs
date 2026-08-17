@@ -8,7 +8,10 @@ import {
 } from "./constants";
 
 export const TRANSCRIPTION_REQUEST_SCHEMA = z.object({
-  blobUrl: z.string().url().describe(TRANSCRIPTION_FIELD_DESCRIPTIONS.blobUrl),
+  mediaSource: z
+    .string()
+    .min(1)
+    .describe(TRANSCRIPTION_FIELD_DESCRIPTIONS.mediaSource),
   format: z
     .enum([
       TRANSCRIPTION_FORMAT.TXT,

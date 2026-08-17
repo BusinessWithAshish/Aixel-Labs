@@ -189,10 +189,6 @@ export const API_ENDPOINTS = {
     API: { route: "/api", full: `${ENDPOINTS.SAMPLE}/api` },
   },
   TRANSCRIPTION: {
-    BLOB_UPLOAD: {
-      route: "/blob-upload",
-      full: `${ENDPOINTS.TRANSCRIPTION}/blob-upload`,
-    },
     TRANSCRIBE: { route: "/", full: `${ENDPOINTS.TRANSCRIPTION}` },
   },
   VIRAL_CLIPPER: {

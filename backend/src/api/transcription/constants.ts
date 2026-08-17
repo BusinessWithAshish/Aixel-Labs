@@ -4,8 +4,8 @@
  */
 
 export const TRANSCRIPTION_FIELD_DESCRIPTIONS = {
-  blobUrl:
-    "URL of the video/audio file to transcribe — from POST /transcription/blob-upload, or any other publicly-reachable URL.",
+  mediaSource:
+    "Local filesystem path to the video/audio file to transcribe (read directly off disk), or a publicly-reachable URL.",
   format: "Output caption format.",
   language:
     "Optional ISO-639-1 language code to improve accuracy (e.g. 'en').",
@@ -27,37 +27,12 @@ export const TRANSCRIPTION_MODEL = {
 export const TRANSCRIPTION = {
   DEFAULT_FORMAT: TRANSCRIPTION_FORMAT.TXT,
   DEFAULT_MODEL: TRANSCRIPTION_MODEL.TURBO,
-  /** Raw upload cap enforced by Vercel Blob itself (client uploads directly, never touches our function). */
-  MAX_UPLOAD_SIZE_BYTES: 500 * 1024 * 1024,
   /** Cap on the ffmpeg-normalized (16kHz mono FLAC) file we actually send to Groq — matches Groq's dev-tier limit. */
   GROQ_MAX_FILE_SIZE_BYTES: 100 * 1024 * 1024,
   /** ffmpeg normalize target — Groq downsamples to this internally anyway, so pre-downsampling loses nothing. */
   TARGET_SAMPLE_RATE_HZ: 16000,
   TARGET_CHANNELS: 1,
-  BLOB_TOKEN_TTL_MS: 60 * 60 * 1000,
 } as const;
-
-/** Content types Vercel Blob will accept for a client upload — anything ffmpeg can demux. */
-export const TRANSCRIPTION_ALLOWED_CONTENT_TYPES = [
-  "video/mp4",
-  "video/quicktime",
-  "video/webm",
-  "video/x-matroska",
-  "video/mpeg",
-  "video/x-msvideo",
-  "audio/mpeg",
-  "audio/mp3",
-  "audio/wav",
-  "audio/x-wav",
-  "audio/mp4",
-  "audio/m4a",
-  "audio/x-m4a",
-  "audio/ogg",
-  "audio/flac",
-  "audio/x-flac",
-  "audio/webm",
-  "audio/aac",
-] as const;
 
 export const GROQ_TRANSCRIPTIONS_URL =
   "https://api.groq.com/openai/v1/audio/transcriptions";
