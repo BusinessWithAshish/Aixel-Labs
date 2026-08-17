@@ -10,6 +10,20 @@ import type {
 export type GroqTranscribeOptions = {
   model: TRANSCRIPTION_MODEL_VALUE;
   language?: string;
+  /**
+   * Ask for per-word start/end times (`verbose_json.words`) on top of the
+   * usual segments. Off by default — plain transcription has no use for them
+   * and they inflate the response — but required by anything that edits on
+   * word boundaries (`tightening/`).
+   */
+  wordTimestamps?: boolean;
+  /**
+   * Whisper's decoder prompt. Whisper is trained to emit *clean* prose and
+   * silently drops disfluencies ("um", "uh") from its output, so a caller that
+   * needs to find those words must bias the decode toward verbatim by seeding
+   * this with a disfluency-heavy sample. See `TIGHTENING.VERBATIM_PROMPT`.
+   */
+  prompt?: string;
 };
 
 /**
@@ -30,7 +44,7 @@ type FetchResponseLike = {
  * (Groq has no native srt/vtt output). */
 export async function transcribeWithGroq(
   filePath: string,
-  { model, language }: GroqTranscribeOptions,
+  { model, language, wordTimestamps, prompt }: GroqTranscribeOptions,
 ): Promise<GROQ_VERBOSE_JSON_RESPONSE> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -45,6 +59,17 @@ export async function transcribeWithGroq(
   form.set("response_format", "verbose_json");
   form.set("temperature", "0");
   if (language) form.set("language", language);
+  if (prompt) form.set("prompt", prompt);
+  /**
+   * Repeated `timestamp_granularities[]` fields (not one comma-joined value) —
+   * this is an array field in Groq's OpenAI-compatible multipart API. `segment`
+   * is requested alongside `word` because asking for `word` alone makes the API
+   * stop returning segments, which the srt/vtt formatters still need.
+   */
+  if (wordTimestamps) {
+    form.append("timestamp_granularities[]", "word");
+    form.append("timestamp_granularities[]", "segment");
+  }
 
   const res = (await fetch(GROQ_TRANSCRIPTIONS_URL, {
     method: "POST",

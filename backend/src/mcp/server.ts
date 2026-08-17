@@ -63,6 +63,8 @@ import {
   VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_SCHEMA,
   VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA,
 } from "../api/viral-clipper/schemas";
+import { tightenVideo } from "../api/tightening/client";
+import { TIGHTENING_REQUEST_SCHEMA } from "../api/tightening/schemas";
 import { fail, ok } from "./tool-result";
 import { IS_VERCEL_RUNTIME } from "../config";
 
@@ -70,7 +72,11 @@ export const MCP_SERVER_NAME = "aixel-intelligence";
 export const MCP_SERVER_VERSION = "1.0.0";
 /** Both viral_clipper tools shell out to yt-dlp (see VPS_ONLY_ENDPOINTS in config.ts) and are skipped on Vercel. */
 const VIRAL_CLIPPER_TOOL_COUNT = 2;
-export const MCP_TOOL_COUNT = IS_VERCEL_RUNTIME ? 24 - VIRAL_CLIPPER_TOOL_COUNT : 24;
+/** tightening_remove_silences_and_fillers is VPS-only (see VPS_ONLY_ENDPOINTS in config.ts) and is skipped on Vercel. */
+const TIGHTENING_TOOL_COUNT = 1;
+export const MCP_TOOL_COUNT = IS_VERCEL_RUNTIME
+  ? 25 - VIRAL_CLIPPER_TOOL_COUNT - TIGHTENING_TOOL_COUNT
+  : 25;
 
 export function createAixelIntelligenceMcpServer(): McpServer {
   const server = new McpServer({
@@ -302,6 +308,32 @@ export function createAixelIntelligenceMcpServer(): McpServer {
       }
     },
   );
+
+  /**
+   * VPS-only: a full-source re-encode is a minutes-long job, well past
+   * Vercel's serverless duration ceiling (and this module is VPS-only
+   * anyway — see VPS_ONLY_ENDPOINTS in config.ts). Skip registering it
+   * entirely on Vercel rather than registering a tool that would just time
+   * out at call time.
+   */
+  if (!IS_VERCEL_RUNTIME) {
+    server.registerTool(
+      "tightening_remove_silences_and_fillers",
+      {
+        description:
+          "Take a video and return a tightened version of it: dead air removed and filler words (uh, um, er, ...) cut out, video and audio staying in sync. Returns the finished video's local path plus how much was removed. One call, no editing decisions required from the caller.\n\nHow it works: ffmpeg's silencedetect finds every stretch quieter than `silenceThresholdDb` lasting at least `minSilenceSeconds`; Groq Whisper transcribes the audio with word-level timestamps to locate fillers; both sets of ranges are merged and cut from video and audio with one shared expression so they can't drift apart.\n\nTHE KNOB THAT MATTERS is `keepPaddingSeconds` (default 0.15). Silences are SHORTENED, not deleted — this much is left at each end of every pause. Lower it toward 0 for a punchier, more aggressive cut; raise it toward 0.3 if the result sounds rushed or gasping. `silenceThresholdDb` (default -30) controls what counts as silence at all: nearer 0 (e.g. -20) is more aggressive and will begin eating quiet speech, further away (e.g. -45) removes only near-total silence.\n\nFiller removal is best-effort, not exhaustive. Whisper is trained to emit clean prose and drops many disfluencies from its transcript before this tool ever sees them; a verbatim decoder prompt is used to counteract that, but expect most fillers caught, not all. The default dictionary is English-only pure disfluencies — discourse markers like 'like' and 'you know' are deliberately excluded because cutting a legitimate use is worse than leaving a filler in. Override `fillerWords` to change that. Set `removeFillers: false` to skip transcription entirely and do silence removal only (faster, and the right choice for non-English audio).\n\nThis re-encodes the WHOLE video, so runtime scales with source length — expect minutes, not seconds, on a long recording. `videoSource` accepts a local filesystem path (this runs on the VPS and reads/writes files directly off disk — the expected case when Hermes and this backend share the VPS's filesystem) or a publicly-reachable video URL. The source file is left in place, not deleted, so you can re-run with different settings without re-fetching it. The finished video is written straight to local disk (`TIGHTENING_OUTPUT_DIR`), no Blob upload round-trip.\n\nThis is NOT the viral-clipper pipeline: use viral_clipper_* / POST /viral-clipper for finding and cutting short-form moments OUT of an episode. This tool keeps the whole video and just removes the wasted time inside it.",
+        inputSchema: TIGHTENING_REQUEST_SCHEMA,
+      },
+      async (args) => {
+        try {
+          const parsed = TIGHTENING_REQUEST_SCHEMA.parse(args);
+          return ok(await tightenVideo(parsed));
+        } catch (err) {
+          return fail(err);
+        }
+      },
+    );
+  }
 
   server.registerTool(
     "gsearch_web_search",

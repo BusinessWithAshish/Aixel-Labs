@@ -8,7 +8,7 @@ HTTP intelligence handlers — **no HTTP loopback**.
 | Mount | `ENDPOINTS.MCP` → `/mcp` |
 | Server name | `aixel-intelligence` |
 | Factory | `createAixelIntelligenceMcpServer()` in `server.ts` |
-| Tool count | `MCP_TOOL_COUNT` (**30**, **28** on Vercel — see below) in `server.ts` |
+| Tool count | `MCP_TOOL_COUNT` (**30**, **27** on Vercel — see below) in `server.ts` |
 
 Tool names are domain-prefixed (`youtube_*`, `trends_*`, `gsearch_*`,
 `transcription_*`, `instagram_*`, `viral_clipper_*`, `twitter_*`) so tools group by name alone even though
@@ -48,7 +48,7 @@ splitting these into separate mounted server instances per domain.
 | `twitter_search` | Query → GSearch `site:x.com` + GraphQL hydrate |
 | `viral_clipper_get_youtube_comment_highlights` | Video → audience-flagged timestamps from top comments (yt-dlp, no API key) — **VPS only, skipped on Vercel** |
 | `viral_clipper_get_youtube_chapters` | Video → creator's own chapter markers (yt-dlp, no API key) — **VPS only, skipped on Vercel** |
-| `tightening_remove_silences_and_fillers` | Video → same video with dead air + filler words cut out (ffmpeg silencedetect + Whisper word timestamps) |
+| `tightening_remove_silences_and_fillers` | Video → same video with dead air + filler words cut out (ffmpeg silencedetect + Whisper word timestamps) — **VPS only, skipped on Vercel** |
 
 ### Instagram discovery tool — which one to call
 
@@ -75,12 +75,19 @@ Guest GraphQL/REST — no user login. Native keyword search is login-walled.
 
 ## Vercel vs VPS
 
-Two viral_clipper tools shell out to yt-dlp, which isn't guaranteed present
-on Vercel's build image (the whole viral-clipper module is VPS-only — see
-`VPS_ONLY_ENDPOINTS` in `../config.ts`). `server.ts` skips registering them
-entirely when `IS_VERCEL_RUNTIME` is true, instead of registering a tool
-that would just fail at call time; `MCP_TOOL_COUNT` reflects the actual
-count for the current runtime.
+Three tools are skipped on Vercel, for two different reasons — both covered
+by `VPS_ONLY_ENDPOINTS` in `../config.ts`:
+
+- The two `viral_clipper_*` comment/chapter tools shell out to yt-dlp, which
+  isn't guaranteed present on Vercel's build image (the whole viral-clipper
+  module is VPS-only regardless).
+- `tightening_remove_silences_and_fillers` always re-encodes the entire
+  source video — a minutes-long job, well past Vercel's serverless duration
+  ceiling.
+
+`server.ts` skips registering all three entirely when `IS_VERCEL_RUNTIME` is
+true, instead of registering a tool that would just time out or fail at call
+time; `MCP_TOOL_COUNT` reflects the actual count for the current runtime.
 
 ## Layout
 

@@ -23,12 +23,26 @@ export type GROQ_TRANSCRIPTION_SEGMENT = {
   text: string;
 };
 
+/**
+ * One Groq `verbose_json` word — only present when the request asked for
+ * `timestamp_granularities[]=word`. Timings are approximate (Whisper aligns
+ * words against 20ms audio frames, so expect ~±100ms), which is why anything
+ * cutting on these should clamp against neighbouring words rather than trust
+ * a single boundary — see `tightening/fillers.ts`.
+ */
+export type GROQ_TRANSCRIPTION_WORD = {
+  word: string;
+  start: number;
+  end: number;
+};
+
 export type GROQ_VERBOSE_JSON_RESPONSE = {
   task?: string;
   language?: string;
   duration?: number;
   text: string;
   segments: GROQ_TRANSCRIPTION_SEGMENT[];
+  words?: GROQ_TRANSCRIPTION_WORD[];
 };
 
 export type TRANSCRIPTION_RESPONSE = {

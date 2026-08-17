@@ -102,6 +102,22 @@
       "types": "./src/api/transcription/constants.ts",
       "default": "./src/api/transcription/constants.ts"
     },
+    "./tightening": {
+      "types": "./src/api/tightening/index.ts",
+      "default": "./src/api/tightening/index.ts"
+    },
+    "./tightening/schemas": {
+      "types": "./src/api/tightening/schemas.ts",
+      "default": "./src/api/tightening/schemas.ts"
+    },
+    "./tightening/types": {
+      "types": "./src/api/tightening/types.ts",
+      "default": "./src/api/tightening/types.ts"
+    },
+    "./tightening/constants": {
+      "types": "./src/api/tightening/constants.ts",
+      "default": "./src/api/tightening/constants.ts"
+    },
     "./instagram": {
       "types": "./src/api/instagram/types.ts",
       "default": "./src/api/instagram/types.ts"

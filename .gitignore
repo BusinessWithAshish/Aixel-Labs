@@ -120,6 +120,7 @@ Thumbs.db
 /backend/scripts/
 /backend/experiments/
 /backend/_temp/
+/backend/storage/
 /scraper/venv
 /scraper/output/
 

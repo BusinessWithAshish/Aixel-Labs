@@ -17,6 +17,7 @@ export enum ENDPOINTS {
   GOOGLE_TRENDS = "/google-trends",
   TRANSCRIPTION = "/transcription",
   VIRAL_CLIPPER = "/viral-clipper",
+  TIGHTENING = "/tightening",
   MCP = "/mcp",
   SAMPLE = "/sample",
 }
@@ -31,7 +32,17 @@ export enum ENDPOINTS {
  * persistent process instead (this project's Ubuntu VPS) — see each
  * module's README for why it's listed here before adding more.
  */
-export const VPS_ONLY_ENDPOINTS: ENDPOINTS[] = [ENDPOINTS.VIRAL_CLIPPER];
+export const VPS_ONLY_ENDPOINTS: ENDPOINTS[] = [
+  ENDPOINTS.VIRAL_CLIPPER,
+  /**
+   * Tightening always re-encodes the WHOLE source video (`select`+`setpts`
+   * rewrites every frame's timestamp regardless of where the cuts land, so
+   * stream-copy is never an option) — minutes, not seconds, on anything
+   * past a few minutes of source. Same execution-time problem as
+   * VIRAL_CLIPPER, same fix.
+   */
+  ENDPOINTS.TIGHTENING,
+];
 
 /**
  * Vercel sets `VERCEL=1` automatically on every deployment (already relied
@@ -216,5 +227,8 @@ export const API_ENDPOINTS = {
       route: "/youtube-chapters",
       full: `${ENDPOINTS.VIRAL_CLIPPER}/youtube-chapters`,
     },
+  },
+  TIGHTENING: {
+    TIGHTEN: { route: "/", full: `${ENDPOINTS.TIGHTENING}` },
   },
 } as const;
