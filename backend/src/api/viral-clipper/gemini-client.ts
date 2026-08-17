@@ -32,8 +32,20 @@ const GEMINI_FETCH_DISPATCHER = new Agent({
   bodyTimeout: 15 * 60 * 1000,
 });
 
-/** `dispatcher` is a Node/undici extension to the standard `fetch()` options. */
-type FetchInitWithDispatcher = RequestInit & { dispatcher?: Agent };
+/**
+ * Locally-declared, not extending the ambient `RequestInit` — same fix as
+ * `FetchResponseLike` above: Vercel's build container resolves a different
+ * (incompatible, missing `method`) ambient `RequestInit` than local installs
+ * do, since this monorepo has multiple `@types/node` versions in its
+ * dependency graph. `dispatcher` itself is a Node/undici extension to the
+ * standard `fetch()` options.
+ */
+type FetchInitWithDispatcher = {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string | Buffer;
+  dispatcher?: Agent;
+};
 
 function geminiFetch(
   url: string,
