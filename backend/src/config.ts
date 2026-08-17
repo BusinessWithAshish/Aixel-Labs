@@ -21,6 +21,31 @@ export enum ENDPOINTS {
   SAMPLE = "/sample",
 }
 
+/**
+ * Endpoints that must NOT be mounted when running on Vercel (`routes.ts`
+ * skips `app.use` for these when `IS_VERCEL_RUNTIME` is true) — long-running
+ * jobs that would exceed Vercel's serverless function time limit (10s-15min
+ * depending on plan; nowhere near enough for a 20+ minute chunked Gemini
+ * pipeline), and/or that shell out to system binaries (yt-dlp, ffmpeg) not
+ * guaranteed present on Vercel's build image. These are meant to run on a
+ * persistent process instead (this project's Ubuntu VPS) — see each
+ * module's README for why it's listed here before adding more.
+ */
+export const VPS_ONLY_ENDPOINTS: ENDPOINTS[] = [ENDPOINTS.VIRAL_CLIPPER];
+
+/**
+ * Vercel sets `VERCEL=1` automatically on every deployment (already relied
+ * on in `server.ts` to skip `app.listen`) — reused here as the single
+ * signal for "am I running as a Vercel serverless function" vs. a normal
+ * persistent process (VPS, local dev). No separate env var to configure.
+ */
+export const IS_VERCEL_RUNTIME = !!process.env.VERCEL;
+
+/** `routes.ts` (and `mcp/server.ts` for tool registration) guard mounts with this instead of repeating the IS_VERCEL_RUNTIME + VPS_ONLY_ENDPOINTS check inline. */
+export function isEndpointAllowedOnCurrentRuntime(endpoint: ENDPOINTS): boolean {
+  return !IS_VERCEL_RUNTIME || !VPS_ONLY_ENDPOINTS.includes(endpoint);
+}
+
 export const ALLOWED_ORIGINS_DEV_REGEX = [
   /^http:\/\/.*\.localhost:3003$/,
   /^https:\/\/.*\.aixellabs\.com$/,

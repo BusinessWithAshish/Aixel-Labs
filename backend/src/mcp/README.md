@@ -8,10 +8,10 @@ HTTP intelligence handlers — **no HTTP loopback**.
 | Mount | `ENDPOINTS.MCP` → `/mcp` |
 | Server name | `aixel-intelligence` |
 | Factory | `createAixelIntelligenceMcpServer()` in `server.ts` |
-| Tool count | `MCP_TOOL_COUNT` (**24**) in `server.ts` |
+| Tool count | `MCP_TOOL_COUNT` (**30**, **28** on Vercel — see below) in `server.ts` |
 
 Tool names are domain-prefixed (`youtube_*`, `trends_*`, `gsearch_*`,
-`transcription_*`, `instagram_*`, `viral_clipper_*`) so tools group by name alone even though
+`transcription_*`, `instagram_*`, `viral_clipper_*`, `twitter_*`) so tools group by name alone even though
 they all live on one `McpServer` instance — a possible follow-up is actually
 splitting these into separate mounted server instances per domain.
 
@@ -41,8 +41,14 @@ splitting these into separate mounted server instances per domain.
 | `instagram_get_popular_topic` | Topic → native IG `/popular/{q}/` reels (Puppeteer) |
 | `instagram_get_account_intelligence` | Profile + posts → per-post engagement/velocity intelligence |
 | `instagram_aggregate_account_signals` | Post-array → outlier detection, cadence, score distribution |
-| `viral_clipper_get_youtube_comment_highlights` | Video → audience-flagged timestamps from top comments (yt-dlp, no API key) |
-| `viral_clipper_get_youtube_chapters` | Video → creator's own chapter markers (yt-dlp, no API key) |
+| `twitter_get_user` | Handle/URL → public profile stats |
+| `twitter_get_tweet` | Tweet ID/URL → tweet (+ optional same-author related) |
+| `twitter_get_user_tweets` | Handle → profile + recent timeline |
+| `twitter_get_trending` | Country → X trending topics (guest REST) |
+| `twitter_search` | Query → GSearch `site:x.com` + GraphQL hydrate |
+| `viral_clipper_get_youtube_comment_highlights` | Video → audience-flagged timestamps from top comments (yt-dlp, no API key) — **VPS only, skipped on Vercel** |
+| `viral_clipper_get_youtube_chapters` | Video → creator's own chapter markers (yt-dlp, no API key) — **VPS only, skipped on Vercel** |
+| `tightening_remove_silences_and_fillers` | Video → same video with dead air + filler words cut out (ffmpeg silencedetect + Whisper word timestamps) |
 
 ### Instagram discovery tool — which one to call
 
@@ -54,6 +60,27 @@ and are not interchangeable:
 | `instagram_search_profiles` | Google, profile-title biased | Default first try — "type of account" queries |
 | `instagram_search_content_leads` | Google, post/reel content | Local/niche/business accounts that don't rank on profile title |
 | `instagram_get_popular_topic` | Native Instagram (no Google) | Fallback when both GSearch-based tools are thin/rate-limited |
+
+### Twitter / X — which tool to call
+
+Guest GraphQL/REST — no user login. Native keyword search is login-walled.
+
+| Tool | Surface | Best for |
+|------|---------|----------|
+| `twitter_get_trending` | X `trends/place.json` | "What's trending right now" |
+| `twitter_search` | GSearch `site:x.com` + hydrate | Topic → tweets or profiles (needs Evomi) |
+| `twitter_get_user` | GraphQL `UserByScreenName` | You already have a handle/URL |
+| `twitter_get_user_tweets` | GraphQL `UserTweets` | Profile timeline |
+| `twitter_get_tweet` | GraphQL + syndication | One tweet ID/URL; `includeRelated` for same-author posts |
+
+## Vercel vs VPS
+
+Two viral_clipper tools shell out to yt-dlp, which isn't guaranteed present
+on Vercel's build image (the whole viral-clipper module is VPS-only — see
+`VPS_ONLY_ENDPOINTS` in `../config.ts`). `server.ts` skips registering them
+entirely when `IS_VERCEL_RUNTIME` is true, instead of registering a tool
+that would just fail at call time; `MCP_TOOL_COUNT` reflects the actual
+count for the current runtime.
 
 ## Layout
 

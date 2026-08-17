@@ -1,9 +1,9 @@
-import { diarizeFromBlobUrl } from "./diarize";
+import { diarizeFromSource } from "./diarize";
 import type { VIRAL_CLIPPER_PIPELINE_RESPONSE } from "./types";
 import { scoreViralMoments } from "./viral-moments";
 
 export type RunViralClipperPipelineOptions = {
-  blobUrl: string;
+  audioSource: string;
   model: string;
   minCandidates: number;
   maxCandidates: number;
@@ -13,12 +13,12 @@ export type RunViralClipperPipelineOptions = {
   audienceSignals?: string[];
 };
 
-/** Full viral-clipper pipeline: audio URL -> diarized transcript -> ranked clip candidates. */
+/** Full viral-clipper pipeline: audio source -> diarized transcript -> ranked clip candidates. */
 export async function runViralClipperPipeline(
   options: RunViralClipperPipelineOptions,
 ): Promise<VIRAL_CLIPPER_PIPELINE_RESPONSE> {
   const {
-    blobUrl,
+    audioSource,
     model,
     minCandidates,
     maxCandidates,
@@ -28,7 +28,7 @@ export async function runViralClipperPipeline(
     audienceSignals,
   } = options;
 
-  const diarized = await diarizeFromBlobUrl(blobUrl, model);
+  const diarized = await diarizeFromSource(audioSource, model);
   const viral = await scoreViralMoments({
     diarized: diarized.transcript,
     model,

@@ -52,7 +52,7 @@ function requireValidClipDurationRange<
 }
 
 export const VIRAL_CLIPPER_DIARIZE_REQUEST_SCHEMA = z.object({
-  blobUrl: z.string().url().describe(VIRAL_CLIPPER_FIELD_DESCRIPTIONS.blobUrl),
+  audioSource: z.string().min(1).describe(VIRAL_CLIPPER_FIELD_DESCRIPTIONS.audioSource),
   model: z
     .string()
     .optional()
@@ -116,10 +116,10 @@ const CLIP_RANGE_SCHEMA = z.object({
 });
 
 export const VIRAL_CLIPPER_CUT_REQUEST_SCHEMA = z.object({
-  videoBlobUrl: z
+  videoSource: z
     .string()
-    .url()
-    .describe(VIRAL_CLIPPER_FIELD_DESCRIPTIONS.videoBlobUrl),
+    .min(1)
+    .describe(VIRAL_CLIPPER_FIELD_DESCRIPTIONS.videoSource),
   clips: z.array(CLIP_RANGE_SCHEMA).min(1).describe(VIRAL_CLIPPER_FIELD_DESCRIPTIONS.clips),
   diarized: DIARIZED_TRANSCRIPT_SCHEMA.optional().describe(
     VIRAL_CLIPPER_FIELD_DESCRIPTIONS.diarizedForSnap,
@@ -148,7 +148,7 @@ export const VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_SCHEMA = z.object({
 
 export const VIRAL_CLIPPER_PIPELINE_REQUEST_SCHEMA = z
   .object({
-    blobUrl: z.string().url().describe(VIRAL_CLIPPER_FIELD_DESCRIPTIONS.blobUrl),
+    audioSource: z.string().min(1).describe(VIRAL_CLIPPER_FIELD_DESCRIPTIONS.audioSource),
     model: z
       .string()
       .optional()

@@ -22,6 +22,52 @@ transcription + diarization together. Viral-moment scoring is a pure text
 task afterward — reuses the same model so the two calls compose naturally in
 `pipeline.ts`.
 
+## Deployment: VPS-only, not Vercel
+
+**This entire module is VPS-only.** It's listed in `VPS_ONLY_ENDPOINTS`
+(`backend/src/config.ts`) — `routes.ts` skips mounting `/viral-clipper/*`
+entirely when `IS_VERCEL_RUNTIME` is true (Vercel sets `VERCEL=1`
+automatically on every deployment; no separate env var to configure). The
+same guard skips registering the two `viral_clipper_*` MCP tools on Vercel
+(see `mcp/server.ts`). Two independent reasons this can't run as a Vercel
+serverless function:
+
+1. **Execution time.** Chunked diarization on a long episode is a 15-20+
+   minute job (see "Long episodes" below) — Vercel serverless functions have
+   a hard duration ceiling (10s-15min depending on plan), nowhere near
+   enough. `server.ts`'s `if (!process.env.VERCEL) { app.listen(...) }` split
+   means any timeout tuning only takes effect off Vercel anyway.
+2. **System binaries.** `/youtube-comments` and `/youtube-chapters` shell out
+   to a `yt-dlp` binary that isn't guaranteed present on Vercel's build
+   image (unlike `ffmpeg`, which ships as the `ffmpeg-static` npm package and
+   works anywhere Node runs).
+
+Run this backend on the VPS (persistent process, not serverless) for
+anything under `/viral-clipper/*`. **Hermes, running on the same VPS, calls
+the pipeline's internal URL directly** (e.g. `http://localhost:<port>/viral-clipper/...`)
+— no public URL, no Blob upload/download round-trip, just a local HTTP call
+to a sibling process on the same machine.
+
+## Storage: local disk, not Vercel Blob
+
+This module reads and writes local files directly — **no Vercel Blob**,
+which was only ever needed to hand a file between stateless serverless
+invocations (a constraint that doesn't exist on a persistent VPS process)
+and was capped at Vercel's 1GB free storage limit besides.
+
+- **Input** (`audioSource` / `videoSource` on `/diarize`, `/pipeline`,
+  `/cut`) accepts either a local filesystem path (used in place, read
+  directly off disk — the expected case when Hermes and this backend share
+  the VPS's filesystem) or an http(s) URL (downloaded to a temp dir first,
+  for the rare case where the only thing available is a remote link). See
+  `resolveMediaSource`/`cleanupResolvedMediaSource` in `download.ts`.
+- **Output** — `/cut` writes finished clips straight to
+  `VIRAL_CLIPPER_OUTPUT_DIR` (env var, defaults to
+  `<cwd>/storage/viral-clipper-cuts`) and returns each clip's local
+  `clipPath` in the response instead of an uploaded URL. Point
+  `VIRAL_CLIPPER_OUTPUT_DIR` at wherever on the VPS's 200GB disk should hold
+  finished clips; the directory is created automatically if missing.
+
 ## Env
 
 - `GEMINI_API_KEY_FREE` — **required**. Deliberately a separate key/env var
@@ -35,34 +81,27 @@ task afterward — reuses the same model so the two calls compose naturally in
   (`key1,key2,key3`) — see "Multi-key pool + retry" below. The pool NEVER
   falls back to `GEMINI_API_KEY` (the paid key) automatically; that's a
   deliberate boundary, not an oversight.
-- `BLOB_READ_WRITE_TOKEN` — same Vercel Blob store the `transcription` module
-  uses. **This store is private-only** — `access: 'public'` is rejected;
-  uploads must use `access: 'private'`, and downloads send the token as a
-  bearer header to match (see `download.ts`, and `scripts/viral-clipper-smoke.ts`
-  for a working example).
+- `VIRAL_CLIPPER_OUTPUT_DIR` — optional, local directory `/cut` writes
+  finished clips to. Defaults to `<cwd>/storage/viral-clipper-cuts`; set it
+  to wherever on the VPS's disk clips should actually live.
 - **`yt-dlp` binary** (system-level, not an npm dependency) — required by
   `/viral-clipper/youtube-comments` and `/viral-clipper/youtube-chapters` only (the
   core diarize/viral-moments/cut endpoints don't need it). No YouTube Data
   API key exists in this project, so both endpoints shell out to a system
   `yt-dlp` install instead — same public endpoints youtube.com itself uses,
-  no quota/key required. **Production-readiness not yet verified**: unlike
-  `ffmpeg` (bundled via the `ffmpeg-static` npm package, works anywhere Node
-  runs), this backend has no `Dockerfile` of its own in the repo (only
-  `browser-worker` does), which suggests it deploys via a Node buildpack —
-  those don't install arbitrary system binaries like `yt-dlp`. Confirmed
-  working locally (this machine has `yt-dlp` via Homebrew); whether it's
-  present on the actual Cloud Run deploy target is unconfirmed. If not, these
-  two endpoints will fail there until either the deploy adds `yt-dlp` or a
-  bundled-binary npm alternative is adopted (no reliably-maintained one
-  identified yet, unlike `ffmpeg-static`).
+  no quota/key required. Confirmed working locally (this machine has
+  `yt-dlp` via Homebrew) — make sure it's installed on the VPS too.
 
 ## Endpoints
 
 ### `POST /viral-clipper/diarize`
 
 ```jsonc
-{ "blobUrl": "https://....private.blob.vercel-storage.com/....mp3", "model": "gemini-3.5-flash" /* optional */ }
+{ "audioSource": "/data/podcasts/episode-42.mp3", "model": "gemini-3.5-flash" /* optional */ }
 ```
+
+`audioSource` is a local filesystem path (the normal case — read directly
+off the VPS's disk) or an http(s) URL.
 
 Returns `ALApiResponse<VIRAL_CLIPPER_DIARIZE_RESPONSE>` — `{ transcript: DIARIZED_TRANSCRIPT, usage }`.
 
@@ -123,14 +162,14 @@ Returns `ALApiResponse<VIRAL_CLIPPER_YOUTUBE_CHAPTERS_RESPONSE>` — `{ videoTit
 
 ```jsonc
 {
-  "videoBlobUrl": "https://....private.blob.vercel-storage.com/....mp4", // the SOURCE VIDEO, not audio-only
+  "videoSource": "/data/podcasts/episode-42.mp4", // the SOURCE VIDEO, not audio-only — local path or URL
   "clips": [{ "start": "17:25", "end": "18:14", "label": "trauma-jokes" }], // any {start,end} list — not tied to VIRAL_MOMENT_CANDIDATE's shape
   "diarized": /* optional DIARIZED_TRANSCRIPT — enables boundary-snapping, see below */,
   "aspectRatio": "9:16" // optional — "9:16" (default) | "16:9" | "1:1" | "original"
 }
 ```
 
-Returns `ALApiResponse<VIRAL_CLIPPER_CUT_RESPONSE>` — `{ clips: CUT_CLIP_RESULT[] }`, one entry per requested clip with the actual cut boundaries used, the resolved `aspectRatio`, and the uploaded clip's Blob URL.
+Returns `ALApiResponse<VIRAL_CLIPPER_CUT_RESPONSE>` — `{ clips: CUT_CLIP_RESULT[] }`, one entry per requested clip with the actual cut boundaries used, the resolved `aspectRatio`, and the finished clip's local `clipPath` (under `VIRAL_CLIPPER_OUTPUT_DIR`).
 
 **Output framing** — `aspectRatio` applies to every clip in the request (call `/cut` again for a different ratio on the same clips). `"9:16"` → 1080x1920 (Shorts/Reels/TikTok), `"16:9"` → 1920x1080 (YouTube/landscape), `"1:1"` → 1080x1080 (square), `"original"` → no reframing, just re-encode at the source's native resolution. Reframing is a **centered crop** to the target aspect ratio followed by a scale to the fixed output dimensions — see `buildAspectRatioFilter` in `ffmpeg-cut.ts` for the exact ffmpeg filter (the crop width/height are computed as ffmpeg expressions against the actual decoded frame, so no source-dimension probing step is needed). This is a fixed center-crop, not subject/face tracking — if the interesting content in a wide shot sits off-center, a center-crop can cut it out of frame; there's no automatic reframing-toward-the-speaker here.
 
@@ -206,10 +245,11 @@ Chapter titles are the creator's own labeling of each section, often naming
 the funny/notable bit directly.
 
 **Deliberately a separate call, not auto-fetched inside `/viral-moments` or
-`/pipeline`**: the video URL a caller has and the Blob-hosted audio/video
-`/diarize`/`/cut` operate on aren't guaranteed to be the same source (Blob
-URLs could come from anywhere), and not every caller wants the extra
-yt-dlp round-trip or has an actual YouTube URL at all. Fetch
+`/pipeline`**: the YouTube video URL a caller has and the local
+`audioSource`/`videoSource` `/diarize`/`/cut` operate on aren't guaranteed to
+be the same source (a caller might diarize a local file that was never
+uploaded to YouTube at all), and not every caller wants the extra yt-dlp
+round-trip or has an actual YouTube URL at all. Fetch
 `/viral-clipper/youtube-comments` and/or `/viral-clipper/youtube-chapters` (or their
 MCP equivalents, `viral_clipper_get_youtube_comment_highlights` /
 `viral_clipper_get_youtube_chapters`) yourself, format with the exported
@@ -221,21 +261,22 @@ standalone-clip requirements.
 
 ## Pipeline
 
-1. `download.ts` — fetch the blob URL to a temp file (bearer token attached,
-   no TLS-fallback dance like `transcription/download.ts` has — this is
-   always our own Blob URL, never an adversarial third-party source).
+1. `download.ts` — `resolveMediaSource` resolves `audioSource`/`videoSource`
+   to a local path: used in place if it's already a local path (no I/O),
+   downloaded to a fresh temp dir if it's a URL.
 2. `gemini-client.ts` → `uploadFileToGemini` + `waitForGeminiFileActive` —
-   Gemini's resumable File API upload, polled until `state: "ACTIVE"`
-   (required before the file can be referenced in `generateContent`).
+   Gemini's resumable File API upload (takes the local file directly, not a
+   URL fetch), polled until `state: "ACTIVE"` (required before the file can
+   be referenced in `generateContent`).
 3. `diarize.ts` — `generateContent` with the audio file + the diarization
    prompt from `constants.ts`, constrained to `GEMINI_DIARIZATION_RESPONSE_SCHEMA`.
 4. `viral-moments.ts` — flattens the diarized transcript into
    `[MM:SS-MM:SS] role: text` lines, sends as plain text with the
    viral-moment rubric prompt, constrained to `GEMINI_VIRAL_MOMENTS_RESPONSE_SCHEMA`.
-5. Temp files cleaned up in a `finally` in `diarize.ts`; the smoke-test
-   script also deletes its own uploaded blob afterward — the route handlers
-   don't own blob lifecycle (caller uploaded it, caller's to delete when
-   done).
+5. `cleanupResolvedMediaSource` in a `finally` in `diarize.ts`/`cut.ts` —
+   only ever deletes the temp dir `resolveMediaSource` created itself
+   (`ownsSource`/`workDir` tracked explicitly); a caller-supplied local path
+   is never touched.
 
 ## Long episodes: root cause, fix, and what's still open
 
@@ -280,7 +321,7 @@ full-duration coverage — retracted as unverified.
 coverage + speaker consistency.** Long audio (over
 `VIRAL_CLIPPER.CHUNK_THRESHOLD_SECONDS`, 18 min) is now split into sequential
 `VIRAL_CLIPPER.CHUNK_DURATION_SECONDS` (15 min) chunks, each diarized in its own
-Gemini call — transparent to callers, `diarizeFromBlobUrl`'s signature is
+Gemini call — transparent to callers, `diarizeFromSource`'s signature is
 unchanged, and short audio still takes the original single-call path with
 zero behavior change. The hard part is speaker identity: each chunk is an
 otherwise-isolated Gemini call with no memory of prior chunks, so naively
@@ -482,20 +523,21 @@ a fixed daily reset.
 viral-clipper/
   index.ts               # routes: /diarize, /viral-moments, /pipeline, /cut, /youtube-comments, /youtube-chapters
   handler.ts              # thin: zod validate -> service call -> ALApiResponse
-  diarize.ts                # orchestration: download -> single call OR chunked (long audio) -> generateContent
+  diarize.ts                # orchestration: resolve source -> single call OR chunked (long audio) -> generateContent
   viral-moments.ts            # transcript (+ optional audienceSignals) -> flattened prompt -> generateContent
   pipeline.ts                   # diarize.ts + viral-moments.ts combined
-  cut.ts                          # orchestration: download video -> per-clip snap+cut -> upload each to Blob
+  cut.ts                          # orchestration: resolve source video -> per-clip snap+cut -> write to VIRAL_CLIPPER_OUTPUT_DIR
   boundary-snap.ts                  # MM:SS parsing + segment-boundary snap-or-pad logic
   ffmpeg-cut.ts                       # single-clip ffmpeg re-encode cut + aspect-ratio filter + audio-chunk/reference-clip cutting
   gemini-client.ts                     # generic Gemini File API + generateContent(responseSchema) helpers
-  download.ts                            # blob URL -> temp file (audio or video, content-agnostic)
+  download.ts                            # resolveMediaSource: local path (used in place) or URL (downloaded) -> local path, content-agnostic
   youtube-metadata.ts                      # shared yt-dlp --dump-single-json wrapper
   youtube-comments.ts                        # top comments -> timestamp-mention extraction + clustering
   youtube-chapters.ts                          # creator chapter markers
   schemas.ts / types.ts / constants.ts
   README.md
 
-../../../scripts/viral-clipper-smoke.ts  # end-to-end smoke test (upload -> diarize -> score -> cleanup)
-../../mcp/server.ts                 # viral_clipper_get_youtube_comment_highlights / viral_clipper_get_youtube_chapters MCP tools
+../../../scripts/viral-clipper-smoke.ts  # end-to-end smoke test (resolve -> diarize -> score -> cleanup)
+../../mcp/server.ts                 # viral_clipper_get_youtube_comment_highlights / viral_clipper_get_youtube_chapters MCP tools (VPS only)
+../../config.ts                     # VPS_ONLY_ENDPOINTS / IS_VERCEL_RUNTIME / isEndpointAllowedOnCurrentRuntime — the Vercel-vs-VPS gate
 ```

@@ -1,5 +1,4 @@
-import { rm } from "node:fs/promises";
-import { dirname, extname, join } from "node:path";
+import { extname, join } from "node:path";
 
 import { parseTimestampToSeconds } from "./boundary-snap";
 import {
@@ -7,7 +6,7 @@ import {
   VIRAL_CLIPPER_DIARIZATION_CONTINUATION_PROMPT_HEADER,
   VIRAL_CLIPPER_DIARIZATION_PROMPT,
 } from "./constants";
-import { downloadBlobToTempFile } from "./download";
+import { cleanupResolvedMediaSource, resolveMediaSource } from "./download";
 import { cutAudioSegment, getMediaDurationSeconds } from "./ffmpeg-cut";
 import {
   generateStructuredContent,
@@ -320,21 +319,20 @@ async function diarizeChunked(
 }
 
 /**
- * Download -> (single call, or chunked if long — see VIRAL_CLIPPER.CHUNK_THRESHOLD_SECONDS)
- * -> diarize via Gemini generateContent.
+ * Resolve (local path or URL) -> (single call, or chunked if long — see
+ * VIRAL_CLIPPER.CHUNK_THRESHOLD_SECONDS) -> diarize via Gemini generateContent.
  */
-export async function diarizeFromBlobUrl(
-  blobUrl: string,
+export async function diarizeFromSource(
+  audioSource: string,
   model: string,
 ): Promise<VIRAL_CLIPPER_DIARIZE_RESPONSE> {
-  const sourcePath = await downloadBlobToTempFile(blobUrl);
-  const tempDir = dirname(sourcePath);
+  const resolved = await resolveMediaSource(audioSource);
 
   try {
-    const durationSeconds = await getMediaDurationSeconds(sourcePath);
+    const durationSeconds = await getMediaDurationSeconds(resolved.path);
 
     if (durationSeconds <= VIRAL_CLIPPER.CHUNK_THRESHOLD_SECONDS) {
-      const result = await diarizeChunkFirst(sourcePath, model, "single-call diarize");
+      const result = await diarizeChunkFirst(resolved.path, model, "single-call diarize");
       return {
         transcript: {
           speaker_count: result.speakers.length,
@@ -345,8 +343,8 @@ export async function diarizeFromBlobUrl(
       };
     }
 
-    return await diarizeChunked(sourcePath, tempDir, durationSeconds, model);
+    return await diarizeChunked(resolved.path, resolved.workDir, durationSeconds, model);
   } finally {
-    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    await cleanupResolvedMediaSource(resolved);
   }
 }

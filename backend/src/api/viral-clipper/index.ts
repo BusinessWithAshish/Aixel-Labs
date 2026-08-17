@@ -41,7 +41,7 @@ viralClipperRoutes.post(
 
 export default viralClipperRoutes;
 
-export { diarizeFromBlobUrl } from "./diarize";
+export { diarizeFromSource } from "./diarize";
 export { cutClipsFromVideo } from "./cut";
 export { runViralClipperPipeline } from "./pipeline";
 export { scoreViralMoments } from "./viral-moments";

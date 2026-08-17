@@ -168,7 +168,7 @@ export type CUT_CLIP_RESULT = {
   /** The framing actually applied — see VIRAL_CLIPPER_ASPECT_RATIO_DIMENSIONS in constants.ts. */
   aspectRatio: VIRAL_CLIPPER_ASPECT_RATIO_VALUE;
   /** Absent (and `error` set instead) when the requested range fell outside the source video's actual duration — see cut.ts. */
-  clipUrl?: string;
+  clipPath?: string;
   error?: string;
 };
 

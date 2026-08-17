@@ -6,12 +6,12 @@
  */
 
 export const VIRAL_CLIPPER_FIELD_DESCRIPTIONS = {
-  blobUrl:
-    "URL of the audio file to process — from POST /transcription/blob-upload, or any other publicly-reachable audio URL.",
+  audioSource:
+    "Local filesystem path to the audio file to process (this pipeline runs on the VPS and reads files directly off disk), or a publicly-reachable audio URL.",
   model: "Optional Gemini model override.",
   diarized: "Diarized transcript object, as returned by POST /viral-clipper/diarize.",
-  videoBlobUrl:
-    "URL of the SOURCE VIDEO (not audio-only) to cut clips from — cutting needs the real video stream.",
+  videoSource:
+    "Local filesystem path to the SOURCE VIDEO (not audio-only) to cut clips from, or a publicly-reachable video URL — cutting needs the real video stream.",
   clips: "List of time ranges to cut, e.g. straight from /viral-moments' candidates.",
   diarizedForSnap:
     "Optional diarized transcript — when provided, each clip's start/end is snapped to the nearest real speech-segment boundary so cuts don't land mid-word. Omit to cut at the raw timestamps plus fixed padding only.",
@@ -268,8 +268,7 @@ export const VIRAL_CLIPPER_AUDIENCE_SIGNALS_RULE_TEMPLATE = `- Cross-reference c
 export const VIRAL_CLIPPER_ERROR_MESSAGES = {
   INVALID_PARAMS: "Invalid request parameters",
   MISSING_API_KEY: "GEMINI_API_KEY_FREE is not configured",
-  DOWNLOAD_FAILED: "Failed to download source audio",
-  DOWNLOAD_VIDEO_FAILED: "Failed to download source video",
+  DOWNLOAD_FAILED: "Failed to resolve source media",
   GEMINI_UPLOAD_FAILED: "Gemini file upload failed",
   GEMINI_FILE_NOT_ACTIVE: "Gemini file never became ACTIVE in time",
   GEMINI_REQUEST_FAILED: "Gemini generateContent request failed",
@@ -278,7 +277,6 @@ export const VIRAL_CLIPPER_ERROR_MESSAGES = {
   GEMINI_MALFORMED_RESPONSE: "Gemini response did not match the expected shape",
   GEMINI_KEY_POOL_EXHAUSTED: "All Gemini API keys failed or are exhausted",
   FFMPEG_CUT_FAILED: "ffmpeg failed to cut clip",
-  BLOB_UPLOAD_FAILED: "Failed to upload cut clip to Blob storage",
   YOUTUBE_METADATA_FETCH_FAILED: "Failed to fetch YouTube video metadata (yt-dlp)",
   GENERIC: "Viral Clipper pipeline step failed",
 } as const;

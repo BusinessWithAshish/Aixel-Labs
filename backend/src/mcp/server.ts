@@ -64,10 +64,13 @@ import {
   VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA,
 } from "../api/viral-clipper/schemas";
 import { fail, ok } from "./tool-result";
+import { IS_VERCEL_RUNTIME } from "../config";
 
 export const MCP_SERVER_NAME = "aixel-intelligence";
 export const MCP_SERVER_VERSION = "1.0.0";
-export const MCP_TOOL_COUNT = 24;
+/** Both viral_clipper tools shell out to yt-dlp (see VPS_ONLY_ENDPOINTS in config.ts) and are skipped on Vercel. */
+const VIRAL_CLIPPER_TOOL_COUNT = 2;
+export const MCP_TOOL_COUNT = IS_VERCEL_RUNTIME ? 24 - VIRAL_CLIPPER_TOOL_COUNT : 24;
 
 export function createAixelIntelligenceMcpServer(): McpServer {
   const server = new McpServer({
@@ -441,39 +444,47 @@ export function createAixelIntelligenceMcpServer(): McpServer {
     },
   );
 
-  server.registerTool(
-    "viral_clipper_get_youtube_comment_highlights",
-    {
-      description:
-        "Fetch a YouTube video's top comments (via yt-dlp, no API key) and extract 'audience-flagged' moments — timestamps (MM:SS / H:MM:SS) viewers themselves called out in their comments (e.g. \"12:34 lol\", \"the part at 15:20 killed me\"), clustered by proximity and ranked by how many independent commenters pointed at roughly the same moment plus total likes on those comments.\n\nUse this before or alongside the viral-clipper pipeline (youtube niche/video tools are for discovery/velocity — this is specifically for finding which MOMENTS within one already-chosen video real viewers reacted to) to bias short-form clip selection toward moments the audience already validated, not just what an LLM guesses is funny/interesting. Pass the formatted highlights into a viral-moment-scoring call's audienceSignals field (format each as \"MM:SS — N viewers mentioned this, M likes total\").\n\nThis is a pure extraction + aggregation tool, no LLM call — cheap and fast relative to the viral-clipper pipeline itself. Not every video has comments that reference timestamps; an empty or thin `highlights` array is a valid, common result, not an error.",
-      inputSchema: VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA,
-    },
-    async (args) => {
-      try {
-        const parsed = VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA.parse(args);
-        return ok(await fetchYoutubeCommentHighlights(parsed.videoUrl, parsed.maxComments));
-      } catch (err) {
-        return fail(err);
-      }
-    },
-  );
+  /**
+   * Both tools shell out to yt-dlp, which isn't guaranteed present on
+   * Vercel's build image (and this module is VPS-only anyway — see
+   * VPS_ONLY_ENDPOINTS in config.ts). Skip registering them entirely on
+   * Vercel rather than registering a tool that would just fail at call time.
+   */
+  if (!IS_VERCEL_RUNTIME) {
+    server.registerTool(
+      "viral_clipper_get_youtube_comment_highlights",
+      {
+        description:
+          "Fetch a YouTube video's top comments (via yt-dlp, no API key) and extract 'audience-flagged' moments — timestamps (MM:SS / H:MM:SS) viewers themselves called out in their comments (e.g. \"12:34 lol\", \"the part at 15:20 killed me\"), clustered by proximity and ranked by how many independent commenters pointed at roughly the same moment plus total likes on those comments.\n\nUse this before or alongside the viral-clipper pipeline (youtube niche/video tools are for discovery/velocity — this is specifically for finding which MOMENTS within one already-chosen video real viewers reacted to) to bias short-form clip selection toward moments the audience already validated, not just what an LLM guesses is funny/interesting. Pass the formatted highlights into a viral-moment-scoring call's audienceSignals field (format each as \"MM:SS — N viewers mentioned this, M likes total\").\n\nThis is a pure extraction + aggregation tool, no LLM call — cheap and fast relative to the viral-clipper pipeline itself. Not every video has comments that reference timestamps; an empty or thin `highlights` array is a valid, common result, not an error.",
+        inputSchema: VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA,
+      },
+      async (args) => {
+        try {
+          const parsed = VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA.parse(args);
+          return ok(await fetchYoutubeCommentHighlights(parsed.videoUrl, parsed.maxComments));
+        } catch (err) {
+          return fail(err);
+        }
+      },
+    );
 
-  server.registerTool(
-    "viral_clipper_get_youtube_chapters",
-    {
-      description:
-        "Fetch a YouTube video's own creator-authored chapter markers (via yt-dlp, no API key) — title + start/end timestamps for each chapter, if the uploader added any.\n\nUse alongside viral_clipper_get_youtube_comment_highlights as a second audience/creator signal source for short-form clip selection — chapter titles are the creator's own labeling of what each section is about (often naming the funny/notable bit directly, e.g. \"Hilarious bit on X\"), which is a strong, free prior on where to look. Pass formatted chapters into a viral-moment-scoring call's audienceSignals field (format each as 'MM:SS — chapter: \"title\"').\n\nNot every video has chapters — an empty `chapters` array is a valid, common result (most videos don't have them), not an error.",
-      inputSchema: VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_SCHEMA,
-    },
-    async (args) => {
-      try {
-        const parsed = VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_SCHEMA.parse(args);
-        return ok(await fetchYoutubeChapters(parsed.videoUrl));
-      } catch (err) {
-        return fail(err);
-      }
-    },
-  );
+    server.registerTool(
+      "viral_clipper_get_youtube_chapters",
+      {
+        description:
+          "Fetch a YouTube video's own creator-authored chapter markers (via yt-dlp, no API key) — title + start/end timestamps for each chapter, if the uploader added any.\n\nUse alongside viral_clipper_get_youtube_comment_highlights as a second audience/creator signal source for short-form clip selection — chapter titles are the creator's own labeling of what each section is about (often naming the funny/notable bit directly, e.g. \"Hilarious bit on X\"), which is a strong, free prior on where to look. Pass formatted chapters into a viral-moment-scoring call's audienceSignals field (format each as 'MM:SS — chapter: \"title\"').\n\nNot every video has chapters — an empty `chapters` array is a valid, common result (most videos don't have them), not an error.",
+        inputSchema: VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_SCHEMA,
+      },
+      async (args) => {
+        try {
+          const parsed = VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_SCHEMA.parse(args);
+          return ok(await fetchYoutubeChapters(parsed.videoUrl));
+        } catch (err) {
+          return fail(err);
+        }
+      },
+    );
+  }
 
   return server;
 }

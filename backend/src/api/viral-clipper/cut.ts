@@ -1,12 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { readFile, rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
-
-import { put } from "@vercel/blob";
+import { mkdir } from "node:fs/promises";
+import { join, resolve } from "node:path";
 
 import { snapClipBoundaries } from "./boundary-snap";
-import { VIRAL_CLIPPER_ERROR_MESSAGES } from "./constants";
-import { downloadBlobToTempFile } from "./download";
+import { cleanupResolvedMediaSource, resolveMediaSource } from "./download";
 import { cutClip, getMediaDurationSeconds } from "./ffmpeg-cut";
 import type {
   CLIP_RANGE,
@@ -16,22 +13,34 @@ import type {
 } from "./types";
 
 /**
- * Downloads the source video once, cuts each requested clip (boundary-snapped
- * against `diarized` when provided — see `boundary-snap.ts`), uploads each
- * cut clip to Blob, and cleans up all temp files. Content-agnostic beyond
- * that: doesn't care which pipeline produced the clip list.
+ * Where finished clips are written — local disk (this pipeline is VPS-only,
+ * see `VPS_ONLY_ENDPOINTS` in config.ts), not Blob storage. The VPS's actual
+ * storage mount isn't known at code-authoring time, so it's configurable;
+ * defaults to a project-relative folder for local dev.
+ */
+const VIRAL_CLIPPER_OUTPUT_DIR = resolve(
+  process.env.VIRAL_CLIPPER_OUTPUT_DIR || join(process.cwd(), "storage", "viral-clipper-cuts"),
+);
+
+/**
+ * Resolves the source video (local path or URL — see `resolveMediaSource`),
+ * cuts each requested clip (boundary-snapped against `diarized` when
+ * provided — see `boundary-snap.ts`) directly into `VIRAL_CLIPPER_OUTPUT_DIR`,
+ * and cleans up the resolved source's own temp files. Content-agnostic
+ * beyond that: doesn't care which pipeline produced the clip list.
  */
 export async function cutClipsFromVideo(
-  videoBlobUrl: string,
+  videoSource: string,
   clips: CLIP_RANGE[],
   diarized: DIARIZED_TRANSCRIPT | undefined,
   aspectRatio: VIRAL_CLIPPER_ASPECT_RATIO_VALUE,
 ): Promise<VIRAL_CLIPPER_CUT_RESPONSE> {
-  const sourcePath = await downloadBlobToTempFile(videoBlobUrl);
-  const tempDir = dirname(sourcePath);
+  const resolved = await resolveMediaSource(videoSource);
 
   try {
-    const sourceDurationSeconds = await getMediaDurationSeconds(sourcePath);
+    await mkdir(VIRAL_CLIPPER_OUTPUT_DIR, { recursive: true });
+
+    const sourceDurationSeconds = await getMediaDurationSeconds(resolved.path);
     const results = [];
     for (const clip of clips) {
       const { cutStartSeconds, cutEndSeconds, snapped } = snapClipBoundaries(
@@ -62,24 +71,8 @@ export async function cutClipsFromVideo(
         continue;
       }
 
-      const outputPath = join(tempDir, `clip-${randomUUID()}.mp4`);
-      await cutClip(sourcePath, cutStartSeconds, cutEndSeconds, outputPath, aspectRatio);
-
-      const buffer = await readFile(outputPath);
-      let blobUrl: string;
-      try {
-        const blob = await put(
-          `viral-clipper-cuts/${clip.label ?? "clip"}-${randomUUID()}.mp4`,
-          buffer,
-          { access: "private", addRandomSuffix: true, contentType: "video/mp4" },
-        );
-        blobUrl = blob.url;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new Error(`${VIRAL_CLIPPER_ERROR_MESSAGES.BLOB_UPLOAD_FAILED}: ${message}`);
-      } finally {
-        await rm(outputPath, { force: true }).catch(() => {});
-      }
+      const outputPath = join(VIRAL_CLIPPER_OUTPUT_DIR, `clip-${randomUUID()}.mp4`);
+      await cutClip(resolved.path, cutStartSeconds, cutEndSeconds, outputPath, aspectRatio);
 
       results.push({
         label: clip.label,
@@ -89,12 +82,12 @@ export async function cutClipsFromVideo(
         cutEndSeconds,
         snapped,
         aspectRatio,
-        clipUrl: blobUrl,
+        clipPath: outputPath,
       });
     }
 
     return { clips: results };
   } finally {
-    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    await cleanupResolvedMediaSource(resolved);
   }
 }

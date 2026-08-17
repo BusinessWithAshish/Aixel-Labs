@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { ALApiResponse } from "../types";
 import { VIRAL_CLIPPER_ERROR_MESSAGES } from "./constants";
 import { cutClipsFromVideo } from "./cut";
-import { diarizeFromBlobUrl } from "./diarize";
+import { diarizeFromSource } from "./diarize";
 import { runViralClipperPipeline } from "./pipeline";
 import {
   VIRAL_CLIPPER_CUT_REQUEST_SCHEMA,
@@ -41,7 +41,7 @@ export async function viralClipperDiarizeHandler(req: Request, res: Response) {
   }
 
   try {
-    const data = await diarizeFromBlobUrl(parsed.data.blobUrl, parsed.data.model);
+    const data = await diarizeFromSource(parsed.data.audioSource, parsed.data.model);
     res
       .status(200)
       .json({ success: true, data } satisfies ALApiResponse<VIRAL_CLIPPER_DIARIZE_RESPONSE>);
@@ -85,7 +85,7 @@ export async function viralClipperViralMomentsHandler(req: Request, res: Respons
   }
 }
 
-/** POST /viral-clipper/cut — video URL + time ranges in, uploaded clip URLs out. */
+/** POST /viral-clipper/cut — video source + time ranges in, local clip file paths out. */
 export async function viralClipperCutHandler(req: Request, res: Response) {
   const parsed = VIRAL_CLIPPER_CUT_REQUEST_SCHEMA.safeParse(req.body);
   if (!parsed.success) {
@@ -98,7 +98,7 @@ export async function viralClipperCutHandler(req: Request, res: Response) {
 
   try {
     const data = await cutClipsFromVideo(
-      parsed.data.videoBlobUrl,
+      parsed.data.videoSource,
       parsed.data.clips,
       parsed.data.diarized,
       parsed.data.aspectRatio,
@@ -164,7 +164,7 @@ export async function viralClipperYoutubeChaptersHandler(req: Request, res: Resp
   }
 }
 
-/** POST /viral-clipper/pipeline — audio URL in, ranked clip candidates out. */
+/** POST /viral-clipper/pipeline — audio source in, ranked clip candidates out. */
 export async function viralClipperPipelineHandler(req: Request, res: Response) {
   const parsed = VIRAL_CLIPPER_PIPELINE_REQUEST_SCHEMA.safeParse(req.body);
   if (!parsed.success) {
@@ -177,7 +177,7 @@ export async function viralClipperPipelineHandler(req: Request, res: Response) {
 
   try {
     const data = await runViralClipperPipeline({
-      blobUrl: parsed.data.blobUrl,
+      audioSource: parsed.data.audioSource,
       model: parsed.data.model,
       minCandidates: parsed.data.minCandidates,
       maxCandidates: parsed.data.maxCandidates,
