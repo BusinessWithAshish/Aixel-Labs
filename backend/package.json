@@ -102,6 +102,22 @@
       "types": "./src/api/transcription/constants.ts",
       "default": "./src/api/transcription/constants.ts"
     },
+    "./twitter": {
+      "types": "./src/api/twitter/index.ts",
+      "default": "./src/api/twitter/index.ts"
+    },
+    "./twitter/schemas": {
+      "types": "./src/api/twitter/schemas.ts",
+      "default": "./src/api/twitter/schemas.ts"
+    },
+    "./twitter/types": {
+      "types": "./src/api/twitter/types.ts",
+      "default": "./src/api/twitter/types.ts"
+    },
+    "./twitter/constants": {
+      "types": "./src/api/twitter/constants.ts",
+      "default": "./src/api/twitter/constants.ts"
+    },
     "./tightening": {
       "types": "./src/api/tightening/index.ts",
       "default": "./src/api/tightening/index.ts"

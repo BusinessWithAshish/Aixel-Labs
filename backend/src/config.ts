@@ -5,6 +5,7 @@ import { IG_ADVANCED_ROUTES } from "./api/instagram/advanced/constants";
 import { INSTAGRAM_INTELLIGENCE_ROUTES } from "./api/instagram/intelligence/constants";
 import { GMAPS_DETAILS_ROUTES } from "./api/gmaps/details/constants";
 import { GMAPS_ADVANCED_ROUTES } from "./api/gmaps/advanced/constants";
+import { TWITTER_API_ROUTES } from "./api/twitter/constants";
 
 export enum ENDPOINTS {
   HOME = "/",
@@ -13,6 +14,7 @@ export enum ENDPOINTS {
   FACEBOOK = "/facebook",
   LINKEDIN = "/linkedin",
   YOUTUBE = "/youtube",
+  TWITTER = "/twitter",
   GSEARCH = "/gsearch",
   GOOGLE_TRENDS = "/google-trends",
   TRANSCRIPTION = "/transcription",
@@ -108,6 +110,28 @@ export const API_ENDPOINTS = {
         route: INSTAGRAM_INTELLIGENCE_ROUTES.ACCOUNT,
         full: `${ENDPOINTS.INSTAGRAM}${INSTAGRAM_INTELLIGENCE_ROUTES.ACCOUNT}`,
       },
+    },
+  },
+  TWITTER: {
+    SEARCH: {
+      route: TWITTER_API_ROUTES.SEARCH,
+      full: `${ENDPOINTS.TWITTER}${TWITTER_API_ROUTES.SEARCH}`,
+    },
+    USER: {
+      route: TWITTER_API_ROUTES.USER,
+      full: `${ENDPOINTS.TWITTER}${TWITTER_API_ROUTES.USER}`,
+    },
+    TWEET: {
+      route: TWITTER_API_ROUTES.TWEET,
+      full: `${ENDPOINTS.TWITTER}${TWITTER_API_ROUTES.TWEET}`,
+    },
+    TWEETS: {
+      route: TWITTER_API_ROUTES.TWEETS,
+      full: `${ENDPOINTS.TWITTER}${TWITTER_API_ROUTES.TWEETS}`,
+    },
+    TRENDING: {
+      route: TWITTER_API_ROUTES.TRENDING,
+      full: `${ENDPOINTS.TWITTER}${TWITTER_API_ROUTES.TRENDING}`,
     },
   },
   YOUTUBE: {

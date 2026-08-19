@@ -7,6 +7,7 @@ import gmapsRoutes from "./api/gmaps/index";
 import homeRoutes from "./api/home/index";
 import linkedinRoutes from "./api/linkedin";
 import youtubeRoutes from "./api/youtube/index";
+import twitterRoutes from "./api/twitter/index";
 import gsearchRoutes from "./api/gsearch/index";
 import googleTrendsRoutes from "./api/google-trends/index";
 import transcriptionRoutes from "./api/transcription/index";
@@ -21,6 +22,7 @@ export function registerRoutes(app: Express) {
   app.use(ENDPOINTS.FACEBOOK, facebookRoutes);
   app.use(ENDPOINTS.LINKEDIN, linkedinRoutes);
   app.use(ENDPOINTS.YOUTUBE, youtubeRoutes);
+  app.use(ENDPOINTS.TWITTER, twitterRoutes);
   app.use(ENDPOINTS.GSEARCH, gsearchRoutes);
   app.use(ENDPOINTS.GOOGLE_TRENDS, googleTrendsRoutes);
   app.use(ENDPOINTS.TRANSCRIPTION, transcriptionRoutes);

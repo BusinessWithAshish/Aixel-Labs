@@ -65,6 +65,20 @@ import {
 } from "../api/viral-clipper/schemas";
 import { tightenVideo } from "../api/tightening/client";
 import { TIGHTENING_REQUEST_SCHEMA } from "../api/tightening/schemas";
+import {
+  fetchTwitterSearch,
+  fetchTwitterTrending,
+  fetchTwitterTweet,
+  fetchTwitterUser,
+  fetchTwitterUserTweets,
+} from "../api/twitter/client";
+import {
+  TWITTER_SEARCH_REQUEST_SCHEMA,
+  TWITTER_TRENDING_REQUEST_SCHEMA,
+  TWITTER_TWEETS_REQUEST_SCHEMA,
+  TWITTER_TWEET_REQUEST_SCHEMA,
+  TWITTER_USER_REQUEST_SCHEMA,
+} from "../api/twitter/schemas";
 import { fail, ok } from "./tool-result";
 import { IS_VERCEL_RUNTIME } from "../config";
 
@@ -74,9 +88,10 @@ export const MCP_SERVER_VERSION = "1.0.0";
 const VIRAL_CLIPPER_TOOL_COUNT = 2;
 /** tightening_remove_silences_and_fillers is VPS-only (see VPS_ONLY_ENDPOINTS in config.ts) and is skipped on Vercel. */
 const TIGHTENING_TOOL_COUNT = 1;
+const TWITTER_TOOL_COUNT = 5;
 export const MCP_TOOL_COUNT = IS_VERCEL_RUNTIME
-  ? 25 - VIRAL_CLIPPER_TOOL_COUNT - TIGHTENING_TOOL_COUNT
-  : 25;
+  ? 25 + TWITTER_TOOL_COUNT - VIRAL_CLIPPER_TOOL_COUNT - TIGHTENING_TOOL_COUNT
+  : 25 + TWITTER_TOOL_COUNT;
 
 export function createAixelIntelligenceMcpServer(): McpServer {
   const server = new McpServer({
@@ -517,6 +532,91 @@ export function createAixelIntelligenceMcpServer(): McpServer {
       },
     );
   }
+
+  server.registerTool(
+    "twitter_get_user",
+    {
+      description:
+        "Fetch a public X/Twitter profile by handle or profile URL: rest id, name, bio, location, website, follower/following/tweet counts, avatar/banner, blue-verified flag, and pinned tweet IDs.\n\nUse this when you already have a handle (@NASA, NASA, or https://x.com/NASA). Guest GraphQL — no user login. For a topic with no handle yet, start with twitter_search (filter=user) or twitter_get_trending. Pair with twitter_get_user_tweets for the timeline.",
+      inputSchema: TWITTER_USER_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        const parsed = TWITTER_USER_REQUEST_SCHEMA.parse(args);
+        return ok(await fetchTwitterUser(parsed));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "twitter_get_tweet",
+    {
+      description:
+        "Fetch a single public tweet by snowflake ID or status URL (text, author, likes/retweets/replies/quotes/bookmarks/views). Guest GraphQL with syndication embed fallback.\n\nSet includeRelated=true to also return recent posts from the same author (native SimilarPosts is login-walled). Use twitter_get_user_tweets when you want a full profile timeline instead of one tweet.",
+      inputSchema: TWITTER_TWEET_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        const parsed = TWITTER_TWEET_REQUEST_SCHEMA.parse(args);
+        return ok(await fetchTwitterTweet(parsed));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "twitter_get_user_tweets",
+    {
+      description:
+        "Fetch a public X/Twitter user's recent posts (UserTweets timeline) plus profile stats. Pass `cursor` from a previous response to page. `limit` defaults to 20 (max 50).\n\nCall twitter_get_user first if you only need profile stats. Native keyword search is login-walled — discover handles via twitter_search or twitter_get_trending, then pull timelines here.",
+      inputSchema: TWITTER_TWEETS_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        const parsed = TWITTER_TWEETS_REQUEST_SCHEMA.parse(args);
+        return ok(await fetchTwitterUserTweets(parsed));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "twitter_get_trending",
+    {
+      description:
+        "Fetch current X/Twitter trending topics for a country (ISO alpha-2, default US) via guest REST trends/place.json. Returns trend name, search query, URL, and tweet_volume when X exposes it. Valid ISO codes without a trends WOEID fall back to worldwide.\n\nUse this FIRST for 'what's trending on Twitter/X right now'. Then twitter_search on a trend name, or twitter_get_user / twitter_get_user_tweets on accounts posting about it.",
+      inputSchema: TWITTER_TRENDING_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        const parsed = TWITTER_TRENDING_REQUEST_SCHEMA.parse(args);
+        return ok(await fetchTwitterTrending(parsed));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "twitter_search",
+    {
+      description:
+        "Search public X/Twitter content. Native SearchTimeline is login-walled, so this uses GSearch site:x.com then hydrates hits via guest GraphQL (same path as Instagram content search).\n\nfilter=tweet (default) finds status URLs and returns tweets; filter=user finds profiles. Requires Evomi (GSearch). country defaults to US.\n\nUse twitter_get_trending when you want X's own trending list with no Google in the loop. Use twitter_get_user / twitter_get_tweet when you already have a handle or tweet ID.",
+      inputSchema: TWITTER_SEARCH_REQUEST_SCHEMA,
+    },
+    async (args) => {
+      try {
+        const parsed = TWITTER_SEARCH_REQUEST_SCHEMA.parse(args);
+        return ok(await fetchTwitterSearch(parsed));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
 
   return server;
 }
