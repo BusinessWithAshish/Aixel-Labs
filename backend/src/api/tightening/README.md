@@ -53,20 +53,13 @@ way, tightening is a knob-tuning operation: re-running with a different
 threshold shouldn't require re-fetching the video, so nothing about the input
 is deleted beyond this call's own temp files.
 
-## Deployment: VPS-only, not Vercel
+## Deployment
 
-**This module is VPS-only.** It's listed in `VPS_ONLY_ENDPOINTS`
-(`backend/src/config.ts`) — `routes.ts` skips mounting `/tightening` entirely
-when `IS_VERCEL_RUNTIME` is true, and the same guard skips registering
-`tightening_remove_silences_and_fillers` as an MCP tool (see `mcp/server.ts`).
-
-The reason is execution time, not missing binaries: `assembleKeepRanges`
-always re-encodes the **whole** source video — `select`+`setpts` rewrites
-every frame's presentation timestamp regardless of where the cuts land, so
-stream-copy is never an option — which is a minutes-long job on anything past
-a few minutes of source. Vercel's serverless duration ceiling (10s-15min
-depending on plan) isn't built for that. Run this backend as a persistent
-process (VPS, local dev) for anything under `/tightening`.
+HTTP `/tightening` and the `tightening` MCP tool (`op=tighten`) always
+register. The job always re-encodes the **whole** source video (`select`+
+`setpts`) — minutes on anything past a few minutes of source — so run this
+backend as a persistent process with ffmpeg, not a short-lived serverless
+function.
 
 ## Storage: local disk, not Vercel Blob
 
@@ -235,11 +228,9 @@ either — this module never touches Vercel Blob.
 
 ## MCP
 
-`tightening_remove_silences_and_fillers` (`backend/src/mcp/server.ts`) wraps
+`tightening` MCP tool, `op=tighten` (`backend/src/mcp/tools/tightening.ts`) wraps
 `tightenVideo()` from `client.ts` directly — same function the HTTP handler
-calls, no loopback — and reuses `TIGHTENING_REQUEST_SCHEMA` unchanged.
-Registration is guarded by `!IS_VERCEL_RUNTIME`, same as the route mount —
-see "Deployment" above.
+calls, no loopback — and reuses `TIGHTENING_REQUEST_SCHEMA` as `input`.
 
 ## Notes / tunables
 

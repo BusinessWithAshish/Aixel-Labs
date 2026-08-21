@@ -9,6 +9,11 @@ the VPS's filesystem) or a publicly-reachable URL (downloaded server-side).
 There's no client-upload step and nothing to clean up on a third-party
 store afterward.
 
+HTTP and MCP always mount. Local-path `mediaSource` still needs a host
+filesystem: `resolveMediaSource` (`download.ts`) rejects a local path with
+`LOCAL_PATH_ON_VERCEL` when `IS_VERCEL_RUNTIME` is true, rather than failing
+with a misleading "file not found". URL sources download then transcribe.
+
 ## Request — `POST /transcription`
 
 ```jsonc
@@ -81,10 +86,10 @@ transcription/
 
 ## MCP
 
-`transcription_transcribe_media` (`backend/src/mcp/server.ts`) wraps `transcribe()` from
-`client.ts` directly — same function the HTTP handler calls, no loopback —
-and reuses `TRANSCRIPTION_REQUEST_SCHEMA` unchanged. It takes `mediaSource`
-as a local path or URL, not raw bytes: MCP tool calls carry JSON args only.
+`transcription` MCP tool, `op=transcribe` (`backend/src/mcp/tools/transcription.ts`)
+wraps `transcribe()` from `client.ts` directly — same function the HTTP handler
+calls, no loopback — and reuses `TRANSCRIPTION_REQUEST_SCHEMA` as `input`.
+`mediaSource` is a local path or URL, not raw bytes: MCP tool calls carry JSON args only.
 
 ## Notes / tunables
 

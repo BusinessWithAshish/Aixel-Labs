@@ -1,105 +1,83 @@
 # MCP server (`/mcp`)
 
 Streamable HTTP MCP for agents. Tools call the same TypeScript **services** as
-HTTP intelligence handlers — **no HTTP loopback**.
+HTTP handlers — **no HTTP loopback**.
 
-| | |
-|--|--|
-| Mount | `ENDPOINTS.MCP` → `/mcp` |
-| Server name | `aixel-intelligence` |
-| Factory | `createAixelIntelligenceMcpServer()` in `server.ts` |
-| Tool count | `MCP_TOOL_COUNT` (**30**, **27** on Vercel — see below) in `server.ts` |
+|             |                                                     |
+| ----------- | --------------------------------------------------- |
+| Mount       | `ENDPOINTS.MCP` → `/mcp`                            |
+| Server name | `aixel-intelligence`                                |
+| Factory     | `createAixelIntelligenceMcpServer()` in `server.ts` |
+| Tool count  | `MCP_TOOL_COUNT` (**8**)                            |
 
-Tool names are domain-prefixed (`youtube_*`, `trends_*`, `gsearch_*`,
-`transcription_*`, `instagram_*`, `viral_clipper_*`, `twitter_*`) so tools group by name alone even though
-they all live on one `McpServer` instance — a possible follow-up is actually
-splitting these into separate mounted server instances per domain.
+HTTP stays exploded (one POST per function). MCP collapses to **one tool per
+domain**. Every tool takes the same top-level shape:
+
+```ts
+{ op: "<enum>", layer?: "raw" | "intel", input: { /* that op's HTTP body */ } }
+```
+
+- Default `layer`: `intel` when that op has a real overlay, else `raw`.
+- Invalid `op`/`layer` combo **fails** — no silent fallback.
+- `input` is parsed with the existing API `*_REQUEST_SCHEMA` (not a parallel MCP Zod tree).
+- JSON Schema cannot vary `input` per `op`; the **tool description** is the dispatch table.
+
+Lead-gen (Maps / Facebook / LinkedIn) stays **HTTP-only**.
 
 ## Tools
 
-| Tool | Domain |
-|------|--------|
-| `youtube_search_niche_intelligence` | YouTube search + intelligence |
-| `youtube_get_video_intelligence` | Single video |
-| `youtube_get_video_suggestions_intelligence` | Related videos |
-| `youtube_get_channel_intelligence` | Channel |
-| `youtube_bulk_enrich_videos` | Video-meta batch |
-| `youtube_aggregate_niche_signals` | Niche aggregates |
-| `youtube_aggregate_keyword_signals` | Keyword aggregates |
-| `youtube_compare_channels` | Channel compare |
-| `youtube_resolve_handle` | Handle → channel |
-| `youtube_get_niche_keyword_tree` | Suggest tree |
-| `youtube_get_video_transcript_intelligence` | Transcript intelligence |
-| `trends_get_trend_intelligence` | Google Trends interest |
-| `trends_compare_trend_topics` | Trends compare |
-| `gsearch_web_search` | Backend `/gsearch` (CSE) |
-| `transcription_transcribe_media` | Groq Whisper transcription |
-| `instagram_get_profile` | Handle/URL → profile stats |
-| `instagram_get_posts` | Profile → paginated posts/reels/carousels w/ CDN URLs |
-| `instagram_search_profiles` | Query → profile-title-biased GSearch discovery |
-| `instagram_search_content_leads` | Query → content-first (`/p/`, `/reel/`) GSearch discovery |
-| `instagram_get_popular_topic` | Topic → native IG `/popular/{q}/` reels (Puppeteer) |
-| `instagram_get_account_intelligence` | Profile + posts → per-post engagement/velocity intelligence |
-| `instagram_aggregate_account_signals` | Post-array → outlier detection, cadence, score distribution |
-| `twitter_get_user` | Handle/URL → public profile stats |
-| `twitter_get_tweet` | Tweet ID/URL → tweet (+ optional same-author related) |
-| `twitter_get_user_tweets` | Handle → profile + recent timeline |
-| `twitter_get_trending` | Country → X trending topics (guest REST) |
-| `twitter_search` | Query → GSearch `site:x.com` + GraphQL hydrate |
-| `viral_clipper_get_youtube_comment_highlights` | Video → audience-flagged timestamps from top comments (yt-dlp, no API key) — **VPS only, skipped on Vercel** |
-| `viral_clipper_get_youtube_chapters` | Video → creator's own chapter markers (yt-dlp, no API key) — **VPS only, skipped on Vercel** |
-| `tightening_remove_silences_and_fillers` | Video → same video with dead air + filler words cut out (ffmpeg silencedetect + Whisper word timestamps) — **VPS only, skipped on Vercel** |
+| Tool            | Ops                                                                                                                                                                | Layer                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `youtube`       | `search`, `suggest`, `video`, `suggested`, `transcript`, `comments`, `channel`, `handle`, `video_meta`, `aggregate_niche`, `aggregate_keyword`, `compare_channels` | intel where an overlay exists (incl. comments). Aggregates are compute-only (`raw`). |
+| `trends`        | `interest`, `compare`, `trending`                                                                                                                                  | intel for interest/compare; `trending` raw-only                                      |
+| `instagram`     | `profile`, `search_profiles`, `posts`, `content_leads`, `popular`, `account`, `aggregate_account`                                                                  | intel **only** for `account`. `aggregate_account` is compute/`raw`. Rest raw.        |
+| `twitter`       | `user`, `tweet`, `user_tweets`, `trending`, `search`                                                                                                               | raw only (no Twitter intel API)                                                      |
+| `gsearch`       | `search` (v1 CSE), `search_v2` (Docs Explore / CSE fallback)                                                                                                       | raw                                                                                  |
+| `transcription` | `transcribe`                                                                                                                                                       | raw                                                                                  |
+| `viral_clipper` | `diarize`, `moments`, `pipeline`, `cut`, `comment_highlights`, `chapters`                                                                                          | raw                                                                                  |
+| `tightening`    | `tighten`                                                                                                                                                          | raw                                                                                  |
 
-### Instagram discovery tool — which one to call
+### Instagram discovery — which op
 
-Three tools discover profiles from a topic/query; they hit different surfaces
-and are not interchangeable:
+| Op                | Surface                      | Best for                                              |
+| ----------------- | ---------------------------- | ----------------------------------------------------- |
+| `search_profiles` | Google, profile-title biased | Default first try — "type of account" queries         |
+| `content_leads`   | Google, post/reel content    | Local/niche accounts that don't rank on profile title |
+| `popular`         | Native Instagram (no Google) | Fallback when both GSearch ops are thin/rate-limited  |
 
-| Tool | Surface | Best for |
-|------|---------|----------|
-| `instagram_search_profiles` | Google, profile-title biased | Default first try — "type of account" queries |
-| `instagram_search_content_leads` | Google, post/reel content | Local/niche/business accounts that don't rank on profile title |
-| `instagram_get_popular_topic` | Native Instagram (no Google) | Fallback when both GSearch-based tools are thin/rate-limited |
+`account` is the intel overlay (profile + posts + engagement/velocity).
+`aggregate_account` is in-memory compute over one account's intel `posts[]`.
 
-### Twitter / X — which tool to call
+### Twitter / X — which op
 
 Guest GraphQL/REST — no user login. Native keyword search is login-walled.
 
-| Tool | Surface | Best for |
-|------|---------|----------|
-| `twitter_get_trending` | X `trends/place.json` | "What's trending right now" |
-| `twitter_search` | GSearch `site:x.com` + hydrate | Topic → tweets or profiles (needs Evomi) |
-| `twitter_get_user` | GraphQL `UserByScreenName` | You already have a handle/URL |
-| `twitter_get_user_tweets` | GraphQL `UserTweets` | Profile timeline |
-| `twitter_get_tweet` | GraphQL + syndication | One tweet ID/URL; `includeRelated` for same-author posts |
+| Op            | Surface                        | Best for                                                 |
+| ------------- | ------------------------------ | -------------------------------------------------------- |
+| `trending`    | X `trends/place.json`          | "What's trending right now"                              |
+| `search`      | GSearch `site:x.com` + hydrate | Topic → tweets or profiles (needs Evomi)                 |
+| `user`        | GraphQL `UserByScreenName`     | You already have a handle/URL                            |
+| `user_tweets` | GraphQL `UserTweets`           | Profile timeline                                         |
+| `tweet`       | GraphQL + syndication          | One tweet ID/URL; `includeRelated` for same-author posts |
 
-## Vercel vs VPS
+### YouTube comments vs viral_clipper highlights
 
-Three tools are skipped on Vercel, for two different reasons — both covered
-by `VPS_ONLY_ENDPOINTS` in `../config.ts`:
-
-- The two `viral_clipper_*` comment/chapter tools shell out to yt-dlp, which
-  isn't guaranteed present on Vercel's build image (the whole viral-clipper
-  module is VPS-only regardless).
-- `tightening_remove_silences_and_fillers` always re-encodes the entire
-  source video — a minutes-long job, well past Vercel's serverless duration
-  ceiling.
-
-`server.ts` skips registering all three entirely when `IS_VERCEL_RUNTIME` is
-true, instead of registering a tool that would just time out or fail at call
-time; `MCP_TOOL_COUNT` reflects the actual count for the current runtime.
+- `youtube` `op=comments` — InnerTube comment text, authors, likes, replies; `layer=intel` adds timestamp/like aggregates.
+- `viral_clipper` `op=comment_highlights` — yt-dlp timestamp clusters for clip priors. Does not return the comments themselves.
 
 ## Layout
 
 ```
 mcp/
 ├── router.ts        # Express mount + health
-├── server.ts        # registerTool + MCP_TOOL_COUNT
+├── server.ts        # factory + MCP_TOOL_COUNT (registers 8 domain tools)
+├── domain-tool.ts   # registerDomainTool({ op, layer, input })
 ├── tool-result.ts   # ok / fail wrappers
+├── tools/           # one file per domain
 └── UNSUPPORTED_FILTERS.md
 ```
 
 ## Agents
 
-Skill: `.cursor/skills/backend/backend-mcp/SKILL.md`.  
+Skill: `.cursor/skills/backend/backend-mcp/SKILL.md`.
 Governor: `.cursor/rules/backend/mcp.mdc`.

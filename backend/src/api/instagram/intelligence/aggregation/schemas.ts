@@ -4,7 +4,7 @@ export const AGGREGATE_ACCOUNT_SIGNALS_SCHEMA = z.object({
   items: z
     .array(z.any())
     .describe(
-      "The `posts` array from instagram_get_account_intelligence, all from the same account. Never mix posts from different accounts — follower counts differ too much for one outlier threshold to mean anything across them.",
+      "The `posts` array from instagram op=account (intel), all from the same account. Never mix posts from different accounts — follower counts differ too much for one outlier threshold to mean anything across them.",
     ),
   username: z
     .string()

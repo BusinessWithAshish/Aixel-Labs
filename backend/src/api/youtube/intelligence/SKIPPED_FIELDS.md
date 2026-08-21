@@ -83,6 +83,6 @@ No deferred per-item fields. `publishedAt` and `channelSubscribers` are merged o
 
 `viewCountText` is YouTube's formatted view-count string (e.g. `"11,997 views"`), extracted from the watch-next `videoPrimaryInfoRenderer.viewCount.videoViewCountRenderer.viewCount.simpleText` when available, with a `toLocaleString("en-US") + " views"` fallback built from the raw numeric count so the field is never a bare number like `"11997"`.
 
-## Aggregation — `youtube_aggregate_keyword_signals` (MCP)
+## Aggregation — `youtube` `op=aggregate_keyword` (MCP)
 
 `velocityLift` is now the real `topQuartileFrequency / bottomQuartileFrequency` ratio and is **`null`** when a keyword never appears in the bottom quartile (the ratio is undefined, not capped). A new `topQuartileExclusive: boolean` flag surfaces those keywords separately. The previous `Math.max(bottom, 1)` cap was removed because it conflated `5/0` with `5/1` (both yielded `5`), which was misleading. Sort order: computable `velocityLift` descending (nulls last), then `topQuartileExclusive` descending, then raw `frequency` descending.

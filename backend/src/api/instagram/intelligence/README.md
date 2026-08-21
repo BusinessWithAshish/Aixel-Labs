@@ -2,12 +2,12 @@
 
 Mirrors `youtube/intelligence`'s architecture: raw fetch layer stays in
 `instagram/client.ts` / `instagram/advanced/client.ts` (never reimplemented
-here), this module adds a pure `compute/` layer on top and exposes it via
-MCP tools only — no HTTP route, same pattern as `youtube/intelligence/video-meta`.
+here), this module adds a pure `compute/` layer on top and exposes it via HTTP
+(`POST /instagram/intelligence/account`) and the `instagram` MCP tool.
 
 ## Why this exists
 
-`instagram_get_profile` / `instagram_get_posts` return raw stats only. Unlike
+`instagram` `op=profile` / `op=posts` return raw stats only. Unlike
 YouTube, there was no aggregation layer computing engagement scores, velocity,
 or outlier detection — every caller had to do that arithmetic by hand, in
 context, every time. This module does it once, in code.
@@ -15,12 +15,12 @@ context, every time. This module does it once, in code.
 ## Mental model
 
 ```
-instagram_get_account_intelligence          (fetch + enrich, I/O)
+instagram op=account (layer=intel)          (fetch + enrich, I/O)
   → fetchFromEntities + fetchInstagramAdvancedPosts   (raw layer, unchanged)
   → enrichPost per post                                (compute/ — pure)
   → lean post shape + intelligence block
 
-instagram_aggregate_account_signals          (pure, sync, no I/O)
+instagram op=aggregate_account (raw/compute)  (pure, sync, no I/O)
   → takes the posts array above (single account only)
   → outlier threshold (mean + 2×stddev), score distribution,
     posting cadence, media type mix, reel ratio
@@ -47,9 +47,9 @@ instagram_aggregate_account_signals          (pure, sync, no I/O)
 
 ## Deliberate scope cuts
 
-- **No HTTP route.** MCP-only, like `video-meta`. Add one later via the
-  `backend-api-module` checklist if a non-MCP consumer needs it — reuse
-  `instagramAccountIntelligenceService` as-is, don't fork it.
+- **Account HTTP exists** (`POST /instagram/intelligence/account`). Aggregate is
+  compute-only (MCP `op=aggregate_account` and in-process). Don't fork
+  `instagramAccountIntelligenceService`.
 - **Lean post shape, not `WithIntelligence<IG_ADVANCED_POST, …>`.** The full
   raw post type carries every CDN rendition (`images[]`, `videos[]`,
   `carousel[]`) — a single page from a video-heavy account measured 400K+
@@ -71,6 +71,5 @@ instagram_aggregate_account_signals          (pure, sync, no I/O)
 - [x] `compute/`, `math.ts`, `constants.ts`, `types.ts`
 - [x] `account/` (fetch + enrich)
 - [x] `aggregation/` (pure aggregate)
-- [x] MCP tools: `instagram_get_account_intelligence`, `instagram_aggregate_account_signals`
+- [x] MCP: `instagram` `op=account` (intel) and `op=aggregate_account` (raw)
 - [ ] Unit tests for `compute/` (no test runner exists anywhere in this repo yet — same gap `youtube/intelligence` has)
-- [ ] HTTP route (add only if a non-MCP consumer needs it)

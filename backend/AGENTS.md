@@ -26,6 +26,7 @@ for mounts/boot, **db** for anything persisted, then the folder you are editing.
 - **`src/db` is schema SSOT.** New persisted features start in `types.ts`.
 - APIs return `ALApiResponse<T>`; Zod validates **requests** only.
 - **No Mongo inside `src/api`.** Utils are BE-only (no FE package export).
-- MCP tools call the same intelligence **services** as HTTP — no loopback.
+- MCP: one tool per domain (`op` / `layer` / `input`) calling the same
+  **services** as HTTP — no loopback. Catalog: `backend/src/mcp/README.md`.
 
 Mirror `src/api/website-contacts/` for a new single-endpoint module.

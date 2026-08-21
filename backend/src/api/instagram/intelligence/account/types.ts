@@ -11,7 +11,7 @@ export type InstagramAccountIntelligenceInput = z.infer<
 >;
 
 /** Deliberately excludes `images[]`/`videos[]`/`carousel[]`/`coauthors[]` —
- * those CDN-rendition arrays are what pushed a single instagram_get_posts
+ * those CDN-rendition arrays are what pushed a single instagram `op=posts`
  * page past MCP response size limits during skill research. Keep exactly
  * one direct URL per post instead of every rendition. */
 export type INSTAGRAM_POST_LEAN_FIELDS = Pick<

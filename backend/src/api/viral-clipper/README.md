@@ -22,31 +22,15 @@ transcription + diarization together. Viral-moment scoring is a pure text
 task afterward — reuses the same model so the two calls compose naturally in
 `pipeline.ts`.
 
-## Deployment: VPS-only, not Vercel
+## Deployment
 
-**This entire module is VPS-only.** It's listed in `VPS_ONLY_ENDPOINTS`
-(`backend/src/config.ts`) — `routes.ts` skips mounting `/viral-clipper/*`
-entirely when `IS_VERCEL_RUNTIME` is true (Vercel sets `VERCEL=1`
-automatically on every deployment; no separate env var to configure). The
-same guard skips registering the two `viral_clipper_*` MCP tools on Vercel
-(see `mcp/server.ts`). Two independent reasons this can't run as a Vercel
-serverless function:
-
-1. **Execution time.** Chunked diarization on a long episode is a 15-20+
-   minute job (see "Long episodes" below) — Vercel serverless functions have
-   a hard duration ceiling (10s-15min depending on plan), nowhere near
-   enough. `server.ts`'s `if (!process.env.VERCEL) { app.listen(...) }` split
-   means any timeout tuning only takes effect off Vercel anyway.
-2. **System binaries.** `/youtube-comments` and `/youtube-chapters` shell out
-   to a `yt-dlp` binary that isn't guaranteed present on Vercel's build
-   image (unlike `ffmpeg`, which ships as the `ffmpeg-static` npm package and
-   works anywhere Node runs).
-
-Run this backend on the VPS (persistent process, not serverless) for
-anything under `/viral-clipper/*`. **Hermes, running on the same VPS, calls
-the pipeline's internal URL directly** (e.g. `http://localhost:<port>/viral-clipper/...`)
-— no public URL, no Blob upload/download round-trip, just a local HTTP call
-to a sibling process on the same machine.
+HTTP `/viral-clipper/*` and the `viral_clipper` MCP tool always register.
+Chunked diarization can run 15–20+ minutes (see "Long episodes" below);
+`/youtube-comments` and `/youtube-chapters` shell out to `yt-dlp`. Run this
+backend as a persistent process with those binaries. **Hermes, on the same
+host, calls the pipeline's internal URL directly** (e.g.
+`http://localhost:<port>/viral-clipper/...`) — no public URL, no Blob
+upload/download round-trip.
 
 ## Storage: local disk, not Vercel Blob
 
@@ -251,8 +235,8 @@ be the same source (a caller might diarize a local file that was never
 uploaded to YouTube at all), and not every caller wants the extra yt-dlp
 round-trip or has an actual YouTube URL at all. Fetch
 `/viral-clipper/youtube-comments` and/or `/viral-clipper/youtube-chapters` (or their
-MCP equivalents, `viral_clipper_get_youtube_comment_highlights` /
-`viral_clipper_get_youtube_chapters`) yourself, format with the exported
+MCP equivalents, `viral_clipper` `op=comment_highlights` /
+`op=chapters`) yourself, format with the exported
 `formatCommentHighlightsAsAudienceSignals` / `formatChaptersAsAudienceSignals`
 helpers, and pass the result as `audienceSignals` to `/viral-moments` or
 `/pipeline`. The prompt treats this as a strong prior, not proof — it raises
@@ -538,6 +522,6 @@ viral-clipper/
   README.md
 
 ../../../scripts/viral-clipper-smoke.ts  # end-to-end smoke test (resolve -> diarize -> score -> cleanup)
-../../mcp/server.ts                 # viral_clipper_get_youtube_comment_highlights / viral_clipper_get_youtube_chapters MCP tools (VPS only)
-../../config.ts                     # VPS_ONLY_ENDPOINTS / IS_VERCEL_RUNTIME / isEndpointAllowedOnCurrentRuntime — the Vercel-vs-VPS gate
+../../mcp/tools/viral-clipper.ts     # viral_clipper MCP ops (diarize, moments, pipeline, cut, comment_highlights, chapters)
+../../config.ts                     # ENDPOINTS.VIRAL_CLIPPER mount (always registered)
 ```

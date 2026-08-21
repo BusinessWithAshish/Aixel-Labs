@@ -118,6 +118,6 @@ cd backend && pnpm exec tsx scripts/twitter-smoke.ts
 
 ## MCP
 
-Same fetchers, no HTTP loopback, on `/mcp` (`aixel-intelligence`):
-`twitter_get_user`, `twitter_get_tweet`, `twitter_get_user_tweets`,
-`twitter_get_trending`, `twitter_search`.
+Same fetchers, no HTTP loopback, on `/mcp` (`aixel-intelligence`) via the
+`twitter` domain tool: `op` = `user` | `tweet` | `user_tweets` | `trending` |
+`search`. Raw only — no Twitter intelligence API.
