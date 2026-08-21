@@ -4,6 +4,7 @@ import { youtubeSearchIntelligenceHandler } from "./search/handler";
 import { youtubeVideoIntelligenceHandler } from "./video/handler";
 import { youtubeVideoSuggestedIntelligenceHandler } from "./video/suggested/handler";
 import { youtubeTranscriptIntelligenceHandler } from "./transcript/handler";
+import { youtubeCommentsIntelligenceHandler } from "./comments/handler";
 import { youtubeChannelIntelligenceHandler } from "./channel/handler";
 import { youtubeHandleIntelligenceHandler } from "./handle/handler";
 import { youtubeSuggestIntelligenceHandler } from "./suggest/handler";
@@ -24,6 +25,10 @@ export function registerYoutubeIntelligenceRoutes(router: IRouter) {
   router.post(
     YOUTUBE_INTELLIGENCE_ROUTES.VIDEO_TRANSCRIPT,
     youtubeTranscriptIntelligenceHandler,
+  );
+  router.post(
+    YOUTUBE_INTELLIGENCE_ROUTES.VIDEO_COMMENTS,
+    youtubeCommentsIntelligenceHandler,
   );
   router.post(
     YOUTUBE_INTELLIGENCE_ROUTES.CHANNEL,

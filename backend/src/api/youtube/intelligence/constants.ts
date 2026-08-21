@@ -7,6 +7,7 @@ export const YOUTUBE_INTELLIGENCE_ROUTES = {
   VIDEO: "/intelligence/video",
   VIDEO_SUGGESTED: "/intelligence/video/suggested",
   VIDEO_TRANSCRIPT: "/intelligence/video/transcript",
+  VIDEO_COMMENTS: "/intelligence/video/comments",
   CHANNEL: "/intelligence/channel",
   HANDLE: "/intelligence/handle",
   SUGGEST: "/intelligence/suggest",
@@ -19,6 +20,7 @@ export const YOUTUBE_INTELLIGENCE_HANDLER_LABELS = {
   VIDEO: "YOUTUBE/INTELLIGENCE/VIDEO",
   VIDEO_SUGGESTED: "YOUTUBE/INTELLIGENCE/VIDEO/SUGGESTED",
   VIDEO_TRANSCRIPT: "YOUTUBE/INTELLIGENCE/VIDEO/TRANSCRIPT",
+  VIDEO_COMMENTS: "YOUTUBE/INTELLIGENCE/VIDEO/COMMENTS",
   CHANNEL: "YOUTUBE/INTELLIGENCE/CHANNEL",
   HANDLE: "YOUTUBE/INTELLIGENCE/HANDLE",
   SUGGEST: "YOUTUBE/INTELLIGENCE/SUGGEST",
@@ -100,7 +102,8 @@ export const YOUTUBE_INTELLIGENCE_PATTERNS = {
   TITLE_WORDS: /\s+/,
   CHANNEL_KEYWORDS: /"([^"]+)"|(\S+)/g,
   CHANNEL_JOINED_DATE_PREFIX: /^Joined\s+/i,
-  /** Unicode letter/number tokeniser for suggest + transcript keyword extraction. */
+  /** MM:SS or H:MM:SS inside comment text (audience-flagged moments). */
+  COMMENT_TIMESTAMP: /\b(?:(\d{1,2}):)?([0-5]?\d):([0-5]\d)\b/g,
   WORD_TOKEN: /[^\p{L}\p{N}'-]+/gu,
   /** ASCII-oriented tokeniser used by transcript keyword frequency. */
   ASCII_WORD_SPLIT: /[^a-z0-9'-]+/i,

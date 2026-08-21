@@ -12,6 +12,7 @@ Express router mounting scraper sub-APIs under `/youtube`. All endpoints use **P
 | Suggest | [suggest/README.md](./suggest/README.md) | `POST` | `/suggest` |
 | Video | [video/README.md](./video/README.md) | `POST` | `/video`, `/video/suggested` |
 | Transcript | [transcript/README.md](./transcript/README.md) | `POST` | `/video/transcript` |
+| Comments | [comments/README.md](./comments/README.md) | `POST` | `/video/comments` |
 | Video meta | — | `POST` | `/video-meta` |
 | Handle | — | `POST` | `/handle` |
 | Channel | [channel/README.md](./channel/README.md) | `POST` | `/channel` |
@@ -48,6 +49,7 @@ youtube/
 │   ├── get-watch.ts          # get_watch fetch + field extractors
 │   ├── suggested.ts          # Suggested videos pagination
 │   └── helpers.ts            # Public fetch API + re-exports
+├── comments/
 ├── video-meta/
 ├── handle/
 ├── channel/

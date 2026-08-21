@@ -10,6 +10,7 @@ Derived endpoints that return **raw API responses + a nested `intelligence` bloc
 | Video              | `POST` | `/youtube/intelligence/video`              | `/youtube/video`             |
 | Video suggested    | `POST` | `/youtube/intelligence/video/suggested`    | `/youtube/video/suggested`   |
 | Video transcript   | `POST` | `/youtube/intelligence/video/transcript`   | `/youtube/video/transcript`  |
+| Video comments     | `POST` | `/youtube/intelligence/video/comments`     | `/youtube/video/comments`    |
 | Suggest            | `POST` | `/youtube/intelligence/suggest`            | `/youtube/suggest`           |
 | Channel            | `POST` | `/youtube/intelligence/channel`            | `/youtube/channel`           |
 | Handle             | `POST` | `/youtube/intelligence/handle`             | `/youtube/handle`            |
@@ -67,6 +68,7 @@ intelligence/
 │   ├── enrich.ts
 │   ├── service.ts
 │   └── handler.ts
+├── comments/                 # timestamp mentions, hearted/verified counts, like distribution
 ├── channel/                  # handler → harvest → enrich → compute + content-metrics
 ├── handle/
 ├── video-meta/
