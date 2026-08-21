@@ -10,6 +10,7 @@ import {
   closeUrlFetchSession,
   createUrlFetchSession,
 } from "../../utils/node-tls-client-session-handler";
+import { IS_VERCEL_RUNTIME } from "../../config";
 import {
   TRANSCRIPTION_ERROR_MESSAGES,
   TRANSCRIPTION_GATED_STATUS_CODES,
@@ -129,9 +130,19 @@ export type RESOLVED_MEDIA_SOURCE = {
  * share the VPS's filesystem) or an http(s) URL (downloaded to a fresh temp
  * directory this function owns, with the TLS-fingerprint fallback above). No
  * Vercel Blob or any other storage-specific handling.
+ *
+ * Local paths only resolve on a host that shares the caller's filesystem.
+ * When `IS_VERCEL_RUNTIME` is true there is no such filesystem, so a local
+ * path is rejected immediately with a clear error instead of attempting
+ * `access()` and surfacing a misleading "file not found".
  */
 export async function resolveMediaSource(source: string): Promise<RESOLVED_MEDIA_SOURCE> {
   if (!isRemoteUrl(source)) {
+    if (IS_VERCEL_RUNTIME) {
+      throw new Error(
+        `${TRANSCRIPTION_ERROR_MESSAGES.LOCAL_PATH_ON_VERCEL}: ${source}`,
+      );
+    }
     try {
       await access(source);
     } catch {

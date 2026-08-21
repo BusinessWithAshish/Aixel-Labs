@@ -25,39 +25,13 @@ export enum ENDPOINTS {
 }
 
 /**
- * Endpoints that must NOT be mounted when running on Vercel (`routes.ts`
- * skips `app.use` for these when `IS_VERCEL_RUNTIME` is true) — long-running
- * jobs that would exceed Vercel's serverless function time limit (10s-15min
- * depending on plan; nowhere near enough for a 20+ minute chunked Gemini
- * pipeline), and/or that shell out to system binaries (yt-dlp, ffmpeg) not
- * guaranteed present on Vercel's build image. These are meant to run on a
- * persistent process instead (this project's Ubuntu VPS) — see each
- * module's README for why it's listed here before adding more.
- */
-export const VPS_ONLY_ENDPOINTS: ENDPOINTS[] = [
-  ENDPOINTS.VIRAL_CLIPPER,
-  /**
-   * Tightening always re-encodes the WHOLE source video (`select`+`setpts`
-   * rewrites every frame's timestamp regardless of where the cuts land, so
-   * stream-copy is never an option) — minutes, not seconds, on anything
-   * past a few minutes of source. Same execution-time problem as
-   * VIRAL_CLIPPER, same fix.
-   */
-  ENDPOINTS.TIGHTENING,
-];
-
-/**
- * Vercel sets `VERCEL=1` automatically on every deployment (already relied
- * on in `server.ts` to skip `app.listen`) — reused here as the single
- * signal for "am I running as a Vercel serverless function" vs. a normal
- * persistent process (VPS, local dev). No separate env var to configure.
+ * Vercel sets `VERCEL=1` automatically on every deployment. Used in
+ * `server.ts` to skip `app.listen` (export the app instead). Product HTTP
+ * mounts and MCP tools always register — this backend is intended to run
+ * as a persistent process (VPS / local). Transcription still rejects
+ * local-path sources when this is true because Vercel has no host FS.
  */
 export const IS_VERCEL_RUNTIME = !!process.env.VERCEL;
-
-/** `routes.ts` (and `mcp/server.ts` for tool registration) guard mounts with this instead of repeating the IS_VERCEL_RUNTIME + VPS_ONLY_ENDPOINTS check inline. */
-export function isEndpointAllowedOnCurrentRuntime(endpoint: ENDPOINTS): boolean {
-  return !IS_VERCEL_RUNTIME || !VPS_ONLY_ENDPOINTS.includes(endpoint);
-}
 
 export const ALLOWED_ORIGINS_DEV_REGEX = [
   /^http:\/\/.*\.localhost:3003$/,

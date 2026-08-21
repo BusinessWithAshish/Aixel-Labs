@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { ENDPOINTS, isEndpointAllowedOnCurrentRuntime } from "./config";
+import { ENDPOINTS } from "./config";
 
 import instagramRoutes from "./api/instagram/index";
 import facebookRoutes from "./api/facebook/index";
@@ -26,11 +26,7 @@ export function registerRoutes(app: Express) {
   app.use(ENDPOINTS.GSEARCH, gsearchRoutes);
   app.use(ENDPOINTS.GOOGLE_TRENDS, googleTrendsRoutes);
   app.use(ENDPOINTS.TRANSCRIPTION, transcriptionRoutes);
-  if (isEndpointAllowedOnCurrentRuntime(ENDPOINTS.VIRAL_CLIPPER)) {
-    app.use(ENDPOINTS.VIRAL_CLIPPER, viralClipperRoutes);
-  }
-  if (isEndpointAllowedOnCurrentRuntime(ENDPOINTS.TIGHTENING)) {
-    app.use(ENDPOINTS.TIGHTENING, tighteningRoutes);
-  }
+  app.use(ENDPOINTS.VIRAL_CLIPPER, viralClipperRoutes);
+  app.use(ENDPOINTS.TIGHTENING, tighteningRoutes);
   app.use(ENDPOINTS.MCP, mcpRoutes);
 }

@@ -54,4 +54,6 @@ export const TRANSCRIPTION_ERROR_MESSAGES = {
     "Normalized audio exceeds the Groq upload size limit — trim the source file and try again",
   GROQ_FAILED: "Groq transcription request failed",
   GENERIC: "Transcription failed",
+  LOCAL_PATH_ON_VERCEL:
+    "Local filesystem paths are only readable when this backend runs on the VPS (same filesystem as Hermes) — this is the Vercel deployment, so mediaSource must be a publicly-reachable URL instead",
 } as const;

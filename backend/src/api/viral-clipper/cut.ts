@@ -13,8 +13,7 @@ import type {
 } from "./types";
 
 /**
- * Where finished clips are written — local disk (this pipeline is VPS-only,
- * see `VPS_ONLY_ENDPOINTS` in config.ts), not Blob storage. The VPS's actual
+ * Where finished clips are written — local disk, not Blob storage. The host's
  * storage mount isn't known at code-authoring time, so it's configurable;
  * defaults to a project-relative folder for local dev.
  */

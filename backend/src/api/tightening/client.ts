@@ -24,9 +24,8 @@ import { detectSilences } from "./silence";
 import type { TIGHTENING_REQUEST_PARSED, TIGHTENING_RESPONSE, TIME_RANGE } from "./types";
 
 /**
- * Where finished videos are written — local disk (this pipeline is VPS-only,
- * see `VPS_ONLY_ENDPOINTS` in config.ts), not Blob storage. Same pattern as
- * `VIRAL_CLIPPER_OUTPUT_DIR` in `viral-clipper/cut.ts`: the VPS's actual
+ * Where finished videos are written — local disk, not Blob storage. Same
+ * pattern as `VIRAL_CLIPPER_OUTPUT_DIR` in `viral-clipper/cut.ts`: the host's
  * storage mount isn't known at code-authoring time, so it's configurable,
  * and defaults to a project-relative folder for local dev.
  */
