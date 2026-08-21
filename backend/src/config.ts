@@ -36,9 +36,13 @@ export const IS_VERCEL_RUNTIME = !!process.env.VERCEL;
 export const ALLOWED_ORIGINS_DEV_REGEX = [
   /^http:\/\/.*\.localhost:3003$/,
   /^https:\/\/.*\.aixellabs\.com$/,
+  /^https:\/\/.*\.aixellabs\.in$/,
 ];
 
-export const ALLOWED_ORIGINS_PROD_REGEX = [/^https:\/\/.*\.aixellabs\.com$/];
+export const ALLOWED_ORIGINS_PROD_REGEX = [
+  /^https:\/\/.*\.aixellabs\.com$/,
+  /^https:\/\/.*\.aixellabs\.in$/,
+];
 
 /**
  * Single config per endpoint: `route` for backend Express, `full` for frontend API calls.
