@@ -42,6 +42,10 @@ export type LeadBulkActionsDropdownProps = {
     onPreviewExport?: () => void;
     onCreateListFromFilters?: () => void;
     createListFromFiltersDisabled?: boolean;
+    onEnrich?: () => void;
+    enrichWithoutSelection?: boolean;
+    enrichDisabled?: boolean;
+    enrichLabel?: string;
     deselectAllLabel?: string;
     deleteLabel?: string;
 };
@@ -56,11 +60,17 @@ export function LeadBulkActionsDropdown({
     onPreviewExport,
     onCreateListFromFilters,
     createListFromFiltersDisabled,
+    onEnrich,
+    enrichWithoutSelection = false,
+    enrichDisabled = false,
+    enrichLabel = 'Enrich',
     deselectAllLabel = 'Deselect all',
     deleteLabel = 'Delete',
 }: LeadBulkActionsDropdownProps) {
     const hasSelection = selectedCount > 0;
     const showExport = Boolean(onExport || onPreviewExport);
+    const enrichEnabled =
+        Boolean(onEnrich) && !enrichDisabled && (hasSelection || enrichWithoutSelection);
 
     const primaryOptions: DropdownMenuOption[] = [
         {
@@ -105,10 +115,11 @@ export function LeadBulkActionsDropdown({
         },
         {
             key: 'enrich',
-            label: 'Enrich',
+            label: enrichLabel,
             icon: Sparkles,
-            disabled: !hasSelection,
-            onSelect: notifyActionComingSoon,
+            hidden: !onEnrich,
+            disabled: !enrichEnabled,
+            onSelect: () => onEnrich?.(),
         },
     ];
 

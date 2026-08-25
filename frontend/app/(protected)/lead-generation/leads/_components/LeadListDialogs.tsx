@@ -3,6 +3,7 @@
 import { ZodStringField } from '@/components/common/zod-form-builder/ZodFieldComponents';
 import { Button } from '@/components/ui/button';
 import { DialogDescription } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { usePage } from '@/contexts/PageStore';
 import type { TUseUserLeadListsPageReturn } from '../_hooks/use-user-lead-lists-page';
 import { LeadListDialogShell } from './LeadListDialogShell';
@@ -163,12 +164,47 @@ function DeleteLeadListsDialog() {
     );
 }
 
+function LeadListEnrichDialog() {
+    const {
+        enrichConfirmOpen,
+        setEnrichConfirmOpen,
+        confirmEnrichSelectedLists,
+        enrichPreviewCount,
+        enrichPreviewCost,
+        isEnriching,
+    } = usePage<TUseUserLeadListsPageReturn>();
+
+    return (
+        <ConfirmDialog
+            open={enrichConfirmOpen}
+            onOpenChange={(open) => {
+                if (!open && isEnriching) return;
+                setEnrichConfirmOpen(open);
+            }}
+            title="Enrich selected lists?"
+            description="Crawl websites on eligible leads and append contacts without creating new leads."
+            alertMessage={
+                <>
+                    About <strong>{enrichPreviewCount}</strong> unique website(s). Estimated
+                    cost: <strong>{enrichPreviewCost}</strong> credit(s). Already enriched and
+                    Crawl leads are skipped.
+                </>
+            }
+            onConfirm={() => void confirmEnrichSelectedLists()}
+            isLoading={isEnriching}
+            confirmText="Enrich"
+            variant="default"
+        />
+    );
+}
+
 export function LeadListDialogs() {
     return (
         <>
             <AddLeadListDialog />
             <EditLeadListDialog />
             <DeleteLeadListsDialog />
+            <LeadListEnrichDialog />
         </>
     );
 }

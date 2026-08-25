@@ -22,7 +22,8 @@ export type FilterSource =
     | LeadSource.GOOGLE_ADVANCED_SEARCH
     | LeadSource.LINKEDIN
     | LeadSource.INSTAGRAM
-    | LeadSource.FACEBOOK;
+    | LeadSource.FACEBOOK
+    | LeadSource.CRAWL;
 
 /** Google Maps sheet filters — same shape as the scrape-request enrichment SSOT. */
 export type GoogleMapsFilters = GMAPS_ENRICHMENT;
@@ -179,6 +180,7 @@ export const SOURCE_META: Record<FilterSource, SourceMeta> = {
     [LeadSource.LINKEDIN]: { label: 'LinkedIn', imageSrc: '/linkedin-logo-svg.png' },
     [LeadSource.INSTAGRAM]: { label: 'Instagram', imageSrc: '/instagram-logo.svg' },
     [LeadSource.FACEBOOK]: { label: 'Facebook', imageSrc: '/facebook-logo.svg' },
+    [LeadSource.CRAWL]: { label: 'Crawl', imageSrc: '/aixellabs-logo.svg' },
 };
 
 export const FILTERABLE_SOURCES: FilterSource[] = [
@@ -188,6 +190,7 @@ export const FILTERABLE_SOURCES: FilterSource[] = [
     LeadSource.LINKEDIN,
     LeadSource.INSTAGRAM,
     LeadSource.FACEBOOK,
+    LeadSource.CRAWL,
 ];
 
 export const SOURCE_FILTER_OPTIONS: { value: FilterSource; label: string }[] = FILTERABLE_SOURCES.map((s) => ({

@@ -29,4 +29,4 @@ for mounts/boot, **db** for anything persisted, then the folder you are editing.
 - MCP: one tool per domain (`op` / `layer` / `input`) calling the same
   **services** as HTTP — no loopback. Catalog: `backend/src/mcp/README.md`.
 
-Mirror `src/api/website-contacts/` for a new single-endpoint module.
+Mirror `src/api/crawl/` for a new single-endpoint module.

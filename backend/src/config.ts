@@ -20,6 +20,7 @@ export enum ENDPOINTS {
   TRANSCRIPTION = "/transcription",
   VIRAL_CLIPPER = "/viral-clipper",
   TIGHTENING = "/tightening",
+  CRAWL = "/crawl",
   MCP = "/mcp",
   SAMPLE = "/sample",
 }
@@ -240,5 +241,8 @@ export const API_ENDPOINTS = {
   },
   TIGHTENING: {
     TIGHTEN: { route: "/", full: `${ENDPOINTS.TIGHTENING}` },
+  },
+  CRAWL: {
+    API: { route: "/", full: `${ENDPOINTS.CRAWL}` },
   },
 } as const;

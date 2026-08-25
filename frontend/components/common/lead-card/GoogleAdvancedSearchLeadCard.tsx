@@ -16,6 +16,7 @@ import type { GSEARCH_RESPONSE } from '@aixellabs/backend/gsearch/types';
 import { CalendarDays, ExternalLink, PlayCircle, RefreshCw, Trash2, User } from 'lucide-react';
 import Image from 'next/image';
 import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { LeadEnrichmentStatus } from '@/components/common/lead-card/LeadEnrichmentStatus';
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
 
@@ -27,6 +28,7 @@ type GoogleAdvancedSearchLeadCardProps = {
     onDelete?: () => void;
     onSelect?: (selected: boolean) => void;
     isSelected?: boolean;
+    isEnriched?: boolean;
 };
 
 function formatDateTime(value: string | null | undefined): string | null {
@@ -54,7 +56,7 @@ function formatLocale(value: string | null | undefined): string | null {
 }
 
 export const GoogleAdvancedSearchLeadCard = (props: GoogleAdvancedSearchLeadCardProps) => {
-    const { lead, className, actions, showCheckbox, onDelete, onSelect, isSelected } = props;
+    const { lead, className, actions, showCheckbox, onDelete, onSelect, isSelected, isEnriched = false } = props;
 
     const leadInfo = useMemo(() => {
         const title = lead.title?.trim() || DEFAULT_DISPLAY_VALUE;
@@ -171,10 +173,11 @@ export const GoogleAdvancedSearchLeadCard = (props: GoogleAdvancedSearchLeadCard
                     ) : null}
                     <div className="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
                         <span
-                            className="min-w-0 truncate text-lg font-semibold text-foreground"
+                            className="flex min-w-0 items-center gap-1.5 text-lg font-semibold text-foreground"
                             title={leadInfo.title}
                         >
-                            {leadInfo.title}
+                            <span className="min-w-0 truncate">{leadInfo.title}</span>
+                            <LeadEnrichmentStatus enriched={isEnriched} />
                         </span>
                         {leadInfo.displayHost && (
                             <CardDescription className="truncate" title={leadInfo.displayHost}>
@@ -325,7 +328,7 @@ export const GoogleAdvancedSearchLeadCard = (props: GoogleAdvancedSearchLeadCard
                     <ExternalLink className="size-3.5 shrink-0" />
                 </a>
 
-                {actions && <div className="border-t">{actions}</div>}
+                {actions ? <div className="border-t border-border pt-2">{actions}</div> : null}
             </CardContent>
         </Card>
     );

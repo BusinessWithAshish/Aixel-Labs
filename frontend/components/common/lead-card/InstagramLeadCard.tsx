@@ -12,6 +12,7 @@ import Image from "next/image";
 import type { INSTAGRAM_RESPONSE } from "@aixellabs/backend/instagram";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InstagramAvatar } from "@/components/common/lead-card/InstagramAvatar";
+import { LeadEnrichmentStatus } from "@/components/common/lead-card/LeadEnrichmentStatus";
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
 
@@ -36,11 +37,12 @@ type InstagramLeadCardProps = {
     onDelete?: () => void;
     onSelect?: (selected: boolean) => void;
     isSelected?: boolean;
+    isEnriched?: boolean;
 };
 
 export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
 
-    const { lead, className, actions, showCheckbox, onDelete, onSelect, isSelected } = props;
+    const { lead, className, actions, showCheckbox, onDelete, onSelect, isSelected, isEnriched = false } = props;
 
     const leadInfo = useMemo(() => {
         return {
@@ -134,6 +136,7 @@ export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
                         <div className="flex items-start flex-col min-w-0 flex-1 overflow-hidden">
                             <CardTitle className="flex w-full min-w-0 max-w-full items-center gap-1.5">
                                 <span className="min-w-0 flex-1 truncate">{leadInfo.fullName}</span>
+                                <LeadEnrichmentStatus enriched={isEnriched} />
                             </CardTitle>
                             <CardDescription className="truncate">
                                 @{leadInfo.username}
@@ -247,7 +250,7 @@ export const InstagramLeadCard = (props: InstagramLeadCardProps) => {
                     </Badge>
                 )}
 
-                {actions && <div className="border-t">{actions}</div>}
+                {actions ? <div className="border-t border-border pt-2">{actions}</div> : null}
 
             </CardContent>
 

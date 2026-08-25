@@ -19,6 +19,8 @@ export function getLeadSoruceFromSubModule(subModule: LEAD_GENERATION_SUB_MODULE
             return LeadSource.FACEBOOK;
         case LEAD_GENERATION_SUB_MODULES.LINKEDIN:
             return LeadSource.LINKEDIN;
+        case LEAD_GENERATION_SUB_MODULES.CRAWL:
+            return LeadSource.CRAWL;
         default:
             throw new Error('Method not implemented');
     }
@@ -61,6 +63,8 @@ const getLeads = <TRequest>(
             return apiClient.post(API_ENDPOINTS.FACEBOOK.API.full, body, options);
         case LEAD_GENERATION_SUB_MODULES.LINKEDIN:
             return apiClient.post(API_ENDPOINTS.LINKEDIN.API.full, body, options);
+        case LEAD_GENERATION_SUB_MODULES.CRAWL:
+            return apiClient.post(API_ENDPOINTS.CRAWL.API.full, body, options);
         default:
             throw new Error('Method not implemented');
     }

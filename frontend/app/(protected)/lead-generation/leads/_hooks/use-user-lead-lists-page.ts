@@ -1,12 +1,20 @@
 'use client';
 
 import type { UserLeadList } from '@aixellabs/backend/db/types';
+import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { createUserLeadList, deleteUserLeadListById, updateUserLeadListById } from '@/app/actions/user-lead-lists-actions';
+import { resolveEnrichmentTargets } from '@/app/actions/user-lead-actions';
 import { isValidObjectId } from '@/helpers/object-id';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { getCreditCostPerItem } from '@/helpers/credits';
+import { runLeadEnrichment } from '../_utils/run-lead-enrichment';
+import { setCreditsBadgeCache } from '@/components/common/credits/CreditsBadge';
+import { websiteDedupeKey } from '@/helpers/lead-website';
 
 export function useUserLeadListsPage(apiLeadLists: UserLeadList[]) {
+    const router = useRouter();
     const [lists, setLists] = useState<UserLeadList[]>(() => [...apiLeadLists]);
     const [listSearchQuery, setListSearchQuery] = useState('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -21,6 +29,11 @@ export function useUserLeadListsPage(apiLeadLists: UserLeadList[]) {
     const [editSubmitting, setEditSubmitting] = useState(false);
     const [addSubmitting, setAddSubmitting] = useState(false);
     const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+    const [enrichConfirmOpen, setEnrichConfirmOpen] = useState(false);
+    const [enrichPreviewCount, setEnrichPreviewCount] = useState(0);
+    const [enrichPreviewCost, setEnrichPreviewCost] = useState(0);
+    const [isEnriching, setIsEnriching] = useState(false);
+    const enrichAbortRef = useRef<AbortController | null>(null);
 
     const selectedCount = selectedIds.size;
     const editDialogOpen = editListId !== null;
@@ -30,6 +43,12 @@ export function useUserLeadListsPage(apiLeadLists: UserLeadList[]) {
         if (!q) return lists;
         return lists.filter((l) => l.name.toLowerCase().includes(q) || (l.description?.toLowerCase().includes(q) ?? false));
     }, [lists, listSearchQuery]);
+
+    useEffect(() => {
+        return () => {
+            enrichAbortRef.current?.abort();
+        };
+    }, []);
 
     const toggleSelect = useCallback((id: string, checked: boolean) => {
         setSelectedIds((prev) => {
@@ -222,6 +241,61 @@ export function useUserLeadListsPage(apiLeadLists: UserLeadList[]) {
         setDeleteIntent(null);
     }, [deleteSubmitting]);
 
+    const requestEnrichSelectedLists = useCallback(async () => {
+        if (isEnriching || selectedIds.size === 0) return;
+        const listIds = [...selectedIds].filter((id) => isValidObjectId(id));
+        if (!listIds.length) {
+            toast.error('Select saved lists to enrich');
+            return;
+        }
+        const res = await resolveEnrichmentTargets({ listIds });
+        if (!res.success || !res.data) {
+            toast.error(res.error ?? 'Failed to resolve enrichment targets');
+            return;
+        }
+        const uniqueDomains = new Set(res.data.map((t) => websiteDedupeKey(t.domain)).filter(Boolean));
+        if (!uniqueDomains.size) {
+            toast.message('Nothing to enrich', {
+                description: 'No eligible websites in the selected lists.',
+            });
+            return;
+        }
+        const costPer = getCreditCostPerItem(LEAD_GENERATION_SUB_MODULES.CRAWL);
+        setEnrichPreviewCount(uniqueDomains.size);
+        setEnrichPreviewCost(uniqueDomains.size * costPer);
+        setEnrichConfirmOpen(true);
+    }, [isEnriching, selectedIds]);
+
+    const confirmEnrichSelectedLists = useCallback(async () => {
+        if (isEnriching) return;
+        const listIds = [...selectedIds].filter((id) => isValidObjectId(id));
+        if (!listIds.length) return;
+
+        setEnrichConfirmOpen(false);
+        enrichAbortRef.current?.abort();
+        const controller = new AbortController();
+        enrichAbortRef.current = controller;
+        setIsEnriching(true);
+        try {
+            const result = await runLeadEnrichment({
+                listIds,
+                mode: 'bulk',
+                signal: controller.signal,
+            });
+            if (result && result.patched > 0) {
+                if (!result.creditsExempt && result.remainingCredits != null) {
+                    setCreditsBadgeCache(result.remainingCredits);
+                }
+                router.refresh();
+            }
+        } finally {
+            if (enrichAbortRef.current === controller) {
+                enrichAbortRef.current = null;
+            }
+            setIsEnriching(false);
+        }
+    }, [isEnriching, selectedIds, router]);
+
     const deleteDialogOpen = deleteTargetIds !== null;
 
     return {
@@ -259,6 +333,13 @@ export function useUserLeadListsPage(apiLeadLists: UserLeadList[]) {
         confirmDelete,
         cancelDelete,
         deleteSubmitting,
+        requestEnrichSelectedLists,
+        confirmEnrichSelectedLists,
+        enrichConfirmOpen,
+        setEnrichConfirmOpen,
+        enrichPreviewCount,
+        enrichPreviewCost,
+        isEnriching,
     };
 }
 

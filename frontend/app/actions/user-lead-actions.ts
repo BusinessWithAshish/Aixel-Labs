@@ -3,6 +3,7 @@
 import { Lead, LeadDoc, MongoCollections, MongoObjectId, UserLead, getCollection } from '@aixellabs/backend/db';
 import {
     type LeadData,
+    LeadSource,
     LEAD_GENERATION_SUB_MODULES,
     Modules,
     UserLeadDoc,
@@ -177,6 +178,7 @@ export const getUserLeadsForList = async (listId: string): Promise<ALApiResponse
             source: leadDoc.source,
             sourceId: leadDoc.sourceId,
             data: leadDoc.data,
+            ...(leadDoc.enriched ? { enriched: leadDoc.enriched } : {}),
         }));
     });
 };
@@ -262,5 +264,169 @@ export const createUserLeadListFromLeadIds = async (input: {
             listId: newListId.toString(),
             copiedCount,
         };
+    });
+};
+
+export type EnrichmentTarget = {
+    leadId: string;
+    domain: string;
+};
+
+export type ResolveEnrichmentTargetsInput = {
+    listIds?: string[];
+    leadIds?: string[];
+};
+
+/** Owned lists only. Skips Crawl / already-enriched / no website. */
+export const resolveEnrichmentTargets = async (
+    input: ResolveEnrichmentTargetsInput,
+): Promise<ALApiResponse<EnrichmentTarget[]>> => {
+    return runAuthenticatedAction(async function resolveEnrichmentTargets(userId: string) {
+        const uid = requireUserObjectId(userId);
+        const listIds = (input.listIds ?? []).filter(Boolean);
+        const leadIds = (input.leadIds ?? []).filter(Boolean);
+        if (!listIds.length && !leadIds.length) {
+            throw new Error('Select at least one list or lead');
+        }
+
+        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
+        let memberships: UserLeadDoc[];
+
+        if (leadIds.length) {
+            const leadOids = leadIds.map((id) => toObjectId(id, 'Lead ID'));
+            memberships = await userLeadsCollection
+                .find({ userId: uid, leadId: { $in: leadOids } })
+                .toArray();
+        } else {
+            const listOids = listIds.map((id) => {
+                assertValidObjectId(id, 'List ID');
+                return toObjectId(id, 'List ID');
+            });
+            const listsCollection = await getCollection<UserLeadListDoc>(MongoCollections.LEAD_LISTS);
+            const ownedLists = await listsCollection
+                .find({ _id: { $in: listOids }, userId: uid })
+                .project({ _id: 1 })
+                .toArray();
+            const ownedListIds = ownedLists.map((l) => l._id!);
+            if (!ownedListIds.length) {
+                throw new Error('No matching lists found');
+            }
+            memberships = await userLeadsCollection
+                .find({ userId: uid, listId: { $in: ownedListIds } })
+                .toArray();
+        }
+
+        if (!memberships.length) {
+            return [];
+        }
+
+        const uniqueLeadIds = [...new Set(memberships.map((m) => m.leadId.toString()))].map(
+            (id) => toObjectId(id, 'Lead ID'),
+        );
+        const leadsCollection = await getCollection<LeadDoc>(MongoCollections.LEADS);
+        const leadDocs = await leadsCollection.find({ _id: { $in: uniqueLeadIds } }).toArray();
+
+        const { extractLeadWebsite } = await import('@/helpers/lead-website');
+        const targets: EnrichmentTarget[] = [];
+        for (const leadDoc of leadDocs) {
+            const lead: Lead = {
+                _id: leadDoc._id.toString(),
+                source: leadDoc.source,
+                sourceId: leadDoc.sourceId,
+                data: leadDoc.data,
+                ...(leadDoc.enriched ? { enriched: leadDoc.enriched } : {}),
+            };
+            const domain = extractLeadWebsite(lead);
+            if (!domain) continue;
+            targets.push({ leadId: lead._id!, domain });
+        }
+        return targets;
+    });
+};
+
+export type ApplyLeadEnrichmentPatch = {
+    leadId: string;
+    enriched: import('@aixellabs/backend/crawl/types').CRAWL_RESPONSE;
+};
+
+export type ApplyLeadEnrichmentResult = {
+    patchedCount: number;
+    remainingCredits: number;
+    creditsExempt: boolean;
+};
+
+/**
+ * Debit CRAWL credits × unique domains in this batch, then `$set: { enriched }` on owned leads.
+ * Does not create leads or change memberships.
+ */
+export const applyLeadEnrichment = async (
+    patches: ApplyLeadEnrichmentPatch[],
+): Promise<ALApiResponse<ApplyLeadEnrichmentResult>> => {
+    return runAuthenticatedAction(async function applyLeadEnrichment(userId: string) {
+        const uid = requireUserObjectId(userId);
+        const session = await getAppSession();
+        if (!session?.user) {
+            throw new Error('Unauthorized');
+        }
+
+        if (!patches.length) {
+            throw new Error('No enrichment patches to apply');
+        }
+
+        const { credits: availableCredits, exempt } = await getUserCreditsState(uid);
+        if (!exempt) {
+            if (
+                !hasSubModuleAccess(
+                    session.user.moduleAccess,
+                    Modules.LEAD_GENERATION,
+                    LEAD_GENERATION_SUB_MODULES.CRAWL,
+                )
+            ) {
+                throw new Error('Unauthorized: no access to Crawl');
+            }
+        }
+
+        const { websiteDedupeKey } = await import('@/helpers/lead-website');
+        const uniqueDomainKeys = new Set(
+            patches.map((p) => websiteDedupeKey(p.enriched.domain || p.enriched.id)).filter(Boolean),
+        );
+        const uniqueDomainCount = uniqueDomainKeys.size || patches.length;
+        const cost = computeLeadGenCreditCost(LEAD_GENERATION_SUB_MODULES.CRAWL, uniqueDomainCount);
+        if (!exempt && availableCredits < cost) {
+            throw new Error(`Insufficient credits: need ${cost}, have ${availableCredits}`);
+        }
+
+        // Verify ownership via any user_leads membership
+        const leadOids = patches.map((p) => toObjectId(p.leadId, 'Lead ID'));
+        const userLeadsCollection = await getCollection<UserLeadDoc>(MongoCollections.USER_LEADS);
+        const owned = await userLeadsCollection
+            .find({ userId: uid, leadId: { $in: leadOids } })
+            .project({ leadId: 1 })
+            .toArray();
+        const ownedSet = new Set(owned.map((o) => o.leadId.toString()));
+        const ownedPatches = patches.filter((p) => ownedSet.has(p.leadId));
+        if (!ownedPatches.length) {
+            throw new Error('No matching leads to enrich');
+        }
+
+        const remainingCredits = await assertAndDebitCredits(uid, cost);
+        const leadsCollection = await getCollection<LeadDoc>(MongoCollections.LEADS);
+
+        let patchedCount = 0;
+        for (const patch of ownedPatches) {
+            const result = await leadsCollection.updateOne(
+                {
+                    _id: toObjectId(patch.leadId, 'Lead ID'),
+                    source: { $ne: LeadSource.CRAWL },
+                    enriched: { $exists: false },
+                },
+                { $set: { enriched: patch.enriched } },
+            );
+            if (result.modifiedCount > 0) {
+                patchedCount += 1;
+            }
+        }
+
+        return { patchedCount, remainingCredits, creditsExempt: exempt };
     });
 };

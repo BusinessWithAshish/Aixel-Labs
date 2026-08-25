@@ -69,6 +69,7 @@ export function flattenLeadForExport(lead: Lead): Record<string, unknown> {
         source: lead.source,
         sourceId: lead.sourceId,
         ...flattenObject(lead.data),
+        ...(lead.enriched ? flattenObject(lead.enriched, 'enriched') : {}),
     };
 }
 

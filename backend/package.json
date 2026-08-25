@@ -54,6 +54,22 @@
       "types": "./src/api/gmaps/scrape/types.ts",
       "default": "./src/api/gmaps/scrape/types.ts"
     },
+    "./crawl": {
+      "types": "./src/api/crawl/index.ts",
+      "default": "./src/api/crawl/index.ts"
+    },
+    "./crawl/schemas": {
+      "types": "./src/api/crawl/schemas.ts",
+      "default": "./src/api/crawl/schemas.ts"
+    },
+    "./crawl/types": {
+      "types": "./src/api/crawl/types.ts",
+      "default": "./src/api/crawl/types.ts"
+    },
+    "./crawl/constants": {
+      "types": "./src/api/crawl/constants.ts",
+      "default": "./src/api/crawl/constants.ts"
+    },
     "./gsearch": {
       "types": "./src/api/gsearch/index.ts",
       "default": "./src/api/gsearch/index.ts"
@@ -191,7 +207,9 @@
     "cheerio": "^1.2.0",
     "cors": "^2.8.5",
     "cycletls": "^2.0.5",
+    "disposable-email-domains": "^1.0.62",
     "dotenv": "^16.5.0",
+    "email-addresses": "^5.0.0",
     "express": "^5.1.0",
     "express-rate-limit": "^8.0.1",
     "ffmpeg-static": "^5.3.0",
@@ -203,6 +221,7 @@
     "morgan": "^1.10.1",
     "node-tls-client": "^2.1.0",
     "simple-statistics": "^7.9.3",
+    "tldts": "^7.4.11",
     "undici": "^7.16.0",
     "zod": "^3.25.43"
   },

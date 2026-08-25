@@ -25,6 +25,7 @@ import {
     SearchIcon,
     PhoneIcon,
     ListIcon,
+    Globe,
 } from 'lucide-react';
 
 export type SidebarNavItem = {
@@ -87,6 +88,10 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
     [LEAD_GENERATION_SUB_MODULES.LINKEDIN]: {
         icon: Linkedin,
         color: '!text-blue-700',
+    },
+    [LEAD_GENERATION_SUB_MODULES.CRAWL]: {
+        icon: Globe,
+        color: '!text-teal-600',
     },
     [LEAD_ENRICHMENT_SUB_MODULES.EMAIL_VERIFICATION]: {
         icon: Mail,

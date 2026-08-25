@@ -23,6 +23,7 @@ export const SubModuleUrls: Record<SubModule, string> = {
     [LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH]: '/lead-generation/instagram-advanced-search',
     [LEAD_GENERATION_SUB_MODULES.FACEBOOK]: '/lead-generation/facebook',
     [LEAD_GENERATION_SUB_MODULES.LINKEDIN]: '/lead-generation/linkedin',
+    [LEAD_GENERATION_SUB_MODULES.CRAWL]: '/lead-generation/crawl',
     [LEAD_ENRICHMENT_SUB_MODULES.EMAIL_VERIFICATION]: '/lead-enrichment/email-verification',
     [LEAD_ENRICHMENT_SUB_MODULES.PHONE_VERIFICATION]: '/lead-enrichment/phone-verification',
     [VOICE_AGENT_SUB_MODULES.WEB_DIALER]: '/voice-agent/web-dialer',

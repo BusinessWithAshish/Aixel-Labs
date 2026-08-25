@@ -1,6 +1,6 @@
 'use client';
 
-import { ListFilter } from 'lucide-react';
+import { Filter } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePage } from '@/contexts/PageStore';
@@ -39,6 +39,8 @@ export const AllUserLeads = () => {
         filterPanel,
         createListFromSelection,
         isCreatingList,
+        enrichLeads,
+        isEnriching,
     } = usePage<TUseAllLeadsPageReturn>();
 
     const hasLeads = leads.length > 0;
@@ -107,6 +109,9 @@ export const AllUserLeads = () => {
                         onPreviewExport={handlePreviewExport}
                         onCreateListFromFilters={filterPanel.filtersActive ? createListFromSelection : undefined}
                         createListFromFiltersDisabled={isCreatingList}
+                        onEnrich={enrichLeads}
+                        enrichDisabled={isEnriching}
+                        enrichLabel={isEnriching ? 'Enriching…' : 'Enrich'}
                         deleteLabel="Delete selected"
                     />
                 </CardAction>
@@ -129,7 +134,7 @@ export const AllUserLeads = () => {
                             onClick={() => setFilterSheetOpen(true)}
                             aria-label="Filter leads"
                         >
-                            <ListFilter className="size-4" />
+                            <Filter className="size-4" />
                             {filterPanel.filtersActive ? (
                                 <span
                                     className="absolute top-1 right-1 size-2 rounded-full bg-primary"

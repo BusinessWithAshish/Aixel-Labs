@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import type { FACEBOOK_RESPONSE } from '@aixellabs/backend/facebook';
 import { Checkbox } from '@/components/ui/checkbox';
+import { LeadEnrichmentStatus } from '@/components/common/lead-card/LeadEnrichmentStatus';
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
 const FACEBOOK_BLUE = '#1877F2';
@@ -32,6 +33,7 @@ type FacebookLeadCardProps = {
     onDelete?: () => void;
     onSelect?: (selected: boolean) => void;
     isSelected?: boolean;
+    isEnriched?: boolean;
 };
 
 function getInitials(name: string) {
@@ -52,7 +54,7 @@ function formatNumber(num: number | null | undefined) {
 }
 
 export function FacebookLeadCard(props: FacebookLeadCardProps) {
-    const { lead, className, actions, showCheckbox, onDelete, onSelect, isSelected } = props;
+    const { lead, className, actions, showCheckbox, onDelete, onSelect, isSelected, isEnriched = false } = props;
 
     const leadInfo = useMemo(() => {
         return {
@@ -135,6 +137,7 @@ export function FacebookLeadCard(props: FacebookLeadCardProps) {
                         <div className="flex items-start flex-col min-w-0 flex-1 overflow-hidden">
                             <CardTitle className="flex w-full min-w-0 max-w-full items-center gap-1.5">
                                 <span className="min-w-0 flex-1 truncate">{leadInfo.name}</span>
+                                <LeadEnrichmentStatus enriched={isEnriched} />
                                 {leadInfo.verified && (
                                     <Popover>
                                         <PopoverTrigger className="cursor-pointer shrink-0">
@@ -234,7 +237,7 @@ export function FacebookLeadCard(props: FacebookLeadCardProps) {
                     </div>
                 )}
 
-                {actions && <div className="border-t">{actions}</div>}
+                {actions ? <div className="border-t border-border pt-2">{actions}</div> : null}
             </CardContent>
 
             <CardFooter className="flex items-start flex-col gap-2 min-w-0 overflow-hidden">

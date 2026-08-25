@@ -3,15 +3,17 @@
 import { createUserLeadListFromLeadIds, deleteUserLeads } from '@/app/actions/user-lead-actions';
 import type { Lead, LeadSource } from '@aixellabs/backend/db/types';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useLeadsFilterPanel } from './use-leads-filter-panel';
 import { sortLeads } from '../_utils/lead-sort';
+import { runLeadEnrichment } from '../_utils/run-lead-enrichment';
+import { setCreditsBadgeCache } from '@/components/common/credits/CreditsBadge';
 
 function leadMatchesSearchQuery(lead: Lead, rawQuery: string): boolean {
     const q = rawQuery.trim().toLowerCase();
     if (!q) return true;
-    const blob = `${JSON.stringify(lead.data)} ${lead.sourceId}`.toLowerCase();
+    const blob = `${JSON.stringify(lead.data)} ${lead.sourceId} ${JSON.stringify(lead.enriched ?? {})}`.toLowerCase();
     return blob.includes(q);
 }
 
@@ -36,6 +38,8 @@ export const useAllLeadsPage = ({ listId, leads, listSources }: AllLeadsPageData
     const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
     const [isDeleting, setIsDeleting] = useState(false);
     const [isCreatingList, setIsCreatingList] = useState(false);
+    const [isEnriching, setIsEnriching] = useState(false);
+    const enrichAbortRef = useRef<AbortController | null>(null);
 
     const filterPanel = useLeadsFilterPanel();
 
@@ -47,6 +51,12 @@ export const useAllLeadsPage = ({ listId, leads, listSources }: AllLeadsPageData
     }, [leads, filterPanel, searchQuery]);
 
     useEffect(() => setSelectedLeadIds(new Set()), [leads]);
+
+    useEffect(() => {
+        return () => {
+            enrichAbortRef.current?.abort();
+        };
+    }, []);
 
     const selectLead = useCallback((leadId: string, selected: boolean) => {
         setSelectedLeadIds((prev) => {
@@ -63,7 +73,11 @@ export const useAllLeadsPage = ({ listId, leads, listSources }: AllLeadsPageData
 
     const selectAllFiltered = useCallback(() => {
         setSelectedLeadIds(
-            new Set(filteredLeads.map((l) => l._id).filter((id): id is string => typeof id === 'string' && id.length > 0)),
+            new Set(
+                filteredLeads
+                    .map((l) => l._id)
+                    .filter((id): id is string => typeof id === 'string' && id.length > 0),
+            ),
         );
     }, [filteredLeads]);
 
@@ -93,7 +107,10 @@ export const useAllLeadsPage = ({ listId, leads, listSources }: AllLeadsPageData
 
         setIsCreatingList(true);
         try {
-            const result = await createUserLeadListFromLeadIds({ name: buildFilteredListName(), leadIds: ids });
+            const result = await createUserLeadListFromLeadIds({
+                name: buildFilteredListName(),
+                leadIds: ids,
+            });
             if (!result.success || !result.data) {
                 toast.error(result.error ?? 'Failed to create list');
                 return;
@@ -105,6 +122,38 @@ export const useAllLeadsPage = ({ listId, leads, listSources }: AllLeadsPageData
             setIsCreatingList(false);
         }
     }, [selectedLeadIds, filterPanel.filtersActive, isCreatingList, router]);
+
+    const enrichLeads = useCallback(async () => {
+        if (isEnriching) return;
+        const leadIds = [...selectedLeadIds];
+        if (!leadIds.length) {
+            toast.message('Select leads to enrich');
+            return;
+        }
+
+        enrichAbortRef.current?.abort();
+        const controller = new AbortController();
+        enrichAbortRef.current = controller;
+        setIsEnriching(true);
+        try {
+            const result = await runLeadEnrichment({
+                leadIds,
+                mode: 'selected',
+                signal: controller.signal,
+            });
+            if (result && result.patched > 0) {
+                if (!result.creditsExempt && result.remainingCredits != null) {
+                    setCreditsBadgeCache(result.remainingCredits);
+                }
+                router.refresh();
+            }
+        } finally {
+            if (enrichAbortRef.current === controller) {
+                enrichAbortRef.current = null;
+            }
+            setIsEnriching(false);
+        }
+    }, [isEnriching, selectedLeadIds, router]);
 
     return {
         listId,
@@ -124,6 +173,8 @@ export const useAllLeadsPage = ({ listId, leads, listSources }: AllLeadsPageData
         filterPanel,
         createListFromSelection,
         isCreatingList,
+        enrichLeads,
+        isEnriching,
     };
 };
 

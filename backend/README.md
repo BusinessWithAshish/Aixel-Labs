@@ -29,7 +29,7 @@ Registered in `src/routes.ts` from `ENDPOINTS` in `src/config.ts`:
 | `/youtube` | Raw scrapers + `/intelligence/*` |
 | `/gsearch` | CSE organic search (v1); `/gsearch/v2` Docs Explore |
 | `/google-trends` | Trends + intelligence |
-| `/website-contacts` | Crawl site for emails/phones |
+| `/crawl` | Crawl site for emails/phones |
 | `/mcp` | Streamable HTTP MCP (`aixel-intelligence`) |
 
 `ENDPOINTS.SAMPLE` exists in config but is **not** mounted.
@@ -58,6 +58,6 @@ FE and other packages consume selected paths (`./db`, `./db/types`, `./config`,
 ## Agents
 
 Conventions and skill pointers: [`AGENTS.md`](./AGENTS.md).  
-New module pattern: mirror `src/api/website-contacts/` and follow
+New module pattern: mirror `src/api/crawl/` and follow
 `.cursor/skills/backend/backend-api-module/SKILL.md`. New mounts:
 `backend-platform` (`config.ts` + `routes.ts`).

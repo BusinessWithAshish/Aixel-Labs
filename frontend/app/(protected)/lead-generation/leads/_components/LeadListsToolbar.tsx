@@ -20,6 +20,8 @@ export function LeadListsToolbar() {
         selectAllFiltered,
         deselectAll,
         requestDeleteFromMenu,
+        requestEnrichSelectedLists,
+        isEnriching,
     } = usePage<TUseUserLeadListsPageReturn>();
 
     const allFilteredSelected = useMemo(() => {
@@ -54,6 +56,9 @@ export function LeadListsToolbar() {
                         selectAllDisabled={allFilteredSelected}
                         onDeselectAll={deselectAll}
                         onDelete={requestDeleteFromMenu}
+                        onEnrich={requestEnrichSelectedLists}
+                        enrichDisabled={isEnriching}
+                        enrichLabel={isEnriching ? 'Enriching…' : 'Enrich'}
                     />
                 )}
             </CardAction>

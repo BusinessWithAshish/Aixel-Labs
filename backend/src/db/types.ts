@@ -12,6 +12,7 @@ import {
   LINKEDIN_BY_COMPANY_RESPONSE,
   LINKEDIN_BY_PEOPLE_RESPONSE,
 } from "../api/linkedin/types";
+import type { CRAWL_RESPONSE } from "../api/crawl";
 
 export enum TenantType {
   IFRAME = "IFRAME",
@@ -46,6 +47,7 @@ export enum LEAD_GENERATION_SUB_MODULES {
   INSTAGRAM_ADVANCED_SEARCH = "INSTAGRAM_ADVANCED_SEARCH",
   FACEBOOK = "FACEBOOK",
   LINKEDIN = "LINKEDIN",
+  CRAWL = "CRAWL",
 }
 
 export enum VOICE_AGENT_SUB_MODULES {
@@ -93,7 +95,8 @@ export type LeadData =
   | GMAPS_DETAILS_RESPONSE
   | GSEARCH_RESPONSE
   | LINKEDIN_BY_COMPANY_RESPONSE
-  | LINKEDIN_BY_PEOPLE_RESPONSE;
+  | LINKEDIN_BY_PEOPLE_RESPONSE
+  | CRAWL_RESPONSE;
 
 export type TenantDoc<Id = ObjectId> = {
   _id?: Id;
@@ -132,6 +135,7 @@ export enum LeadSource {
   INSTAGRAM = "INSTAGRAM",
   LINKEDIN = "LINKEDIN",
   FACEBOOK = "FACEBOOK",
+  CRAWL = "CRAWL",
 }
 
 export type LeadDoc<Id = ObjectId> = {
@@ -139,6 +143,7 @@ export type LeadDoc<Id = ObjectId> = {
   source: LeadSource;
   sourceId: string;
   data: LeadData;
+  enriched?: CRAWL_RESPONSE;
 };
 
 export type Lead = LeadDoc<string>;

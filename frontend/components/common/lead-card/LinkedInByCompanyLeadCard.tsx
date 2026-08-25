@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { LeadEnrichmentStatus } from '@/components/common/lead-card/LeadEnrichmentStatus';
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
 const LINKEDIN_BLUE = '#0A66C2';
@@ -41,6 +42,7 @@ type LinkedInByCompanyLeadCardProps = {
     onDelete?: () => void;
     onSelect?: (selected: boolean) => void;
     isSelected?: boolean;
+    isEnriched?: boolean;
 };
 
 function getInitials(name: string) {
@@ -101,7 +103,7 @@ function pageNames(
 }
 
 export function LinkedInByCompanyLeadCard(props: LinkedInByCompanyLeadCardProps) {
-    const { lead, className, actions, showCheckbox, onDelete, onSelect, isSelected } = props;
+    const { lead, className, actions, showCheckbox, onDelete, onSelect, isSelected, isEnriched = false } = props;
 
     const leadInfo = useMemo(() => {
         const name = lead.name?.trim() || DEFAULT_DISPLAY_VALUE;
@@ -267,6 +269,7 @@ export function LinkedInByCompanyLeadCard(props: LinkedInByCompanyLeadCardProps)
                                 <span className="min-w-0 flex-1 truncate" title={leadInfo.name}>
                                     {leadInfo.name}
                                 </span>
+                                <LeadEnrichmentStatus enriched={isEnriched} />
                             </CardTitle>
                             <CardDescription className="w-full truncate" title={leadInfo.industry ?? undefined}>
                                 {leadInfo.industry ?? leadInfo.tagline ?? 'Company'}
@@ -508,7 +511,7 @@ export function LinkedInByCompanyLeadCard(props: LinkedInByCompanyLeadCardProps)
                     </div>
                 )}
 
-                {actions && <div className="border-t pt-2">{actions}</div>}
+                {actions ? <div className="border-t border-border pt-2">{actions}</div> : null}
             </CardContent>
 
             <CardFooter className="flex min-w-0 flex-col items-start gap-2 overflow-hidden">

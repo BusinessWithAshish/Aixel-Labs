@@ -11,6 +11,7 @@ import Image from 'next/image';
 import type { GMAPS_DETAILS_RESPONSE } from '@aixellabs/backend/gmaps/details/types';
 import { Badge } from '@/components/ui/badge';
 import { Website, PhoneNumber } from './ExternalContacts';
+import { LeadEnrichmentStatus } from './LeadEnrichmentStatus';
 import { gmapsProxiedImageUrl, pickGmapsCardPhotos } from '@/helpers/gmaps-image';
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
@@ -26,6 +27,7 @@ type LeadCardProps = {
     showCheckbox?: boolean;
     isSelected?: boolean;
     onSelect?: (selected: boolean) => void;
+    isEnriched?: boolean;
 };
 
 function formatCount(n: number | null | undefined): string {
@@ -103,7 +105,7 @@ function PhotoStrip({ urls, name }: { urls: string[]; name: string }) {
 }
 
 export const GoogleMapsAdvancedLeadCard = (props: LeadCardProps) => {
-    const { data, actions, className, onDelete, showCheckbox, isSelected, onSelect } = props;
+    const { data, actions, className, onDelete, showCheckbox, isSelected, onSelect, isEnriched = false } = props;
 
     const openState = getOpenState(data.common.openStatus);
     const openStatus = openState.label || null;
@@ -152,10 +154,11 @@ export const GoogleMapsAdvancedLeadCard = (props: LeadCardProps) => {
                             onCheckedChange={onSelect}
                         />
                     )}
-                    <CardTitle className="min-w-0 flex-1 truncate text-base font-semibold leading-snug text-foreground">
-                        <span title={data.name ?? DEFAULT_DISPLAY_VALUE}>
+                    <CardTitle className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-base font-semibold leading-snug text-foreground">
+                        <span className="min-w-0 flex-1 truncate" title={data.name ?? DEFAULT_DISPLAY_VALUE}>
                             {data.name ?? DEFAULT_DISPLAY_VALUE}
                         </span>
+                        <LeadEnrichmentStatus enriched={isEnriched} />
                     </CardTitle>
                     {data.gmapsUrl && (
                         <a
@@ -362,7 +365,7 @@ export const GoogleMapsAdvancedLeadCard = (props: LeadCardProps) => {
                     </div>
                 )}
 
-                {actions && <div className="border-t pt-2">{actions}</div>}
+                {actions ? <div className="border-t border-border pt-2">{actions}</div> : null}
             </CardContent>
         </Card>
     );

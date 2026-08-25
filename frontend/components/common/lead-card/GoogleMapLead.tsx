@@ -10,6 +10,7 @@ import Image from 'next/image';
 import type { GMAPS_INTERNAL_RESPONSE } from '@aixellabs/backend/gmaps/internal/types';
 import { Badge } from '@/components/ui/badge';
 import { Website, PhoneNumber } from './ExternalContacts';
+import { LeadEnrichmentStatus } from './LeadEnrichmentStatus';
 
 const DEFAULT_DISPLAY_VALUE = 'N/A';
 
@@ -21,10 +22,11 @@ type LeadCardProps = {
     showCheckbox?: boolean;
     isSelected?: boolean;
     onSelect?: (selected: boolean) => void;
+    isEnriched?: boolean;
 };
 
 export const GoogleMapLead = (props: LeadCardProps) => {
-    const { data, actions, className, onDelete, showCheckbox, isSelected, onSelect } = props;
+    const { data, actions, className, onDelete, showCheckbox, isSelected, onSelect, isEnriched = false } = props;
 
     const handleMapsClick = () => {
         if (data.gmapsUrl) {
@@ -67,6 +69,7 @@ export const GoogleMapLead = (props: LeadCardProps) => {
                     >
                         {data.name ?? DEFAULT_DISPLAY_VALUE}
                     </span>
+                    <LeadEnrichmentStatus enriched={isEnriched} />
                 </CardTitle>
                 <CardDescription className="flex min-w-0 flex-col gap-2 font-normal">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
@@ -112,7 +115,7 @@ export const GoogleMapLead = (props: LeadCardProps) => {
                 <Website value={data.website} />
                 <PhoneNumber value={data.phone} />
 
-                {actions && <div className="border-t">{actions}</div>}
+                {actions ? <div className="border-t border-border pt-2">{actions}</div> : null}
             </CardContent>
         </Card>
     );
