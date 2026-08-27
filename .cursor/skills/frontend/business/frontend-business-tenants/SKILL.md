@@ -46,8 +46,7 @@ manage-tenants/
 │   ├── TenantCard / CreateTenantCard
 │   ├── CreateTenantDialog.tsx        # create + edit
 │   ├── ModuleAccessCard.tsx          # shared module toggles
-│   ├── DeleteConfirmDialog.tsx
-│   └── SwitchTenantConfirmDialog.tsx
+│   └── DeleteConfirmDialog.tsx
 └── [tenantId]/
     ├── page.tsx                      # users + coupons
     ├── _hooks/use-tenant-users-page.ts
@@ -61,15 +60,15 @@ manage-tenants/
 
 ## Hard product rules
 
-### 1. Session-tenant isolation
+### 1. Admin cross-tenant access
 
-Mutations only target the **current host tenant** (`session.user.tenantName`).
+Admins can list, edit, and delete any tenant, and manage that tenant's users/coupons, without switching host.
 
-- Guards: `requireAdminSessionContext`, `assertTenantIsSessionTenant`, `assertTenantNameIsSessionTenant`, `assertUserInSessionTenant` in `frontend/server/auth/admin-guards.ts`.
-- UI: edit/delete/open users for another tenant → `SwitchTenantConfirmDialog` + `getTenantHostPathUrl` (subdomain jump). Never call mutate actions for a foreign tenant.
-- `[tenantId]` with `sessionTenantName !== tenantId` → treat as foreign: skip data fetch, show switch dialog only (`isForeignTenant`).
+- Guards: `assertCallerIsAdmin`. Resolve the target tenant by slug with `getTenantObjectIdByName` (or by `_id` on tenant update/delete).
+- UI: edit/delete/open users in place. Do not add a subdomain-switch dialog for manage-tenants.
+- `[tenantId]` always fetches that tenant's users/coupons (`listCoupons(tenantId)`, `getAllUsersByTenant(tenantId)`).
 
-`getAllTenants` is admin-readable across tenants (list view). Create is admin-wide. Update/delete/user/coupon mutations stay session-scoped.
+Create is admin-wide. Update/delete/user/coupon mutations are admin-wide, targeted by the tenant/user/coupon in the request.
 
 ### 2. Tenant types
 
@@ -145,16 +144,13 @@ Import from `@aixellabs/backend/db/types` — **schema SSOT** is `backend/src/db
 **User edit / bulk / coupons**
 
 1. Prefer extending existing dialogs/toolbars over new pages.
-2. Keep foreign-tenant switch UX.
-3. Self-demotion: warn via confirm when `currentUserId === user._id` and clearing `isAdmin`.
+2. Keep self-demotion: warn via confirm when `currentUserId === user._id` and clearing `isAdmin`.
 
 ## Anti-patterns
 
-- DO NOT mutate another tenant without host switch.
 - DO NOT allow editing `defaultModuleAccess` / `defaultCredits` / tenant `name` after create.
 - DO NOT store full module maps on admin users.
 - DO NOT select admins in bulk module access.
-- DO NOT fetch users/coupons for `isForeignTenant` pages.
 - DO NOT bypass `withAdminOnly` or admin guards on new actions used here.
 
 ## Related

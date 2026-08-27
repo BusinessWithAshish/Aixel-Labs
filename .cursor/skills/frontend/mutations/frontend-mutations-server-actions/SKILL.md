@@ -78,14 +78,14 @@ export const myAction = async (input: string): Promise<ALApiResponse<MyResult>> 
 | Mongo → client `_id` string | `mapMongoDocToClient` (`helpers/normalize-helpers`) |
 | Credits clamp/parse | `normalizeCredits` / `parseCreditsInput` (`helpers/credits`) |
 | Credits debit / exempt | `assertAndDebitCredits` / `getUserCreditsState` (`credit-db.ts`) |
-| Admin session scope | `requireAdminSessionContext`, `assertTenantIsSessionTenant`, `assertUserInSessionTenant`, … (`@/server/auth`) |
+| Admin session scope | `assertCallerIsAdmin`, `getTenantObjectIdByName`, `requireAdminSessionContext` (`@/server/auth`) |
 
 ## Hard product rules
 
 1. **`isAdmin === true` ⇒ credits-exempt.** Never debit admins; never redeem coupons for admins. UI must gate on `creditsExempt` / `exempt`, but enforcement is server-side.
 2. **Debit only in `credit-db` / callers of it.** Never `$inc` credits ad hoc except coupon redeem (which has its own atomic path) and admin `updateUser` credit edits.
 3. **`credit-db.ts` stays `server-only`**, not `'use server'`. Import it only from other server actions / server code — never from client components.
-4. **Session-tenant isolation** for admin mutations: only mutate the current host tenant. See `frontend-business-tenants` skill.
+4. **Admin tenant mutations** target the tenant/user/coupon in the request (`assertCallerIsAdmin` + slug/`_id`). See `frontend-business-tenants` skill.
 5. **Shared `leads` docs are never cascade-deleted** with user/tenant/list cleanup — only user-owned memberships (`USER_LEADS` / `LEAD_LISTS`). Use `deleteUserOwnedLeadData` for user/tenant deletes.
 6. **Lead save order in `createUserLeads`:** access/credits check → cap by balance → **debit first** → create list → upsert leads/memberships. Debit before list so a failed charge cannot orphan a list.
 7. **Types from `@aixellabs/backend/db`** — schema SSOT is `backend/src/db` (`.cursor/skills/backend/backend-db/SKILL.md`). Do not duplicate `UserDoc` / `TenantDoc` / `CouponDoc` / `LeadData` / module enums on the FE; change `types.ts` first when the schema evolves.
@@ -98,7 +98,7 @@ export const myAction = async (input: string): Promise<ALApiResponse<MyResult>> 
 | Public | `runPublicAction` | `getTenantByNamePublic` |
 | Any signed-in user | `runAuthenticatedAction` + `userId` | lead lists, `updateCurrentUserName`, `redeemCoupon` |
 | Admin (any tenant read) | `assertCallerIsAdmin()` | `getAllTenants`, `createTenant` |
-| Admin (session tenant only) | `requireAdminSessionContext()` + assert helpers | `updateTenant`, `deleteUser`, coupons CRUD, bulk module access |
+| Admin (any tenant) | `assertCallerIsAdmin()` + target by id/slug | `updateTenant`, `deleteUser`, coupons CRUD, bulk module access |
 | Cookie / session special | Direct cookies + `@/server/auth` | `createSession`, `handleSignOut` |
 
 ## Naming & file rules
@@ -148,7 +148,6 @@ export const myAction = async (input: string): Promise<ALApiResponse<MyResult>> 
 - DO NOT return raw Mongo `ObjectId` / `Date` without mapping when the client consumes the payload (prefer string ids; ISO strings for dates on coupon-like DTOs).
 - DO NOT put scrape HTTP / Botasaurus calls inside actions — scrape is `POST /api/lead-gen/scrape`; actions only debit + persist.
 - DO NOT import `@/server/auth` (firebase) into public actions used by middleware.
-- DO NOT mutate another tenant without the host-switch UX (frontend-business-tenants skill).
 - DO NOT delete shared `MongoCollections.LEADS` documents on user/list/tenant cleanup.
 
 ## Related skills / rules

@@ -13,11 +13,12 @@ import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { normalizeCredits, parseCreditsInput } from '@/helpers/credits';
 import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
-import { requireAdminSessionContext, requireAppSession } from '@/server/auth';
+import { assertCallerIsAdmin, getTenantObjectIdByName, requireAppSession } from '@/server/auth';
 import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key';
 import { ensureCouponIndexes } from '@/server/coupons/indexes';
 
 export type CreateCouponInput = {
+    tenantName: string;
     code: string;
     creditAmount: number;
     maxRedemptions?: number | null;
@@ -96,10 +97,11 @@ function isCouponExhausted(coupon: Pick<CouponDoc, 'maxRedemptions' | 'redemptio
     return coupon.maxRedemptions != null && coupon.redemptionCount >= coupon.maxRedemptions;
 }
 
-/** Lists coupons for the caller's current session tenant. */
-export const listCoupons = async (): Promise<ALApiResponse<Coupon[]>> =>
+/** Lists coupons for the given tenant slug. */
+export const listCoupons = async (tenantName: string): Promise<ALApiResponse<Coupon[]>> =>
     runAuthenticatedAction(async function listCoupons() {
-        const { tenantObjectId } = await requireAdminSessionContext();
+        await assertCallerIsAdmin();
+        const tenantObjectId = await getTenantObjectIdByName(tenantName);
         await ensureCouponIndexes();
 
         const coupons = await getCollection<CouponDoc>(MongoCollections.COUPONS);
@@ -107,10 +109,11 @@ export const listCoupons = async (): Promise<ALApiResponse<Coupon[]>> =>
         return docs.map(mapCouponDocToCoupon);
     });
 
-/** Creates a coupon for the caller's current session tenant. */
+/** Creates a coupon for the given tenant slug. */
 export const createCoupon = async (input: CreateCouponInput): Promise<ALApiResponse<Coupon>> =>
     runAuthenticatedAction(async function createCoupon() {
-        const { session, tenantObjectId } = await requireAdminSessionContext();
+        const session = await assertCallerIsAdmin();
+        const tenantObjectId = await getTenantObjectIdByName(input.tenantName);
         await ensureCouponIndexes();
 
         const code = assertValidCouponCode(input.code);
@@ -153,12 +156,12 @@ export const createCoupon = async (input: CreateCouponInput): Promise<ALApiRespo
 /** Updates active flag, max redemptions, or expiry for a tenant coupon. */
 export const updateCoupon = async (input: UpdateCouponInput): Promise<ALApiResponse<Coupon>> =>
     runAuthenticatedAction(async function updateCoupon() {
-        const { tenantObjectId } = await requireAdminSessionContext();
+        await assertCallerIsAdmin();
         assertValidObjectId(input.id, 'Coupon ID');
         await ensureCouponIndexes();
 
         const coupons = await getCollection<CouponDoc>(MongoCollections.COUPONS);
-        const existing = await coupons.findOne({ _id: new MongoObjectId(input.id), tenantId: tenantObjectId });
+        const existing = await coupons.findOne({ _id: new MongoObjectId(input.id) });
         if (!existing) {
             throw new Error('Coupon not found');
         }
@@ -183,7 +186,7 @@ export const updateCoupon = async (input: UpdateCouponInput): Promise<ALApiRespo
         }
 
         const updated = await coupons.findOneAndUpdate(
-            { _id: existing._id, tenantId: tenantObjectId },
+            { _id: existing._id },
             { $set: update },
             { returnDocument: 'after' },
         );

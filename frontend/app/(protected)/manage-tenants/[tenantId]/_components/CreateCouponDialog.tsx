@@ -41,10 +41,11 @@ type CreateCouponFormValues = z.infer<typeof createCouponSchema>;
 type CreateCouponDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    tenantName: string;
     onSuccess?: () => void;
 };
 
-export function CreateCouponDialog({ open, onOpenChange, onSuccess }: CreateCouponDialogProps) {
+export function CreateCouponDialog({ open, onOpenChange, tenantName, onSuccess }: CreateCouponDialogProps) {
     const form = useForm<CreateCouponFormValues>({
         resolver: zodResolver(createCouponSchema),
         defaultValues: {
@@ -78,6 +79,7 @@ export function CreateCouponDialog({ open, onOpenChange, onSuccess }: CreateCoup
         const maxRedemptions = maxRaw ? Number(maxRaw) : null;
 
         const res = await createCoupon({
+            tenantName,
             code: values.code,
             creditAmount: values.creditAmount,
             maxRedemptions,

@@ -1,5 +1,5 @@
 ---
-description: Manage Tenants business — session-tenant isolation
+description: Manage Tenants business — admin tenant console
 globs: frontend/app/(protected)/manage-tenants/**/*
 alwaysApply: false
 ---
@@ -11,7 +11,7 @@ Product governor for the admin tenants console. Executor: `.cursor/skills/fronte
 ## Hard rules
 
 - Page shell: `PageProvider` + `PageLayout` + `withAdminOnly(withPageHandler(Page))`.
-- Mutations scoped to the **session host tenant** — switch subdomain for other tenants.
+- Mutations are admin-wide — target tenant/user/coupon by id or slug, not the session host.
 - **Schema SSOT:** `TenantDoc`, `UserDoc`, `ModuleAccess`, `Modules` / submodule enums, `CouponDoc` live in `backend/src/db/types.ts` (`.cursor/skills/backend/backend-db/SKILL.md`) — change types there before UI/actions.
 - Admins are credits-exempt; do not assign credits UI to admin users.
 - Bulk module updates skip admins; demotion uses tenant `defaultModuleAccess`.

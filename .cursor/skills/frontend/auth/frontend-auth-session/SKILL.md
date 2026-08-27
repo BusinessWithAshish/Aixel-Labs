@@ -65,10 +65,9 @@ Session never falls back to another tenant’s membership.
 
 ### New admin-guarded mutation
 
-1. Prefer `requireAdminSessionContext()` + `assertUserInSessionTenant` /
-   `assertTenantIsSessionTenant` from `@/server/auth`.
+1. Prefer `assertCallerIsAdmin()` from `@/server/auth`. Resolve a tenant slug with `getTenantObjectIdByName` when the action is tenant-scoped.
 2. Wire through `*-actions.ts` with `runAuthenticatedAction` (server-actions skill).
-3. Session-tenant only — cross-tenant requires host switch (frontend-business-tenants skill).
+3. Target the tenant/user/coupon in the request — do not gate on the session host.
 
 ### Client auth UX
 

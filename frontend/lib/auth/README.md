@@ -29,9 +29,9 @@ When `isAdmin` on the **session tenant**:
 - Full module access for sidebar/routes via `getDefaultModuleAccess()` (SSOT) — stored `moduleAccess` is ignored and kept as `{}`
 - Credits exempt (no credits field when editing an admin user)
 - `/manage-tenants` + tenant switcher
-- Sensitive user/tenant reads and mutations (**scoped to that session tenant only**)
+- Sensitive user/tenant reads and mutations (any tenant; still requires `isAdmin`)
 
-**Tenant-scoped mutations:** an admin signed into tenant A cannot update/delete users or the tenant document for tenant B. Switch host (subdomain) first. Listing all tenants for navigation (`getAllTenants`) remains allowed for admins.
+**Tenant mutations:** an admin can update/delete any tenant, and that tenant's users/coupons, without switching host. Listing all tenants (`getAllTenants`) remains allowed for admins.
 
 **Demotion on A only:** set `isAdmin: false` and `moduleAccess = tenant.defaultModuleAccess` on A; leave other memberships unchanged (may stay admin on B). Same Firebase UID — no extra accounts.
 
@@ -44,7 +44,7 @@ When `isAdmin` on the **session tenant**:
 | `lib/auth/` | Client-safe helpers: constants, types, Thumbmark fingerprint helper, Firebase error copy, cookie option builders. **No Mongo / Admin writes.** |
 | `server/auth/` | Policy, Firebase Admin, Mongo membership, session read, create-session orchestration, admin/tenant guards |
 | `app/actions/auth-actions.ts` / `api/auth/session` | Thin entrypoints (cookies, redirect) |
-| `app/actions/user-actions.ts` / `tenant-actions.ts` | Admin-gated, session-tenant-scoped CRUD |
+| `app/actions/user-actions.ts` / `tenant-actions.ts` | Admin-gated CRUD (target tenant by id/slug) |
 
 ## Login flow
 

@@ -3,9 +3,7 @@ export { getAppSession, requireAppSession, getCurrentUserObjectId } from '@/serv
 export { revokeSessionCookie } from '@/server/auth/identity/session-cookie';
 export {
     assertCallerIsAdmin,
-    assertTenantIsSessionTenant,
-    assertTenantNameIsSessionTenant,
-    assertUserInSessionTenant,
+    getTenantObjectIdByName,
     requireAdminSessionContext,
     type AdminSessionContext,
 } from '@/server/auth/admin-guards';

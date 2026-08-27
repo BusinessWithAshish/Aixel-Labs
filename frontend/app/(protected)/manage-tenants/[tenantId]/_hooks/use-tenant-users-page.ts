@@ -8,8 +8,6 @@ export type BulkModuleAccessTarget = 'selected' | 'all';
 export type TenantUsersPageData = {
     users: User[];
     coupons: Coupon[];
-    sessionTenantName: string;
-    tenantSlug: string;
     defaultModuleAccess: ModuleAccess;
     /** Mongo user id of the signed-in admin (for self-demotion warnings). */
     currentUserId: string;
@@ -18,11 +16,8 @@ export type TenantUsersPageData = {
 export type UseTenantUsersPageReturn = {
     users: User[];
     coupons: Coupon[];
-    sessionTenantName: string;
-    tenantSlug: string;
     defaultModuleAccess: ModuleAccess;
     currentUserId: string;
-    isForeignTenant: boolean;
     editingUser: User | null | undefined;
     setEditingUser: (user: User | null | undefined) => void;
     selectedUserIds: Set<string>;
@@ -40,8 +35,7 @@ export type UseTenantUsersPageReturn = {
  * editingUser: undefined = dialog closed; User = edit dialog open.
  */
 export function useTenantUsersPage(data: TenantUsersPageData): UseTenantUsersPageReturn {
-    const { users, coupons, sessionTenantName, tenantSlug, defaultModuleAccess, currentUserId } = data;
-    const isForeignTenant = sessionTenantName !== tenantSlug;
+    const { users, coupons, defaultModuleAccess, currentUserId } = data;
 
     const [editingUser, setEditingUser] = useState<User | null | undefined>(undefined);
     const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
@@ -80,11 +74,8 @@ export function useTenantUsersPage(data: TenantUsersPageData): UseTenantUsersPag
     return {
         users,
         coupons,
-        sessionTenantName,
-        tenantSlug,
         defaultModuleAccess,
         currentUserId,
-        isForeignTenant,
         editingUser,
         setEditingUser,
         selectedUserIds,

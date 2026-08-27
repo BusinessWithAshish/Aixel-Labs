@@ -13,7 +13,7 @@ Shared governor for identity and membership. Executor: `.cursor/skills/frontend/
 - `lib/auth/` is client-safe only — no Mongo writes, no firebase-admin.
 - Session/membership/policy live in `server/auth/` with `server-only`.
 - **Schema SSOT:** `UserDoc` / membership fields and related enums live in `backend/src/db/types.ts` (`.cursor/skills/backend/backend-db/SKILL.md`) — do not invent parallel membership Doc types on the FE.
-- Admin mutations are session-tenant scoped (`requireAdminSessionContext` + assert helpers).
+- Admin mutations: `assertCallerIsAdmin`; target tenant/user/coupon by id or slug (`getTenantObjectIdByName`).
 - Non-admin: one tenant membership per Firebase uid; admins may have many.
 - Public/middleware actions must not import `@/server/auth` / firebase-admin at top level.
 - Do not delete shared `leads` docs on user/tenant cleanup — only user-owned memberships.

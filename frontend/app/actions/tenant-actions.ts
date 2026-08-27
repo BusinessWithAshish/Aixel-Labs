@@ -6,11 +6,7 @@ import { MongoCollections, MongoObjectId, getCollection } from '@aixellabs/backe
 import { parseCreditsInput } from '@/helpers/credits';
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { assertValidObjectId, runAuthenticatedAction, runPublicAction } from '@/helpers/server-action-helpers';
-import {
-    assertCallerIsAdmin,
-    assertTenantIsSessionTenant,
-    requireAdminSessionContext,
-} from '@/server/auth';
+import { assertCallerIsAdmin } from '@/server/auth';
 import { deleteOrphanedFirebaseUsers } from '@/server/auth/firebase-cleanup';
 import { deleteUserOwnedLeadData } from '@/server/leads/cascade-delete';
 
@@ -86,14 +82,13 @@ export const createTenant = async (tenant: Tenant): Promise<ALApiResponse<Tenant
 
 export const updateTenant = async (tenant: Tenant): Promise<ALApiResponse<Tenant>> =>
     runAuthenticatedAction(async function updateTenant() {
-        const ctx = await requireAdminSessionContext();
+        await assertCallerIsAdmin();
         const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
 
         const existing = await tenantsCollection.findOne({ _id: new MongoObjectId(tenant._id) });
         if (!existing) {
             throw new Error('Tenant not found');
         }
-        assertTenantIsSessionTenant(existing, ctx);
 
         const updateFields: Partial<TenantDoc> = {
             name: tenant.name,
@@ -124,7 +119,7 @@ export type TenantDeletePreview = {
 /** Count users that would be removed if this tenant is deleted. */
 export const getTenantDeletePreview = async (id: string): Promise<ALApiResponse<TenantDeletePreview>> =>
     runAuthenticatedAction(async function getTenantDeletePreview() {
-        const ctx = await requireAdminSessionContext();
+        await assertCallerIsAdmin();
         assertValidObjectId(id, 'Tenant ID');
 
         const tenantObjectId = new MongoObjectId(id);
@@ -133,7 +128,6 @@ export const getTenantDeletePreview = async (id: string): Promise<ALApiResponse<
         if (!tenant) {
             throw new Error('Tenant not found');
         }
-        assertTenantIsSessionTenant(tenant, ctx);
 
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
         const userCount = await usersCollection.countDocuments({ tenantId: tenantObjectId });
@@ -147,12 +141,12 @@ export type DeleteTenantResult = {
 };
 
 /**
- * Deletes the session tenant and cascades to its users and user-owned lead data.
+ * Deletes a tenant and cascades to its users and user-owned lead data.
  * Shared `leads` documents are kept. Firebase Auth is deleted when no memberships remain.
  */
 export const deleteTenant = async (id: string): Promise<ALApiResponse<DeleteTenantResult>> =>
     runAuthenticatedAction(async function deleteTenant() {
-        const ctx = await requireAdminSessionContext();
+        await assertCallerIsAdmin();
         assertValidObjectId(id, 'Tenant ID');
 
         const tenantObjectId = new MongoObjectId(id);
@@ -163,7 +157,6 @@ export const deleteTenant = async (id: string): Promise<ALApiResponse<DeleteTena
         if (!tenant) {
             throw new Error('Tenant not found');
         }
-        assertTenantIsSessionTenant(tenant, ctx);
 
         const users = await usersCollection
             .find({ tenantId: tenantObjectId }, { projection: { _id: 1, firebaseUid: 1 } })

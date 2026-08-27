@@ -14,7 +14,7 @@ Shared governor for DB-backed server actions and lead/coupon server helpers. Exe
 - **Schema SSOT** is `backend/src/db` (`@aixellabs/backend/db`) — do not redefine `*Doc`, `LeadData`, `MongoCollections`, or module enums on the FE. See `.cursor/skills/backend/backend-db/SKILL.md`.
 - `credit-db.ts` stays `server-only` — never `'use server'`, never import from client.
 - Debit only through `assertAndDebitCredits` (or coupon redeem’s atomic path).
-- Admin mutations: session-tenant scope via `@/server/auth` guards.
+- Admin mutations: `assertCallerIsAdmin`; target tenant/user/coupon by id or slug.
 - Public actions must not import firebase-admin / `@/server/auth` at top level.
 - Cascade deletes use `deleteUserOwnedLeadData` — never delete shared `leads` docs.
 - Scrape HTTP stays on `POST /api/lead-gen/scrape`; actions only debit + persist.

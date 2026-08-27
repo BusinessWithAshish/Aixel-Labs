@@ -5,14 +5,12 @@ import type { Tenant } from '@aixellabs/backend/db/types';
 
 export type ManageTenantsPageData = {
     tenants: Tenant[];
-    sessionTenantName: string;
 };
 
 export type UseManageTenantsPageReturn = {
     isCreateDialogOpen: boolean;
     setIsCreateDialogOpen: (open: boolean) => void;
     tenants: Tenant[];
-    sessionTenantName: string;
     editingTenant: Tenant | null;
     setEditingTenant: (tenant: Tenant | null) => void;
 };
@@ -22,7 +20,7 @@ export type UseManageTenantsPageReturn = {
  * Accepts server-fetched tenants as initial data
  */
 export const useManageTenantsPage = (data: ManageTenantsPageData): UseManageTenantsPageReturn => {
-    const { tenants, sessionTenantName } = data;
+    const { tenants } = data;
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
 
@@ -44,7 +42,6 @@ export const useManageTenantsPage = (data: ManageTenantsPageData): UseManageTena
         isCreateDialogOpen,
         setIsCreateDialogOpen: handleSetIsCreateDialogOpen,
         tenants,
-        sessionTenantName,
         editingTenant,
         setEditingTenant: handleSetEditingTenant,
     };

@@ -15,6 +15,7 @@ import { CopyIcon, TicketIcon } from 'lucide-react';
 
 type CouponsSectionProps = {
     coupons: Coupon[];
+    tenantName: string;
 };
 
 function formatUses(coupon: Coupon): string {
@@ -37,7 +38,7 @@ function couponStatus(coupon: Coupon): { label: string; variant: 'green' | 'yell
     return { label: 'Active', variant: 'green' };
 }
 
-export function CouponsSection({ coupons }: CouponsSectionProps) {
+export function CouponsSection({ coupons, tenantName }: CouponsSectionProps) {
     const router = useRouter();
     const [createOpen, setCreateOpen] = useState(false);
     const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -146,6 +147,7 @@ export function CouponsSection({ coupons }: CouponsSectionProps) {
             <CreateCouponDialog
                 open={createOpen}
                 onOpenChange={setCreateOpen}
+                tenantName={tenantName}
                 onSuccess={() => router.refresh()}
             />
         </section>

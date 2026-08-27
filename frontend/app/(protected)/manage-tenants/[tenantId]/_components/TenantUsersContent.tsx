@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { UserCard } from './UserCard';
 import { UserDialog } from './EditUserDialog';
@@ -8,7 +8,6 @@ import { DeleteUserConfirmDialog } from './DeleteUserConfirmDialog';
 import { UserBulkActionsToolbar } from './UserBulkActionsToolbar';
 import { BulkModuleAccessDialog } from './BulkModuleAccessDialog';
 import { CouponsSection } from './CouponsSection';
-import { SwitchTenantConfirmDialog } from '../../_components/SwitchTenantConfirmDialog';
 import { usePage } from '@/contexts/PageStore';
 import type { UseTenantUsersPageReturn } from '../_hooks/use-tenant-users-page';
 import type { User } from '@aixellabs/backend/db/types';
@@ -17,8 +16,6 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { MANAGE_TENANTS_PREFIX } from '@/config/app-config';
-import { getTenantHostPathUrl } from '@/helpers/get-tenant-masked-url';
 
 export function TenantUsersContent() {
     const router = useRouter();
@@ -29,8 +26,6 @@ export function TenantUsersContent() {
         coupons,
         defaultModuleAccess,
         currentUserId,
-        isForeignTenant,
-        tenantSlug,
         editingUser,
         setEditingUser,
         selectedUserIds,
@@ -47,13 +42,6 @@ export function TenantUsersContent() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [switchDialogOpen, setSwitchDialogOpen] = useState(false);
-
-    useEffect(() => {
-        if (isForeignTenant) {
-            setSwitchDialogOpen(true);
-        }
-    }, [isForeignTenant]);
 
     const nonAdminUsers = useMemo(() => users.filter((user) => !user.isAdmin), [users]);
 
@@ -120,23 +108,6 @@ export function TenantUsersContent() {
     };
 
     const isDialogOpen = editingUser !== undefined && editingUser !== null;
-
-    if (isForeignTenant) {
-        return (
-            <SwitchTenantConfirmDialog
-                open={switchDialogOpen}
-                onOpenChange={(open) => {
-                    setSwitchDialogOpen(open);
-                    if (!open) {
-                        router.push('/manage-tenants');
-                    }
-                }}
-                targetTenantName={tenantSlug}
-                targetUrl={getTenantHostPathUrl(tenantSlug, `${MANAGE_TENANTS_PREFIX}${tenantSlug}`)}
-                description={`You are signed into a different tenant. Switch to ${tenantSlug} to manage its users.`}
-            />
-        );
-    }
 
     return (
         <>
@@ -213,7 +184,7 @@ export function TenantUsersContent() {
                     </p>
                 )}
 
-                <CouponsSection coupons={coupons} />
+                <CouponsSection coupons={coupons} tenantName={tenantId} />
             </div>
 
             <UserDialog

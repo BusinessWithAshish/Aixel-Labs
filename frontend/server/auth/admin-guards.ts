@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { getAppSession, requireAppSession } from '@/server/auth/session/get-app-session';
-import { getCollection, MongoCollections, MongoObjectId, type TenantDoc, type UserDoc } from '@aixellabs/backend/db';
+import { getCollection, MongoCollections, MongoObjectId, type TenantDoc } from '@aixellabs/backend/db';
 import type { AppSession } from '@/lib/auth/types';
 
 export type AdminSessionContext = {
@@ -23,20 +23,16 @@ export async function requireAdminSessionContext(): Promise<AdminSessionContext>
     }
 
     const tenantName = session.user.tenantName;
-    const tenants = await getCollection<TenantDoc>(MongoCollections.TENANTS);
-    const tenant = await tenants.findOne({ name: tenantName }, { projection: { _id: 1, name: 1 } });
-    if (!tenant?._id) {
-        throw new Error('Tenant not found for current session');
-    }
+    const tenantObjectId = await getTenantObjectIdByName(tenantName);
 
     return {
         session,
-        tenantObjectId: tenant._id,
-        tenantName: tenant.name,
+        tenantObjectId,
+        tenantName,
     };
 }
 
-/** Admin check only (no tenant ObjectId resolution). Prefer {@link requireAdminSessionContext} for mutations. */
+/** Admin check only (no tenant ObjectId resolution). */
 export async function assertCallerIsAdmin(): Promise<AppSession> {
     const session = await getAppSession();
     if (!session?.user?.isAdmin) {
@@ -45,28 +41,12 @@ export async function assertCallerIsAdmin(): Promise<AppSession> {
     return session;
 }
 
-export function assertUserInSessionTenant(
-    user: Pick<UserDoc, 'tenantId'>,
-    sessionTenantObjectId: MongoObjectId,
-): void {
-    if (!user.tenantId.equals(sessionTenantObjectId)) {
-        throw new Error('Unauthorized: user belongs to another tenant');
+/** Resolve a tenant slug (`name`) to its Mongo ObjectId. Throws if missing. */
+export async function getTenantObjectIdByName(tenantName: string): Promise<MongoObjectId> {
+    const tenants = await getCollection<TenantDoc>(MongoCollections.TENANTS);
+    const tenant = await tenants.findOne({ name: tenantName.trim() }, { projection: { _id: 1 } });
+    if (!tenant?._id) {
+        throw new Error('Tenant not found');
     }
-}
-
-export function assertTenantIsSessionTenant(
-    tenant: Pick<TenantDoc, '_id' | 'name'>,
-    ctx: Pick<AdminSessionContext, 'tenantObjectId' | 'tenantName'>,
-): void {
-    const idMatch = tenant._id != null && tenant._id.equals(ctx.tenantObjectId);
-    const nameMatch = tenant.name === ctx.tenantName;
-    if (!idMatch && !nameMatch) {
-        throw new Error('Unauthorized: cannot modify another tenant');
-    }
-}
-
-export function assertTenantNameIsSessionTenant(tenantName: string, sessionTenantName: string): void {
-    if (tenantName.trim() !== sessionTenantName) {
-        throw new Error('Unauthorized: tenant is outside your current session');
-    }
+    return tenant._id;
 }

@@ -39,18 +39,18 @@ Returns `CreateSessionActionResult` / `void` — not `ALApiResponse`.
 | `getTenantByNamePublic` | Public | Middleware / `app/api/tenant` / `validate-tenant` — no firebase imports |
 | `getTenantByName` | Admin | Manage-tenants detail |
 | `createTenant` | Admin | Normal tenants require `defaultModuleAccess` + `defaultCredits` |
-| `updateTenant` | Session tenant | Does **not** update defaults or allow foreign tenant |
-| `getTenantDeletePreview` | Session tenant | `{ userCount }` |
-| `deleteTenant` | Session tenant | Cascades users + lead memberships; keeps shared leads |
+| `updateTenant` | Admin | Does **not** update defaults (`defaultModuleAccess` / `defaultCredits`) |
+| `getTenantDeletePreview` | Admin | `{ userCount }` |
+| `deleteTenant` | Admin | Cascades users + lead memberships; keeps shared leads |
 
 ## `user-actions.ts`
 
 | Export | Scope | Notes |
 |--------|-------|-------|
-| `getAllUsersByTenant` | Admin session tenant | Arg is tenant **name/slug**, not Mongo id |
-| `updateUser` | Admin session tenant | Promote admin → `moduleAccess: {}`; demote → tenant defaults |
-| `deleteUser` | Admin session tenant | Cascades owned lead data + orphaned Firebase |
-| `bulkUpdateUsersModuleAccess` | Admin session tenant | Skips admins (`isAdmin: { $ne: true }`) |
+| `getAllUsersByTenant` | Admin | Arg is tenant **name/slug**, not Mongo id |
+| `updateUser` | Admin | Promote admin → `moduleAccess: {}`; demote → that user's tenant defaults |
+| `deleteUser` | Admin | Cascades owned lead data + orphaned Firebase |
+| `bulkUpdateUsersModuleAccess` | Admin | Skips admins (`isAdmin: { $ne: true }`) |
 | `updateCurrentUserName` | Self | `parseUserName` |
 | `getCurrentUserCredits` | Self | Wraps `getUserCreditsState` |
 
@@ -58,7 +58,7 @@ Returns `CreateSessionActionResult` / `void` — not `ALApiResponse`.
 
 | Export | Scope | Notes |
 |--------|-------|-------|
-| `listCoupons` / `createCoupon` / `updateCoupon` | Admin session tenant | Codes normalized uppercase; unique per tenant |
+| `listCoupons` / `createCoupon` / `updateCoupon` | Admin | `listCoupons`/`createCoupon` take tenant slug; unique code per tenant |
 | `redeemCoupon` | Non-admin user | Atomic capacity reserve + unique redemption; rolls back on failure |
 
 ## `user-lead-lists-actions.ts`

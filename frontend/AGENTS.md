@@ -104,7 +104,7 @@ When adding or editing scraper forms under `app/(protected)/lead-generation/`, f
 
 ## Manage tenants (admin)
 
-When changing `app/(protected)/manage-tenants/` or related tenant/user/coupon admin actions, follow `.cursor/skills/frontend/business/frontend-business-tenants/SKILL.md` and `.cursor/rules/frontend/business/tenants.mdc`. Mutations stay scoped to the session host tenant; foreign tenants use subdomain switch, not cross-tenant writes.
+When changing `app/(protected)/manage-tenants/` or related tenant/user/coupon admin actions, follow `.cursor/skills/frontend/business/frontend-business-tenants/SKILL.md` and `.cursor/rules/frontend/business/tenants.mdc`. Admins can mutate any tenant; target by the tenant/user/coupon in the request.
 
 ## Shared components
 

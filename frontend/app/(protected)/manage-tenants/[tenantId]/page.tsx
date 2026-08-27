@@ -13,23 +13,16 @@ import type { Coupon, ModuleAccess, User } from '@aixellabs/backend/db/types';
 async function TenantUsersPage({ params }: { params: Promise<{ tenantId: string }> }) {
     const { tenantId } = await params;
     const session = await getAppSession();
-    const sessionTenantName = session?.user.tenantName ?? '';
-    const isForeignTenant = sessionTenantName !== tenantId;
 
-    let users: User[] = [];
-    let coupons: Coupon[] = [];
-    let defaultModuleAccess: ModuleAccess = {};
+    const [usersResponse, couponsResponse, tenantRes] = await Promise.all([
+        getAllUsersByTenant(tenantId),
+        listCoupons(tenantId),
+        getTenantByName(tenantId),
+    ]);
 
-    if (!isForeignTenant) {
-        const [usersResponse, couponsResponse, tenantRes] = await Promise.all([
-            getAllUsersByTenant(tenantId),
-            listCoupons(),
-            getTenantByName(tenantId),
-        ]);
-        users = usersResponse.success && usersResponse.data ? usersResponse.data : [];
-        coupons = couponsResponse.success && couponsResponse.data ? couponsResponse.data : [];
-        defaultModuleAccess = tenantRes.data?.defaultModuleAccess ?? {};
-    }
+    const users: User[] = usersResponse.success && usersResponse.data ? usersResponse.data : [];
+    const coupons: Coupon[] = couponsResponse.success && couponsResponse.data ? couponsResponse.data : [];
+    const defaultModuleAccess: ModuleAccess = tenantRes.data?.defaultModuleAccess ?? {};
 
     const pageTitle = `Users - ${tenantId.toLocaleUpperCase()}`;
 
@@ -38,8 +31,6 @@ async function TenantUsersPage({ params }: { params: Promise<{ tenantId: string 
             data={{
                 users,
                 coupons,
-                sessionTenantName,
-                tenantSlug: tenantId,
                 defaultModuleAccess,
                 currentUserId: session?.user.id ?? '',
             }}
