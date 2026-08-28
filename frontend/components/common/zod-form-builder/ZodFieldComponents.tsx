@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
 import { SearchableMultiSelect } from '@/components/ui/searchable-multi-select';
 import { SearchableSelect, OptionType } from '@/components/ui/searchable-select';
-import { Select, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { FieldError as ReactHookFormFieldError } from 'react-hook-form';
 import { generateFieldLabel } from './helpers';
@@ -403,6 +403,8 @@ export type ZodSelectFieldProps = BaseZodFieldProps & {
     onChange?: (value: string) => void;
     options: OptionType[];
     suppressSelectValueHydrationWarning?: boolean;
+    /** Virtualize the menu. Off by default so the selected label can render when the menu is closed. */
+    virtualized?: boolean;
 };
 
 export const ZodSelectField = ({
@@ -422,10 +424,12 @@ export const ZodSelectField = ({
     orientation,
     placeholder,
     suppressSelectValueHydrationWarning,
+    virtualized = false,
 }: ZodSelectFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
+    const selectedValue = value ?? '';
     const selectedOptionLabel =
-        options.find((option) => option.value === value)?.label ?? (value ? String(value) : undefined);
+        options.find((option) => option.value === selectedValue)?.label ?? (selectedValue || undefined);
     return (
         <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
             <FieldContent>
@@ -434,15 +438,16 @@ export const ZodSelectField = ({
                 </FieldLabel>
                 {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
             </FieldContent>
-            <Select name={name} value={value} onValueChange={onChange} disabled={disabled} aria-disabled={disabled}>
-                <SelectTrigger className={cn(classNames?.input, "[&_.select-clear-icon]:pointer-events-auto")}>
+            <Select name={name} value={selectedValue} onValueChange={onChange} disabled={disabled} aria-disabled={disabled}>
+                <SelectTrigger className={cn('w-full', classNames?.input, '[&_.select-clear-icon]:pointer-events-auto')}>
                     <SelectValue
+                        className="flex-1 truncate text-left"
                         placeholder={placeholder ?? `Select ${fieldLabel.toLowerCase()}`}
                         suppressHydrationWarning={suppressSelectValueHydrationWarning}
                     >
-                        {selectedOptionLabel}
+                        {virtualized ? selectedOptionLabel : undefined}
                     </SelectValue>
-                    {isClearable && value && (
+                    {isClearable && selectedValue && (
                         <XIcon
                             className="select-clear-icon ml-auto size-4 shrink-0 opacity-50 cursor-pointer"
                             onClick={(e) => {
@@ -453,7 +458,17 @@ export const ZodSelectField = ({
                         />
                     )}
                 </SelectTrigger>
-                <VirtualizedSelectContent options={options} />
+                {virtualized ? (
+                    <VirtualizedSelectContent options={options} />
+                ) : (
+                    <SelectContent>
+                        {options.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                )}
             </Select>
             {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
         </Field>

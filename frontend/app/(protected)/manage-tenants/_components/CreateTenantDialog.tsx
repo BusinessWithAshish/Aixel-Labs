@@ -47,22 +47,26 @@ type TenantFormValues = z.infer<typeof tenantSchema>;
 
 const emptyModuleAccess = (): ModuleAccess => ({});
 
+function getTenantFormValues(tenant?: Tenant | null): TenantFormValues {
+    return {
+        name: tenant?.name ?? '',
+        type: tenant?.type,
+        redirect_url: tenant?.redirect_url ?? '',
+        app_description: tenant?.app_description ?? '',
+        label: tenant?.label ?? '',
+        app_logo_url: tenant?.app_logo_url ?? '',
+        app_theme_color: tenant?.app_theme_color ?? '',
+        defaultCredits: tenant?.defaultCredits ?? 0,
+    };
+}
+
 export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSuccess }: CreateTenantDialogProps) {
     const isEditing = Boolean(editingTenant);
     const [defaultModuleAccess, setDefaultModuleAccess] = useState<ModuleAccess>(emptyModuleAccess());
 
     const form = useForm<TenantFormValues>({
         resolver: zodResolver(tenantSchema),
-        values: {
-            name: editingTenant?.name ?? '',
-            type: editingTenant?.type ?? undefined,
-            redirect_url: editingTenant?.redirect_url ?? '',
-            app_description: editingTenant?.app_description ?? '',
-            label: editingTenant?.label ?? '',
-            app_logo_url: editingTenant?.app_logo_url ?? '',
-            app_theme_color: editingTenant?.app_theme_color ?? '',
-            defaultCredits: editingTenant?.defaultCredits ?? 0,
-        },
+        defaultValues: getTenantFormValues(),
     });
 
     const { handleSubmit, watch, formState: { isSubmitting }, reset } = form;
@@ -72,8 +76,9 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
 
     useEffect(() => {
         if (!open) return;
+        reset(getTenantFormValues(editingTenant));
         setDefaultModuleAccess(editingTenant?.defaultModuleAccess ?? emptyModuleAccess());
-    }, [open, editingTenant]);
+    }, [open, editingTenant, reset]);
 
     const handleOpenChange = (nextOpen: boolean) => {
         if (!nextOpen) {

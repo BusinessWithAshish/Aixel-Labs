@@ -167,7 +167,7 @@ export const EnumControlledField = ({ name, description, required, label, disabl
 
 type SelectControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodSelectFieldProps>
 
-export const SelectControlledField = ({ name, description, required, label, disabled, className, classNames, options, isClearable }: SelectControlledFieldProps) => {
+export const SelectControlledField = ({ name, description, required, label, disabled, className, classNames, options, isClearable, virtualized }: SelectControlledFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
     return (
         <FieldController
@@ -187,6 +187,7 @@ export const SelectControlledField = ({ name, description, required, label, disa
                     disabled={disabled}
                     className={className}
                     classNames={classNames}
+                    virtualized={virtualized}
                 />
             )}
         />
