@@ -19,4 +19,4 @@ Mounts / boot → `.cursor/rules/backend/platform.mdc`. Utils → `.cursor/rules
 - Lead product items expose stable `id`; extend `LeadData` / `LeadSource` / submodule enums in **`backend/src/db/types.ts`** (schema SSOT — `.cursor/skills/backend/backend-db/SKILL.md`) when shipping a lead API.
 - New mounts: follow **platform** skill (`config.ts` + `routes.ts`) — don’t hardcode bases only in the module.
 - Prefer shared **utils** (TLS + Evomi, `location-schema`) over inventing a new browser stack; follow the module README if it already uses something else.
-- Optional MCP: same services as HTTP — see **mcp** skill (no loopback).
+- Optional MCP: same services as HTTP, **one domain tool + `op`**, not a new tool per route — see **mcp** skill (no loopback).

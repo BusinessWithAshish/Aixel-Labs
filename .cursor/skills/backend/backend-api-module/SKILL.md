@@ -45,7 +45,7 @@ type ALApiResponse<T> = { success: boolean; error?: string; data?: T };
 
 | Need | Mirror |
 |------|--------|
-| Single POST lead/scrape API (preferred default) | `backend/src/api/website-contacts/` |
+| Single POST lead/scrape API (preferred default) | `backend/src/api/crawl/` |
 | Lead scrape + discovery branches | `backend/src/api/facebook/` |
 | Multi-route family + handler factory | `backend/src/api/youtube/` (+ `create-handler.ts`) |
 | Raw + intelligence overlay / MCP | `youtube/intelligence`, `google-trends` — follow those READMEs; keep HTTP services reusable for MCP |
@@ -140,7 +140,9 @@ already requires it — default stack is TLS client + proxy (`backend-utils`).
 4. Export schemas/types/constants from `backend/package.json` `exports` when the
    frontend (or NL chat) needs them (`@aixellabs/backend/<module>`).
 5. If lead product: update `LeadData` / `LeadSource` / submodules via **`backend-db`**, then FE lead-gen checklist.
-6. Optional MCP tool: **`backend-mcp`** skill — same service as HTTP, no loopback.
+6. Optional MCP: **`backend-mcp`** skill — same service as HTTP, no loopback.
+   MCP is **not** 1:1 with HTTP. HTTP = one POST per function; MCP = one domain
+   tool, new functions are new `op`s (`{ op, layer?, input }`).
 
 ## Package export pattern
 

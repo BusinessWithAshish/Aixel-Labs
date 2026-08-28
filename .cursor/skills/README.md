@@ -34,7 +34,7 @@ How Cursor discovers skills/rules/AGENTS: [`.cursor/README.md`](../README.md) ·
 | [`backend-db/`](backend/backend-db/) | Mongo schema SSOT |
 | [`backend-api-module/`](backend/backend-api-module/) | Express scraper pattern |
 | [`backend-utils/`](backend/backend-utils/) | TLS/proxy/location (BE-only) |
-| [`backend-mcp/`](backend/backend-mcp/) | Streamable HTTP MCP → services |
+| [`backend-mcp/`](backend/backend-mcp/) | Streamable HTTP MCP — domain tools (`op`/`layer`/`input`) |
 
 ## Skill → governor (FE)
 

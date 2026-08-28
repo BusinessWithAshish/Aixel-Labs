@@ -1,5 +1,5 @@
 ---
-description: Backend MCP — Streamable HTTP /mcp, tools call services, no loopback
+description: Backend MCP — Streamable HTTP /mcp, domain tools, no loopback
 globs: backend/src/mcp/**/*
 alwaysApply: false
 ---
@@ -10,10 +10,13 @@ Governor for `backend/src/mcp`. Executor: `.cursor/skills/backend/backend-mcp/SK
 
 ## Hard rules
 
-- Tools call the same TypeScript **services** as HTTP intelligence handlers — **no HTTP loopback**.
-- Reuse API Zod `*_REQUEST_SCHEMA` as `inputSchema` — do not fork parallel MCP schemas.
-- Prefer object schemas without `.superRefine` for MCP JSON Schema compatibility.
-- Wrap handlers with `ok` / `fail` from `tool-result.ts`.
-- Keep `MCP_TOOL_COUNT` equal to registered tools.
-- Prefix every tool name with its domain (`youtube_*`, `trends_*`, `gsearch_*`, `transcription_*`, `instagram_*`) — new domains get a new prefix.
-- New base paths go through `ENDPOINTS` + `routes.ts` (platform skill) — don’t hardcode mounts only in the router.
+- Tools call the same TypeScript **services** as HTTP handlers — **no HTTP loopback**.
+- One MCP tool per domain (`youtube`, `trends`, `instagram`, `twitter`, `gsearch`, `transcription`, `viral_clipper`, `tightening`). New functions are new **ops**, not new tools.
+- Top-level args are only `{ op, layer?, input }`. Reuse API Zod `*_REQUEST_SCHEMA` as `input` — do not fork parallel MCP schemas.
+- Default `layer` is `intel` when that overlay exists, else `raw`. Invalid combo **fails** — no silent fallback. Do not invent a fake intel layer.
+- Wrap handlers with `ok` / `fail` from `tool-result.ts` (via `registerDomainTool`).
+- Keep `MCP_TOOL_COUNT` equal to registered **domain** tools.
+- Tool **description** must list ops, valid layers, and required input keys (JSON Schema cannot vary `input` per op).
+- Always register every domain tool — do not skip mounts/tools based on `VERCEL`.
+- New HTTP base paths go through `ENDPOINTS` + `routes.ts` (platform skill) — don’t hardcode mounts only in the MCP router.
+- Lead-gen (Maps / Facebook / LinkedIn) stays HTTP-only unless product asks otherwise.

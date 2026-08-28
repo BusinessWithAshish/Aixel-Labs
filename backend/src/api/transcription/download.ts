@@ -45,7 +45,7 @@ type FetchResponseLike = {
  * Fallback for sources that block a plain `fetch()` (bot detection, WAF
  * challenges, rate limiting) — same browser-fingerprint TLS client used
  * elsewhere in this backend for scraping (`gsearch/http.ts`,
- * `website-contacts/crawl.ts`). Buffers the whole file in memory since this
+ * `crawl/crawl.ts`). Buffers the whole file in memory since this
  * client has no binary streaming API; only hit on the gated-response path.
  */
 async function downloadViaTlsSession(url: string): Promise<Buffer> {

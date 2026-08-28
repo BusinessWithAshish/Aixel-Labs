@@ -18,4 +18,5 @@ behavior must follow this file.
 - `server.ts` loads `dotenv/config` first; do not reorder above env-dependent imports.
 - On Vercel: export the app only — do not `listen` when `VERCEL` is set.
 - CORS / MCP headers stay in `server.ts`; origin allowlists stay in `config.ts`.
+- Do not skip product `app.use` mounts or MCP tools based on `VERCEL`. `VERCEL` only skips `listen`.
 - Do not invent parallel backend path constants on the frontend — import `@aixellabs/backend/config`.

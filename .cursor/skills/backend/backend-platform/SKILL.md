@@ -60,7 +60,8 @@ constants see variables.
 2. Add `ENDPOINTS` + `API_ENDPOINTS` in `config.ts`.
 3. `app.use(ENDPOINTS.…, routes)` in `routes.ts`.
 4. Optional `package.json` exports for FE schemas/types.
-5. Optional MCP tool → `backend-mcp` (same service, no loopback).
+5. Optional MCP → `backend-mcp` (same service, no loopback; add an `op` on
+   the domain tool, do not register a new MCP tool per HTTP route).
 
 ## New MCP base path
 
@@ -73,7 +74,7 @@ Default stays `/mcp`. Extra servers: path-split under the MCP router **or** new
 |-----|--------|
 | `NODE_ENV` | CORS set, morgan format |
 | `PORT` | Local listen (default 8002) |
-| `VERCEL` | Skip `listen`; trust proxy default |
+| `VERCEL` | Skip `listen`; trust proxy default. Does **not** skip product mounts or MCP tools. |
 | `TRUST_PROXY` | Override trust proxy |
 | `RATE_LIMIT_MAX` | Global limiter |
 
@@ -85,6 +86,7 @@ Proxy scrape env (`EVOMI_*`) is documented under `backend-utils`.
 - DO keep FE paths aligned with `API_ENDPOINTS.*.full`.
 - DON’T hardcode product base paths in FE helpers when config already exports them.
 - DON’T call `listen` on Vercel — keep `export = app`.
+- DON’T skip product mounts or MCP tools when `VERCEL` is set.
 - DON’T move `dotenv` below modules that read `process.env` at import time.
 
 ## Related

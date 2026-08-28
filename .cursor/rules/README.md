@@ -36,7 +36,7 @@ Attachment is via each `.mdc` frontmatter (`globs` / `description` / `alwaysAppl
 | [`backend/db.mdc`](backend/db.mdc) | **Schema SSOT** — `src/db` collections, Doc types, `LeadData`, module enums |
 | [`backend/api.mdc`](backend/api.mdc) | Express scrapers under `src/api` |
 | [`backend/utils.mdc`](backend/utils.mdc) | Shared TLS/proxy/location utils (BE-only) |
-| [`backend/mcp.mdc`](backend/mcp.mdc) | MCP Streamable HTTP tools → intelligence services |
+| [`backend/mcp.mdc`](backend/mcp.mdc) | MCP Streamable HTTP — domain tools (`op`/`layer`/`input`) → services |
 
 ## Layered attachment
 
