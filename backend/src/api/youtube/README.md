@@ -13,6 +13,7 @@ Express router mounting scraper sub-APIs under `/youtube`. All endpoints use **P
 | Video | [video/README.md](./video/README.md) | `POST` | `/video`, `/video/suggested` |
 | Transcript | [transcript/README.md](./transcript/README.md) | `POST` | `/video/transcript` |
 | Comments | [comments/README.md](./comments/README.md) | `POST` | `/video/comments` |
+| Download | [download/README.md](./download/README.md) | `POST` | `/video/download` |
 | Video meta | — | `POST` | `/video-meta` |
 | Handle | — | `POST` | `/handle` |
 | Channel | [channel/README.md](./channel/README.md) | `POST` | `/channel` |
@@ -50,6 +51,7 @@ youtube/
 │   ├── suggested.ts          # Suggested videos pagination
 │   └── helpers.ts            # Public fetch API + re-exports
 ├── comments/
+├── download/                 # yt-dlp → local filePath (VPS only; no MCP)
 ├── video-meta/
 ├── handle/
 ├── channel/

@@ -203,6 +203,66 @@ export function normalizeYoutubeHandle(handle: string): string {
   return handle.trim().replace(/^@/, "");
 }
 
+const YOUTUBE_VIDEO_ID_PATTERN = /^[a-zA-Z0-9_-]{11,20}$/;
+
+function youtubeVideoIdFromPathSegment(segment: string | undefined): string | null {
+  if (!segment || !YOUTUBE_VIDEO_ID_PATTERN.test(segment)) return null;
+  return segment;
+}
+
+/** True when the URL is a playlist page with no `v=` video id. */
+export function isYoutubePlaylistUrl(input: string): boolean {
+  try {
+    const url = new URL(input.trim());
+    if (url.pathname.startsWith("/playlist")) return true;
+    if (url.searchParams.has("list") && !url.searchParams.get("v")) {
+      return !parseYoutubeVideoId(input);
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Accepts a raw video id or a watch / shorts / embed / youtu.be URL.
+ * Playlist-only URLs return null — callers should 400 those.
+ */
+export function parseYoutubeVideoId(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (YOUTUBE_VIDEO_ID_PATTERN.test(trimmed) && !trimmed.includes("://")) {
+    return trimmed;
+  }
+
+  try {
+    const url = new URL(trimmed);
+    const host = url.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") {
+      return youtubeVideoIdFromPathSegment(url.pathname.split("/").filter(Boolean)[0]);
+    }
+    if (
+      host !== "youtube.com" &&
+      host !== "m.youtube.com" &&
+      host !== "music.youtube.com"
+    ) {
+      return null;
+    }
+
+    const fromQuery = url.searchParams.get("v");
+    if (fromQuery && YOUTUBE_VIDEO_ID_PATTERN.test(fromQuery)) return fromQuery;
+
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts[0] === "shorts" || parts[0] === "embed" || parts[0] === "live") {
+      return youtubeVideoIdFromPathSegment(parts[1]);
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 export function resolveRedirectUrl(url: string): string {
   try {
     const parsed = new URL(url);

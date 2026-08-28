@@ -128,6 +128,7 @@ export const YOUTUBE_API_ROUTES = {
   VIDEO_META: "/video-meta",
   VIDEO_TRANSCRIPT: "/video/transcript",
   VIDEO_COMMENTS: "/video/comments",
+  VIDEO_DOWNLOAD: "/video/download",
   CHANNEL: "/channel",
   HANDLE: "/handle",
 } as const;
@@ -146,6 +147,7 @@ export const YOUTUBE_HANDLER_LABELS = {
   VIDEO_META: "YOUTUBE/VIDEO-META",
   VIDEO_TRANSCRIPT: "YOUTUBE/VIDEO/TRANSCRIPT",
   VIDEO_COMMENTS: "YOUTUBE/VIDEO/COMMENTS",
+  VIDEO_DOWNLOAD: "YOUTUBE/VIDEO/DOWNLOAD",
   CHANNEL: "YOUTUBE/CHANNEL",
   HANDLE: "YOUTUBE/HANDLE",
 } as const;
