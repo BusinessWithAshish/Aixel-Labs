@@ -163,7 +163,7 @@ Ops:
 - video (raw|intel, default intel) — one video's details. input: videoId, country?, region?
 - suggested (raw|intel, default intel) — related/suggested videos. input: videoId, limit?, country?, region?
 - transcript (raw|intel, default intel) — captions. intel input may include title. input: videoId, language?, country?, region?, title?
-- comments (raw|intel, default intel) — InnerTube comment threads + optional timestamp/like overlay. Distinct from viral_clipper comment_highlights (yt-dlp). input: videoId, sort?, limit?, continuation?, country?, region?
+- comments (raw|intel, default intel) — InnerTube comment threads. intel adds timestamp mentions + 10s clusters for clip priors. Distinct from viral_clipper comment_highlights (formatter over the same clusters). input: videoId, sort?, limit?, continuation?, country?, region?
 - channel (raw|intel, default intel) — channel + tab. input: channelId OR handle, contentType?, limit?, country?, region?
 - handle (raw|intel, default intel) — resolve @handle. input: handle, country?, region?
 - video_meta (raw|intel, default intel) — batch watch-page metadata. input: videoIds[], country?, region?

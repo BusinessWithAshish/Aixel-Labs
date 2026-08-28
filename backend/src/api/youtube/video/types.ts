@@ -259,6 +259,18 @@ export type YOUTUBE_VIDEO_DETAILS_RESPONSE = {
   commentCount: number | null;
 };
 
+export type YOUTUBE_VIDEO_CHAPTER = {
+  title: string;
+  startSeconds: number;
+  endSeconds: number;
+};
+
+export type YOUTUBE_VIDEO_CHAPTERS_RESPONSE = {
+  videoId: string;
+  videoTitle: string | null;
+  chapters: YOUTUBE_VIDEO_CHAPTER[];
+};
+
 export type YOUTUBE_VIDEO_SUGGESTED_VIDEOS_RESPONSE = {
   videoId: string;
   items: YOUTUBE_VIDEO_SUGGESTION_ITEM[];

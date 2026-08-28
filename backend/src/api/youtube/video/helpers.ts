@@ -7,9 +7,14 @@ import {
 import { withSharedClientVersion } from "../client-version-cache";
 import { closeUrlFetchSession } from "../../../utils/node-tls-client-session-handler";
 import type { YOUTUBE_GEO_REQUEST } from "../types";
-import type { YOUTUBE_VIDEO_DETAILS_RESPONSE } from "./types";
+import type {
+  YOUTUBE_VIDEO_CHAPTERS_RESPONSE,
+  YOUTUBE_VIDEO_DETAILS_RESPONSE,
+} from "./types";
 import {
+  extractChaptersFromGetWatch,
   extractCommentCountFromGetWatch,
+  extractLengthSecondsFromGetWatch,
   fetchGetWatch,
   isVideoResolvable,
   parsePlayerResponse,
@@ -19,6 +24,7 @@ import { fetchYoutubeVideoSuggestedVideos } from "./suggested";
 
 export { YoutubeVideoError } from "./errors";
 export {
+  extractChaptersFromGetWatch,
   extractChannelSubscriberCountText,
   extractCommentCountFromGetWatch,
   extractDescriptionFromGetWatch,
@@ -75,6 +81,39 @@ export async function fetchYoutubeVideoDetails(
     }
 
     return parsePlayerResponse(data, videoId, initialData);
+  } finally {
+    await closeUrlFetchSession(session);
+  }
+}
+
+export async function fetchYoutubeVideoChapters(
+  request: YoutubeVideoFetchRequest,
+): Promise<YOUTUBE_VIDEO_CHAPTERS_RESPONSE> {
+  const { videoId, country, region } = request;
+  const { gl } = resolveYoutubeGeo({ country, region });
+  const session = await createYoutubeFetchSession({ country, region });
+
+  try {
+    const { result: data } = await withSharedClientVersion(
+      () => createYoutubeFetchSession({ country, region }),
+      (clientVersion) => fetchGetWatch(session, clientVersion, gl, videoId),
+    );
+    assertVideoResolvable(data, videoId);
+
+    const details = parsePlayerResponse(data, videoId);
+    const durationSeconds =
+      details.lengthSeconds ?? extractLengthSecondsFromGetWatch(data) ?? 0;
+    const markers = extractChaptersFromGetWatch(data);
+
+    return {
+      videoId,
+      videoTitle: details.title,
+      chapters: markers.map((marker, index) => ({
+        title: marker.title,
+        startSeconds: marker.startSeconds,
+        endSeconds: markers[index + 1]?.startSeconds ?? durationSeconds,
+      })),
+    };
   } finally {
     await closeUrlFetchSession(session);
   }

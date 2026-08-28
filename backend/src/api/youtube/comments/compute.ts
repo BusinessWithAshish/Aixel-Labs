@@ -314,13 +314,24 @@ export function extractCommentsBootstrap(root: unknown): YOUTUBE_COMMENTS_BOOTST
   };
   if (!rec) return empty;
 
+  const commentCountText = extractPanelCountText(rec);
+  const defaultContinuation = extractDefaultContinuation(rec);
+  const continuationBySort = extractSortContinuations(rec);
+  const hasToken = Boolean(
+    defaultContinuation ||
+      continuationBySort.top ||
+      continuationBySort.newest,
+  );
+  // get_watch often injects "Comments are turned off" under UNPLAYABLE even
+  // when a comments continuation (or count) is still present. A real token
+  // or count wins over the marker string.
+  const marker = JSON.stringify(rec).includes(YOUTUBE_COMMENTS_DISABLED_MARKER);
+
   return {
-    commentsDisabled: JSON.stringify(rec).includes(
-      YOUTUBE_COMMENTS_DISABLED_MARKER,
-    ),
-    commentCountText: extractPanelCountText(rec),
-    defaultContinuation: extractDefaultContinuation(rec),
-    continuationBySort: extractSortContinuations(rec),
+    commentsDisabled: marker && !hasToken && commentCountText === null,
+    commentCountText,
+    defaultContinuation,
+    continuationBySort,
   };
 }
 

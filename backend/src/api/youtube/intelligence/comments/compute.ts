@@ -1,7 +1,13 @@
-import { YOUTUBE_INTELLIGENCE_PATTERNS } from "../constants";
+import {
+  YOUTUBE_COMMENT_TIMESTAMP_CLUSTER_SAMPLE_LIMIT,
+  YOUTUBE_COMMENT_TIMESTAMP_CLUSTER_WINDOW_SECONDS,
+  YOUTUBE_COMMENT_TIMESTAMP_CLUSTERS_MAX,
+  YOUTUBE_INTELLIGENCE_PATTERNS,
+} from "../constants";
 import type { YOUTUBE_COMMENT } from "../../comments/types";
 import type {
   YOUTUBE_COMMENT_INTELLIGENCE_FIELDS,
+  YOUTUBE_COMMENT_TIMESTAMP_CLUSTER,
   YOUTUBE_COMMENT_TIMESTAMP_MENTION,
   YOUTUBE_COMMENTS_INTELLIGENCE_FIELDS,
 } from "./types";
@@ -22,6 +28,50 @@ export function extractCommentTimestampSeconds(text: string): number[] {
   return matches;
 }
 
+type TimestampMentionForCluster = {
+  timestampSeconds: number;
+  text: string;
+  likeCount: number;
+};
+
+/**
+ * Greedy single-pass clustering: sort by timestamp, merge into the previous
+ * cluster when within the window, else start a new one. Ranked by
+ * mentionCount * 10 + totalLikes.
+ */
+export function clusterCommentTimestampMentions(
+  mentions: TimestampMentionForCluster[],
+  windowSeconds: number = YOUTUBE_COMMENT_TIMESTAMP_CLUSTER_WINDOW_SECONDS,
+): YOUTUBE_COMMENT_TIMESTAMP_CLUSTER[] {
+  const sorted = [...mentions].sort((a, b) => a.timestampSeconds - b.timestampSeconds);
+  const clusters: YOUTUBE_COMMENT_TIMESTAMP_CLUSTER[] = [];
+
+  for (const mention of sorted) {
+    const last = clusters[clusters.length - 1];
+    if (last && mention.timestampSeconds - last.timestampSeconds <= windowSeconds) {
+      last.mentionCount += 1;
+      last.totalLikes += mention.likeCount;
+      if (last.sampleTexts.length < YOUTUBE_COMMENT_TIMESTAMP_CLUSTER_SAMPLE_LIMIT) {
+        last.sampleTexts.push(mention.text);
+      }
+    } else {
+      clusters.push({
+        timestampSeconds: mention.timestampSeconds,
+        mentionCount: 1,
+        totalLikes: mention.likeCount,
+        sampleTexts: [mention.text],
+      });
+    }
+  }
+
+  return clusters
+    .sort(
+      (a, b) =>
+        b.mentionCount * 10 + b.totalLikes - (a.mentionCount * 10 + a.totalLikes),
+    )
+    .slice(0, YOUTUBE_COMMENT_TIMESTAMP_CLUSTERS_MAX);
+}
+
 export function enrichCommentIntelligence(
   comment: YOUTUBE_COMMENT,
 ): YOUTUBE_COMMENT_INTELLIGENCE_FIELDS {
@@ -39,6 +89,7 @@ export function aggregateCommentsIntelligence(
 ): YOUTUBE_COMMENTS_INTELLIGENCE_FIELDS {
   const authorIds = new Set<string>();
   const timestampMentions: YOUTUBE_COMMENT_TIMESTAMP_MENTION[] = [];
+  const clusterMentions: TimestampMentionForCluster[] = [];
   const likeCounts: number[] = [];
   let likeCountSum = 0;
   let creatorHeartedCount = 0;
@@ -63,6 +114,11 @@ export function aggregateCommentsIntelligence(
           timestampSeconds,
           text: comment.text,
         });
+        clusterMentions.push({
+          timestampSeconds,
+          text: comment.text.slice(0, 200),
+          likeCount: comment.likeCount ?? 0,
+        });
       }
     }
   }
@@ -77,5 +133,6 @@ export function aggregateCommentsIntelligence(
     likeCountSum,
     likeDistribution: computePercentiles(likeCounts),
     timestampMentions,
+    timestampClusters: clusterCommentTimestampMentions(clusterMentions),
   };
 }

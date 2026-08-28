@@ -68,7 +68,7 @@ intelligence/
 │   ├── enrich.ts
 │   ├── service.ts
 │   └── handler.ts
-├── comments/                 # timestamp mentions, hearted/verified counts, like distribution
+├── comments/                 # timestamp mentions + 10s clusters, hearted/verified counts, like distribution
 ├── channel/                  # handler → harvest → enrich → compute + content-metrics
 ├── handle/
 ├── video-meta/

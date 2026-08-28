@@ -2,7 +2,8 @@
 
 Fetches a video's comments via InnerTube `POST /youtubei/v1/next` (the same
 WEB-client endpoint youtube.com uses in the network tab). No official Data API
-key and no yt-dlp — unlike `/viral-clipper/youtube-comments`.
+key. Viral clipper `/youtube-comments` formats timestamp clusters from this
+same scrape (intelligence overlay).
 
 Verified live 2026-08-20 against [Despacito](https://www.youtube.com/watch?v=kJQP7kiw5Fk)
 (`commentThreadRenderer` + `frameworkUpdates.commentEntityPayload`; replies
@@ -51,8 +52,11 @@ token — pass it back as `continuation` to fetch that thread.
 1. `createYoutubeFetchSession({ country, region })`.
 2. Cached WEB `INNERTUBE_CLIENT_VERSION` + `POST /youtubei/v1/get_watch` to
    resolve the video and pull the comments continuation (Top / Newest tokens
-   live on `engagement-panel-comments-section`). Falls back to watch-page
-   `ytInitialData` only when get_watch omits the token.
+   live on `engagement-panel-comments-section`). If get_watch has no usable
+   continuation, fall back to watch-page `ytInitialData` — including when
+   get_watch injects `"Comments are turned off"` under UNPLAYABLE (false
+   positive; the live WEB client still POSTs `/youtubei/v1/next`). A
+   continuation token or panel count wins over the marker string.
 3. `POST /youtubei/v1/next` with `{ context, continuation }` until `limit`.
 4. Join `commentThreadRenderer` / `commentViewModel` rows to
    `frameworkUpdates.entityBatchUpdate.mutations[].commentEntityPayload`.
@@ -92,6 +96,10 @@ curl -sS -X POST http://localhost:8002/youtube/video/comments \
 
 - Do not use `/youtubei/v1/comment/get_comment_replies` — the live WEB client
   loads replies through `/youtubei/v1/next` with the thread continuation.
-- Timestamp-highlight clustering for viral clips stays on
-  `/viral-clipper/youtube-comments` (yt-dlp). This API returns the
-  comments themselves. MCP: `youtube` `op=comments` (`layer=raw` or `intel`).
+- Never treat `"Comments are turned off"` in get_watch as terminal if a
+  continuation token (or comments count) is present — that string is often
+  injected under UNPLAYABLE while comments are live on the watch page.
+- Timestamp clustering for clip priors lives on comments intelligence
+  (`timestampClusters`), not on this raw comments API. Viral clipper
+  `/youtube-comments` is a formatter over that overlay. MCP: `youtube`
+  `op=comments` (`layer=raw` or `intel`).

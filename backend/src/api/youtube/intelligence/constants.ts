@@ -114,6 +114,14 @@ export const YOUTUBE_INTELLIGENCE_PATTERNS = {
   PURE_NUMBER: /^\d+$/,
 } as const;
 
+/** Greedy window for collapsing comment timestamp mentions into one highlight. */
+export const YOUTUBE_COMMENT_TIMESTAMP_CLUSTER_WINDOW_SECONDS = 10;
+
+/** Max ranked timestamp clusters returned on comments intelligence. */
+export const YOUTUBE_COMMENT_TIMESTAMP_CLUSTERS_MAX = 20;
+
+export const YOUTUBE_COMMENT_TIMESTAMP_CLUSTER_SAMPLE_LIMIT = 3;
+
 /** Shared English stop words for suggest clustering, brand detection, and transcript keywords. */
 export const YOUTUBE_INTELLIGENCE_STOP_WORDS = new Set([
   "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "for", "with",

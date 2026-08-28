@@ -44,10 +44,18 @@ async function resolveBootstrap(
   videoId: string,
 ): Promise<YOUTUBE_COMMENTS_BOOTSTRAP> {
   const fromWatchNext = extractCommentsBootstrap(watchNextRoot);
-  if (fromWatchNext.commentsDisabled || hasUsableContinuation(fromWatchNext)) {
-    return fromWatchNext;
+  if (hasUsableContinuation(fromWatchNext)) {
+    return { ...fromWatchNext, commentsDisabled: false };
   }
-  return extractCommentsBootstrap(await fetchWatchPageRoot(session, videoId));
+  // Don't trust get_watch's disabled marker — it fires on UNPLAYABLE even
+  // when the watch-page HTML still has the comments continuation.
+  const fromPage = extractCommentsBootstrap(
+    await fetchWatchPageRoot(session, videoId),
+  );
+  if (hasUsableContinuation(fromPage)) {
+    return { ...fromPage, commentsDisabled: false };
+  }
+  return fromPage;
 }
 
 async function collectComments(

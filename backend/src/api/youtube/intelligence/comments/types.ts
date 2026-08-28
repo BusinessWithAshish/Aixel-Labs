@@ -10,6 +10,13 @@ export type YOUTUBE_COMMENT_TIMESTAMP_MENTION = {
   text: string;
 };
 
+export type YOUTUBE_COMMENT_TIMESTAMP_CLUSTER = {
+  timestampSeconds: number;
+  mentionCount: number;
+  totalLikes: number;
+  sampleTexts: string[];
+};
+
 export type YOUTUBE_COMMENT_INTELLIGENCE_FIELDS = {
   timestampSeconds: number[];
   hasTimestampMention: boolean;
@@ -30,6 +37,7 @@ export type YOUTUBE_COMMENTS_INTELLIGENCE_FIELDS = {
   likeCountSum: number;
   likeDistribution: YOUTUBE_INTELLIGENCE_PERCENTILES | null;
   timestampMentions: YOUTUBE_COMMENT_TIMESTAMP_MENTION[];
+  timestampClusters: YOUTUBE_COMMENT_TIMESTAMP_CLUSTER[];
 };
 
 export type YOUTUBE_COMMENTS_INTELLIGENCE_RESPONSE = Omit<

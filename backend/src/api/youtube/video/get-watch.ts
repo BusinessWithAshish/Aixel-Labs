@@ -362,6 +362,52 @@ export function extractLengthSecondsFromGetWatch(
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function youtubeChapterTitle(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const obj = value as { simpleText?: string; runs?: Array<{ text?: string }> };
+  if (obj.simpleText?.trim()) return obj.simpleText.trim();
+  return joinYoutubeTextRuns(obj.runs);
+}
+
+/**
+ * Creator chapter markers from watch-next (`DESCRIPTION_CHAPTERS` /
+ * `chapterRenderer`). Empty array is valid — most videos have none.
+ */
+export function extractChaptersFromGetWatch(
+  data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
+): Array<{ title: string; startSeconds: number }> {
+  const found: Array<{ title: string; startSeconds: number }> = [];
+  const seen = new Set<number>();
+
+  function visit(node: unknown): void {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item);
+      return;
+    }
+    const rec = node as Record<string, unknown>;
+    const chapter = rec.chapterRenderer as Record<string, unknown> | undefined;
+    if (chapter) {
+      const title = youtubeChapterTitle(chapter.title);
+      const startMs = Number(chapter.timeRangeStartMillis);
+      const startSec = Number(chapter.startTimeSeconds);
+      const startSeconds = Number.isFinite(startMs)
+        ? Math.round(startMs / 1000)
+        : Number.isFinite(startSec)
+          ? Math.round(startSec)
+          : NaN;
+      if (title && Number.isFinite(startSeconds) && !seen.has(startSeconds)) {
+        seen.add(startSeconds);
+        found.push({ title, startSeconds });
+      }
+    }
+    for (const value of Object.values(rec)) visit(value);
+  }
+
+  visit(data[1] ?? data);
+  return found.sort((a, b) => a.startSeconds - b.startSeconds);
+}
+
 export function extractDescriptionFromGetWatch(
   data: YOUTUBE_VIDEO_GET_WATCH_RESPONSE,
 ): string | null {
