@@ -131,25 +131,12 @@ export const VIRAL_CLIPPER = {
 export const VIRAL_CLIPPER_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 
 /**
- * YouTube audience-signal extraction (comments + chapters) — both shell out
- * to a system `yt-dlp` binary (no YouTube Data API key needed/available in
- * this project's .env). Unlike ffmpeg (bundled via `ffmpeg-static`, works
- * anywhere Node runs), yt-dlp has no equivalent reliably-maintained
- * self-contained npm package used here — this needs `yt-dlp` actually
- * installed wherever this backend runs. See viral-clipper/README.md for the
- * production-availability caveat; not yet verified on this project's
- * actual Cloud Run deploy target.
+ * YouTube audience-signal extraction (comments + chapters) now uses InnerTube.
+ * yt-dlp is only used when a YouTube URL is passed as a media source (download).
  */
 export const VIRAL_CLIPPER_YOUTUBE = {
-  YT_DLP_BINARY: "yt-dlp",
-  /** yt-dlp --dump-single-json output can run several MB with comments included. */
-  YT_DLP_MAX_BUFFER_BYTES: 25 * 1024 * 1024,
-  YT_DLP_TIMEOUT_MS: 5 * 60 * 1000,
-  /** Fetch only the top N comments (by relevance) — bounds latency; comment count on popular videos can run into the thousands. */
-  DEFAULT_MAX_COMMENTS: 300,
-  /** Comments whose timestamp mentions fall within this many seconds of each other are treated as pointing at the same moment. */
-  TIMESTAMP_CLUSTER_WINDOW_SECONDS: 10,
-  MAX_TIMESTAMP_CLUSTERS_RETURNED: 20,
+  /** Clamped to YouTube comments max (200) — InnerTube pages are ~20 comments each. */
+  DEFAULT_MAX_COMMENTS: 200,
 } as const;
 
 /**
@@ -277,6 +264,6 @@ export const VIRAL_CLIPPER_ERROR_MESSAGES = {
   GEMINI_MALFORMED_RESPONSE: "Gemini response did not match the expected shape",
   GEMINI_KEY_POOL_EXHAUSTED: "All Gemini API keys failed or are exhausted",
   FFMPEG_CUT_FAILED: "ffmpeg failed to cut clip",
-  YOUTUBE_METADATA_FETCH_FAILED: "Failed to fetch YouTube video metadata (yt-dlp)",
+  YOUTUBE_METADATA_FETCH_FAILED: "Failed to fetch YouTube video metadata",
   GENERIC: "Viral Clipper pipeline step failed",
 } as const;

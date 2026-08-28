@@ -129,10 +129,10 @@ you already have without paying for diarization again.
 ### `POST /viral-clipper/youtube-comments`
 
 ```jsonc
-{ "videoUrl": "https://www.youtube.com/watch?v=...", "maxComments": 300 /* optional, default 300 */ }
+{ "videoUrl": "https://www.youtube.com/watch?v=...", "maxComments": 200 /* optional, default 200, max 200 */ }
 ```
 
-Returns `ALApiResponse<VIRAL_CLIPPER_YOUTUBE_COMMENTS_RESPONSE>` — `{ videoTitle, commentsScanned, highlights: TIMESTAMP_MENTION_CLUSTER[] }`. Fetches the video's top comments via `yt-dlp` (no YouTube Data API key needed/available in this project), extracts `MM:SS`/`H:MM:SS` timestamp mentions from comment text with a regex, and clusters mentions within `VIRAL_CLIPPER.TIMESTAMP_CLUSTER_WINDOW_SECONDS` (10s) of each other — ranked by mention count (weighted) + total likes. Pure extraction + aggregation, **no LLM call**. Not every video has comments referencing timestamps; an empty `highlights` array is a valid, common result.
+Returns `ALApiResponse<VIRAL_CLIPPER_YOUTUBE_COMMENTS_RESPONSE>` — `{ videoTitle, commentsScanned, highlights: TIMESTAMP_MENTION_CLUSTER[] }`. Fetches top comments via InnerTube (same service as `/youtube/video/comments` intelligence), then maps `timestampClusters` (10s greedy window, ranked by mention count × 10 + likes). **No yt-dlp, no LLM.** Empty `highlights` is a valid, common result.
 
 ### `POST /viral-clipper/youtube-chapters`
 
@@ -140,7 +140,7 @@ Returns `ALApiResponse<VIRAL_CLIPPER_YOUTUBE_COMMENTS_RESPONSE>` — `{ videoTit
 { "videoUrl": "https://www.youtube.com/watch?v=..." }
 ```
 
-Returns `ALApiResponse<VIRAL_CLIPPER_YOUTUBE_CHAPTERS_RESPONSE>` — `{ videoTitle, chapters: CHAPTER_SIGNAL[] }`, the creator's own chapter markers if the video has any (via `yt-dlp`, same no-API-key approach). Most videos don't have chapters — an empty array is a valid result, not an error.
+Returns `ALApiResponse<VIRAL_CLIPPER_YOUTUBE_CHAPTERS_RESPONSE>` — `{ videoTitle, chapters: CHAPTER_SIGNAL[] }`, creator chapter markers from InnerTube `get_watch`. Most videos don't have chapters — an empty array is a valid result, not an error.
 
 ### `POST /viral-clipper/cut`
 
@@ -514,10 +514,10 @@ viral-clipper/
   boundary-snap.ts                  # MM:SS parsing + segment-boundary snap-or-pad logic
   ffmpeg-cut.ts                       # single-clip ffmpeg re-encode cut + aspect-ratio filter + audio-chunk/reference-clip cutting
   gemini-client.ts                     # generic Gemini File API + generateContent(responseSchema) helpers
-  download.ts                            # resolveMediaSource: local path (used in place) or URL (downloaded) -> local path, content-agnostic
-  youtube-metadata.ts                      # shared yt-dlp --dump-single-json wrapper
-  youtube-comments.ts                        # top comments -> timestamp-mention extraction + clustering
-  youtube-chapters.ts                          # creator chapter markers
+  download.ts                            # resolveMediaSource: local path, YouTube URL (yt-dlp via youtube/download), or other URL
+  format-timestamp.ts                      # MM:SS / H:MM:SS formatter
+  youtube-comments.ts                        # InnerTube comments intelligence → timestamp clusters
+  youtube-chapters.ts                          # InnerTube get_watch chapter markers
   schemas.ts / types.ts / constants.ts
   README.md
 

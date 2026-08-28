@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { YOUTUBE_COMMENTS_MAX_LIMIT } from "../youtube/comments/constants";
 import {
   VIRAL_CLIPPER,
   VIRAL_CLIPPER_ASPECT_RATIOS,
@@ -137,7 +138,7 @@ export const VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA = z.object({
     .number()
     .int()
     .min(10)
-    .max(1000)
+    .max(YOUTUBE_COMMENTS_MAX_LIMIT)
     .optional()
     .default(VIRAL_CLIPPER_YOUTUBE.DEFAULT_MAX_COMMENTS),
 });

@@ -22,7 +22,7 @@ import type {
   DIARIZED_TRANSCRIPT,
   GEMINI_USAGE_METADATA,
 } from "./types";
-import { formatSecondsAsTimestamp } from "./youtube-metadata";
+import { formatSecondsAsTimestamp } from "./format-timestamp";
 
 const AUDIO_MIME_BY_EXT: Record<string, string> = {
   ".mp3": "audio/mpeg",

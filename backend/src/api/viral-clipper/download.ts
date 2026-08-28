@@ -9,6 +9,8 @@ import { pipeline } from "node:stream/promises";
 import { Agent } from "undici";
 
 import { VIRAL_CLIPPER_ERROR_MESSAGES } from "./constants";
+import { downloadYoutubeMedia } from "../youtube/download/helpers";
+import { parseYoutubeVideoId } from "../youtube/helpers";
 
 /** See the matching note in `transcription/download.ts` — avoids the ambient `Response` name. */
 type FetchResponseLike = {
@@ -66,6 +68,16 @@ export async function resolveMediaSource(source: string): Promise<RESOLVED_MEDIA
     }
     const workDir = await mkdtemp(join(tmpdir(), "viral-clipper-"));
     return { path: source, workDir, ownsSource: false };
+  }
+
+  const youtubeVideoId = parseYoutubeVideoId(source);
+  if (youtubeVideoId) {
+    const downloaded = await downloadYoutubeMedia({
+      videoId: youtubeVideoId,
+      media: "video",
+    });
+    const workDir = await mkdtemp(join(tmpdir(), "viral-clipper-"));
+    return { path: downloaded.filePath, workDir, ownsSource: false };
   }
 
   const workDir = await mkdtemp(join(tmpdir(), "viral-clipper-"));

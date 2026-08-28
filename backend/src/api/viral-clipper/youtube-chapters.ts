@@ -1,19 +1,29 @@
-import { fetchYoutubeMetadata, formatSecondsAsTimestamp } from "./youtube-metadata";
+import { YOUTUBE_DEFAULT_COUNTRY } from "../youtube/constants";
+import { parseYoutubeVideoId } from "../youtube/helpers";
+import { fetchYoutubeVideoChapters } from "../youtube/video/helpers";
+import { VIRAL_CLIPPER_ERROR_MESSAGES } from "./constants";
+import { formatSecondsAsTimestamp } from "./format-timestamp";
 import type { VIRAL_CLIPPER_YOUTUBE_CHAPTERS_RESPONSE } from "./types";
 
-/** Fetches a YouTube video's creator-authored chapter markers, if it has any. */
+/** Fetches creator-authored chapter markers via InnerTube get_watch. Empty chapters is valid. */
 export async function fetchYoutubeChapters(
   videoUrl: string,
 ): Promise<VIRAL_CLIPPER_YOUTUBE_CHAPTERS_RESPONSE> {
-  const meta = await fetchYoutubeMetadata(videoUrl, { withComments: false });
+  const videoId = parseYoutubeVideoId(videoUrl);
+  if (!videoId) {
+    throw new Error(
+      `${VIRAL_CLIPPER_ERROR_MESSAGES.YOUTUBE_METADATA_FETCH_FAILED}: invalid YouTube URL`,
+    );
+  }
 
-  const chapters = (meta.chapters ?? []).map((c) => ({
-    title: c.title,
-    startSeconds: c.start_time,
-    endSeconds: c.end_time,
-  }));
-
-  return { videoTitle: meta.title, chapters };
+  const result = await fetchYoutubeVideoChapters({
+    videoId,
+    country: YOUTUBE_DEFAULT_COUNTRY,
+  });
+  return {
+    videoTitle: result.videoTitle ?? videoId,
+    chapters: result.chapters,
+  };
 }
 
 /** Formats chapters into prompt-ready lines for `scoreViralMoments`' `audienceSignals`. */

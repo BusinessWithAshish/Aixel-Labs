@@ -87,17 +87,17 @@ const VIRAL_CLIPPER_OPS: Record<string, DomainOp> = {
   },
 };
 
-const VIRAL_CLIPPER_DESCRIPTION = `Podcast/video clip pipeline (Gemini diarize + viral moments + ffmpeg cut) and yt-dlp YouTube helpers. Raw only.
+const VIRAL_CLIPPER_DESCRIPTION = `Podcast/video clip pipeline (Gemini diarize + viral moments + ffmpeg cut). Comments/chapters use InnerTube. Raw only.
 
-Call with { op, layer?, input }. layer must be omitted or raw. Needs ffmpeg/yt-dlp on the host.
+Call with { op, layer?, input }. layer must be omitted or raw. Needs ffmpeg on the host. YouTube URL sources also need yt-dlp (download only).
 
 Ops:
 - diarize (raw) — audioSource → speaker-labelled transcript. input: audioSource, model?
 - moments (raw) — diarized transcript → ranked clip candidates. input: diarized, model?, minCandidates?, maxCandidates?, minClipSeconds?, maxClipSeconds?, channelContext?, audienceSignals?
 - pipeline (raw) — diarize + moments in one call. input: audioSource, model?, minCandidates?, maxCandidates?, minClipSeconds?, maxClipSeconds?, channelContext?, audienceSignals?
 - cut (raw) — videoSource + {start,end} ranges → local clip files. input: videoSource, clips[], diarized?, aspectRatio?
-- comment_highlights (raw) — yt-dlp timestamp clusters from top comments for clip priors. NOT youtube comments (InnerTube comment text). input: videoUrl, maxComments?
-- chapters (raw) — creator chapter markers via yt-dlp. Empty chapters[] is valid. input: videoUrl
+- comment_highlights (raw) — InnerTube timestamp clusters from top comments for clip priors. NOT the raw youtube comments list. input: videoUrl, maxComments?
+- chapters (raw) — creator chapter markers via InnerTube get_watch. Empty chapters[] is valid. input: videoUrl
 
 Typical flow: comment_highlights/chapters → audienceSignals on pipeline or moments → cut.`;
 
