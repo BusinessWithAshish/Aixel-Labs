@@ -1,3 +1,7 @@
+import { resolve } from "node:path";
+
+import { AIXEL_MEDIA } from "../../../media";
+
 export const YOUTUBE_DOWNLOAD_MEDIA = {
   VIDEO: "video",
   AUDIO: "audio",
@@ -8,6 +12,10 @@ export const YOUTUBE_DOWNLOAD_TIMEOUT_MS = 20 * 60 * 1000;
 export const YOUTUBE_DOWNLOAD_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 
 export const YOUTUBE_DOWNLOAD_BINARY = process.env.YOUTUBE_YT_DLP_BIN ?? "yt-dlp";
+
+export const YOUTUBE_DOWNLOAD_DIR = resolve(
+  process.env.YOUTUBE_DOWNLOAD_DIR || AIXEL_MEDIA.YOUTUBE_DOWNLOADS,
+);
 
 export const YOUTUBE_DOWNLOAD_FIELD_DESCRIPTIONS = {
   VIDEO_ID:

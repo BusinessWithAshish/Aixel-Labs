@@ -8,7 +8,7 @@ HTTP handlers — **no HTTP loopback**.
 | Mount       | `ENDPOINTS.MCP` → `/mcp`                            |
 | Server name | `aixel-intelligence`                                |
 | Factory     | `createAixelIntelligenceMcpServer()` in `server.ts` |
-| Tool count  | `MCP_TOOL_COUNT` (**8**)                            |
+| Tool count  | `MCP_TOOL_COUNT` (**10**)                            |
 
 HTTP stays exploded (one POST per function). MCP collapses to **one tool per
 domain**. Every tool takes the same top-level shape:
@@ -34,8 +34,10 @@ Lead-gen (Maps / Facebook / LinkedIn) stays **HTTP-only**.
 | `twitter`       | `user`, `tweet`, `user_tweets`, `trending`, `search`                                                                                                               | raw only (no Twitter intel API)                                                      |
 | `gsearch`       | `search` (v1 CSE), `search_v2` (Docs Explore / CSE fallback)                                                                                                       | raw                                                                                  |
 | `transcription` | `transcribe`                                                                                                                                                       | raw                                                                                  |
-| `viral_clipper` | `diarize`, `moments`, `pipeline`, `cut`, `comment_highlights`, `chapters`                                                                                          | raw                                                                                  |
-| `tightening`    | `tighten`                                                                                                                                                          | raw                                                                                  |
+| `viral_clipper` | `diarize`, `moments`, `pipeline`, `cut`, `comment_highlights`, `chapters`                                                                                          | raw. `cut` writes to local disk — refused on Vercel (`IS_VERCEL_RUNTIME`)            |
+| `tightening`    | `tighten`                                                                                                                                                          | raw. Writes to local disk — refused on Vercel (`IS_VERCEL_RUNTIME`)                  |
+| `chatgpt`       | `generate`, `stage_image`                                                                                                                                          | raw only (browser-driven, no intel overlay). **VPS only** — refused everywhere else unless `AIXEL_VPS=1` |
+| `claude`        | `ask`, `budget_status`                                                                                                                                              | raw only (CLI-driven, no intel overlay). **VPS only** — refused everywhere else unless `AIXEL_VPS=1` |
 
 ### Instagram discovery — which op
 
@@ -70,7 +72,7 @@ Guest GraphQL/REST — no user login. Native keyword search is login-walled.
 ```
 mcp/
 ├── router.ts        # Express mount + health
-├── server.ts        # factory + MCP_TOOL_COUNT (registers 8 domain tools)
+├── server.ts        # factory + MCP_TOOL_COUNT (registers 10 domain tools)
 ├── domain-tool.ts   # registerDomainTool({ op, layer, input })
 ├── tool-result.ts   # ok / fail wrappers
 ├── tools/           # one file per domain

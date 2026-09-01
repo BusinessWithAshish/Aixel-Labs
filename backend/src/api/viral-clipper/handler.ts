@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 
+import { statusCodeFromError } from "../../config";
 import { ALApiResponse } from "../types";
 import { VIRAL_CLIPPER_ERROR_MESSAGES } from "./constants";
 import { cutClipsFromVideo } from "./cut";
@@ -47,7 +48,7 @@ export async function viralClipperDiarizeHandler(req: Request, res: Response) {
       .json({ success: true, data } satisfies ALApiResponse<VIRAL_CLIPPER_DIARIZE_RESPONSE>);
   } catch (err) {
     res
-      .status(502)
+      .status(statusCodeFromError(err))
       .json({ success: false, error: errorMessage(err) } satisfies ALApiResponse<never>);
   }
 }
@@ -80,7 +81,7 @@ export async function viralClipperViralMomentsHandler(req: Request, res: Respons
     } satisfies ALApiResponse<VIRAL_CLIPPER_VIRAL_MOMENTS_RESPONSE>);
   } catch (err) {
     res
-      .status(502)
+      .status(statusCodeFromError(err))
       .json({ success: false, error: errorMessage(err) } satisfies ALApiResponse<never>);
   }
 }
@@ -108,7 +109,7 @@ export async function viralClipperCutHandler(req: Request, res: Response) {
       .json({ success: true, data } satisfies ALApiResponse<VIRAL_CLIPPER_CUT_RESPONSE>);
   } catch (err) {
     res
-      .status(502)
+      .status(statusCodeFromError(err))
       .json({ success: false, error: errorMessage(err) } satisfies ALApiResponse<never>);
   }
 }
@@ -135,7 +136,7 @@ export async function viralClipperYoutubeCommentsHandler(req: Request, res: Resp
     } satisfies ALApiResponse<VIRAL_CLIPPER_YOUTUBE_COMMENTS_RESPONSE>);
   } catch (err) {
     res
-      .status(502)
+      .status(statusCodeFromError(err))
       .json({ success: false, error: errorMessage(err) } satisfies ALApiResponse<never>);
   }
 }
@@ -159,7 +160,7 @@ export async function viralClipperYoutubeChaptersHandler(req: Request, res: Resp
     } satisfies ALApiResponse<VIRAL_CLIPPER_YOUTUBE_CHAPTERS_RESPONSE>);
   } catch (err) {
     res
-      .status(502)
+      .status(statusCodeFromError(err))
       .json({ success: false, error: errorMessage(err) } satisfies ALApiResponse<never>);
   }
 }
@@ -191,7 +192,7 @@ export async function viralClipperPipelineHandler(req: Request, res: Response) {
       .json({ success: true, data } satisfies ALApiResponse<VIRAL_CLIPPER_PIPELINE_RESPONSE>);
   } catch (err) {
     res
-      .status(502)
+      .status(statusCodeFromError(err))
       .json({ success: false, error: errorMessage(err) } satisfies ALApiResponse<never>);
   }
 }

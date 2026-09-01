@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
+import { assertPersistentDisk } from "../../config";
 import { cleanupResolvedMediaSource, resolveMediaSource } from "../transcription/download";
 import { normalizeToFlac } from "../transcription/ffmpeg";
 import { transcribeWithGroq } from "../transcription/groq-client";
@@ -10,6 +11,7 @@ import { assembleKeepRanges } from "./assemble";
 import {
   TIGHTENING,
   TIGHTENING_ERROR_MESSAGES,
+  TIGHTENING_OUTPUT_DIR,
   TIGHTENING_VERBATIM_PROMPT,
 } from "./constants";
 import { findFillerRanges } from "./fillers";
@@ -22,16 +24,6 @@ import {
 } from "./ranges";
 import { detectSilences } from "./silence";
 import type { TIGHTENING_REQUEST_PARSED, TIGHTENING_RESPONSE, TIME_RANGE } from "./types";
-
-/**
- * Where finished videos are written — local disk, not Blob storage. Same
- * pattern as `VIRAL_CLIPPER_OUTPUT_DIR` in `viral-clipper/cut.ts`: the host's
- * storage mount isn't known at code-authoring time, so it's configurable,
- * and defaults to a project-relative folder for local dev.
- */
-const TIGHTENING_OUTPUT_DIR = resolve(
-  process.env.TIGHTENING_OUTPUT_DIR || join(process.cwd(), "storage", "tightening-output"),
-);
 
 /**
  * Extracts audio and transcribes it with word-level timestamps — the only
@@ -80,6 +72,7 @@ async function getWordTimestamps(
 export async function tightenVideo(
   request: TIGHTENING_REQUEST_PARSED,
 ): Promise<TIGHTENING_RESPONSE> {
+  assertPersistentDisk(TIGHTENING_ERROR_MESSAGES.VERCEL);
   const {
     videoSource,
     silenceThresholdDb,

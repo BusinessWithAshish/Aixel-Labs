@@ -39,7 +39,7 @@ Playlist-only URLs (no `v=`) return 400. One video per call.
 
 ## Disk
 
-Default dir: `cwd/storage/youtube-downloads/{id}.mp4` (`.m4a` for audio). Override with `YOUTUBE_DOWNLOAD_DIR`. Binary override: `YOUTUBE_YT_DLP_BIN` (default `yt-dlp`). If the file already exists, yt-dlp is not spawned.
+Default dir: `{AIXEL_MEDIA_ROOT}/private/youtube-downloads/{id}.mp4` (`.m4a` for audio). Unset `AIXEL_MEDIA_ROOT` → `cwd/storage/private/youtube-downloads`. Override with `YOUTUBE_DOWNLOAD_DIR`. Binary override: `YOUTUBE_YT_DLP_BIN` (default `yt-dlp`). If the file already exists, yt-dlp is not spawned. Not public — copy into `public/` only when a URL is required.
 
 ffmpeg for merge/extract comes from `ffmpeg-static` (`--ffmpeg-location`).
 

@@ -24,6 +24,12 @@ for mounts/boot, **db** for anything persisted, then the folder you are editing.
   FE calls `API_ENDPOINTS.*.full` via `@aixellabs/backend/config`.
 - `server.ts`: `dotenv` first → middleware → `registerRoutes` → Vercel `export = app`.
 - **`src/db` is schema SSOT.** New persisted features start in `types.ts`.
+- Disk: `src/media.ts` (`AIXEL_MEDIA_ROOT`) — `{root}/public` vs `{root}/private/…`.
+- Runtime guards in `config.ts`: `IS_VERCEL_RUNTIME` (auto) blocks disk-output
+  ops on Vercel; `IS_VPS_RUNTIME` (`AIXEL_VPS=1`, explicit) gates the
+  `chatgpt`/`claude` modules to the VPS only, local dev included. Use
+  `assertPersistentDisk` / `assertVpsRuntime` at the top of the service
+  function, not the route — MCP ops call the same function.
 - APIs return `ALApiResponse<T>`; Zod validates **requests** only.
 - **No Mongo inside `src/api`.** Utils are BE-only (no FE package export).
 - MCP: one tool per domain (`op` / `layer` / `input`) calling the same

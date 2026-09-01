@@ -1,3 +1,7 @@
+import { resolve } from "node:path";
+
+import { AIXEL_MEDIA } from "../../media";
+
 /**
  * Tightening — single source of truth for silence-detection thresholds, the
  * filler dictionary, ffmpeg encode settings, and safety caps. Nothing in
@@ -130,4 +134,10 @@ export const TIGHTENING_ERROR_MESSAGES = {
   NOTHING_TO_CUT: "No removable silence or filler was found in this video",
   OUTPUT_WRITE_FAILED: "Failed to write the tightened video to disk",
   GENERIC: "Tightening failed",
+  VERCEL:
+    "Tightening needs a persistent host with local disk output (not available on Vercel)",
 } as const;
+
+export const TIGHTENING_OUTPUT_DIR = resolve(
+  process.env.TIGHTENING_OUTPUT_DIR || AIXEL_MEDIA.TIGHTENING_OUTPUT,
+);

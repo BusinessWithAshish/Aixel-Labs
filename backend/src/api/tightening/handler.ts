@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 
+import { statusCodeFromError } from "../../config";
 import { ALApiResponse } from "../types";
 import { tightenVideo } from "./client";
 import { TIGHTENING_ERROR_MESSAGES } from "./constants";
@@ -25,6 +26,6 @@ export async function tighteningApiHandler(req: Request, res: Response) {
     const msg =
       err instanceof Error ? err.message : TIGHTENING_ERROR_MESSAGES.GENERIC;
     const response: ALApiResponse<never> = { success: false, error: msg };
-    res.status(502).json(response);
+    res.status(statusCodeFromError(err)).json(response);
   }
 }

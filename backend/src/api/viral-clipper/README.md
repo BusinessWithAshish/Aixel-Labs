@@ -37,7 +37,10 @@ upload/download round-trip.
 This module reads and writes local files directly — **no Vercel Blob**,
 which was only ever needed to hand a file between stateless serverless
 invocations (a constraint that doesn't exist on a persistent VPS process)
-and was capped at Vercel's 1GB free storage limit besides.
+and was capped at Vercel's 1GB free storage limit besides. `cutClipsFromVideo`
+refuses to run at all on Vercel (`IS_VERCEL_RUNTIME`, checked in `cut.ts`)
+rather than silently writing to a `/tmp` that won't survive the invocation;
+`diarize`/`viral-moments` are analysis-only and still run everywhere.
 
 - **Input** (`audioSource` / `videoSource` on `/diarize`, `/pipeline`,
   `/cut`) accepts either a local filesystem path (used in place, read
@@ -47,10 +50,13 @@ and was capped at Vercel's 1GB free storage limit besides.
   `resolveMediaSource`/`cleanupResolvedMediaSource` in `download.ts`.
 - **Output** — `/cut` writes finished clips straight to
   `VIRAL_CLIPPER_OUTPUT_DIR` (env var, defaults to
-  `<cwd>/storage/viral-clipper-cuts`) and returns each clip's local
+  `{AIXEL_MEDIA_ROOT}/private/viral-clipper-cuts`; unset root →
+  `<cwd>/storage/private/viral-clipper-cuts`) and returns each clip's local
   `clipPath` in the response instead of an uploaded URL. Point
   `VIRAL_CLIPPER_OUTPUT_DIR` at wherever on the VPS's 200GB disk should hold
-  finished clips; the directory is created automatically if missing.
+  finished clips; the directory is created automatically if missing. These
+  paths are private working files — copy into `{AIXEL_MEDIA_ROOT}/public` only
+  when a fetchable `https://hermes.aixellabs.in/media/…` URL is needed.
 
 ## Env
 
@@ -66,8 +72,7 @@ and was capped at Vercel's 1GB free storage limit besides.
   falls back to `GEMINI_API_KEY` (the paid key) automatically; that's a
   deliberate boundary, not an oversight.
 - `VIRAL_CLIPPER_OUTPUT_DIR` — optional, local directory `/cut` writes
-  finished clips to. Defaults to `<cwd>/storage/viral-clipper-cuts`; set it
-  to wherever on the VPS's disk clips should actually live.
+  finished clips to. Defaults to `{AIXEL_MEDIA_ROOT}/private/viral-clipper-cuts`.
 - **`yt-dlp` binary** (system-level, not an npm dependency) — required by
   `/viral-clipper/youtube-comments` and `/viral-clipper/youtube-chapters` only (the
   core diarize/viral-moments/cut endpoints don't need it). No YouTube Data

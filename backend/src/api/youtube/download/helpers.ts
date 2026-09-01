@@ -10,6 +10,7 @@ import { YOUTUBE_VIDEO_URL } from "../constants";
 import { isYoutubePlaylistUrl, parseYoutubeVideoId } from "../helpers";
 import {
   YOUTUBE_DOWNLOAD_BINARY,
+  YOUTUBE_DOWNLOAD_DIR,
   YOUTUBE_DOWNLOAD_ERROR_MESSAGES,
   YOUTUBE_DOWNLOAD_MAX_BUFFER_BYTES,
   YOUTUBE_DOWNLOAD_MEDIA,
@@ -24,16 +25,9 @@ import type {
 
 const execFileAsync = promisify(execFile);
 
-function downloadDir(): string {
-  return (
-    process.env.YOUTUBE_DOWNLOAD_DIR ||
-    join(process.cwd(), "storage", "youtube-downloads")
-  );
-}
-
 function expectedPath(videoId: string, media: YOUTUBE_DOWNLOAD_MEDIA_VALUE): string {
   const ext = media === YOUTUBE_DOWNLOAD_MEDIA.AUDIO ? "m4a" : "mp4";
-  return join(downloadDir(), `${videoId}.${ext}`);
+  return join(YOUTUBE_DOWNLOAD_DIR, `${videoId}.${ext}`);
 }
 
 function mimeTypeFor(media: YOUTUBE_DOWNLOAD_MEDIA_VALUE): string {
@@ -80,7 +74,7 @@ function ytDlpArgs(
   videoId: string,
   media: YOUTUBE_DOWNLOAD_MEDIA_VALUE,
 ): string[] {
-  const outTemplate = join(downloadDir(), "%(id)s.%(ext)s");
+  const outTemplate = join(YOUTUBE_DOWNLOAD_DIR, "%(id)s.%(ext)s");
   const args = [
     "--no-playlist",
     "--no-progress",
@@ -123,7 +117,7 @@ export async function downloadYoutubeMedia(
   const cached = await existingDownload(videoId, media);
   if (cached) return cached;
 
-  await mkdir(downloadDir(), { recursive: true });
+  await mkdir(YOUTUBE_DOWNLOAD_DIR, { recursive: true });
 
   let stdout = "";
   try {

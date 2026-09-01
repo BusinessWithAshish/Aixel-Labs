@@ -14,6 +14,8 @@ import transcriptionRoutes from "./api/transcription/index";
 import viralClipperRoutes from "./api/viral-clipper/index";
 import tighteningRoutes from "./api/tightening/index";
 import crawlRoutes from "./api/crawl/index";
+import chatgptRoutes from "./api/chatgpt/index";
+import claudeRoutes from "./api/claude/index";
 import mcpRoutes from "./mcp/router";
 
 export function registerRoutes(app: Express) {
@@ -30,5 +32,7 @@ export function registerRoutes(app: Express) {
   app.use(ENDPOINTS.VIRAL_CLIPPER, viralClipperRoutes);
   app.use(ENDPOINTS.TIGHTENING, tighteningRoutes);
   app.use(ENDPOINTS.CRAWL, crawlRoutes);
+  app.use(ENDPOINTS.CHATGPT, chatgptRoutes);
+  app.use(ENDPOINTS.CLAUDE, claudeRoutes);
   app.use(ENDPOINTS.MCP, mcpRoutes);
 }

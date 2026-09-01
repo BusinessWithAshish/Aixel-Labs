@@ -66,13 +66,16 @@ function.
 Same reasoning as `viral-clipper/` (see its README): Blob only existed to hand
 a file between stateless serverless invocations, a constraint that doesn't
 exist on a persistent VPS process, and it was capped at Vercel's 1GB free
-storage limit besides.
+storage limit besides. `tightenVideo` refuses to run at all on Vercel
+(`IS_VERCEL_RUNTIME`, checked in `client.ts`) rather than silently writing to
+a `/tmp` that won't survive the invocation.
 
 - **Input** (`videoSource`) accepts a local path or a URL — see above.
 - **Output** — `tightenVideo` writes the finished video straight to
   `TIGHTENING_OUTPUT_DIR` (env var, defaults to
-  `<cwd>/storage/tightening-output`) and returns its local `videoPath` in the
-  response instead of an uploaded URL. Point `TIGHTENING_OUTPUT_DIR` at
+  `{AIXEL_MEDIA_ROOT}/private/tightening-output`) and returns its local
+  `videoPath` in the response instead of an uploaded URL. Point
+  `TIGHTENING_OUTPUT_DIR` at
   wherever on the VPS's disk should hold tightened videos; the directory is
   created automatically if missing.
 

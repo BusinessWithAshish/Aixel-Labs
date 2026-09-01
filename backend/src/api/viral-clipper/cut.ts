@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
+import { assertPersistentDisk } from "../../config";
 import { snapClipBoundaries } from "./boundary-snap";
+import { VIRAL_CLIPPER_ERROR_MESSAGES, VIRAL_CLIPPER_OUTPUT_DIR } from "./constants";
 import { cleanupResolvedMediaSource, resolveMediaSource } from "./download";
 import { cutClip, getMediaDurationSeconds } from "./ffmpeg-cut";
 import type {
@@ -11,15 +13,6 @@ import type {
   VIRAL_CLIPPER_CUT_RESPONSE,
   DIARIZED_TRANSCRIPT,
 } from "./types";
-
-/**
- * Where finished clips are written — local disk, not Blob storage. The host's
- * storage mount isn't known at code-authoring time, so it's configurable;
- * defaults to a project-relative folder for local dev.
- */
-const VIRAL_CLIPPER_OUTPUT_DIR = resolve(
-  process.env.VIRAL_CLIPPER_OUTPUT_DIR || join(process.cwd(), "storage", "viral-clipper-cuts"),
-);
 
 /**
  * Resolves the source video (local path or URL — see `resolveMediaSource`),
@@ -34,6 +27,7 @@ export async function cutClipsFromVideo(
   diarized: DIARIZED_TRANSCRIPT | undefined,
   aspectRatio: VIRAL_CLIPPER_ASPECT_RATIO_VALUE,
 ): Promise<VIRAL_CLIPPER_CUT_RESPONSE> {
+  assertPersistentDisk(VIRAL_CLIPPER_ERROR_MESSAGES.VERCEL);
   const resolved = await resolveMediaSource(videoSource);
 
   try {

@@ -1,3 +1,7 @@
+import { resolve } from "node:path";
+
+import { AIXEL_MEDIA } from "../../media";
+
 /**
  * Viral Clipper pipeline — single source of truth for Gemini wiring, prompts, and limits.
  * Diarization (audio -> speaker-labeled transcript) and viral-moment scoring
@@ -266,4 +270,10 @@ export const VIRAL_CLIPPER_ERROR_MESSAGES = {
   FFMPEG_CUT_FAILED: "ffmpeg failed to cut clip",
   YOUTUBE_METADATA_FETCH_FAILED: "Failed to fetch YouTube video metadata",
   GENERIC: "Viral Clipper pipeline step failed",
+  VERCEL:
+    "Viral Clipper's cut step needs a persistent host with local disk output (not available on Vercel)",
 } as const;
+
+export const VIRAL_CLIPPER_OUTPUT_DIR = resolve(
+  process.env.VIRAL_CLIPPER_OUTPUT_DIR || AIXEL_MEDIA.VIRAL_CLIPPER_CUTS,
+);

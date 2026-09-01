@@ -1,4 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerChatgptTool } from "./tools/chatgpt";
+import { registerClaudeTool } from "./tools/claude";
 import { registerGsearchTool } from "./tools/gsearch";
 import { registerInstagramTool } from "./tools/instagram";
 import { registerTighteningTool } from "./tools/tightening";
@@ -10,8 +12,8 @@ import { registerYoutubeTool } from "./tools/youtube";
 
 export const MCP_SERVER_NAME = "aixel-intelligence";
 export const MCP_SERVER_VERSION = "1.0.0";
-/** One domain tool each: youtube, trends, instagram, twitter, gsearch, transcription, viral_clipper, tightening. */
-export const MCP_TOOL_COUNT = 8;
+/** One domain tool each: youtube, trends, instagram, twitter, gsearch, transcription, viral_clipper, tightening, chatgpt, claude. */
+export const MCP_TOOL_COUNT = 10;
 
 export function createAixelIntelligenceMcpServer(): McpServer {
   const server = new McpServer({
@@ -27,6 +29,8 @@ export function createAixelIntelligenceMcpServer(): McpServer {
   registerTranscriptionTool(server);
   registerViralClipperTool(server);
   registerTighteningTool(server);
+  registerChatgptTool(server);
+  registerClaudeTool(server);
 
   return server;
 }

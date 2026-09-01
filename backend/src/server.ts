@@ -132,8 +132,13 @@ export = app;
 
 // For local/dev or traditional servers, keep `listen`.
 if (!process.env.VERCEL) {
-  const PORT = process.env.PORT || 8002;
-  const server = app.listen(PORT, () => {
+  const PORT = Number(process.env.PORT) || 8002;
+  // Production on this VPS is reached via Caddy on :443. Bind loopback so
+  // Node is not on the public internet. Override with HOST=0.0.0.0 for LAN.
+  const HOST =
+    process.env.HOST ||
+    (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");
+  const server = app.listen(PORT, HOST, () => {
     const timestamp = new Date().toLocaleString("en-US", {
       weekday: "long",
       month: "long",
@@ -143,20 +148,28 @@ if (!process.env.VERCEL) {
       second: "2-digit",
     });
     console.log(
-      `Aixel Labs backend running on port ${PORT} [${process.env.NODE_ENV}] - Started at ${timestamp}...`,
+      `Aixel Labs backend running on ${HOST}:${PORT} [${process.env.NODE_ENV}] - Started at ${timestamp}...`,
     );
   });
 
   /**
    * Node's `server.requestTimeout` defaults to 300_000ms (5 min) since v18 —
-   * too short for long-running upstream calls. Raised app-wide since several
-   * scrape/AI routes here can legitimately run long — in particular,
-   * viral-clipper's chunked diarization (see viral-clipper/diarize.ts) makes
-   * several sequential Gemini calls for long episodes (one per ~15min
-   * chunk), so a single `/viral-clipper/diarize` or `/viral-clipper/pipeline`
-   * request on a long episode can itself run considerably longer than any
-   * one Gemini call.
+   * too short for long-running upstream calls. Raised app-wide (VPS and
+   * local alike — both take this `!VERCEL` branch) since several scrape/AI
+   * routes here can legitimately run long — in particular, viral-clipper's
+   * chunked diarization (see viral-clipper/diarize.ts) makes several
+   * sequential Gemini calls for long episodes (one per ~15min chunk), so a
+   * single `/viral-clipper/diarize` or `/viral-clipper/pipeline` request on
+   * a long episode can itself run considerably longer than any one Gemini
+   * call.
    * `headersTimeout` stays under this per Node's requirement.
+   *
+   * This block is unreachable on Vercel, and deliberately so: there is no
+   * `http.Server` there to set these properties on (the app is exported and
+   * invoked per-request rather than `.listen()`-ing). Vercel's own request
+   * ceiling is `vercel.json`'s `functions.maxDuration` (plan-tier dependent,
+   * commonly capped well under an hour) — set it there, not here, if it
+   * ever needs to change.
    */
   server.requestTimeout = 60 * 60 * 1000;
   server.headersTimeout = 60 * 60 * 1000 - 1000;

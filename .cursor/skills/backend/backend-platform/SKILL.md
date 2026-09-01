@@ -74,9 +74,12 @@ Default stays `/mcp`. Extra servers: path-split under the MCP router **or** new
 |-----|--------|
 | `NODE_ENV` | CORS set, morgan format |
 | `PORT` | Local listen (default 8002) |
-| `VERCEL` | Skip `listen`; trust proxy default. Does **not** skip product mounts or MCP tools. |
+| `VERCEL` | Auto-set by Vercel. Skip `listen`; trust proxy default. Also refuses (501) any op that writes local disk expecting it to persist — tightening, viral-clipper `cut`, youtube-download (`IS_VERCEL_RUNTIME` in `config.ts`). Does **not** skip product mounts or MCP tools. |
+| `AIXEL_VPS` | Explicit opt-in, nothing sets it automatically — VPS systemd sets `AIXEL_VPS=1`. Gates the `chatgpt` (headful Chrome/CDP) and `claude` (shells to local CLI) modules end-to-end; refused everywhere else, local dev included (`IS_VPS_RUNTIME` in `config.ts`). |
 | `TRUST_PROXY` | Override trust proxy |
 | `RATE_LIMIT_MAX` | Global limiter |
+| `AIXEL_MEDIA_ROOT` | Public/private disk root (`src/media.ts`). Unset → `cwd/storage`. VPS: `/home/ubuntu/media`. |
+| `AIXEL_MEDIA_PUBLIC_BASE` | Public URL prefix for staged files (default `https://hermes.aixellabs.in/media`) |
 
 Proxy scrape env (`EVOMI_*`) is documented under `backend-utils`.
 

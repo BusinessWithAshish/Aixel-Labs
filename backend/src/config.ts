@@ -21,6 +21,8 @@ export enum ENDPOINTS {
   VIRAL_CLIPPER = "/viral-clipper",
   TIGHTENING = "/tightening",
   CRAWL = "/crawl",
+  CHATGPT = "/chatgpt",
+  CLAUDE = "/claude",
   MCP = "/mcp",
   SAMPLE = "/sample",
 }
@@ -29,10 +31,46 @@ export enum ENDPOINTS {
  * Vercel sets `VERCEL=1` automatically on every deployment. Used in
  * `server.ts` to skip `app.listen` (export the app instead). Product HTTP
  * mounts and MCP tools always register — this backend is intended to run
- * as a persistent process (VPS / local). Transcription still rejects
- * local-path sources when this is true because Vercel has no host FS.
+ * as a persistent process (VPS / local). Also gates every op that writes
+ * to local disk expecting it to persist (transcription's local-path input,
+ * tightening/viral-clipper output, youtube-download) — Vercel's filesystem
+ * is per-invocation and ephemeral, so those ops are refused there even if
+ * a storage-path env var happens to be set.
  */
 export const IS_VERCEL_RUNTIME = !!process.env.VERCEL;
+
+/**
+ * Explicit opt-in — nothing sets this automatically. The VPS's systemd env
+ * sets `AIXEL_VPS=1`. Gates capabilities that only make sense on that one
+ * persistent, browser-equipped host: the chatgpt module's headful
+ * Chrome/CDP session and the claude module's shelling to the local `claude`
+ * CLI. Both are refused everywhere else — Vercel (no persistent host) and
+ * local/dev alike — so a stray local run can't accidentally drive a browser
+ * that isn't there or burn real Claude usage against your own subscription.
+ */
+export const IS_VPS_RUNTIME = !!process.env.AIXEL_VPS;
+
+function withStatusCode(message: string, statusCode: number): Error {
+  const err = new Error(message);
+  (err as Error & { statusCode?: number }).statusCode = statusCode;
+  return err;
+}
+
+/** Throws (501) unless `IS_VPS_RUNTIME` — see {@link IS_VPS_RUNTIME}. */
+export function assertVpsRuntime(message: string): void {
+  if (!IS_VPS_RUNTIME) throw withStatusCode(message, 501);
+}
+
+/** Throws (501) on Vercel only — see {@link IS_VERCEL_RUNTIME}. */
+export function assertPersistentDisk(message: string): void {
+  if (IS_VERCEL_RUNTIME) throw withStatusCode(message, 501);
+}
+
+/** Reads `err.statusCode` (set by {@link assertVpsRuntime} / {@link assertPersistentDisk} / a busy-lock, etc.); falls back to 502. */
+export function statusCodeFromError(err: unknown, fallback = 502): number {
+  const code = (err as { statusCode?: number })?.statusCode;
+  return typeof code === "number" ? code : fallback;
+}
 
 export const ALLOWED_ORIGINS_DEV_REGEX = [
   /^http:\/\/.*\.localhost:3003$/,
@@ -248,5 +286,29 @@ export const API_ENDPOINTS = {
   },
   CRAWL: {
     API: { route: "/", full: `${ENDPOINTS.CRAWL}` },
+  },
+  CHATGPT: {
+    GENERATE: {
+      route: "/",
+      full: `${ENDPOINTS.CHATGPT}`,
+    },
+    HEALTH: {
+      route: "/health",
+      full: `${ENDPOINTS.CHATGPT}/health`,
+    },
+    STAGE: {
+      route: "/stage",
+      full: `${ENDPOINTS.CHATGPT}/stage`,
+    },
+  },
+  CLAUDE: {
+    ASK: {
+      route: "/",
+      full: `${ENDPOINTS.CLAUDE}`,
+    },
+    BUDGET: {
+      route: "/budget",
+      full: `${ENDPOINTS.CLAUDE}/budget`,
+    },
   },
 } as const;
