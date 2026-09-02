@@ -8,6 +8,7 @@ import { promises as fs } from "node:fs";
 import { basename } from "node:path";
 import { promisify } from "node:util";
 import sharp from "sharp";
+import { fetch } from "undici";
 
 import { assertVpsRuntime } from "../../config";
 import { attachChatGptTab, listCdpTargets, type CdpTab } from "./cdp";
