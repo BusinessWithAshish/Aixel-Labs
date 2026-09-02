@@ -22,7 +22,11 @@ export const INSTAGRAM_REQUEST_SCHEMA = z.object({
     .optional()
     .refine(
       (entities) =>
-        entities?.every(
+        // `.optional().refine()` runs the refine on `undefined` too, so
+        // short-circuit: an absent `entities` field is valid (query-only
+        // request); only validate the format when entities are present.
+        !entities ||
+        entities.every(
           (entity) =>
             INSTAGRAM_USERNAME_REGEX.test(entity) ||
             INSTAGRAM_URL_REGEX.test(entity),
