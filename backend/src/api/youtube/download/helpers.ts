@@ -25,7 +25,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import ffmpegPath from "ffmpeg-static";
-import { ClientType, Innertube, Platform } from "youtubei.js";
+import type { Innertube } from "youtubei.js";
 
 import { isYoutubePlaylistUrl, parseYoutubeVideoId } from "../helpers";
 import { IS_VERCEL_RUNTIME } from "../../../config";
@@ -49,29 +49,71 @@ const execFileAsync = promisify(execFile);
  * today. IOS returns the highest-quality adaptive mp4 streams; ANDROID_VR
  * and VISIONOS are alternates for videos where IOS returns no formats.
  *
- * `Innertube.create({ client_type })` wants the `ClientType` enum (where
- * `IOS = "iOS"`), but `getBasicInfo(id, { client })` / `info.download({ client })`
- * want the `InnerTubeClient` string union (where the literal is `"IOS"`).
- * The library accepts both at runtime; we keep two parallel constants so
- * each call site type-checks cleanly.
+ * These are string literals matching the `InnerTubeClient` union from
+ * youtubei.js (note: the `ClientType` enum uses `"iOS"` for IOS, which the
+ * `InnerTubeClient` type rejects). The enum value for `Innertube.create`'s
+ * `client_type` is resolved lazily after the dynamic import (see below).
  */
-const INNERTUBE_CREATE_CLIENT = ClientType.IOS;
 const INNERTUBE_CLIENT_CHAIN = ["IOS", "ANDROID_VR", "VISIONOS"] as const;
 type InnerTubeClientName = (typeof INNERTUBE_CLIENT_CHAIN)[number];
 
-// youtubei.js requires a JS interpreter to decipher YouTube's obfuscated
-// signature algorithm for some clients. The Node `Function` constructor is
-// sufficient and runs in-process — no extra runtime needed.
-Platform.shim.eval = async (data: { output: string }) =>
-  // eslint-disable-next-line no-new-func
-  new Function(data.output)();
+/**
+ * `youtubei.js` is an ESM-only package, but this backend is CommonJS
+ * (`"type": "commonjs"`). A top-level `import` would compile to a
+ * `require()` that Node rejects at runtime (`ERR_REQUIRE_ESM`), crashing
+ * every request — not just downloads — because this module is imported
+ * through the youtube router at startup. Two consequences:
+ *
+ *  1. The runtime values (`Innertube`, `ClientType`, `Platform`) are loaded
+ *     with a native dynamic `import()` inside `loadInnertubeModule`, so
+ *     they only load when a download actually runs. On Vercel the download
+ *     endpoint returns 501 before reaching here, so the ESM module is never
+ *     loaded.
+ *  2. The compile-time types come from `import type` (erased by TypeScript,
+ *     no runtime `require()`).
+ *
+ * Why `Function("return import(...)")` instead of `await import(...)`:
+ * `tsconfig.json` sets `"module": "CommonJS"`, so TypeScript downlevels a
+ * plain `import("youtubei.js")` to `Promise.resolve().then(() =>
+ * require("youtubei.js"))` — which still hits `ERR_REQUIRE_ESM`. Wrapping
+ * the call in the `Function` constructor keeps it as a *native* dynamic
+ * import at runtime (Node supports `import()` from CommonJS), which can
+ * load ESM modules. This is the standard escape hatch for exactly this
+ * case; it lets us load youtubei.js without flipping the whole backend to
+ * ESM or changing `module` in tsconfig (which would ripple across every
+ * module).
+ */
+type InnertubeModule = typeof import("youtubei.js");
+
+const nativeImport = new Function(
+  "specifier",
+  "return import(specifier)",
+) as (specifier: string) => Promise<InnertubeModule>;
+
+let innertubeModulePromise: Promise<InnertubeModule> | null = null;
+
+function loadInnertubeModule(): Promise<InnertubeModule> {
+  if (!innertubeModulePromise) {
+    innertubeModulePromise = nativeImport("youtubei.js").then((mod) => {
+      // youtubei.js requires a JS interpreter to decipher YouTube's
+      // obfuscated signature algorithm for some clients. The Node
+      // `Function` constructor is sufficient and runs in-process.
+      mod.Platform.shim.eval = async (data: { output: string }) =>
+        // eslint-disable-next-line no-new-func
+        new Function(data.output)();
+      return mod;
+    });
+  }
+  return innertubeModulePromise;
+}
 
 let innertubePromise: Promise<Innertube> | null = null;
 
-function getInnertube(): Promise<Innertube> {
+async function getInnertube(): Promise<Innertube> {
   if (!innertubePromise) {
+    const { Innertube, ClientType } = await loadInnertubeModule();
     innertubePromise = Innertube.create({
-      client_type: INNERTUBE_CREATE_CLIENT,
+      client_type: ClientType.IOS,
       generate_session_locally: false,
       retrieve_player: true,
       enable_session_cache: true,
