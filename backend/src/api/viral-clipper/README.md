@@ -26,8 +26,8 @@ task afterward — reuses the same model so the two calls compose naturally in
 
 HTTP `/viral-clipper/*` and the `viral_clipper` MCP tool always register.
 Chunked diarization can run 15–20+ minutes (see "Long episodes" below);
-`/youtube-comments` and `/youtube-chapters` shell out to `yt-dlp`. Run this
-backend as a persistent process with those binaries. **Hermes, on the same
+`/youtube-comments` and `/youtube-chapters` use InnerTube (no external
+binary). Run this backend as a persistent process. **Hermes, on the same
 host, calls the pipeline's internal URL directly** (e.g.
 `http://localhost:<port>/viral-clipper/...`) — no public URL, no Blob
 upload/download round-trip.
@@ -73,13 +73,11 @@ rather than silently writing to a `/tmp` that won't survive the invocation;
   deliberate boundary, not an oversight.
 - `VIRAL_CLIPPER_OUTPUT_DIR` — optional, local directory `/cut` writes
   finished clips to. Defaults to `{AIXEL_MEDIA_ROOT}/private/viral-clipper-cuts`.
-- **`yt-dlp` binary** (system-level, not an npm dependency) — required by
-  `/viral-clipper/youtube-comments` and `/viral-clipper/youtube-chapters` only (the
-  core diarize/viral-moments/cut endpoints don't need it). No YouTube Data
-  API key exists in this project, so both endpoints shell out to a system
-  `yt-dlp` install instead — same public endpoints youtube.com itself uses,
-  no quota/key required. Confirmed working locally (this machine has
-  `yt-dlp` via Homebrew) — make sure it's installed on the VPS too.
+- **ffmpeg** — required by `/cut` (clip re-encode) and the YouTube
+  download path inside `/pipeline`/`/cut` when a YouTube URL is passed as
+  the video source. Comes from the `ffmpeg-static` npm dependency, so no
+  system install is needed. `/youtube-comments` and `/youtube-chapters`
+  use InnerTube directly and need no binary at all.
 
 ## Endpoints
 
@@ -225,11 +223,12 @@ episode is scored on insight/emotion/conflict as before, laughter or not.
 
 **2026-08-11.** `youtube-comments.ts` and `youtube-chapters.ts` add a second,
 independent signal source: what real viewers and the creator themselves
-already flagged as notable on this exact episode, via `yt-dlp` (no YouTube
-Data API key exists in this project — see the Env section's caveat on
-production availability). Comments frequently call out a moment directly
-("12:34 lol", "the part at 15:20 killed me") — `youtube-comments.ts` extracts
-those timestamp mentions and clusters/ranks them by mention count + likes.
+already flagged as notable on this exact episode, via InnerTube (no
+YouTube Data API key exists in this project — see the Env section's
+caveat on production availability). Comments frequently call out a moment
+directly ("12:34 lol", "the part at 15:20 killed me") —
+`youtube-comments.ts` extracts those timestamp mentions and
+clusters/ranks them by mention count + likes.
 Chapter titles are the creator's own labeling of each section, often naming
 the funny/notable bit directly.
 
@@ -237,8 +236,8 @@ the funny/notable bit directly.
 `/pipeline`**: the YouTube video URL a caller has and the local
 `audioSource`/`videoSource` `/diarize`/`/cut` operate on aren't guaranteed to
 be the same source (a caller might diarize a local file that was never
-uploaded to YouTube at all), and not every caller wants the extra yt-dlp
-round-trip or has an actual YouTube URL at all. Fetch
+uploaded to YouTube at all), and not every caller wants the extra
+InnerTube round-trip or has an actual YouTube URL at all. Fetch
 `/viral-clipper/youtube-comments` and/or `/viral-clipper/youtube-chapters` (or their
 MCP equivalents, `viral_clipper` `op=comment_highlights` /
 `op=chapters`) yourself, format with the exported
@@ -519,7 +518,7 @@ viral-clipper/
   boundary-snap.ts                  # MM:SS parsing + segment-boundary snap-or-pad logic
   ffmpeg-cut.ts                       # single-clip ffmpeg re-encode cut + aspect-ratio filter + audio-chunk/reference-clip cutting
   gemini-client.ts                     # generic Gemini File API + generateContent(responseSchema) helpers
-  download.ts                            # resolveMediaSource: local path, YouTube URL (yt-dlp via youtube/download), or other URL
+  download.ts                            # resolveMediaSource: local path, YouTube URL (InnerTube via youtube/download), or other URL
   format-timestamp.ts                      # MM:SS / H:MM:SS formatter
   youtube-comments.ts                        # InnerTube comments intelligence → timestamp clusters
   youtube-chapters.ts                          # InnerTube get_watch chapter markers

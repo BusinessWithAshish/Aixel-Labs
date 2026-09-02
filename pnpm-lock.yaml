@@ -87,6 +87,9 @@ importers:
       ws:
         specifier: ^8.21.3
         version: 8.21.3
+      youtubei.js:
+        specifier: ^18.0.0
+        version: 18.0.0
       zod:
         specifier: ^3.25.43
         version: 3.25.76
@@ -456,6 +459,10 @@ packages:
     resolution: {integrity: sha512-qSs4ifwzKJSV39ucNjsvc6WVHs6b7S03sOh2OcHF9UHfVPqWWALUsNUVzhSBiItjRZoLHx7nIarVjqKVusUZ1Q==}
     engines: {node: '>=6.9.0'}
     dev: true
+
+  /@bufbuild/protobuf@2.14.1:
+    resolution: {integrity: sha512-agRJn3+EJDUe8AvxTx/LnHA/GErvLE62pSaSk7+MwFOtOv8eWBu/qCq2qoZjBjVZ3C2aiFJCveuSs17KMkYGOw==}
+    dev: false
 
   /@cemalgnlts/mailjs@3.1.2:
     resolution: {integrity: sha512-69djmCPhPn0stfH60lp5xYQRfoa7hJC8NhfbVxlZPutJa4a2g/sp1EG4fxQ/HZwDI1Fp1lZZUPoIQ3BfQ6lPpA==}
@@ -7405,6 +7412,10 @@ packages:
       web-streams-polyfill: 3.3.3
     dev: false
 
+  /fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
+    dev: false
+
   /ffmpeg-static@5.3.0:
     resolution: {integrity: sha512-H+K6sW6TiIX6VGend0KQwthe+kaceeH/luE8dIZyOP35ik7ahYojDuqlTV1bOrtEwl01sy2HFNGQfi5IDJvotg==}
     engines: {node: '>=16'}
@@ -8857,6 +8868,11 @@ packages:
     resolution: {integrity: sha512-8q7VEgMJW4J8tcfVPy8g09NcQwZdbwFEqhe/WZkoIzjn/3TGDwtOCYtXGxA3O8tPzpczCCDgv+P2P5y00ZJOOg==}
     engines: {node: '>= 8'}
     dev: true
+
+  /meriyah@7.3.2:
+    resolution: {integrity: sha512-uFPXbsoxaEd7PafMz3K/n/Z3kXz7iZBJtYU0VQB/kcV7i33+JghLTKweabLir480FUsyLz6gUIj4LW7kCQ35TA==}
+    engines: {node: '>=20.0.0'}
+    dev: false
 
   /micromatch@4.0.8:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
@@ -11219,6 +11235,14 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
     requiresBuild: true
+
+  /youtubei.js@18.0.0:
+    resolution: {integrity: sha512-7Tztl5QzNL4nIhiAxa4P/0C8cDDsUe0j4iaUeNiaA+ZfSe/l+HkHxXyoWlQXNW7IPi2n6AW23ysVMJLDh+AwWQ==}
+    dependencies:
+      '@bufbuild/protobuf': 2.14.1
+      fflate: 0.8.3
+      meriyah: 7.3.2
+    dev: false
 
   /zod-to-json-schema@3.25.2(zod@3.25.76):
     resolution: {integrity: sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==}

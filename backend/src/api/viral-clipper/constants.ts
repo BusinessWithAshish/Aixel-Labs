@@ -135,8 +135,9 @@ export const VIRAL_CLIPPER = {
 export const VIRAL_CLIPPER_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 
 /**
- * YouTube audience-signal extraction (comments + chapters) now uses InnerTube.
- * yt-dlp is only used when a YouTube URL is passed as a media source (download).
+ * YouTube audience-signal extraction (comments + chapters) uses InnerTube.
+ * YouTube URL media sources are downloaded via the in-house InnerTube client
+ * (`youtube/download/helpers.ts`) — no external `yt-dlp` binary required.
  */
 export const VIRAL_CLIPPER_YOUTUBE = {
   /** Clamped to YouTube comments max (200) — InnerTube pages are ~20 comments each. */

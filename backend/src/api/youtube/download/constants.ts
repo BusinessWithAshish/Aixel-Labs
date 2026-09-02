@@ -7,11 +7,8 @@ export const YOUTUBE_DOWNLOAD_MEDIA = {
   AUDIO: "audio",
 } as const;
 
+/** ffmpeg merge timeout for the video path (audio is a single stream). */
 export const YOUTUBE_DOWNLOAD_TIMEOUT_MS = 20 * 60 * 1000;
-
-export const YOUTUBE_DOWNLOAD_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
-
-export const YOUTUBE_DOWNLOAD_BINARY = process.env.YOUTUBE_YT_DLP_BIN ?? "yt-dlp";
 
 export const YOUTUBE_DOWNLOAD_DIR = resolve(
   process.env.YOUTUBE_DOWNLOAD_DIR || AIXEL_MEDIA.YOUTUBE_DOWNLOADS,
@@ -27,8 +24,9 @@ export const YOUTUBE_DOWNLOAD_ERROR_MESSAGES = {
   INVALID_SOURCE: "Could not parse a YouTube video ID from the request",
   PLAYLIST_ONLY: "Playlist URLs are not supported — pass a single video ID or watch URL",
   VERCEL:
-    "YouTube download needs a persistent host with yt-dlp and disk (not available on Vercel)",
-  BINARY_MISSING: "yt-dlp is not installed on this host",
-  FAILED: "yt-dlp failed to download the video",
-  OUTPUT_MISSING: "yt-dlp finished but the output file was not found",
+    "YouTube download needs a persistent host with disk (not available on Vercel)",
+  NO_CLIENTS:
+    "Every InnerTube client failed for this video — it may be private, age-restricted, or removed",
+  MERGE_FAILED: "ffmpeg failed to merge the downloaded video and audio streams",
+  OUTPUT_MISSING: "Download finished but the output file was not found",
 } as const;

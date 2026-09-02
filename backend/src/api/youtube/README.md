@@ -51,7 +51,7 @@ youtube/
 │   ├── suggested.ts          # Suggested videos pagination
 │   └── helpers.ts            # Public fetch API + re-exports
 ├── comments/
-├── download/                 # yt-dlp → local filePath (VPS only; no MCP)
+├── download/                 # InnerTube (youtubei.js) → local filePath (VPS only; no MCP)
 ├── video-meta/
 ├── handle/
 ├── channel/

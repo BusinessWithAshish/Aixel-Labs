@@ -65,7 +65,7 @@ Guest GraphQL/REST — no user login. Native keyword search is login-walled.
 ### YouTube comments vs viral_clipper highlights
 
 - `youtube` `op=comments` — InnerTube comment text, authors, likes, replies; `layer=intel` adds timestamp/like aggregates.
-- `viral_clipper` `op=comment_highlights` — yt-dlp timestamp clusters for clip priors. Does not return the comments themselves.
+- `viral_clipper` `op=comment_highlights` — InnerTube timestamp clusters for clip priors. Does not return the comments themselves.
 
 ## Layout
 

@@ -89,7 +89,7 @@ const VIRAL_CLIPPER_OPS: Record<string, DomainOp> = {
 
 const VIRAL_CLIPPER_DESCRIPTION = `Podcast/video clip pipeline (Gemini diarize + viral moments + ffmpeg cut). Comments/chapters use InnerTube. Raw only.
 
-Call with { op, layer?, input }. layer must be omitted or raw. Needs ffmpeg on the host. YouTube URL sources also need yt-dlp (download only).
+Call with { op, layer?, input }. layer must be omitted or raw. Needs ffmpeg on the host. YouTube URL sources are downloaded via the in-house InnerTube client (no external binary).
 
 Ops:
 - diarize (raw) — audioSource → speaker-labelled transcript. input: audioSource, model?
