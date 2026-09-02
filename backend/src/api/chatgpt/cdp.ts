@@ -2,6 +2,7 @@
  * Minimal Chrome DevTools Protocol client for the VPS headful ChatGPT Chrome.
  * Port of sova/skills/chatgpt/cdp.py
  */
+import { fetch } from "undici";
 import WebSocket from "ws";
 
 import { CHATGPT } from "./constants";
