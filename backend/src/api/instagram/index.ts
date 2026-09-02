@@ -1,3 +1,7 @@
+/**
+ * Instagram router — mounts the base `/instagram` POST handler, the
+ * `/instagram/advanced/*` sub-routes, and the intelligence routes.
+ */
 import { IRouter, Router } from "express";
 import { API_ENDPOINTS } from "../../config";
 import { instagramApiHandler } from "./handler";
