@@ -20,13 +20,11 @@
 export const IG_ADVANCED_ROUTES = {
   POSTS: "/advanced/posts",
   SEARCH: "/advanced/search",
-  POPULAR: "/advanced/popular",
 } as const;
 
 export const IG_ADVANCED_HANDLER_LABELS = {
   POSTS: "instagram-advanced-posts",
   SEARCH: "instagram-advanced-search",
-  POPULAR: "instagram-advanced-popular",
 } as const;
 
 /** REST path used by the web profile Posts tab (initial + infinite scroll). */
