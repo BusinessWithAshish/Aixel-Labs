@@ -19,16 +19,22 @@
  */
 
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
 import ffmpegPath from "ffmpeg-static";
+import { ProxyAgent, fetch as undiciFetch } from "undici";
 import type { Innertube } from "youtubei.js";
 
-import { isYoutubePlaylistUrl, parseYoutubeVideoId } from "../helpers";
+import { isYoutubePlaylistUrl, parseYoutubeVideoId, resolveYoutubeGeo } from "../helpers";
 import { IS_VERCEL_RUNTIME } from "../../../config";
+import {
+  buildEvomiProxyUrl,
+  evomiConfigured,
+} from "../../../utils/fetch-session-common";
 import {
   YOUTUBE_DOWNLOAD_DIR,
   YOUTUBE_DOWNLOAD_ERROR_MESSAGES,
@@ -107,19 +113,91 @@ function loadInnertubeModule(): Promise<InnertubeModule> {
   return innertubeModulePromise;
 }
 
-let innertubePromise: Promise<Innertube> | null = null;
+/**
+ * Evomi residential proxy routing for youtubei.js's fetch.
+ *
+ * Why: YouTube blocks datacenter IP ranges (the VPS included) at the
+ * network layer with "Sign in to confirm you're not a bot" /
+ * `LOGIN_REQUIRED`, before any client/token logic is evaluated. The same
+ * InnerTube clients that work from a residential IP fail from the VPS IP.
+ * Routing youtubei.js's fetch through Evomi (already used by every other
+ * YouTube endpoint here via `createYoutubeFetchSession`) makes YouTube
+ * see a residential IP instead. This is the only reliable fix for a
+ * network-layer IP block — client rotation and PoTokens don't help.
+ *
+ * One `ProxyAgent` per country, with a stable session suffix so the same
+ * residential IP is reused for every fetch in a download (InnerTube API
+ * call + the actual googlevideo stream fetch). The stream URLs are signed
+ * to the requesting IP, so the API call and the download must egress from
+ * the same IP or YouTube rejects the stream.
+ *
+ * youtubei.js's HTTPClient passes a `Request` object as the first arg and
+ * always sets `body` in init (even for GETs). undici needs the URL as a
+ * string and rejects a GET with a body, so the wrapper extracts the URL
+ * and method from the Request and drops the body for GET/HEAD.
+ */
+const proxyAgentByCountry = new Map<string, ProxyAgent>();
 
-async function getInnertube(): Promise<Innertube> {
-  if (!innertubePromise) {
-    const { Innertube, ClientType } = await loadInnertubeModule();
-    innertubePromise = Innertube.create({
-      client_type: ClientType.IOS,
-      generate_session_locally: false,
-      retrieve_player: true,
-      enable_session_cache: true,
+function getProxiedFetch(
+  country: string,
+): ((input: string | URL | Request, init?: RequestInit) => Promise<Response>) | undefined {
+  if (!evomiConfigured()) return undefined;
+  let agent = proxyAgentByCountry.get(country);
+  if (!agent) {
+    const proxyUrl = buildEvomiProxyUrl({
+      countryCode: country,
+      sessionId: randomUUID().replace(/-/g, "").slice(0, 12),
     });
+    if (!proxyUrl) return undefined;
+    agent = new ProxyAgent({ uri: proxyUrl });
+    proxyAgentByCountry.set(country, agent);
   }
-  return innertubePromise;
+  return (input, init) => {
+    let url: string;
+    let method: string | undefined;
+    if (typeof input === "string") {
+      url = input;
+    } else if (input instanceof URL) {
+      url = input.href;
+    } else {
+      url = typeof input.url === "string" ? input.url : String(input);
+      method = input.method;
+    }
+    const resolvedMethod = (method || init?.method || "GET").toUpperCase();
+    const nextInit: Record<string, unknown> = {
+      ...(init as Record<string, unknown> | undefined),
+      dispatcher: agent,
+      method: resolvedMethod,
+    };
+    if (resolvedMethod === "GET" || resolvedMethod === "HEAD") {
+      delete nextInit.body;
+    }
+    return undiciFetch(
+      url,
+      nextInit as unknown as Parameters<typeof undiciFetch>[1],
+    ) as unknown as Promise<Response>;
+  };
+}
+
+const innertubeByCountry = new Map<string, Promise<Innertube>>();
+
+async function getInnertube(country: string): Promise<Innertube> {
+  let cached = innertubeByCountry.get(country);
+  if (!cached) {
+    cached = (async () => {
+      const { Innertube, ClientType } = await loadInnertubeModule();
+      const fetch = getProxiedFetch(country);
+      return Innertube.create({
+        client_type: ClientType.IOS,
+        generate_session_locally: false,
+        retrieve_player: true,
+        enable_session_cache: true,
+        ...(fetch ? { fetch } : {}),
+      });
+    })();
+    innertubeByCountry.set(country, cached);
+  }
+  return cached;
 }
 
 function expectedPath(
@@ -230,9 +308,10 @@ type InnertubeVideoInfo = Awaited<ReturnType<Innertube["getBasicInfo"]>>;
 
 async function fetchInfoWithClientChain(
   videoId: string,
+  country: string,
 ): Promise<{ info: InnertubeVideoInfo; client: InnerTubeClientName }> {
   let lastError: Error | null = null;
-  const yt = await getInnertube();
+  const yt = await getInnertube(country);
   for (const client of INNERTUBE_CLIENT_CHAIN) {
     try {
       const info = await yt.getBasicInfo(videoId, { client });
@@ -286,7 +365,8 @@ async function downloadVideo(
  * not spawned (cache hit).
  */
 export async function downloadYoutubeMedia(
-  request: Pick<YOUTUBE_VIDEO_DOWNLOAD_REQUEST, "videoId" | "media">,
+  request: Pick<YOUTUBE_VIDEO_DOWNLOAD_REQUEST, "videoId" | "media"> &
+    Partial<Pick<YOUTUBE_VIDEO_DOWNLOAD_REQUEST, "country" | "region">>,
 ): Promise<YOUTUBE_VIDEO_DOWNLOAD_RESPONSE> {
   if (IS_VERCEL_RUNTIME) {
     throw new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.VERCEL, 501);
@@ -294,6 +374,7 @@ export async function downloadYoutubeMedia(
 
   const videoId = resolveYoutubeDownloadVideoId(request.videoId);
   const media = request.media ?? YOUTUBE_DOWNLOAD_MEDIA.VIDEO;
+  const { country } = resolveYoutubeGeo({ country: request.country, region: request.region });
 
   const cached = await existingDownload(videoId, media);
   if (cached) return cached;
@@ -301,7 +382,7 @@ export async function downloadYoutubeMedia(
   await mkdir(YOUTUBE_DOWNLOAD_DIR, { recursive: true });
   const outPath = expectedPath(videoId, media);
 
-  const { info, client } = await fetchInfoWithClientChain(videoId);
+  const { info, client } = await fetchInfoWithClientChain(videoId, country);
   const title = info.basic_info.title || videoId;
   const durationSeconds = Number(info.basic_info.duration) || 0;
 

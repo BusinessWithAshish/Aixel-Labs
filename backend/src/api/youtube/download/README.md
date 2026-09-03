@@ -16,7 +16,7 @@ returns 501 — this needs a persistent host with disk.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `country` | `string` | `"US"` | Unused for download; kept for shared geo shape |
+| `country` | `string` | `"US"` | Routes the Evomi residential proxy (IP-egress country) |
 | `region` | `string` | — | Unused for download |
 | `videoId` | `string` | required | Video ID **or** watch / shorts / youtu.be URL |
 | `media` | `"video" \| "audio"` | `"video"` | `video` → merged mp4; `audio` → m4a |
@@ -59,8 +59,27 @@ fallback.
   formats for most videos, so the video path always merges even when a
   progressive stream exists — keeps the code path single.
 
-The Innertube session is created once and cached (`enable_session_cache`).
-If the file already exists on disk, the client is not spawned (cache hit).
+The Innertube session is created once per country and cached
+(`enable_session_cache`). If the file already exists on disk, the client is
+not spawned (cache hit).
+
+### IP-egress: Evomi residential proxy
+
+YouTube blocks datacenter IP ranges (the VPS included) at the network
+layer with `LOGIN_REQUIRED` / "Sign in to confirm you're not a bot",
+**before** any client/token logic is evaluated — the same InnerTube
+clients that work from a residential IP fail from a datacenter IP. Client
+rotation and PoTokens don't fix a network-layer IP block.
+
+When Evomi is configured (`PROXY_CONFIG` in `utils/constants.ts`),
+`helpers.ts` routes youtubei.js's `fetch` through an undici `ProxyAgent`
+bound to a residential exit in the request's `country`. One `ProxyAgent`
+per country with a stable session suffix, so the InnerTube API call and
+the googlevideo stream fetch egress from the same IP (the stream URLs are
+signed to the requesting IP — a mismatch makes YouTube reject the
+download). When Evomi is **not** configured (local dev without creds),
+`Innertube.create` gets no custom `fetch` and youtubei.js fetches
+directly — fine from a residential dev machine.
 
 ## Disk
 
