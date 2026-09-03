@@ -49,9 +49,13 @@ whenever the WEB client demanded a PoToken we cannot mint server-side.
 
 The InnerTube client chain tried in order is `IOS → ANDROID_VR → VISIONOS`.
 All three are JS-less / PoToken-exempt today, so they keep working where the
-WEB client is blocked. If every client fails (private, age-restricted, or
-removed video), the request fails with `NO_CLIENTS` — there is no further
-fallback.
+WEB client is blocked. One *attempt* = the full chain, where each client
+fetches info **and** downloads the stream before the next client is tried —
+`getBasicInfo` succeeding does not mean the stream will (IOS can return
+playable metadata while its googlevideo stream fetch 403s; VISIONOS then
+works for the same video). If every client fails (private, age-restricted,
+or removed video), the request fails with `NO_CLIENTS` — there is no
+further fallback.
 
 - **Audio** — one adaptive audio stream → `.m4a`.
 - **Video** — separate video + audio adaptive streams → `ffmpeg-static`
@@ -73,13 +77,26 @@ rotation and PoTokens don't fix a network-layer IP block.
 
 When Evomi is configured (`PROXY_CONFIG` in `utils/constants.ts`),
 `helpers.ts` routes youtubei.js's `fetch` through an undici `ProxyAgent`
-bound to a residential exit in the request's `country`. One `ProxyAgent`
-per country with a stable session suffix, so the InnerTube API call and
-the googlevideo stream fetch egress from the same IP (the stream URLs are
-signed to the requesting IP — a mismatch makes YouTube reject the
+bound to a residential exit in the request's `country`. Each country's
+agent carries one stable Evomi session suffix, so the InnerTube API call
+and the googlevideo stream fetch egress from the same IP (the stream URLs
+are signed to the requesting IP — a mismatch makes YouTube reject the
 download). When Evomi is **not** configured (local dev without creds),
 `Innertube.create` gets no custom `fetch` and youtubei.js fetches
 directly — fine from a residential dev machine.
+
+**Session rotation:** residential pools contain flagged exits, and a
+sticky session pinned to a burnt IP would fail every download until
+process restart. When a full attempt (whole client chain) fails while
+proxied, the code rotates to a fresh Evomi session — a new exit IP — and
+retries, up to 2 rotations (3 attempts total). This mirrors the
+fresh-session-per-request convention of `createYoutubeFetchSession`,
+applied only on failure so successful downloads stay IP-consistent.
+
+**Large videos:** `media: "video"` picks the *best* quality stream. For
+long 4K sources this can be hundreds of MB through a residential proxy
+and take minutes — set the HTTP client timeout accordingly (curl `-m
+600+`). Audio (`best` audio stream) is typically 10× smaller.
 
 ## Disk
 

@@ -125,37 +125,42 @@ function loadInnertubeModule(): Promise<InnertubeModule> {
  * see a residential IP instead. This is the only reliable fix for a
  * network-layer IP block — client rotation and PoTokens don't help.
  *
- * One `ProxyAgent` per country, with a stable session suffix so the same
- * residential IP is reused for every fetch in a download (InnerTube API
- * call + the actual googlevideo stream fetch). The stream URLs are signed
- * to the requesting IP, so the API call and the download must egress from
- * the same IP or YouTube rejects the stream.
+ * Stickiness: within one download the agent must NOT change — googlevideo
+ * stream URLs are signed to the requesting IP, so the InnerTube API call
+ * and the stream fetch must egress from the same IP or YouTube rejects
+ * the download. Each agent therefore carries one stable Evomi session
+ * suffix (one pinned residential IP).
+ *
+ * Rotation: residential pools contain flagged exits. A sticky session that
+ * drew a burnt IP would fail every download until process restart. When a
+ * full download attempt (client chain + stream fetch + merge) fails while
+ * proxied, the attempt loop in `downloadYoutubeMedia` rotates to a fresh
+ * Evomi session (new exit IP) and retries — mirroring the fresh-session-
+ * per-request convention of `createYoutubeFetchSession`, but only on
+ * failure so successful downloads stay IP-consistent.
  *
  * youtubei.js's HTTPClient passes a `Request` object as the first arg and
  * always sets `body` in init (even for GETs). undici needs the URL as a
  * string and rejects a GET with a body, so the wrapper extracts the URL
  * and method from the Request and drops the body for GET/HEAD.
  */
-const proxyAgentByCountry = new Map<string, ProxyAgent>();
+const INNERTUBE_PROXY_ROTATIONS = 2;
 
-function getProxiedFetch(
-  country: string,
-): ((input: string | URL | Request, init?: RequestInit) => Promise<Response>) | undefined {
-  if (!evomiConfigured()) return undefined;
-  let agent = proxyAgentByCountry.get(country);
-  if (!agent) {
-    const proxyUrl = buildEvomiProxyUrl({
-      countryCode: country,
-      sessionId: randomUUID().replace(/-/g, "").slice(0, 12),
-    });
-    if (!proxyUrl) return undefined;
-    agent = new ProxyAgent({ uri: proxyUrl });
-    proxyAgentByCountry.set(country, agent);
-  }
+type CountryInnertube = {
+  agent: ProxyAgent;
+  innertube: Promise<Innertube>;
+  sessionId: string;
+};
+
+const innertubeByCountry = new Map<string, CountryInnertube>();
+
+function proxiedFetchFor(
+  agent: ProxyAgent,
+): (input: string | URL | Request, init?: RequestInit) => Promise<Response> {
   return (input: string | URL | Request, init?: RequestInit) => {
-    // Cast to `any` for property access: the global `Request`/`RequestInit`
-    // shapes differ between local (undici types expose `url`/`method`) and
-    // the Vercel build env (they don't), so we can't rely on the type shape.
+    // Cast for property access: the global `Request`/`RequestInit` shapes
+    // differ between local (undici types expose `url`/`method`) and the
+    // Vercel build env (they don't), so we can't rely on the type shape.
     const req = input as unknown as {
       url?: unknown;
       method?: unknown;
@@ -191,25 +196,59 @@ function getProxiedFetch(
   };
 }
 
-const innertubeByCountry = new Map<string, Promise<Innertube>>();
+function createCountryInnertube(country: string): CountryInnertube {
+  const sessionId = randomUUID().replace(/-/g, "").slice(0, 12);
+  const proxyUrl = buildEvomiProxyUrl({ countryCode: country, sessionId });
+  if (!proxyUrl) {
+    throw new Error("Evomi proxy URL unavailable after evomiConfigured() check");
+  }
+  const agent = new ProxyAgent({ uri: proxyUrl });
+  const innertube = (async () => {
+    const { Innertube, ClientType } = await loadInnertubeModule();
+    return Innertube.create({
+      client_type: ClientType.IOS,
+      generate_session_locally: false,
+      retrieve_player: true,
+      enable_session_cache: true,
+      fetch: proxiedFetchFor(agent),
+    });
+  })();
+  // Surface creation failures even if nobody awaits this entry anymore.
+  innertube.catch(() => {});
+  return { agent, innertube, sessionId };
+}
+
+function rotateCountryInnertube(country: string): void {
+  const previous = innertubeByCountry.get(country);
+  if (previous) {
+    void previous.agent.close().catch(() => {});
+  }
+  innertubeByCountry.set(country, createCountryInnertube(country));
+}
+
+let directInnertubePromise: Promise<Innertube> | null = null;
 
 async function getInnertube(country: string): Promise<Innertube> {
-  let cached = innertubeByCountry.get(country);
-  if (!cached) {
-    cached = (async () => {
-      const { Innertube, ClientType } = await loadInnertubeModule();
-      const fetch = getProxiedFetch(country);
-      return Innertube.create({
-        client_type: ClientType.IOS,
-        generate_session_locally: false,
-        retrieve_player: true,
-        enable_session_cache: true,
-        ...(fetch ? { fetch } : {}),
-      });
-    })();
-    innertubeByCountry.set(country, cached);
+  if (!evomiConfigured()) {
+    if (!directInnertubePromise) {
+      directInnertubePromise = (async () => {
+        const { Innertube, ClientType } = await loadInnertubeModule();
+        return Innertube.create({
+          client_type: ClientType.IOS,
+          generate_session_locally: false,
+          retrieve_player: true,
+          enable_session_cache: true,
+        });
+      })();
+    }
+    return directInnertubePromise;
   }
-  return cached;
+  let entry = innertubeByCountry.get(country);
+  if (!entry) {
+    entry = createCountryInnertube(country);
+    innertubeByCountry.set(country, entry);
+  }
+  return entry.innertube;
 }
 
 function expectedPath(
@@ -318,9 +357,19 @@ async function mergeWithFfmpeg(
 
 type InnertubeVideoInfo = Awaited<ReturnType<Innertube["getBasicInfo"]>>;
 
-async function fetchInfoWithClientChain(
+/**
+ * Full attempt across the client chain: for each client, fetch info and
+ * immediately try the stream download with that same client. `getBasicInfo`
+ * succeeding does not mean the stream will — e.g. IOS can return playable
+ * metadata while its googlevideo stream fetch 403s, and VISIONOS then works
+ * for the same video. Returning on the first *complete* success (info +
+ * bytes on disk) avoids pinning a client whose info works but streams fail.
+ */
+async function attemptDownloadWithClientChain(
   videoId: string,
+  media: YOUTUBE_DOWNLOAD_MEDIA_VALUE,
   country: string,
+  outPath: string,
 ): Promise<{ info: InnertubeVideoInfo; client: InnerTubeClientName }> {
   let lastError: Error | null = null;
   const yt = await getInnertube(country);
@@ -330,6 +379,9 @@ async function fetchInfoWithClientChain(
       if (!info?.basic_info) {
         throw new Error("Empty InnerTube response");
       }
+      await (media === YOUTUBE_DOWNLOAD_MEDIA.AUDIO
+        ? downloadAudio(info, client, outPath)
+        : downloadVideo(info, client, outPath));
       return { info, client };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
@@ -394,27 +446,34 @@ export async function downloadYoutubeMedia(
   await mkdir(YOUTUBE_DOWNLOAD_DIR, { recursive: true });
   const outPath = expectedPath(videoId, media);
 
-  const { info, client } = await fetchInfoWithClientChain(videoId, country);
-  const title = info.basic_info.title || videoId;
-  const durationSeconds = Number(info.basic_info.duration) || 0;
+  // Attempt loop with Evomi session rotation: one attempt = the full client
+  // chain (info + stream + merge per client). If an entire attempt fails
+  // while proxied, the exit IP is likely flagged — rotate to a fresh Evomi
+  // session (new residential IP) and retry. Within an attempt the agent is
+  // sticky, which googlevideo's IP-signed stream URLs require.
+  const attempts = evomiConfigured() ? 1 + INNERTUBE_PROXY_ROTATIONS : 1;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) rotateCountryInnertube(country);
+    try {
+      const { info } = await attemptDownloadWithClientChain(videoId, media, country, outPath);
+      const title = info.basic_info.title || videoId;
+      const durationSeconds = Number(info.basic_info.duration) || 0;
 
-  const bytes =
-    media === YOUTUBE_DOWNLOAD_MEDIA.AUDIO
-      ? await downloadAudio(info, client, outPath)
-      : await downloadVideo(info, client, outPath);
-
-  try {
-    const fileStat = await stat(outPath);
-    return {
-      videoId,
-      title,
-      durationSeconds,
-      filePath: outPath,
-      mimeType: mimeTypeFor(media),
-      bytes: fileStat.size,
-      media,
-    };
-  } catch {
-    throw new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.OUTPUT_MISSING, 502);
+      const fileStat = await stat(outPath);
+      return {
+        videoId,
+        title,
+        durationSeconds,
+        filePath: outPath,
+        mimeType: mimeTypeFor(media),
+        bytes: fileStat.size,
+        media,
+      };
+    } catch (err) {
+      lastError = err;
+      if (err instanceof YoutubeDownloadError && err.statusCode < 500) throw err;
+    }
   }
+  throw lastError ?? new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.OUTPUT_MISSING, 502);
 }
