@@ -165,6 +165,59 @@ Two independent problems, two independent fixes — see `boundary-snap.ts` and `
 - **No glitches**: `ffmpeg-cut.ts` always re-encodes (`-c:v libx264 -c:a aac`, never `-c copy`). `-ss`/`-to` before `-i` is fast but only seeks to the nearest keyframe, which can be seconds off and cause black-frame/A-V-desync glitches at arbitrary cut points. Clips here are short (<=120s), so re-encoding costs a couple seconds and eliminates the problem entirely — no need for GOP-surgery tooling. Reframing (crop+scale) rides along on this same re-encode pass, no extra cost.
 - **No words cut**: not a video-tool problem — ffmpeg has no idea where a word ends. If `diarized` is provided, `boundary-snap.ts` snaps each clip's start/end to the *nearest real speech-segment boundary* (only ever snapping start **backward** and end **forward**, so wanted content is never dropped) when that boundary is within `VIRAL_CLIPPER.BOUNDARY_SNAP_MAX_DISTANCE_SECONDS` (constants.ts) — cheap and safe. Beyond that distance (the suggested timestamp sits deep inside one long segment), snapping all the way back would make the clip unexpectedly long, so it falls back to the raw timestamp + `VIRAL_CLIPPER.CLIP_PADDING_SECONDS` padding instead. **This is a best-effort reduction, not a guarantee** — diarization segments are speaker-turn-level, not word-level, so a cut deep inside a long monologue segment can still land mid-sentence. Word-level timestamps (not currently produced anywhere in this pipeline) would be the real fix if this matters more than the current behavior allows.
 
+## Stream-direct clip extraction (YouTube sources)
+
+**Why.** The earlier `/cut` path downloaded the **entire source video** at
+`quality: "best"` through the Evomi residential proxy before cutting clips
+from the local file. A handful of test runs burned ~2 GB of paid Evomi
+bandwidth (Evomi dashboard: dominated by `googlevideo.com` subdomains at
+231 MB / 448 MB / 357 MB each) — the clipper used ~25% of what it
+downloaded. Residential proxy bandwidth is the most expensive tier, so
+pulling a full 4K source to extract a few 30-second clips is unsustainable.
+
+**How.** For a YouTube `videoSource`, `cut.ts` now calls
+`resolveVideoSourceForCut` (`download.ts`), which fetches only the signed
+googlevideo stream URLs (video + audio) via the proxied InnerTube API call
+(KB, no media bytes) and returns them alongside the Evomi proxy URL.
+`cutClipFromStream` (`ffmpeg-cut.ts`) then runs ffmpeg with `-http_proxy`
+set to Evomi, cutting each clip directly from the two stream URLs:
+
+- ffmpeg issues HTTP **range requests** for only the clip segment, so the
+  bytes transiting the residential proxy are ~`clip duration + 3s` per
+  stream — not the whole source. A 3-clip job from a 10-min 4K source drops
+  from ~300 MB-1 GB to ~30-60 MB of proxy bandwidth.
+- **Seek**: fast-seek each input to `max(0, start - 3s)` (keyframe-snapped,
+  range request), then accurate output-seek to the requested start and
+  `-t` for duration — frame-accurate like the file path, without the
+  full-source download. Re-encode (not stream-copy) keeps the same quality
+  and carries the aspect-ratio filter.
+- **IP-signing**: googlevideo URLs are signed to the requesting (proxy) IP;
+  ffmpeg fetches through the same Evomi session/IP, so the stream URLs
+  validate. The per-country sticky agent from the download helper is reused
+  so all clips in one job egress from the same IP.
+- **Proxy auth bridge**: ffmpeg's `-http_proxy` parses credentials from the
+  URL but does **not** send them as `Proxy-Authorization` on the `CONNECT`
+  (confirmed by capturing ffmpeg's bytes), so Evomi rejects an unauthenticated
+  CONNECT with `403`. `cut.ts` starts a tiny local CONNECT bridge
+  (`proxy-bridge.ts`) for the job: ffmpeg points `-http_proxy` at
+  `http://127.0.0.1:<port>`, and the bridge re-issues each `CONNECT` to
+  Evomi **with** the `Basic` auth header, then tunnels bytes both ways.
+  ffmpeg's range requests then flow through Evomi authenticated — the
+  stream-direct bandwidth win is preserved without ffmpeg ever seeing
+  Evomi's credentials.
+- **No proxy / local dev**: when Evomi isn't configured, `proxyUrl` is
+  `undefined` and ffmpeg fetches the stream URLs directly — fine from a
+  residential dev machine.
+
+**Diarize path unchanged.** `/diarize` still downloads the full audio
+(`resolveMediaSource` → `downloadYoutubeMedia({ media: "audio" })`) because
+chunked diarization needs random access to segments across the whole
+duration. Audio is ~10× smaller than video, so the cost is much lower; the
+stream-direct optimization is scoped to the clip path (the bandwidth hog).
+
+**The `/youtube/video/download` HTTP endpoint is also unchanged** — explicit
+full downloads still work when a caller genuinely wants the whole file.
+
 ## Prompt structure (hook / body / button)
 
 `VIRAL_CLIPPER_VIRAL_MOMENTS_PROMPT_HEADER` (constants.ts) explicitly rubrics every
@@ -515,10 +568,11 @@ viral-clipper/
   viral-moments.ts            # transcript (+ optional audienceSignals) -> flattened prompt -> generateContent
   pipeline.ts                   # diarize.ts + viral-moments.ts combined
   cut.ts                          # orchestration: resolve source video -> per-clip snap+cut -> write to VIRAL_CLIPPER_OUTPUT_DIR
+  proxy-bridge.ts                     # local CONNECT bridge: adds Evomi auth to ffmpeg's -http_proxy CONNECTs (stream-direct path)
   boundary-snap.ts                  # MM:SS parsing + segment-boundary snap-or-pad logic
   ffmpeg-cut.ts                       # single-clip ffmpeg re-encode cut + aspect-ratio filter + audio-chunk/reference-clip cutting
   gemini-client.ts                     # generic Gemini File API + generateContent(responseSchema) helpers
-  download.ts                            # resolveMediaSource: local path, YouTube URL (InnerTube via youtube/download), or other URL
+  download.ts                            # resolveMediaSource (diarize: full audio download) + resolveVideoSourceForCut (cut: YouTube stream-direct URLs, no full download)
   format-timestamp.ts                      # MM:SS / H:MM:SS formatter
   youtube-comments.ts                        # InnerTube comments intelligence → timestamp clusters
   youtube-chapters.ts                          # InnerTube get_watch chapter markers

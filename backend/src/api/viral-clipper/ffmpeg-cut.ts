@@ -157,3 +157,79 @@ export async function cutClip(
     throw new Error(`${VIRAL_CLIPPER_ERROR_MESSAGES.FFMPEG_CUT_FAILED}: ${message}`);
   }
 }
+
+/**
+ * How far before the requested start ffmpeg fast-seeks (input-level, keyframe
+ * snapped). The accurate output-level seek then recovers frame precision
+ * within this window. Larger = fewer bytes re-downloaded at the keyframe
+ * boundary; smaller = less extra proxy bandwidth. 3s is a good default for
+ * typical keyframe intervals (2-5s on adaptive streams).
+ */
+const STREAM_DIRECT_FAST_SEEK_BACKUP_SECONDS = 3;
+
+/**
+ * Cuts one clip directly from two remote stream URLs (a video-only and an
+ * audio-only adaptive googlevideo URL) with ffmpeg, routing each input
+ * through `proxyUrl` via `-http_proxy`. This is the stream-direct path:
+ * ffmpeg issues HTTP range requests for only the clip segment, so the
+ * bytes transiting the residential proxy are ~`duration + backup` per
+ * stream — not the whole source video (the difference between ~30 MB and
+ * ~300 MB-1 GB per clip job).
+ *
+ * Seek strategy: fast-seek each input to `max(0, start - backup)` (keyframe
+ * snap, range request), then accurate-seek the output to the requested
+ * start and limit duration. The accurate output seek runs after both
+ * inputs are fast-seeked, so it applies to the mapped output timeline
+ * (both inputs) — effective clip start = backup + (start - backup) =
+ * start, frame-accurate. Re-encode (not stream-copy) keeps the same
+ * quality as `cutClip` and carries the aspect-ratio filter.
+ *
+ * `proxyUrl` is optional — when Evomi isn't configured (local dev) ffmpeg
+ * fetches the stream URLs directly, which works from a residential IP.
+ */
+export async function cutClipFromStream(
+  videoUrl: string,
+  audioUrl: string,
+  startSeconds: number,
+  endSeconds: string | number,
+  outputPath: string,
+  aspectRatio: VIRAL_CLIPPER_ASPECT_RATIO_VALUE,
+  proxyUrl?: string,
+): Promise<void> {
+  if (!ffmpegPath) {
+    throw new Error(VIRAL_CLIPPER_ERROR_MESSAGES.FFMPEG_CUT_FAILED);
+  }
+
+  const videoFilter = buildAspectRatioFilter(aspectRatio);
+  const fastSeek = Math.max(0, Number(startSeconds) - STREAM_DIRECT_FAST_SEEK_BACKUP_SECONDS);
+  const accurateSeek = Number(startSeconds) - fastSeek;
+  const duration = Number(endSeconds) - Number(startSeconds);
+
+  const args: string[] = ["-y"];
+  // Each input is routed through the proxy (per-input protocol option) and
+  // fast-seeked to the keyframe just before the clip start.
+  for (const url of [videoUrl, audioUrl]) {
+    if (proxyUrl) args.push("-http_proxy", proxyUrl);
+    args.push("-ss", fastSeek.toFixed(3), "-i", url);
+  }
+  // Accurate output-level seek recovers frame precision within the
+  // fast-seek window; -t limits the output duration.
+  args.push("-ss", accurateSeek.toFixed(3), "-t", duration.toFixed(3));
+  args.push("-map", "0:v", "-map", "1:a");
+  if (videoFilter) args.push("-vf", videoFilter);
+  args.push(
+    "-c:v", VIRAL_CLIPPER.FFMPEG_VIDEO_CODEC,
+    "-preset", VIRAL_CLIPPER.FFMPEG_PRESET,
+    "-crf", VIRAL_CLIPPER.FFMPEG_CRF,
+    "-c:a", VIRAL_CLIPPER.FFMPEG_AUDIO_CODEC,
+    "-avoid_negative_ts", "make_zero",
+    outputPath,
+  );
+
+  try {
+    await execFileAsync(ffmpegPath, args);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`${VIRAL_CLIPPER_ERROR_MESSAGES.FFMPEG_CUT_FAILED}: ${message}`);
+  }
+}

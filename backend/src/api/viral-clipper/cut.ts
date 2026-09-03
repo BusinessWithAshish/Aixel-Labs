@@ -5,8 +5,9 @@ import { join } from "node:path";
 import { assertPersistentDisk } from "../../config";
 import { snapClipBoundaries } from "./boundary-snap";
 import { VIRAL_CLIPPER_ERROR_MESSAGES, VIRAL_CLIPPER_OUTPUT_DIR } from "./constants";
-import { cleanupResolvedMediaSource, resolveMediaSource } from "./download";
-import { cutClip, getMediaDurationSeconds } from "./ffmpeg-cut";
+import { cleanupResolvedMediaSource, resolveVideoSourceForCut } from "./download";
+import { cutClip, cutClipFromStream, getMediaDurationSeconds } from "./ffmpeg-cut";
+import { parseProxyUrlForBridge, ProxyConnectBridge } from "./proxy-bridge";
 import type {
   CLIP_RANGE,
   VIRAL_CLIPPER_ASPECT_RATIO_VALUE,
@@ -15,11 +16,17 @@ import type {
 } from "./types";
 
 /**
- * Resolves the source video (local path or URL — see `resolveMediaSource`),
- * cuts each requested clip (boundary-snapped against `diarized` when
- * provided — see `boundary-snap.ts`) directly into `VIRAL_CLIPPER_OUTPUT_DIR`,
- * and cleans up the resolved source's own temp files. Content-agnostic
- * beyond that: doesn't care which pipeline produced the clip list.
+ * Resolves the source video and cuts each requested clip (boundary-snapped
+ * against `diarized` when provided — see `boundary-snap.ts`) directly into
+ * `VIRAL_CLIPPER_OUTPUT_DIR`, then cleans up the resolved source's temp
+ * files. Content-agnostic beyond that: doesn't care which pipeline
+ * produced the clip list.
+ *
+ * YouTube sources take the stream-direct path (see `resolveVideoSourceForCut`):
+ * ffmpeg cuts clips directly from the signed googlevideo stream URLs through
+ * the Evomi proxy, so only the clip segments transit the proxy — not the
+ * whole source video. Local files and non-YouTube URLs fall back to the
+ * file path (download once, cut from disk).
  */
 export async function cutClipsFromVideo(
   videoSource: string,
@@ -28,12 +35,32 @@ export async function cutClipsFromVideo(
   aspectRatio: VIRAL_CLIPPER_ASPECT_RATIO_VALUE,
 ): Promise<VIRAL_CLIPPER_CUT_RESPONSE> {
   assertPersistentDisk(VIRAL_CLIPPER_ERROR_MESSAGES.VERCEL);
-  const resolved = await resolveMediaSource(videoSource);
+  const resolved = await resolveVideoSourceForCut(videoSource);
+
+  // For the youtube kind with an Evomi proxy, start a local CONNECT bridge:
+  // ffmpeg's `-http_proxy` doesn't send Proxy-Authorization, so it can't
+  // authenticate to Evomi directly. The bridge forwards ffmpeg's CONNECTs
+  // to Evomi WITH the auth header, and ffmpeg's range requests then flow
+  // through the same residential IP that signed the stream URLs.
+  let bridge: ProxyConnectBridge | undefined;
+  let ffmpegProxyUrl: string | undefined;
+  if (resolved.kind === "youtube" && resolved.proxyUrl) {
+    const parsed = parseProxyUrlForBridge(resolved.proxyUrl);
+    if (parsed) {
+      bridge = new ProxyConnectBridge(parsed.host, parsed.port, parsed.proxyAuthorization);
+      await bridge.start();
+      ffmpegProxyUrl = bridge.localProxyUrl;
+    }
+  }
 
   try {
     await mkdir(VIRAL_CLIPPER_OUTPUT_DIR, { recursive: true });
 
-    const sourceDurationSeconds = await getMediaDurationSeconds(resolved.path);
+    const sourceDurationSeconds =
+      resolved.kind === "youtube"
+        ? resolved.durationSeconds
+        : await getMediaDurationSeconds(resolved.path);
+
     const results = [];
     for (const clip of clips) {
       const { cutStartSeconds, cutEndSeconds, snapped } = snapClipBoundaries(
@@ -65,7 +92,19 @@ export async function cutClipsFromVideo(
       }
 
       const outputPath = join(VIRAL_CLIPPER_OUTPUT_DIR, `clip-${randomUUID()}.mp4`);
-      await cutClip(resolved.path, cutStartSeconds, cutEndSeconds, outputPath, aspectRatio);
+      if (resolved.kind === "youtube") {
+        await cutClipFromStream(
+          resolved.videoUrl,
+          resolved.audioUrl,
+          cutStartSeconds,
+          cutEndSeconds,
+          outputPath,
+          aspectRatio,
+          ffmpegProxyUrl,
+        );
+      } else {
+        await cutClip(resolved.path, cutStartSeconds, cutEndSeconds, outputPath, aspectRatio);
+      }
 
       results.push({
         label: clip.label,
@@ -81,6 +120,7 @@ export async function cutClipsFromVideo(
 
     return { clips: results };
   } finally {
+    await bridge?.stop().catch(() => {});
     await cleanupResolvedMediaSource(resolved);
   }
 }

@@ -150,6 +150,8 @@ type CountryInnertube = {
   agent: ProxyAgent;
   innertube: Promise<Innertube>;
   sessionId: string;
+  /** The full Evomi proxy URL (with this session's `_session-` id) — ffmpeg reuses it so its stream fetches egress from the same residential IP that signed the URLs. */
+  proxyUrl: string;
 };
 
 const innertubeByCountry = new Map<string, CountryInnertube>();
@@ -215,7 +217,7 @@ function createCountryInnertube(country: string): CountryInnertube {
   })();
   // Surface creation failures even if nobody awaits this entry anymore.
   innertube.catch(() => {});
-  return { agent, innertube, sessionId };
+  return { agent, innertube, sessionId, proxyUrl };
 }
 
 function rotateCountryInnertube(country: string): void {
@@ -249,6 +251,23 @@ async function getInnertube(country: string): Promise<Innertube> {
     innertubeByCountry.set(country, entry);
   }
   return entry.innertube;
+}
+
+/**
+ * The Evomi proxy URL for the cached per-country Innertube session — same
+ * `_session-` id (same residential exit IP) the InnerTube API calls used.
+ * ffmpeg reuses this URL so its googlevideo stream fetches egress from the
+ * same IP that signed the stream URLs (a different IP → 403). Returns
+ * `undefined` when Evomi isn't configured (direct fetch, no proxy).
+ */
+function getCountryProxyUrl(country: string): string | undefined {
+  if (!evomiConfigured()) return undefined;
+  let entry = innertubeByCountry.get(country);
+  if (!entry) {
+    entry = createCountryInnertube(country);
+    innertubeByCountry.set(country, entry);
+  }
+  return entry.proxyUrl;
 }
 
 function expectedPath(
@@ -476,4 +495,99 @@ export async function downloadYoutubeMedia(
     }
   }
   throw lastError ?? new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.OUTPUT_MISSING, 502);
+}
+
+export type YOUTUBE_STREAM_URLS = {
+  videoId: string;
+  title: string;
+  durationSeconds: number;
+  /** Deciphered, signed googlevideo URL for the best adaptive video-only stream. */
+  videoUrl: string;
+  /** Deciphered, signed googlevideo URL for the best adaptive audio-only stream. */
+  audioUrl: string;
+  /** The InnerTube client that produced the URLs (for debugging / rotation logs). */
+  client: InnerTubeClientName;
+  /**
+   * The Evomi proxy URL (with the session id that signed the URLs) for
+   * ffmpeg's `-http_proxy` — same residential exit IP. `undefined` when
+   * Evomi isn't configured (direct fetch).
+   */
+  proxyUrl?: string;
+};
+
+/**
+ * Extract the signed googlevideo stream URLs (video + audio) for a YouTube
+ * source without downloading any media bytes. Used by the viral-clipper's
+ * stream-direct clip path: ffmpeg then cuts clips directly from these URLs
+ * with `-http_proxy` set to Evomi, so only the clip segments transit the
+ * residential proxy — not the whole source video (the bandwidth cost that
+ * made the full-download path burn ~2 GB of Evomi quota in a few test runs).
+ *
+ * Same client chain + Evomi session rotation as `downloadYoutubeMedia`:
+ * `getBasicInfo` succeeding does not mean the stream URL will fetch (IOS
+ * can return playable metadata while its googlevideo stream 403s), so each
+ * client must produce usable URLs before the chain returns. A failed full
+ * attempt rotates to a fresh Evomi session (new exit IP) and retries.
+ */
+async function attemptGetStreamUrlsWithClientChain(
+  videoId: string,
+  country: string,
+): Promise<YOUTUBE_STREAM_URLS> {
+  let lastError: Error | null = null;
+  const yt = await getInnertube(country);
+  for (const client of INNERTUBE_CLIENT_CHAIN) {
+    try {
+      const info = await yt.getBasicInfo(videoId, { client });
+      if (!info?.basic_info) {
+        throw new Error("Empty InnerTube response");
+      }
+      const videoFormat = info.chooseFormat({ type: "video", quality: "best" });
+      const audioFormat = info.chooseFormat({ type: "audio", quality: "best" });
+      const player = yt.session.player;
+      const [videoUrl, audioUrl] = await Promise.all([
+        videoFormat.decipher(player),
+        audioFormat.decipher(player),
+      ]);
+      if (!videoUrl || !audioUrl) {
+        throw new Error("Stream URL missing after decipher");
+      }
+      return {
+        videoId,
+        title: info.basic_info.title || videoId,
+        durationSeconds: Number(info.basic_info.duration) || 0,
+        videoUrl,
+        audioUrl,
+        client,
+        proxyUrl: getCountryProxyUrl(country),
+      };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+  throw new YoutubeDownloadError(
+    `${YOUTUBE_DOWNLOAD_ERROR_MESSAGES.NO_CLIENTS}: ${lastError?.message ?? "unknown error"}`,
+    502,
+  );
+}
+
+export async function getYoutubeStreamUrls(
+  videoId: string,
+  country: string,
+): Promise<YOUTUBE_STREAM_URLS> {
+  if (IS_VERCEL_RUNTIME) {
+    throw new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.VERCEL, 501);
+  }
+  const resolvedId = resolveYoutubeDownloadVideoId(videoId);
+  const attempts = evomiConfigured() ? 1 + INNERTUBE_PROXY_ROTATIONS : 1;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) rotateCountryInnertube(country);
+    try {
+      return await attemptGetStreamUrlsWithClientChain(resolvedId, country);
+    } catch (err) {
+      lastError = err;
+      if (err instanceof YoutubeDownloadError && err.statusCode < 500) throw err;
+    }
+  }
+  throw lastError ?? new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.NO_CLIENTS, 502);
 }
