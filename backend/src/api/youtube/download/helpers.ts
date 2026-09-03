@@ -152,7 +152,14 @@ function getProxiedFetch(
     agent = new ProxyAgent({ uri: proxyUrl });
     proxyAgentByCountry.set(country, agent);
   }
-  return (input, init) => {
+  return (input: string | URL | Request, init?: RequestInit) => {
+    // Cast to `any` for property access: the global `Request`/`RequestInit`
+    // shapes differ between local (undici types expose `url`/`method`) and
+    // the Vercel build env (they don't), so we can't rely on the type shape.
+    const req = input as unknown as {
+      url?: unknown;
+      method?: unknown;
+    };
     let url: string;
     let method: string | undefined;
     if (typeof input === "string") {
@@ -160,12 +167,17 @@ function getProxiedFetch(
     } else if (input instanceof URL) {
       url = input.href;
     } else {
-      url = typeof input.url === "string" ? input.url : String(input);
-      method = input.method;
+      url = typeof req.url === "string" ? req.url : String(input);
+      method = typeof req.method === "string" ? req.method : undefined;
     }
-    const resolvedMethod = (method || init?.method || "GET").toUpperCase();
+    const initMethod = (init as unknown as { method?: unknown } | undefined)?.method;
+    const resolvedMethod = (
+      method ||
+      (typeof initMethod === "string" ? initMethod : undefined) ||
+      "GET"
+    ).toUpperCase();
     const nextInit: Record<string, unknown> = {
-      ...(init as Record<string, unknown> | undefined),
+      ...(init as unknown as Record<string, unknown> | undefined),
       dispatcher: agent,
       method: resolvedMethod,
     };
