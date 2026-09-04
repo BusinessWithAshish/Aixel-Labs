@@ -35,7 +35,7 @@ Mount: `ENDPOINTS.MCP` (`/mcp`) via `routes.ts` — platform skill owns that wir
 
 | File | Role |
 |------|------|
-| `server.ts` | `McpServer` factory, registers 8 domain tools, `MCP_TOOL_COUNT` |
+| `server.ts` | `McpServer` factory, registers 10 domain tools, `MCP_TOOL_COUNT` |
 | `domain-tool.ts` | `registerDomainTool` — `{ op, layer?, input }` dispatch |
 | `tools/<domain>.ts` | Ops table + description dispatch table for that tool |
 | `router.ts` | `GET /health`, `ALL /` → StreamableHTTP transport |
@@ -48,12 +48,12 @@ Mount: `ENDPOINTS.MCP` (`/mcp`) via `routes.ts` — platform skill owns that wir
 |----------|--------|
 | Name | `aixel-intelligence` |
 | Version | `1.0.0` |
-| Tools | `MCP_TOOL_COUNT` = **8** (keep in sync with domain registrations) |
+| Tools | `MCP_TOOL_COUNT` = **10** (keep in sync with domain registrations) |
 | Package | `@modelcontextprotocol/sdk` |
 
 Domains: `youtube`, `trends`, `instagram`, `twitter`, `gsearch`, `transcription`,
-`viral_clipper`, `tightening`. Lead-gen (Maps / Facebook / LinkedIn) is HTTP-only
-unless product asks otherwise.
+`viral_clipper`, `tightening`, `chatgpt`, `claude`. Lead-gen (Maps / Facebook /
+LinkedIn) is HTTP-only unless product asks otherwise.
 
 Health: `GET /mcp/health` → `{ status, server, tools }`.
 
@@ -98,7 +98,7 @@ parallel MCP Zod tree. Outer MCP schema is only `op` / `layer` / `input`.
 2. Reuse `*_REQUEST_SCHEMA` as the layer handler `schema`.
 3. Add the op to `mcp/tools/<domain>.ts` (`raw` and/or `intel` + `defaultLayer`).
 4. Update that tool's description dispatch table (ops, valid layers, input keys).
-5. `MCP_TOOL_COUNT` stays 8 unless you add a **new domain tool**.
+5. `MCP_TOOL_COUNT` stays 10 unless you add a **new domain tool**.
 
 ## Add a domain tool checklist
 

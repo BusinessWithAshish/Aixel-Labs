@@ -11,7 +11,7 @@ Governor for `backend/src/mcp`. Executor: `.cursor/skills/backend/backend-mcp/SK
 ## Hard rules
 
 - Tools call the same TypeScript **services** as HTTP handlers — **no HTTP loopback**.
-- One MCP tool per domain (`youtube`, `trends`, `instagram`, `twitter`, `gsearch`, `transcription`, `viral_clipper`, `tightening`). New functions are new **ops**, not new tools.
+- One MCP tool per domain (`youtube`, `trends`, `instagram`, `twitter`, `gsearch`, `transcription`, `viral_clipper`, `tightening`, `chatgpt`, `claude`). New functions are new **ops**, not new tools.
 - Top-level args are only `{ op, layer?, input }`. Reuse API Zod `*_REQUEST_SCHEMA` as `input` — do not fork parallel MCP schemas.
 - Default `layer` is `intel` when that overlay exists, else `raw`. Invalid combo **fails** — no silent fallback. Do not invent a fake intel layer.
 - Wrap handlers with `ok` / `fail` from `tool-result.ts` (via `registerDomainTool`).
