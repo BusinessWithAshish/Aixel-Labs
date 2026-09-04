@@ -69,6 +69,7 @@ intelligence/
 │   ├── service.ts
 │   └── handler.ts
 ├── comments/                 # timestamp mentions + 10s clusters, hearted/verified counts, like distribution
+├── audience-signals.ts       # format comment clusters / chapters as viral-clipper audienceSignals lines
 ├── channel/                  # handler → harvest → enrich → compute + content-metrics
 ├── handle/
 ├── video-meta/

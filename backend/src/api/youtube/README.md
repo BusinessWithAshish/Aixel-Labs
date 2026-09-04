@@ -10,7 +10,7 @@ Express router mounting scraper sub-APIs under `/youtube`. All endpoints use **P
 |---------|--------|--------|-------|
 | Search | [search/README.md](./search/README.md) | `POST` | `/search` |
 | Suggest | [suggest/README.md](./suggest/README.md) | `POST` | `/suggest` |
-| Video | [video/README.md](./video/README.md) | `POST` | `/video`, `/video/suggested` |
+| Video | [video/README.md](./video/README.md) | `POST` | `/video`, `/video/suggested`, `/video/chapters` |
 | Transcript | [transcript/README.md](./transcript/README.md) | `POST` | `/video/transcript` |
 | Comments | [comments/README.md](./comments/README.md) | `POST` | `/video/comments` |
 | Download | [download/README.md](./download/README.md) | `POST` | `/video/download` |

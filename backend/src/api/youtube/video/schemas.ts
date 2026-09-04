@@ -13,3 +13,5 @@ export const YOUTUBE_VIDEO_SUGGESTED_REQUEST_SCHEMA =
   YOUTUBE_VIDEO_REQUEST_SCHEMA.extend({
     limit: youtubeLimitSchema("Maximum number of suggested videos to return"),
   });
+
+export const YOUTUBE_VIDEO_CHAPTERS_REQUEST_SCHEMA = YOUTUBE_VIDEO_REQUEST_SCHEMA;

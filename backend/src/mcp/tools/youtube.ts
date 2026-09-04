@@ -4,10 +4,12 @@ import { fetchYoutubeSearch } from "../../api/youtube/search/helpers";
 import { YOUTUBE_SUGGEST_REQUEST_SCHEMA } from "../../api/youtube/suggest/schemas";
 import { fetchYoutubeSuggest } from "../../api/youtube/suggest/helpers";
 import {
+  YOUTUBE_VIDEO_CHAPTERS_REQUEST_SCHEMA,
   YOUTUBE_VIDEO_REQUEST_SCHEMA,
   YOUTUBE_VIDEO_SUGGESTED_REQUEST_SCHEMA,
 } from "../../api/youtube/video/schemas";
 import {
+  fetchYoutubeVideoChapters,
   fetchYoutubeVideoDetails,
   fetchYoutubeVideoSuggestedVideos,
 } from "../../api/youtube/video/helpers";
@@ -112,6 +114,13 @@ const YOUTUBE_OPS: Record<string, DomainOp> = {
       run: commentsIntelligenceService,
     },
   },
+  chapters: {
+    defaultLayer: MCP_LAYER.RAW,
+    raw: {
+      schema: YOUTUBE_VIDEO_CHAPTERS_REQUEST_SCHEMA,
+      run: fetchYoutubeVideoChapters,
+    },
+  },
   channel: {
     defaultLayer: MCP_LAYER.INTEL,
     raw: { schema: YOUTUBE_CHANNEL_REQUEST_SCHEMA, run: fetchChannelRaw },
@@ -163,7 +172,8 @@ Ops:
 - video (raw|intel, default intel) — one video's details. input: videoId, country?, region?
 - suggested (raw|intel, default intel) — related/suggested videos. input: videoId, limit?, country?, region?
 - transcript (raw|intel, default intel) — captions. intel input may include title. input: videoId, language?, country?, region?, title?
-- comments (raw|intel, default intel) — InnerTube comment threads. intel adds timestamp mentions + 10s clusters for clip priors. Distinct from viral_clipper comment_highlights (formatter over the same clusters). input: videoId, sort?, limit?, continuation?, country?, region?
+- comments (raw|intel, default intel) — InnerTube comment threads. intel adds timestamp mentions + 10s clusters for clip priors. input: videoId, sort?, limit?, continuation?, country?, region?
+- chapters (raw only) — creator-authored chapter markers via get_watch. Empty chapters[] is valid (not every video has them). Use comments intel for clip priors, not this. input: videoId, country?, region?
 - channel (raw|intel, default intel) — channel + tab. input: channelId OR handle, contentType?, limit?, country?, region?
 - handle (raw|intel, default intel) — resolve @handle. input: handle, country?, region?
 - video_meta (raw|intel, default intel) — batch watch-page metadata. input: videoIds[], country?, region?

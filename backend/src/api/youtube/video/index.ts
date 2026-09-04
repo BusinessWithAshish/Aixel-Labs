@@ -3,6 +3,7 @@ import { YOUTUBE_API_ROUTES } from "../constants";
 import {
   youtubeVideoHandler,
   youtubeVideoSuggestedVideosHandler,
+  youtubeVideoChaptersHandler,
 } from "./handler";
 
 export function registerYoutubeVideoRoutes(router: IRouter) {
@@ -11,4 +12,5 @@ export function registerYoutubeVideoRoutes(router: IRouter) {
     YOUTUBE_API_ROUTES.VIDEO_SUGGESTED,
     youtubeVideoSuggestedVideosHandler,
   );
+  router.post(YOUTUBE_API_ROUTES.VIDEO_CHAPTERS, youtubeVideoChaptersHandler);
 }

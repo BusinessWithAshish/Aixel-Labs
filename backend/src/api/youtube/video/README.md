@@ -1,6 +1,6 @@
 # YouTube Video API
 
-Fetches video metadata and suggested (related) videos via InnerTube `get_watch` and `next` endpoints.
+Fetches video metadata, suggested (related) videos, and creator chapters via InnerTube `get_watch` and `next` endpoints.
 
 ## Endpoints
 
@@ -8,6 +8,7 @@ Fetches video metadata and suggested (related) videos via InnerTube `get_watch` 
 |--------|-------|------------|
 | `POST` | `/youtube/video` | `API_ENDPOINTS.YOUTUBE.VIDEO` |
 | `POST` | `/youtube/video/suggested` | `API_ENDPOINTS.YOUTUBE.VIDEO_SUGGESTED` |
+| `POST` | `/youtube/video/chapters` | `API_ENDPOINTS.YOUTUBE.VIDEO_CHAPTERS` |
 
 ## Video details — `POST /video`
 
@@ -67,6 +68,34 @@ Fetches video metadata and suggested (related) videos via InnerTube `get_watch` 
   totalResults: number;
 }
 ```
+
+## Chapters — `POST /video/chapters`
+
+Creator-authored chapter markers from `get_watch` chapter markers, end-bounded
+by the next marker's start (last: video duration). Most videos don't have
+chapters — an empty `chapters[]` is a valid result, not an error.
+
+### Request body
+
+`YOUTUBE_VIDEO_CHAPTERS_REQUEST_SCHEMA` — same shape as video details
+(`videoId` + geo fields).
+
+### Response
+
+`ALApiResponse<YOUTUBE_VIDEO_CHAPTERS_RESPONSE>`:
+
+```ts
+{
+  videoId: string;
+  videoTitle: string | null;
+  chapters: { title: string; startSeconds: number; endSeconds: number }[];
+}
+```
+
+Formatting chapters as viral-clipper `audienceSignals` lines is done by
+`formatChaptersAsAudienceSignals` in
+[`intelligence/audience-signals.ts`](../intelligence/audience-signals.ts) —
+the clipper consumes strings, not this shape.
 
 ## How it works
 
