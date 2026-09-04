@@ -6,8 +6,6 @@ import {
   viralClipperDiarizeHandler,
   viralClipperPipelineHandler,
   viralClipperViralMomentsHandler,
-  viralClipperYoutubeChaptersHandler,
-  viralClipperYoutubeCommentsHandler,
 } from "./handler";
 
 const viralClipperRoutes: IRouter = Router();
@@ -29,35 +27,17 @@ viralClipperRoutes.post(
 
 viralClipperRoutes.post(API_ENDPOINTS.VIRAL_CLIPPER.CUT.route, viralClipperCutHandler);
 
-viralClipperRoutes.post(
-  API_ENDPOINTS.VIRAL_CLIPPER.YOUTUBE_COMMENTS.route,
-  viralClipperYoutubeCommentsHandler,
-);
-
-viralClipperRoutes.post(
-  API_ENDPOINTS.VIRAL_CLIPPER.YOUTUBE_CHAPTERS.route,
-  viralClipperYoutubeChaptersHandler,
-);
-
 export default viralClipperRoutes;
 
-export { diarizeFromSource } from "./diarize";
-export { cutClipsFromVideo } from "./cut";
+export { diarizeFromYoutubeCaptions, youtubeCaptionsToDiarizedTranscript } from "./diarize/captions";
+export { diarizeFromSource } from "./diarize/audio";
+export { cutClipsFromVideo } from "./cut/cut";
 export { runViralClipperPipeline } from "./pipeline";
-export { scoreViralMoments } from "./viral-moments";
-export { fetchYoutubeChapters, formatChaptersAsAudienceSignals } from "./youtube-chapters";
-export {
-  fetchYoutubeCommentHighlights,
-  formatCommentHighlightsAsAudienceSignals,
-} from "./youtube-comments";
-export {
-  VIRAL_CLIPPER_CUT_REQUEST_SCHEMA,
-  VIRAL_CLIPPER_DIARIZE_REQUEST_SCHEMA,
-  VIRAL_CLIPPER_PIPELINE_REQUEST_SCHEMA,
-  VIRAL_CLIPPER_VIRAL_MOMENTS_REQUEST_SCHEMA,
-  VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_SCHEMA,
-  VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA,
-} from "./schemas";
+export { scoreViralMoments } from "./moments/score";
+export { VIRAL_CLIPPER_DIARIZE_REQUEST_SCHEMA } from "./diarize/schemas";
+export { VIRAL_CLIPPER_VIRAL_MOMENTS_REQUEST_SCHEMA } from "./moments/schemas";
+export { VIRAL_CLIPPER_CUT_REQUEST_SCHEMA } from "./cut/schemas";
+export { VIRAL_CLIPPER_PIPELINE_REQUEST_SCHEMA } from "./schemas";
 export {
   VIRAL_CLIPPER,
   VIRAL_CLIPPER_ASPECT_RATIO_DIMENSIONS,
@@ -67,8 +47,6 @@ export {
 } from "./constants";
 export { VIRAL_CLIPPER_PODCAST_TONES } from "./types";
 export type {
-  CHAPTER_SIGNAL,
-  CLIP_RANGE,
   VIRAL_CLIPPER_ASPECT_RATIO_VALUE,
   VIRAL_CLIPPER_CUT_REQUEST,
   VIRAL_CLIPPER_CUT_REQUEST_PARSED,
@@ -83,14 +61,8 @@ export type {
   VIRAL_CLIPPER_VIRAL_MOMENTS_REQUEST,
   VIRAL_CLIPPER_VIRAL_MOMENTS_REQUEST_PARSED,
   VIRAL_CLIPPER_VIRAL_MOMENTS_RESPONSE,
-  VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST,
-  VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_PARSED,
-  VIRAL_CLIPPER_YOUTUBE_CHAPTERS_RESPONSE,
-  VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST,
-  VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_PARSED,
-  VIRAL_CLIPPER_YOUTUBE_COMMENTS_RESPONSE,
   CUT_CLIP_RESULT,
   DIARIZED_TRANSCRIPT,
-  TIMESTAMP_MENTION_CLUSTER,
+  VIRAL_CLIPPER_DIARIZE_SOURCE,
   VIRAL_MOMENT_CANDIDATE,
 } from "./types";

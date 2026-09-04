@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
-import { assertPersistentDisk } from "../../config";
+import { assertPersistentDisk } from "../../../config";
 import { snapClipBoundaries } from "./boundary-snap";
-import { VIRAL_CLIPPER_ERROR_MESSAGES, VIRAL_CLIPPER_OUTPUT_DIR } from "./constants";
-import { cleanupResolvedMediaSource, resolveVideoSourceForCut } from "./download";
+import { VIRAL_CLIPPER_ERROR_MESSAGES, VIRAL_CLIPPER_OUTPUT_DIR } from "../constants";
+import { cleanupResolvedMediaSource, resolveVideoSourceForCut } from "../download";
 import { cutClip, cutClipFromStream, getMediaDurationSeconds } from "./ffmpeg-cut";
 import { parseProxyUrlForBridge, ProxyConnectBridge } from "./proxy-bridge";
 import type {
@@ -13,7 +13,7 @@ import type {
   VIRAL_CLIPPER_ASPECT_RATIO_VALUE,
   VIRAL_CLIPPER_CUT_RESPONSE,
   DIARIZED_TRANSCRIPT,
-} from "./types";
+} from "../types";
 
 /**
  * Resolves the source video and cuts each requested clip (boundary-snapped
@@ -23,9 +23,9 @@ import type {
  * produced the clip list.
  *
  * YouTube sources take the stream-direct path (see `resolveVideoSourceForCut`):
- * ffmpeg cuts clips directly from the signed googlevideo stream URLs through
- * the Evomi proxy, so only the clip segments transit the proxy — not the
- * whole source video. Local files and non-YouTube URLs fall back to the
+ * ffmpeg cuts clips directly from the signed googlevideo stream URLs.
+ * Evomi `-http_proxy` is used only when this host cannot fetch googlevideo
+ * (VPS datacenter 403). Local files and non-YouTube URLs fall back to the
  * file path (download once, cut from disk).
  */
 export async function cutClipsFromVideo(
@@ -37,11 +37,9 @@ export async function cutClipsFromVideo(
   assertPersistentDisk(VIRAL_CLIPPER_ERROR_MESSAGES.VERCEL);
   const resolved = await resolveVideoSourceForCut(videoSource);
 
-  // For the youtube kind with an Evomi proxy, start a local CONNECT bridge:
-  // ffmpeg's `-http_proxy` doesn't send Proxy-Authorization, so it can't
-  // authenticate to Evomi directly. The bridge forwards ffmpeg's CONNECTs
-  // to Evomi WITH the auth header, and ffmpeg's range requests then flow
-  // through the same residential IP that signed the stream URLs.
+  // For the youtube kind that still needs Evomi (VPS googlevideo 403),
+  // start a local CONNECT bridge: ffmpeg's `-http_proxy` doesn't send
+  // Proxy-Authorization, so it can't authenticate to Evomi directly.
   let bridge: ProxyConnectBridge | undefined;
   let ffmpegProxyUrl: string | undefined;
   if (resolved.kind === "youtube" && resolved.proxyUrl) {

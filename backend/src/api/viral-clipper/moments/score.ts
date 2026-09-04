@@ -4,7 +4,7 @@ import {
   VIRAL_CLIPPER_CHANNEL_CONTEXT_BLOCK_TEMPLATE,
   VIRAL_CLIPPER_VIRAL_MOMENTS_PROMPT_HEADER,
 } from "./constants";
-import { generateStructuredContent, withGeminiKeyPoolRetry } from "./gemini-client";
+import { generateStructuredContent, withGeminiKeyPoolRetry } from "../gemini-client";
 import {
   GEMINI_VIRAL_MOMENTS_RESPONSE_SCHEMA,
   GEMINI_VIRAL_MOMENTS_RESPONSE_VALIDATOR,
@@ -14,7 +14,7 @@ import type {
   VIRAL_CLIPPER_VIRAL_MOMENTS_RESPONSE,
   DIARIZED_TRANSCRIPT,
   VIRAL_MOMENT_CANDIDATE,
-} from "./types";
+} from "../types";
 
 /** Flattens a diarized transcript into `[MM:SS-MM:SS] role: text` lines for the prompt. */
 function renderTranscriptForPrompt(diarized: DIARIZED_TRANSCRIPT): string {
@@ -40,10 +40,11 @@ export type ScoreViralMomentsOptions = {
   channelContext?: string;
   /**
    * Optional pre-formatted lines of real audience behavior on this exact
-   * episode — e.g. "12:34 — 8 viewers mentioned this, 340 likes" from
-   * youtube-comments.ts, or "12:34 — chapter: 'Ravi's viral BBC video'"
-   * from youtube-chapters.ts. Caller fetches/formats these; this function
-   * just injects them — see VIRAL_CLIPPER_AUDIENCE_SIGNALS_BLOCK_TEMPLATE.
+   * episode — e.g. "12:34 — 8 viewers mentioned this, 340 likes" from the
+   * youtube module's comments-intel clusters, or "12:34 — chapter: 'Ravi's
+   * viral BBC video'" from its chapters route. Caller fetches/formats
+   * these; this function just injects them — see
+   * VIRAL_CLIPPER_AUDIENCE_SIGNALS_BLOCK_TEMPLATE.
    */
   audienceSignals?: string[];
 };

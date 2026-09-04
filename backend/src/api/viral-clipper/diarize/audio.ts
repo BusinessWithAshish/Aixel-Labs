@@ -1,28 +1,31 @@
 import { extname, join } from "node:path";
 
-import { parseTimestampToSeconds } from "./boundary-snap";
+import { parseTimestampToSeconds } from "../../../utils/timestamp";
 import {
   VIRAL_CLIPPER,
+  VIRAL_CLIPPER_ERROR_MESSAGES,
+} from "../constants";
+import {
   VIRAL_CLIPPER_DIARIZATION_CONTINUATION_PROMPT_HEADER,
   VIRAL_CLIPPER_DIARIZATION_PROMPT,
 } from "./constants";
-import { cleanupResolvedMediaSource, resolveMediaSource } from "./download";
-import { cutAudioSegment, getMediaDurationSeconds } from "./ffmpeg-cut";
+import { cleanupResolvedMediaSource, resolveMediaSource } from "../download";
+import { cutAudioSegment, getMediaDurationSeconds } from "../cut/ffmpeg-cut";
 import {
   generateStructuredContent,
   uploadFileToGemini,
   waitForGeminiFileActive,
   withGeminiKeyPoolRetry,
-} from "./gemini-client";
-import { DIARIZED_TRANSCRIPT_SCHEMA, GEMINI_DIARIZATION_RESPONSE_SCHEMA } from "./schemas";
+} from "../gemini-client";
+import { GEMINI_DIARIZATION_RESPONSE_SCHEMA, DIARIZED_TRANSCRIPT_SCHEMA } from "./schemas";
 import type {
   VIRAL_CLIPPER_DIARIZE_RESPONSE,
   DIARIZED_SEGMENT,
   DIARIZED_SPEAKER,
   DIARIZED_TRANSCRIPT,
   GEMINI_USAGE_METADATA,
-} from "./types";
-import { formatSecondsAsTimestamp } from "./format-timestamp";
+} from "../types";
+import { formatSecondsAsTimestamp } from "../../../utils/timestamp";
 
 const AUDIO_MIME_BY_EXT: Record<string, string> = {
   ".mp3": "audio/mpeg",
@@ -315,6 +318,7 @@ async function diarizeChunked(
       segments: allSegments,
     },
     usage,
+    source: "gemini_audio",
   };
 }
 
@@ -340,6 +344,7 @@ export async function diarizeFromSource(
           segments: result.segments,
         },
         usage: result.usage,
+        source: "gemini_audio",
       };
     }
 

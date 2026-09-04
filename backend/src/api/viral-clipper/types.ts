@@ -1,14 +1,10 @@
 import type { z } from "zod";
 
 import type { VIRAL_CLIPPER_ASPECT_RATIOS, VIRAL_CLIPPER_GEMINI_MODEL } from "./constants";
-import type {
-  VIRAL_CLIPPER_CUT_REQUEST_SCHEMA,
-  VIRAL_CLIPPER_DIARIZE_REQUEST_SCHEMA,
-  VIRAL_CLIPPER_PIPELINE_REQUEST_SCHEMA,
-  VIRAL_CLIPPER_VIRAL_MOMENTS_REQUEST_SCHEMA,
-  VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_SCHEMA,
-  VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA,
-} from "./schemas";
+import type { VIRAL_CLIPPER_DIARIZE_REQUEST_SCHEMA } from "./diarize/schemas";
+import type { VIRAL_CLIPPER_VIRAL_MOMENTS_REQUEST_SCHEMA } from "./moments/schemas";
+import type { VIRAL_CLIPPER_CUT_REQUEST_SCHEMA } from "./cut/schemas";
+import type { VIRAL_CLIPPER_PIPELINE_REQUEST_SCHEMA } from "./schemas";
 
 export type VIRAL_CLIPPER_DIARIZE_REQUEST = z.input<
   typeof VIRAL_CLIPPER_DIARIZE_REQUEST_SCHEMA
@@ -34,20 +30,6 @@ export type VIRAL_CLIPPER_PIPELINE_REQUEST_PARSED = z.output<
 export type VIRAL_CLIPPER_CUT_REQUEST = z.input<typeof VIRAL_CLIPPER_CUT_REQUEST_SCHEMA>;
 export type VIRAL_CLIPPER_CUT_REQUEST_PARSED = z.output<
   typeof VIRAL_CLIPPER_CUT_REQUEST_SCHEMA
->;
-
-export type VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST = z.input<
-  typeof VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA
->;
-export type VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_PARSED = z.output<
-  typeof VIRAL_CLIPPER_YOUTUBE_COMMENTS_REQUEST_SCHEMA
->;
-
-export type VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST = z.input<
-  typeof VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_SCHEMA
->;
-export type VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_PARSED = z.output<
-  typeof VIRAL_CLIPPER_YOUTUBE_CHAPTERS_REQUEST_SCHEMA
 >;
 
 export type VIRAL_CLIPPER_GEMINI_MODEL_VALUE =
@@ -91,9 +73,13 @@ export type DIARIZED_TRANSCRIPT = {
   segments: DIARIZED_SEGMENT[];
 };
 
+export type VIRAL_CLIPPER_DIARIZE_SOURCE = "gemini_audio" | "youtube_captions";
+
 export type VIRAL_CLIPPER_DIARIZE_RESPONSE = {
   transcript: DIARIZED_TRANSCRIPT;
   usage: GEMINI_USAGE_METADATA;
+  /** How the transcript was produced. Captions skip Gemini entirely. */
+  source: VIRAL_CLIPPER_DIARIZE_SOURCE;
 };
 
 export const VIRAL_CLIPPER_HOOK_TYPES = [
@@ -174,28 +160,4 @@ export type CUT_CLIP_RESULT = {
 
 export type VIRAL_CLIPPER_CUT_RESPONSE = {
   clips: CUT_CLIP_RESULT[];
-};
-
-export type CHAPTER_SIGNAL = {
-  title: string;
-  startSeconds: number;
-  endSeconds: number;
-};
-
-export type VIRAL_CLIPPER_YOUTUBE_CHAPTERS_RESPONSE = {
-  videoTitle: string;
-  chapters: CHAPTER_SIGNAL[];
-};
-
-export type TIMESTAMP_MENTION_CLUSTER = {
-  timestampSeconds: number;
-  mentionCount: number;
-  totalLikes: number;
-  sampleComments: string[];
-};
-
-export type VIRAL_CLIPPER_YOUTUBE_COMMENTS_RESPONSE = {
-  videoTitle: string;
-  commentsScanned: number;
-  highlights: TIMESTAMP_MENTION_CLUSTER[];
 };

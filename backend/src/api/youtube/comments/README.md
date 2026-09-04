@@ -2,7 +2,7 @@
 
 Fetches a video's comments via InnerTube `POST /youtubei/v1/next` (the same
 WEB-client endpoint youtube.com uses in the network tab). No official Data API
-key. Viral clipper `/youtube-comments` formats timestamp clusters from this
+key. Viral-clipper audience signals format timestamp clusters from this
 same scrape (intelligence overlay).
 
 Verified live 2026-08-20 against [Despacito](https://www.youtube.com/watch?v=kJQP7kiw5Fk)
@@ -100,6 +100,6 @@ curl -sS -X POST http://localhost:8002/youtube/video/comments \
   continuation token (or comments count) is present — that string is often
   injected under UNPLAYABLE while comments are live on the watch page.
 - Timestamp clustering for clip priors lives on comments intelligence
-  (`timestampClusters`), not on this raw comments API. Viral clipper
-  `/youtube-comments` is a formatter over that overlay. MCP: `youtube`
-  `op=comments` (`layer=raw` or `intel`).
+  (`timestampClusters`), not on this raw comments API. Viral-clipper
+  audience signals (`youtube/intelligence/audience-signals.ts`) format
+  that overlay. MCP: `youtube` `op=comments` (`layer=raw` or `intel`).

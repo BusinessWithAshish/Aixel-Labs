@@ -34,7 +34,7 @@ Lead-gen (Maps / Facebook / LinkedIn) stays **HTTP-only**.
 | `twitter`       | `user`, `tweet`, `user_tweets`, `trending`, `search`                                                                                                               | raw only (no Twitter intel API)                                                      |
 | `gsearch`       | `search` (v1 CSE), `search_v2` (Docs Explore / CSE fallback)                                                                                                       | raw                                                                                  |
 | `transcription` | `transcribe`                                                                                                                                                       | raw                                                                                  |
-| `viral_clipper` | `diarize`, `moments`, `pipeline`, `cut`, `comment_highlights`, `chapters`                                                                                          | raw. `cut` writes to local disk — refused on Vercel (`IS_VERCEL_RUNTIME`)            |
+| `viral_clipper` | `diarize`, `moments`, `pipeline`, `cut`                                                                                                                            | raw. `diarize`/`pipeline` accept `videoUrl` (YouTube captions, no Gemini) or `audioSource` (Gemini). `cut` writes to local disk — refused on Vercel (`IS_VERCEL_RUNTIME`). Fetch captions/comments/chapters via `youtube`, then clipper |
 | `tightening`    | `tighten`                                                                                                                                                          | raw. Writes to local disk — refused on Vercel (`IS_VERCEL_RUNTIME`)                  |
 | `chatgpt`       | `generate`, `stage_image`                                                                                                                                          | raw only (browser-driven, no intel overlay). **VPS only** — refused everywhere else unless `AIXEL_VPS=1` |
 | `claude`        | `ask`, `budget_status`                                                                                                                                              | raw only (CLI-driven, no intel overlay). **VPS only** — refused everywhere else unless `AIXEL_VPS=1` |
@@ -62,10 +62,15 @@ Guest GraphQL/REST — no user login. Native keyword search is login-walled.
 | `user_tweets` | GraphQL `UserTweets`           | Profile timeline                                         |
 | `tweet`       | GraphQL + syndication          | One tweet ID/URL; `includeRelated` for same-author posts |
 
-### YouTube comments vs viral_clipper highlights
+### YouTube comments → clip priors
 
-- `youtube` `op=comments` — InnerTube comment text, authors, likes, replies; `layer=intel` adds timestamp/like aggregates.
-- `viral_clipper` `op=comment_highlights` — InnerTube timestamp clusters for clip priors. Does not return the comments themselves.
+`youtube` `op=comments` — InnerTube comment text, authors, likes, replies;
+`layer=intel` adds timestamp mentions + 10s clusters, the input for
+viral-clipper `audienceSignals` (format via
+`youtube/intelligence/audience-signals.ts` helpers). Chapter priors:
+`youtube` `op=chapters`. The clipper no longer wraps these — fetch via
+`youtube`, format, pass as `audienceSignals` to `viral_clipper`
+`moments`/`pipeline`.
 
 ## Layout
 

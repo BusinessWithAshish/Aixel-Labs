@@ -1,5 +1,5 @@
-import { VIRAL_CLIPPER } from "./constants";
-import type { DIARIZED_TRANSCRIPT } from "./types";
+import { VIRAL_CLIPPER } from "../constants";
+import type { DIARIZED_TRANSCRIPT } from "../types";
 
 /** Parses "MM:SS" or "HH:MM:SS" into seconds. */
 export function parseTimestampToSeconds(timestamp: string): number {

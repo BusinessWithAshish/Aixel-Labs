@@ -14,9 +14,17 @@ later decision, not made yet.
 
 ## Why Gemini (not this backend's Claude/Groq surfaces)
 
-Diarization needs **audio** input — a text transcript alone has no speaker
-signal, no matter how the prompt is written. Gemini's `generateContent`
-accepts audio directly and has documented speaker-diarization support (see
+YouTube captions are the cheap path when the video already has them
+(`videoUrl` on `/diarize`): ASR inserts `>>` at turn boundaries, and some
+creators upload `Name: text` tracks. `>>` is not a speaker id — a 4-person
+panel still only gets "someone new started talking." Named tracks map N
+speakers directly. ASR tracks get a Gemini **text** pass over those turns
+(no audio upload) so speaker_1..N stay stable. Pass `audioSource` when
+captions are missing or you need voice-accurate ids.
+
+Audio diarization needs **audio** input — a plain undivided transcript has
+no speaker signal. Gemini's `generateContent` accepts audio directly and
+has documented speaker-diarization support (see
 `ai.google.dev/gemini-api/docs/audio`), so one Gemini call does
 transcription + diarization together. Viral-moment scoring is a pure text
 task afterward — reuses the same model so the two calls compose naturally in
@@ -26,8 +34,8 @@ task afterward — reuses the same model so the two calls compose naturally in
 
 HTTP `/viral-clipper/*` and the `viral_clipper` MCP tool always register.
 Chunked diarization can run 15–20+ minutes (see "Long episodes" below);
-`/youtube-comments` and `/youtube-chapters` use InnerTube (no external
-binary). Run this backend as a persistent process. **Hermes, on the same
+The audience-signal sources (comments/chapters) use InnerTube in the
+youtube module (no external binary). Run this backend as a persistent process. **Hermes, on the same
 host, calls the pipeline's internal URL directly** (e.g.
 `http://localhost:<port>/viral-clipper/...`) — no public URL, no Blob
 upload/download round-trip.
@@ -38,7 +46,7 @@ This module reads and writes local files directly — **no Vercel Blob**,
 which was only ever needed to hand a file between stateless serverless
 invocations (a constraint that doesn't exist on a persistent VPS process)
 and was capped at Vercel's 1GB free storage limit besides. `cutClipsFromVideo`
-refuses to run at all on Vercel (`IS_VERCEL_RUNTIME`, checked in `cut.ts`)
+refuses to run at all on Vercel (`IS_VERCEL_RUNTIME`, checked in `cut/cut.ts`)
 rather than silently writing to a `/tmp` that won't survive the invocation;
 `diarize`/`viral-moments` are analysis-only and still run everywhere.
 
@@ -76,28 +84,44 @@ rather than silently writing to a `/tmp` that won't survive the invocation;
 - **ffmpeg** — required by `/cut` (clip re-encode) and the YouTube
   download path inside `/pipeline`/`/cut` when a YouTube URL is passed as
   the video source. Comes from the `ffmpeg-static` npm dependency, so no
-  system install is needed. `/youtube-comments` and `/youtube-chapters`
-  use InnerTube directly and need no binary at all.
+  system install is needed. The captions path and YouTube audience-signal
+  sources use InnerTube directly and need no binary at all.
 
 ## Endpoints
 
 ### `POST /viral-clipper/diarize`
 
+Exactly one source:
+
 ```jsonc
+// Captions path — no audio download. ASR turns are labeled with a Gemini
+// text pass (not Google STT). Same DIARIZED_TRANSCRIPT shape.
+{ "videoUrl": "https://www.youtube.com/watch?v=1u5dMAKl_ks", "speakerCount": 4 /* optional hint */ }
+
+// Audio path — existing Gemini diarization (unchanged).
 { "audioSource": "/data/podcasts/episode-42.mp3", "model": "gemini-3.5-flash" /* optional */ }
 ```
+
+`videoUrl` is a YouTube watch/share URL or raw video id. Captions come from the
+existing InnerTube transcript API. YouTube ASR does **not** name speakers; it
+inserts `>>` / `isSpeakerChange` at turn boundaries (the watch-page transcript
+UI strips those marks). A 2-person toggle would mash a 4-host panel into two
+ids, so ASR turns are labeled with a Gemini **text** call (no audio upload).
+Pass `speakerCount` (2–8) when you know the panel size. Authored captions
+that use `Name: text` keep `guessed_identity` and skip Gemini. `source` in
+the response is `"youtube_captions"` or `"gemini_audio"`.
 
 `audioSource` is a local filesystem path (the normal case — read directly
 off the VPS's disk) or an http(s) URL.
 
-Returns `ALApiResponse<VIRAL_CLIPPER_DIARIZE_RESPONSE>` — `{ transcript: DIARIZED_TRANSCRIPT, usage }`.
+Returns `ALApiResponse<VIRAL_CLIPPER_DIARIZE_RESPONSE>` — `{ transcript: DIARIZED_TRANSCRIPT, usage, source }`. Named-caption `usage` is zeros; ASR caption labeling reports the Gemini text-call usage.
 
 **Long audio is chunked automatically** — no request-shape difference. Audio
 over `VIRAL_CLIPPER.CHUNK_THRESHOLD_SECONDS` (18 min) is transparently split into
 sequential `VIRAL_CLIPPER.CHUNK_DURATION_SECONDS` (15 min) chunks internally;
 `usage` is the sum across all chunk calls. See "Long episodes: root cause,
 fix, and what's still open" below for how this actually works and its
-current caveats.
+current caveats. The captions path is not audio-chunked.
 
 ### `POST /viral-clipper/viral-moments`
 
@@ -117,33 +141,19 @@ Returns `ALApiResponse<VIRAL_CLIPPER_VIRAL_MOMENTS_RESPONSE>` — `{ candidates:
 
 **`channelContext`** is optional free text describing the show/channel and its audience — it's injected into the prompt to weight which moments and `hook_type`s fit that specific audience (with an explicit "don't fabricate niche claims" guard). Omit it and the prompt still produces good generic results; it isn't required to get quality output, it's a tuning knob.
 
-**`audienceSignals`** is an optional array of pre-formatted strings — real viewer/creator behavior on this exact episode (which moments viewers themselves called out as funny/memorable in comments, and/or the creator's own chapter titles) used to bias candidate selection toward moments already externally validated, not just what the model guesses. This endpoint doesn't fetch that data itself — call `/viral-clipper/youtube-comments` and/or `/viral-clipper/youtube-chapters` first (or their MCP equivalents) and pass their formatted output straight in (`formatCommentHighlightsAsAudienceSignals` / `formatChaptersAsAudienceSignals` from `youtube-comments.ts` / `youtube-chapters.ts` do the formatting for you). See "Audience signals" below for why this is a separate call rather than baked into `/viral-moments` itself.
+**`audienceSignals`** is an optional array of pre-formatted strings — real viewer/creator behavior on this exact episode (which moments viewers themselves called out as funny/memorable in comments, and/or the creator's own chapter titles) used to bias candidate selection toward moments already externally validated, not just what the model guesses. This endpoint doesn't fetch that data itself — call `/youtube/video/comments` (intel layer) and/or `/youtube/video/chapters` first (or their MCP equivalents, `youtube` `op=comments layer=intel` / `op=chapters`) and pass their formatted output straight in (`formatCommentTimestampClustersAsAudienceSignals` / `formatChaptersAsAudienceSignals` from `youtube/intelligence/audience-signals.ts` do the formatting for you). See "Audience signals" below for why this is a separate call rather than baked into `/viral-moments` itself.
 
 ### `POST /viral-clipper/pipeline`
 
-Convenience endpoint — same request shape as `/diarize` plus the same
+Convenience endpoint — same request shape as `/diarize` (`audioSource` **or**
+`videoUrl`) plus the same
 `minCandidates`/`maxCandidates`/`minClipSeconds`/`maxClipSeconds`/`channelContext`/`audienceSignals`
 options as `/viral-moments` above — runs both steps and returns
 `ALApiResponse<VIRAL_CLIPPER_PIPELINE_RESPONSE>` — transcript + candidates +
 `podcast_tone`/`podcast_tone_note` + usage for both calls. This is the one a
 caller normally wants; the split endpoints exist for re-scoring a transcript
-you already have without paying for diarization again.
-
-### `POST /viral-clipper/youtube-comments`
-
-```jsonc
-{ "videoUrl": "https://www.youtube.com/watch?v=...", "maxComments": 200 /* optional, default 200, max 200 */ }
-```
-
-Returns `ALApiResponse<VIRAL_CLIPPER_YOUTUBE_COMMENTS_RESPONSE>` — `{ videoTitle, commentsScanned, highlights: TIMESTAMP_MENTION_CLUSTER[] }`. Fetches top comments via InnerTube (same service as `/youtube/video/comments` intelligence), then maps `timestampClusters` (10s greedy window, ranked by mention count × 10 + likes). **No yt-dlp, no LLM.** Empty `highlights` is a valid, common result.
-
-### `POST /viral-clipper/youtube-chapters`
-
-```jsonc
-{ "videoUrl": "https://www.youtube.com/watch?v=..." }
-```
-
-Returns `ALApiResponse<VIRAL_CLIPPER_YOUTUBE_CHAPTERS_RESPONSE>` — `{ videoTitle, chapters: CHAPTER_SIGNAL[] }`, creator chapter markers from InnerTube `get_watch`. Most videos don't have chapters — an empty array is a valid result, not an error.
+you already have without paying for diarization again. Pass `videoUrl` to skip
+Gemini and build speaker turns from YouTube captions.
 
 ### `POST /viral-clipper/cut`
 
@@ -158,12 +168,12 @@ Returns `ALApiResponse<VIRAL_CLIPPER_YOUTUBE_CHAPTERS_RESPONSE>` — `{ videoTit
 
 Returns `ALApiResponse<VIRAL_CLIPPER_CUT_RESPONSE>` — `{ clips: CUT_CLIP_RESULT[] }`, one entry per requested clip with the actual cut boundaries used, the resolved `aspectRatio`, and the finished clip's local `clipPath` (under `VIRAL_CLIPPER_OUTPUT_DIR`).
 
-**Output framing** — `aspectRatio` applies to every clip in the request (call `/cut` again for a different ratio on the same clips). `"9:16"` → 1080x1920 (Shorts/Reels/TikTok), `"16:9"` → 1920x1080 (YouTube/landscape), `"1:1"` → 1080x1080 (square), `"original"` → no reframing, just re-encode at the source's native resolution. Reframing is a **centered crop** to the target aspect ratio followed by a scale to the fixed output dimensions — see `buildAspectRatioFilter` in `ffmpeg-cut.ts` for the exact ffmpeg filter (the crop width/height are computed as ffmpeg expressions against the actual decoded frame, so no source-dimension probing step is needed). This is a fixed center-crop, not subject/face tracking — if the interesting content in a wide shot sits off-center, a center-crop can cut it out of frame; there's no automatic reframing-toward-the-speaker here.
+**Output framing** — `aspectRatio` applies to every clip in the request (call `/cut` again for a different ratio on the same clips). `"9:16"` → 1080x1920 (Shorts/Reels/TikTok), `"16:9"` → 1920x1080 (YouTube/landscape), `"1:1"` → 1080x1080 (square), `"original"` → no reframing, just re-encode at the source's native resolution. Reframing is a **centered crop** to the target aspect ratio followed by a scale to the fixed output dimensions — see `buildAspectRatioFilter` in `cut/ffmpeg-cut.ts` for the exact ffmpeg filter (the crop width/height are computed as ffmpeg expressions against the actual decoded frame, so no source-dimension probing step is needed). This is a fixed center-crop, not subject/face tracking — if the interesting content in a wide shot sits off-center, a center-crop can cut it out of frame; there's no automatic reframing-toward-the-speaker here.
 
-Two independent problems, two independent fixes — see `boundary-snap.ts` and `ffmpeg-cut.ts`:
+Two independent problems, two independent fixes — see `cut/boundary-snap.ts` and `cut/ffmpeg-cut.ts`:
 
-- **No glitches**: `ffmpeg-cut.ts` always re-encodes (`-c:v libx264 -c:a aac`, never `-c copy`). `-ss`/`-to` before `-i` is fast but only seeks to the nearest keyframe, which can be seconds off and cause black-frame/A-V-desync glitches at arbitrary cut points. Clips here are short (<=120s), so re-encoding costs a couple seconds and eliminates the problem entirely — no need for GOP-surgery tooling. Reframing (crop+scale) rides along on this same re-encode pass, no extra cost.
-- **No words cut**: not a video-tool problem — ffmpeg has no idea where a word ends. If `diarized` is provided, `boundary-snap.ts` snaps each clip's start/end to the *nearest real speech-segment boundary* (only ever snapping start **backward** and end **forward**, so wanted content is never dropped) when that boundary is within `VIRAL_CLIPPER.BOUNDARY_SNAP_MAX_DISTANCE_SECONDS` (constants.ts) — cheap and safe. Beyond that distance (the suggested timestamp sits deep inside one long segment), snapping all the way back would make the clip unexpectedly long, so it falls back to the raw timestamp + `VIRAL_CLIPPER.CLIP_PADDING_SECONDS` padding instead. **This is a best-effort reduction, not a guarantee** — diarization segments are speaker-turn-level, not word-level, so a cut deep inside a long monologue segment can still land mid-sentence. Word-level timestamps (not currently produced anywhere in this pipeline) would be the real fix if this matters more than the current behavior allows.
+- **No glitches**: `cut/ffmpeg-cut.ts` always re-encodes (`-c:v libx264 -c:a aac`, never `-c copy`). `-ss`/`-to` before `-i` is fast but only seeks to the nearest keyframe, which can be seconds off and cause black-frame/A-V-desync glitches at arbitrary cut points. Clips here are short (<=120s), so re-encoding costs a couple seconds and eliminates the problem entirely — no need for GOP-surgery tooling. Reframing (crop+scale) rides along on this same re-encode pass, no extra cost.
+- **No words cut**: not a video-tool problem — ffmpeg has no idea where a word ends. If `diarized` is provided, `cut/boundary-snap.ts` snaps each clip's start/end to the *nearest real speech-segment boundary* (only ever snapping start **backward** and end **forward**, so wanted content is never dropped) when that boundary is within `VIRAL_CLIPPER.BOUNDARY_SNAP_MAX_DISTANCE_SECONDS` (constants.ts) — cheap and safe. Beyond that distance (the suggested timestamp sits deep inside one long segment), snapping all the way back would make the clip unexpectedly long, so it falls back to the raw timestamp + `VIRAL_CLIPPER.CLIP_PADDING_SECONDS` padding instead. **This is a best-effort reduction, not a guarantee** — diarization segments are speaker-turn-level, not word-level, so a cut deep inside a long monologue segment can still land mid-sentence. Word-level timestamps (not currently produced anywhere in this pipeline) would be the real fix if this matters more than the current behavior allows.
 
 ## Stream-direct clip extraction (YouTube sources)
 
@@ -175,11 +185,11 @@ bandwidth (Evomi dashboard: dominated by `googlevideo.com` subdomains at
 downloaded. Residential proxy bandwidth is the most expensive tier, so
 pulling a full 4K source to extract a few 30-second clips is unsustainable.
 
-**How.** For a YouTube `videoSource`, `cut.ts` now calls
+**How.** For a YouTube `videoSource`, `cut/cut.ts` now calls
 `resolveVideoSourceForCut` (`download.ts`), which fetches only the signed
 googlevideo stream URLs (video + audio) via the proxied InnerTube API call
 (KB, no media bytes) and returns them alongside the Evomi proxy URL.
-`cutClipFromStream` (`ffmpeg-cut.ts`) then runs ffmpeg with `-http_proxy`
+`cutClipFromStream` (`cut/ffmpeg-cut.ts`) then runs ffmpeg with `-http_proxy`
 set to Evomi, cutting each clip directly from the two stream URLs:
 
 - ffmpeg issues HTTP **range requests** for only the clip segment, so the
@@ -191,23 +201,23 @@ set to Evomi, cutting each clip directly from the two stream URLs:
   `-t` for duration — frame-accurate like the file path, without the
   full-source download. Re-encode (not stream-copy) keeps the same quality
   and carries the aspect-ratio filter.
-- **IP-signing**: googlevideo URLs are signed to the requesting (proxy) IP;
-  ffmpeg fetches through the same Evomi session/IP, so the stream URLs
-  validate. The per-country sticky agent from the download helper is reused
-  so all clips in one job egress from the same IP.
+- **IP / egress**: InnerTube (KB) stays on Evomi. googlevideo media is
+  probed from this host: residential/local → ffmpeg fetches the CDN
+  **directly** (no Evomi bytes); VPS datacenter → `403`, so ffmpeg still
+  uses `-http_proxy` and only the clip range transits Evomi. Override with
+  `YOUTUBE_MEDIA_VIA_PROXY=always|never`. The `ip=` param on stream URLs
+  is not enforced across two residential IPs; datacenter IPs are blocked
+  at googlevideo regardless of the signature.
 - **Proxy auth bridge**: ffmpeg's `-http_proxy` parses credentials from the
   URL but does **not** send them as `Proxy-Authorization` on the `CONNECT`
   (confirmed by capturing ffmpeg's bytes), so Evomi rejects an unauthenticated
-  CONNECT with `403`. `cut.ts` starts a tiny local CONNECT bridge
-  (`proxy-bridge.ts`) for the job: ffmpeg points `-http_proxy` at
-  `http://127.0.0.1:<port>`, and the bridge re-issues each `CONNECT` to
-  Evomi **with** the `Basic` auth header, then tunnels bytes both ways.
-  ffmpeg's range requests then flow through Evomi authenticated — the
-  stream-direct bandwidth win is preserved without ffmpeg ever seeing
-  Evomi's credentials.
-- **No proxy / local dev**: when Evomi isn't configured, `proxyUrl` is
-  `undefined` and ffmpeg fetches the stream URLs directly — fine from a
-  residential dev machine.
+  CONNECT with `403`. `cut/cut.ts` starts a tiny local CONNECT bridge
+  (`proxy-bridge.ts`) for the job **only when `proxyUrl` is set**: ffmpeg
+  points `-http_proxy` at `http://127.0.0.1:<port>`, and the bridge
+  re-issues each `CONNECT` to Evomi **with** the `Basic` auth header.
+- **No proxy / local / direct media**: when Evomi isn't configured, or
+  when the googlevideo probe succeeds, `proxyUrl` is `undefined` and
+  ffmpeg fetches the stream URLs directly.
 
 **Diarize path unchanged.** `/diarize` still downloads the full audio
 (`resolveMediaSource` → `downloadYoutubeMedia({ media: "audio" })`) because
@@ -247,7 +257,7 @@ stretches (a coherent anecdote, a considered answer) above the moments that
 actually made people laugh. The fix is two-part, not a scoring-weight tweak
 alone:
 
-1. **`diarize.ts`'s prompt now captures laughter instead of discarding it.**
+1. **`diarize/audio.ts`'s prompt now captures laughter instead of discarding it.**
    Previously, backchannel sounds *including laughter* were explicitly
    filtered out of the transcript as noise (rule 6, pre-2026-08-11). Laughter
    is now its own rule: inline `[speaker_1 laughs]` / `[speaker_2 laughs]` /
@@ -255,7 +265,7 @@ alone:
    near-zero extra token cost (no new segment, just a few characters). This
    is the ground-truth signal everything below depends on — without it,
    "was this actually funny" is unanswerable from a transcript alone.
-2. **`viral-moments.ts`'s prompt reads that signal and reasons about genre
+2. **`moments/score.ts`'s prompt reads that signal and reasons about genre
    first.** Before picking candidates, the prompt has the model classify the
    episode as `comedy` / `informative` / `mixed` from how often and how
    genuinely the laugh markers fire (not just topic), returned as
@@ -274,14 +284,13 @@ episode is scored on insight/emotion/conflict as before, laughter or not.
 
 ## Audience signals (YouTube comments + chapters)
 
-**2026-08-11.** `youtube-comments.ts` and `youtube-chapters.ts` add a second,
-independent signal source: what real viewers and the creator themselves
-already flagged as notable on this exact episode, via InnerTube (no
-YouTube Data API key exists in this project — see the Env section's
-caveat on production availability). Comments frequently call out a moment
-directly ("12:34 lol", "the part at 15:20 killed me") —
-`youtube-comments.ts` extracts those timestamp mentions and
-clusters/ranks them by mention count + likes.
+**2026-08-11.** Audience signals add a second, independent signal source:
+what real viewers and the creator themselves already flagged as notable on
+this exact episode, via InnerTube (no YouTube Data API key exists in this
+project — see the Env section's caveat on production availability).
+Comments frequently call out a moment directly ("12:34 lol", "the part at
+15:20 killed me") — the youtube module's comments intelligence extracts
+those timestamp mentions and clusters/ranks them by mention count + likes.
 Chapter titles are the creator's own labeling of each section, often naming
 the funny/notable bit directly.
 
@@ -291,14 +300,16 @@ the funny/notable bit directly.
 be the same source (a caller might diarize a local file that was never
 uploaded to YouTube at all), and not every caller wants the extra
 InnerTube round-trip or has an actual YouTube URL at all. Fetch
-`/viral-clipper/youtube-comments` and/or `/viral-clipper/youtube-chapters` (or their
-MCP equivalents, `viral_clipper` `op=comment_highlights` /
+`/youtube/video/comments` (intel layer) and/or `/youtube/video/chapters`
+(or their MCP equivalents, `youtube` `op=comments layer=intel` /
 `op=chapters`) yourself, format with the exported
-`formatCommentHighlightsAsAudienceSignals` / `formatChaptersAsAudienceSignals`
-helpers, and pass the result as `audienceSignals` to `/viral-moments` or
-`/pipeline`. The prompt treats this as a strong prior, not proof — it raises
-a nearby candidate's priority, it doesn't override the hook/body/button and
-standalone-clip requirements.
+`formatCommentTimestampClustersAsAudienceSignals` /
+`formatChaptersAsAudienceSignals` helpers
+(`youtube/intelligence/audience-signals.ts`), and pass the result as
+`audienceSignals` to `/viral-moments` or `/pipeline`. The prompt treats
+this as a strong prior, not proof — it raises a nearby candidate's
+priority, it doesn't override the hook/body/button and standalone-clip
+requirements.
 
 ## Pipeline
 
@@ -309,12 +320,12 @@ standalone-clip requirements.
    Gemini's resumable File API upload (takes the local file directly, not a
    URL fetch), polled until `state: "ACTIVE"` (required before the file can
    be referenced in `generateContent`).
-3. `diarize.ts` — `generateContent` with the audio file + the diarization
+3. `diarize/audio.ts` — `generateContent` with the audio file + the diarization
    prompt from `constants.ts`, constrained to `GEMINI_DIARIZATION_RESPONSE_SCHEMA`.
-4. `viral-moments.ts` — flattens the diarized transcript into
+4. `moments/score.ts` — flattens the diarized transcript into
    `[MM:SS-MM:SS] role: text` lines, sends as plain text with the
    viral-moment rubric prompt, constrained to `GEMINI_VIRAL_MOMENTS_RESPONSE_SCHEMA`.
-5. `cleanupResolvedMediaSource` in a `finally` in `diarize.ts`/`cut.ts` —
+5. `cleanupResolvedMediaSource` in a `finally` in `diarize/audio.ts`/`cut/cut.ts` —
    only ever deletes the temp dir `resolveMediaSource` created itself
    (`ownsSource`/`workDir` tracked explicitly); a caller-supplied local path
    is never touched.
@@ -469,7 +480,7 @@ key" request would violate that without consent.
   `GEMINI_VIRAL_MOMENTS_RESPONSE_VALIDATOR` in `schemas.ts`) immediately
   after parsing, instead of trusting it as an unchecked cast. We were
   bitten by exactly this class of bug once already (a diarized segment
-  silently missing `end`, which crashed deep inside `boundary-snap.ts` with
+  silently missing `end`, which crashed deep inside `cut/boundary-snap.ts` with
   a confusing error) — this fails clearly at the source instead.
 
 **Validated (2026-08-12), two separate real runs.** First attempt (one key,
@@ -508,7 +519,7 @@ a fixed daily reset.
   and (2026-08-11, hook/body/button prompt) consistently respected the
   `maxClipSeconds` ceiling and produced literal, checkable `hook_line`
   quotes and coherent `ending_note` justifications on real content.
-- `snapped: true` (the tighter segment-boundary snap in `boundary-snap.ts`,
+- `snapped: true` (the tighter segment-boundary snap in `cut/boundary-snap.ts`,
   vs. the looser fixed-padding fallback) was **not observed on either
   2026-08-10 test run** — every clip fell back to padding-only. It **was**
   observed for the first time on 2026-08-11, on 3 of 6 cut clips from the
@@ -562,24 +573,47 @@ a fixed daily reset.
 
 ```
 viral-clipper/
-  index.ts               # routes: /diarize, /viral-moments, /pipeline, /cut, /youtube-comments, /youtube-chapters
-  handler.ts              # thin: zod validate -> service call -> ALApiResponse
-  diarize.ts                # orchestration: resolve source -> single call OR chunked (long audio) -> generateContent
-  viral-moments.ts            # transcript (+ optional audienceSignals) -> flattened prompt -> generateContent
-  pipeline.ts                   # diarize.ts + viral-moments.ts combined
-  cut.ts                          # orchestration: resolve source video -> per-clip snap+cut -> write to VIRAL_CLIPPER_OUTPUT_DIR
-  proxy-bridge.ts                     # local CONNECT bridge: adds Evomi auth to ffmpeg's -http_proxy CONNECTs (stream-direct path)
-  boundary-snap.ts                  # MM:SS parsing + segment-boundary snap-or-pad logic
-  ffmpeg-cut.ts                       # single-clip ffmpeg re-encode cut + aspect-ratio filter + audio-chunk/reference-clip cutting
+  index.ts               # routes: /diarize, /viral-moments, /pipeline, /cut
+  handler.ts              # pipeline handler + re-export of per-stage handlers
+  create-handler.ts          # thin handler factory (zod validate -> service -> ALApiResponse)
+  pipeline.ts                   # compose diarize + viral-moments
   gemini-client.ts                     # generic Gemini File API + generateContent(responseSchema) helpers
   download.ts                            # resolveMediaSource (diarize: full audio download) + resolveVideoSourceForCut (cut: YouTube stream-direct URLs, no full download)
-  format-timestamp.ts                      # MM:SS / H:MM:SS formatter
-  youtube-comments.ts                        # InnerTube comments intelligence → timestamp clusters
-  youtube-chapters.ts                          # InnerTube get_watch chapter markers
-  schemas.ts / types.ts / constants.ts
+  diarize/                  # POST /viral-clipper/diarize — speaker labels
+    audio.ts                   # Gemini audio path: single call OR chunked (long audio) with reference-clip voice matching
+    captions.ts                  # YouTube-captions path: named tracks direct, ASR `>>` turns via a Gemini text pass
+    handler.ts / schemas.ts / constants.ts
+  moments/                  # POST /viral-clipper/viral-moments — clip scoring
+    score.ts                   # transcript (+ optional audienceSignals) -> flattened prompt -> generateContent
+    handler.ts / schemas.ts / constants.ts
+  cut/                      # POST /viral-clipper/cut — ffmpeg extraction
+    cut.ts                     # orchestration: resolve source video -> per-clip snap+cut -> write to VIRAL_CLIPPER_OUTPUT_DIR
+    ffmpeg-cut.ts                 # single-clip ffmpeg re-encode cut + aspect-ratio filter + audio-chunk/reference-clip cutting
+    boundary-snap.ts                # MM:SS parsing + segment-boundary snap-or-pad logic
+    proxy-bridge.ts                   # local CONNECT bridge: adds Evomi auth to ffmpeg's -http_proxy CONNECTs (stream-direct path)
+    handler.ts / schemas.ts
+  schemas.ts / types.ts / constants.ts   # pipeline schema, DIARIZED_TRANSCRIPT SSOT, shared limits/errors/prompts
   README.md
 
 ../../../scripts/viral-clipper-smoke.ts  # end-to-end smoke test (resolve -> diarize -> score -> cleanup)
-../../mcp/tools/viral-clipper.ts     # viral_clipper MCP ops (diarize, moments, pipeline, cut, comment_highlights, chapters)
+../../mcp/tools/viral-clipper.ts     # viral_clipper MCP ops (diarize, moments, pipeline, cut)
 ../../config.ts                     # ENDPOINTS.VIRAL_CLIPPER mount (always registered)
+../../utils/timestamp.ts            # shared MM:SS <-> seconds helpers (used here + youtube audience-signal formatters)
 ```
+
+## Ownership boundaries
+
+YouTube scraping lives in the `youtube` module, not here:
+
+| Concern | Where to get it |
+|---|---|
+| Captions / transcript | `POST /youtube/video/transcript` · `youtube` MCP `op=transcript` |
+| Comments (+ timestamp clusters) | `POST /youtube/video/comments` intel · `youtube` MCP `op=comments layer=intel` |
+| Chapters | `POST /youtube/video/chapters` · `youtube` MCP `op=chapters` |
+| Media download / stream URLs | `youtube/download/` (used internally by this module's `download.ts`) |
+| Audience-signal formatters | `youtube/intelligence/audience-signals.ts` (`formatCommentTimestampClustersAsAudienceSignals` / `formatChaptersAsAudienceSignals`) |
+
+The clipper owns speaker labeling, clip scoring, and cutting only. Captions
+diarize stays here (reading captions is a scrape; *labeling speakers* is a
+clipper concern) and already calls `fetchYoutubeVideoTranscript` — there is
+exactly one captions implementation.

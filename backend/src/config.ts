@@ -272,14 +272,6 @@ export const API_ENDPOINTS = {
       route: "/cut",
       full: `${ENDPOINTS.VIRAL_CLIPPER}/cut`,
     },
-    YOUTUBE_COMMENTS: {
-      route: "/youtube-comments",
-      full: `${ENDPOINTS.VIRAL_CLIPPER}/youtube-comments`,
-    },
-    YOUTUBE_CHAPTERS: {
-      route: "/youtube-chapters",
-      full: `${ENDPOINTS.VIRAL_CLIPPER}/youtube-chapters`,
-    },
   },
   TIGHTENING: {
     TIGHTEN: { route: "/", full: `${ENDPOINTS.TIGHTENING}` },

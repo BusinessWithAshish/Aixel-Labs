@@ -7,8 +7,8 @@ import {
   VIRAL_CLIPPER,
   VIRAL_CLIPPER_ASPECT_RATIO_DIMENSIONS,
   VIRAL_CLIPPER_ERROR_MESSAGES,
-} from "./constants";
-import type { VIRAL_CLIPPER_ASPECT_RATIO_VALUE } from "./types";
+} from "../constants";
+import type { VIRAL_CLIPPER_ASPECT_RATIO_VALUE } from "../types";
 
 const execFileAsync = promisify(execFile);
 
@@ -169,12 +169,9 @@ const STREAM_DIRECT_FAST_SEEK_BACKUP_SECONDS = 3;
 
 /**
  * Cuts one clip directly from two remote stream URLs (a video-only and an
- * audio-only adaptive googlevideo URL) with ffmpeg, routing each input
- * through `proxyUrl` via `-http_proxy`. This is the stream-direct path:
- * ffmpeg issues HTTP range requests for only the clip segment, so the
- * bytes transiting the residential proxy are ~`duration + backup` per
- * stream — not the whole source video (the difference between ~30 MB and
- * ~300 MB-1 GB per clip job).
+ * audio-only adaptive googlevideo URL) with ffmpeg. `proxyUrl` is passed
+ * as `-http_proxy` only when this host cannot fetch googlevideo directly
+ * (VPS datacenter 403); otherwise ffmpeg hits the CDN with no proxy.
  *
  * Seek strategy: fast-seek each input to `max(0, start - backup)` (keyframe
  * snap, range request), then accurate-seek the output to the requested
@@ -184,8 +181,8 @@ const STREAM_DIRECT_FAST_SEEK_BACKUP_SECONDS = 3;
  * start, frame-accurate. Re-encode (not stream-copy) keeps the same
  * quality as `cutClip` and carries the aspect-ratio filter.
  *
- * `proxyUrl` is optional — when Evomi isn't configured (local dev) ffmpeg
- * fetches the stream URLs directly, which works from a residential IP.
+ * `proxyUrl` is optional — omitted when googlevideo is reachable from this
+ * host (local/residential) or when Evomi isn't configured.
  */
 export async function cutClipFromStream(
   videoUrl: string,
@@ -206,8 +203,8 @@ export async function cutClipFromStream(
   const duration = Number(endSeconds) - Number(startSeconds);
 
   const args: string[] = ["-y"];
-  // Each input is routed through the proxy (per-input protocol option) and
-  // fast-seeked to the keyframe just before the clip start.
+  // Each input is optionally routed through the proxy and fast-seeked to
+  // the keyframe just before the clip start.
   for (const url of [videoUrl, audioUrl]) {
     if (proxyUrl) args.push("-http_proxy", proxyUrl);
     args.push("-ss", fastSeek.toFixed(3), "-i", url);
