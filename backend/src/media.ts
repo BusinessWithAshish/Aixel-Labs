@@ -19,6 +19,8 @@ export const AIXEL_MEDIA = {
   MEDIA_CONDENSE_OUTPUT: join(AIXEL_MEDIA_ROOT, "private", "media-condense-output"),
   /** Where `media.fetch` writes a genuine remote (non-local) download — a fixed, persistent folder rather than a temp dir, so the op's response can just be `{ path }` with nothing to track or clean up. */
   MEDIA_FETCHED: join(AIXEL_MEDIA_ROOT, "private", "media-fetched"),
+  /** `chatgpt` op=stage's downloaded reference images — private (not web-served), a root-level sibling of public/private on purpose since it predates that split and already has real accumulated content. */
+  REFS: join(AIXEL_MEDIA_ROOT, "refs"),
   PUBLIC_BASE_URL:
     process.env.AIXEL_MEDIA_PUBLIC_BASE || "https://hermes.aixellabs.in/media",
 } as const;

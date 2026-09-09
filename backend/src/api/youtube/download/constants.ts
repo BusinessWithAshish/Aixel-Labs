@@ -1,5 +1,3 @@
-import { resolve } from "node:path";
-
 import { AIXEL_MEDIA } from "../../../media";
 
 export const YOUTUBE_DOWNLOAD_MEDIA = {
@@ -10,9 +8,7 @@ export const YOUTUBE_DOWNLOAD_MEDIA = {
 /** ffmpeg merge timeout for the video path (audio is a single stream). */
 export const YOUTUBE_DOWNLOAD_TIMEOUT_MS = 20 * 60 * 1000;
 
-export const YOUTUBE_DOWNLOAD_DIR = resolve(
-  process.env.YOUTUBE_DOWNLOAD_DIR || AIXEL_MEDIA.YOUTUBE_DOWNLOADS,
-);
+export const YOUTUBE_DOWNLOAD_DIR = AIXEL_MEDIA.YOUTUBE_DOWNLOADS;
 
 export const YOUTUBE_DOWNLOAD_FIELD_DESCRIPTIONS = {
   VIDEO_ID:

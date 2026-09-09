@@ -49,11 +49,10 @@ export const CHATGPT = {
   LOGO_PATH:
     process.env.CHATGPT_LOGO_PATH ||
     "/home/ubuntu/AIXEL-LABS-ORG/brand/assets/aixellabs-lockup.png",
-  MEDIA_ROOT: process.env.CHATGPT_MEDIA_ROOT || AIXEL_MEDIA.PUBLIC,
-  MEDIA_PUBLIC_BASE:
-    process.env.CHATGPT_MEDIA_PUBLIC_BASE || AIXEL_MEDIA.PUBLIC_BASE_URL,
+  MEDIA_ROOT: AIXEL_MEDIA.PUBLIC,
+  MEDIA_PUBLIC_BASE: AIXEL_MEDIA.PUBLIC_BASE_URL,
   /** Downloaded reference images (research finds, not generated output) — private, not web-served. */
-  STAGE_ROOT: process.env.CHATGPT_STAGE_ROOT || "/home/ubuntu/media/refs",
+  STAGE_ROOT: AIXEL_MEDIA.REFS,
   STAGE_MAX_BYTES: 15 * 1024 * 1024,
   STAGE_FETCH_TIMEOUT_MS: 30_000,
   STAGE_ALLOWED_CONTENT_TYPES: [

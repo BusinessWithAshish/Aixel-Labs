@@ -48,10 +48,11 @@ generation reference: download it first, then pass the path into `images[]`.
 { "success": true, "data": { "path": "/home/ubuntu/media/refs/….jpg", "content_type": "image/jpeg", "size_bytes": 123456 } }
 ```
 
-Staged files live under `CHATGPT_STAGE_ROOT` (default `/home/ubuntu/media/refs`,
-private — not web-served, unlike generated output under `MEDIA_ROOT`). Max
-15MB, must be a real image content-type. Nothing cleans these up automatically
-— they're meant to accumulate as a reference library, not ephemeral scratch.
+Staged files live under `{AIXEL_MEDIA_ROOT}/refs` (`AIXEL_MEDIA.REFS` in
+`src/media.ts`, not independently overridable) — private, not web-served,
+unlike generated output under `MEDIA_ROOT`. Max 15MB, must be a real image
+content-type. Nothing cleans these up automatically — they're meant to
+accumulate as a reference library, not ephemeral scratch.
 
 ## Request (`POST /chatgpt`)
 

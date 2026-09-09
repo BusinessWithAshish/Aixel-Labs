@@ -71,13 +71,13 @@ storage limit besides. `condenseVideo` refuses to run at all on Vercel
 a `/tmp` that won't survive the invocation.
 
 - **Input** (`videoSource`) accepts a local path or a URL — see above.
-- **Output** — `condenseVideo` writes the finished video straight to
-  `MEDIA_CONDENSE_OUTPUT_DIR` (env var, defaults to
-  `{AIXEL_MEDIA_ROOT}/private/video-condense-output`) and returns its local
-  `videoPath` in the response instead of an uploaded URL. Point
-  `MEDIA_CONDENSE_OUTPUT_DIR` at
-  wherever on the VPS's disk should hold condensed videos; the directory is
-  created automatically if missing.
+- **Output** — `condenseVideo` writes the finished file straight to
+  `MEDIA_CONDENSE_OUTPUT_DIR` (fixed at
+  `{AIXEL_MEDIA_ROOT}/private/media-condense-output` — see `src/media.ts`,
+  not independently overridable, repoint the whole tree via
+  `AIXEL_MEDIA_ROOT`) and returns its local `mediaPath` in the response
+  instead of an uploaded URL; the directory is created automatically if
+  missing.
 
 ## Pipeline
 
@@ -222,8 +222,8 @@ video/condense/
 ## Env
 
 - `GROQ_API_KEY` — required unless every call passes `removeFillers: false`.
-- `MEDIA_CONDENSE_OUTPUT_DIR` — optional, where finished videos are written; see
-  "Storage" above.
+- `MEDIA_CONDENSE_OUTPUT_DIR` — not an env var despite the name, a fixed
+  subpath of `AIXEL_MEDIA_ROOT`; see "Storage" above.
 
 No Gemini key: nothing here needs an LLM. Silence is a signal-processing
 question and fillers are a dictionary lookup over timestamps. No Blob token

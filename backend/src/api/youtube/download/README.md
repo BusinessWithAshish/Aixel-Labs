@@ -100,9 +100,10 @@ and take minutes — set the HTTP client timeout accordingly (curl `-m
 
 ## Disk
 
-Default dir: `{AIXEL_MEDIA_ROOT}/private/youtube-downloads/{id}.mp4` (`.m4a`
+Fixed dir: `{AIXEL_MEDIA_ROOT}/private/youtube-downloads/{id}.mp4` (`.m4a`
 for audio). Unset `AIXEL_MEDIA_ROOT` → `cwd/storage/private/youtube-downloads`.
-Override with `YOUTUBE_DOWNLOAD_DIR`.
+Not independently overridable — repoint the whole media tree via
+`AIXEL_MEDIA_ROOT` if needed.
 
 ffmpeg for the video merge comes from `ffmpeg-static` (no system ffmpeg
 required, but it's used if present).

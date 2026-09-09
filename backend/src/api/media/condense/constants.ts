@@ -1,5 +1,3 @@
-import { resolve } from "node:path";
-
 import { AIXEL_MEDIA } from "../../../media";
 
 /**
@@ -138,6 +136,4 @@ export const MEDIA_CONDENSE_ERROR_MESSAGES = {
     "Condense needs a persistent host with local disk output (not available on Vercel)",
 } as const;
 
-export const MEDIA_CONDENSE_OUTPUT_DIR = resolve(
-  process.env.MEDIA_CONDENSE_OUTPUT_DIR || AIXEL_MEDIA.MEDIA_CONDENSE_OUTPUT,
-);
+export const MEDIA_CONDENSE_OUTPUT_DIR = AIXEL_MEDIA.MEDIA_CONDENSE_OUTPUT;

@@ -70,14 +70,14 @@ rather than silently writing to a `/tmp` that won't survive the invocation;
   for the rare case where the only thing available is a remote link). See
   `resolveMediaSource`/`cleanupResolvedMediaSource` in `download.ts`.
 - **Output** — `/cut` writes finished clips straight to
-  `MEDIA_CUT_OUTPUT_DIR` (env var, defaults to
-  `{AIXEL_MEDIA_ROOT}/private/video-cuts`; unset root →
-  `<cwd>/storage/private/video-cuts`) and returns each clip's local
-  `clipPath` in the response instead of an uploaded URL. Point
-  `MEDIA_CUT_OUTPUT_DIR` at wherever on the VPS's 200GB disk should hold
-  finished clips; the directory is created automatically if missing. These
-  paths are private working files — copy into `{AIXEL_MEDIA_ROOT}/public` only
-  when a fetchable `https://hermes.aixellabs.in/media/…` URL is needed.
+  `MEDIA_CUT_OUTPUT_DIR` (fixed at `{AIXEL_MEDIA_ROOT}/private/media-cuts`;
+  unset root → `<cwd>/storage/private/media-cuts`) and returns each clip's
+  local `clipPath` in the response instead of an uploaded URL. Repoint the
+  whole tree by setting `AIXEL_MEDIA_ROOT` — this subpath isn't
+  independently overridable, see `src/media.ts`; the directory is created
+  automatically if missing. These paths are private working files — copy
+  into `{AIXEL_MEDIA_ROOT}/public` only when a fetchable
+  `https://hermes.aixellabs.in/media/…` URL is needed.
 
 ## Env
 
@@ -92,10 +92,12 @@ rather than silently writing to a `/tmp` that won't survive the invocation;
   (`key1,key2,key3`) — see "Multi-key pool + retry" below. The pool NEVER
   falls back to `GEMINI_API_KEY` (the paid key) automatically; that's a
   deliberate boundary, not an oversight.
-- `MEDIA_CUT_OUTPUT_DIR` — optional, local directory `/cut` writes finished
-  clips to. Defaults to `{AIXEL_MEDIA_ROOT}/private/video-cuts`.
-- `MEDIA_CONDENSE_OUTPUT_DIR` — optional, local directory `/condense` writes
-  its output to. Defaults to `{AIXEL_MEDIA_ROOT}/private/video-condense-output`.
+- `MEDIA_CUT_OUTPUT_DIR` / `MEDIA_CONDENSE_OUTPUT_DIR` / `MEDIA_FETCH_DIR` —
+  not env vars despite the name; fixed subpaths of `AIXEL_MEDIA_ROOT`
+  (`private/media-cuts`, `private/media-condense-output`,
+  `private/media-fetched` — see `src/media.ts`). Repoint the whole media
+  tree via `AIXEL_MEDIA_ROOT` if needed; these aren't independently
+  overridable.
 - `GROQ_API_KEY` — **required by `/transcribe`** (Groq Whisper). Unrelated to
   the Gemini keys above; `/diarize` and `/transcribe` are separate providers.
 - **ffmpeg** — required by `/cut` (clip re-encode), `/condense` (full

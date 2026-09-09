@@ -1,5 +1,3 @@
-import { resolve } from "node:path";
-
 import { AIXEL_MEDIA } from "../../media";
 
 /**
@@ -162,11 +160,7 @@ export const MEDIA_ERROR_MESSAGES = {
 /** HTTP statuses treated as "this source is blocking a plain fetch" — triggers the TLS-fingerprint fallback in source.ts. */
 export const MEDIA_GATED_STATUS_CODES = [401, 403, 429, 503] as const;
 
-export const MEDIA_CUT_OUTPUT_DIR = resolve(
-  process.env.MEDIA_CUT_OUTPUT_DIR || AIXEL_MEDIA.MEDIA_CUTS,
-);
+export const MEDIA_CUT_OUTPUT_DIR = AIXEL_MEDIA.MEDIA_CUTS;
 
 /** Where `media.fetch` writes a genuine remote download — see AIXEL_MEDIA.MEDIA_FETCHED. */
-export const MEDIA_FETCH_DIR = resolve(
-  process.env.MEDIA_FETCH_DIR || AIXEL_MEDIA.MEDIA_FETCHED,
-);
+export const MEDIA_FETCH_DIR = AIXEL_MEDIA.MEDIA_FETCHED;
