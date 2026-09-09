@@ -27,7 +27,25 @@ export const CHATGPT_FIELD_DESCRIPTIONS = {
 } as const;
 
 export const CHATGPT = {
-  CDP_HTTP: process.env.CHATGPT_CDP_HTTP || "http://localhost:9222",
+  CDP_HTTP: process.env.CHATGPT_CDP_HTTP || "http://127.0.0.1:9222",
+  /** Chrome binary spawned fresh per call — see cdp.ts launchChatGptChrome(). */
+  CHROME_BIN: process.env.CHATGPT_CHROME_BIN || "/usr/bin/google-chrome-stable",
+  /**
+   * Persistent profile dir (cookies + ChatGPT login) reused across spawns.
+   * Same directory the old always-on VNC Chrome used — logging in once via
+   * VNC (or copying a logged-in profile here) keeps working across restarts
+   * because only the profile *directory* needs to persist, not the process.
+   */
+  PROFILE_DIR: process.env.CHATGPT_PROFILE_DIR || "/home/ubuntu/browser-vnc/chrome-official",
+  /**
+   * X11 display to render into. MUST be headed, not `--headless=new` —
+   * verified live 2026-09-07: chatgpt.com's Cloudflare check waves through
+   * a headed browser using these exact cookies but walls a headless one
+   * behind a "Just a moment…" interstitial, even with a valid session.
+   * Reuses the Xvfb the aixel-xvfb systemd unit already runs (originally for
+   * the always-on VNC Chrome) — no new display server needed.
+   */
+  DISPLAY: process.env.CHATGPT_DISPLAY || ":99",
   LOGO_PATH:
     process.env.CHATGPT_LOGO_PATH ||
     "/home/ubuntu/AIXEL-LABS-ORG/brand/assets/aixellabs-lockup.png",
@@ -44,13 +62,6 @@ export const CHATGPT = {
     "image/webp",
     "image/gif",
   ] as const,
-  SYSTEMD_SERVICES: [
-    "aixel-xvfb",
-    "aixel-fluxbox",
-    "aixel-x11vnc",
-    "aixel-novnc",
-    "aixel-chromium",
-  ] as const,
   /** Soft upper bound for waiting on ChatGPT stream; CDP/session errors fail sooner. */
   DEFAULT_STREAM_TIMEOUT_SEC: 30 * 60,
   COMPOSER_WAIT_SEC: 90,
@@ -60,6 +71,9 @@ export const CHATGPT = {
   CDP_EVAL_TIMEOUT_MS: 60_000,
   CDP_DOWNLOAD_TIMEOUT_MS: 240_000,
   CDP_MAX_PAYLOAD_BYTES: 200 * 1024 * 1024,
+  /** How long a freshly spawned Chrome gets to open its CDP port. */
+  CDP_LAUNCH_TIMEOUT_MS: 20_000,
+  CDP_LAUNCH_POLL_MS: 300,
 } as const;
 
 export const CHATGPT_MODES = ["new", "revise"] as const;

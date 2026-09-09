@@ -51,7 +51,7 @@ Strategy:
 3. **Flatten** `events[].segs[].utf8` into ordered transcript lines.
    Auto-generated tracks often include `>>` at speaker-turn boundaries;
    the watch-page transcript UI hides those marks. Viral-clipper's
-   captions diarize path (`videoUrl` on `/viral-clipper/diarize`) reads
+   captions diarize path (`videoUrl` on `/video/diarize`) reads
    them to build `speaker_1` / `speaker_2` segments.
 
 Language selection preference (`pickTrack`):

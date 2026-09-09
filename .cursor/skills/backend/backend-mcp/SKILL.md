@@ -51,8 +51,8 @@ Mount: `ENDPOINTS.MCP` (`/mcp`) via `routes.ts` — platform skill owns that wir
 | Tools | `MCP_TOOL_COUNT` = **10** (keep in sync with domain registrations) |
 | Package | `@modelcontextprotocol/sdk` |
 
-Domains: `youtube`, `trends`, `instagram`, `twitter`, `gsearch`, `transcription`,
-`viral_clipper`, `tightening`, `chatgpt`, `claude`. Lead-gen (Maps / Facebook /
+Domains: `youtube`, `trends`, `instagram`, `twitter`, `gsearch`, `media`,
+`segment`, `chatgpt`, `claude`. Lead-gen (Maps / Facebook /
 LinkedIn) is HTTP-only unless product asks otherwise.
 
 Health: `GET /mcp/health` → `{ status, server, tools }`.
@@ -82,7 +82,7 @@ registerDomainTool(server, {
 | Layer | When |
 |-------|------|
 | `intel` | Real computed overlay exists (YouTube comments/search/video/…, Trends interest/compare, Instagram `account`) |
-| `raw` | Scrape or in-memory compute with no overlay (Twitter, GSearch, transcription, viral_clipper, tightening, Instagram aggregates) |
+| `raw` | Scrape or in-memory compute with no overlay (Twitter, GSearch, video, Instagram aggregates) |
 
 Default `layer`: intel if that op has an overlay, else raw. Invalid combo **fails**
 — no silent fallback. Aggregates/compute-only ops expose **raw only**.

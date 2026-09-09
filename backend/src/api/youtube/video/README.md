@@ -92,7 +92,8 @@ chapters — an empty `chapters[]` is a valid result, not an error.
 }
 ```
 
-Formatting chapters as viral-clipper `audienceSignals` lines is done by
+Formatting chapters as `audienceSignals` lines (consumed by the parked
+moments scorer, `api/segment/moments/`) is done by
 `formatChaptersAsAudienceSignals` in
 [`intelligence/audience-signals.ts`](../intelligence/audience-signals.ts) —
 the clipper consumes strings, not this shape.

@@ -25,6 +25,10 @@ import {
   resolveYoutubeHandleToChannelId,
 } from "../../api/youtube/handle/helpers";
 import { YOUTUBE_HANDLE_REQUEST_SCHEMA } from "../../api/youtube/handle/schemas";
+import { YOUTUBE_VIDEO_DOWNLOAD_REQUEST_SCHEMA } from "../../api/youtube/download/schemas";
+import { downloadYoutubeMedia } from "../../api/youtube/download/helpers";
+import { YOUTUBE_DIARIZE_REQUEST_SCHEMA } from "../../api/youtube/diarize/schemas";
+import { diarizeFromYoutubeCaptions } from "../../api/youtube/diarize/captions";
 import { YOUTUBE_VIDEO_META_REQUEST_SCHEMA } from "../../api/youtube/video-meta/schemas";
 import { fetchYoutubeVideoMeta } from "../../api/youtube/video-meta/helpers";
 import {
@@ -134,6 +138,23 @@ const YOUTUBE_OPS: Record<string, DomainOp> = {
     raw: { schema: YOUTUBE_HANDLE_REQUEST_SCHEMA, run: fetchYoutubeHandle },
     intel: { schema: YOUTUBE_HANDLE_REQUEST_SCHEMA, run: resolveHandleService },
   },
+  video_download: {
+    defaultLayer: MCP_LAYER.RAW,
+    raw: { schema: YOUTUBE_VIDEO_DOWNLOAD_REQUEST_SCHEMA, run: downloadYoutubeMedia },
+  },
+  diarize: {
+    defaultLayer: MCP_LAYER.RAW,
+    raw: {
+      schema: YOUTUBE_DIARIZE_REQUEST_SCHEMA,
+      run: (input) =>
+        diarizeFromYoutubeCaptions(
+          input.videoUrl,
+          input.language,
+          input.model,
+          input.speakerCount,
+        ),
+    },
+  },
   video_meta: {
     defaultLayer: MCP_LAYER.INTEL,
     raw: { schema: YOUTUBE_VIDEO_META_REQUEST_SCHEMA, run: fetchYoutubeVideoMeta },
@@ -177,6 +198,8 @@ Ops:
 - channel (raw|intel, default intel) — channel + tab. input: channelId OR handle, contentType?, limit?, country?, region?
 - handle (raw|intel, default intel) — resolve @handle. input: handle, country?, region?
 - video_meta (raw|intel, default intel) — batch watch-page metadata. input: videoIds[], country?, region?
+- video_download (raw only) — download a video/audio stream to local disk (cached — re-downloading the same videoId+media returns the cached file). Refused on Vercel (no persistent disk). input: videoId, media? ('video'|'audio', default video), country?, region?
+- diarize (raw only) — speaker-labelled transcript from the video's own captions. Always free/cheap (at most one small text-only Gemini call), no audio uploaded. Hard-fails if there are no usable captions — no fallback to Gemini-audio diarization here; that's 'media' op=diarize, called explicitly if you want it. input: videoUrl, language?, model?, speakerCount?
 - aggregate_niche (raw only) — compute-only niche signals from harvested videos
 - aggregate_keyword (raw only) — compute-only keyword signals
 - compare_channels (raw only) — compute-only channel comparison

@@ -7,16 +7,29 @@ does not declare which one it wants ahead of time. When an image comes back
 it's staged as a public JPEG under `{AIXEL_MEDIA_ROOT}/public` →
 `https://hermes.aixellabs.in/media/…`.
 
-Requires the same host as `aixel-chromium` (localhost CDP). **VPS only** —
-every endpoint (including `/health`) refuses to run unless `AIXEL_VPS=1` is
-set, so a local `pnpm dev` or a Vercel deployment can't accidentally drive a
-browser session that isn't there.
+Spawns a fresh headed Chrome per call against a persistent profile dir
+(`CHATGPT.PROFILE_DIR`, default `/home/ubuntu/browser-vnc/chrome-official` —
+the same dir the old always-on VNC Chrome used) and closes it when done.
+Login state lives in the profile directory, not a running process, so it
+survives every spawn. **Headed is required, not headless** — chatgpt.com's
+Cloudflare check walls a headless launch behind a "Just a moment…"
+interstitial even with valid session cookies; the spawn renders into the
+Xvfb display `aixel-xvfb` already runs (`CHATGPT.DISPLAY`, default `:99`).
+`busy` (module-level) serializes calls so two spawns never race for the same
+profile dir. **VPS only** — every endpoint (including `/health`) refuses to
+run unless `AIXEL_VPS=1` is set, so a local `pnpm dev` or a Vercel deployment
+can't accidentally drive a browser session that isn't there.
+
+If the profile's ChatGPT login expires, re-authenticate by temporarily
+running Chrome headed against the same profile dir + display and signing in
+by hand (e.g. via the `aixel-novnc` VNC endpoint), then let this module
+resume spawning against it.
 
 ## Endpoints
 
 | Method | Path | Role |
 |--------|------|------|
-| `GET` | `/chatgpt/health` | Preflight (systemd + CDP + session) |
+| `GET` | `/chatgpt/health` | Static checks (binary, profile dir) + one real spawn+login check |
 | `POST` | `/chatgpt` | One ChatGPT turn (sync; may take many minutes for an image) |
 | `POST` | `/chatgpt/stage` | Download a URL to a local reference file (fast, no browser) |
 

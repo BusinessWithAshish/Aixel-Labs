@@ -8,7 +8,7 @@ HTTP handlers — **no HTTP loopback**.
 | Mount       | `ENDPOINTS.MCP` → `/mcp`                            |
 | Server name | `aixel-intelligence`                                |
 | Factory     | `createAixelIntelligenceMcpServer()` in `server.ts` |
-| Tool count  | `MCP_TOOL_COUNT` (**10**)                            |
+| Tool count  | `MCP_TOOL_COUNT` (**9**)                            |
 
 HTTP stays exploded (one POST per function). MCP collapses to **one tool per
 domain**. Every tool takes the same top-level shape:
@@ -28,14 +28,13 @@ Lead-gen (Maps / Facebook / LinkedIn) stays **HTTP-only**.
 
 | Tool            | Ops                                                                                                                                                                | Layer                                                                                |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `youtube`       | `search`, `suggest`, `video`, `suggested`, `transcript`, `comments`, `chapters`, `channel`, `handle`, `video_meta`, `aggregate_niche`, `aggregate_keyword`, `compare_channels` | intel where an overlay exists (incl. comments). `chapters` + aggregates are `raw` only. |
+| `youtube`       | `search`, `suggest`, `video`, `suggested`, `transcript`, `comments`, `chapters`, `channel`, `handle`, `video_meta`, `video_download`, `diarize`, `aggregate_niche`, `aggregate_keyword`, `compare_channels` | intel where an overlay exists (incl. comments). `chapters`, `video_download`, `diarize` + aggregates are `raw` only. `video_download` writes to local disk, cached — refused on Vercel. `diarize` reads the video's own captions (free/cheap, no audio uploaded) into the same transcript shape `media` op=diarize produces — hard-fails on no captions, no fallback. |
 | `trends`        | `interest`, `compare`, `trending`                                                                                                                                  | intel for interest/compare; `trending` raw-only                                      |
 | `instagram`     | `profile`, `search_profiles`, `posts`, `content_leads`, `popular`, `account`, `aggregate_account`                                                                  | intel **only** for `account`. `aggregate_account` is compute/`raw`. Rest raw.        |
 | `twitter`       | `user`, `tweet`, `user_tweets`, `trending`, `search`                                                                                                               | raw only (no Twitter intel API)                                                      |
 | `gsearch`       | `search` (v1 CSE), `search_v2` (Docs Explore / CSE fallback)                                                                                                       | raw                                                                                  |
-| `transcription` | `transcribe`                                                                                                                                                       | raw                                                                                  |
-| `viral_clipper` | `diarize`, `moments`, `pipeline`, `cut`                                                                                                                            | raw. `diarize`/`pipeline` accept `videoUrl` (YouTube captions, no Gemini) or `audioSource` (Gemini). `cut` writes to local disk — refused on Vercel (`IS_VERCEL_RUNTIME`). Fetch captions/comments/chapters via `youtube`, then clipper |
-| `tightening`    | `tighten`                                                                                                                                                          | raw. Writes to local disk — refused on Vercel (`IS_VERCEL_RUNTIME`)                  |
+| `media`         | `fetch`, `transcribe`, `diarize`, `cut`, `condense`                                                                            | raw. Generic media primitives — no pipeline baked in, and never touches YouTube-specific code (get a YouTube video via `youtube` op=video_download or op=diarize first, then hand this tool the result). `diarize` here is Gemini-audio only — costs real money/quota; try `youtube` op=diarize (free) first for a YouTube source. `fetch`/`cut`/`condense` write to local disk — refused on Vercel (`IS_VERCEL_RUNTIME`). Clip scoring lives in the `segment` tool below, not here. |
+| `segment`       | `by_speech`                                                                                                                            | raw. Decides WHAT to cut, `media` handles the mechanics. `by_speech` ranks a diarized transcript (hook/body/button rubric, tone-aware) into candidates shaped for `media` op=cut's `clips` field — works with a transcript from either `media` op=diarize or `youtube` op=diarize, they produce the same shape. Takes `provider` (`claude`|`gemini`, REQUIRED, no default) — see `api/segment/moments/README.md` for the cost/quota tradeoff. `by_scene`/`by_vision` not yet built. |
 | `chatgpt`       | `generate`, `stage_image`                                                                                                                                          | raw only (browser-driven, no intel overlay). **VPS only** — refused everywhere else unless `AIXEL_VPS=1` |
 | `claude`        | `ask`, `budget_status`                                                                                                                                              | raw only (CLI-driven, no intel overlay). **VPS only** — refused everywhere else unless `AIXEL_VPS=1` |
 
@@ -66,10 +65,10 @@ Guest GraphQL/REST — no user login. Native keyword search is login-walled.
 
 `youtube` `op=comments` — InnerTube comment text, authors, likes, replies;
 `layer=intel` adds timestamp mentions + 10s clusters, the input for
-viral-clipper `audienceSignals` (format via
+the parked moments scorer's `audienceSignals` (format via
 `youtube/intelligence/audience-signals.ts` helpers). Chapter priors:
 `youtube` `op=chapters`. The clipper no longer wraps these — fetch via
-`youtube`, format, pass as `audienceSignals` to `viral_clipper`
+`youtube`, format, pass as `audienceSignals` to the moments scorer
 `moments`/`pipeline`.
 
 ## Layout
@@ -77,7 +76,7 @@ viral-clipper `audienceSignals` (format via
 ```
 mcp/
 ├── router.ts        # Express mount + health
-├── server.ts        # factory + MCP_TOOL_COUNT (registers 10 domain tools)
+├── server.ts        # factory + MCP_TOOL_COUNT (registers 9 domain tools)
 ├── domain-tool.ts   # registerDomainTool({ op, layer, input })
 ├── tool-result.ts   # ok / fail wrappers
 ├── tools/           # one file per domain

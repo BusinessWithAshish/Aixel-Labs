@@ -156,12 +156,11 @@ if (!process.env.VERCEL) {
    * Node's `server.requestTimeout` defaults to 300_000ms (5 min) since v18 —
    * too short for long-running upstream calls. Raised app-wide (VPS and
    * local alike — both take this `!VERCEL` branch) since several scrape/AI
-   * routes here can legitimately run long — in particular, viral-clipper's
-   * chunked diarization (see viral-clipper/diarize.ts) makes several
-   * sequential Gemini calls for long episodes (one per ~15min chunk), so a
-   * single `/viral-clipper/diarize` or `/viral-clipper/pipeline` request on
-   * a long episode can itself run considerably longer than any one Gemini
-   * call.
+   * routes here can legitimately run long — in particular, the video
+   * module's chunked diarization (see api/video/diarize/) makes several
+   * sequential Gemini calls for long sources (one per ~15min chunk), so a
+   * single `/video/diarize` request on a long source can itself run
+   * considerably longer than any one Gemini call.
    * `headersTimeout` stays under this per Node's requirement.
    *
    * This block is unreachable on Vercel, and deliberately so: there is no

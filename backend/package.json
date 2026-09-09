@@ -102,21 +102,29 @@
       "types": "./src/api/gsearch/v2/constants.ts",
       "default": "./src/api/gsearch/v2/constants.ts"
     },
-    "./transcription": {
-      "types": "./src/api/transcription/index.ts",
-      "default": "./src/api/transcription/index.ts"
+    "./media": {
+      "types": "./src/api/media/index.ts",
+      "default": "./src/api/media/index.ts"
     },
-    "./transcription/schemas": {
-      "types": "./src/api/transcription/schemas.ts",
-      "default": "./src/api/transcription/schemas.ts"
+    "./media/types": {
+      "types": "./src/api/media/types.ts",
+      "default": "./src/api/media/types.ts"
     },
-    "./transcription/types": {
-      "types": "./src/api/transcription/types.ts",
-      "default": "./src/api/transcription/types.ts"
+    "./media/constants": {
+      "types": "./src/api/media/constants.ts",
+      "default": "./src/api/media/constants.ts"
     },
-    "./transcription/constants": {
-      "types": "./src/api/transcription/constants.ts",
-      "default": "./src/api/transcription/constants.ts"
+    "./segment": {
+      "types": "./src/api/segment/index.ts",
+      "default": "./src/api/segment/index.ts"
+    },
+    "./segment/types": {
+      "types": "./src/api/segment/types.ts",
+      "default": "./src/api/segment/types.ts"
+    },
+    "./segment/constants": {
+      "types": "./src/api/segment/constants.ts",
+      "default": "./src/api/segment/constants.ts"
     },
     "./twitter": {
       "types": "./src/api/twitter/index.ts",
@@ -133,22 +141,6 @@
     "./twitter/constants": {
       "types": "./src/api/twitter/constants.ts",
       "default": "./src/api/twitter/constants.ts"
-    },
-    "./tightening": {
-      "types": "./src/api/tightening/index.ts",
-      "default": "./src/api/tightening/index.ts"
-    },
-    "./tightening/schemas": {
-      "types": "./src/api/tightening/schemas.ts",
-      "default": "./src/api/tightening/schemas.ts"
-    },
-    "./tightening/types": {
-      "types": "./src/api/tightening/types.ts",
-      "default": "./src/api/tightening/types.ts"
-    },
-    "./tightening/constants": {
-      "types": "./src/api/tightening/constants.ts",
-      "default": "./src/api/tightening/constants.ts"
     },
     "./instagram": {
       "types": "./src/api/instagram/types.ts",

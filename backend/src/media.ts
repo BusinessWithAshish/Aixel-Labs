@@ -15,8 +15,10 @@ export const AIXEL_MEDIA = {
   PUBLIC: join(AIXEL_MEDIA_ROOT, "public"),
   PRIVATE: join(AIXEL_MEDIA_ROOT, "private"),
   YOUTUBE_DOWNLOADS: join(AIXEL_MEDIA_ROOT, "private", "youtube-downloads"),
-  VIRAL_CLIPPER_CUTS: join(AIXEL_MEDIA_ROOT, "private", "viral-clipper-cuts"),
-  TIGHTENING_OUTPUT: join(AIXEL_MEDIA_ROOT, "private", "tightening-output"),
+  MEDIA_CUTS: join(AIXEL_MEDIA_ROOT, "private", "media-cuts"),
+  MEDIA_CONDENSE_OUTPUT: join(AIXEL_MEDIA_ROOT, "private", "media-condense-output"),
+  /** Where `media.fetch` writes a genuine remote (non-local) download — a fixed, persistent folder rather than a temp dir, so the op's response can just be `{ path }` with nothing to track or clean up. */
+  MEDIA_FETCHED: join(AIXEL_MEDIA_ROOT, "private", "media-fetched"),
   PUBLIC_BASE_URL:
     process.env.AIXEL_MEDIA_PUBLIC_BASE || "https://hermes.aixellabs.in/media",
 } as const;

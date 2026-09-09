@@ -3,7 +3,7 @@ import type { YOUTUBE_COMMENT_TIMESTAMP_CLUSTER } from "./comments/types";
 import type { YOUTUBE_VIDEO_CHAPTERS_RESPONSE } from "../video/types";
 
 /**
- * Audience-signal formatters — the YouTube side of the viral-clipper's
+ * Audience-signal formatters — the YouTube side of the moments scorer's
  * `audienceSignals` input. They turn this module's own scrape output
  * (comments-intelligence timestamp clusters, creator chapters) into the
  * prompt-ready lines `/viral-moments` consumes, so callers fetch via the

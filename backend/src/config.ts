@@ -17,9 +17,8 @@ export enum ENDPOINTS {
   TWITTER = "/twitter",
   GSEARCH = "/gsearch",
   GOOGLE_TRENDS = "/google-trends",
-  TRANSCRIPTION = "/transcription",
-  VIRAL_CLIPPER = "/viral-clipper",
-  TIGHTENING = "/tightening",
+  MEDIA = "/media",
+  SEGMENT = "/segment",
   CRAWL = "/crawl",
   CHATGPT = "/chatgpt",
   CLAUDE = "/claude",
@@ -32,8 +31,8 @@ export enum ENDPOINTS {
  * `server.ts` to skip `app.listen` (export the app instead). Product HTTP
  * mounts and MCP tools always register — this backend is intended to run
  * as a persistent process (VPS / local). Also gates every op that writes
- * to local disk expecting it to persist (transcription's local-path input,
- * tightening/viral-clipper output, youtube-download) — Vercel's filesystem
+ * to local disk expecting it to persist (media's local-path inputs, its cut
+ * and condense output, youtube-download) — Vercel's filesystem
  * is per-invocation and ephemeral, so those ops are refused there even if
  * a storage-path env var happens to be set.
  */
@@ -180,6 +179,10 @@ export const API_ENDPOINTS = {
       route: YOUTUBE_API_ROUTES.VIDEO_DOWNLOAD,
       full: `${ENDPOINTS.YOUTUBE}${YOUTUBE_API_ROUTES.VIDEO_DOWNLOAD}`,
     },
+    DIARIZE: {
+      route: YOUTUBE_API_ROUTES.DIARIZE,
+      full: `${ENDPOINTS.YOUTUBE}${YOUTUBE_API_ROUTES.DIARIZE}`,
+    },
     CHANNEL: {
       route: YOUTUBE_API_ROUTES.CHANNEL,
       full: `${ENDPOINTS.YOUTUBE}${YOUTUBE_API_ROUTES.CHANNEL}`,
@@ -252,29 +255,15 @@ export const API_ENDPOINTS = {
   SAMPLE: {
     API: { route: "/api", full: `${ENDPOINTS.SAMPLE}/api` },
   },
-  TRANSCRIPTION: {
-    TRANSCRIBE: { route: "/", full: `${ENDPOINTS.TRANSCRIPTION}` },
+  MEDIA: {
+    FETCH: { route: "/fetch", full: `${ENDPOINTS.MEDIA}/fetch` },
+    TRANSCRIBE: { route: "/transcribe", full: `${ENDPOINTS.MEDIA}/transcribe` },
+    DIARIZE: { route: "/diarize", full: `${ENDPOINTS.MEDIA}/diarize` },
+    CUT: { route: "/cut", full: `${ENDPOINTS.MEDIA}/cut` },
+    CONDENSE: { route: "/condense", full: `${ENDPOINTS.MEDIA}/condense` },
   },
-  VIRAL_CLIPPER: {
-    DIARIZE: {
-      route: "/diarize",
-      full: `${ENDPOINTS.VIRAL_CLIPPER}/diarize`,
-    },
-    VIRAL_MOMENTS: {
-      route: "/viral-moments",
-      full: `${ENDPOINTS.VIRAL_CLIPPER}/viral-moments`,
-    },
-    PIPELINE: {
-      route: "/pipeline",
-      full: `${ENDPOINTS.VIRAL_CLIPPER}/pipeline`,
-    },
-    CUT: {
-      route: "/cut",
-      full: `${ENDPOINTS.VIRAL_CLIPPER}/cut`,
-    },
-  },
-  TIGHTENING: {
-    TIGHTEN: { route: "/", full: `${ENDPOINTS.TIGHTENING}` },
+  SEGMENT: {
+    BY_SPEECH: { route: "/by_speech", full: `${ENDPOINTS.SEGMENT}/by_speech` },
   },
   CRAWL: {
     API: { route: "/", full: `${ENDPOINTS.CRAWL}` },

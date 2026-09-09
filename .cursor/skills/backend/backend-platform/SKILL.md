@@ -74,7 +74,7 @@ Default stays `/mcp`. Extra servers: path-split under the MCP router **or** new
 |-----|--------|
 | `NODE_ENV` | CORS set, morgan format |
 | `PORT` | Local listen (default 8002) |
-| `VERCEL` | Auto-set by Vercel. Skip `listen`; trust proxy default. Also refuses (501) any op that writes local disk expecting it to persist — tightening, viral-clipper `cut`, youtube-download (`IS_VERCEL_RUNTIME` in `config.ts`). Does **not** skip product mounts or MCP tools. |
+| `VERCEL` | Auto-set by Vercel. Skip `listen`; trust proxy default. Also refuses (501) any op that writes local disk expecting it to persist — video `fetch`/`cut`/`condense`, youtube-download (`IS_VERCEL_RUNTIME` in `config.ts`). Does **not** skip product mounts or MCP tools. |
 | `AIXEL_VPS` | Explicit opt-in, nothing sets it automatically — VPS systemd sets `AIXEL_VPS=1`. Gates the `chatgpt` (headful Chrome/CDP) and `claude` (shells to local CLI) modules end-to-end; refused everywhere else, local dev included (`IS_VPS_RUNTIME` in `config.ts`). |
 | `TRUST_PROXY` | Override trust proxy |
 | `RATE_LIMIT_MAX` | Global limiter |

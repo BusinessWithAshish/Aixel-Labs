@@ -517,7 +517,7 @@ export type YOUTUBE_STREAM_URLS = {
 
 /**
  * Extract the signed googlevideo stream URLs (video + audio) for a YouTube
- * source without downloading any media bytes. Used by the viral-clipper's
+ * source without downloading any media bytes. Used by the video module's
  * stream-direct clip path: ffmpeg then cuts clips directly from these URLs
  * with `-http_proxy` set to Evomi, so only the clip segments transit the
  * residential proxy — not the whole source video (the bandwidth cost that

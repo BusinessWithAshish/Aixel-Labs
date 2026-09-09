@@ -2,16 +2,21 @@
  * Orchestration: preflight → ChatGPT generate via CDP → stage public JPEG.
  * Port of sova/skills/chatgpt/{preflight,generate}.py + media staging.
  */
-import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { promises as fs } from "node:fs";
+import { promises as fs, constants as fsConstants } from "node:fs";
 import { basename } from "node:path";
-import { promisify } from "node:util";
+
 import sharp from "sharp";
 import { fetch } from "undici";
 
 import { assertVpsRuntime } from "../../config";
-import { attachChatGptTab, listCdpTargets, type CdpTab } from "./cdp";
+import {
+  closeChatGptChrome,
+  launchChatGptChrome,
+  openNewTab,
+  type ChromeHandle,
+  type CdpTab,
+} from "./cdp";
 import { CHATGPT, CHATGPT_ERROR_MESSAGES } from "./constants";
 import type {
   CHATGPT_HEALTH_RESPONSE,
@@ -20,8 +25,6 @@ import type {
   CHATGPT_STAGE_REQUEST_PARSED,
   CHATGPT_STAGE_RESPONSE,
 } from "./types";
-
-const execFileAsync = promisify(execFile);
 
 let busy = false;
 
@@ -33,80 +36,39 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function checkServices(): Promise<{ ok: boolean; detail: string }> {
-  const dead: string[] = [];
-  for (const svc of CHATGPT.SYSTEMD_SERVICES) {
-    try {
-      const { stdout } = await execFileAsync("systemctl", ["is-active", svc], {
-        encoding: "utf8",
-      });
-      if (stdout.trim() !== "active") dead.push(svc);
-    } catch {
-      dead.push(svc);
-    }
-  }
-  if (dead.length) {
-    return {
-      ok: false,
-      detail: `not running: ${dead.join(", ")}. sudo systemctl restart ${dead.join(" ")}`,
-    };
-  }
-  return { ok: true, detail: "all five systemd units active" };
-}
-
-async function checkPort(): Promise<{ ok: boolean; detail: string }> {
+async function checkChromeBinary(): Promise<{ ok: boolean; detail: string }> {
   try {
-    const res = await fetch(`${CHATGPT.CDP_HTTP}/json/version`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return { ok: false, detail: `CDP version HTTP ${res.status}` };
-    return { ok: true, detail: "CDP port open" };
-  } catch (err) {
-    return {
-      ok: false,
-      detail: `port refused (${err instanceof Error ? err.message : err})`,
-    };
+    await fs.access(CHATGPT.CHROME_BIN, fsConstants.X_OK);
+    return { ok: true, detail: CHATGPT.CHROME_BIN };
+  } catch {
+    return { ok: false, detail: `not found or not executable: ${CHATGPT.CHROME_BIN}` };
   }
 }
 
-async function checkBrowser(): Promise<{ ok: boolean; detail: string }> {
+async function checkProfileDir(): Promise<{ ok: boolean; detail: string }> {
   try {
-    const res = await fetch(`${CHATGPT.CDP_HTTP}/json/version`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    const v = (await res.json()) as { Browser?: string };
-    return { ok: true, detail: `browser ${v.Browser || "unknown"}` };
-  } catch (err) {
-    return {
-      ok: false,
-      detail: `CDP did not answer: ${err instanceof Error ? err.message : err}`,
-    };
+    await fs.access(CHATGPT.PROFILE_DIR);
+    return { ok: true, detail: CHATGPT.PROFILE_DIR };
+  } catch {
+    return { ok: false, detail: `profile directory missing: ${CHATGPT.PROFILE_DIR}` };
   }
 }
 
-async function checkChatGptTab(): Promise<{ ok: boolean; detail: string }> {
-  try {
-    const tabs = await listCdpTargets();
-    const pages = tabs.filter((t) => t.type === "page");
-    if (pages.some((t) => (t.url || "").includes("chatgpt.com"))) {
-      return { ok: true, detail: "ChatGPT tab open" };
-    }
-    return {
-      ok: false,
-      detail: `no ChatGPT tab open (${pages.length} other page(s)). Open VNC and navigate to chatgpt.com.`,
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      detail: `could not list tabs: ${err instanceof Error ? err.message : err}`,
-    };
-  }
-}
-
-async function checkLoggedIn(): Promise<{ ok: boolean; detail: string }> {
+/** Real end-to-end check: spawns Chrome, verifies the session, closes it. Slower (a few seconds) but honest. */
+async function checkBrowserSpawnAndLogin(): Promise<{ ok: boolean; detail: string }> {
+  let chrome: ChromeHandle | undefined;
   let tab: CdpTab | undefined;
   try {
-    tab = await attachChatGptTab();
+    chrome = await launchChatGptChrome();
+    tab = await openNewTab(CHATGPT.CDP_HTTP, "https://chatgpt.com");
+    // openNewTab's navigation is fire-and-forget (the target may still be on
+    // about:blank when it returns) — wait for the real document before
+    // evaluating, same reason openChat() polls for the composer.
+    for (let i = 0; i < 30; i++) {
+      const loaded = await tab.js("document.readyState === 'complete' && location.hostname.includes('chatgpt.com')");
+      if (loaded) break;
+      await sleep(500);
+    }
     const ok = await tab.js(
       `(async () => {
         const r = await fetch('/api/auth/session', {credentials:'include'});
@@ -115,39 +77,54 @@ async function checkLoggedIn(): Promise<{ ok: boolean; detail: string }> {
       })()`,
       { timeoutMs: 30_000, awaitPromise: true },
     );
-    if (ok) return { ok: true, detail: "ChatGPT session authenticated" };
+    if (ok) return { ok: true, detail: "browser launches and session is authenticated" };
     return {
       ok: false,
-      detail: "ChatGPT is open but logged out. Sign in via VNC.",
+      detail:
+        "browser launches but ChatGPT session is logged out — sign in via VNC into the profile dir, or copy in a logged-in profile",
     };
   } catch (err) {
     return {
       ok: false,
-      detail: `could not verify the session: ${err instanceof Error ? err.message : err}`,
+      detail: `browser launch/check failed: ${err instanceof Error ? err.message : err}`,
     };
   } finally {
     tab?.close();
+    if (chrome) await closeChatGptChrome(chrome);
   }
 }
 
 export async function runChatGptHealth(): Promise<CHATGPT_HEALTH_RESPONSE> {
   assertVpsRuntime(CHATGPT_ERROR_MESSAGES.NOT_VPS);
   const checks: CHATGPT_HEALTH_RESPONSE["checks"] = [];
-  const runners: [string, () => Promise<{ ok: boolean; detail: string }>][] = [
-    ["services", checkServices],
-    ["port", checkPort],
-    ["browser", checkBrowser],
-    ["chatgpt tab", checkChatGptTab],
-    ["session", checkLoggedIn],
+
+  const staticRunners: [string, () => Promise<{ ok: boolean; detail: string }>][] = [
+    ["chrome binary", checkChromeBinary],
+    ["profile directory", checkProfileDir],
   ];
-  for (const [name, fn] of runners) {
+  for (const [name, fn] of staticRunners) {
     const result = await fn();
     checks.push({ name, ok: result.ok, detail: result.detail });
-    if (!result.ok) {
-      return { ready: false, checks };
-    }
+    if (!result.ok) return { ready: false, checks };
   }
-  return { ready: true, checks };
+
+  if (busy) {
+    checks.push({
+      name: "browser",
+      ok: true,
+      detail: "skipped — a generate call is already in progress",
+    });
+    return { ready: true, checks };
+  }
+
+  busy = true;
+  try {
+    const result = await checkBrowserSpawnAndLogin();
+    checks.push({ name: "browser", ok: result.ok, detail: result.detail });
+    return { ready: result.ok, checks };
+  } finally {
+    busy = false;
+  }
 }
 
 async function chatgptApiGet(
@@ -424,17 +401,17 @@ export async function generateChatGpt(
   }
 
   busy = true;
+  let chrome: ChromeHandle | undefined;
   let tab: CdpTab | undefined;
   try {
-    const health = await runChatGptHealth();
-    if (!health.ready) {
-      const failed = health.checks.find((c) => !c.ok);
-      throw new Error(
-        `${CHATGPT_ERROR_MESSAGES.PREFLIGHT}: ${failed?.name} — ${failed?.detail}`,
-      );
+    const staticChecks = await Promise.all([checkChromeBinary(), checkProfileDir()]);
+    const failedStatic = staticChecks.find((c) => !c.ok);
+    if (failedStatic) {
+      throw new Error(`${CHATGPT_ERROR_MESSAGES.PREFLIGHT}: ${failedStatic.detail}`);
     }
 
-    tab = await attachChatGptTab();
+    chrome = await launchChatGptChrome();
+    tab = await openNewTab(CHATGPT.CDP_HTTP);
     const openUrl =
       req.mode === "revise" && req.conversation_url
         ? req.conversation_url
@@ -476,6 +453,7 @@ export async function generateChatGpt(
     };
   } finally {
     tab?.close();
+    if (chrome) await closeChatGptChrome(chrome);
     busy = false;
   }
 }
