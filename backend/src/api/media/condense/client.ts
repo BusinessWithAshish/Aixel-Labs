@@ -112,14 +112,19 @@ export async function condenseVideo(
     // A render failure here is ffmpeg's own error (`assembleKeepRanges` already
     // attaches its stderr detail) — let it propagate unwrapped rather than
     // relabeling it as an output-write failure it isn't.
-    const videoPath = join(MEDIA_CONDENSE_OUTPUT_DIR, `condensed-${randomUUID()}.mp4`);
-    await assembleKeepRanges(sourcePath, keeps, videoPath);
+    const mediaType: "video" | "audio" = scan.hasVideo ? "video" : "audio";
+    const mediaPath = join(
+      MEDIA_CONDENSE_OUTPUT_DIR,
+      `condensed-${randomUUID()}.${mediaType === "video" ? "mp4" : "m4a"}`,
+    );
+    await assembleKeepRanges(sourcePath, keeps, mediaPath, scan.hasVideo);
 
     const outputDurationSeconds = totalDuration(keeps);
     const removedSeconds = scan.durationSeconds - outputDurationSeconds;
 
     return {
-      videoPath,
+      mediaPath,
+      mediaType,
       sourceDurationSeconds: scan.durationSeconds,
       outputDurationSeconds,
       removedSeconds,

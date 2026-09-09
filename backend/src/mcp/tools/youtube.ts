@@ -152,6 +152,7 @@ const YOUTUBE_OPS: Record<string, DomainOp> = {
           input.language,
           input.model,
           input.speakerCount,
+          input.provider,
         ),
     },
   },
@@ -199,7 +200,7 @@ Ops:
 - handle (raw|intel, default intel) — resolve @handle. input: handle, country?, region?
 - video_meta (raw|intel, default intel) — batch watch-page metadata. input: videoIds[], country?, region?
 - video_download (raw only) — download a video/audio stream to local disk (cached — re-downloading the same videoId+media returns the cached file). Refused on Vercel (no persistent disk). input: videoId, media? ('video'|'audio', default video), country?, region?
-- diarize (raw only) — speaker-labelled transcript from the video's own captions. Always free/cheap (at most one small text-only Gemini call), no audio uploaded. Hard-fails if there are no usable captions — no fallback to Gemini-audio diarization here; that's 'media' op=diarize, called explicitly if you want it. input: videoUrl, language?, model?, speakerCount?
+- diarize (raw only) — speaker-labelled transcript from the video's own captions. Always free/cheap regardless of provider (at most one small text-only labeling call, no audio uploaded ever). Hard-fails if there are no usable captions — no fallback to Gemini-audio diarization here; that's 'media' op=diarize, called explicitly if you want it. input: videoUrl, language?, provider? ('gemini'|'claude', default 'gemini'), model?, speakerCount?
 - aggregate_niche (raw only) — compute-only niche signals from harvested videos
 - aggregate_keyword (raw only) — compute-only keyword signals
 - compare_channels (raw only) — compute-only channel comparison

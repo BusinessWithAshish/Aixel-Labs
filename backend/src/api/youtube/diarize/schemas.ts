@@ -1,13 +1,18 @@
 import { z } from "zod";
 
-import { MEDIA_GEMINI_MODEL } from "../../media/constants";
 import { YOUTUBE_TRANSCRIPT_LANGUAGE_SCHEMA } from "../transcript/schemas";
 import { YOUTUBE_DIARIZE_MAX_CAPTION_SPEAKERS } from "./constants";
 
 /**
- * Captions only — no `audioSource` fallback here. Gemini-audio diarization
+ * Captions only — no `mediaSource` fallback here. Gemini-audio diarization
  * lives in `media` op=diarize; this op fails when there are no usable
  * captions rather than silently escalating to a paid call on your behalf.
+ *
+ * The model call this op makes is small — label already-split turns with
+ * speaker ids, no audio, no judgment about content — so `provider` defaults
+ * to `gemini` (real schema-constrained output, free-tier key pool) rather
+ * than being required like `segment.by_speech`'s. `claude` is there for when
+ * the free-tier pool is dry or you specifically want Claude's labeling.
  */
 export const YOUTUBE_DIARIZE_REQUEST_SCHEMA = z.object({
   videoUrl: z
@@ -17,12 +22,18 @@ export const YOUTUBE_DIARIZE_REQUEST_SCHEMA = z.object({
   language: YOUTUBE_TRANSCRIPT_LANGUAGE_SCHEMA.describe(
     "Caption language (BCP-47). Defaults to en.",
   ),
+  provider: z
+    .enum(["gemini", "claude"])
+    .optional()
+    .default("gemini")
+    .describe(
+      "Which AI backend runs the (cheap, text-only) speaker-labeling pass over already-split caption turns. 'gemini' (default) — free-tier key pool, real schema-constrained output. 'claude' — local Claude Code subscription (flat-rate, shares the org-wide 40-session/day delegation budget), validated + retried on a malformed response.",
+    ),
   model: z
     .string()
     .optional()
-    .default(MEDIA_GEMINI_MODEL.DEFAULT)
     .describe(
-      "Gemini model for the (cheap, text-only) speaker-labeling pass over already-split caption turns.",
+      "Optional model override, passed to whichever provider is chosen. Omit to use that provider's own default.",
     ),
   speakerCount: z
     .number()

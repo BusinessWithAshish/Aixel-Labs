@@ -10,8 +10,8 @@ import { AIXEL_MEDIA } from "../../media";
  */
 
 export const MEDIA_FIELD_DESCRIPTIONS = {
-  audioSource:
-    "Local filesystem path to the audio file to process (this pipeline runs on the VPS and reads files directly off disk), or a publicly-reachable audio URL. Mutually exclusive with videoUrl.",
+  mediaSource:
+    "Local filesystem path to the audio or video file to diarize (this pipeline runs on the VPS and reads files directly off disk), or a publicly-reachable audio/video URL. Video input is fine — only the audio track is ever uploaded to Gemini. Not for YouTube links: use `youtube` op=diarize for the free captions path, or `youtube` op=video_download then pass the resulting local path here.",
   videoUrl:
     "YouTube watch/share URL or video id. Uses that video's captions (ASR `>>` turn marks or authored Name: labels) instead of Gemini audio diarization. Mutually exclusive with audioSource.",
   language: "Caption language (BCP-47). Only used with videoUrl. Defaults to en.",

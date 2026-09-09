@@ -102,9 +102,11 @@ export type CUT_CLIP_RESULT = {
   cutStartSeconds: number;
   cutEndSeconds: number;
   snapped: boolean;
-  /** The framing actually applied — see MEDIA_ASPECT_RATIO_DIMENSIONS in constants.ts. */
+  /** "video" when the source has a video stream, "audio" when it doesn't — cut returns the same type it was given. See cut.ts's probeMediaStreams call. */
+  mediaType: "video" | "audio";
+  /** The framing actually applied — meaningless (kept for shape stability, always "original") when `mediaType` is "audio": there's no video stream to reframe. */
   aspectRatio: MEDIA_ASPECT_RATIO_VALUE;
-  /** Absent (and `error` set instead) when the requested range fell outside the source video's actual duration — see cut.ts. */
+  /** Absent (and `error` set instead) when the requested range fell outside the source's actual duration — see cut.ts. */
   clipPath?: string;
   error?: string;
 };

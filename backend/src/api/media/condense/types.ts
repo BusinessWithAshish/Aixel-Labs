@@ -22,8 +22,10 @@ export type TAGGED_RANGE = TIME_RANGE & {
 };
 
 export type MEDIA_CONDENSE_RESPONSE = {
-  /** Local filesystem path of the condensed video, under `MEDIA_CONDENSE_OUTPUT_DIR`. */
-  videoPath: string;
+  /** Local filesystem path of the condensed file, under `MEDIA_CONDENSE_OUTPUT_DIR`. */
+  mediaPath: string;
+  /** "video" when the source has a video stream, "audio" when it doesn't — condense returns the same type it was given. */
+  mediaType: "video" | "audio";
   sourceDurationSeconds: number;
   outputDurationSeconds: number;
   removedSeconds: number;

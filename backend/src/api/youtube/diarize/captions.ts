@@ -7,6 +7,7 @@ import { formatSecondsAsTimestamp } from "../../../utils/timestamp";
 import { MEDIA_GEMINI_MODEL } from "../../media/constants";
 import {
   YOUTUBE_CAPTION_SPEAKER_LABEL_PROMPT,
+  YOUTUBE_DIARIZE_CLAUDE_MAX_ATTEMPTS,
   YOUTUBE_DIARIZE_ERROR_MESSAGES,
   YOUTUBE_DIARIZE_MAX_CAPTION_SPEAKERS,
 } from "./constants";
@@ -14,6 +15,7 @@ import {
   generateStructuredContent,
   withGeminiKeyPoolRetry,
 } from "../../media/gemini-client";
+import { askClaudeForJson } from "../../claude/structured-json";
 import {
   GEMINI_CAPTION_SPEAKER_LABEL_SCHEMA,
   GEMINI_CAPTION_SPEAKER_LABEL_VALIDATOR,
@@ -24,7 +26,7 @@ import type {
   DIARIZED_TRANSCRIPT,
   GEMINI_USAGE_METADATA,
 } from "../../media/types";
-import type { YOUTUBE_DIARIZE_RESPONSE } from "./types";
+import type { YOUTUBE_DIARIZE_RESPONSE, YOUTUBE_DIARIZE_USAGE } from "./types";
 
 /** YouTube ASR inserts `>>` at speaker-turn boundaries. The watch-page UI strips them. */
 const SPEAKER_CHANGE_MARK = />>+/g;
@@ -258,31 +260,66 @@ function applyTurnLabels(
   });
 }
 
-async function labelAsrTurns(
-  turns: CaptionTurn[],
-  model: string,
-  speakerCount?: number,
-): Promise<{ labeled: CaptionSpeakerLabel; usage: GEMINI_USAGE_METADATA }> {
+function buildLabelPrompt(turns: CaptionTurn[], speakerCount?: number): string {
   const hint = speakerCount
     ? `- There are ${speakerCount} distinct speakers. Use speaker_1 through speaker_${speakerCount}. Do not add extras.\n`
     : "";
-  const prompt = YOUTUBE_CAPTION_SPEAKER_LABEL_PROMPT.replace(
+  return YOUTUBE_CAPTION_SPEAKER_LABEL_PROMPT.replace(
     "{{MAX_SPEAKERS}}",
     String(YOUTUBE_DIARIZE_MAX_CAPTION_SPEAKERS),
   )
     .replace("{{SPEAKER_COUNT_HINT}}", hint)
     .replace("{{TURNS}}", formatTurnsForPrompt(turns));
+}
 
+/**
+ * `provider` picks the transport for this one cheap text-only labeling call
+ * — same rubric prompt and same output contract either way. `gemini` uses
+ * real schema-constrained decoding (`responseSchema`) against the free-tier
+ * key pool. `claude` delegates to the local Claude Code subscription
+ * (flat-rate, shares the org-wide 40-session/day budget) via
+ * `askClaudeForJson` — no native schema constraint, so it asks for JSON
+ * explicitly and validates/retries on a malformed response. This is the same
+ * two-provider choice `segment.by_speech` already offers, applied to a much
+ * smaller task (label already-known turns, not judge which moments matter).
+ */
+async function labelAsrTurns(
+  turns: CaptionTurn[],
+  model: string | undefined,
+  speakerCount: number | undefined,
+  provider: "gemini" | "claude",
+): Promise<{ labeled: CaptionSpeakerLabel; usage: YOUTUBE_DIARIZE_USAGE }> {
+  const prompt = buildLabelPrompt(turns, speakerCount);
+
+  if (provider === "claude") {
+    // `model` here is a Claude model name (or undefined -> Claude's own
+    // default) — never the Gemini default, which would be meaningless to
+    // `askClaude`.
+    const { data, usage, attempts } = await askClaudeForJson({
+      prompt:
+        prompt +
+        "\n\nReturn ONLY a single JSON object matching exactly this JSON Schema — no " +
+        "markdown code fences, no commentary before or after it:\n\n" +
+        JSON.stringify(GEMINI_CAPTION_SPEAKER_LABEL_SCHEMA, null, 2),
+      zodValidator: GEMINI_CAPTION_SPEAKER_LABEL_VALIDATOR,
+      model,
+      maxAttempts: YOUTUBE_DIARIZE_CLAUDE_MAX_ATTEMPTS,
+      exhaustedErrorPrefix: YOUTUBE_DIARIZE_ERROR_MESSAGES.CLAUDE_INVALID_JSON,
+    });
+    return { labeled: data, usage: { provider: "claude", usage, attempts } };
+  }
+
+  const geminiModel = model ?? MEDIA_GEMINI_MODEL.DEFAULT;
   return withGeminiKeyPoolRetry(async (apiKey) => {
     const { data, usage } = await generateStructuredContent<CaptionSpeakerLabel>({
-      model,
+      model: geminiModel,
       parts: [{ text: prompt }],
       responseSchema: GEMINI_CAPTION_SPEAKER_LABEL_SCHEMA,
       thinkingLevel: "minimal",
       apiKey,
       zodValidator: GEMINI_CAPTION_SPEAKER_LABEL_VALIDATOR,
     });
-    return { labeled: data, usage };
+    return { labeled: data, usage: { provider: "gemini" as const, usage } };
   }, "caption speaker label");
 }
 
@@ -335,8 +372,9 @@ export function youtubeCaptionsToDiarizedTranscript(
 export async function diarizeFromYoutubeCaptions(
   videoUrl: string,
   language: string = YOUTUBE_TRANSCRIPT_DEFAULT_HL,
-  model: string = MEDIA_GEMINI_MODEL.DEFAULT,
+  model?: string,
   speakerCount?: number,
+  provider: "gemini" | "claude" = "gemini",
 ): Promise<YOUTUBE_DIARIZE_RESPONSE> {
   const videoId = parseYoutubeVideoId(videoUrl);
   if (!videoId) {
@@ -362,7 +400,7 @@ export async function diarizeFromYoutubeCaptions(
     }
     return {
       transcript: toDiarizedTranscript(utterances),
-      usage: emptyUsage(),
+      usage: { provider: "gemini", usage: emptyUsage() },
     };
   }
 
@@ -374,11 +412,11 @@ export async function diarizeFromYoutubeCaptions(
   if (turns.length === 1) {
     return {
       transcript: toDiarizedTranscript(singleSpeakerFromTurns(turns)),
-      usage: emptyUsage(),
+      usage: { provider: "gemini", usage: emptyUsage() },
     };
   }
 
-  const { labeled, usage } = await labelAsrTurns(turns, model, speakerCount);
+  const { labeled, usage } = await labelAsrTurns(turns, model, speakerCount, provider);
   const utterances = mergeConsecutive(applyTurnLabels(turns, labeled));
   return {
     transcript: toDiarizedTranscript(utterances),

@@ -24,7 +24,9 @@ function buildSelectExpression(keeps: TIME_RANGE[]): string {
 }
 
 /**
- * Renders the keep-list into a single video.
+ * Renders the keep-list into a single file — video, or audio-only when
+ * `hasVideo` is false (an audio source stays audio out; there's no video
+ * stream to select/map/encode at all in that case).
  *
  * Uses `select`/`aselect` + `setpts`/`asetpts` rather than the more obvious
  * "N `trim` filters into a `concat`" graph. Both produce the same output, but
@@ -36,8 +38,9 @@ function buildSelectExpression(keeps: TIME_RANGE[]): string {
  * frames/samples from zero, which is what actually closes the gaps — without
  * it the dropped spans would come back as freezes.
  *
- * The identical time expression drives both the video and audio chains, which
- * is what guarantees the two stay in sync no matter how many cuts there are.
+ * The identical time expression drives both chains when both exist, which is
+ * what guarantees video and audio stay in sync no matter how many cuts there
+ * are.
  *
  * The filtergraph goes to a FILE via `-filter_complex_script`, not an argv
  * string: at a few thousand ranges the expression runs to hundreds of
@@ -47,6 +50,7 @@ export async function assembleKeepRanges(
   inputPath: string,
   keeps: TIME_RANGE[],
   outputPath: string,
+  hasVideo: boolean,
 ): Promise<void> {
   if (!ffmpegPath) {
     throw new Error(MEDIA_CONDENSE_ERROR_MESSAGES.FFMPEG_FAILED);
@@ -54,7 +58,7 @@ export async function assembleKeepRanges(
 
   const expression = buildSelectExpression(keeps);
   const filterGraph = [
-    `[0:v]select='${expression}',setpts=N/FRAME_RATE/TB[v]`,
+    ...(hasVideo ? [`[0:v]select='${expression}',setpts=N/FRAME_RATE/TB[v]`] : []),
     `[0:a]aselect='${expression}',asetpts=N/SR/TB[a]`,
   ].join(";\n");
 
@@ -72,19 +76,24 @@ export async function assembleKeepRanges(
         inputPath,
         "-filter_complex_script",
         scriptPath,
-        "-map",
-        "[v]",
+        ...(hasVideo ? ["-map", "[v]"] : []),
         "-map",
         "[a]",
-        "-c:v",
-        MEDIA_CONDENSE.FFMPEG_VIDEO_CODEC,
-        "-preset",
-        MEDIA_CONDENSE.FFMPEG_PRESET,
-        "-crf",
-        MEDIA_CONDENSE.FFMPEG_CRF,
+        ...(hasVideo
+          ? [
+              "-c:v",
+              MEDIA_CONDENSE.FFMPEG_VIDEO_CODEC,
+              "-preset",
+              MEDIA_CONDENSE.FFMPEG_PRESET,
+              "-crf",
+              MEDIA_CONDENSE.FFMPEG_CRF,
+            ]
+          : []),
         "-c:a",
         MEDIA_CONDENSE.FFMPEG_AUDIO_CODEC,
-        // Put the moov atom up front so the result streams/scrubs immediately.
+        // Put the moov atom up front so the result streams/scrubs immediately
+        // (valid for both the video mp4 and the audio m4a case — both are
+        // MP4-family containers).
         "-movflags",
         "+faststart",
         outputPath,

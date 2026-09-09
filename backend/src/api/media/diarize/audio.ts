@@ -326,10 +326,10 @@ async function diarizeChunked(
  * MEDIA.CHUNK_THRESHOLD_SECONDS) -> diarize via Gemini generateContent.
  */
 export async function diarizeFromSource(
-  audioSource: string,
+  mediaSource: string,
   model: string,
 ): Promise<MEDIA_DIARIZE_RESPONSE> {
-  const resolved = await resolveMediaSource(audioSource);
+  const resolved = await resolveMediaSource(mediaSource);
 
   try {
     const durationSeconds = await getMediaDurationSeconds(resolved.path);

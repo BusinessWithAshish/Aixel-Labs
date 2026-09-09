@@ -1,19 +1,11 @@
 /**
  * Claude path for viral-moment ranking — same rubric, same output contract
- * as score.ts's Gemini path, different transport. `claude -p` has no
- * schema-constrained decoding, so this builds the request explicitly asking
- * for JSON matching GEMINI_VIRAL_MOMENTS_RESPONSE_SCHEMA (reused here purely
- * as prompt documentation, not as an API parameter), then parses and
- * validates the free-text answer. On a malformed response, retries on the
- * SAME Claude session (via session_id) with the validation error appended —
- * cheaper than a fresh session and lets the model see exactly what it got
- * wrong, up to SEGMENT_CLAUDE_MAX_ATTEMPTS total attempts.
+ * as score.ts's Gemini path, different transport (see
+ * `api/claude/structured-json.ts` for the parse/validate/retry mechanics
+ * shared with youtube's caption speaker-labeling Claude path).
  */
-import { z } from "zod";
-
-import { askClaude } from "../../claude/client";
-import { CLAUDE_ASK_REQUEST_SCHEMA } from "../../claude/schemas";
 import { SEGMENT_CLAUDE_MAX_ATTEMPTS, SEGMENT_ERROR_MESSAGES } from "../constants";
+import { askClaudeForJson } from "../../claude/structured-json";
 import {
   MOMENTS_AUDIENCE_SIGNALS_BLOCK_TEMPLATE,
   MOMENTS_AUDIENCE_SIGNALS_RULE_TEMPLATE,
@@ -47,12 +39,6 @@ export type ScoreViralMomentsWithClaudeResult = {
   usage: CLAUDE_USAGE | undefined;
   attempts: number;
 };
-
-/** Strips a ```json ... ``` (or bare ```) fence Claude sometimes wraps its answer in despite being told not to. Leaves unfenced text untouched. */
-function stripCodeFence(text: string): string {
-  const fenced = text.trim().match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);
-  return fenced ? fenced[1].trim() : text.trim();
-}
 
 function buildPrompt(options: ScoreViralMomentsWithClaudeOptions): string {
   const {
@@ -104,60 +90,19 @@ function buildPrompt(options: ScoreViralMomentsWithClaudeOptions): string {
 export async function scoreViralMomentsWithClaude(
   options: ScoreViralMomentsWithClaudeOptions,
 ): Promise<ScoreViralMomentsWithClaudeResult> {
-  const prompt = buildPrompt(options);
+  const { data, usage, attempts } = await askClaudeForJson({
+    prompt: buildPrompt(options),
+    zodValidator: MOMENTS_RESPONSE_VALIDATOR,
+    model: options.model,
+    maxAttempts: SEGMENT_CLAUDE_MAX_ATTEMPTS,
+    exhaustedErrorPrefix: SEGMENT_ERROR_MESSAGES.CLAUDE_INVALID_JSON,
+  });
 
-  let sessionId: string | undefined;
-  let lastUsage: CLAUDE_USAGE | undefined;
-  let lastError = "";
-  let task = prompt;
-
-  for (let attempt = 1; attempt <= SEGMENT_CLAUDE_MAX_ATTEMPTS; attempt++) {
-    const req = CLAUDE_ASK_REQUEST_SCHEMA.parse({
-      task,
-      session_id: sessionId,
-      model: options.model,
-    });
-    const res = await askClaude(req);
-
-    if (!res.ok) {
-      throw new Error(res.error || SEGMENT_ERROR_MESSAGES.GENERIC);
-    }
-    sessionId = res.session_id;
-    lastUsage = res.usage;
-
-    const candidate = stripCodeFence(res.text ?? "");
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(candidate);
-    } catch (err) {
-      lastError = `not valid JSON: ${err instanceof Error ? err.message : String(err)}`;
-      task =
-        `Your previous response was not valid JSON (${lastError}). ` +
-        "Return ONLY the corrected JSON object — no markdown fences, no commentary.";
-      continue;
-    }
-
-    const validated = MOMENTS_RESPONSE_VALIDATOR.safeParse(parsed);
-    if (!validated.success) {
-      lastError = validated.error.issues
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join("; ");
-      task =
-        `Your previous JSON did not match the required schema (${lastError}). ` +
-        "Return ONLY the corrected JSON object — no markdown fences, no commentary.";
-      continue;
-    }
-
-    return {
-      candidates: validated.data.candidates,
-      podcast_tone: validated.data.podcast_tone,
-      podcast_tone_note: validated.data.podcast_tone_note,
-      usage: lastUsage,
-      attempts: attempt,
-    };
-  }
-
-  throw new Error(
-    `${SEGMENT_ERROR_MESSAGES.CLAUDE_INVALID_JSON} after ${SEGMENT_CLAUDE_MAX_ATTEMPTS} attempts: ${lastError}`,
-  );
+  return {
+    candidates: data.candidates,
+    podcast_tone: data.podcast_tone,
+    podcast_tone_note: data.podcast_tone_note,
+    usage,
+    attempts,
+  };
 }

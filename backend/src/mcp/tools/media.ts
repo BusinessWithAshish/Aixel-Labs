@@ -25,7 +25,7 @@ const MEDIA_OPS: Record<string, DomainOp> = {
     defaultLayer: MCP_LAYER.RAW,
     raw: {
       schema: MEDIA_DIARIZE_REQUEST_SCHEMA,
-      run: (input) => diarizeFromSource(input.audioSource, input.model),
+      run: (input) => diarizeFromSource(input.mediaSource, input.model),
     },
   },
   cut: {
@@ -54,9 +54,9 @@ Any source field otherwise accepts a local filesystem path or a publicly-reachab
 Ops:
 - fetch (raw) — resolve a source to a local file. input: source -> { path }
 - transcribe (raw) — speech to text via Groq Whisper -> txt|json|srt|vtt. No speaker labels — use diarize for that. input: mediaSource, format?, language?, model?
-- diarize (raw) — speaker-labelled transcript via Gemini audio. Costs real money/quota — for a YouTube source, try \`youtube\` op=diarize (free, captions-based) first; only fall back here if that fails or there are no captions. input: audioSource, model?
-- cut (raw) — a video plus time ranges -> clip files. Ranges may come from anywhere (segment.by_speech, a human, another system). input: videoSource, clips[{start,end,label?}], diarized?, aspectRatio?
-- condense (raw) — remove silences and filler words from a whole video -> one shorter mp4. Not clip selection. input: videoSource, silenceThresholdDb?, minSilenceSeconds?, keepPaddingSeconds?, removeFillers?, fillerWords?, language?
+- diarize (raw) — speaker-labelled transcript via Gemini audio. Costs real money/quota — for a YouTube source, try \`youtube\` op=diarize (free, captions-based) first; only fall back here if that fails or there are no captions. input: mediaSource, model?
+- cut (raw) — a video OR audio source plus time ranges -> clip files of the same type (audio in -> audio clips, video in -> video clips; aspectRatio is ignored for audio). Ranges may come from anywhere (segment.by_speech, a human, another system). input: videoSource, clips[{start,end,label?}], diarized?, aspectRatio?
+- condense (raw) — remove silences and filler words from a whole video OR audio source -> one shorter file of the same type. Not clip selection. input: videoSource, silenceThresholdDb?, minSilenceSeconds?, keepPaddingSeconds?, removeFillers?, fillerWords?, language?
 Composition is the caller's job: diarize -> segment -> cut is a podcast clipper, fetch -> cut is a manual trim. No op assumes what the media is.`;
 
 export function registerMediaTool(server: McpServer): void {

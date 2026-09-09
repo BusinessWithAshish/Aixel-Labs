@@ -6,7 +6,7 @@ import { assertPersistentDisk } from "../../../config";
 import { snapClipBoundaries } from "./boundary-snap";
 import { MEDIA_ERROR_MESSAGES, MEDIA_CUT_OUTPUT_DIR } from "../constants";
 import { cleanupResolvedMediaSource, resolveVideoSourceForCut } from "../source";
-import { cutClip, cutClipFromStream, getMediaDurationSeconds } from "./ffmpeg-cut";
+import { cutClip, cutClipFromStream, probeMediaStreams } from "./ffmpeg-cut";
 import { parseProxyUrlForBridge, ProxyConnectBridge } from "./proxy-bridge";
 import type {
   CLIP_RANGE,
@@ -54,10 +54,19 @@ export async function cutClipsFromVideo(
   try {
     await mkdir(MEDIA_CUT_OUTPUT_DIR, { recursive: true });
 
-    const sourceDurationSeconds =
-      resolved.kind === "youtube"
-        ? resolved.durationSeconds
-        : await getMediaDurationSeconds(resolved.path);
+    // A YouTube source is always video by construction (its own adaptive
+    // video+audio streams) — no probe needed there. `kind: "file"` is the
+    // one case that might be audio-only, so that's the one we probe (once).
+    const fileProbe = resolved.kind === "file" ? await probeMediaStreams(resolved.path) : null;
+    const durationSeconds =
+      resolved.kind === "youtube" ? resolved.durationSeconds : fileProbe!.durationSeconds;
+    const hasVideo = resolved.kind === "youtube" ? true : fileProbe!.hasVideo;
+    const mediaType: "video" | "audio" = hasVideo ? "video" : "audio";
+    const outputExt = mediaType === "video" ? "mp4" : "m4a";
+    // Echoed in the response as "original" for audio results — no reframe was
+    // actually applied, so echoing back whatever the caller requested would
+    // claim a framing decision that never happened.
+    const responseAspectRatio: MEDIA_ASPECT_RATIO_VALUE = hasVideo ? aspectRatio : "original";
 
     const results = [];
     for (const clip of clips) {
@@ -65,7 +74,7 @@ export async function cutClipsFromVideo(
         clip.start,
         clip.end,
         diarized,
-        sourceDurationSeconds,
+        durationSeconds,
       );
 
       /**
@@ -75,7 +84,7 @@ export async function cutClipsFromVideo(
        * file (container boxes, no media). Catch that here instead of
        * shipping a broken clip.
        */
-      if (cutStartSeconds >= sourceDurationSeconds - 0.5) {
+      if (cutStartSeconds >= durationSeconds - 0.5) {
         results.push({
           label: clip.label,
           requestedStart: clip.start,
@@ -83,13 +92,14 @@ export async function cutClipsFromVideo(
           cutStartSeconds,
           cutEndSeconds,
           snapped,
-          aspectRatio,
-          error: `Requested start is at/past the source video's actual duration (${sourceDurationSeconds.toFixed(1)}s) — skipped rather than producing an empty clip.`,
+          mediaType,
+          aspectRatio: responseAspectRatio,
+          error: `Requested start is at/past the source's actual duration (${durationSeconds.toFixed(1)}s) — skipped rather than producing an empty clip.`,
         });
         continue;
       }
 
-      const outputPath = join(MEDIA_CUT_OUTPUT_DIR, `clip-${randomUUID()}.mp4`);
+      const outputPath = join(MEDIA_CUT_OUTPUT_DIR, `clip-${randomUUID()}.${outputExt}`);
       if (resolved.kind === "youtube") {
         await cutClipFromStream(
           resolved.videoUrl,
@@ -101,7 +111,14 @@ export async function cutClipsFromVideo(
           ffmpegProxyUrl,
         );
       } else {
-        await cutClip(resolved.path, cutStartSeconds, cutEndSeconds, outputPath, aspectRatio);
+        await cutClip(
+          resolved.path,
+          cutStartSeconds,
+          cutEndSeconds,
+          outputPath,
+          aspectRatio,
+          hasVideo,
+        );
       }
 
       results.push({
@@ -111,7 +128,8 @@ export async function cutClipsFromVideo(
         cutStartSeconds,
         cutEndSeconds,
         snapped,
-        aspectRatio,
+        mediaType,
+        aspectRatio: responseAspectRatio,
         clipPath: outputPath,
       });
     }

@@ -10,7 +10,7 @@ import { MEDIA_FIELD_DESCRIPTIONS, MEDIA_GEMINI_MODEL } from "../constants";
  * fail to download as media bytes.
  */
 export const MEDIA_DIARIZE_REQUEST_SCHEMA = z.object({
-  audioSource: z.string().min(1).describe(MEDIA_FIELD_DESCRIPTIONS.audioSource),
+  mediaSource: z.string().min(1).describe(MEDIA_FIELD_DESCRIPTIONS.mediaSource),
   model: z
     .string()
     .optional()

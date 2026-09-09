@@ -13,15 +13,30 @@ import type { MEDIA_ASPECT_RATIO_VALUE } from "../types";
 const execFileAsync = promisify(execFile);
 
 const DURATION_REGEX = /Duration:\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})/;
+const VIDEO_STREAM_REGEX = /Stream #\d+:\d+.*: Video:/;
+const AUDIO_STREAM_REGEX = /Stream #\d+:\d+.*: Audio:/;
+
+export type MEDIA_STREAM_PROBE = {
+  durationSeconds: number;
+  hasVideo: boolean;
+  hasAudio: boolean;
+};
 
 /**
- * Reads a media file's duration by parsing ffmpeg's own stderr banner
- * (`Duration: HH:MM:SS.ms`) — avoids adding `ffprobe-static` as a second
- * binary dependency alongside `ffmpeg-static` just for this one number.
- * `ffmpeg -i <input>` with no output writes this and exits non-zero (no
- * output was requested), which is expected here — we only read stderr.
+ * Reads a media file's duration and which stream types it actually has, by
+ * parsing ffmpeg's own stderr banner — the `Duration: HH:MM:SS.ms` line and
+ * the `Stream #N:M: Video: ...` / `Stream #N:M: Audio: ...` lines ffmpeg
+ * prints during input analysis, before any output option (like `-vn`) has a
+ * chance to apply. Avoids adding `ffprobe-static` as a second binary
+ * dependency alongside `ffmpeg-static` for what boils down to reading text
+ * ffmpeg already writes for free. `ffmpeg -i <input>` with no output exits
+ * non-zero (no output was requested) — expected here, we only read stderr.
+ *
+ * This is what makes `cut`/`condense` type-preserving: an audio-only source
+ * (`hasVideo: false`) skips every video-specific step (aspect-ratio reframe,
+ * video codec, `-map` of a video stream) rather than assuming one exists.
  */
-export async function getMediaDurationSeconds(inputPath: string): Promise<number> {
+export async function probeMediaStreams(inputPath: string): Promise<MEDIA_STREAM_PROBE> {
   if (!ffmpegPath) {
     throw new Error(MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED);
   }
@@ -38,7 +53,16 @@ export async function getMediaDurationSeconds(inputPath: string): Promise<number
     throw new Error(`${MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED}: could not read duration`);
   }
   const [, h, m, s, cs] = match;
-  return Number(h) * 3600 + Number(m) * 60 + Number(s) + Number(cs) / 100;
+  return {
+    durationSeconds: Number(h) * 3600 + Number(m) * 60 + Number(s) + Number(cs) / 100,
+    hasVideo: VIDEO_STREAM_REGEX.test(stderr),
+    hasAudio: AUDIO_STREAM_REGEX.test(stderr),
+  };
+}
+
+/** Thin wrapper for the many callers that only need the duration. */
+export async function getMediaDurationSeconds(inputPath: string): Promise<number> {
+  return (await probeMediaStreams(inputPath)).durationSeconds;
 }
 
 /**
@@ -117,18 +141,26 @@ export async function cutAudioSegment(
  * `-c copy` cuts are prone to at arbitrary cut points. Reframing (crop+scale
  * to `aspectRatio`) rides along on the same re-encode at no extra pass.
  */
+/**
+ * `hasVideo` picks the branch: a video source gets the full treatment
+ * (aspect-ratio reframe, video codec); an audio-only source skips every
+ * video-specific flag entirely (`-vn`, audio codec only) rather than
+ * assuming a video stream that isn't there — same shape `cutAudioSegment`
+ * above already uses for its own narrower purpose.
+ */
 export async function cutClip(
   inputPath: string,
   startSeconds: number,
   endSeconds: number,
   outputPath: string,
   aspectRatio: MEDIA_ASPECT_RATIO_VALUE,
+  hasVideo: boolean,
 ): Promise<void> {
   if (!ffmpegPath) {
     throw new Error(MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED);
   }
 
-  const videoFilter = buildAspectRatioFilter(aspectRatio);
+  const videoFilter = hasVideo ? buildAspectRatioFilter(aspectRatio) : undefined;
 
   try {
     await execFileAsync(ffmpegPath, [
@@ -139,13 +171,17 @@ export async function cutClip(
       startSeconds.toFixed(3),
       "-to",
       endSeconds.toFixed(3),
-      ...(videoFilter ? ["-vf", videoFilter] : []),
-      "-c:v",
-      MEDIA.FFMPEG_VIDEO_CODEC,
-      "-preset",
-      MEDIA.FFMPEG_PRESET,
-      "-crf",
-      MEDIA.FFMPEG_CRF,
+      ...(hasVideo
+        ? [
+            ...(videoFilter ? ["-vf", videoFilter] : []),
+            "-c:v",
+            MEDIA.FFMPEG_VIDEO_CODEC,
+            "-preset",
+            MEDIA.FFMPEG_PRESET,
+            "-crf",
+            MEDIA.FFMPEG_CRF,
+          ]
+        : ["-vn"]),
       "-c:a",
       MEDIA.FFMPEG_AUDIO_CODEC,
       "-avoid_negative_ts",

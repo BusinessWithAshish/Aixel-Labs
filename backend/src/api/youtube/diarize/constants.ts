@@ -14,8 +14,13 @@ export const YOUTUBE_DIARIZE_ERROR_MESSAGES = {
   INVALID_PARAMS: "Invalid request parameters",
   YOUTUBE_METADATA_FETCH_FAILED: "Failed to fetch YouTube video metadata",
   CAPTIONS_EMPTY: "YouTube captions were empty",
+  CLAUDE_INVALID_JSON:
+    "Claude did not return valid JSON matching the speaker-label schema after retrying",
   GENERIC: "YouTube diarize failed",
 } as const;
+
+/** Total attempts (1 initial + retries) before giving up on Claude's structured output. Mirrors SEGMENT_CLAUDE_MAX_ATTEMPTS. */
+export const YOUTUBE_DIARIZE_CLAUDE_MAX_ATTEMPTS = 3;
 
 /**
  * YouTube ASR `>>` / `isSpeakerChange` only marks that the speaker changed,

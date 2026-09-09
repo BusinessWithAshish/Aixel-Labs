@@ -6,5 +6,5 @@ import { MEDIA_DIARIZE_REQUEST_SCHEMA } from "./schemas";
 export const mediaDiarizeHandler = createMediaHandler({
   label: "MEDIA/DIARIZE",
   schema: MEDIA_DIARIZE_REQUEST_SCHEMA,
-  fetch: (input) => diarizeFromSource(input.audioSource, input.model),
+  fetch: (input) => diarizeFromSource(input.mediaSource, input.model),
 });

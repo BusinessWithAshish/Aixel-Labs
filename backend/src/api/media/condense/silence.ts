@@ -21,20 +21,29 @@ const SILENCE_START_REGEX = /silence_start:\s*(-?[\d.]+)/g;
 /** `[silencedetect @ 0x...] silence_end: 14.567 | silence_duration: 2.222` */
 const SILENCE_END_REGEX = /silence_end:\s*(-?[\d.]+)/g;
 
+/** `Stream #0:0: Video: ...` — same detection ffmpeg-cut.ts's probeMediaStreams uses, applied here to the stderr this call already captures rather than a separate probe run. */
+const VIDEO_STREAM_REGEX = /Stream #\d+:\d+.*: Video:/;
+
 export type SilenceScan = {
   durationSeconds: number;
   silences: TIME_RANGE[];
+  /** Whether the source has a video stream at all — read off this same run's stderr, no extra ffmpeg spawn needed. */
+  hasVideo: boolean;
 };
 
 /**
  * Runs ffmpeg's `silencedetect` filter over the source and returns every
  * stretch quieter than `thresholdDb` for longer than `minSilenceSeconds`,
- * plus the source duration (both come out of the same stderr).
+ * plus the source duration and whether it has a video stream at all (all
+ * three come out of the same stderr).
  *
  * `-vn` matters for speed, not correctness: `silencedetect` is an audio
  * filter, so decoding the video stream would be pure waste on what is already
  * a full-length pass over the file. `-f null -` discards the output — this run
- * exists only for its stderr.
+ * exists only for its stderr. Stream enumeration happens during ffmpeg's
+ * input analysis, before `-vn` (an output-side option) has any effect, so the
+ * `Video:` line is still there in stderr even though the video stream itself
+ * is never decoded.
  *
  * Deliberately detect-only. ffmpeg also ships a `silenceremove` filter that
  * would do the cutting in one step, but it's an audio filter: it shortens the
@@ -109,5 +118,5 @@ export async function detectSilences(
     if (end > start) silences.push({ start, end });
   }
 
-  return { durationSeconds, silences };
+  return { durationSeconds, silences, hasVideo: VIDEO_STREAM_REGEX.test(stderr) };
 }
