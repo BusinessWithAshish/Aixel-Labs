@@ -27,6 +27,7 @@ by the frontend (no `@aixellabs/backend/utils` package export).
 |------|------|
 | `node-tls-client-session-handler.ts` | Primary HTTP: sessions, `fetchUrls`, `tlsGet`, sticky proxy, retries |
 | `fetch-session-common.ts` | Shared options, `buildEvomiProxyUrl`, presets, retry/skip, timeouts |
+| `evomi-budget.ts` | Global Evomi spend cap — `assertEvomiBudget()` runs inside `buildEvomiProxyUrl`; throws 503 once rolling-24h usage ≥ `EVOMI_DAILY_CAP_MB`. Fail-open; gates new proxy URLs only |
 | `constants.ts` | Browser timeouts + `PROXY_CONFIG` from `EVOMI_PROXY_*` (after `dotenv` in `server.ts`) |
 | `location-schema.ts` | Shared Zod: `LOCATION_FIELDS_SCHEMA`, ISO country, state/city |
 | `country.ts` | `toAlpha2CountryCode` for proxy `_country-XX` / Google `gl` |
@@ -59,6 +60,7 @@ caller and a module README note.
 | Var | Used by |
 |-----|---------|
 | `EVOMI_PROXY_*` | `PROXY_CONFIG` |
+| `EVOMI_DAILY_CAP_MB` + `EVOMI_PUBLIC_API_KEY` | `evomi-budget.ts` — cap is off unless both are set |
 | `BROWSER_WORKER_URL` | `browser-worker.ts` |
 | `FETCH_URLS_DEBUG_PROXY` | proxy debug |
 

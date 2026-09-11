@@ -5,6 +5,7 @@ import {
   sleep,
 } from "./async-helpers";
 import { PROXY_CONFIG } from "./constants";
+import { assertEvomiBudget } from "./evomi-budget";
 
 export type FetchUrlsMapperCtx = { url: string; batchIndex: number };
 
@@ -103,6 +104,8 @@ export function buildEvomiProxyUrl(parts: {
 }): string | undefined {
   const { PROTOCOL, HOSTNAME, PORT, USERNAME, PASSWORD } = PROXY_CONFIG;
   if (!USERNAME || !PASSWORD || !HOSTNAME || !PORT) return undefined;
+  // Every proxied path builds its URL here, so this is the one global spend gate.
+  assertEvomiBudget();
 
   let pwd = PASSWORD;
   if (parts.sessionId?.trim()) pwd = `${pwd}_session-${parts.sessionId.trim()}`;
