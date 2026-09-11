@@ -18,6 +18,8 @@ export const CLAUDE_ASK_FIELD_DESCRIPTIONS = {
     "Comma-separated Claude Code tools. Default read-only. Add Write,Edit,Bash only when the task must change files.",
   max_turns: "Max agent turns. Default 12.",
   timeout_seconds: "Default 600.",
+  ref_images:
+    "Absolute local file paths to images the task should look at. Claude has no image-attach flag — its multimodal input is the Read tool reading a file directly (Read is force-included in the tool list whenever this is set, no staging/copying involved, any path the process can read works). Claude only ever returns text — this is input-only, there is no image output. To use a remote image, download it first with `media` op=fetch (imageOnly: true) and pass the returned path here.",
 } as const;
 
 export const CLAUDE_ASK = {
@@ -55,8 +57,6 @@ export const CLAUDE_ERROR_MESSAGES = {
   DELEGATION_FAILED: "Delegation failed",
   UNAVAILABLE: "Claude is unavailable",
   REPORTED_ERROR: "Claude reported an error",
-  NOT_VPS:
-    "Claude delegation requires the VPS — set AIXEL_VPS=1 on the one host that runs it",
 } as const;
 
 // Shared with every caller (Hermes profiles + this backend) — same default

@@ -30,7 +30,7 @@ webhook, optional `NEXT_PUBLIC_SKIP_DEVICE_FINGERPRINT` for local auth).
 | `components/`              | Shared UI (`ui/`, `common/`, layout)                                       |
 | `hooks/`                   | Cross-route hooks (lead-gen scraper, NL chat/query, …)                     |
 | `contexts/`                | `PageProvider` / `usePage` page shell                                      |
-| `brand-guidelines/`        | Brand pack for humans + AI                                                 |
+| `brand/`        | Brand pack for humans + AI                                                 |
 
 Schema SSOT for Docs / `LeadData` / modules: `@aixellabs/backend` (`backend/src/db`).
 
@@ -47,4 +47,4 @@ YouTube / Trends product UI.
 
 Conventions, skills, and governors: [`AGENTS.md`](./AGENTS.md).  
 Auth detail: [`lib/auth/README.md`](./lib/auth/README.md).  
-Brand: [`brand-guidelines/`](./brand-guidelines/).
+Brand: [`brand/`](./brand/).

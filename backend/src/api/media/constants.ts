@@ -22,6 +22,10 @@ export const MEDIA_FIELD_DESCRIPTIONS = {
   diarized: "Diarized transcript object, as returned by POST /video/diarize.",
   source:
     "Media to resolve to a local file: a local filesystem path (returned as-is), or any publicly-reachable media URL (downloaded). Not for YouTube links — use `youtube` op=video_download for those and pass this the resulting local path instead; a YouTube URL given here is just a URL and will fail to resolve as one.",
+  fetchImageOnly:
+    "Reject the download unless the response is a real image content-type (jpeg/png/webp/gif) — for staging a reference image (e.g. a competitor's post) to view or attach elsewhere, where silently saving a login-wall HTML page or an unusable format is worse than a clear error. Omit for a plain media fetch with no content-type check.",
+  fetchMaxBytes:
+    "Reject the download if it exceeds this many bytes. Checked against Content-Length up front when the server sends one, and against the actual file size after writing either way. Omit for no limit.",
   videoSource:
     "Local filesystem path to the SOURCE VIDEO (not audio-only) to cut clips from, or a publicly-reachable video URL — cutting needs the real video stream.",
   clips: "List of time ranges to cut — `{ start, end, label? }` — start/end as seconds (number, e.g. 1082) or an HH:MM:SS / MM:SS timestamp string. Any source of ranges works; nothing here is tied to a particular scorer.",
@@ -170,6 +174,9 @@ export const MEDIA_ERROR_MESSAGES = {
     "The cut op needs a persistent host with local disk output (not available on Vercel)",
   LOCAL_PATH_ON_VERCEL:
     "A local filesystem path was given, but this is running on Vercel (no shared filesystem) — pass a URL instead",
+  FETCH_NOT_IMAGE:
+    "imageOnly was set but the source did not return a real image content-type",
+  FETCH_TOO_LARGE: "Downloaded file exceeded maxBytes",
   CAPTION_NO_AUDIO:
     "The source has no audio track, so there is nothing to transcribe — pass `subtitles` explicitly to caption a silent video",
   CAPTION_NO_VIDEO:
@@ -183,6 +190,20 @@ export const MEDIA_ERROR_MESSAGES = {
 
 /** HTTP statuses treated as "this source is blocking a plain fetch" — triggers the TLS-fingerprint fallback in source.ts. */
 export const MEDIA_GATED_STATUS_CODES = [401, 403, 429, 503] as const;
+
+/**
+ * Extensions `media.fetch` will name a downloaded file with when the
+ * response's content-type matches — otherwise the file is left unnamed
+ * (no extension), same as always. Deliberately just the common image types:
+ * `imageOnly` REQUIRES a match from this set (unmatched = rejected, not
+ * just unnamed); a plain fetch only uses it as an opportunistic nicety.
+ */
+export const MEDIA_FETCH_EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
 
 export const MEDIA_CUT_OUTPUT_DIR = AIXEL_MEDIA.MEDIA_CUTS;
 

@@ -83,8 +83,12 @@ export type MEDIA_DIARIZE_RESPONSE = {
  * same banner `getMediaDurationSeconds` already parses).
  */
 export type MEDIA_FETCH_RESPONSE = {
-  /** Local path to the media file — the caller's own path (untouched), or our downloaded copy under MEDIA_FETCH_DIR. */
+  /** Local path to the media file — the caller's own path (untouched), or our downloaded copy under MEDIA_FETCH_DIR (named with a real extension when the content-type was recognized). */
   path: string;
+  /** Response content-type, when we downloaded (undefined for a local-path passthrough — nothing to sniff). */
+  contentType?: string;
+  /** Downloaded byte count, when we downloaded. */
+  sizeBytes?: number;
 };
 
 /** A generic time range to cut — deliberately not tied to any scorer's candidate shape, so `cut` works for any pipeline's clip list. */

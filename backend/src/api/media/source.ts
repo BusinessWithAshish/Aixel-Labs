@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -13,7 +13,11 @@ import {
   closeUrlFetchSession,
   createUrlFetchSession,
 } from "../../utils/node-tls-client-session-handler";
-import { MEDIA_ERROR_MESSAGES, MEDIA_GATED_STATUS_CODES } from "./constants";
+import {
+  MEDIA_ERROR_MESSAGES,
+  MEDIA_FETCH_EXTENSION_BY_CONTENT_TYPE,
+  MEDIA_GATED_STATUS_CODES,
+} from "./constants";
 import { getYoutubeStreamUrls } from "../youtube/download/helpers";
 import { parseYoutubeVideoId, resolveYoutubeGeo } from "../youtube/helpers";
 
@@ -73,7 +77,9 @@ function isGatedStatus(status: number): boolean {
  * `transcription/download.ts` so every caller through `resolveMediaSource`
  * gets it, not just transcribe.
  */
-async function downloadViaTlsSession(url: string): Promise<Buffer> {
+async function downloadViaTlsSession(
+  url: string,
+): Promise<{ buffer: Buffer; contentType: string | null }> {
   const session = await createUrlFetchSession();
   try {
     const response = await session.get(url, {
@@ -85,24 +91,44 @@ async function downloadViaTlsSession(url: string): Promise<Buffer> {
     }
     // `byteResponse` returns a data URI (`data:<mime>;base64,<payload>`), not bare base64.
     const mimeMatch = response.body.match(/^data:([^;]*);base64,/);
-    if (isHtmlContentType(mimeMatch?.[1] ?? null)) {
+    const contentType = mimeMatch?.[1] ?? null;
+    if (isHtmlContentType(contentType)) {
       throw new Error(
-        `source returned ${mimeMatch?.[1] ?? "an unknown content type"} — this looks like a webpage, not media`,
+        `source returned ${contentType ?? "an unknown content type"} — this looks like a webpage, not media`,
       );
     }
     const base64Payload = response.body.replace(/^data:[^;]*;base64,/, "");
-    return Buffer.from(base64Payload, "base64");
+    return { buffer: Buffer.from(base64Payload, "base64"), contentType };
   } finally {
     await closeUrlFetchSession(session);
+  }
+}
+
+/** `imageOnly` rejects unless the content-type is one of the known image types — bare (parameters stripped), case-insensitive. */
+function assertImageContentType(contentType: string | null, imageOnly?: boolean): void {
+  if (!imageOnly) return;
+  const bare = (contentType ?? "").split(";")[0]!.trim().toLowerCase();
+  if (!MEDIA_FETCH_EXTENSION_BY_CONTENT_TYPE[bare]) {
+    throw new Error(MEDIA_ERROR_MESSAGES.FETCH_NOT_IMAGE);
   }
 }
 
 /**
  * Downloads a remote file to `destPath`. If the plain fetch is blocked
  * (network error, or a bot-detection-shaped status), retries once through
- * the TLS-fingerprint session before giving up.
+ * the TLS-fingerprint session before giving up. `maxBytes` is checked
+ * against a declared Content-Length up front when the server sends one, and
+ * against the real file size after writing either way — the latter is a
+ * backstop, not a streaming cutoff, so a server that lies about its length
+ * still gets fully downloaded before being rejected; fine for the
+ * image-staging sizes this is meant for, not a substitute for a hard cap on
+ * arbitrary large media.
  */
-async function downloadRemoteToFile(url: string, destPath: string): Promise<void> {
+async function downloadRemoteToFile(
+  url: string,
+  destPath: string,
+  opts: { imageOnly?: boolean; maxBytes?: number } = {},
+): Promise<{ contentType: string | null; sizeBytes: number }> {
   let res: FetchResponseLike | undefined;
   let fetchError: unknown;
   try {
@@ -118,9 +144,13 @@ async function downloadRemoteToFile(url: string, destPath: string): Promise<void
 
   if (gated) {
     try {
-      const buffer = await downloadViaTlsSession(url);
-      await writeFile(destPath, buffer);
-      return;
+      const fallback = await downloadViaTlsSession(url);
+      assertImageContentType(fallback.contentType, opts.imageOnly);
+      if (opts.maxBytes && fallback.buffer.byteLength > opts.maxBytes) {
+        throw new Error(MEDIA_ERROR_MESSAGES.FETCH_TOO_LARGE);
+      }
+      await writeFile(destPath, fallback.buffer);
+      return { contentType: fallback.contentType, sizeBytes: fallback.buffer.byteLength };
     } catch (fallbackErr) {
       const primary =
         fetchError instanceof Error
@@ -148,11 +178,25 @@ async function downloadRemoteToFile(url: string, destPath: string): Promise<void
         `A link that needs a dedicated downloader (e.g. a YouTube URL) belongs to that platform's own tool, not a generic fetch.`,
     );
   }
+  assertImageContentType(contentType, opts.imageOnly);
+
+  const declaredLength = Number(res.headers.get("content-length") || "");
+  if (opts.maxBytes && Number.isFinite(declaredLength) && declaredLength > opts.maxBytes) {
+    throw new Error(MEDIA_ERROR_MESSAGES.FETCH_TOO_LARGE);
+  }
 
   await pipeline(
     Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
     createWriteStream(destPath),
   );
+
+  const sizeBytes = (await stat(destPath)).size;
+  if (opts.maxBytes && sizeBytes > opts.maxBytes) {
+    await rm(destPath, { force: true });
+    throw new Error(MEDIA_ERROR_MESSAGES.FETCH_TOO_LARGE);
+  }
+
+  return { contentType, sizeBytes };
 }
 
 export type RESOLVED_MEDIA_SOURCE = {
@@ -221,8 +265,18 @@ export async function resolveMediaSource(source: string): Promise<RESOLVED_MEDIA
  * temp dir `resolveMediaSource` creates. No `workDir`, no `ownsSource`, no
  * relationship to `cleanupResolvedMediaSource`: nothing here is ever meant
  * to be deleted by this module, so there is nothing to accidentally delete.
+ *
+ * `opts.imageOnly`/`opts.maxBytes` (both optional, off by default so plain
+ * media fetches are unaffected) turn on the validation `chatgpt`'s old
+ * `stage_image` op used to do on its own, redundantly, with a weaker plain
+ * `fetch()` that lacked this function's TLS-fingerprint fallback for gated
+ * CDNs — folded in here instead of staying a second implementation.
  */
-export async function downloadToFixedDir(source: string, destDir: string): Promise<string> {
+export async function downloadToFixedDir(
+  source: string,
+  destDir: string,
+  opts: { imageOnly?: boolean; maxBytes?: number } = {},
+): Promise<{ path: string; contentType?: string; sizeBytes?: number }> {
   if (!isRemoteUrl(source)) {
     if (IS_VERCEL_RUNTIME) {
       throw new Error(`${MEDIA_ERROR_MESSAGES.LOCAL_PATH_ON_VERCEL}: ${source}`);
@@ -234,13 +288,25 @@ export async function downloadToFixedDir(source: string, destDir: string): Promi
         `${MEDIA_ERROR_MESSAGES.DOWNLOAD_FAILED}: local file not found: ${source}`,
       );
     }
-    return source;
+    return { path: source };
   }
 
   await mkdir(destDir, { recursive: true });
-  const destPath = join(destDir, `source-${randomUUID()}`);
-  await downloadRemoteToFile(source, destPath);
-  return destPath;
+  // Extension depends on the response's content-type, which we only know
+  // once the download starts — write under a provisional name, then rename
+  // once known. `imageOnly` guarantees a recognized type (or throws); a
+  // plain fetch just leaves the file unnamed when the type isn't recognized,
+  // same as always.
+  const provisional = join(destDir, `source-${randomUUID()}`);
+  const { contentType, sizeBytes } = await downloadRemoteToFile(source, provisional, opts);
+
+  const bare = (contentType ?? "").split(";")[0]!.trim().toLowerCase();
+  const ext = MEDIA_FETCH_EXTENSION_BY_CONTENT_TYPE[bare];
+  if (!ext) return { path: provisional, contentType: contentType ?? undefined, sizeBytes };
+
+  const finalPath = `${provisional}.${ext}`;
+  await rename(provisional, finalPath);
+  return { path: finalPath, contentType: contentType ?? undefined, sizeBytes };
 }
 
 /**

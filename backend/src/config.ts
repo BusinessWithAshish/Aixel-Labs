@@ -42,11 +42,15 @@ export const IS_VERCEL_RUNTIME = !!process.env.VERCEL;
 /**
  * Explicit opt-in — nothing sets this automatically. The VPS's systemd env
  * sets `AIXEL_VPS=1`. Gates capabilities that only make sense on that one
- * persistent, browser-equipped host: the chatgpt module's headful
- * Chrome/CDP session and the claude module's shelling to the local `claude`
- * CLI. Both are refused everywhere else — Vercel (no persistent host) and
- * local/dev alike — so a stray local run can't accidentally drive a browser
- * that isn't there or burn real Claude usage against your own subscription.
+ * persistent, browser-equipped host: specifically the chatgpt module's
+ * headful Chrome/CDP session, which needs the VPS's Xvfb + logged-in Chrome
+ * profile and cannot run anywhere else. Refused everywhere else — Vercel (no
+ * persistent host) and local/dev alike — so a stray local run can't
+ * accidentally try to drive a browser that isn't there.
+ *
+ * The claude module is deliberately NOT gated by this: `claude -p` is just a
+ * CLI, not VPS-specific infrastructure, so it runs wherever it's installed
+ * and authenticated, and fails with a plain error otherwise.
  */
 export const IS_VPS_RUNTIME = !!process.env.AIXEL_VPS;
 
@@ -283,10 +287,6 @@ export const API_ENDPOINTS = {
     HEALTH: {
       route: "/health",
       full: `${ENDPOINTS.CHATGPT}/health`,
-    },
-    STAGE: {
-      route: "/stage",
-      full: `${ENDPOINTS.CHATGPT}/stage`,
     },
   },
   CLAUDE: {

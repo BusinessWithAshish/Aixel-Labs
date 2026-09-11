@@ -12,7 +12,7 @@ How skills/rules attach: [`.cursor/README.md`](../.cursor/README.md).
 - Forms: react-hook-form + Zod (`zod-form-builder`)
 - Server mutations: Next.js server actions under `app/actions/`
 - Auth: custom Firebase + session cookie (`lib/auth`, `server/auth`)
-- **Brand pack (paste into any AI):** [`brand-guidelines/BRAND.md`](brand-guidelines/BRAND.md) + `brand-guidelines/assets/`
+- **Brand pack (paste into any AI):** [`brand/BRAND.md`](brand/BRAND.md) + `brand/assets/`
 
 ## Commands
 

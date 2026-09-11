@@ -22,8 +22,6 @@ import type {
   CHATGPT_HEALTH_RESPONSE,
   CHATGPT_REQUEST_PARSED,
   CHATGPT_RESPONSE,
-  CHATGPT_STAGE_REQUEST_PARSED,
-  CHATGPT_STAGE_RESPONSE,
 } from "./types";
 
 let busy = false;
@@ -456,47 +454,4 @@ export async function generateChatGpt(
     if (chrome) await closeChatGptChrome(chrome);
     busy = false;
   }
-}
-
-const STAGE_EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-};
-
-/**
- * Downloads a public image URL (e.g. an Instagram post image) to a private
- * local file so it can be viewed with the Read tool and/or passed into a
- * later generate() call's images[]. Not CDP-driven — a plain server-side
- * fetch, so it does not touch the shared ChatGPT tab/session.
- */
-export async function stageChatGptReferenceImage(
-  req: CHATGPT_STAGE_REQUEST_PARSED,
-): Promise<CHATGPT_STAGE_RESPONSE> {
-  assertVpsRuntime(CHATGPT_ERROR_MESSAGES.NOT_VPS);
-  const res = await fetch(req.url, {
-    signal: AbortSignal.timeout(CHATGPT.STAGE_FETCH_TIMEOUT_MS),
-  }).catch(() => null);
-  if (!res || !res.ok) {
-    throw new Error(CHATGPT_ERROR_MESSAGES.STAGE_FETCH_FAILED);
-  }
-
-  const contentType = (res.headers.get("content-type") || "").split(";")[0]!.trim();
-  const extension = STAGE_EXTENSION_BY_CONTENT_TYPE[contentType];
-  if (!extension) {
-    throw new Error(CHATGPT_ERROR_MESSAGES.STAGE_NOT_IMAGE);
-  }
-
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.byteLength === 0 || buf.byteLength > CHATGPT.STAGE_MAX_BYTES) {
-    throw new Error(CHATGPT_ERROR_MESSAGES.STAGE_TOO_LARGE);
-  }
-
-  await fs.mkdir(CHATGPT.STAGE_ROOT, { recursive: true });
-  const name = `${randomBytes(16).toString("hex")}.${extension}`;
-  const dest = `${CHATGPT.STAGE_ROOT}/${name}`;
-  await fs.writeFile(dest, buf);
-
-  return { path: dest, content_type: contentType, size_bytes: buf.byteLength };
 }

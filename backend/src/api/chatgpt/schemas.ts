@@ -43,7 +43,3 @@ export const CHATGPT_REQUEST_SCHEMA = z
       });
     }
   });
-
-export const CHATGPT_STAGE_REQUEST_SCHEMA = z.object({
-  url: z.string().url().describe(CHATGPT_FIELD_DESCRIPTIONS.stage_url),
-});

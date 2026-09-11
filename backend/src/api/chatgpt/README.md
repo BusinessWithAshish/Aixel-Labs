@@ -31,28 +31,21 @@ resume spawning against it.
 |--------|------|------|
 | `GET` | `/chatgpt/health` | Static checks (binary, profile dir) + one real spawn+login check |
 | `POST` | `/chatgpt` | One ChatGPT turn (sync; may take many minutes for an image) |
-| `POST` | `/chatgpt/stage` | Download a URL to a local reference file (fast, no browser) |
 
-Also exposed as the `chatgpt` MCP tool (ops `generate` and `stage_image`) — same request/response shapes, same underlying services.
+Also exposed as the `chatgpt` MCP tool (op `ask`) — same request/response
+shape, same underlying service.
 
-## Staging a reference image (`POST /chatgpt/stage`)
+## Staging a reference image
 
-For research flows that find a viral post and want to use its image as a
-generation reference: download it first, then pass the path into `images[]`.
-
-```json
-{ "url": "https://…instagram-cdn…/post-image.jpg" }
-```
-
-```json
-{ "success": true, "data": { "path": "/home/ubuntu/media/refs/….jpg", "content_type": "image/jpeg", "size_bytes": 123456 } }
-```
-
-Staged files live under `{AIXEL_MEDIA_ROOT}/refs` (`AIXEL_MEDIA.REFS` in
-`src/media.ts`, not independently overridable) — private, not web-served,
-unlike generated output under `MEDIA_ROOT`. Max 15MB, must be a real image
-content-type. Nothing cleans these up automatically — they're meant to
-accumulate as a reference library, not ephemeral scratch.
+This module used to have its own `stage_image` op/`/chatgpt/stage` route —
+removed. It was a plain HTTP download with zero ChatGPT-specific logic
+(weaker than `media`'s own downloader, too — no gated-CDN fallback). For a
+research flow that finds a viral post and wants to use its image as a
+generation reference: call `media` op=fetch with `imageOnly: true` (validates
+a real image content-type, enforces a size cap, names the file with the
+right extension) and pass the returned `path` into this module's `images[]`.
+Downloaded images land in `{AIXEL_MEDIA_ROOT}/private/media-fetched` — see
+`media/README.md`.
 
 ## Request (`POST /chatgpt`)
 
@@ -112,6 +105,6 @@ curl -sS -X POST http://127.0.0.1:8002/chatgpt \
     "project_url":"'"$CHATGPT_PROJECT_URL"'",
     "prompt":"Square flat-vector product still: one inbox UI. Use the first attached image as the exact logo source, pixel-faithful. Use the second attached image only as a layout/composition reference, not for its content.",
     "mode":"new",
-    "images":["/home/ubuntu/AIXEL-LABS-ORG/brand/assets/aixellabs-lockup.png","/home/ubuntu/media/refs/example-viral-post.jpg"]
+    "images":["/home/ubuntu/AIXEL-LABS-ORG/brand/assets/aixellabs-lockup.png","/home/ubuntu/media/private/media-fetched/example-viral-post.jpg"]
   }' | jq .
 ```

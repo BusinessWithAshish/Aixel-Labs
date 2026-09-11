@@ -115,14 +115,29 @@ Every `source` field accepts the same three things: a **local filesystem path**
 
 ### `POST /media/fetch`
 
-`{ source }` -> `{ path }`. That's the whole response.
+`{ source, imageOnly?, maxBytes? }` -> `{ path, contentType?, sizeBytes? }`.
 
-A local path passes through untouched; a remote URL downloads to
-`MEDIA_FETCH_DIR` (a fixed, persistent folder, not a temp dir) — so there's
-nothing to track or clean up. **Never touches YouTube** — a YouTube link is
-just a URL here and is rejected (see below), not silently special-cased. Get
-a YouTube video onto local disk via `youtube` op=`video_download` first, then
-pass this the resulting local path.
+A local path passes through untouched (no `contentType`/`sizeBytes` — nothing
+to sniff); a remote URL downloads to `MEDIA_FETCH_DIR` (a fixed, persistent
+folder, not a temp dir) — so there's nothing to track or clean up. Named with
+a real extension when the content-type is recognized (currently the four
+common image types; otherwise left unnamed, as always).
+
+`imageOnly: true` rejects the download unless the response is a real image
+content-type — this is what `chatgpt` op=stage_image used to do with its own,
+separate, weaker implementation (plain `fetch()`, no gated-CDN fallback);
+folded in here instead of staying duplicated. `maxBytes` rejects an
+oversized download — checked against `Content-Length` up front when sent,
+and against the real file size after writing either way (a backstop, not a
+streaming cutoff — fine for reference-image sizes, not a hard cap for
+arbitrary large media). Any caller staging a reference image for `chatgpt` or
+`claude` uses `imageOnly: true` (and typically a `maxBytes` cap); a plain
+media fetch leaves both off.
+
+**Never touches YouTube** — a YouTube link is just a URL here and is rejected
+(see below), not silently special-cased. Get a YouTube video onto local disk
+via `youtube` op=`video_download` first, then pass this the resulting local
+path.
 
 `cut` and `diarize` resolve their own source internally into their own
 scratch space, so `fetch` isn't a required first step for either — reach for

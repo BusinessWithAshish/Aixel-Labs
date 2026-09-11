@@ -315,7 +315,7 @@ medium rather than the evidence.
 
 | Concern | Path |
 |---|---|
-| This brief | `frontend/brand-guidelines/SOCIAL_BRAND.md` |
-| Product/UI brand (unchanged, this file layers on top) | `frontend/brand-guidelines/BRAND.md` |
-| Logo assets | `frontend/brand-guidelines/assets/` |
+| This brief | `frontend/brand/SOCIAL_BRAND.md` |
+| Product/UI brand (unchanged, this file layers on top) | `frontend/brand/BRAND.md` |
+| Logo assets | `frontend/brand/assets/` |
 | Research basis for §0 | Aixel Labs' own `aixel-youtube-intelligence` MCP/backend (`backend/src/api/youtube`), queried 2026-08-08 |

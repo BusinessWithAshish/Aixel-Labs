@@ -16,9 +16,12 @@ The system prompt is never overridden — that's the one thing that keeps this
 off extra-usage billing. `ANTHROPIC_API_KEY` is stripped from the child
 environment so the CLI can't silently fall through to metered API billing.
 
-**VPS only** — every endpoint (including `/claude/budget`) refuses to run
-unless `AIXEL_VPS=1` is set, so this can't accidentally shell out on a
-developer's own machine and burn real usage against their subscription.
+**Not VPS-gated** — unlike `chatgpt` (which needs a specific headful-browser
+setup that only exists on this one host), `claude -p` is just a CLI: it runs
+wherever it's installed and logged in. Call it from any machine; if the
+binary is missing or the session isn't authenticated, the call fails with a
+plain error describing what broke (see `runClaudeCli`/`askClaude` in
+`client.ts`) rather than a hard environment gate.
 
 ## Endpoints
 
@@ -39,6 +42,7 @@ Also exposed as the `claude` MCP tool (ops `ask` and `budget_status`).
   "effort": null,
   "home_dir": "/home/ubuntu/.hermes/profiles/killjoy",
   "allow_tools": null,
+  "ref_images": null,
   "max_turns": 12,
   "timeout_seconds": 600
 }
@@ -57,6 +61,15 @@ Also exposed as the `claude` MCP tool (ops `ask` and `budget_status`).
   (`Read,Grep,Glob,WebSearch,WebFetch`) — delegation is for thinking, not
   silently mutating the filesystem. Add `Write,Edit,Bash` only when the task
   must change files.
+- `ref_images`: absolute local image paths. Claude Code has no image-attach
+  flag — its multimodal input is the Read tool reading a file directly, no
+  staging or copying needed (this CLI invocation never sandboxes the process
+  to a subtree, so Read can reach any path it has filesystem permission
+  for) — the prompt is just told to Read them. `Read` is force-included in
+  the tool list whenever this is set, even if `allow_tools` omitted it.
+  Output is still text-only — Claude never returns an image. For a remote
+  image, download it first with `media` op=fetch (`imageOnly: true`) and
+  pass the returned path here.
 
 ## Response
 

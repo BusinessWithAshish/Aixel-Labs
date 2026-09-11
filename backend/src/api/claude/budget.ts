@@ -16,8 +16,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { assertVpsRuntime } from "../../config";
-import { CLAUDE_BUDGET, CLAUDE_ERROR_MESSAGES } from "./constants";
+import { CLAUDE_BUDGET } from "./constants";
 import type { CLAUDE_BUDGET_LEDGER, CLAUDE_BUDGET_STATUS_RESPONSE, CLAUDE_USAGE } from "./types";
 
 const today = (): string => new Date().toISOString().slice(0, 10);
@@ -128,7 +127,6 @@ export function recordBudget({
 }
 
 export function budgetStatus(): CLAUDE_BUDGET_STATUS_RESPONSE {
-  assertVpsRuntime(CLAUDE_ERROR_MESSAGES.NOT_VPS);
   const s = load();
   const used = s.tokens_in + s.tokens_out;
   return {

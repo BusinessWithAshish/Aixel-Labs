@@ -5,12 +5,20 @@ Also attach (or `@`-reference) the files in `assets/` so the agent can see the l
 
 | File | Use |
 |------|-----|
-| `assets/aixellabs-logo.png` | Primary mark / icon (“A.”) — square, favicon-ready |
-| `assets/aixellabs-full-logo.png` | Full lockup: mark + wordmark “Aixel Labs” |
-| `assets/aixellabs-logo.svg` | Vector mark (same icon as PNG) |
+| `assets/aixellabs-mark.png` | Mark alone (“A.”), transparent, 229×212 |
+| `assets/aixellabs-lockup.png` | Full lockup: mark + wordmark “Aixel Labs”, transparent, 619×223 |
 
-In-app public URLs (Next.js): `/aixellabs-logo.svg` (the only mark served today) and `/aixellabs-wordmark.png`.
-`aixellabs-logo.png` and `aixellabs-full-logo.png` exist in `assets/` for agents but are **not** served from `public/` — do not link to them as URLs.
+Exactly these two — every other export (opaque backgrounds, white variants,
+favicon .ico, standalone .svg) was pruned as unused dead weight; nothing in
+this org actually referenced them. If a future need (e.g. a real favicon
+build step) requires one of those forms again, regenerate it from these two
+rather than resurrecting old exports that may have drifted from the current
+mark.
+
+In-app public URLs (Next.js, this repo's own `frontend/public/`, unrelated
+to this folder): `/aixellabs-logo.svg`. This `brand/assets/`
+folder is a reference pack for AI agents and marketing generation, not
+something the app build reads from — don't link to these paths as URLs.
 
 ---
 
@@ -72,7 +80,7 @@ Tenants can override **logo URL**, **theme color**, **label**, and **app descrip
 
 ## 2. Logo system
 
-### Mark (icon) — `aixellabs-logo.png` / `.svg`
+### Mark (icon) — `aixellabs-mark.png`
 
 - Stylized **“A.”**: continuous thick ribbon folded into a 3D “A”; circular negative-space cutout near the top; small solid **dot** at bottom-right (reads as “A.”).
 - Gradient purple/violet “liquid metal” look: deep near-black violet in recesses → bright lavender/indigo on highlights.
@@ -81,7 +89,7 @@ Tenants can override **logo URL**, **theme color**, **label**, and **app descrip
 - **Clear space:** keep ~⅛ of the mark’s height empty around it; don’t crop the dot.
 - **Don’t:** recolor randomly, flatten to a single flat purple without gradient unless producing a monochrome lockup, stretch, add drop shadows that fight the built-in depth, or replace with a generic letter “A”.
 
-### Full lockup — `aixellabs-full-logo.png`
+### Full lockup — `aixellabs-lockup.png`
 
 - Horizontal: **mark on the left** + wordmark **“ixel Labs”** in bold modern sans (together with the mark = **“Aixel Labs”**).
 - Wordmark color: solid vibrant purple aligned with mid-tones of the mark.
@@ -192,8 +200,8 @@ When generating UI, marketing pages, or mockups for Aixel Labs:
 
 | Concern | Path |
 |---------|------|
-| This brief | `frontend/brand-guidelines/BRAND.md` |
-| Logo assets (pack) | `frontend/brand-guidelines/assets/` |
+| This brief | `frontend/brand/BRAND.md` |
+| Logo assets (pack) | `frontend/brand/assets/` |
 | Logo assets (served) | `frontend/public/aixellabs-*` |
 | CSS tokens | `frontend/app/globals.css` |
 | App name / description / default theme | `frontend/config/app-config.ts` |

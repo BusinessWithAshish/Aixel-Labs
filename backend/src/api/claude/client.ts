@@ -16,7 +16,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { assertVpsRuntime } from "../../config";
 import { checkBudget, recordBudget } from "./budget";
 import {
   CLAUDE_API_ERROR_PREFIX,
@@ -161,7 +160,6 @@ function runClaudeCli(opts: {
 export async function askClaude(
   req: CLAUDE_ASK_REQUEST_PARSED,
 ): Promise<CLAUDE_ASK_RESPONSE> {
-  assertVpsRuntime(CLAUDE_ERROR_MESSAGES.NOT_VPS);
   const isResume = Boolean(req.session_id);
   const cwd = req.home_dir && existsSync(req.home_dir) ? req.home_dir : homedir();
 
@@ -177,7 +175,25 @@ export async function askClaude(
 
   // Background only on a new session with a home_dir; a resumed one already has it.
   const bg = !isResume && req.home_dir ? contextBundle(req.home_dir) : "";
-  const prompt = bg ? `${bg}\n\n## Task\n${req.task}` : req.task;
+  let prompt = bg ? `${bg}\n\n## Task\n${req.task}` : req.task;
+
+  // No image-attach flag, no sandbox to work around (this CLI invocation
+  // never passes `--sandbox`) — the Read tool reads any absolute path the
+  // process can access, staging elsewhere isn't needed. Just point at them.
+  const refImages = (req.ref_images || []).filter((p) => existsSync(p));
+  if (refImages.length) {
+    prompt +=
+      "\n\n## Attached images\nUse the Read tool on each of these paths to view them:\n" +
+      refImages.map((p) => `- ${p}`).join("\n");
+  }
+
+  const tools = new Set(
+    (req.allow_tools || CLAUDE_ASK.DEFAULT_TOOLS)
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean),
+  );
+  if (refImages.length) tools.add("Read");
 
   let res: ClaudeCliResult;
   try {
@@ -187,7 +203,7 @@ export async function askClaude(
       model: req.model,
       effort: req.effort,
       cwd,
-      tools: req.allow_tools || CLAUDE_ASK.DEFAULT_TOOLS,
+      tools: [...tools].join(","),
       maxTurns: req.max_turns,
       timeoutSec: req.timeout_seconds,
     });

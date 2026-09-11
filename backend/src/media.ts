@@ -24,12 +24,10 @@ export const AIXEL_MEDIA = {
    * path instead of the model re-sending a ~50K-token transcript as a tool
    * argument (see api/media/diarize/transcript-store.ts). */
   MEDIA_TRANSCRIPTS: join(AIXEL_MEDIA_ROOT, "private", "transcripts"),
-  /** Where `media.fetch` writes a genuine remote (non-local) download — a fixed, persistent folder rather than a temp dir, so the op's response can just be `{ path }` with nothing to track or clean up. */
+  /** Where `media.fetch` writes a genuine remote (non-local) download — a fixed, persistent folder rather than a temp dir, so the op's response can just be `{ path }` with nothing to track or clean up. Also where a caller stages a reference image (`imageOnly: true`) for later use, e.g. by `chatgpt`/`claude` — one download op, one folder, not a second bucket per consumer. */
   MEDIA_FETCHED: join(AIXEL_MEDIA_ROOT, "private", "media-fetched"),
   /** Where `instagram` op=download writes post/reel/carousel media — `{shortcode}/{index}.{mp4|jpg}`. Private: shortcode paths are guessable. */
   INSTAGRAM_DOWNLOADS: join(AIXEL_MEDIA_ROOT, "private", "instagram-downloads"),
-  /** `chatgpt` op=stage's downloaded reference images — private (not web-served), a root-level sibling of public/private on purpose since it predates that split and already has real accumulated content. */
-  REFS: join(AIXEL_MEDIA_ROOT, "refs"),
   PUBLIC_BASE_URL:
     process.env.AIXEL_MEDIA_PUBLIC_BASE || "https://hermes.aixellabs.in/media",
 } as const;

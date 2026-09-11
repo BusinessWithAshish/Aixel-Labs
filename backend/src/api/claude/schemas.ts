@@ -12,6 +12,10 @@ export const CLAUDE_ASK_REQUEST_SCHEMA = z.object({
     .describe(CLAUDE_ASK_FIELD_DESCRIPTIONS.effort),
   home_dir: z.string().optional().describe(CLAUDE_ASK_FIELD_DESCRIPTIONS.home_dir),
   allow_tools: z.string().optional().describe(CLAUDE_ASK_FIELD_DESCRIPTIONS.allow_tools),
+  ref_images: z
+    .array(z.string())
+    .optional()
+    .describe(CLAUDE_ASK_FIELD_DESCRIPTIONS.ref_images),
   max_turns: z
     .number()
     .int()

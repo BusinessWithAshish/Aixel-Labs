@@ -8,7 +8,6 @@ import { AIXEL_MEDIA } from "../../media";
 export const CHATGPT_ROUTES = {
   GENERATE: "/",
   HEALTH: "/health",
-  STAGE: "/stage",
 } as const;
 
 export const CHATGPT_FIELD_DESCRIPTIONS = {
@@ -21,9 +20,7 @@ export const CHATGPT_FIELD_DESCRIPTIONS = {
     "Required when mode=revise. ChatGPT /c/… URL from a prior successful call.",
   revise_notes: "Human revise feedback; appended into the prompt when mode=revise.",
   images:
-    "Absolute local file paths to attach to the message, in order, as real input images (e.g. the brand logo, reference posts to emulate). Omit to use the server default (just the brand logo); pass [] to attach nothing.",
-  stage_url:
-    "Public image URL to download and stage as a local file (e.g. an Instagram post's image) — the returned path can then be viewed with the Read tool and/or passed in a later call's images[].",
+    "Absolute local file paths to attach to the message, in order, as real input images (e.g. the brand logo, reference posts to emulate). Omit to use the server default (just the brand logo); pass [] to attach nothing. To use a remote image (e.g. a competitor's post) as a reference, first download it with `media` op=fetch (imageOnly: true) and pass the returned path here — this module has no downloader of its own.",
 } as const;
 
 export const CHATGPT = {
@@ -51,16 +48,6 @@ export const CHATGPT = {
     "/home/ubuntu/AIXEL-LABS-ORG/brand/assets/aixellabs-lockup.png",
   MEDIA_ROOT: AIXEL_MEDIA.PUBLIC,
   MEDIA_PUBLIC_BASE: AIXEL_MEDIA.PUBLIC_BASE_URL,
-  /** Downloaded reference images (research finds, not generated output) — private, not web-served. */
-  STAGE_ROOT: AIXEL_MEDIA.REFS,
-  STAGE_MAX_BYTES: 15 * 1024 * 1024,
-  STAGE_FETCH_TIMEOUT_MS: 30_000,
-  STAGE_ALLOWED_CONTENT_TYPES: [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/gif",
-  ] as const,
   /** Soft upper bound for waiting on ChatGPT stream; CDP/session errors fail sooner. */
   DEFAULT_STREAM_TIMEOUT_SEC: 30 * 60,
   COMPOSER_WAIT_SEC: 90,
@@ -83,9 +70,6 @@ export const CHATGPT_ERROR_MESSAGES = {
   PREFLIGHT: "ChatGPT browser preflight failed",
   GENERIC: "ChatGPT call failed",
   NO_RESULT: "ChatGPT produced neither text nor an image — it may have refused",
-  STAGE_FETCH_FAILED: "Could not download the image at that URL",
-  STAGE_NOT_IMAGE: "URL did not return an image content-type",
-  STAGE_TOO_LARGE: "Image exceeded the size limit",
   NOT_VPS:
     "ChatGPT calls require the VPS Chrome/CDP stack — set AIXEL_VPS=1 on the one host that runs it",
 } as const;
