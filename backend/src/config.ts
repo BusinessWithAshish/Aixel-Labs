@@ -3,6 +3,7 @@ import { YOUTUBE_INTELLIGENCE_ROUTES } from "./api/youtube/intelligence/constant
 import { GOOGLE_TRENDS_API_ROUTES } from "./api/google-trends/constants";
 import { IG_ADVANCED_ROUTES } from "./api/instagram/advanced/constants";
 import { INSTAGRAM_INTELLIGENCE_ROUTES } from "./api/instagram/intelligence/constants";
+import { IG_DOWNLOAD_ROUTES } from "./api/instagram/download/constants";
 import { GMAPS_DETAILS_ROUTES } from "./api/gmaps/details/constants";
 import { GMAPS_ADVANCED_ROUTES } from "./api/gmaps/advanced/constants";
 import { TWITTER_API_ROUTES } from "./api/twitter/constants";
@@ -116,6 +117,10 @@ export const API_ENDPOINTS = {
     ADVANCED_SEARCH: {
       route: IG_ADVANCED_ROUTES.SEARCH,
       full: `${ENDPOINTS.INSTAGRAM}${IG_ADVANCED_ROUTES.SEARCH}`,
+    },
+    DOWNLOAD: {
+      route: IG_DOWNLOAD_ROUTES.DOWNLOAD,
+      full: `${ENDPOINTS.INSTAGRAM}${IG_DOWNLOAD_ROUTES.DOWNLOAD}`,
     },
     INTELLIGENCE: {
       ACCOUNT: {

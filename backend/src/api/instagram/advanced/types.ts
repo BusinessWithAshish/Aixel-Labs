@@ -121,6 +121,9 @@ export type IgFeedItem = {
   comments_disabled?: boolean;
   like_and_view_counts_disabled?: boolean;
   location?: IgFeedLocation | null;
+  /** Media dimensions — the crawler SSR page's candidates carry `url` only, so this is the one size source there. */
+  original_width?: number;
+  original_height?: number;
   image_versions2?: { candidates?: IgFeedImageCandidate[] };
   video_versions?: IgFeedVideoVersion[];
   carousel_media_count?: number;

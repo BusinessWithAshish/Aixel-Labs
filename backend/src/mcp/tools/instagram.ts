@@ -8,6 +8,8 @@ import { fetchInstagramAdvancedPosts } from "../../api/instagram/advanced/client
 import { IG_ADVANCED_POSTS_REQUEST_SCHEMA } from "../../api/instagram/advanced/schemas";
 import { fetchInstagramAdvancedSearch } from "../../api/instagram/advanced/search/client";
 import { IG_ADVANCED_SEARCH_REQUEST_SCHEMA } from "../../api/instagram/advanced/search/schemas";
+import { downloadInstagramMedia } from "../../api/instagram/download/client";
+import { IG_DOWNLOAD_REQUEST_SCHEMA } from "../../api/instagram/download/schemas";
 import { instagramAccountIntelligenceService } from "../../api/instagram/intelligence/account/service";
 import { INSTAGRAM_ACCOUNT_INTELLIGENCE_REQUEST_SCHEMA } from "../../api/instagram/intelligence/account/schemas";
 import {
@@ -37,6 +39,13 @@ const INSTAGRAM_OPS: Record<string, DomainOp> = {
     raw: {
       schema: IG_ADVANCED_POSTS_REQUEST_SCHEMA,
       run: fetchInstagramAdvancedPosts,
+    },
+  },
+  download: {
+    defaultLayer: MCP_LAYER.RAW,
+    raw: {
+      schema: IG_DOWNLOAD_REQUEST_SCHEMA,
+      run: downloadInstagramMedia,
     },
   },
   content_leads: {
@@ -70,6 +79,7 @@ Ops:
 - profile (raw only) — lookup by handle/URL. input: entities[], country, limit?
 - search_profiles (raw only) — GSearch discovery biased to profile titles. input: query, country?, city?, state?, hashtags?, keywords?, excludeKeywords?, excludeHashtags?, limit?
 - posts (raw only) — paginated Posts-tab media. input: username, cursor?, count?, pages?
+- download (raw only) — save public post / reel / carousel media to local disk (mp4 + jpg), direct fetch, no proxy. Returns per-post { ok, items[{ index, kind, filePath, bytes, width, height, cached }] }; hand filePath to \`media\` ops. Stories/highlights/private accounts unsupported. input: urls[] (1-10 post/reel/tv URLs or shortcodes), items? (carousel slide indexes, 0-based), media? (all|video|image), maxBytes?
 - content_leads (raw only) — GSearch content-first (/p/, /reel/) discovery. Use when search_profiles is thin. input: query, country?, kinds?, pages?, maxResolve?, enrichProfiles?
 - account (intel only) — profile + posts + per-post engagement/velocity. The only Instagram intel overlay. input: username, country, pages?
 - aggregate_account (raw only, compute) — outlier/cadence stats from one account's intel posts[]. Never mix accounts. input: items[], username?
