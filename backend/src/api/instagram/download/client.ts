@@ -4,6 +4,11 @@ import { join } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
+// Explicit undici fetch: on Vercel's build machine the ambient global fetch
+// types resolve `Response` without ok/status/body/headers (TS2339) — the same
+// quirk fixed in chatgpt/client.ts and chatgpt/cdp.ts. Same runtime fetch.
+import { fetch } from "undici";
+
 import { assertPersistentDisk } from "../../../config";
 import { mapFeedItem } from "../advanced/compute";
 import type { IG_ADVANCED_POST, IgFeedItem } from "../advanced/types";
