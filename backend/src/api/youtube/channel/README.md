@@ -19,7 +19,7 @@ Validated by `schemas.ts` → `YOUTUBE_CHANNEL_REQUEST_SCHEMA` (extends `YOUTUBE
 | `channelId` | `string` | — | Required unless `handle` is set |
 | `handle` | `string` | — | Required unless `channelId` is set |
 | `contentType` | `"videos" \| "shorts" \| "playlists"` | `"videos"` | Channel tab |
-| `limit` | `number` | `1000` | Max items (1–1000) |
+| `limit` | `number` | `20` | Max items (1–1000). Channel **intel** fetches watch metadata per listed video through the proxy — keep it small. |
 
 ## Response
 

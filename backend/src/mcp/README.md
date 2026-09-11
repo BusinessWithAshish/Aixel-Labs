@@ -71,6 +71,24 @@ the parked moments scorer's `audienceSignals` (format via
 `youtube`, format, pass as `audienceSignals` to the moments scorer
 `moments`/`pipeline`.
 
+## Input shapes, validation, keepalive
+
+- **Generated input shapes.** `registerDomainTool` appends an `INPUT SHAPES`
+  section to every tool description, rendered from each op's own
+  `*_REQUEST_SCHEMA` by `schema-signature.ts` — field names, types, enums,
+  defaults, bounds, first sentence of each `.describe()`. Fields shared by 3+
+  ops (country, region, …) print once under `SHARED FIELDS`. It is generated,
+  so it cannot drift from what the op accepts: keep `.describe()` text in the
+  module `constants.ts` accurate and the description stays accurate.
+- **Unknown fields are rejected**, not stripped: `op=<op>: unknown field(s) X.
+  Valid fields: …`. **Zod failures** come back as
+  `op=<op>: invalid input — <path>: <message>. Expected: <shape>` so an agent
+  can correct itself in one retry.
+- **Keepalive.** While a call runs, the server sends a debug
+  `notifications/message` every 20s (`logging` capability in `server.ts`).
+  MCP clients drop a call whose stream is silent too long — Hermes at 300s —
+  so without it long `diarize` / `segment` / `claude` calls failed mid-run.
+
 ## Layout
 
 ```

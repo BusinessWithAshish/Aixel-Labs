@@ -44,6 +44,12 @@ export const YOUTUBE_DIARIZE_REQUEST_SCHEMA = z.object({
     .describe(
       "Optional hint for how many distinct people are talking (2-8). Omit to let the model infer.",
     ),
+  includeTranscript: z
+    .boolean()
+    .optional()
+    .describe(
+      "false: return transcriptPath + a summary instead of the full transcript inline. Use it whenever the transcript goes on to segment op=by_speech (pass the path as diarizedPath) — a long episode's transcript is tens of thousands of tokens. The file is written either way. Default true.",
+    ),
 });
 
 

@@ -55,7 +55,7 @@ Fetches video metadata, suggested (related) videos, and creator chapters via Inn
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `limit` | `number` | `1000` | Max suggestions (1–1000) |
+| `limit` | `number` | `20` | Max suggestions (1–1000) |
 
 ### Response
 

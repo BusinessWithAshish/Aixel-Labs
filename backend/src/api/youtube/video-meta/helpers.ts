@@ -34,22 +34,28 @@ import type {
 
 type VideoMetaGeo = Pick<YOUTUBE_VIDEO_META_REQUEST, "country" | "region">;
 
+function isTransportFailure(err: unknown): boolean {
+  return err instanceof Error && / failed: 0$/.test(err.message);
+}
+
 async function fetchVideoMetaForVideo(
   videoId: string,
   gl: string,
   geo: VideoMetaGeo,
   deepCommentLookup: boolean,
+  direct: boolean,
+  attempt = 0,
 ): Promise<YOUTUBE_VIDEO_META_ITEM> {
   let session: UrlFetchSession | null = null;
 
   try {
-    session = await createYoutubeFetchSession(geo);
+    session = await createYoutubeFetchSession(geo, { direct });
     const activeSession = session;
 
     // withSharedClientVersion self-heals a mid-TTL client-version rotation
     // (invalidate + one fresh retry) instead of failing the whole video.
     const { result: data } = await withSharedClientVersion(
-      () => createYoutubeFetchSession(geo),
+      () => createYoutubeFetchSession(geo, { direct }),
       (clientVersion) => fetchGetWatch(activeSession, clientVersion, gl, videoId),
     );
 
@@ -88,6 +94,14 @@ async function fetchVideoMetaForVideo(
       description: extractDescriptionFromGetWatch(data),
     };
   } catch (err) {
+    // Status 0 is a transport failure (proxy connect/read timeout), not an
+    // answer from YouTube: one retry on a fresh session usually resolves it,
+    // where before the video silently lost its metadata (13 in one cron run).
+    if (attempt === 0 && isTransportFailure(err)) {
+      await closeUrlFetchSession(session);
+      session = null;
+      return fetchVideoMetaForVideo(videoId, gl, geo, deepCommentLookup, direct, 1);
+    }
     console.warn(
       `[${YOUTUBE_HANDLER_LABELS.VIDEO_META}] Failed to resolve video:`,
       videoId,
@@ -134,7 +148,11 @@ export async function fetchYoutubeVideoMeta(
   const items = await runWithConcurrency(
     uniqueVideoIds,
     YOUTUBE_VIDEO_META_CONCURRENCY,
-    (videoId) => fetchVideoMetaForVideo(videoId, gl, geo, deepCommentLookup),
+    // Always through the proxy. Unlike search/suggest, get_watch from this
+    // host's own IP returns an unresolved item for every video (measured
+    // 2026-09-10: 10/10 direct attempts came back with publishedAt null), so a
+    // direct-first attempt only added a wasted request before the proxy one.
+    (videoId) => fetchVideoMetaForVideo(videoId, gl, geo, deepCommentLookup, false),
   );
 
   const resolved = items.filter((item) => item.publishedAt !== null).length;

@@ -93,12 +93,25 @@ app.use(express.static(path.join(process.cwd(), "public")));
 // ===================
 // 5. Rate Limiting
 // ===================
+// Loopback callers are this host's own services — the Hermes gateways and
+// their cron sessions, local Claude Code sessions — reaching `/mcp` directly on
+// 127.0.0.1:8002. They must not share the public per-IP budget: every one of
+// them arrives as 127.0.0.1, so they all drew from a single 100-per-15-minute
+// bucket, and one MCP tool call is several HTTP requests. A cron run fanning
+// out to four scouts exhausted it in minutes (2026-09-10: 69 x 429), which got
+// the MCP connection parked and the run halted. Public traffic is unaffected:
+// it arrives through Caddy with TRUST_PROXY=1, so `req.ip` resolves to the real
+// client from X-Forwarded-For (which Caddy sets, so it cannot be spoofed to
+// loopback), and the server itself only listens on 127.0.0.1.
+const LOOPBACK_IPS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: Number(process.env.RATE_LIMIT_MAX) || 100,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => LOOPBACK_IPS.has(req.ip ?? ""),
   }),
 );
 

@@ -15,9 +15,13 @@ export async function enrichCommentsIntelligence(
     intelligence: enrichCommentIntelligence(comment),
   }));
 
+  const intelligence = aggregateCommentsIntelligence(comments);
+  // Clusters are computed from the full set above either way; `false` only
+  // drops the bodies from the RESPONSE. Research needs the clusters, and the
+  // bodies made every 50-100 comment result spill out of the agent's context.
   return {
     ...raw,
-    comments,
-    intelligence: aggregateCommentsIntelligence(comments),
+    comments: request.includeComments === false ? [] : comments,
+    intelligence,
   };
 }

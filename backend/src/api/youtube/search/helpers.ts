@@ -13,6 +13,7 @@ import {
   buildInnertubeContext,
   composeYoutubeSearchQuery,
   createYoutubeFetchSession,
+  withDirectFirst,
   durationTextToSeconds,
   extractInnertubeClientVersion,
   extractYtInitialDataFromHtml,
@@ -236,6 +237,13 @@ async function fetchSearchContinuation(
 export async function fetchYoutubeSearch(
   params: YOUTUBE_SEARCH_REQUEST,
 ): Promise<YOUTUBE_SEARCH_RESPONSE> {
+  return withDirectFirst("search", (direct) => fetchYoutubeSearchVia(params, direct));
+}
+
+async function fetchYoutubeSearchVia(
+  params: YOUTUBE_SEARCH_REQUEST,
+  direct: boolean,
+): Promise<YOUTUBE_SEARCH_RESPONSE> {
   const {
     query,
     country,
@@ -256,7 +264,7 @@ export async function fetchYoutubeSearch(
   }
 
   // Proxy is country-scoped only; region is in searchQuery above.
-  const session = await createYoutubeFetchSession({ country });
+  const session = await createYoutubeFetchSession({ country }, { direct });
 
   try {
     const { initdata, clientVersion } = await fetchYoutubeSearchPage(

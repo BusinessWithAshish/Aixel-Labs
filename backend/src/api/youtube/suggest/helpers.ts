@@ -5,6 +5,7 @@ import {
 } from "../constants";
 import {
   createYoutubeFetchSession,
+  withDirectFirst,
   resolveYoutubeGeo,
 } from "../helpers";
 import {
@@ -113,11 +114,19 @@ function buildSuggestUrl(request: YOUTUBE_SUGGEST_REQUEST): string {
 export async function fetchYoutubeSuggest(
   request: YOUTUBE_SUGGEST_REQUEST,
 ): Promise<YOUTUBE_SUGGEST_RESPONSE> {
+  return withDirectFirst("suggest", (direct) => fetchYoutubeSuggestVia(request, direct));
+}
+
+async function fetchYoutubeSuggestVia(
+  request: YOUTUBE_SUGGEST_REQUEST,
+  direct: boolean,
+): Promise<YOUTUBE_SUGGEST_RESPONSE> {
   const { country, query } = request;
 
-  const session: UrlFetchSession = await createYoutubeFetchSession({
-    country,
-  });
+  const session: UrlFetchSession = await createYoutubeFetchSession(
+    { country },
+    { direct },
+  );
 
   try {
     const url = buildSuggestUrl(request);

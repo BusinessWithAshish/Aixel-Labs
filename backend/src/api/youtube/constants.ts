@@ -3,7 +3,11 @@ export const YOUTUBE_BASE_URL = "https://www.youtube.com";
 /** Default ISO 3166-1 alpha-2 country code for geo routing and InnerTube `gl`. */
 export const YOUTUBE_DEFAULT_COUNTRY = "US";
 
-export const YOUTUBE_DEFAULT_LIMIT = 1000;
+// Default when a caller omits `limit`. Small on purpose: channel intel and
+// search intel fetch proxied watch metadata per result, so an omitted limit at
+// 1000 meant hundreds of metered requests and calls that ran past 5 minutes
+// (2026-09-10 cron). Callers that want more ask for it, up to the max.
+export const YOUTUBE_DEFAULT_LIMIT = 20;
 export const YOUTUBE_MAX_LIMIT = 1000;
 
 export const YOUTUBE_HANDLE_MAX_LENGTH = 100;

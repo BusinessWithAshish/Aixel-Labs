@@ -266,6 +266,8 @@ export const API_ENDPOINTS = {
     DIARIZE: { route: "/diarize", full: `${ENDPOINTS.MEDIA}/diarize` },
     CUT: { route: "/cut", full: `${ENDPOINTS.MEDIA}/cut` },
     CONDENSE: { route: "/condense", full: `${ENDPOINTS.MEDIA}/condense` },
+    CAPTION: { route: "/caption", full: `${ENDPOINTS.MEDIA}/caption` },
+    SHARE: { route: "/share", full: `${ENDPOINTS.MEDIA}/share` },
   },
   SEGMENT: {
     BY_SPEECH: { route: "/by_speech", full: `${ENDPOINTS.SEGMENT}/by_speech` },

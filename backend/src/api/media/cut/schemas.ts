@@ -8,8 +8,10 @@ import {
 import { DIARIZED_TRANSCRIPT_SCHEMA } from "../diarize/schemas";
 
 const CLIP_RANGE_SCHEMA = z.object({
-  start: z.string(),
-  end: z.string(),
+  // Seconds as a number or a timestamp string. Ledgers and segment output
+  // store numbers; rejecting them made every revise re-cut fail once first.
+  start: z.union([z.string(), z.number()]).transform(String),
+  end: z.union([z.string(), z.number()]).transform(String),
   label: z.string().optional(),
 });
 

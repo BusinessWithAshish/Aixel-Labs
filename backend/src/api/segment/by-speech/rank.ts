@@ -1,4 +1,5 @@
 import { MEDIA_GEMINI_MODEL } from "../../media/constants";
+import { loadDiarizedTranscript } from "../../media/diarize/transcript-store";
 import { scoreViralMoments } from "../moments/score";
 import { scoreViralMomentsWithClaude } from "../moments/score-claude";
 import type { BY_SPEECH_REQUEST_PARSED, BY_SPEECH_RESPONSE } from "../types";
@@ -13,8 +14,15 @@ import type { BY_SPEECH_REQUEST_PARSED, BY_SPEECH_RESPONSE } from "../types";
 export async function rankBySpeech(
   input: BY_SPEECH_REQUEST_PARSED,
 ): Promise<BY_SPEECH_RESPONSE> {
+  // A path from a diarize op keeps the transcript server-side (see
+  // transcript-store.ts); the inline object is still accepted.
+  const diarized =
+    input.diarized ??
+    (input.diarizedPath ? await loadDiarizedTranscript(input.diarizedPath) : undefined);
+  if (!diarized) {
+    throw new Error("Provide exactly one of diarized or diarizedPath");
+  }
   const {
-    diarized,
     provider,
     model,
     minCandidates,

@@ -7,6 +7,8 @@ import {
   mediaDiarizeHandler,
   mediaFetchHandler,
   mediaTranscribeHandler,
+  mediaCaptionHandler,
+  mediaShareHandler,
 } from "./handler";
 
 const mediaRoutes: IRouter = Router();
@@ -16,6 +18,8 @@ mediaRoutes.post(API_ENDPOINTS.MEDIA.TRANSCRIBE.route, mediaTranscribeHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.DIARIZE.route, mediaDiarizeHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.CUT.route, mediaCutHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.CONDENSE.route, mediaCondenseHandler);
+mediaRoutes.post(API_ENDPOINTS.MEDIA.CAPTION.route, mediaCaptionHandler);
+mediaRoutes.post(API_ENDPOINTS.MEDIA.SHARE.route, mediaShareHandler);
 
 export default mediaRoutes;
 
@@ -25,6 +29,8 @@ export { transcribe } from "./transcribe/client";
 export { diarizeFromSource } from "./diarize/audio";
 export { cutClipsFromVideo } from "./cut/cut";
 export { condenseVideo } from "./condense/client";
+export { captionVideo } from "./caption/caption";
+export { shareMedia } from "./share/share";
 
 /* Source resolution — shared by every op that takes a media source. */
 export {
@@ -40,11 +46,23 @@ export { MEDIA_TRANSCRIBE_REQUEST_SCHEMA } from "./transcribe/schemas";
 export { MEDIA_DIARIZE_REQUEST_SCHEMA } from "./diarize/schemas";
 export { MEDIA_CUT_REQUEST_SCHEMA } from "./cut/schemas";
 export { MEDIA_CONDENSE_REQUEST_SCHEMA } from "./condense/schemas";
+export { MEDIA_CAPTION_REQUEST_SCHEMA } from "./caption/schemas";
+export { MEDIA_SHARE_REQUEST_SCHEMA } from "./share/schemas";
+export type { MEDIA_SHARE_REQUEST, MEDIA_SHARE_RESPONSE } from "./share/types";
+
+export type {
+  CAPTION_STYLE_RESOLVED,
+  MEDIA_CAPTION_REQUEST,
+  MEDIA_CAPTION_REQUEST_PARSED,
+  MEDIA_CAPTION_RESPONSE,
+} from "./caption/types";
 
 export {
   MEDIA,
   MEDIA_ASPECT_RATIO_DIMENSIONS,
   MEDIA_ASPECT_RATIOS,
+  MEDIA_CAPTION,
+  MEDIA_SHARE,
   MEDIA_ERROR_MESSAGES,
   MEDIA_GEMINI_MODEL,
 } from "./constants";

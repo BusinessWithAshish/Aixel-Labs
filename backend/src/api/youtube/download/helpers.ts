@@ -64,6 +64,56 @@ const INNERTUBE_CLIENT_CHAIN = ["IOS", "ANDROID_VR", "VISIONOS"] as const;
 type InnerTubeClientName = (typeof INNERTUBE_CLIENT_CHAIN)[number];
 
 /**
+ * Client order for STREAM-DIRECT resolution (`getYoutubeStreamUrls`, used by
+ * `media` op=cut) — deliberately different from the download chain above.
+ *
+ * Measured 2026-09-10 on the same video and the same Evomi session, requesting
+ * 1MB at 60% into the file: IOS URLs return 302/403, ANDROID_VR URLs 403, and
+ * only VISIONOS URLs return 206. googlevideo now proof-of-origin-gates IOS and
+ * ANDROID_VR stream URLs: without a PO token they serve roughly the opening
+ * chunk and refuse everything after it. A cut is by definition a mid-file
+ * seek, so resolving with IOS first made every cut fail with 403 even though
+ * IOS "succeeds" at signing — the chain stopped at the first client that
+ * returned URLs, not the first one whose URLs actually serve.
+ *
+ * The download path keeps its own chain: it reads sequentially from byte 0
+ * with youtubei.js's chunking, which is not affected the same way.
+ */
+const STREAM_CLIENT_CHAIN = ["VISIONOS", "IOS", "ANDROID_VR"] as const satisfies readonly InnerTubeClientName[];
+
+/**
+ * Tallest source resolution stream-direct cuts will read. Every byte of a cut
+ * travels through the metered residential proxy, and on the test episode a
+ * 16s clip cost 7.3MB of proxy traffic from the 4K AV1 stream against 1.6MB
+ * from the 1080p AV1 stream — same output size, same encode time. The output
+ * is a 1080x1920 vertical crop, so a 1080p source is upscaled into it while a
+ * 4K source is downscaled: raise this if the crop's sharpness matters more
+ * than proxy cost for a given channel.
+ */
+const STREAM_MAX_VIDEO_HEIGHT = 1080;
+
+type BasicInfo = Awaited<ReturnType<Innertube["getBasicInfo"]>>;
+
+/**
+ * Pick the video-only format for a stream-direct cut: the tallest resolution
+ * at or under STREAM_MAX_VIDEO_HEIGHT, and at that height the lowest-bitrate
+ * stream (fewest proxy bytes per clip second — usually AV1). Falls back to the
+ * library's own "best" pick if the video offers nothing it can compare.
+ */
+function chooseStreamVideoFormat(info: BasicInfo) {
+  const videoOnly = (info.streaming_data?.adaptive_formats ?? []).filter(
+    (f) => f.has_video && !f.has_audio && typeof f.height === "number" && f.height > 0,
+  );
+  const capped = videoOnly.filter((f) => (f.height ?? 0) <= STREAM_MAX_VIDEO_HEIGHT);
+  const pool = capped.length > 0 ? capped : videoOnly;
+  if (pool.length === 0) return info.chooseFormat({ type: "video", quality: "best" });
+  const tallest = Math.max(...pool.map((f) => f.height ?? 0));
+  return pool
+    .filter((f) => f.height === tallest)
+    .sort((a, b) => (a.bitrate ?? Number(a.content_length ?? 0)) - (b.bitrate ?? Number(b.content_length ?? 0)))[0];
+}
+
+/**
  * `youtubei.js` is an ESM-only package, but this backend is CommonJS
  * (`"type": "commonjs"`). A top-level `import` would compile to a
  * `require()` that Node rejects at runtime (`ERR_REQUIRE_ESM`), crashing
@@ -251,23 +301,6 @@ async function getInnertube(country: string): Promise<Innertube> {
     innertubeByCountry.set(country, entry);
   }
   return entry.innertube;
-}
-
-/**
- * The Evomi proxy URL for the cached per-country Innertube session — same
- * `_session-` id (same residential exit IP) the InnerTube API calls used.
- * ffmpeg reuses this URL so its googlevideo stream fetches egress from the
- * same IP that signed the stream URLs (a different IP → 403). Returns
- * `undefined` when Evomi isn't configured (direct fetch, no proxy).
- */
-function getCountryProxyUrl(country: string): string | undefined {
-  if (!evomiConfigured()) return undefined;
-  let entry = innertubeByCountry.get(country);
-  if (!entry) {
-    entry = createCountryInnertube(country);
-    innertubeByCountry.set(country, entry);
-  }
-  return entry.proxyUrl;
 }
 
 function expectedPath(
@@ -531,17 +564,17 @@ export type YOUTUBE_STREAM_URLS = {
  */
 async function attemptGetStreamUrlsWithClientChain(
   videoId: string,
-  country: string,
+  yt: Innertube,
+  proxyUrl: string | undefined,
 ): Promise<YOUTUBE_STREAM_URLS> {
   let lastError: Error | null = null;
-  const yt = await getInnertube(country);
-  for (const client of INNERTUBE_CLIENT_CHAIN) {
+  for (const client of STREAM_CLIENT_CHAIN) {
     try {
       const info = await yt.getBasicInfo(videoId, { client });
       if (!info?.basic_info) {
         throw new Error("Empty InnerTube response");
       }
-      const videoFormat = info.chooseFormat({ type: "video", quality: "best" });
+      const videoFormat = chooseStreamVideoFormat(info);
       const audioFormat = info.chooseFormat({ type: "audio", quality: "best" });
       const player = yt.session.player;
       const [videoUrl, audioUrl] = await Promise.all([
@@ -558,7 +591,7 @@ async function attemptGetStreamUrlsWithClientChain(
         videoUrl,
         audioUrl,
         client,
-        proxyUrl: getCountryProxyUrl(country),
+        proxyUrl,
       };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
@@ -578,15 +611,36 @@ export async function getYoutubeStreamUrls(
     throw new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.VERCEL, 501);
   }
   const resolvedId = resolveYoutubeDownloadVideoId(videoId);
-  const attempts = evomiConfigured() ? 1 + INNERTUBE_PROXY_ROTATIONS : 1;
+  if (!evomiConfigured()) {
+    return attemptGetStreamUrlsWithClientChain(resolvedId, await getInnertube(country), undefined);
+  }
+  // A FRESH proxy session per resolution — never the shared cached one.
+  // ffmpeg fetches these signed URLs over a NEW connection (via the CONNECT
+  // bridge), and googlevideo 403s unless that connection exits from the IP that
+  // signed them. The cached session's pooled keep-alive connection can be hours
+  // old, pinned to an IP its session id no longer maps to once Evomi's sticky
+  // lifetime lapses: signing then egresses from the old IP and ffmpeg from a new
+  // one. A fresh session signs over a brand-new connection seconds before ffmpeg
+  // dials, so both land on the same IP. Dedicated rather than rotated in place,
+  // because rotating closes the shared agent and would kill a download running
+  // concurrently in the same country.
+  const attempts = 1 + INNERTUBE_PROXY_ROTATIONS;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < attempts; attempt++) {
-    if (attempt > 0) rotateCountryInnertube(country);
+    const entry = createCountryInnertube(country);
     try {
-      return await attemptGetStreamUrlsWithClientChain(resolvedId, country);
+      return await attemptGetStreamUrlsWithClientChain(
+        resolvedId,
+        await entry.innertube,
+        entry.proxyUrl,
+      );
     } catch (err) {
       lastError = err;
       if (err instanceof YoutubeDownloadError && err.statusCode < 500) throw err;
+    } finally {
+      // ffmpeg reaches googlevideo through its own bridge connection, not this
+      // agent, so the agent is finished once the URLs are signed.
+      void entry.agent.close().catch(() => {});
     }
   }
   throw lastError ?? new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.NO_CLIENTS, 502);

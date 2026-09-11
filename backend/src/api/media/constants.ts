@@ -8,6 +8,8 @@ import { AIXEL_MEDIA } from "../../media";
  */
 
 export const MEDIA_FIELD_DESCRIPTIONS = {
+  sharePath:
+    "Absolute path of a file this backend produced under the private media root (e.g. a `caption` or `cut` output).",
   mediaSource:
     "Local filesystem path to the audio or video file to diarize (this pipeline runs on the VPS and reads files directly off disk), or a publicly-reachable audio/video URL. Video input is fine — only the audio track is ever uploaded to Gemini. Not for YouTube links: use `youtube` op=diarize for the free captions path, or `youtube` op=video_download then pass the resulting local path here.",
   videoUrl:
@@ -22,7 +24,7 @@ export const MEDIA_FIELD_DESCRIPTIONS = {
     "Media to resolve to a local file: a local filesystem path (returned as-is), or any publicly-reachable media URL (downloaded). Not for YouTube links — use `youtube` op=video_download for those and pass this the resulting local path instead; a YouTube URL given here is just a URL and will fail to resolve as one.",
   videoSource:
     "Local filesystem path to the SOURCE VIDEO (not audio-only) to cut clips from, or a publicly-reachable video URL — cutting needs the real video stream.",
-  clips: "List of time ranges to cut — `{ start, end, label? }` with HH:MM:SS or MM:SS timestamps. Any source of ranges works; nothing here is tied to a particular scorer.",
+  clips: "List of time ranges to cut — `{ start, end, label? }` — start/end as seconds (number, e.g. 1082) or an HH:MM:SS / MM:SS timestamp string. Any source of ranges works; nothing here is tied to a particular scorer.",
   diarizedForSnap:
     "Optional diarized transcript — when provided, each clip's start/end is snapped to the nearest real speech-segment boundary so cuts don't land mid-word. Omit to cut at the raw timestamps plus fixed padding only.",
   minClipSeconds: "Minimum candidate clip length in seconds.",
@@ -34,6 +36,16 @@ export const MEDIA_FIELD_DESCRIPTIONS = {
     "Optional pre-fetched, pre-formatted lines of real audience behavior on this exact episode — e.g. from the youtube module's comments-intel timestamp clusters and/or video chapters, formatted via its audience-signal formatters — used to bias candidate selection toward moments viewers/the creator already flagged. Fetch those yourself first; this field just takes the output.",
   aspectRatio:
     "Output aspect ratio for cut clips: '9:16' (Shorts/Reels/TikTok, default), '16:9' (YouTube/landscape), '1:1' (square), or 'original' (no crop, keep source framing). Cropping is centered on the source frame.",
+  captionVideoSource:
+    "Local filesystem path to the video to caption — normally an already-cut clip, not a full episode. A publicly-reachable video URL also works.",
+  captionSubtitles:
+    "Optional SRT or VTT to burn in: either the subtitle text itself, or a local path to a .srt/.vtt file. OMIT THIS for the normal case — the clip's own audio is transcribed instead, which is both more accurate and already timed from zero. Only pass this when you have subtitles that must be used verbatim; timings are taken as-is and are assumed to be relative to the start of THIS video, not the episode it was cut from.",
+  captionStyle:
+    "Optional appearance overrides. Defaults are tuned for a 1080x1920 vertical Short: white bold text, heavy black outline, positioned in the middle band so the platform's own UI (which covers the bottom third) does not sit on top of it.",
+  captionWrap:
+    "Optional line-breaking overrides. Whisper returns long unbroken segments; they are re-wrapped into short lines so captions stay readable on a phone. Defaults: 32 characters per line, 2 lines on screen at once.",
+  captionBurn:
+    "Burn the captions into the video (default true). Set false to only generate the .srt sidecar and skip re-encoding — useful when you want to review or edit the text before committing to a render.",
 } as const;
 
 export const MEDIA_GEMINI_MODEL = {
@@ -139,6 +151,9 @@ export const MEDIA = {
 
 export const MEDIA_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 export const MEDIA_ERROR_MESSAGES = {
+  SHARE_NOT_FOUND: "share: no such file",
+  SHARE_OUTSIDE_ROOT: "share: path must be under the private media root (a file this backend produced)",
+  SHARE_NOT_A_FILE: "share: not a file",
   INVALID_PARAMS: "Invalid request parameters",
   MISSING_API_KEY: "GEMINI_API_KEY_FREE is not configured",
   DOWNLOAD_FAILED: "Failed to resolve source media",
@@ -155,12 +170,99 @@ export const MEDIA_ERROR_MESSAGES = {
     "The cut op needs a persistent host with local disk output (not available on Vercel)",
   LOCAL_PATH_ON_VERCEL:
     "A local filesystem path was given, but this is running on Vercel (no shared filesystem) — pass a URL instead",
+  CAPTION_NO_AUDIO:
+    "The source has no audio track, so there is nothing to transcribe — pass `subtitles` explicitly to caption a silent video",
+  CAPTION_NO_VIDEO:
+    "The source has no video track — captions can only be burned into a video",
+  CAPTION_EMPTY:
+    "Transcription produced no usable cues (silent or unintelligible audio) — no caption file was written",
+  CAPTION_BURN_FAILED: "ffmpeg failed to burn in captions",
+  CAPTION_SUBTITLE_PARSE_FAILED:
+    "Could not parse the supplied `subtitles` as SRT or VTT",
 } as const;
 
 /** HTTP statuses treated as "this source is blocking a plain fetch" — triggers the TLS-fingerprint fallback in source.ts. */
 export const MEDIA_GATED_STATUS_CODES = [401, 403, 429, 503] as const;
 
 export const MEDIA_CUT_OUTPUT_DIR = AIXEL_MEDIA.MEDIA_CUTS;
+
+export const MEDIA_CAPTION_OUTPUT_DIR = AIXEL_MEDIA.MEDIA_CAPTIONS;
+
+/** `share` — public copies live here; /home/ubuntu/media/prune.sh deletes them after RETENTION_DAYS. */
+export const MEDIA_SHARE = {
+  PUBLIC_DIR: AIXEL_MEDIA.PUBLIC,
+  PUBLIC_BASE_URL: AIXEL_MEDIA.PUBLIC_BASE_URL,
+  PUBLIC_RETENTION_DAYS: 7,
+} as const;
+
+/**
+ * Caption defaults, tuned for a 1080x1920 vertical Short.
+ *
+ * `position` maps to a libass alignment rather than a raw pixel offset so the
+ * common cases stay resolution-independent: `middle` is alignment 5 (true
+ * vertical centre, no margin arithmetic), while `lower-third`/`bottom` are
+ * alignment 2 (bottom-centre) plus a margin measured up from the bottom edge.
+ * Those two margins ARE in source pixels and assume a 1920-tall frame — pass
+ * `style.marginV` explicitly for anything else.
+ *
+ * Why the default is `middle`: YouTube Shorts, Reels and TikTok all overlay
+ * their own chrome (title, handle, action rail) across the bottom of the
+ * frame. Bottom-anchored captions are the single most common way a clip ships
+ * unreadable.
+ */
+export const MEDIA_CAPTION = {
+  DEFAULT_FONT_NAME: "DejaVu Sans",
+  /**
+   * No default font SIZE: an absolute pixel size that suits 1080x1920 is
+   * wrong for every other frame. Omitting `style.fontSize` scales the text to
+   * this fraction of the frame height instead (~4.5%, the band commercial
+   * Shorts captions sit in). An explicit `fontSize` is honoured verbatim, in
+   * real source pixels — see `ass.ts` on why that is now meaningful.
+   */
+  FONT_SIZE_HEIGHT_RATIO: 0.045,
+  DEFAULT_PRIMARY_COLOUR: "#FFFFFF",
+  DEFAULT_OUTLINE_COLOUR: "#000000",
+  DEFAULT_OUTLINE: 3,
+  DEFAULT_SHADOW: 0,
+  DEFAULT_BOLD: true,
+  DEFAULT_UPPERCASE: false,
+  DEFAULT_POSITION: "middle" as const,
+  /**
+   * `middle` is libass alignment 5 (true vertical centre), so its margin is
+   * irrelevant. The other two anchor to the bottom edge (alignment 2) with a
+   * margin expressed as a FRACTION OF FRAME HEIGHT, so they hold at any
+   * resolution. `style.marginV` overrides with absolute source pixels.
+   */
+  MARGIN_V_HEIGHT_RATIO: { middle: 0, "lower-third": 0.25, bottom: 0.04 },
+  ALIGNMENT_BY_POSITION: { middle: 5, "lower-third": 2, bottom: 2 },
+  /** Fallback frame size when ffmpeg's banner reported no dimensions. */
+  FALLBACK_WIDTH: 1080,
+  FALLBACK_HEIGHT: 1920,
+  /**
+   * No fixed default characters-per-line either: how many characters fit is a
+   * function of frame width and font size, and a constant guess overflows the
+   * frame the moment either changes. Omitting `wrap.maxCharsPerLine` derives
+   * it from the usable width instead.
+   *
+   * `CHAR_WIDTH_RATIO` is the mean glyph advance as a fraction of font size —
+   * ~0.55 for DejaVu Sans Bold and close enough for any humanist sans. It only
+   * has to be good enough to pick a line length; `WrapStyle: 0` in the ASS
+   * header re-wraps anything that still overflows rather than clipping it.
+   */
+  CHAR_WIDTH_RATIO: 0.55,
+  MARGIN_H_WIDTH_RATIO: 0.05,
+  DEFAULT_MAX_LINES_PER_CUE: 2,
+  /** Hard bounds so a bad style value can't produce an unrenderable or absurd result. */
+  MIN_FONT_SIZE: 8,
+  MAX_FONT_SIZE: 200,
+  MIN_CHARS_PER_LINE: 8,
+  MAX_CHARS_PER_LINE: 120,
+  MAX_LINES_PER_CUE: 4,
+  /** A cue shorter than this is padded out so a fast line is still readable. */
+  MIN_CUE_SECONDS: 0.5,
+} as const;
+
+export const MEDIA_CAPTION_POSITIONS = ["middle", "lower-third", "bottom"] as const;
 
 /** Where `media.fetch` writes a genuine remote download — see AIXEL_MEDIA.MEDIA_FETCHED. */
 export const MEDIA_FETCH_DIR = AIXEL_MEDIA.MEDIA_FETCHED;

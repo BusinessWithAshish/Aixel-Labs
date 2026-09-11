@@ -46,7 +46,7 @@ API_ENDPOINTS.FACEBOOK.API.full = "/facebook"  // FE / apiClient path
 4. `express.json` (5mb)
 5. `morgan`
 6. `express.static(public)`
-7. Global `rateLimit` (`RATE_LIMIT_MAX` or 100 / 15m)
+7. Global `rateLimit` (`RATE_LIMIT_MAX` or 100 / 15m) — loopback callers (127.0.0.1 / ::1: local agents, cron, MCP on this host) are exempt via `skip`; public traffic arrives through Caddy with `TRUST_PROXY=1`, so `req.ip` is the real client and cannot be spoofed to loopback
 8. `GET API_ENDPOINTS.PING` (`/v1/ping`) — extra-tight limit
 9. `registerRoutes(app)`
 10. `export = app`; if not `VERCEL`, `listen(PORT || 8002)`

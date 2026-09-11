@@ -36,4 +36,10 @@ export const YOUTUBE_VIDEO_COMMENTS_REQUEST_SCHEMA =
       .max(8000)
       .optional()
       .describe(YOUTUBE_COMMENTS_FIELD_DESCRIPTIONS.CONTINUATION),
+    includeComments: z
+      .boolean()
+      .optional()
+      .describe(
+        "Intel layer only. false: return the aggregate intelligence (timestampClusters, timestampMentions, counts) WITHOUT the per-comment bodies. Use it when you only need clip priors: a 50-100 comment result is otherwise tens to hundreds of KB. Default true.",
+      ),
   });

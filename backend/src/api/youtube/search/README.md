@@ -21,7 +21,7 @@ Validated by `schemas.ts` → `YOUTUBE_SEARCH_REQUEST_SCHEMA` (extends shared `Y
 | `region`  | `string`           | —         | Optional proxy region (not sent to YouTube)        |
 | `query`   | `string`           | required  | 1–500 chars                                        |
 | `filter`  | `YT_SEARCH_FILTER` | `"video"` | `video` or `channel` only                          |
-| `limit`   | `number`           | `1000`    | Max results (1–1000)                               |
+| `limit`   | `number`           | `20`      | Max results (1–1000)                               |
 
 
 Filter `sp` query values live in `../constants.ts` → `YOUTUBE_SEARCH_FILTER_SP`.

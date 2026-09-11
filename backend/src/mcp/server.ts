@@ -15,10 +15,11 @@ export const MCP_SERVER_VERSION = "1.0.0";
 export const MCP_TOOL_COUNT = 9;
 
 export function createAixelIntelligenceMcpServer(): McpServer {
-  const server = new McpServer({
-    name: MCP_SERVER_NAME,
-    version: MCP_SERVER_VERSION,
-  });
+  const server = new McpServer(
+    { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
+    // logging: lets tool calls send keepalive log notifications (domain-tool.ts).
+    { capabilities: { logging: {} } },
+  );
 
   registerYoutubeTool(server);
   registerTrendsTool(server);

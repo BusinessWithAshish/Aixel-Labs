@@ -13,6 +13,17 @@ export type FetchUrlsMapperCtx = { url: string; batchIndex: number };
 export const DEFAULT_HTML_HEADERS: Record<string, string> = {
   accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "accept-language": "en-US,en;q=0.9",
+  /**
+   * Ask for compression. Omitting this made YouTube serve plain HTML: a search
+   * page cost 1.75MB on the wire instead of 153KB, and a watch page 1.55MB
+   * instead of 144KB — roughly 11x, paid on every request and, when a proxy is
+   * configured, paid in metered proxy bandwidth. `node-tls-client` decodes the
+   * body transparently, so callers still receive plain text.
+   *
+   * A real Chrome also sends this, so its absence was a fingerprint smell as
+   * well as a cost.
+   */
+  "accept-encoding": "gzip, deflate, br",
   "cache-control": "no-cache",
   "upgrade-insecure-requests": "1",
   referer: "https://www.google.com/",

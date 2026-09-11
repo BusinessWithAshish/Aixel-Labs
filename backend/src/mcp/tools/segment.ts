@@ -12,9 +12,9 @@ const SEGMENT_OPS: Record<string, DomainOp> = {
 };
 
 const SEGMENT_DESCRIPTION = `Decides WHAT to cut — ranks a diarized transcript into short-form clip candidates. Raw only.
-Call with { op, layer?, input }. layer must be omitted or raw. Pairs with the \`video\` tool: diarize -> segment -> cut.
+Call with { op, layer?, input }. layer must be omitted or raw. Pairs with \`youtube\`/\`media\` op=diarize before it and \`media\` op=cut after it: diarize -> segment -> cut.
 Ops:
-- by_speech (raw) — speech-driven ranking (hook/body/button rubric, standalone-clip scoring, tone-aware). Needs a diarized transcript from \`video\` op=diarize. Returns candidates shaped for \`video\` op=cut's \`clips\` field. input: diarized, provider ('claude'|'gemini', REQUIRED — no default, see cost/quota tradeoffs below), model?, minCandidates?, maxCandidates?, minClipSeconds?, maxClipSeconds?, channelContext?, audienceSignals?
+- by_speech (raw) — speech-driven ranking (hook/body/button rubric, standalone-clip scoring, tone-aware). Needs a diarized transcript from \`youtube\` or \`media\` op=diarize — pass that op's \`transcriptPath\` as diarizedPath (preferred: the transcript stays server-side) or the transcript object as diarized; exactly one. Returns candidates shaped for \`media\` op=cut's \`clips\` field. input: diarizedPath | diarized, provider ('claude'|'gemini', REQUIRED — no default, see cost/quota tradeoffs below), model?, minCandidates?, maxCandidates?, minClipSeconds?, maxClipSeconds?, channelContext? (string, max 2000 chars), audienceSignals? (ARRAY of strings, max 50 — one formatted line per signal, e.g. "12:31-12:45: 14 comments timestamp this moment"; never an object)
   provider='gemini': schema-constrained JSON output, thin free-tier daily quota — can run dry on frequent unattended runs.
   provider='claude': flat-rate local Claude Code subscription, no native schema constraint (validated + retried up to 3 attempts on the same session), shares the org-wide 40-session/day delegation budget.
 Not yet built: by_scene (ffmpeg scene-change detection, no AI call) and by_vision (sampled frames -> vision model) for non-speech content — see api/segment/moments/README.md.`;

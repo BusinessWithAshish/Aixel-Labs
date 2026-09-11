@@ -17,6 +17,13 @@ export const AIXEL_MEDIA = {
   YOUTUBE_DOWNLOADS: join(AIXEL_MEDIA_ROOT, "private", "youtube-downloads"),
   MEDIA_CUTS: join(AIXEL_MEDIA_ROOT, "private", "media-cuts"),
   MEDIA_CONDENSE_OUTPUT: join(AIXEL_MEDIA_ROOT, "private", "media-condense-output"),
+  /** Where `media.caption` writes the burned-in clip and its `.srt` sidecar. Separate from MEDIA_CUTS so a
+   * captioned result is never confused with the raw cut it came from — both survive, and the caller picks. */
+  MEDIA_CAPTIONS: join(AIXEL_MEDIA_ROOT, "private", "media-captions"),
+  /** Where the diarize ops write full transcripts, so \`segment\` can be handed a
+   * path instead of the model re-sending a ~50K-token transcript as a tool
+   * argument (see api/media/diarize/transcript-store.ts). */
+  MEDIA_TRANSCRIPTS: join(AIXEL_MEDIA_ROOT, "private", "transcripts"),
   /** Where `media.fetch` writes a genuine remote (non-local) download — a fixed, persistent folder rather than a temp dir, so the op's response can just be `{ path }` with nothing to track or clean up. */
   MEDIA_FETCHED: join(AIXEL_MEDIA_ROOT, "private", "media-fetched"),
   /** Where `instagram` op=download writes post/reel/carousel media — `{shortcode}/{index}.{mp4|jpg}`. Private: shortcode paths are guessable. */

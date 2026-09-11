@@ -14,12 +14,17 @@ const execFileAsync = promisify(execFile);
 
 const DURATION_REGEX = /Duration:\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})/;
 const VIDEO_STREAM_REGEX = /Stream #\d+:\d+.*: Video:/;
+/** `, 1080x1920` on the video stream line. `[SAR .. DAR ..]` may follow; both are ignored — we want stored pixels. */
+const VIDEO_SIZE_REGEX = /Stream #\d+:\d+.*: Video:.*?,\s*(\d{2,5})x(\d{2,5})/;
 const AUDIO_STREAM_REGEX = /Stream #\d+:\d+.*: Audio:/;
 
 export type MEDIA_STREAM_PROBE = {
   durationSeconds: number;
   hasVideo: boolean;
   hasAudio: boolean;
+  /** Stored frame size, when the source has a video stream ffmpeg reported dimensions for. */
+  width?: number;
+  height?: number;
 };
 
 /**
@@ -53,10 +58,13 @@ export async function probeMediaStreams(inputPath: string): Promise<MEDIA_STREAM
     throw new Error(`${MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED}: could not read duration`);
   }
   const [, h, m, s, cs] = match;
+  const size = stderr.match(VIDEO_SIZE_REGEX);
   return {
     durationSeconds: Number(h) * 3600 + Number(m) * 60 + Number(s) + Number(cs) / 100,
     hasVideo: VIDEO_STREAM_REGEX.test(stderr),
     hasAudio: AUDIO_STREAM_REGEX.test(stderr),
+    width: size ? Number(size[1]) : undefined,
+    height: size ? Number(size[2]) : undefined,
   };
 }
 

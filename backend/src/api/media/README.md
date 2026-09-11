@@ -196,6 +196,65 @@ than choosing excerpts from it. Not yet generalized to hand back the same
 media type it was given (an audio-only input currently fails — its ffmpeg
 step assumes both a video and an audio stream) — another parked follow-up.
 
+### `POST /media/caption`
+
+`{ videoSource, subtitles?, language?, model?, style?, wrap?, burn? }` ->
+`{ captionedPath?, subtitlePath, cueCount, source, language?, durationSeconds }`.
+
+Burns readable subtitles into a video. The normal call passes **only
+`videoSource`**, pointing at an already-cut clip, and lets the op transcribe
+that clip's own audio.
+
+**Why transcribe the clip rather than reuse the episode's transcript.** A clip
+cut from minute 35 of a podcast needs captions timed from *its* zero. Slicing
+the episode transcript means re-timing every cue by the clip's start offset —
+arithmetic that is easy to get subtly wrong and produces captions that drift
+without ever failing loudly. Whisper on the clip returns timings that are
+already relative to the clip, so the whole re-timing step ceases to exist. It
+is also more accurate: 40 seconds of clip audio beats a slice of a two-hour
+auto-caption track. `subtitles` (SRT/VTT text, or a path to a file) exists for
+the case where wording must be verbatim; its timings are taken as-is and
+assumed to be relative to *this* video.
+
+**Line breaking is done here, not by the caller.** Whisper emits long unbroken
+segments; they are re-wrapped to fit the frame, with cue timings taken from
+real word timestamps (`wordTimestamps`) so a cue appears exactly on its first
+spoken word rather than being apportioned by character count.
+
+**Geometry, not guesses.** Font size defaults to a fraction of the frame
+height, the vertical margin to a fraction of it too, and characters-per-line
+is derived from the usable width and that font size. A fixed pixel default
+overflows the frame the moment resolution or font size changes. Every one of
+those is overridable: an explicit `style.fontSize` / `style.marginV` /
+`wrap.maxCharsPerLine` is honoured verbatim in real source pixels.
+
+**The output is ASS, not SRT + `force_style`.** An SRT carries no resolution,
+so libass assumes a default script height of a few hundred pixels and scales
+everything up to the real frame — turning `FontSize=48` into roughly 320px of
+text on a 1920-tall video. Authoring ASS with `PlayResX/Y` set to the actual
+frame makes every measurement mean what it says. The `.srt` sidecar is still
+written and returned, since it is the portable artifact worth keeping; the
+`.ass` is an implementation detail of the burn.
+
+Defaults are tuned for a 9:16 Short — white bold text, heavy outline, placed
+in the **middle band**, because Shorts/Reels/TikTok all overlay their own
+chrome across the bottom third and bottom-anchored captions are the single
+most common way a clip ships unreadable. `position: "lower-third" | "bottom"`
+opt out.
+
+`burn: false` writes only the `.srt` and skips the re-encode — for reviewing
+or editing the text before committing to a render. Video is re-encoded
+(pixels change); audio is stream-copied.
+
+### `POST /media/share`
+
+Also the `media` MCP tool's `share` op. Copies a file from under the private media root into `{root}/public` with a
+random UUID name and returns `{ url, publicPath, bytes, retentionDays }`. For
+services that can only fetch by URL — the YouTube publish step stages a clip
+into Composio's sandbox from this URL. Paths outside the private root are
+refused, so it cannot expose arbitrary host files. `/home/ubuntu/media/prune.sh`
+deletes public files after 7 days.
+
 ## Stream-direct clip extraction (YouTube sources)
 
 **Why.** The earlier `/cut` path downloaded the **entire source video** at
@@ -492,8 +551,8 @@ a fixed daily reset.
 
 ```
 video/
-  index.ts                  # routes: /fetch, /transcribe, /diarize, /cut, /condense + module public surface
-  handler.ts                # re-exports the five per-op handlers
+  index.ts                  # routes: /fetch, /transcribe, /diarize, /cut, /condense, /caption + module public surface
+  handler.ts                # re-exports the six per-op handlers
   create-handler.ts         # thin handler factory (zod validate -> service -> ALApiResponse)
   gemini-client.ts          # generic Gemini File API + generateContent(responseSchema) helpers
   source.ts                 # resolveMediaSource (download to local) + resolveVideoSourceForCut (YouTube stream-direct URLs, no full download)
@@ -516,11 +575,17 @@ video/
   condense/                 # POST /media/condense — silence + filler removal
     client.ts / silence.ts / fillers.ts / ranges.ts / assemble.ts
     handler.ts / schemas.ts / constants.ts / types.ts
+  caption/                  # POST /media/caption — burn-in subtitles
+    caption.ts                 # orchestration: probe -> transcribe (or parse `subtitles`) -> .srt + .ass -> burn
+    cues.ts                    # word-timed cue building, greedy line packing, SRT/VTT parsing + serialization
+    ass.ts                     # ASS document with PlayResX/Y = real frame size (why font size is meaningful)
+    ffmpeg-caption.ts          # the `ass` filter burn-in
+    handler.ts / schemas.ts / types.ts
   types.ts / constants.ts   # DIARIZED_TRANSCRIPT SSOT, shared limits/errors/prompts
   README.md
 
 ../segment/moments/         # parked clip scorer — not mounted, not an MCP op (see its README)
-../../mcp/tools/media.ts    # `media` MCP tool: fetch, transcribe, diarize, cut, condense
+../../mcp/tools/media.ts    # `media` MCP tool: fetch, transcribe, diarize, cut, condense, caption
 ../../config.ts             # ENDPOINTS.VIDEO mount (always registered)
 ../../utils/timestamp.ts    # shared MM:SS <-> seconds helpers (used here + youtube audience-signal formatters)
 ```

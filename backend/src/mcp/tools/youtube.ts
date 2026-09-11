@@ -29,6 +29,7 @@ import { YOUTUBE_VIDEO_DOWNLOAD_REQUEST_SCHEMA } from "../../api/youtube/downloa
 import { downloadYoutubeMedia } from "../../api/youtube/download/helpers";
 import { YOUTUBE_DIARIZE_REQUEST_SCHEMA } from "../../api/youtube/diarize/schemas";
 import { diarizeFromYoutubeCaptions } from "../../api/youtube/diarize/captions";
+import { withTranscriptFile } from "../../api/media/diarize/transcript-store";
 import { YOUTUBE_VIDEO_META_REQUEST_SCHEMA } from "../../api/youtube/video-meta/schemas";
 import { fetchYoutubeVideoMeta } from "../../api/youtube/video-meta/helpers";
 import {
@@ -126,7 +127,9 @@ const YOUTUBE_OPS: Record<string, DomainOp> = {
     },
   },
   channel: {
-    defaultLayer: MCP_LAYER.INTEL,
+    // Raw by default: intel fetches proxied metadata for every video and Short
+    // on the channel, which is slow and metered. Ask for intel explicitly.
+    defaultLayer: MCP_LAYER.RAW,
     raw: { schema: YOUTUBE_CHANNEL_REQUEST_SCHEMA, run: fetchChannelRaw },
     intel: {
       schema: YOUTUBE_CHANNEL_REQUEST_SCHEMA,
@@ -146,13 +149,17 @@ const YOUTUBE_OPS: Record<string, DomainOp> = {
     defaultLayer: MCP_LAYER.RAW,
     raw: {
       schema: YOUTUBE_DIARIZE_REQUEST_SCHEMA,
-      run: (input) =>
-        diarizeFromYoutubeCaptions(
-          input.videoUrl,
-          input.language,
-          input.model,
-          input.speakerCount,
-          input.provider,
+      run: async (input) =>
+        withTranscriptFile(
+          await diarizeFromYoutubeCaptions(
+            input.videoUrl,
+            input.language,
+            input.model,
+            input.speakerCount,
+            input.provider,
+          ),
+          `yt-${input.videoUrl}`,
+          input.includeTranscript,
         ),
     },
   },
@@ -189,18 +196,18 @@ const YOUTUBE_DESCRIPTION = `YouTube search, video, comments, channel, and compu
 Call with { op, layer?, input }. layer defaults to intel when that overlay exists, else raw. Invalid combo fails.
 
 Ops:
-- search (raw|intel, default intel) — keyword search. input: query, filter?, limit?, country?, region?
+- search (raw|intel, default intel) — keyword search. input: query, filter? (\`video\` or \`channel\` only — there is no upload-date filter; judge recency from publishedAt in intel results), limit?, country?, region?
 - suggest (raw|intel, default intel) — typeahead suggestions. input: query, country?, region?
 - video (raw|intel, default intel) — one video's details. input: videoId, country?, region?
 - suggested (raw|intel, default intel) — related/suggested videos. input: videoId, limit?, country?, region?
 - transcript (raw|intel, default intel) — captions. intel input may include title. input: videoId, language?, country?, region?, title?
-- comments (raw|intel, default intel) — InnerTube comment threads. intel adds timestamp mentions + 10s clusters for clip priors. input: videoId, sort?, limit?, continuation?, country?, region?
+- comments (raw|intel, default intel) — InnerTube comment threads. intel adds timestamp mentions + 10s clusters for clip priors. input: videoId, sort?, limit?, continuation?, country?, region?, includeComments? (intel: false = clusters and counts only, no comment bodies — use this when all you need is clip priors; keeps the result small)
 - chapters (raw only) — creator-authored chapter markers via get_watch. Empty chapters[] is valid (not every video has them). Use comments intel for clip priors, not this. input: videoId, country?, region?
-- channel (raw|intel, default intel) — channel + tab. input: channelId OR handle, contentType?, limit?, country?, region?
+- channel (raw|intel, default raw; intel fetches metadata for every listed video, so keep limit small) — channel + tab. input: channelId OR handle, contentType?, limit?, country?, region?
 - handle (raw|intel, default intel) — resolve @handle. input: handle, country?, region?
 - video_meta (raw|intel, default intel) — batch watch-page metadata. input: videoIds[], country?, region?
 - video_download (raw only) — download a video/audio stream to local disk (cached — re-downloading the same videoId+media returns the cached file). Refused on Vercel (no persistent disk). input: videoId, media? ('video'|'audio', default video), country?, region?
-- diarize (raw only) — speaker-labelled transcript from the video's own captions. Always free/cheap regardless of provider (at most one small text-only labeling call, no audio uploaded ever). Hard-fails if there are no usable captions — no fallback to Gemini-audio diarization here; that's 'media' op=diarize, called explicitly if you want it. input: videoUrl, language?, provider? ('gemini'|'claude', default 'gemini'), model?, speakerCount?
+- diarize (raw only) — speaker-labelled transcript from the video's own captions. Always free/cheap regardless of provider (at most one small text-only labeling call, no audio uploaded ever). Hard-fails if there are no usable captions — no fallback to Gemini-audio diarization here; that's 'media' op=diarize, called explicitly if you want it. input: videoUrl, language?, provider? ('gemini'|'claude', default 'gemini'), model?, speakerCount?, includeTranscript? (false = return transcriptPath + summary instead of the inline transcript — use it whenever the transcript goes to segment). Always returns transcriptPath.
 - aggregate_niche (raw only) — compute-only niche signals from harvested videos
 - aggregate_keyword (raw only) — compute-only keyword signals
 - compare_channels (raw only) — compute-only channel comparison

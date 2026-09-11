@@ -40,17 +40,50 @@ export function composeYoutubeSearchQuery(
   return `${q} ${r}`;
 }
 
-/** Creates a TLS session with country-targeted Evomi proxy when configured (no proxy region). */
+/**
+ * Creates a TLS session with country-targeted Evomi proxy when configured (no
+ * proxy region). `direct: true` skips the proxy and fetches from this host's
+ * own IP — see `withDirectFirst` for which ops use that and why.
+ */
 export async function createYoutubeFetchSession(
   geo: Partial<YOUTUBE_GEO_REQUEST> = {},
+  options: { direct?: boolean } = {},
 ): Promise<UrlFetchSession> {
   const { country } = resolveYoutubeGeo(geo);
 
   return createUrlFetchSession({
-    useProxy: evomiConfigured(),
+    useProxy: options.direct ? false : evomiConfigured(),
     proxyCountry: country,
     proxySessionSuffix: randomUUID().replace(/-/g, "").slice(0, 12),
   });
+}
+
+/**
+ * Run a fetch from this host's own IP first, and through the residential proxy
+ * only if that fails.
+ *
+ * Only for ops YouTube actually serves to this VPS's datacenter IP: search and
+ * suggest (verified 2026-09-10 — zero proxy fallbacks). NOT video_meta: its
+ * get_watch call direct returns an unresolved item for every video, so it stays
+ * proxy-only, and neither do the player-bound ops (video, comments, chapters,
+ * transcript, diarize, download). Routing search and suggest through the
+ * metered proxy cost bandwidth for nothing; search intel's per-result
+ * watch-meta enrichment is still proxied, via video_meta. The proxy fallback keeps these ops working if YouTube ever
+ * starts challenging this IP; each fallback is logged so that shows up.
+ */
+export async function withDirectFirst<T>(
+  label: string,
+  run: (direct: boolean) => Promise<T>,
+): Promise<T> {
+  if (!evomiConfigured()) return run(true);
+  try {
+    return await run(true);
+  } catch (err) {
+    console.warn(
+      `[youtube:${label}] direct fetch failed, retrying via proxy: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return run(false);
+  }
 }
 
 /** Fetches a YouTube HTML page and returns the InnerTube client version. */
