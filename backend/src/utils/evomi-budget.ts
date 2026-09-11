@@ -1,3 +1,9 @@
+// Explicit undici fetch: Vercel's build resolves the ambient global Response
+// type without ok/status/json (TS2339) — same quirk as chatgpt/client.ts and
+// instagram/download/client.ts. No dispatcher is passed, so it stays direct
+// (never through the proxy), exactly like the global fetch it replaces.
+import { fetch } from "undici";
+
 import { EVOMI_BUDGET_CONFIG } from "./constants";
 
 /**
