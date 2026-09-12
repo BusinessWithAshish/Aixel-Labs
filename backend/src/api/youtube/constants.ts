@@ -69,6 +69,23 @@ export const YOUTUBE_INNERTUBE_GET_WATCH_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/
 export const YOUTUBE_INNERTUBE_NEXT_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/next`;
 export const YOUTUBE_INNERTUBE_BROWSE_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/browse`;
 export const YOUTUBE_INNERTUBE_PLAYER_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/player`;
+export const YOUTUBE_INNERTUBE_RESOLVE_URL = `${YOUTUBE_BASE_URL}/youtubei/v1/navigation/resolve_url`;
+
+/**
+ * WEB InnerTube client version used for the auth-free resolve_url call that
+ * powers handle availability checks. resolve_url tolerates a slightly stale
+ * version (verified live 2026-09-12); bump it if the call ever starts 400ing.
+ */
+export const YOUTUBE_INNERTUBE_WEB_CLIENT_VERSION = "2.20240101.00.00";
+
+// ─── Handle availability check (auth-free) ───────────────────────────────────
+
+/** YouTube handle format rules: 3–30 chars from [A-Za-z0-9._-]. */
+export const YOUTUBE_HANDLE_MIN_LENGTH = 3;
+export const YOUTUBE_HANDLE_VALID_LENGTH_MAX = 30;
+/** Max candidate handles per handle_check request (batch idea-checking). */
+export const YOUTUBE_HANDLE_CHECK_MAX_BATCH = 50;
+export const YOUTUBE_HANDLE_CHECK_CONCURRENCY = 6;
 
 // ─── Suggest (autocomplete) API ───────────────────────────────────────────────
 
@@ -137,6 +154,7 @@ export const YOUTUBE_API_ROUTES = {
   DIARIZE: "/diarize",
   CHANNEL: "/channel",
   HANDLE: "/handle",
+  HANDLE_CHECK: "/handle/check",
 } as const;
 
 export const YOUTUBE_VIDEO_META_MAX_BATCH = 100;
@@ -158,6 +176,7 @@ export const YOUTUBE_HANDLER_LABELS = {
   DIARIZE: "YOUTUBE/DIARIZE",
   CHANNEL: "YOUTUBE/CHANNEL",
   HANDLE: "YOUTUBE/HANDLE",
+  HANDLE_CHECK: "YOUTUBE/HANDLE/CHECK",
 } as const;
 
 // ─── YouTube renderer enum-like strings ──────────────────────────────────────

@@ -25,6 +25,8 @@ import {
   resolveYoutubeHandleToChannelId,
 } from "../../api/youtube/handle/helpers";
 import { YOUTUBE_HANDLE_REQUEST_SCHEMA } from "../../api/youtube/handle/schemas";
+import { YOUTUBE_HANDLE_CHECK_REQUEST_SCHEMA } from "../../api/youtube/handle-check/schemas";
+import { fetchYoutubeHandleCheck } from "../../api/youtube/handle-check/helpers";
 import { YOUTUBE_VIDEO_DOWNLOAD_REQUEST_SCHEMA } from "../../api/youtube/download/schemas";
 import { downloadYoutubeMedia } from "../../api/youtube/download/helpers";
 import { YOUTUBE_DIARIZE_REQUEST_SCHEMA } from "../../api/youtube/diarize/schemas";
@@ -141,6 +143,10 @@ const YOUTUBE_OPS: Record<string, DomainOp> = {
     raw: { schema: YOUTUBE_HANDLE_REQUEST_SCHEMA, run: fetchYoutubeHandle },
     intel: { schema: YOUTUBE_HANDLE_REQUEST_SCHEMA, run: resolveHandleService },
   },
+  handle_check: {
+    defaultLayer: MCP_LAYER.RAW,
+    raw: { schema: YOUTUBE_HANDLE_CHECK_REQUEST_SCHEMA, run: fetchYoutubeHandleCheck },
+  },
   video_download: {
     defaultLayer: MCP_LAYER.RAW,
     raw: { schema: YOUTUBE_VIDEO_DOWNLOAD_REQUEST_SCHEMA, run: downloadYoutubeMedia },
@@ -204,7 +210,8 @@ Ops:
 - comments (raw|intel, default intel) — InnerTube comment threads. intel adds timestamp mentions + 10s clusters for clip priors. input: videoId, sort?, limit?, continuation?, country?, region?, includeComments? (intel: false = clusters and counts only, no comment bodies — use this when all you need is clip priors; keeps the result small)
 - chapters (raw only) — creator-authored chapter markers via get_watch. Empty chapters[] is valid (not every video has them). Use comments intel for clip priors, not this. input: videoId, country?, region?
 - channel (raw|intel, default raw; intel fetches metadata for every listed video, so keep limit small) — channel + tab. input: channelId OR handle, contentType?, limit?, country?, region?
-- handle (raw|intel, default intel) — resolve @handle. input: handle, country?, region?
+- handle (raw|intel, default intel) — resolve an existing @handle to its channel. input: handle, country?, region?
+- handle_check (raw only) — auth-free validity + availability for CANDIDATE handles (channel-name idea checks). Batch: input handles[] (with or without @). Each result: { input, handle, valid, reason?, available (true=free, false=taken, null=not checked because invalid), channelId (set when taken), url }. Uses the public InnerTube resolve_url — no login. input: handles[], country?, region?
 - video_meta (raw|intel, default intel) — batch watch-page metadata. input: videoIds[], country?, region?
 - video_download (raw only) — download a video/audio stream to local disk (cached — re-downloading the same videoId+media returns the cached file). Refused on Vercel (no persistent disk). input: videoId, media? ('video'|'audio', default video), country?, region?
 - diarize (raw only) — speaker-labelled transcript from the video's own captions. Always free/cheap regardless of provider (at most one small text-only labeling call, no audio uploaded ever). Hard-fails if there are no usable captions — no fallback to Gemini-audio diarization here; that's 'media' op=diarize, called explicitly if you want it. input: videoUrl, language?, provider? ('gemini'|'claude', default 'gemini'), model?, speakerCount?, includeTranscript? (false = return transcriptPath + summary instead of the inline transcript — use it whenever the transcript goes to segment). Always returns transcriptPath.

@@ -16,6 +16,7 @@ Express router mounting scraper sub-APIs under `/youtube`. All endpoints use **P
 | Download | [download/README.md](./download/README.md) | `POST` | `/video/download` |
 | Video meta | — | `POST` | `/video-meta` |
 | Handle | — | `POST` | `/handle` |
+| Handle check | — | `POST` | `/handle/check` |
 | Channel | [channel/README.md](./channel/README.md) | `POST` | `/channel` |
 | Intelligence | [intelligence/README.md](./intelligence/README.md) | `POST` | `/intelligence/*` |
 

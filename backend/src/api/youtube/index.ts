@@ -9,6 +9,7 @@ import { registerYoutubeVideoDownloadRoutes } from "./download";
 import { registerYoutubeDiarizeRoutes } from "./diarize";
 import { registerYoutubeChannelRoutes } from "./channel";
 import { registerYoutubeHandleRoutes } from "./handle";
+import { registerYoutubeHandleCheckRoutes } from "./handle-check";
 import { registerYoutubeIntelligenceRoutes } from "./intelligence";
 
 const youtubeRoutes: IRouter = Router();
@@ -22,6 +23,7 @@ registerYoutubeVideoCommentsRoutes(youtubeRoutes);
 registerYoutubeVideoDownloadRoutes(youtubeRoutes);
 registerYoutubeDiarizeRoutes(youtubeRoutes);
 registerYoutubeHandleRoutes(youtubeRoutes);
+registerYoutubeHandleCheckRoutes(youtubeRoutes);
 registerYoutubeChannelRoutes(youtubeRoutes);
 registerYoutubeIntelligenceRoutes(youtubeRoutes);
 
