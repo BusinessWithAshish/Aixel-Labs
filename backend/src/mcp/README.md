@@ -8,7 +8,7 @@ HTTP handlers — **no HTTP loopback**.
 | Mount       | `ENDPOINTS.MCP` → `/mcp`                            |
 | Server name | `aixel-intelligence`                                |
 | Factory     | `createAixelIntelligenceMcpServer()` in `server.ts` |
-| Tool count  | `MCP_TOOL_COUNT` (**9**)                            |
+| Tool count  | `MCP_TOOL_COUNT` (**10**)                           |
 
 HTTP stays exploded (one POST per function). MCP collapses to **one tool per
 domain**. Every tool takes the same top-level shape:
@@ -37,6 +37,7 @@ Lead-gen (Maps / Facebook / LinkedIn) stays **HTTP-only**.
 | `segment`       | `by_speech`                                                                                                                            | raw. Decides WHAT to cut, `media` handles the mechanics. `by_speech` ranks a diarized transcript (hook/body/button rubric, tone-aware) into candidates shaped for `media` op=cut's `clips` field — works with a transcript from either `media` op=diarize or `youtube` op=diarize, they produce the same shape. Takes `provider` (`claude`|`gemini`, REQUIRED, no default) — see `api/segment/moments/README.md` for the cost/quota tradeoff. `by_scene`/`by_vision` not yet built. |
 | `chatgpt`       | `ask`                                                                                                                                          | raw only (browser-driven, no intel overlay). **VPS only** — refused everywhere else unless `AIXEL_VPS=1` (needs the VPS's headful Chrome; `stage_image` was removed, it had no ChatGPT-specific logic — use `media` op=fetch instead) |
 | `claude`        | `ask`, `budget_status`                                                                                                                                              | raw only (CLI-driven, no intel overlay). Runs on any machine with `claude` installed and authenticated — **not** VPS-gated (unlike `chatgpt`), fails with a plain error if the CLI is missing/unauthenticated |
+| `gemini`        | `ask`                                                                                                                                          | raw only (browser-driven, no intel overlay). **VPS only** (`AIXEL_VPS=1`). Text/image/video in and out on the logged-in gemini.google.com session (flat Google AI subscription). Its own Chrome instance (separate profile + port 9333) — independent of `chatgpt`, the two run concurrently. Video output is async (Veo, minutes); media staged to public URLs. Attach refs via `images`/`videos` (local paths — use `media` op=fetch for remote). |
 
 ### Instagram discovery — which op
 

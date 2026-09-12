@@ -15,6 +15,7 @@ import segmentRoutes from "./api/segment/index";
 import crawlRoutes from "./api/crawl/index";
 import chatgptRoutes from "./api/chatgpt/index";
 import claudeRoutes from "./api/claude/index";
+import geminiRoutes from "./api/gemini/index";
 import mcpRoutes from "./mcp/router";
 
 export function registerRoutes(app: Express) {
@@ -32,5 +33,6 @@ export function registerRoutes(app: Express) {
   app.use(ENDPOINTS.CRAWL, crawlRoutes);
   app.use(ENDPOINTS.CHATGPT, chatgptRoutes);
   app.use(ENDPOINTS.CLAUDE, claudeRoutes);
+  app.use(ENDPOINTS.GEMINI, geminiRoutes);
   app.use(ENDPOINTS.MCP, mcpRoutes);
 }

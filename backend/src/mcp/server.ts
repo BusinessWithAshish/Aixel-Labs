@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerChatgptTool } from "./tools/chatgpt";
 import { registerClaudeTool } from "./tools/claude";
+import { registerGeminiTool } from "./tools/gemini";
 import { registerGsearchTool } from "./tools/gsearch";
 import { registerSegmentTool } from "./tools/segment";
 import { registerInstagramTool } from "./tools/instagram";
@@ -11,8 +12,8 @@ import { registerYoutubeTool } from "./tools/youtube";
 
 export const MCP_SERVER_NAME = "aixel-intelligence";
 export const MCP_SERVER_VERSION = "1.0.0";
-/** One domain tool each: youtube, trends, instagram, twitter, gsearch, media, segment, chatgpt, claude. */
-export const MCP_TOOL_COUNT = 9;
+/** One domain tool each: youtube, trends, instagram, twitter, gsearch, media, segment, chatgpt, claude, gemini. */
+export const MCP_TOOL_COUNT = 10;
 
 export function createAixelIntelligenceMcpServer(): McpServer {
   const server = new McpServer(
@@ -30,6 +31,7 @@ export function createAixelIntelligenceMcpServer(): McpServer {
   registerSegmentTool(server);
   registerChatgptTool(server);
   registerClaudeTool(server);
+  registerGeminiTool(server);
 
   return server;
 }

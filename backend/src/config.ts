@@ -23,6 +23,7 @@ export enum ENDPOINTS {
   CRAWL = "/crawl",
   CHATGPT = "/chatgpt",
   CLAUDE = "/claude",
+  GEMINI = "/gemini",
   MCP = "/mcp",
   SAMPLE = "/sample",
 }
@@ -297,6 +298,16 @@ export const API_ENDPOINTS = {
     BUDGET: {
       route: "/budget",
       full: `${ENDPOINTS.CLAUDE}/budget`,
+    },
+  },
+  GEMINI: {
+    GENERATE: {
+      route: "/",
+      full: `${ENDPOINTS.GEMINI}`,
+    },
+    HEALTH: {
+      route: "/health",
+      full: `${ENDPOINTS.GEMINI}/health`,
     },
   },
 } as const;
