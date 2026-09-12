@@ -13,7 +13,7 @@ const GEMINI_OPS: Record<string, DomainOp> = {
   },
 };
 
-const GEMINI_DESCRIPTION = `Gemini via the VPS's already-logged-in browser session — text, image, and video, in and out (runs on the flat Google AI subscription, not the metered Gemini API). Text-to-text/image/video, and image/video-in for description, editing, or as a generation reference — whatever the turn produces. Runs in its own browser instance, independent of the chatgpt tool, so the two never block each other. VPS only: set AIXEL_VPS=1 on the host with the headful Chrome + logged-in Gemini profile; refused elsewhere with a specific reason.
+const GEMINI_DESCRIPTION = `Gemini via the VPS's already-logged-in browser session — text, image, and video, in and out (runs on the flat Google AI subscription, not the metered Gemini API). Text-to-text/image/video, and image/video-in for description, editing, or as a generation reference — whatever the turn produces. Runs in its own browser instance, independent of the chatgpt tool, so the two never block each other. Needs a headful-browser host (auto-detected from an X display; refused on Vercel or anywhere without one, with a specific reason) — no env flag to set.
 
 Call with { op, input }.
 

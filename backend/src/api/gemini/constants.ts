@@ -109,5 +109,5 @@ export const GEMINI_ERROR_MESSAGES = {
   NO_RESULT: "Gemini produced neither text nor media — it may have refused",
   MISSING_FILE: "An attached file path does not exist",
   NOT_VPS:
-    "Gemini calls require the VPS Chrome/CDP stack — set AIXEL_VPS=1 on the one host that runs it",
+    "Gemini calls need a headful Chrome with an X display (the VPS's Xvfb) — no X display is available on this host",
 } as const;

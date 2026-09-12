@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import { YOUTUBE_API_ROUTES } from "./api/youtube/constants";
 import { YOUTUBE_INTELLIGENCE_ROUTES } from "./api/youtube/intelligence/constants";
 import { GOOGLE_TRENDS_API_ROUTES } from "./api/google-trends/constants";
@@ -41,19 +43,29 @@ export enum ENDPOINTS {
 export const IS_VERCEL_RUNTIME = !!process.env.VERCEL;
 
 /**
- * Explicit opt-in — nothing sets this automatically. The VPS's systemd env
- * sets `AIXEL_VPS=1`. Gates capabilities that only make sense on that one
- * persistent, browser-equipped host: specifically the chatgpt module's
- * headful Chrome/CDP session, which needs the VPS's Xvfb + logged-in Chrome
- * profile and cannot run anywhere else. Refused everywhere else — Vercel (no
- * persistent host) and local/dev alike — so a stray local run can't
- * accidentally try to drive a browser that isn't there.
+ * Whether this host can drive a real headful browser (the chatgpt / gemini
+ * modules' Chrome/CDP session). **Detected, not configured** — this replaces
+ * the old hand-set `AIXEL_VPS=1` flag. A headful browser needs an X display to
+ * render into; the VPS's `aixel-xvfb` unit provides one (default `:99`) whose
+ * socket lives at `/tmp/.X11-unix/X<n>`. Vercel (ephemeral, no browser) and
+ * any host without an X server simply have no such socket and refuse browser
+ * ops on their own, so nothing needs to be set anywhere.
  *
- * The claude module is deliberately NOT gated by this: `claude -p` is just a
- * CLI, not VPS-specific infrastructure, so it runs wherever it's installed
- * and authenticated, and fails with a plain error otherwise.
+ * Pass the display the caller will actually spawn Chrome on (each module has
+ * its own DISPLAY default); omit to check `$DISPLAY`, falling back to `:99`.
+ * Each module still runs its own binary/profile/login preflight on top of
+ * this, so a present-but-unusable display degrades to a clear module error.
+ *
+ * The claude module is deliberately NOT gated by this: `claude -p` is a CLI,
+ * not browser infrastructure, so it runs wherever it's installed and
+ * authenticated, and fails with a plain error otherwise.
  */
-export const IS_VPS_RUNTIME = !!process.env.AIXEL_VPS;
+export function isBrowserRuntime(display?: string): boolean {
+  if (IS_VERCEL_RUNTIME) return false;
+  const d = display || process.env.DISPLAY || ":99";
+  const n = d.match(/:(\d+)/)?.[1];
+  return !!n && existsSync(`/tmp/.X11-unix/X${n}`);
+}
 
 function withStatusCode(message: string, statusCode: number): Error {
   const err = new Error(message);
@@ -61,9 +73,9 @@ function withStatusCode(message: string, statusCode: number): Error {
   return err;
 }
 
-/** Throws (501) unless `IS_VPS_RUNTIME` — see {@link IS_VPS_RUNTIME}. */
-export function assertVpsRuntime(message: string): void {
-  if (!IS_VPS_RUNTIME) throw withStatusCode(message, 501);
+/** Throws (501) unless {@link isBrowserRuntime} — i.e. no headful-browser X display on this host. */
+export function assertBrowserRuntime(message: string, display?: string): void {
+  if (!isBrowserRuntime(display)) throw withStatusCode(message, 501);
 }
 
 /** Throws (501) on Vercel only — see {@link IS_VERCEL_RUNTIME}. */
@@ -71,7 +83,7 @@ export function assertPersistentDisk(message: string): void {
   if (IS_VERCEL_RUNTIME) throw withStatusCode(message, 501);
 }
 
-/** Reads `err.statusCode` (set by {@link assertVpsRuntime} / {@link assertPersistentDisk} / a busy-lock, etc.); falls back to 502. */
+/** Reads `err.statusCode` (set by {@link assertBrowserRuntime} / {@link assertPersistentDisk} / a busy-lock, etc.); falls back to 502. */
 export function statusCodeFromError(err: unknown, fallback = 502): number {
   const code = (err as { statusCode?: number })?.statusCode;
   return typeof code === "number" ? code : fallback;

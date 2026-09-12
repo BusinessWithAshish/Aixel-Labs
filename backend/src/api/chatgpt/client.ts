@@ -9,7 +9,7 @@ import { basename } from "node:path";
 import sharp from "sharp";
 import { fetch } from "undici";
 
-import { assertVpsRuntime } from "../../config";
+import { assertBrowserRuntime } from "../../config";
 import {
   closeChatGptChrome,
   launchChatGptChrome,
@@ -93,7 +93,7 @@ async function checkBrowserSpawnAndLogin(): Promise<{ ok: boolean; detail: strin
 }
 
 export async function runChatGptHealth(): Promise<CHATGPT_HEALTH_RESPONSE> {
-  assertVpsRuntime(CHATGPT_ERROR_MESSAGES.NOT_VPS);
+  assertBrowserRuntime(CHATGPT_ERROR_MESSAGES.NOT_VPS, CHATGPT.DISPLAY);
   const checks: CHATGPT_HEALTH_RESPONSE["checks"] = [];
 
   const staticRunners: [string, () => Promise<{ ok: boolean; detail: string }>][] = [
@@ -391,7 +391,7 @@ function buildPrompt(req: CHATGPT_REQUEST_PARSED): string {
 export async function generateChatGpt(
   req: CHATGPT_REQUEST_PARSED,
 ): Promise<CHATGPT_RESPONSE> {
-  assertVpsRuntime(CHATGPT_ERROR_MESSAGES.NOT_VPS);
+  assertBrowserRuntime(CHATGPT_ERROR_MESSAGES.NOT_VPS, CHATGPT.DISPLAY);
   if (busy) {
     const err = new Error(CHATGPT_ERROR_MESSAGES.BUSY);
     (err as Error & { statusCode?: number }).statusCode = 409;

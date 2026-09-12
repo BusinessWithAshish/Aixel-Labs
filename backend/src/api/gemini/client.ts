@@ -28,7 +28,7 @@ import type {
   GEMINI_REQUEST_PARSED,
   GEMINI_RESPONSE,
 } from "./types";
-import { assertVpsRuntime } from "../../config";
+import { assertBrowserRuntime } from "../../config";
 
 let busy = false;
 
@@ -328,7 +328,7 @@ async function modelLabel(tab: CdpTab): Promise<string | undefined> {
 }
 
 export async function generateGemini(req: GEMINI_REQUEST_PARSED): Promise<GEMINI_RESPONSE> {
-  assertVpsRuntime(GEMINI_ERROR_MESSAGES.NOT_VPS);
+  assertBrowserRuntime(GEMINI_ERROR_MESSAGES.NOT_VPS, GEMINI.DISPLAY);
   if (busy) {
     const err = new Error(GEMINI_ERROR_MESSAGES.BUSY);
     (err as Error & { statusCode?: number }).statusCode = 409;
@@ -411,7 +411,7 @@ export async function generateGemini(req: GEMINI_REQUEST_PARSED): Promise<GEMINI
 
 /** Static checks (binary, profile seed) + one real spawn + login check. */
 export async function runGeminiHealth(): Promise<GEMINI_HEALTH_RESPONSE> {
-  assertVpsRuntime(GEMINI_ERROR_MESSAGES.NOT_VPS);
+  assertBrowserRuntime(GEMINI_ERROR_MESSAGES.NOT_VPS, GEMINI.DISPLAY);
   const checks: GEMINI_HEALTH_RESPONSE["checks"] = [];
 
   const bin = await checkChromeBinary();

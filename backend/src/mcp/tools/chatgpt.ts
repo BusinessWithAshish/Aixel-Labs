@@ -13,7 +13,7 @@ const CHATGPT_OPS: Record<string, DomainOp> = {
   },
 };
 
-const CHATGPT_DESCRIPTION = `ChatGPT via the VPS's already-logged-in browser session — text-to-text, text-to-image, and text/image-to-text/image, whatever ChatGPT actually produces for the turn (runs on the existing subscription, not metered API credits). VPS only, and not just by convention: every op first checks the Chrome binary and profile dir actually exist (not just an env flag) and fails fast with a specific reason if not, before ever trying to spawn a browser. Set AIXEL_VPS=1 on this host to enable it at all.
+const CHATGPT_DESCRIPTION = `ChatGPT via the VPS's already-logged-in browser session — text-to-text, text-to-image, and text/image-to-text/image, whatever ChatGPT actually produces for the turn (runs on the existing subscription, not metered API credits). Needs a headful-browser host, and not just by convention: enabled only where an X display is present (auto-detected, refused on Vercel — no env flag to set), and every op then checks the Chrome binary and profile dir actually exist and fails fast with a specific reason before ever trying to spawn a browser.
 
 Call with { op, input }.
 

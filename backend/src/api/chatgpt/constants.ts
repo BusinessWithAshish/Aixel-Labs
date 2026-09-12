@@ -71,5 +71,5 @@ export const CHATGPT_ERROR_MESSAGES = {
   GENERIC: "ChatGPT call failed",
   NO_RESULT: "ChatGPT produced neither text nor an image — it may have refused",
   NOT_VPS:
-    "ChatGPT calls require the VPS Chrome/CDP stack — set AIXEL_VPS=1 on the one host that runs it",
+    "ChatGPT calls need a headful Chrome with an X display (the VPS's Xvfb) — no X display is available on this host",
 } as const;

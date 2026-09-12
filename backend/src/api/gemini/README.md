@@ -27,8 +27,10 @@ Chrome headed against `GEMINI_PROFILE_DIR` + the Xvfb display and signing in via
 VNC, exactly like `chatgpt`.
 
 **Headed is required** — headless is walled by Cloudflare even with valid
-cookies (same as `chatgpt`). **VPS only** — every endpoint refuses unless
-`AIXEL_VPS=1`.
+cookies (same as `chatgpt`). **Needs a headful-browser host** — every endpoint
+refuses unless an X display is present (`assertBrowserRuntime`, auto-detected
+from the Xvfb socket for `GEMINI.DISPLAY`; also refused on Vercel). No env flag
+to set.
 
 ## Why DOM-submit, not a forged request
 

@@ -16,9 +16,12 @@ Cloudflare check walls a headless launch behind a "Just a moment…"
 interstitial even with valid session cookies; the spawn renders into the
 Xvfb display `aixel-xvfb` already runs (`CHATGPT.DISPLAY`, default `:99`).
 `busy` (module-level) serializes calls so two spawns never race for the same
-profile dir. **VPS only** — every endpoint (including `/health`) refuses to
-run unless `AIXEL_VPS=1` is set, so a local `pnpm dev` or a Vercel deployment
-can't accidentally drive a browser session that isn't there.
+profile dir. **Needs a headful-browser host** — every endpoint (including
+`/health`) refuses unless an X display is present (`assertBrowserRuntime`,
+auto-detected from the Xvfb socket at `/tmp/.X11-unix/X<n>` for
+`CHATGPT.DISPLAY`; also refused on Vercel), so a local `pnpm dev` or a Vercel
+deployment can't accidentally drive a browser session that isn't there. No
+env flag to set — the old `AIXEL_VPS=1` gate is gone.
 
 If the profile's ChatGPT login expires, re-authenticate by temporarily
 running Chrome headed against the same profile dir + display and signing in
