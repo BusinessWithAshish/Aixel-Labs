@@ -14,7 +14,7 @@ import time
 import traceback
 
 from . import __version__
-from .fetch_models import DEFAULT_MODELS_DIR, LRASD_WEIGHTS, PYANNOTE_DIRNAME, YUNET_MODEL
+from .fetch_models import DEFAULT_MODELS_DIR, LRASD_WEIGHTS, YUNET_MODEL
 
 FPS = 25  # LR-ASD's training frame rate; all analysis runs on this timeline
 
@@ -42,8 +42,6 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--ffmpeg", default="ffmpeg", help="ffmpeg binary (the backend passes ffmpeg-static)")
     p.add_argument("--models-dir", default=os.environ.get("REFRAME_MODELS_DIR") or str(DEFAULT_MODELS_DIR))
     p.add_argument("--work-dir", default=None, help="temp files go here (default: system temp)")
-    p.add_argument("--speakers", choices=("auto", "pyannote", "none"), default="auto",
-                   help="auto = pyannote when installed, LR-ASD only otherwise")
     p.add_argument("--min-run", type=float, default=0.45, help="stretches shorter than this (s) merge into a neighbour")
     p.add_argument("--lead", type=float, default=0.12, help="cut this many seconds before a speech onset")
     p.add_argument("--speak-thresh", type=float, default=0.0, help="LR-ASD logit above this = speaking")
@@ -55,8 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     started = time.time()
     timings: dict[str, float] = {}
     plan: dict = {"version": 1, "worker": __version__, "mode": "center", "fallbackReason": None, "aspect": a.aspect,
-                  "source": None, "crop": None, "shots": [], "tracks": [], "speakers": {"source": "none"},
-                  "segments": [], "timings": timings}
+                  "source": None, "crop": None, "shots": [], "tracks": [], "segments": [], "timings": timings}
 
     def timed(name: str, fn, *args, **kwargs):
         t0 = time.time()
@@ -92,31 +89,17 @@ def main(argv: list[str] | None = None) -> int:
         for tr in tracks:
             tr["needs_asd"] = tr["shot"] in multi_face_shots
 
-        speakers = None
-        if multi_face_shots:  # single-face shots need neither LR-ASD nor diarization
+        if multi_face_shots:  # single-face shots need no LR-ASD
             from .asd import mfcc, score_tracks
 
             with tempfile.TemporaryDirectory(dir=a.work_dir) as work:
                 timed("crops_s", collect_crops, a.ffmpeg, a.clip, info, tracks, FPS)
                 audio = timed("audio_s", extract_audio, a.ffmpeg, a.clip, os.path.join(work, "audio16k.wav"))
                 timed("asd_s", score_tracks, tracks, mfcc(audio), os.path.join(a.models_dir, LRASD_WEIGHTS), FPS)
-                if a.speakers != "none":
-                    try:
-                        from .speakers import diarize
-
-                        speakers = timed("speakers_s", diarize, audio, 16000, os.path.join(a.models_dir, PYANNOTE_DIRNAME))
-                        plan["speakers"] = {"source": "pyannote", "turns": len(speakers["turns"]),
-                                            "labels": sorted({t[2] for t in speakers["turns"]})}
-                    except Exception as exc:
-                        if a.speakers == "pyannote":
-                            raise
-                        plan["speakers"] = {"source": "none", "error": f"{type(exc).__name__}: {exc}"[:300]}
-                        _log(f"speaker diarization unavailable, planning on LR-ASD alone: {exc}")
 
         result = timed("plan_s", build_plan, info=info, shots=shots, tracks=tracks, n_frames=n_frames, fps=FPS, crop_w=crop_w,
-                       speakers=speakers, speak_thresh=a.speak_thresh, min_run=a.min_run, lead=a.lead)
+                       speak_thresh=a.speak_thresh, min_run=a.min_run, lead=a.lead)
         plan["segments"], plan["tracks"] = result["segments"], result["tracks"]
-        plan["speakers"].update(mapping=result["mapping"], evidence=result["evidence"])
         if not plan["segments"]:
             raise Fallback("plan produced no segments")
         plan["mode"] = "speaker"
@@ -133,5 +116,5 @@ def main(argv: list[str] | None = None) -> int:
     timings["total_s"] = round(time.time() - started, 2)
     _write(a.out, plan)
     _log(f"{plan['mode']}: {len(plan['segments'])} segments, {len(plan['shots'])} shots, "
-         f"{len(plan['tracks'])} faces, speakers={plan['speakers'].get('source')}, {timings['total_s']}s")
+         f"{len(plan['tracks'])} faces, {timings['total_s']}s")
     return 0

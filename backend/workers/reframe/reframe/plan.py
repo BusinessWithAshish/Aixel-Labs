@@ -1,13 +1,9 @@
-"""Turns shots, face tracks, LR-ASD scores and (optional) pyannote turns into crop segments.
+"""Turns shots, face tracks and LR-ASD scores into crop segments.
 
 Offline, so cuts land exactly on speech onsets instead of waiting out a live-camera hold.
 """
 
-from itertools import product
-
 import numpy as np
-
-MAX_ASSIGN = 6  # speakers/faces considered per shot when matching voices to faces
 
 
 def crop_size(width: int, height: int, ratio_w: int, ratio_h: int):
@@ -17,7 +13,7 @@ def crop_size(width: int, height: int, ratio_w: int, ratio_h: int):
     return int(round(height * ratio_w / ratio_h / 2) * 2), int(height)
 
 
-def build_plan(*, info, shots, tracks, n_frames, fps, crop_w, speakers=None, speak_thresh=0.0, min_run=0.45, lead=0.12) -> dict:
+def build_plan(*, info, shots, tracks, n_frames, fps, crop_w, speak_thresh=0.0, min_run=0.45, lead=0.12) -> dict:
     W = info.width
 
     def shot_at(t: float) -> int:
@@ -39,55 +35,7 @@ def build_plan(*, info, shots, tracks, n_frames, fps, crop_w, speakers=None, spe
         q = min(max(j - tr["start"], 0), len(tr["x"]) - 1)
         return float(tr["x"][q])
 
-    # ---- who pyannote says is talking, per frame ----
-    active = [[] for _ in range(n_frames)]
-    current = [None] * n_frames
-    if speakers:
-        for s0, s1, label in speakers["turns"]:
-            for j in range(max(0, int(s0 * fps)), min(n_frames, int(np.ceil(s1 * fps)))):
-                active[j].append(label)
-        for s0, s1, label in speakers.get("exclusive") or speakers["turns"]:
-            for j in range(max(0, int(s0 * fps)), min(n_frames, int(np.ceil(s1 * fps)))):
-                current[j] = label
-
-    # ---- each speaker -> the face LR-ASD scores highest over that speaker's solo speech, per shot ----
-    mapping, evidence = {}, {}
-    if speakers:
-        for k, faces in faces_by_shot.items():
-            scored = [tr for tr in faces if tr.get("score") is not None]
-            if len(scored) < 2:
-                continue
-            shot_frames = [j for j in range(n_frames) if frame_shot[j] == k]
-            labels = sorted({label for j in shot_frames for label in active[j]})
-            means = {}
-            for label in labels:
-                solo = [j for j in shot_frames if active[j] == [label]]
-                for tr in scored:
-                    vals = [v for v in (score_at(tr, j) for j in solo) if v is not None]
-                    if len(vals) >= 10:
-                        means[(label, tr["id"])] = float(np.mean(vals))
-            labels = sorted(labels, key=lambda lb: -sum(1 for (l2, _) in means if l2 == lb))[:MAX_ASSIGN]
-            face_ids = [tr["id"] for tr in sorted(scored, key=lambda t: -float(np.median(t["s"])))][:MAX_ASSIGN]
-            best, best_total = {}, 0.0
-            for combo in product(*([[None] + face_ids] * len(labels))):
-                chosen = [c for c in combo if c is not None]
-                if len(chosen) != len(set(chosen)):
-                    continue
-                total, ok = 0.0, True
-                for label, face in zip(labels, combo):
-                    if face is None:
-                        continue
-                    v = means.get((label, face))
-                    if v is None or v <= speak_thresh:
-                        ok = False
-                        break
-                    total += v
-                if ok and total > best_total:
-                    best, best_total = {label: face for label, face in zip(labels, combo) if face is not None}, total
-            mapping[k] = best
-            evidence[k] = {f"{label}->face{face}": round(v, 2) for (label, face), v in means.items()}
-
-    # ---- the face to show, frame by frame ----
+    # ---- the face to show, frame by frame: the face LR-ASD is most sure is speaking ----
     target = [None] * n_frames
     for j in range(n_frames):
         k = frame_shot[j]
@@ -97,19 +45,12 @@ def build_plan(*, info, shots, tracks, n_frames, fps, crop_w, speakers=None, spe
         if len(faces_by_shot[k]) == 1:  # the editor already chose
             target[j] = here[0]["id"]
             continue
-        pick = None
-        label = current[j]
-        shot_map = mapping.get(k, {})
-        if label is not None and label in shot_map and any(tr["id"] == shot_map[label] for tr in here):
-            pick = shot_map[label]
-        elif not speakers or label is not None:  # with pyannote, silence holds the current face
-            best, best_score = None, speak_thresh
-            for tr in here:
-                s = score_at(tr, j)
-                if s is not None and s > best_score:
-                    best, best_score = tr["id"], s
-            pick = best
-        target[j] = pick
+        best, best_score = None, speak_thresh
+        for tr in here:
+            s = score_at(tr, j)
+            if s is not None and s > best_score:
+                best, best_score = tr["id"], s
+        target[j] = best
 
     # hold through gaps inside a shot; a shot's leading gap takes its first choice
     filled, last = [], {}
@@ -184,8 +125,6 @@ def build_plan(*, info, shots, tracks, n_frames, fps, crop_w, speakers=None, spe
 
     return {
         "segments": segments,
-        "mapping": {str(k): m for k, m in mapping.items()},
-        "evidence": {str(k): e for k, e in evidence.items()},
         "tracks": [{"id": tr["id"], "shot": tr["shot"], "start": round(tr["start"] / fps, 3), "end": round((tr["end"] + 1) / fps, 3),
                     "x": round(float(np.median(tr["x"])), 1), "width": round(float(np.median(tr["s"])) * 2, 1),
                     "speaking": None if tr.get("score") is None else round(float(np.mean(np.asarray(tr["score"]) > speak_thresh)), 3)}

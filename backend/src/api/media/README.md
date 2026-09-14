@@ -206,15 +206,15 @@ Cropped clips (`aspectRatio` other than `original`) can follow whoever is talkin
 instead of the fixed centre crop. `cut` cuts the range unframed into a temp file,
 spawns the Python worker in `backend/workers/reframe` (`python -m reframe`), and
 renders the returned `plan.json` with a piecewise ffmpeg crop (`cut/reframe.ts`).
-The worker plans only: camera cuts (PySceneDetect), faces (YuNet), who speaks when
-(pyannote, from the audio — no captions needed) and which face that is (LR-ASD
-lip-sync). Single-face shots follow the editor's own cut; multi-face shots cut on
-speech onsets. Roughly a minute of CPU per clip.
+The worker plans only: camera cuts (PySceneDetect), faces (YuNet) and which face
+is speaking (LR-ASD, lip motion matched to the audio — no captions needed).
+Single-face shots follow the editor's own cut; multi-face shots cut on speech
+onsets. About 50 s of CPU per clip.
 
 Never fails a clip: worker missing, error, timeout or no faces renders the centre
 crop and sets `clips[].reframe.fallbackReason`. The plan is kept beside the clip
 (`clip-….reframe.json`). Setup and models: `workers/reframe/README.md`
-(`pnpm setup:reframe`; pyannote's gated download needs `HF_TOKEN` once).
+(`pnpm setup:reframe`).
 
 ### `POST /media/condense`
 

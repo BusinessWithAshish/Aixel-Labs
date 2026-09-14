@@ -22,19 +22,16 @@ The backend renders the plain centre crop for anything that is not a
    duplicate-box suppression, same-seat fragment merge, median smoothing.
    Faces narrower than 3% of the frame (posters, background) are dropped.
 3. **Shots with one face** — that face. The video's editor already chose.
-4. **Shots with several faces**
-   - **LR-ASD** (AVA weights) scores every face, every frame, from lip motion
-     against the audio.
-   - **pyannote** `speaker-diarization-community-1` says who speaks when,
-     straight from the audio — no captions needed.
-   - Each pyannote speaker is matched to the face whose LR-ASD score is
-     highest across all of that speaker's solo speech in the shot. While a
-     matched speaker talks, the crop is on their face; an unmatched voice
-     falls back to LR-ASD's frame winner; silence holds the current face.
-   - Without pyannote (model missing, error) the same plan runs on LR-ASD
-     alone — the behaviour validated first.
+4. **Shots with several faces** — **LR-ASD** (AVA weights) scores every face,
+   every frame, by matching its lip motion to the audio; the crop goes to the
+   face most confidently speaking, and holds through silence.
 5. **Cuts** land on speech onsets (0.12 s lead). Stretches under 0.45 s merge
    into a neighbour; back-to-back stretches on the same seat collapse.
+
+No speaker diarization: LR-ASD already hears the audio. pyannote was tried
+(2026-09-14) and removed — it only knows voices, so it still needed LR-ASD to
+find the face; it doubled the runtime and hid a speaker when it merged two
+voices.
 
 ## Setup (VPS, once)
 
@@ -43,20 +40,12 @@ pnpm --filter @aixellabs/backend setup:reframe      # or: bash workers/reframe/s
 ```
 
 Creates `.venv/` (CPU PyTorch + requirements) and downloads into `models/`
-(both gitignored):
+(both gitignored, checksum-verified):
 
 | File | Source | Licence |
 |---|---|---|
 | `face_detection_yunet_2023mar.onnx` | opencv/opencv_zoo | MIT |
 | `lrasd_pretrain_AVA.model` | Junhua-Liao/LR-ASD @ `1b6dcd2` | MIT |
-| `pyannote-speaker-diarization-community-1/` | Hugging Face, **gated** | CC-BY-4.0 |
-
-The two small files are checksum-verified. pyannote needs `HF_TOKEN` (read
-from the environment or `backend/.env`) **only for this download**: the
-account must have accepted the model's terms on its Hugging Face page, and a
-fine-grained token needs "read access to public gated repos". After the
-download it loads from disk, offline. Setup finishes without it; the worker
-then runs LR-ASD-only.
 
 ## Backend env (optional)
 
@@ -68,13 +57,12 @@ then runs LR-ASD-only.
 
 ## Cost
 
-Roughly a minute of CPU for a 45–60 s 1080p clip on the 4-core ARM VPS
-(faces ~20 s, LR-ASD ~15–25 s for multi-face shots only, pyannote on top).
-Single-face shots skip LR-ASD and pyannote entirely.
+About 50 s of CPU for a 45–60 s 1080p clip on the 4-core ARM VPS (faces
+~20 s, LR-ASD ~10–30 s for multi-face shots only). Single-face shots skip
+LR-ASD entirely.
 
 ## Credits
 
 - LR-ASD — Liao et al., *LR-ASD: Lightweight and Robust Network for Active
   Speaker Detection*, IJCV 2025. MIT. Model code vendored in `reframe/lrasd/`.
-- pyannote.audio / speaker-diarization-community-1 — CC-BY-4.0.
 - YuNet (OpenCV Zoo) — MIT. PySceneDetect — BSD-3-Clause.

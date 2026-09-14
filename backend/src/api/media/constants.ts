@@ -43,7 +43,7 @@ export const MEDIA_FIELD_DESCRIPTIONS = {
   aspectRatio:
     "Output aspect ratio for cut clips: '9:16' (Shorts/Reels/TikTok, default), '16:9' (YouTube/landscape), '1:1' (square), or 'original' (no crop, keep source framing). Cropping is centered on the source frame.",
   reframe:
-    "How a cut clip is framed when aspectRatio crops the source: 'center' (default) keeps the fixed centre crop; 'speaker' follows whoever is talking — camera cuts, face tracking, pyannote speaker turns and LR-ASD lip-sync choose the face for each stretch, and the crop cuts on speech onsets. Slower: roughly a minute of CPU per clip. Needs the reframe worker installed on this host (backend/workers/reframe); when it cannot run or finds no faces the clip still gets the centre crop and `reframe.fallbackReason` says why. Ignored for audio sources and for aspectRatio 'original'.",
+    "How a cut clip is framed when aspectRatio crops the source: 'center' (default) keeps the fixed centre crop; 'speaker' follows whoever is talking — camera cuts, face tracking and LR-ASD lip-sync (each face's lip motion matched to the audio) choose the face for each stretch, and the crop cuts on speech onsets. Slower: about 50 s of CPU per clip. Needs the reframe worker installed on this host (backend/workers/reframe); when it cannot run or finds no faces the clip still gets the centre crop and `reframe.fallbackReason` says why. Ignored for audio sources and for aspectRatio 'original'.",
   captionVideoSource:
     "Local filesystem path to the video to caption — normally an already-cut clip, not a full episode. A publicly-reachable video URL also works.",
   captionSubtitles:

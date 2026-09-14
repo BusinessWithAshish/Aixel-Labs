@@ -53,7 +53,7 @@ def frames(ffmpeg: str, path: str, vf: str, pix_fmt: str, w: int, h: int, channe
 
 
 def extract_audio(ffmpeg: str, path: str, wav_path: str) -> np.ndarray:
-    """16 kHz mono int16 — the format LR-ASD's MFCC features and pyannote both take."""
+    """16 kHz mono int16 — the format LR-ASD's MFCC features take."""
     subprocess.run([ffmpeg, "-y", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "16000", "-acodec", "pcm_s16le", wav_path],
                    check=True)
     _, audio = wavfile.read(wav_path)
