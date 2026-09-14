@@ -190,7 +190,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "rm -rf dist && tsc",
-    "prod": "pnpm build && node dist/server.js"
+    "prod": "pnpm build && node dist/server.js",
+    "setup:reframe": "bash workers/reframe/setup.sh"
   },
   "dependencies": {
     "@cemalgnlts/mailjs": "^3.1.1",

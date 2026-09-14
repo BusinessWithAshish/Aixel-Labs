@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import type { MEDIA_ASPECT_RATIOS, MEDIA_GEMINI_MODEL } from "./constants";
+import type { MEDIA_ASPECT_RATIOS, MEDIA_GEMINI_MODEL, MEDIA_REFRAME_MODES } from "./constants";
 import type { MEDIA_DIARIZE_REQUEST_SCHEMA } from "./diarize/schemas";
 import type { MEDIA_CUT_REQUEST_SCHEMA } from "./cut/schemas";
 import type { MEDIA_FETCH_REQUEST_SCHEMA } from "./fetch/schemas";
@@ -22,6 +22,19 @@ export type MEDIA_GEMINI_MODEL_VALUE =
   (typeof MEDIA_GEMINI_MODEL)[keyof typeof MEDIA_GEMINI_MODEL];
 
 export type MEDIA_ASPECT_RATIO_VALUE = (typeof MEDIA_ASPECT_RATIOS)[number];
+export type MEDIA_REFRAME_VALUE = (typeof MEDIA_REFRAME_MODES)[number];
+
+/** How a clip was actually framed when `reframe: "speaker"` was requested. */
+export type CUT_CLIP_REFRAME = {
+  /** "speaker" when the worker's plan was rendered; "center" when it fell back. */
+  mode: MEDIA_REFRAME_VALUE;
+  /** Why the centre crop was used instead, when it was. */
+  fallbackReason?: string;
+  /** Crop stretches rendered (cuts between faces = segments - 1). */
+  segments?: number;
+  /** The worker's plan.json beside the clip — shots, faces, speakers, segments, timings. */
+  planPath?: string;
+};
 
 /** A single Gemini `files.upload` -> ACTIVE-polled file, ready to reference by URI. */
 export type GEMINI_ACTIVE_FILE = {
@@ -110,6 +123,8 @@ export type CUT_CLIP_RESULT = {
   mediaType: "video" | "audio";
   /** The framing actually applied — meaningless (kept for shape stability, always "original") when `mediaType` is "audio": there's no video stream to reframe. */
   aspectRatio: MEDIA_ASPECT_RATIO_VALUE;
+  /** Present only when `reframe: "speaker"` was requested for a video clip that is cropped. */
+  reframe?: CUT_CLIP_REFRAME;
   /** Absent (and `error` set instead) when the requested range fell outside the source's actual duration — see cut.ts. */
   clipPath?: string;
   error?: string;

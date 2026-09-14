@@ -1,17 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { assertPersistentDisk } from "../../../config";
 import { snapClipBoundaries } from "./boundary-snap";
-import { MEDIA_ERROR_MESSAGES, MEDIA_CUT_OUTPUT_DIR } from "../constants";
+import { MEDIA_ERROR_MESSAGES, MEDIA_CUT_OUTPUT_DIR, MEDIA_REFRAME } from "../constants";
 import { cleanupResolvedMediaSource, resolveVideoSourceForCut } from "../source";
 import { cutClip, cutClipFromStream, probeMediaStreams } from "./ffmpeg-cut";
 import { parseProxyUrlForBridge, ProxyConnectBridge } from "./proxy-bridge";
+import { reframeClipBySpeaker } from "./reframe";
 import type {
   CLIP_RANGE,
+  CUT_CLIP_REFRAME,
   MEDIA_ASPECT_RATIO_VALUE,
   MEDIA_CUT_RESPONSE,
+  MEDIA_REFRAME_VALUE,
   DIARIZED_TRANSCRIPT,
 } from "../types";
 
@@ -27,12 +30,17 @@ import type {
  * Evomi `-http_proxy` is used only when this host cannot fetch googlevideo
  * (VPS datacenter 403). Local files and non-YouTube URLs fall back to the
  * file path (download once, cut from disk).
+ *
+ * `reframe: "speaker"` (video, cropping aspect ratios only) cuts each range
+ * unframed into a sibling temp file, then hands it to `reframeClipBySpeaker`,
+ * which plans the crop with the Python worker and renders the final clip.
  */
 export async function cutClipsFromVideo(
   videoSource: string,
   clips: CLIP_RANGE[],
   diarized: DIARIZED_TRANSCRIPT | undefined,
   aspectRatio: MEDIA_ASPECT_RATIO_VALUE,
+  reframe: MEDIA_REFRAME_VALUE = MEDIA_REFRAME.DEFAULT_MODE,
 ): Promise<MEDIA_CUT_RESPONSE> {
   assertPersistentDisk(MEDIA_ERROR_MESSAGES.VERCEL);
   const resolved = await resolveVideoSourceForCut(videoSource);
@@ -100,14 +108,21 @@ export async function cutClipsFromVideo(
       }
 
       const outputPath = join(MEDIA_CUT_OUTPUT_DIR, `clip-${randomUUID()}.${outputExt}`);
+      // Following the speaker needs the whole frame to analyse, so that path
+      // cuts the range unframed into a temp file and frames it afterwards.
+      const followSpeaker = reframe === "speaker" && hasVideo && aspectRatio !== "original";
+      const cutTarget = followSpeaker
+        ? join(MEDIA_CUT_OUTPUT_DIR, `.reframe-src-${randomUUID()}.${outputExt}`)
+        : outputPath;
+      const cutAspect: MEDIA_ASPECT_RATIO_VALUE = followSpeaker ? "original" : aspectRatio;
       if (resolved.kind === "youtube") {
         await cutClipFromStream(
           resolved.videoUrl,
           resolved.audioUrl,
           cutStartSeconds,
           cutEndSeconds,
-          outputPath,
-          aspectRatio,
+          cutTarget,
+          cutAspect,
           ffmpegProxyUrl,
         );
       } else {
@@ -115,10 +130,19 @@ export async function cutClipsFromVideo(
           resolved.path,
           cutStartSeconds,
           cutEndSeconds,
-          outputPath,
-          aspectRatio,
+          cutTarget,
+          cutAspect,
           hasVideo,
         );
+      }
+
+      let reframeInfo: CUT_CLIP_REFRAME | undefined;
+      if (followSpeaker) {
+        try {
+          reframeInfo = await reframeClipBySpeaker(cutTarget, outputPath, aspectRatio);
+        } finally {
+          await rm(cutTarget, { force: true });
+        }
       }
 
       results.push({
@@ -131,6 +155,7 @@ export async function cutClipsFromVideo(
         mediaType,
         aspectRatio: responseAspectRatio,
         clipPath: outputPath,
+        ...(reframeInfo ? { reframe: reframeInfo } : {}),
       });
     }
 

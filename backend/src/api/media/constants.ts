@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { AIXEL_MEDIA } from "../../media";
 
 /**
@@ -40,6 +42,8 @@ export const MEDIA_FIELD_DESCRIPTIONS = {
     "Optional pre-fetched, pre-formatted lines of real audience behavior on this exact episode — e.g. from the youtube module's comments-intel timestamp clusters and/or video chapters, formatted via its audience-signal formatters — used to bias candidate selection toward moments viewers/the creator already flagged. Fetch those yourself first; this field just takes the output.",
   aspectRatio:
     "Output aspect ratio for cut clips: '9:16' (Shorts/Reels/TikTok, default), '16:9' (YouTube/landscape), '1:1' (square), or 'original' (no crop, keep source framing). Cropping is centered on the source frame.",
+  reframe:
+    "How a cut clip is framed when aspectRatio crops the source: 'center' (default) keeps the fixed centre crop; 'speaker' follows whoever is talking — camera cuts, face tracking, pyannote speaker turns and LR-ASD lip-sync choose the face for each stretch, and the crop cuts on speech onsets. Slower: roughly a minute of CPU per clip. Needs the reframe worker installed on this host (backend/workers/reframe); when it cannot run or finds no faces the clip still gets the centre crop and `reframe.fallbackReason` says why. Ignored for audio sources and for aspectRatio 'original'.",
   captionVideoSource:
     "Local filesystem path to the video to caption — normally an already-cut clip, not a full episode. A publicly-reachable video URL also works.",
   captionSubtitles:
@@ -60,6 +64,9 @@ export const MEDIA_GEMINI_MODEL = {
 /** Supported output framings for `/video/cut`. */
 export const MEDIA_ASPECT_RATIOS = ["9:16", "16:9", "1:1", "original"] as const;
 
+/** How `/video/cut` frames a cropped clip: fixed centre, or follow the speaker. */
+export const MEDIA_REFRAME_MODES = ["center", "speaker"] as const;
+
 /**
  * Target pixel dimensions + integer width:height ratio per aspect ratio.
  * Ratios are kept as separate integers (not a precomputed float) so the
@@ -71,6 +78,24 @@ export const MEDIA_ASPECT_RATIO_DIMENSIONS = {
   "9:16": { ratioW: 9, ratioH: 16, outputWidth: 1080, outputHeight: 1920 },
   "16:9": { ratioW: 16, ratioH: 9, outputWidth: 1920, outputHeight: 1080 },
   "1:1": { ratioW: 1, ratioH: 1, outputWidth: 1080, outputHeight: 1080 },
+} as const;
+
+/**
+ * Speaker reframe (`cut` with `reframe: "speaker"`). Analysis is a Python
+ * worker (`backend/workers/reframe`, set up with `pnpm setup:reframe`)
+ * spawned once per clip; rendering stays in ffmpeg here — see `cut/reframe.ts`.
+ */
+export const MEDIA_REFRAME = {
+  DEFAULT_MODE: "center" as const,
+  /** `src/api/media` and `dist/api/media` are both three levels below `backend/`. */
+  WORKER_DIR: process.env.REFRAME_WORKER_DIR || resolve(__dirname, "../../../workers/reframe"),
+  /** Empty = `<WORKER_DIR>/.venv/bin/python`. */
+  PYTHON_BIN: process.env.REFRAME_PYTHON || "",
+  /** Empty = the worker's own `models/` folder. */
+  MODELS_DIR: process.env.REFRAME_MODELS_DIR || "",
+  /** Per clip. A 60 s clip plans in about a minute; this only guards a hung worker. */
+  WORKER_TIMEOUT_MS: 15 * 60 * 1000,
+  WORKER_MAX_BUFFER_BYTES: 32 * 1024 * 1024,
 } as const;
 
 export const MEDIA = {
@@ -169,6 +194,12 @@ export const MEDIA_ERROR_MESSAGES = {
   GEMINI_MALFORMED_RESPONSE: "Gemini response did not match the expected shape",
   GEMINI_KEY_POOL_EXHAUSTED: "All Gemini API keys failed or are exhausted",
   FFMPEG_CUT_FAILED: "ffmpeg failed to cut clip",
+  REFRAME_WORKER_MISSING:
+    "Speaker reframe worker is not installed on this host (run `pnpm setup:reframe` in backend)",
+  REFRAME_WORKER_FAILED: "Speaker reframe worker failed",
+  REFRAME_PLAN_INVALID: "Speaker reframe worker returned an unreadable plan",
+  REFRAME_NO_PLAN: "Speaker reframe worker kept the centre crop",
+  FFMPEG_REFRAME_FAILED: "ffmpeg failed to render the speaker-reframed clip",
   GENERIC: "Media operation failed",
   VERCEL:
     "The cut op needs a persistent host with local disk output (not available on Vercel)",

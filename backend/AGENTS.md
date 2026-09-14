@@ -35,4 +35,9 @@ for mounts/boot, **db** for anything persisted, then the folder you are editing.
 - MCP: one tool per domain (`op` / `layer` / `input`) calling the same
   **services** as HTTP — no loopback. Catalog: `backend/src/mcp/README.md`.
 
+- Python worker: `workers/reframe/` — speaker-following crop plans for `media`
+  op=`cut` (`reframe: "speaker"`). Own venv + models via `pnpm setup:reframe`,
+  spawned per clip from `src/api/media/cut/reframe.ts`; analysis only, the
+  render stays in ffmpeg. Outside `tsc` (`include: ["src"]`).
+
 Mirror `src/api/crawl/` for a new single-endpoint module.

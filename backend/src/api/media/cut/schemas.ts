@@ -4,6 +4,8 @@ import {
   MEDIA,
   MEDIA_ASPECT_RATIOS,
   MEDIA_FIELD_DESCRIPTIONS,
+  MEDIA_REFRAME,
+  MEDIA_REFRAME_MODES,
 } from "../constants";
 import { DIARIZED_TRANSCRIPT_SCHEMA } from "../diarize/schemas";
 
@@ -29,4 +31,9 @@ export const MEDIA_CUT_REQUEST_SCHEMA = z.object({
     .optional()
     .default(MEDIA.DEFAULT_ASPECT_RATIO)
     .describe(MEDIA_FIELD_DESCRIPTIONS.aspectRatio),
+  reframe: z
+    .enum(MEDIA_REFRAME_MODES)
+    .optional()
+    .default(MEDIA_REFRAME.DEFAULT_MODE)
+    .describe(MEDIA_FIELD_DESCRIPTIONS.reframe),
 });

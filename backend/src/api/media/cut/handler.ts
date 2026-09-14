@@ -12,5 +12,6 @@ export const mediaCutHandler = createMediaHandler({
       input.clips,
       input.diarized,
       input.aspectRatio,
+      input.reframe,
     ),
 });
