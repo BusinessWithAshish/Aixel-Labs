@@ -69,6 +69,7 @@ app.use(
       "Accept",
       "mcp-session-id",
       "mcp-protocol-version",
+      "X-Chunk-Offset",
     ],
     exposedHeaders: ["mcp-session-id"],
     credentials: true,
