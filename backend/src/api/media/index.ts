@@ -1,4 +1,5 @@
 import { type IRouter, Router } from "express";
+import express from "express";
 
 import { API_ENDPOINTS } from "../../config";
 import {
@@ -10,6 +11,12 @@ import {
   mediaCaptionHandler,
   mediaShareHandler,
 } from "./handler";
+import {
+  mediaUploadChunkHandler,
+  mediaUploadCompleteHandler,
+  mediaUploadInitHandler,
+  mediaUploadStatusHandler,
+} from "./upload/handler";
 
 const mediaRoutes: IRouter = Router();
 
@@ -20,6 +27,18 @@ mediaRoutes.post(API_ENDPOINTS.MEDIA.CUT.route, mediaCutHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.CONDENSE.route, mediaCondenseHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.CAPTION.route, mediaCaptionHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.SHARE.route, mediaShareHandler);
+
+mediaRoutes.post(API_ENDPOINTS.MEDIA.UPLOAD.INIT.route, mediaUploadInitHandler);
+// Route-scoped raw body parser — this is the one route that must NOT go
+// through the global `express.json({ limit: "5mb" })` in server.ts (raw
+// binary, no JSON, up to 64MB per chunk).
+mediaRoutes.put(
+  API_ENDPOINTS.MEDIA.UPLOAD.CHUNK.route,
+  express.raw({ type: "application/octet-stream", limit: "64mb" }),
+  mediaUploadChunkHandler,
+);
+mediaRoutes.get(API_ENDPOINTS.MEDIA.UPLOAD.STATUS.route, mediaUploadStatusHandler);
+mediaRoutes.post(API_ENDPOINTS.MEDIA.UPLOAD.COMPLETE.route, mediaUploadCompleteHandler);
 
 export default mediaRoutes;
 

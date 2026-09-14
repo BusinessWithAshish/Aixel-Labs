@@ -28,6 +28,8 @@ export const AIXEL_MEDIA = {
   MEDIA_FETCHED: join(AIXEL_MEDIA_ROOT, "private", "media-fetched"),
   /** Where `instagram` op=download writes post/reel/carousel media — `{shortcode}/{index}.{mp4|jpg}`. Private: shortcode paths are guessable. */
   INSTAGRAM_DOWNLOADS: join(AIXEL_MEDIA_ROOT, "private", "instagram-downloads"),
+  /** Where the chunked `media.upload` flow lands finished uploads (its `.tmp/` subfolder holds in-progress sidecar metadata + `.part` files — see api/media/upload/). */
+  UPLOADS: join(AIXEL_MEDIA_ROOT, "private", "uploads"),
   PUBLIC_BASE_URL:
     process.env.AIXEL_MEDIA_PUBLIC_BASE || "https://hermes.aixellabs.in/media",
 } as const;

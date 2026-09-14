@@ -289,6 +289,22 @@ export const API_ENDPOINTS = {
     CONDENSE: { route: "/condense", full: `${ENDPOINTS.MEDIA}/condense` },
     CAPTION: { route: "/caption", full: `${ENDPOINTS.MEDIA}/caption` },
     SHARE: { route: "/share", full: `${ENDPOINTS.MEDIA}/share` },
+    UPLOAD: {
+      /** `:uploadId` is a literal Express param placeholder — substitute the real id when calling. */
+      INIT: { route: "/upload/init", full: `${ENDPOINTS.MEDIA}/upload/init` },
+      CHUNK: {
+        route: "/upload/:uploadId/chunk",
+        full: `${ENDPOINTS.MEDIA}/upload/:uploadId/chunk`,
+      },
+      STATUS: {
+        route: "/upload/:uploadId/status",
+        full: `${ENDPOINTS.MEDIA}/upload/:uploadId/status`,
+      },
+      COMPLETE: {
+        route: "/upload/:uploadId/complete",
+        full: `${ENDPOINTS.MEDIA}/upload/:uploadId/complete`,
+      },
+    },
   },
   SEGMENT: {
     BY_SPEECH: { route: "/by_speech", full: `${ENDPOINTS.SEGMENT}/by_speech` },
