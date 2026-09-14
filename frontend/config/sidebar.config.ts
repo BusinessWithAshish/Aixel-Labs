@@ -1,7 +1,7 @@
-import { MANAGE_TENANTS_ROUTE } from './app-config';
+import { FILE_UPLOADS_ROUTE, MANAGE_TENANTS_ROUTE } from './app-config';
 
 /** Admin-only paths (not in sidebar nav). Exact match or nested routes (e.g. /manage-tenants/[tenantId]) require admin. */
-export const ADMIN_ONLY_PATHS = [MANAGE_TENANTS_ROUTE] as const;
+export const ADMIN_ONLY_PATHS = [MANAGE_TENANTS_ROUTE, FILE_UPLOADS_ROUTE] as const;
 import {
     EMAIL_SUB_MODULES,
     LEAD_ENRICHMENT_SUB_MODULES,

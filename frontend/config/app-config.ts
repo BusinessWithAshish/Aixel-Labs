@@ -59,6 +59,7 @@ export const PRODUCT_TENANTS_ROUTE_PREFIX = '/products';
 export const NOT_FOUND_ROUTE = '/not-found';
 export const ACCOUNT_SETTINGS_ROUTE = '/account-settings';
 export const MANAGE_TENANTS_ROUTE = '/manage-tenants';
+export const FILE_UPLOADS_ROUTE = '/file-uploads';
 
 export const ALWAYS_ALLOWED_PATHS = [
     DEFAULT_HOME_PAGE_ROUTE,

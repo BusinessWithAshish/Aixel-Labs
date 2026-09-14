@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronsUpDown, Plus } from 'lucide-react';
+import { ChevronsUpDown, Plus, UploadCloud } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -120,6 +120,19 @@ export function TenantSwitcher({
                 </>
             ),
             onSelect: () => router.push('/manage-tenants'),
+        },
+        {
+            key: 'file-uploads',
+            className: 'gap-2 p-2',
+            label: (
+                <>
+                    <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+                        <UploadCloud className="size-4" />
+                    </div>
+                    <div className="text-muted-foreground font-medium">File Uploads</div>
+                </>
+            ),
+            onSelect: () => router.push('/file-uploads'),
         },
     ];
 
