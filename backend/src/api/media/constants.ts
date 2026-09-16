@@ -44,12 +44,18 @@ export const MEDIA_FIELD_DESCRIPTIONS = {
     "Output aspect ratio for cut clips: '9:16' (Shorts/Reels/TikTok, default), '16:9' (YouTube/landscape), '1:1' (square), or 'original' (no crop, keep source framing). Cropping is centered on the source frame.",
   reframe:
     "How a cut clip is framed when aspectRatio crops the source: 'center' (default) keeps the fixed centre crop; 'speaker' follows whoever is talking — camera cuts, face tracking and LR-ASD lip-sync (each face's lip motion matched to the audio) choose the face for each stretch, and the crop cuts on speech onsets. Slower: about 50 s of CPU per clip. Needs the reframe worker installed on this host (backend/workers/reframe); when it cannot run or finds no faces the clip still gets the centre crop and `reframe.fallbackReason` says why. Ignored for audio sources and for aspectRatio 'original'.",
+  boundaries:
+    "Where each clip's edges land: 'exact' (default) cuts at the requested start/end plus a little padding; 'natural' re-places them on the clip's own audio — start on the first word of the phrase instead of mid-word, end after the last word of the thought plus any laugh or applause that follows (until it quiets, never into the next sentence). Moves edges by a few seconds at most; the range you ask for still decides what the clip is. Costs one short Groq transcription per clip. cutStartSeconds/cutEndSeconds report where the clip actually starts and ends; clips[].boundaries says why.",
+  cutLanguage:
+    "Optional spoken-language hint (ISO 639-1, e.g. 'hi', 'en') for boundaries: 'natural', which transcribes the audio around each edge. Pass it for anything not plainly English — auto-detection hears short mixed Hindi-English windows as English and drops the Hindi words.",
+  captionScript:
+    "'native' (default) writes words in the script the transcription produced. 'roman' rewrites non-Latin words in everyday Roman script — Hindi/Hinglish as typed on social media ('kya scene hai'), English words spoken inside Hindi in normal English spelling — one word for one word, so timings are unchanged (one small Gemini text call per clip). Pair it with `language` (e.g. 'hi') so the clip is transcribed in its real language first; otherwise Hindi speech is often dropped. Words already in Latin script are untouched; if the rewrite fails the native script is kept and scriptFallbackReason says why.",
   captionVideoSource:
     "Local filesystem path to the video to caption — normally an already-cut clip, not a full episode. A publicly-reachable video URL also works.",
   captionSubtitles:
     "Optional SRT or VTT to burn in: either the subtitle text itself, or a local path to a .srt/.vtt file. OMIT THIS for the normal case — the clip's own audio is transcribed instead, which is both more accurate and already timed from zero. Only pass this when you have subtitles that must be used verbatim; timings are taken as-is and are assumed to be relative to the start of THIS video, not the episode it was cut from.",
   captionStyle:
-    "Optional appearance overrides. Defaults are tuned for a 1080x1920 vertical Short: white bold text, heavy black outline, positioned in the middle band so the platform's own UI (which covers the bottom third) does not sit on top of it.",
+    "Optional appearance overrides. `preset`: 'lines' (default) — white bold sentence lines with a heavy black outline in the middle band; 'chunks' — 1–3 big uppercase words at a time (Anton), the word being spoken in `highlightColour` (default yellow), each new chunk sliding up into place, positioned 'above-ui' (just above the handle/caption/subscribe block Reels and Shorts draw at the bottom). 'chunks' needs word timings, so it applies when the op transcribes; supplied `subtitles` render as 'lines'. `position`: middle | lower-third | bottom | above-ui. Any explicit field overrides the preset's default.",
   captionWrap:
     "Optional line-breaking overrides. Whisper returns long unbroken segments; they are re-wrapped into short lines so captions stay readable on a phone. Defaults: 32 characters per line, 2 lines on screen at once.",
   captionBurn:
@@ -66,6 +72,9 @@ export const MEDIA_ASPECT_RATIOS = ["9:16", "16:9", "1:1", "original"] as const;
 
 /** How `/video/cut` frames a cropped clip: fixed centre, or follow the speaker. */
 export const MEDIA_REFRAME_MODES = ["center", "speaker"] as const;
+
+/** A speaker-reframe segment either crops to one face or shows the whole frame ("wide"). */
+export const MEDIA_REFRAME_LAYOUTS = ["crop", "wide"] as const;
 
 /**
  * Target pixel dimensions + integer width:height ratio per aspect ratio.
@@ -96,6 +105,87 @@ export const MEDIA_REFRAME = {
   /** Per clip. A 60 s clip plans in about a minute; this only guards a hung worker. */
   WORKER_TIMEOUT_MS: 15 * 60 * 1000,
   WORKER_MAX_BUFFER_BYTES: 32 * 1024 * 1024,
+  /**
+   * Wide segments fit the whole frame to the output width over a blurred,
+   * zoomed copy of the same frame. The copy is blurred at this fraction of
+   * the output size (same look, a fraction of the cost), with this box radius.
+   */
+  WIDE_BACKGROUND_SCALE: 0.25,
+  WIDE_BACKGROUND_BLUR_RADIUS: 12,
+} as const;
+
+/** How `/video/cut` places a clip's edges: exactly as requested, or on the audio's natural stops. */
+export const MEDIA_BOUNDARY_MODES = ["exact", "natural"] as const;
+
+/**
+ * `boundaries: "natural"` (see `cut/natural-boundaries.ts`). The requested
+ * range comes from a transcript whose timestamps are seconds-coarse, so the
+ * edges are re-placed on the clip's own audio: word timings from Groq plus
+ * loudness. Every number here keeps the adjustment SMALL — the ranker decides
+ * what the clip is; this only stops it starting or ending mid-word, and keeps
+ * the laugh after a punchline.
+ */
+export const MEDIA_NATURAL_BOUNDARIES = {
+  DEFAULT_MODE: "exact" as const,
+  /** Extra audio cut around the requested range so edges can move outward. */
+  WINDOW_BEFORE_SECONDS: 3,
+  WINDOW_AFTER_SECONDS: 8,
+  /** A new start is a speech onset after at least this much quiet, this close to the requested start. */
+  ONSET_MIN_GAP_SECONDS: 0.3,
+  START_SEARCH_BEFORE_SECONDS: 1.5,
+  START_SEARCH_AFTER_SECONDS: 1,
+  /** Start this long before the first word, so its attack is not clipped. */
+  LEAD_SECONDS: 0.12,
+  /** A stop is the end of a word followed by at least this much quiet… */
+  PAUSE_MIN_SECONDS: 0.45,
+  /** …or a sentence-ending word, or the end of a Whisper phrase (within the tolerance) followed by at least a breath. */
+  PHRASE_PAUSE_MIN_SECONDS: 0.15,
+  PHRASE_END_TOLERANCE_SECONDS: 0.15,
+  /**
+   * Where to look for the end's stop, around the requested end. Both ways:
+   * transcript timestamps are whole seconds, so a requested end usually sits
+   * 1–3 s AFTER the real stop, and searching only later lands on a breath
+   * inside the next sentence.
+   */
+  END_SEARCH_BEFORE_SECONDS: 3,
+  END_SEARCH_AFTER_SECONDS: 6,
+  /**
+   * Among those stops the one that looks most like an ending wins: score =
+   * quiet after it (capped) + reaction after it − distance from the requested
+   * end × a penalty, steeper after the requested end than before it (past it
+   * is where the next sentence or a song starts). A punchline has a pause or a
+   * laugh after it; a breath mid-sentence has neither.
+   */
+  END_GAP_SCORE_CAP_SECONDS: 2,
+  END_PENALTY_BEFORE_PER_SECOND: 0.15,
+  END_PENALTY_AFTER_PER_SECOND: 0.3,
+  /** Extra cost per word spoken between the requested end and a later stop. */
+  END_PENALTY_PER_WORD_CROSSED: 0.3,
+  /** After the stop, keep loud audio with no words (laughter, applause) for at most this long. */
+  REACTION_MAX_SECONDS: 3.5,
+  /** "Loud" = this many dB above the window's noise floor (its NOISE_FLOOR_PERCENTILE loudness). */
+  REACTION_DB_ABOVE_FLOOR: 8,
+  NOISE_FLOOR_PERCENTILE: 20,
+  /** The reaction is over after this much continuous quiet. */
+  QUIET_HOLD_SECONDS: 0.3,
+  /** Shorter tails than this are reported as a plain pause. */
+  REACTION_MIN_SECONDS: 0.6,
+  TAIL_PAD_SECONDS: 0.2,
+  /**
+   * Audio fades on the trimmed clip. The out-fade is what an editor does when
+   * the next voice or the crowd is already coming in: the clip ends softly
+   * instead of on a clipped syllable.
+   */
+  FADE_IN_SECONDS: 0.1,
+  FADE_OUT_SECONDS: 0.35,
+  /** Never run into the next word. */
+  NEXT_WORD_GUARD_SECONDS: 0.05,
+  /** Loudness resolution. */
+  FRAME_SECONDS: 0.05,
+  /** A word smeared over more than this is a Whisper timing artefact, not speech (spans it invents are dropped separately — `dropUnreliableSpans`). */
+  MAX_WORD_SECONDS: 2.5,
+  /** 16 kHz mono s16le for a ~2 min window is ~4MB; generous headroom. */
+  MAX_PCM_BYTES: 64 * 1024 * 1024,
 } as const;
 
 export const MEDIA = {
@@ -200,6 +290,8 @@ export const MEDIA_ERROR_MESSAGES = {
   REFRAME_PLAN_INVALID: "Speaker reframe worker returned an unreadable plan",
   REFRAME_NO_PLAN: "Speaker reframe worker kept the centre crop",
   FFMPEG_REFRAME_FAILED: "ffmpeg failed to render the speaker-reframed clip",
+  NATURAL_BOUNDARIES_FAILED: "Could not analyse the clip's audio for natural boundaries; kept the requested range",
+  CAPTION_ROMANIZE_FAILED: "Could not rewrite captions in Roman script; kept the native script",
   GENERIC: "Media operation failed",
   VERCEL:
     "The cut op needs a persistent host with local disk output (not available on Vercel)",
@@ -285,8 +377,47 @@ export const MEDIA_CAPTION = {
    * margin expressed as a FRACTION OF FRAME HEIGHT, so they hold at any
    * resolution. `style.marginV` overrides with absolute source pixels.
    */
-  MARGIN_V_HEIGHT_RATIO: { middle: 0, "lower-third": 0.25, bottom: 0.04 },
-  ALIGNMENT_BY_POSITION: { middle: 5, "lower-third": 2, bottom: 2 },
+  MARGIN_V_HEIGHT_RATIO: { middle: 0, "lower-third": 0.25, bottom: 0.04, "above-ui": 0.3125 },
+  ALIGNMENT_BY_POSITION: { middle: 5, "lower-third": 2, bottom: 2, "above-ui": 2 },
+  DEFAULT_PRESET: "lines" as const,
+  /** Fonts shipped with the backend (OFL), handed to libass as `fontsdir`. Same depth under src/ and dist/. */
+  FONTS_DIR: resolve(__dirname, "../../../assets/fonts"),
+  /** ASS BackColour (the shadow's colour) whenever a shadow is drawn: black at 25% transparency. */
+  SHADOW_BACK_COLOUR: "&H40000000",
+  /**
+   * The `chunks` preset: 1–3 heavy uppercase words at a time, the spoken word
+   * highlighted, each new chunk sliding up into place. Every value is a
+   * default that an explicit `style` field overrides.
+   *
+   * `above-ui` sits the text bottom at 31% of the frame height from the bottom
+   * (y=1320 on 1080x1920): above the handle/caption/subscribe block both Reels
+   * (~480px) and Shorts (~380px) draw, and usually on the chest or mic of a
+   * speaker-framed crop rather than the face.
+   */
+  CHUNKS: {
+    FONT_NAME: "Anton",
+    /** 130px on a 1920-tall frame. */
+    FONT_SIZE_HEIGHT_RATIO: 0.068,
+    SHADOW: 4,
+    BOLD: false,
+    UPPERCASE: true,
+    POSITION: "above-ui" as const,
+    HIGHLIGHT_COLOUR: "#FFE500",
+    /** 140px each side on 1080 wide — clear of the Reels/Shorts action rail. */
+    MARGIN_H_WIDTH_RATIO: 0.13,
+    MAX_WORDS: 3,
+    MAX_CHARS: 14,
+    /** A pause longer than this starts a new chunk. */
+    BREAK_GAP_SECONDS: 0.6,
+    HOLD_SECONDS: 0.3,
+    MIN_WORD_SECONDS: 0.08,
+    /** Whisper can time two words at the same instant; events are stepped apart by this so each still renders. */
+    MIN_STEP_SECONDS: 0.02,
+    /** Entry: rise from this far below (fraction of height) over ENTRY_MOVE_MS, fading in over ENTRY_FADE_MS. */
+    ENTRY_RISE_HEIGHT_RATIO: 0.036,
+    ENTRY_MOVE_MS: 110,
+    ENTRY_FADE_MS: 70,
+  },
   /** Fallback frame size when ffmpeg's banner reported no dimensions. */
   FALLBACK_WIDTH: 1080,
   FALLBACK_HEIGHT: 1920,
@@ -314,7 +445,35 @@ export const MEDIA_CAPTION = {
   MIN_CUE_SECONDS: 0.5,
 } as const;
 
-export const MEDIA_CAPTION_POSITIONS = ["middle", "lower-third", "bottom"] as const;
+export const MEDIA_CAPTION_POSITIONS = ["middle", "lower-third", "bottom", "above-ui"] as const;
+
+/** `lines`: sentence cues (default). `chunks`: 1–3 words at a time with the spoken word highlighted — see `MEDIA_CAPTION.CHUNKS`. */
+export const MEDIA_CAPTION_PRESETS = ["lines", "chunks"] as const;
+
+/** `native`: words in the script Whisper writes (default). `roman`: non-Latin words rewritten in Roman script — see `caption/transliterate.ts`. */
+export const MEDIA_CAPTION_SCRIPTS = ["native", "roman"] as const;
+
+/** `caption` with `script: "roman"` — see `caption/transliterate.ts`. */
+export const MEDIA_CAPTION_ROMANIZE = {
+  /** Words per Gemini call; long lists drift. */
+  BATCH_WORDS: 80,
+  /** Below this share of words returned, keep the native script rather than mix scripts. */
+  MIN_COVERAGE: 0.9,
+} as const;
+
+/** One numbered word in, the same number out. The JSON list of `{i, w}` is appended. */
+export const MEDIA_CAPTION_ROMANIZE_PROMPT = `You rewrite spoken-word captions in Roman script, the way people in India type Hinglish on social media.
+
+Below is a JSON array of words from a speech transcript, in speaking order, each as {"i": <number>, "w": <word>}. Return {"words": [{"i": <same number>, "roman": <that word rewritten>}, ...]} with exactly one entry per input, keeping each "i". Rewrite each word on its own: never merge two words into one entry, split one word across entries, skip, reorder or translate.
+
+Rules:
+- Hindi/Urdu words: common everyday Roman spelling, not academic transliteration — "क्या" -> "kya", "भाई" -> "bhai", "नहीं" -> "nahi", "है" -> "hai", "मैं" -> "main", "ज़िंदगी" -> "zindagi". No diacritics.
+- English words written in Devanagari: their normal English spelling — "सीन" -> "scene", "पॉडकास्ट" -> "podcast", "बिज़नेस" -> "business".
+- Words already in Latin script, numbers and names you recognise: keep as they are (names in their usual English spelling).
+- Keep punctuation attached to a word where it was ("है।" -> "hai.", "क्या?" -> "kya?").
+
+Words:
+`;
 
 /** Where `media.fetch` writes a genuine remote download — see AIXEL_MEDIA.MEDIA_FETCHED. */
 export const MEDIA_FETCH_DIR = AIXEL_MEDIA.MEDIA_FETCHED;

@@ -32,6 +32,11 @@ export const MEDIA_TRANSCRIBE = {
   /** ffmpeg normalize target — Groq downsamples to this internally anyway, so pre-downsampling loses nothing. */
   TARGET_SAMPLE_RATE_HZ: 16000,
   TARGET_CHANNELS: 1,
+  /** Whisper's own hallucination signals — see `dropUnreliableSpans` in `formatters.ts`. */
+  MAX_COMPRESSION_RATIO: 2.4,
+  MAX_NO_SPEECH_PROB: 0.6,
+  /** Word and segment times are rounded apart from each other; this much slack still counts as "inside the segment". */
+  SPAN_TOLERANCE_SECONDS: 0.01,
 } as const;
 
 export const GROQ_TRANSCRIPTIONS_URL =

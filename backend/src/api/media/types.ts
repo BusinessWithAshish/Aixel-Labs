@@ -1,6 +1,11 @@
 import type { z } from "zod";
 
-import type { MEDIA_ASPECT_RATIOS, MEDIA_GEMINI_MODEL, MEDIA_REFRAME_MODES } from "./constants";
+import type {
+  MEDIA_ASPECT_RATIOS,
+  MEDIA_BOUNDARY_MODES,
+  MEDIA_GEMINI_MODEL,
+  MEDIA_REFRAME_MODES,
+} from "./constants";
 import type { MEDIA_DIARIZE_REQUEST_SCHEMA } from "./diarize/schemas";
 import type { MEDIA_CUT_REQUEST_SCHEMA } from "./cut/schemas";
 import type { MEDIA_FETCH_REQUEST_SCHEMA } from "./fetch/schemas";
@@ -23,6 +28,16 @@ export type MEDIA_GEMINI_MODEL_VALUE =
 
 export type MEDIA_ASPECT_RATIO_VALUE = (typeof MEDIA_ASPECT_RATIOS)[number];
 export type MEDIA_REFRAME_VALUE = (typeof MEDIA_REFRAME_MODES)[number];
+export type MEDIA_BOUNDARY_VALUE = (typeof MEDIA_BOUNDARY_MODES)[number];
+
+/** How a clip's edges were placed when `boundaries: "natural"` was requested. */
+export type CUT_CLIP_BOUNDARIES = {
+  mode: "natural";
+  /** "pause": ends on a word followed by quiet; "reaction": also keeps the laugh/applause after it; "unchanged": kept the requested end. */
+  endReason: "pause" | "reaction" | "unchanged";
+  /** Why the requested range was kept as-is, when the audio could not be analysed. */
+  fallbackReason?: string;
+};
 
 /** How a clip was actually framed when `reframe: "speaker"` was requested. */
 export type CUT_CLIP_REFRAME = {
@@ -30,9 +45,11 @@ export type CUT_CLIP_REFRAME = {
   mode: MEDIA_REFRAME_VALUE;
   /** Why the centre crop was used instead, when it was. */
   fallbackReason?: string;
-  /** Crop stretches rendered (cuts between faces = segments - 1). */
+  /** Stretches rendered (cuts = segments - 1), wide ones included. */
   segments?: number;
-  /** The worker's plan.json beside the clip — shots, faces, speakers, segments, timings. */
+  /** Of those, how many show the whole frame instead of one face. */
+  wideSegments?: number;
+  /** The worker's plan.json beside the clip — shots, faces, segments, timings. */
   planPath?: string;
 };
 
@@ -123,6 +140,8 @@ export type CUT_CLIP_RESULT = {
   mediaType: "video" | "audio";
   /** The framing actually applied — meaningless (kept for shape stability, always "original") when `mediaType` is "audio": there's no video stream to reframe. */
   aspectRatio: MEDIA_ASPECT_RATIO_VALUE;
+  /** Present only when `boundaries: "natural"` was requested; cutStart/EndSeconds are then the placed edges. */
+  boundaries?: CUT_CLIP_BOUNDARIES;
   /** Present only when `reframe: "speaker"` was requested for a video clip that is cropped. */
   reframe?: CUT_CLIP_REFRAME;
   /** Absent (and `error` set instead) when the requested range fell outside the source's actual duration — see cut.ts. */

@@ -3,7 +3,9 @@ import { z } from "zod";
 import {
   MEDIA,
   MEDIA_ASPECT_RATIOS,
+  MEDIA_BOUNDARY_MODES,
   MEDIA_FIELD_DESCRIPTIONS,
+  MEDIA_NATURAL_BOUNDARIES,
   MEDIA_REFRAME,
   MEDIA_REFRAME_MODES,
 } from "../constants";
@@ -36,4 +38,10 @@ export const MEDIA_CUT_REQUEST_SCHEMA = z.object({
     .optional()
     .default(MEDIA_REFRAME.DEFAULT_MODE)
     .describe(MEDIA_FIELD_DESCRIPTIONS.reframe),
+  boundaries: z
+    .enum(MEDIA_BOUNDARY_MODES)
+    .optional()
+    .default(MEDIA_NATURAL_BOUNDARIES.DEFAULT_MODE)
+    .describe(MEDIA_FIELD_DESCRIPTIONS.boundaries),
+  language: z.string().trim().min(2).max(5).optional().describe(MEDIA_FIELD_DESCRIPTIONS.cutLanguage),
 });

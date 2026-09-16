@@ -21,6 +21,10 @@ export type GROQ_TRANSCRIPTION_SEGMENT = {
   start: number;
   end: number;
   text: string;
+  /** Whisper's own confidence that this span holds no speech (music, applause) — its text is then often invented. */
+  no_speech_prob?: number;
+  /** High (> ~2.4) when Whisper looped on repeated tokens, the usual sign of a hallucinated segment. */
+  compression_ratio?: number;
 };
 
 /**

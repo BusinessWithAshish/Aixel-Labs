@@ -33,7 +33,11 @@ creators upload `Name: text` tracks. `>>` is not a speaker id — a 4-person
 panel still only gets "someone new started talking." Named tracks map N
 speakers directly. ASR tracks get a Gemini **text** pass over those turns
 (no audio upload) so speaker_1..N stay stable. Pass `audioSource` when
-captions are missing or you need voice-accurate ids.
+captions are missing or you need voice-accurate ids. Consecutive lines of one
+speaker merge into segments of at most `YOUTUBE_DIARIZE_MAX_SEGMENT_SECONDS`
+(5 s) — without that cap, captions with no `>>` marks (most non-English ASR)
+became one segment for the whole episode and a ranker had no timestamps to
+cut on; at 10 s a payoff line and the next line still shared a segment.
 
 Audio diarization needs **audio** input — a plain undivided transcript has
 no speaker signal. Gemini's `generateContent` accepts audio directly and
@@ -186,7 +190,7 @@ tool entirely; `youtube`'s diarize response carries no such field either).
 
 ### `POST /media/cut`
 
-`{ videoSource, clips[{start,end,label?}], diarized?, aspectRatio? }` ->
+`{ videoSource, clips[{start,end,label?}], diarized?, aspectRatio?, reframe?, boundaries?, language? }` ->
 `{ clips: CUT_CLIP_RESULT[] }`, one entry per requested range with the actual
 boundaries used, the resolved `aspectRatio`, and the finished clip's local
 `clipPath` (under `MEDIA_CUT_OUTPUT_DIR`).
@@ -200,6 +204,45 @@ entry rather than failing the whole call. Still the one op in this module
 that keeps its own YouTube-specific handling (the stream-direct path below)
 — not yet generalized, a deliberately parked follow-up.
 
+#### Natural boundaries (`boundaries: "natural"`)
+
+Transcript timestamps are seconds-coarse (YouTube captions) and a ranker's
+`end` is an estimate, so an exact cut often stops mid-word or on the punchline's
+last syllable with the laugh cut off. `natural` cuts the range with a few extra
+seconds either side (`MEDIA_NATURAL_BOUNDARIES.WINDOW_*`), transcribes that
+window with Groq word timings, measures its loudness, and re-places the edges
+(`cut/natural-boundaries.ts`):
+
+- **start** — the start of the word the requested start splits, or the nearest
+  speech onset after a pause within ~1.5 s;
+- **end** — every natural stop from 3 s before to 6 s after the requested end
+  (a word followed by a pause, or a sentence-ending word / end of a Whisper
+  phrase followed by at least a breath) is scored on how much it looks like an
+  ending: quiet after it (capped at 2 s) plus the loud, word-free reaction
+  after it (laughter, applause, up to 3.5 s), minus 0.15 per second before the
+  requested end or 0.3 per second after it, plus 0.3 per word spoken between
+  the requested end and a later stop (running through live speech is how a
+  clip spills into the next thought). The best one wins and keeps its reaction until it quiets,
+  never into the next word. Searching both ways matters: transcript timestamps
+  are whole seconds, so a requested end usually sits 1–3 s after the real
+  stop, and searching only later lands on a breath inside the next sentence
+  (found in the 2026-09-14 test). With no stop in reach the end stays at the
+  end of the word it would split.
+
+Words Whisper likely invented — inside a no-speech or looping segment
+(`dropUnreliableSpans`, shared with `caption`), or smeared over seconds
+(music, applause) — are ignored. `cutStartSeconds` /
+`cutEndSeconds` report the placed edges and `clips[].boundaries.endReason`
+says which rule ended the clip (`pause` / `reaction` / `unchanged`). The trimmed
+clip gets a 0.1 s audio fade in and 0.35 s fade out, so an ending under crowd
+noise or an incoming voice lands softly instead of on a clipped syllable. Pass
+`language` (ISO 639-1) for anything not plainly English: auto-detection hears
+short mixed Hindi-English windows as English and drops the Hindi words, which
+then read as a word-free "reaction". If the audio cannot be analysed the
+requested range is kept and
+`boundaries.fallbackReason` says why. With `reframe: "speaker"` the trim
+happens first, so the crop is planned on the final clip.
+
 #### Speaker reframe (`reframe: "speaker"`)
 
 Cropped clips (`aspectRatio` other than `original`) can follow whoever is talking
@@ -209,10 +252,13 @@ renders the returned `plan.json` with a piecewise ffmpeg crop (`cut/reframe.ts`)
 The worker plans only: camera cuts (PySceneDetect), faces (YuNet) and which face
 is speaking (LR-ASD, lip motion matched to the audio — no captions needed).
 Single-face shots follow the editor's own cut; multi-face shots cut on speech
-onsets. About 50 s of CPU per clip.
+onsets. Some stretches show the whole frame instead, fitted to the width over a
+blurred copy of itself: shots with no usable face, crosstalk, a shared laugh, and at least every 15 s on an
+existing cut, so a clip is never tight crops alone (`clips[].reframe.wideSegments`
+counts them). About 50 s of CPU per clip.
 
-Never fails a clip: worker missing, error, timeout or no faces renders the centre
-crop and sets `clips[].reframe.fallbackReason`. The plan is kept beside the clip
+Never fails a clip: worker missing, error or timeout renders the centre crop (a
+clip with no usable face at all renders wide throughout) and sets `clips[].reframe.fallbackReason`. The plan is kept beside the clip
 (`clip-….reframe.json`). Setup and models: `workers/reframe/README.md`
 (`pnpm setup:reframe`).
 
@@ -251,6 +297,45 @@ assumed to be relative to *this* video.
 segments; they are re-wrapped to fit the frame, with cue timings taken from
 real word timestamps (`wordTimestamps`) so a cue appears exactly on its first
 spoken word rather than being apportioned by character count.
+
+**Whisper's own warnings are respected.** Segments Whisper marks as likely
+invented — compression ratio above 2.4 (it looped a phrase: "I was like, I was
+like, …") or no-speech probability above 0.6 (words over music) — are left out
+of the captions (`dropUnreliableSpans` in `transcribe/formatters.ts`, the same
+filter natural boundaries uses). A short gap reads better than garbage on
+screen.
+
+**Presets.** `style.preset` picks how the words appear:
+
+- `lines` (default) — the sentence cues described here.
+- `chunks` — the short-form "1–3 words at a time" look: Anton, uppercase, heavy
+  outline and soft shadow, the word being spoken recoloured
+  (`style.highlightColour`, default yellow), each new chunk sliding up and
+  fading in. Built straight from Groq's word timings (`buildWordChunks` in
+  `cues.ts`, `chunksToAss` in `ass.ts`): a chunk closes at 3 words, 14
+  characters, punctuation, or a pause over 0.6 s, and each word is one ASS
+  event, so libass does all the animation. It defaults to position `above-ui`
+  — text bottom at 31% of the frame height from the bottom (y=1320 on
+  1080x1920), above the handle/caption/subscribe block Reels (~480px) and
+  Shorts (~380px) draw, with 13% side margins clear of the action rail.
+  Needs word timings, so supplied `subtitles` render as `lines`.
+
+**Roman script (`script: "roman"`).** Whisper asked for Hindi writes
+Devanagari, and asked for English translates or drops the Hindi — neither gives
+the Hinglish people type ("bhai kya scene hai"). So the clip is transcribed in
+its real language (`language: "hi"`), and one small Gemini text call
+(`caption/transliterate.ts`, free-tier key pool) rewrites the word list one
+word for one word: Hindi in everyday Roman spelling, English words spoken in
+Hindi back to English spelling. Word count and timings don't change, so both
+presets work as before. Latin-script words are untouched; on any failure
+(error, word count mismatch) the native script is kept and
+`scriptFallbackReason` says why.
+
+Fonts the presets use ship in `backend/assets/fonts/` (Anton, SIL OFL — licence
+in `assets/fonts/licenses/`, kept out of the font folder itself because libass
+tries to load every file there) and reach libass through the `ass` filter's
+`fontsdir`, so nothing is installed system-wide. Glyphs a font lacks (Devanagari in Anton) fall back
+through fontconfig to an installed font such as Noto Sans Devanagari.
 
 **Geometry, not guesses.** Font size defaults to a fraction of the frame
 height, the vertical margin to a fraction of it too, and characters-per-line

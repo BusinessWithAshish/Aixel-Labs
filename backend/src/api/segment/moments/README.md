@@ -103,8 +103,17 @@ candidate as three parts, not just "an interesting moment":
    few seconds of dead air before it.
 2. **Body** — the substance that pays off the hook.
 3. **Button** (ending) — a real stopping point (punchline / resolved claim /
-   natural pause), never a mid-sentence or filler-word cutoff. `ending_note`
-   is the same kind of directly-checkable justification for `end`.
+   natural pause), never a mid-sentence or filler-word cutoff, and it includes
+   the reaction: when laughter, applause or a beat of silence follows the
+   payoff, `end` goes after it. `ending_note` is the same kind of
+   directly-checkable justification for `end`.
+
+**Length comes last.** `minClipSeconds`/`maxClipSeconds` check a moment's
+natural shape; they never set it. A clip runs from where the thought starts to
+where it has fully landed, and only then is checked against the bounds — the
+ceiling is hard, but a moment that needs more drops run-up from the start
+rather than losing its ending (or is skipped). Clips that stopped before their
+moment finished were the failure this rule exists for (2026-09-14).
 
 The base prompt is deliberately genre-generic (not hardcoded to specific
 shows) so it performs well by default on any long-form interview/talk

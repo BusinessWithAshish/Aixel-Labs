@@ -27,6 +27,16 @@ The backend renders the plain centre crop for anything that is not a
    face most confidently speaking, and holds through silence.
 5. **Cuts** land on speech onsets (0.12 s lead). Stretches under 0.45 s merge
    into a neighbour; back-to-back stretches on the same seat collapse.
+6. **Wide shots** — the whole frame, fitted to the width over a blurred copy
+   of itself, instead of one face. A shot with no usable face (an
+   establishing shot, people too small) is wide throughout. A multi-face shot goes wide while its
+   faces talk over each other for 1.5 s, or while none of them talks for
+   1.5 s (a laugh, a reaction). On top of that a clip gets a 2 s wide shot
+   at least every 15 s, placed on a cut that is already there: a camera cut
+   into a multi-face shot first, then any camera cut, then a change of
+   speaker. A face shown for under 1 s next to a wide stretch is absorbed
+   into it. Flags: `--wide-overlap`, `--wide-quiet`, `--wide-every` (0 = add
+   none), `--wide-hold`.
 
 No speaker diarization: LR-ASD already hears the audio. pyannote was tried
 (2026-09-14) and removed — it only knows voices, so it still needed LR-ASD to

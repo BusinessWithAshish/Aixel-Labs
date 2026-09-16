@@ -62,7 +62,11 @@ Limits: `constants.ts` → `MEDIA_TRANSCRIBE`.
    format with segment timestamps, which we need since Groq has no native
    srt/vtt output.
 4. `formatters.ts` builds the requested `txt`/`json`/`srt`/`vtt` from the
-   verbose_json segments.
+   verbose_json segments. It also exports `dropUnreliableSpans`, which removes
+   the segments — and the words inside them — that Whisper's own
+   `compression_ratio` / `no_speech_prob` flag as invented (a looped phrase,
+   words over music). `caption` and `cut`'s natural boundaries both use it, so
+   they judge Whisper's output by the same numbers.
 5. `cleanupResolvedMediaSource` in a `finally` — only ever deletes the temp
    dir `resolveMediaSource` created itself (`ownsSource`/`workDir` tracked
    explicitly); a caller-supplied local path is never touched.
@@ -75,7 +79,7 @@ media/transcribe/
   client.ts                  # orchestration: resolve source (../source.ts) -> ffmpeg -> groq -> format -> cleanup
   ffmpeg.ts                      # normalize to 16kHz mono FLAC
   groq-client.ts                   # Groq /audio/transcriptions call
-  formatters.ts                      # txt/json/srt/vtt from verbose_json segments
+  formatters.ts                      # txt/json/srt/vtt from verbose_json segments + dropUnreliableSpans
   schemas.ts / types.ts / constants.ts
   README.md
 ```

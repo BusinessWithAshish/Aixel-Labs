@@ -10,6 +10,7 @@ import {
   YOUTUBE_DIARIZE_CLAUDE_MAX_ATTEMPTS,
   YOUTUBE_DIARIZE_ERROR_MESSAGES,
   YOUTUBE_DIARIZE_MAX_CAPTION_SPEAKERS,
+  YOUTUBE_DIARIZE_MAX_SEGMENT_SECONDS,
 } from "./constants";
 import {
   generateStructuredContent,
@@ -68,10 +69,15 @@ type CaptionUtterance = {
   text: string;
 };
 
-type CaptionTurn = {
+type CaptionPiece = {
   startMs: number;
   endMs: number;
   text: string;
+};
+
+type CaptionTurn = CaptionPiece & {
+  /** The caption lines the turn was built from, each with its own timing — see `mergeConsecutive`. */
+  pieces: CaptionPiece[];
 };
 
 type CaptionSpeakerLabel = {
@@ -124,11 +130,16 @@ function splitOnSpeakerChange(text: string): Array<{ change: boolean; text: stri
   return out;
 }
 
+/** Joins one speaker's consecutive lines, but never past `YOUTUBE_DIARIZE_MAX_SEGMENT_SECONDS` per segment. */
 function mergeConsecutive(utterances: CaptionUtterance[]): CaptionUtterance[] {
   const merged: CaptionUtterance[] = [];
   for (const u of utterances) {
     const last = merged[merged.length - 1];
-    if (last && last.speakerId === u.speakerId) {
+    if (
+      last &&
+      last.speakerId === u.speakerId &&
+      u.endMs - last.startMs <= YOUTUBE_DIARIZE_MAX_SEGMENT_SECONDS * 1000
+    ) {
       last.endMs = Math.max(last.endMs, u.endMs);
       last.text = `${last.text} ${u.text}`.trim();
       continue;
@@ -213,16 +224,14 @@ export function extractAsrTurns(lines: YOUTUBE_TRANSCRIPT_LINE[]): CaptionTurn[]
     const pieces = splitOnSpeakerChange(line.text);
     for (const piece of pieces) {
       const last = turns[turns.length - 1];
+      const timed = { startMs: line.startMs, endMs: lineEndMs(line), text: piece.text };
       if (!last || piece.change) {
-        turns.push({
-          startMs: line.startMs,
-          endMs: lineEndMs(line),
-          text: piece.text,
-        });
+        turns.push({ ...timed, pieces: [timed] });
         continue;
       }
-      last.endMs = Math.max(last.endMs, lineEndMs(line));
+      last.endMs = Math.max(last.endMs, timed.endMs);
       last.text = `${last.text} ${piece.text}`.trim();
+      last.pieces.push(timed);
     }
   }
   return turns;
@@ -247,16 +256,16 @@ function applyTurnLabels(
     labeled.speakers.map((s) => [s.id, s.guessed_identity] as const),
   );
   let previous = labeled.speakers[0]?.id ?? "speaker_1";
-  return turns.map((turn, i) => {
+  // Labels are per turn; utterances stay per caption line so `mergeConsecutive`
+  // can cap segment length inside a long turn.
+  return turns.flatMap((turn, i) => {
     const speakerId = byIndex.get(i) ?? previous;
     previous = speakerId;
-    return {
+    return turn.pieces.map((piece) => ({
       speakerId,
       guessedIdentity: identity.get(speakerId),
-      startMs: turn.startMs,
-      endMs: turn.endMs,
-      text: turn.text,
-    };
+      ...piece,
+    }));
   });
 }
 
@@ -332,13 +341,11 @@ function emptyUsage(): GEMINI_USAGE_METADATA {
   };
 }
 
+/** One utterance per caption line (not per turn), so `mergeConsecutive` can re-join them in capped segments. */
 function singleSpeakerFromTurns(turns: CaptionTurn[]): CaptionUtterance[] {
-  return turns.map((turn) => ({
-    speakerId: "speaker_1",
-    startMs: turn.startMs,
-    endMs: turn.endMs,
-    text: turn.text,
-  }));
+  return turns.flatMap((turn) =>
+    turn.pieces.map((piece) => ({ speakerId: "speaker_1", ...piece })),
+  );
 }
 
 /** Maps YouTube caption lines into the DIARIZED_TRANSCRIPT shape.
@@ -411,7 +418,7 @@ export async function diarizeFromYoutubeCaptions(
 
   if (turns.length === 1) {
     return {
-      transcript: toDiarizedTranscript(singleSpeakerFromTurns(turns)),
+      transcript: toDiarizedTranscript(mergeConsecutive(singleSpeakerFromTurns(turns))),
       usage: { provider: "gemini", usage: emptyUsage() },
     };
   }
@@ -449,10 +456,24 @@ function selfCheck(): void {
       { i: 2, speaker: "speaker_3" },
     ],
   });
-  const three = toDiarizedTranscript(labeled);
+  const three = toDiarizedTranscript(mergeConsecutive(labeled));
   if (three.speaker_count !== 3) throw new Error(`expected 3 speakers, got ${three.speaker_count}`);
   if (three.segments[2].speaker !== "speaker_3") {
     throw new Error("third turn must keep speaker_3, not toggle back to speaker_1");
+  }
+
+  // Captions with no `>>` marks (e.g. Hindi ASR) are one turn; segments must still stay short.
+  const parseClock = (t: string) => t.split(":").map(Number).reduce((acc, n) => acc * 60 + n, 0);
+  const monologue = youtubeCaptionsToDiarizedTranscript(
+    Array.from({ length: 60 }, (_, i) => ({ startMs: i * 3000, durationMs: 3000, text: `line ${i}` })),
+  );
+  const longest = Math.max(
+    ...monologue.segments.map((s) => parseClock(s.end) - parseClock(s.start)),
+  );
+  if (monologue.segments.length < 15 || longest > YOUTUBE_DIARIZE_MAX_SEGMENT_SECONDS) {
+    throw new Error(
+      `a 3-minute unmarked caption track should split into <=${YOUTUBE_DIARIZE_MAX_SEGMENT_SECONDS}s segments, got ${monologue.segments.length} (longest ${longest}s)`,
+    );
   }
 
   const named = youtubeCaptionsToDiarizedTranscript([

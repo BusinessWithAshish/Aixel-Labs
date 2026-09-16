@@ -12,6 +12,7 @@ import {
   MEDIA_ASPECT_RATIO_DIMENSIONS,
   MEDIA_ERROR_MESSAGES,
   MEDIA_REFRAME,
+  MEDIA_REFRAME_LAYOUTS,
   MEDIA_REFRAME_MODES,
 } from "../constants";
 import type { CUT_CLIP_REFRAME, MEDIA_ASPECT_RATIO_VALUE } from "../types";
@@ -39,6 +40,7 @@ const REFRAME_PLAN_SCHEMA = z.object({
       end: z.number().nonnegative(),
       x: z.number().int().nonnegative(),
       y: z.number().int().nonnegative(),
+      layout: z.enum(MEDIA_REFRAME_LAYOUTS).optional().default("crop"),
     }),
   ),
 });
@@ -55,6 +57,11 @@ function workerPython(): string {
  * exactly at segment boundaries and never pans. Quoted like
  * `buildAspectRatioFilter`'s crop so the inner commas are not read as
  * filter separators.
+ *
+ * Wide segments show the whole frame instead: fitted to the output width and
+ * centred on a blurred, zoomed copy of the same frame. Both looks come from a
+ * `split` of the one input, and the wide look is laid over the crop only while
+ * a wide segment runs, so a single encode covers the whole clip.
  */
 export function buildSpeakerCropFilter(
   plan: REFRAME_PLAN,
@@ -70,7 +77,26 @@ export function buildSpeakerCropFilter(
     }
     return expr;
   };
-  return `crop=${crop.width}:${crop.height}:'${piecewise("x")}':'${piecewise("y")}',scale=${outputWidth}:${outputHeight},setsar=1`;
+  const cropped = `crop=${crop.width}:${crop.height}:'${piecewise("x")}':'${piecewise("y")}',scale=${outputWidth}:${outputHeight},setsar=1`;
+
+  const wide = plan.segments.filter((segment) => segment.layout === "wide");
+  if (wide.length === 0) {
+    return cropped;
+  }
+  const even = (value: number) => Math.max(2, Math.round(value / 2) * 2);
+  const during = wide
+    .map((segment) => `gte(t,${segment.start.toFixed(3)})*lt(t,${segment.end.toFixed(3)})`)
+    .join("+");
+  const blurWidth = even(outputWidth * MEDIA_REFRAME.WIDE_BACKGROUND_SCALE);
+  const blurHeight = even(outputHeight * MEDIA_REFRAME.WIDE_BACKGROUND_SCALE);
+  return [
+    "split=3[tight][full][back]",
+    `[tight]${cropped}[cropped]`,
+    `[full]scale=${outputWidth}:-2,setsar=1[fitted]`,
+    `[back]crop=${crop.width}:${crop.height},scale=${blurWidth}:${blurHeight},boxblur=${MEDIA_REFRAME.WIDE_BACKGROUND_BLUR_RADIUS}:2,scale=${outputWidth}:${outputHeight},setsar=1[blurred]`,
+    "[blurred][fitted]overlay=(W-w)/2:(H-h)/2[framed]",
+    `[cropped][framed]overlay=0:0:enable='${during}'`,
+  ].join(";");
 }
 
 async function runWorker(
@@ -169,5 +195,10 @@ export async function reframeClipBySpeaker(
     throw new Error(`${MEDIA_ERROR_MESSAGES.FFMPEG_REFRAME_FAILED}: ${message}`);
   }
 
-  return { mode: "speaker", segments: plan.segments.length, planPath: keptPlanPath };
+  return {
+    mode: "speaker",
+    segments: plan.segments.length,
+    wideSegments: plan.segments.filter((segment) => segment.layout === "wide").length,
+    planPath: keptPlanPath,
+  };
 }

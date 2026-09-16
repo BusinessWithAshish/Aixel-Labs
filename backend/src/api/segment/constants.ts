@@ -29,3 +29,11 @@ export const SEGMENT_ERROR_MESSAGES = {
 
 /** Total attempts (1 initial + retries) before giving up on Claude's structured output. Mirrors VIDEO's Gemini-key-pool retry ceiling of 3. */
 export const SEGMENT_CLAUDE_MAX_ATTEMPTS = 3;
+
+/**
+ * Per-attempt Claude timeout for ranking a whole episode. The `claude` op
+ * default (600 s) is too short: a 52-minute episode took 553 s on 10 s
+ * transcript segments and timed out on 5 s ones (2026-09-14). Still well
+ * inside Sage's 2400 s MCP timeout, and the MCP keepalive holds the call open.
+ */
+export const SEGMENT_CLAUDE_TIMEOUT_SECONDS = 1500;

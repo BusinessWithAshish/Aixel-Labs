@@ -4,7 +4,11 @@
  * `api/claude/structured-json.ts` for the parse/validate/retry mechanics
  * shared with youtube's caption speaker-labeling Claude path).
  */
-import { SEGMENT_CLAUDE_MAX_ATTEMPTS, SEGMENT_ERROR_MESSAGES } from "../constants";
+import {
+  SEGMENT_CLAUDE_MAX_ATTEMPTS,
+  SEGMENT_CLAUDE_TIMEOUT_SECONDS,
+  SEGMENT_ERROR_MESSAGES,
+} from "../constants";
 import { askClaudeForJson } from "../../claude/structured-json";
 import {
   MOMENTS_AUDIENCE_SIGNALS_BLOCK_TEMPLATE,
@@ -95,6 +99,7 @@ export async function scoreViralMomentsWithClaude(
     zodValidator: MOMENTS_RESPONSE_VALIDATOR,
     model: options.model,
     maxAttempts: SEGMENT_CLAUDE_MAX_ATTEMPTS,
+    timeoutSeconds: SEGMENT_CLAUDE_TIMEOUT_SECONDS,
     exhaustedErrorPrefix: SEGMENT_ERROR_MESSAGES.CLAUDE_INVALID_JSON,
   });
 

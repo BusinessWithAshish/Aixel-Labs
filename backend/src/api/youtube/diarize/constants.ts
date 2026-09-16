@@ -10,6 +10,17 @@
 /** Caption-turn labeling: YouTube ASR never names speakers, so we cap how many ids Gemini may invent. */
 export const YOUTUBE_DIARIZE_MAX_CAPTION_SPEAKERS = 8;
 
+/**
+ * Longest a transcript segment may span. Consecutive caption lines from one
+ * speaker are merged only up to this, so a clip ranker always has a timestamp
+ * within a few seconds of any line. Without it, captions with no `>>` marks
+ * (most non-English ASR) merged into ONE segment for the whole episode and
+ * every clip boundary was a guess. 5 s, not 10: at 10 a punchline and the
+ * line after it often share one segment, and the ranker cannot tell where the
+ * first one ends.
+ */
+export const YOUTUBE_DIARIZE_MAX_SEGMENT_SECONDS = 5;
+
 export const YOUTUBE_DIARIZE_ERROR_MESSAGES = {
   INVALID_PARAMS: "Invalid request parameters",
   YOUTUBE_METADATA_FETCH_FAILED: "Failed to fetch YouTube video metadata",

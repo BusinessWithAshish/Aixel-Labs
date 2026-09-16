@@ -13,5 +13,7 @@ export const mediaCutHandler = createMediaHandler({
       input.diarized,
       input.aspectRatio,
       input.reframe,
+      input.boundaries,
+      input.language,
     ),
 });

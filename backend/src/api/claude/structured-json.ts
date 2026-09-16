@@ -39,6 +39,8 @@ export async function askClaudeForJson<T>(options: {
   maxAttempts?: number;
   /** Prefix for the error thrown once attempts are exhausted — pass your own domain's error message. */
   exhaustedErrorPrefix?: string;
+  /** Per-attempt timeout; omitted = the `claude` op default. Long-input callers (a whole-episode ranking) need more. */
+  timeoutSeconds?: number;
 }): Promise<ASK_CLAUDE_FOR_JSON_RESULT<T>> {
   const maxAttempts = options.maxAttempts ?? 3;
 
@@ -52,6 +54,7 @@ export async function askClaudeForJson<T>(options: {
       task,
       session_id: sessionId,
       model: options.model,
+      timeout_seconds: options.timeoutSeconds,
     });
     const res = await askClaude(req);
 

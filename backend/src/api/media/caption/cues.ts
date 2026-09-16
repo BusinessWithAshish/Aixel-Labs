@@ -173,6 +173,94 @@ export function parseSubtitles(raw: string, options: WRAP_OPTIONS): CAPTION_CUE[
   return cues;
 }
 
+/** One spoken word as rendered by the `chunks` preset: absolute seconds, display text. */
+export type CAPTION_WORD = { text: string; start: number; end: number };
+
+/** 1–3 words shown together; one of them is highlighted at a time. */
+export type CAPTION_CHUNK = { start: number; end: number; words: CAPTION_WORD[] };
+
+export type CHUNK_OPTIONS = {
+  maxWords: number;
+  maxChars: number;
+  breakGapSeconds: number;
+  holdSeconds: number;
+  uppercase: boolean;
+};
+
+/** A chunk never continues past a word that ends a phrase. `।` is the Devanagari full stop. */
+const PHRASE_END = /[.?!,;:…।]["'”’)]*$/;
+const EDGE_PUNCTUATION = /^["'“”‘’(\[]+|["'“”‘’)\].,!?;:…।]+$/g;
+
+/**
+ * Group Groq word timings into short on-screen chunks for the `chunks`
+ * preset. A chunk closes at `maxWords`, when adding a word would pass
+ * `maxChars`, after punctuation, or across a pause longer than
+ * `breakGapSeconds`. Whisper word starts can overlap or be zero-length, so
+ * starts are forced forward and every word gets a minimum duration — without
+ * that the highlight flickers. A chunk stays up until the next one starts, but
+ * no more than `holdSeconds` past its last word.
+ */
+export function buildWordChunks(
+  words: GROQ_TRANSCRIPTION_WORD[],
+  options: CHUNK_OPTIONS,
+): CAPTION_CHUNK[] {
+  const groups: CAPTION_WORD[][] = [];
+  let current: CAPTION_WORD[] = [];
+  let previousRaw = "";
+  let previousStart = -Infinity;
+
+  for (const w of words) {
+    const raw = w.word.trim();
+    const cleaned = raw.replace(EDGE_PUNCTUATION, "") || raw;
+    if (!cleaned) continue;
+    const start = Math.max(w.start, previousStart + MEDIA_CAPTION.CHUNKS.MIN_STEP_SECONDS);
+    const word: CAPTION_WORD = {
+      text: options.uppercase ? cleaned.toUpperCase() : cleaned,
+      start,
+      end: Math.max(w.end, start + MEDIA_CAPTION.CHUNKS.MIN_WORD_SECONDS),
+    };
+    previousStart = start;
+
+    if (current.length > 0) {
+      const chars = [...current, word].map((x) => x.text).join(" ").length;
+      if (
+        current.length >= options.maxWords ||
+        chars > options.maxChars ||
+        word.start - current[current.length - 1].end > options.breakGapSeconds ||
+        PHRASE_END.test(previousRaw)
+      ) {
+        groups.push(current);
+        current = [];
+      }
+    }
+    current.push(word);
+    previousRaw = raw;
+  }
+  if (current.length > 0) groups.push(current);
+
+  return groups.map((group, i) => {
+    const last = group[group.length - 1];
+    const nextStart = groups[i + 1]?.[0].start ?? Infinity;
+    return {
+      start: group[0].start,
+      end: Math.max(
+        Math.min(last.end + options.holdSeconds, nextStart),
+        last.start + MEDIA_CAPTION.CHUNKS.MIN_STEP_SECONDS,
+      ),
+      words: group,
+    };
+  });
+}
+
+/** The `.srt` sidecar for a chunked caption: one cue per chunk. */
+export function chunksToCues(chunks: CAPTION_CHUNK[]): CAPTION_CUE[] {
+  return chunks.map((chunk) => ({
+    start: chunk.start,
+    end: chunk.end,
+    lines: [chunk.words.map((w) => w.text).join(" ")],
+  }));
+}
+
 export function cuesToSrt(cues: CAPTION_CUE[]): string {
   return cues
     .map((cue, index) => {

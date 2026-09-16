@@ -45,6 +45,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--min-run", type=float, default=0.45, help="stretches shorter than this (s) merge into a neighbour")
     p.add_argument("--lead", type=float, default=0.12, help="cut this many seconds before a speech onset")
     p.add_argument("--speak-thresh", type=float, default=0.0, help="LR-ASD logit above this = speaking")
+    p.add_argument("--wide-overlap", type=float, default=1.5, help="show the whole frame while faces talk over each other this long (s)")
+    p.add_argument("--wide-quiet", type=float, default=1.5, help="…or while no face talks this long (s), e.g. a laugh")
+    p.add_argument("--wide-every", type=float, default=15.0, help="…and at least this often (s); 0 = add none")
+    p.add_argument("--wide-hold", type=float, default=2.0, help="length of an added wide stretch (s)")
     p.add_argument("--detect-stride", type=int, default=2)
     p.add_argument("--det-width", type=int, default=960)
     p.add_argument("--min-face-frac", type=float, default=0.03)
@@ -82,9 +86,6 @@ def main(argv: list[str] | None = None) -> int:
         plan["shots"] = [[round(s, 3), round(e, 3)] for s, e in shots]
         tracks, n_frames = timed("faces_s", detect_tracks, a.ffmpeg, a.clip, info, shots,
                                  os.path.join(a.models_dir, YUNET_MODEL), FPS, a.det_width, a.detect_stride, a.min_face_frac)
-        if not tracks:
-            raise Fallback("no faces found")
-
         multi_face_shots = {k for k in range(len(shots)) if sum(1 for tr in tracks if tr["shot"] == k) >= 2}
         for tr in tracks:
             tr["needs_asd"] = tr["shot"] in multi_face_shots
@@ -98,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
                 timed("asd_s", score_tracks, tracks, mfcc(audio), os.path.join(a.models_dir, LRASD_WEIGHTS), FPS)
 
         result = timed("plan_s", build_plan, info=info, shots=shots, tracks=tracks, n_frames=n_frames, fps=FPS, crop_w=crop_w,
-                       speak_thresh=a.speak_thresh, min_run=a.min_run, lead=a.lead)
+                       speak_thresh=a.speak_thresh, min_run=a.min_run, lead=a.lead, wide_overlap=a.wide_overlap,
+                       wide_quiet=a.wide_quiet, wide_every=a.wide_every, wide_hold=a.wide_hold)
         plan["segments"], plan["tracks"] = result["segments"], result["tracks"]
         if not plan["segments"]:
             raise Fallback("plan produced no segments")
@@ -115,6 +117,6 @@ def main(argv: list[str] | None = None) -> int:
 
     timings["total_s"] = round(time.time() - started, 2)
     _write(a.out, plan)
-    _log(f"{plan['mode']}: {len(plan['segments'])} segments, {len(plan['shots'])} shots, "
+    _log(f"{plan['mode']}: {len(plan['segments'])} segments ({sum(1 for s in plan['segments'] if s['layout'] == 'wide')} wide), {len(plan['shots'])} shots, "
          f"{len(plan['tracks'])} faces, {timings['total_s']}s")
     return 0

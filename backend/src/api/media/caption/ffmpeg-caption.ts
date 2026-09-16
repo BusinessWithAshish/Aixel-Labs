@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 
 import ffmpegPath from "ffmpeg-static";
 
-import { MEDIA_ERROR_MESSAGES } from "../constants";
+import { MEDIA_CAPTION, MEDIA_ERROR_MESSAGES } from "../constants";
 
 const execFileAsync = promisify(execFile);
 
@@ -49,7 +49,9 @@ export async function burnCaptions(
       [
         "-y",
         "-i", inputPath,
-        "-vf", `ass='${escapeFilterPath(assPath)}'`,
+        // fontsdir: the fonts shipped in backend/assets/fonts (e.g. Anton for
+        // `chunks`) resolve without being installed system-wide.
+        "-vf", `ass='${escapeFilterPath(assPath)}':fontsdir='${escapeFilterPath(MEDIA_CAPTION.FONTS_DIR)}'`,
         "-c:a", "copy",
         "-c:v", "libx264",
         "-preset", "veryfast",

@@ -163,12 +163,18 @@ export async function cutClip(
   outputPath: string,
   aspectRatio: MEDIA_ASPECT_RATIO_VALUE,
   hasVideo: boolean,
+  /** Short audio fades at the clip's edges, in seconds. Filters see the input's own timeline, so fade times are absolute. */
+  fade?: { inSeconds: number; outSeconds: number },
 ): Promise<void> {
   if (!ffmpegPath) {
     throw new Error(MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED);
   }
 
   const videoFilter = hasVideo ? buildAspectRatioFilter(aspectRatio) : undefined;
+  const audioFilter = fade
+    ? `afade=t=in:st=${startSeconds.toFixed(3)}:d=${fade.inSeconds},` +
+      `afade=t=out:st=${Math.max(startSeconds, endSeconds - fade.outSeconds).toFixed(3)}:d=${fade.outSeconds}`
+    : undefined;
 
   try {
     await execFileAsync(ffmpegPath, [
@@ -190,6 +196,7 @@ export async function cutClip(
             MEDIA.FFMPEG_CRF,
           ]
         : ["-vn"]),
+      ...(audioFilter ? ["-af", audioFilter] : []),
       "-c:a",
       MEDIA.FFMPEG_AUDIO_CODEC,
       "-avoid_negative_ts",
