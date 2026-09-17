@@ -20,16 +20,13 @@ type FetchResponseLike = {
 };
 
 /**
- * Node's global `fetch()` (undici) defaults `headersTimeout`/`bodyTimeout` to
- * 300_000ms (5 min) — too short for `generateContent` on a large audio file,
- * where Gemini itself can legitimately take several minutes to diarize +
- * reason. This is a *client-side outgoing* timeout, distinct from (and not
- * fixed by) `server.requestTimeout` in `server.ts`, which only governs
- * *incoming* requests to our own server.
+ * `generateContent` on a large audio file runs well past undici's five-minute
+ * default, so this client gets the module's outgoing budget — see
+ * `MEDIA.OUTBOUND_FETCH_TIMEOUT_MS` for why the default is wrong here.
  */
 const GEMINI_FETCH_DISPATCHER = new Agent({
-  headersTimeout: 15 * 60 * 1000,
-  bodyTimeout: 15 * 60 * 1000,
+  headersTimeout: MEDIA.OUTBOUND_FETCH_TIMEOUT_MS,
+  bodyTimeout: MEDIA.OUTBOUND_FETCH_TIMEOUT_MS,
 });
 
 /**

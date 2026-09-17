@@ -31,9 +31,27 @@ export const SEGMENT_ERROR_MESSAGES = {
 export const SEGMENT_CLAUDE_MAX_ATTEMPTS = 3;
 
 /**
- * Per-attempt Claude timeout for ranking a whole episode. The `claude` op
- * default (600 s) is too short: an hour-long episode on 5 s transcript
- * segments runs past it. Still well inside the caller's MCP timeout, and the
- * MCP keepalive holds the call open.
+ * Wall-clock ceiling for the WHOLE ranking call — every attempt together, not
+ * each one. What this has to fit inside is the caller's own deadline: an MCP
+ * caller abandons a tool call on a timer of its own and cannot see that work
+ * is still going on here, so a call that outlives it leaves this process
+ * ranking an episode nobody is waiting for while the caller retries from
+ * scratch. Sage's chain is 2700 s (Hermes' per-tool deadline) > 2400 s (its
+ * MCP tool timeout) > this; keep it the innermost limit of whatever chain it
+ * runs under, and the caller gets a real error instead of an orphan.
+ *
+ * A successful ranking of an hour-long episode measured ~365 s, so this is
+ * generous even split three ways.
  */
-export const SEGMENT_CLAUDE_TIMEOUT_SECONDS = 1500;
+export const SEGMENT_CLAUDE_TOTAL_BUDGET_SECONDS = 2100;
+
+/**
+ * Per-attempt timeout, derived so the retries can never outrun the budget
+ * above: changing `SEGMENT_CLAUDE_MAX_ATTEMPTS` re-divides the same total
+ * instead of silently multiplying it. (The `claude` op's own 600 s default is
+ * too short for a whole episode on 5 s transcript segments; the MCP keepalive
+ * holds the call open either way.)
+ */
+export const SEGMENT_CLAUDE_TIMEOUT_SECONDS = Math.floor(
+  SEGMENT_CLAUDE_TOTAL_BUDGET_SECONDS / SEGMENT_CLAUDE_MAX_ATTEMPTS,
+);

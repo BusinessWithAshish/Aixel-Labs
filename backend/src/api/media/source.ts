@@ -14,6 +14,7 @@ import {
   createUrlFetchSession,
 } from "../../utils/node-tls-client-session-handler";
 import {
+  MEDIA,
   MEDIA_ERROR_MESSAGES,
   MEDIA_FETCH_EXTENSION_BY_CONTENT_TYPE,
   MEDIA_GATED_STATUS_CODES,
@@ -47,17 +48,14 @@ function isHtmlContentType(contentType: string | null): boolean {
 }
 
 /**
- * Same fix as `gemini-client.ts` — undici's default `headersTimeout`/
- * `bodyTimeout` on `fetch()` is 300_000ms (5 min), which a large media
- * download can exceed on a slow/throttled connection well before the actual
- * transfer stalls (observed: a 238MB video download killed mid-stream by
- * this default, with ~64MB successfully read — the connection was healthy,
- * just slower than the 5-minute ceiling). `dispatcher` is a Node/undici
- * extension to the standard `fetch()` options.
+ * A large download outlives undici's five-minute default long before the
+ * transfer actually stalls, so this client gets the module's outgoing budget
+ * (`MEDIA.OUTBOUND_FETCH_TIMEOUT_MS`). `dispatcher` is a Node/undici extension
+ * to the standard `fetch()` options.
  */
 const DOWNLOAD_FETCH_DISPATCHER = new Agent({
-  headersTimeout: 15 * 60 * 1000,
-  bodyTimeout: 15 * 60 * 1000,
+  headersTimeout: MEDIA.OUTBOUND_FETCH_TIMEOUT_MS,
+  bodyTimeout: MEDIA.OUTBOUND_FETCH_TIMEOUT_MS,
 });
 
 export function isRemoteUrl(source: string): boolean {

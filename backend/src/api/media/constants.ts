@@ -230,6 +230,19 @@ export const MEDIA_NATURAL_BOUNDARIES = {
 } as const;
 
 export const MEDIA = {
+  /**
+   * How long an outgoing `fetch()` in this module may take. Node's global
+   * `fetch()` (undici) defaults `headersTimeout`/`bodyTimeout` to 300_000ms
+   * (5 min), which is shorter than several things we legitimately do: Gemini
+   * reasoning over an hour of audio, a 238MB download on a throttled
+   * connection (observed killed mid-stream with ~64MB read, the connection
+   * healthy), a Whisper transcription of a long window. Every client that can
+   * outlive five minutes builds an undici `Agent` from this — one number, so
+   * the three of them cannot drift apart. It is a *client-side outgoing*
+   * limit, unrelated to `server.requestTimeout` in `server.ts`, which governs
+   * incoming requests.
+   */
+  OUTBOUND_FETCH_TIMEOUT_MS: 15 * 60 * 1000,
   /** Gemini inline-request cap is ~20MB; anything at/above this always goes through the File API. */
   INLINE_AUDIO_MAX_BYTES: 20 * 1024 * 1024,
   /** Gemini's documented audio-per-prompt ceiling. */

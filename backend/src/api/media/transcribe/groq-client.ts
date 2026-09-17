@@ -1,11 +1,25 @@
 import { openAsBlob } from "node:fs";
 import { basename } from "node:path";
 
+import { Agent } from "undici";
+
+import { MEDIA } from "../constants";
 import { GROQ_TRANSCRIPTIONS_URL, MEDIA_TRANSCRIBE_ERROR_MESSAGES } from "./constants";
 import type {
   GROQ_VERBOSE_JSON_RESPONSE,
   MEDIA_TRANSCRIBE_MODEL_VALUE,
 } from "./types";
+
+/**
+ * Uploading a long episode and waiting for Whisper to return it can outlast
+ * undici's five-minute default, and the failure is indistinguishable from a
+ * dead connection — same budget as the module's other outgoing clients
+ * (`MEDIA.OUTBOUND_FETCH_TIMEOUT_MS`).
+ */
+const GROQ_FETCH_DISPATCHER = new Agent({
+  headersTimeout: MEDIA.OUTBOUND_FETCH_TIMEOUT_MS,
+  bodyTimeout: MEDIA.OUTBOUND_FETCH_TIMEOUT_MS,
+});
 
 export type GroqTranscribeOptions = {
   model: MEDIA_TRANSCRIBE_MODEL_VALUE;
@@ -75,7 +89,11 @@ export async function transcribeWithGroq(
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
-  })) as unknown as FetchResponseLike;
+    // `dispatcher` is a Node/undici extension to the standard `fetch()`
+    // options — same cast as `gemini-client.ts`, whose note explains why this
+    // monorepo's ambient `RequestInit` cannot be extended directly.
+    dispatcher: GROQ_FETCH_DISPATCHER,
+  } as unknown as RequestInit)) as unknown as FetchResponseLike;
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
