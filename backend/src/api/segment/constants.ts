@@ -32,8 +32,8 @@ export const SEGMENT_CLAUDE_MAX_ATTEMPTS = 3;
 
 /**
  * Per-attempt Claude timeout for ranking a whole episode. The `claude` op
- * default (600 s) is too short: a 52-minute episode took 553 s on 10 s
- * transcript segments and timed out on 5 s ones (2026-09-14). Still well
- * inside Sage's 2400 s MCP timeout, and the MCP keepalive holds the call open.
+ * default (600 s) is too short: an hour-long episode on 5 s transcript
+ * segments runs past it. Still well inside the caller's MCP timeout, and the
+ * MCP keepalive holds the call open.
  */
 export const SEGMENT_CLAUDE_TIMEOUT_SECONDS = 1500;

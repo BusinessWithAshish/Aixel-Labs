@@ -161,6 +161,42 @@ export const MEDIA_NATURAL_BOUNDARIES = {
   END_PENALTY_AFTER_PER_SECOND: 0.3,
   /** Extra cost per word spoken between the requested end and a later stop. */
   END_PENALTY_PER_WORD_CROSSED: 0.3,
+  /**
+   * Whisper reports a word's end early — it snaps to its own frame grid — so
+   * cutting on that number clips the last syllable, and the fade then runs over
+   * what is left. After the stop the audio itself is followed while it is still
+   * speech (a much lower bar than a reaction: this is one voice trailing off,
+   * not a room reacting), for at most MAX.
+   */
+  SPEECH_TAIL_DB_ABOVE_FLOOR: 3,
+  SPEECH_TAIL_QUIET_HOLD_SECONDS: 0.1,
+  SPEECH_TAIL_MAX_SECONDS: 0.6,
+  /**
+   * Where the clip actually ends: a real pause in the AUDIO, not a gap between
+   * Whisper's word timestamps. On fast, overlapping speech Whisper returns word
+   * gaps of exactly zero and starts the next word up to a second early, so
+   * word-based stops end a clip mid-syllable or a beat into the next person's
+   * first word — while the waveform shows an unmistakable 0.5–1 s dip in the
+   * same place. A pause is this far below the room's loudest speech, lasting at
+   * least MIN; the cut lands OFFSET into it, so the last syllable finishes and
+   * nothing of the next line is heard.
+   */
+  PAUSE_DB_BELOW_SPEECH: 25,
+  /** A breath mid-sentence is ~0.2 s and looks identical in the waveform; the end of a thought runs longer. */
+  PAUSE_MIN_AUDIO_SECONDS: 0.35,
+  PAUSE_CUT_OFFSET_SECONDS: 0.12,
+  /** How much a longer pause is worth when choosing between them (seconds, capped). */
+  PAUSE_LENGTH_SCORE_CAP_SECONDS: 1,
+  /**
+   * The audio says where a line stops; the words say whether it FINISHED. A
+   * pause the speaker ends a sentence into beats a breath they took mid-clause,
+   * so a pause is worth more when the word before it closes a sentence, and a
+   * little more when Whisper ended one of its own phrases there too.
+   */
+  PAUSE_SENTENCE_BONUS: 1,
+  PAUSE_PHRASE_BONUS: 0.5,
+  /** When nothing in the normal window is a pause, look this much further before giving up on the audio. */
+  PAUSE_SEARCH_EXTRA_SECONDS: 3,
   /** After the stop, keep loud audio with no words (laughter, applause) for at most this long. */
   REACTION_MAX_SECONDS: 3.5,
   /** "Loud" = this many dB above the window's noise floor (its NOISE_FLOOR_PERCENTILE loudness). */
@@ -177,7 +213,12 @@ export const MEDIA_NATURAL_BOUNDARIES = {
    * instead of on a clipped syllable.
    */
   FADE_IN_SECONDS: 0.1,
-  FADE_OUT_SECONDS: 0.35,
+  /**
+   * Short enough to live inside the pad after the last word. At 0.35 s it faded
+   * the final syllable itself, which reads as a clip cut off mid-sentence even
+   * when the audio is all there.
+   */
+  FADE_OUT_SECONDS: 0.15,
   /** Never run into the next word. */
   NEXT_WORD_GUARD_SECONDS: 0.05,
   /** Loudness resolution. */
@@ -211,6 +252,15 @@ export const MEDIA = {
   /** Hard validation bounds — callers can request anywhere in this range. */
   MIN_CLIP_SECONDS: 15,
   MAX_CLIP_SECONDS: 120,
+  /**
+   * How far a finished clip may fall short of its range before it is treated as
+   * a failed cut rather than a clip. A dropped stream is invisible otherwise:
+   * ffmpeg reads the truncated input as end-of-input and exits 0, so a 28 s
+   * range can quietly ship as 13 s, or as audio with no video at all. The
+   * slack covers honest rounding (a frame or two) and nothing more.
+   */
+  CLIP_TRUNCATION_SLACK_RATIO: 0.1,
+  CLIP_TRUNCATION_SLACK_SECONDS: 1,
   /** Defaults used when a caller doesn't specify — tuned for Shorts/Reels, not long-form YouTube clips. */
   DEFAULT_MIN_CLIP_SECONDS: 15,
   DEFAULT_MAX_CLIP_SECONDS: 60,
@@ -290,6 +340,8 @@ export const MEDIA_ERROR_MESSAGES = {
   REFRAME_PLAN_INVALID: "Speaker reframe worker returned an unreadable plan",
   REFRAME_NO_PLAN: "Speaker reframe worker kept the centre crop",
   FFMPEG_REFRAME_FAILED: "ffmpeg failed to render the speaker-reframed clip",
+  CLIP_TRUNCATED:
+    "The clip came out shorter than its range — the source stream dropped mid-download; cut this range again",
   NATURAL_BOUNDARIES_FAILED: "Could not analyse the clip's audio for natural boundaries; kept the requested range",
   CAPTION_ROMANIZE_FAILED: "Could not rewrite captions in Roman script; kept the native script",
   GENERIC: "Media operation failed",

@@ -225,17 +225,24 @@ window with Groq word timings, measures its loudness, and re-places the edges
   clip spills into the next thought). The best one wins and keeps its reaction until it quiets,
   never into the next word. Searching both ways matters: transcript timestamps
   are whole seconds, so a requested end usually sits 1–3 s after the real
-  stop, and searching only later lands on a breath inside the next sentence
-  (found in the 2026-09-14 test). With no stop in reach the end stays at the
-  end of the word it would split.
+  stop, and searching only later lands on a breath inside the next sentence.
+  With no stop in reach the end stays at the end of the word it would split.
+- **the last syllable** — Whisper's word ends are early (they snap to its own
+  frame grid), so the end is not the word's timestamp: the audio is followed
+  past it while it is still speech (`SPEECH_TAIL_*`, at most 0.6 s), and a
+  laugh extends it further. Cutting on the raw timestamp clipped the final
+  word on roughly half the clips of a batch.
 
 Words Whisper likely invented — inside a no-speech or looping segment
 (`dropUnreliableSpans`, shared with `caption`), or smeared over seconds
 (music, applause) — are ignored. `cutStartSeconds` /
 `cutEndSeconds` report the placed edges and `clips[].boundaries.endReason`
 says which rule ended the clip (`pause` / `reaction` / `unchanged`). The trimmed
-clip gets a 0.1 s audio fade in and 0.35 s fade out, so an ending under crowd
-noise or an incoming voice lands softly instead of on a clipped syllable. Pass
+clip gets a 0.1 s audio fade in and 0.15 s fade out, so an ending under crowd
+noise or an incoming voice lands softly instead of on a clipped syllable. The
+fade-out is deliberately short: it has to sit inside the pad after the last
+word, because a longer one fades the final syllable itself and the clip reads
+as cut off mid-sentence even when every word is there. Pass
 `language` (ISO 639-1) for anything not plainly English: auto-detection hears
 short mixed Hindi-English windows as English and drops the Hindi words, which
 then read as a word-free "reaction". If the audio cannot be analysed the

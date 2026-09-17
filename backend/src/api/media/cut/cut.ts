@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { assertPersistentDisk } from "../../../config";
 import { parseTimestampToSeconds, snapClipBoundaries } from "./boundary-snap";
 import {
+  MEDIA,
   MEDIA_ERROR_MESSAGES,
   MEDIA_CUT_OUTPUT_DIR,
   MEDIA_NATURAL_BOUNDARIES,
@@ -205,6 +206,22 @@ export async function cutClipsFromVideo(
         await Promise.all(temps.map((path) => rm(path, { force: true })));
       }
 
+      // A stream that drops mid-download does not fail ffmpeg: it reads the
+      // truncated input as end-of-input and exits 0, leaving a clip that is
+      // simply short — or, when the video stream is the one that died, one with
+      // no video at all. Nothing downstream would notice, so check the file.
+      const produced = await probeMediaStreams(outputPath);
+      const expectedSeconds = appliedEnd - appliedStart;
+      const missingVideo = hasVideo && !produced.hasVideo;
+      const shortBy = expectedSeconds - (produced.durationSeconds ?? 0);
+      const truncated =
+        missingVideo ||
+        shortBy >
+          Math.max(MEDIA.CLIP_TRUNCATION_SLACK_SECONDS, expectedSeconds * MEDIA.CLIP_TRUNCATION_SLACK_RATIO);
+      if (truncated) {
+        await rm(outputPath, { force: true });
+      }
+
       results.push({
         label: clip.label,
         requestedStart: clip.start,
@@ -216,7 +233,11 @@ export async function cutClipsFromVideo(
         snapped: natural ? appliedStart !== requestedStart || appliedEnd !== requestedEnd : snapped,
         mediaType,
         aspectRatio: responseAspectRatio,
-        clipPath: outputPath,
+        ...(truncated
+          ? {
+              error: `${MEDIA_ERROR_MESSAGES.CLIP_TRUNCATED} (expected ${expectedSeconds.toFixed(2)}s, got ${(produced.durationSeconds ?? 0).toFixed(2)}s${missingVideo ? ", no video track" : ""})`,
+            }
+          : { clipPath: outputPath }),
         ...(boundariesInfo ? { boundaries: boundariesInfo } : {}),
         ...(reframeInfo ? { reframe: reframeInfo } : {}),
       });

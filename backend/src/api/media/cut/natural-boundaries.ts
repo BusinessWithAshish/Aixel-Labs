@@ -44,11 +44,16 @@ function percentile(values: number[], p: number): number {
  *
  * - **Start** moves to the start of the word it splits, or to the nearest
  *   speech onset after a pause close by.
- * - **End** moves to the natural stop near the requested end (a few seconds
- *   either side) that looks most like an ending — quiet or a reaction after
- *   it, not too far away, later costing more than earlier — then keeps that
- *   loud, word-free reaction (laughter, applause) until it quiets, never into
- *   the next word.
+ * - **End** lands in a real pause in the AUDIO near the requested end: the
+ *   loudness drops well below the speech in this window and stays there, and
+ *   the cut goes just inside that dip. Word timings are not trusted for this —
+ *   on fast or overlapping speech Whisper reports zero-length gaps between
+ *   words and starts the next line's first word up to a second early, which
+ *   ends a clip mid-syllable or on the next person's first word. Laughter and
+ *   applause are loud, so the pause after them is the one that wins, which
+ *   keeps the reaction in the clip. Only when the audio offers no pause at all
+ *   (music, a continuous room) does it fall back to the stop between words
+ *   that looks most like an ending.
  *
  * Words Whisper likely invented (inside a no-speech or looping segment, or
  * smeared over seconds) are ignored, because music and applause are exactly
@@ -98,18 +103,111 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
 
   // ---- end ----
   const noiseFloor = percentile(loudnessDb, NB.NOISE_FLOOR_PERCENTILE);
-  /** Where the loud, word-free reaction after `t` dies down (at most `limit`). */
-  const reactionEndAfter = (t0: number, limit: number): number => {
+  /** Walks on from `t0` while the audio stays `dbAboveFloor` over the room, ending after `quietHold` of quiet. */
+  const loudTailEnd = (t0: number, limit: number, dbAboveFloor: number, quietHold: number): number => {
     let t = t0;
     let quiet = 0;
     while (t < limit) {
       const db = loudnessDb[Math.floor(t / NB.FRAME_SECONDS)] ?? -120;
-      quiet = db > noiseFloor + NB.REACTION_DB_ABOVE_FLOOR ? 0 : quiet + NB.FRAME_SECONDS;
-      if (quiet >= NB.QUIET_HOLD_SECONDS) break;
+      quiet = db > noiseFloor + dbAboveFloor ? 0 : quiet + NB.FRAME_SECONDS;
+      if (quiet >= quietHold) break;
       t += NB.FRAME_SECONDS;
     }
     return Math.max(t0, t - quiet);
   };
+
+  /** Where the loud, word-free reaction after `t` dies down (at most `limit`). */
+  const reactionEndAfter = (t0: number, limit: number): number =>
+    loudTailEnd(t0, limit, NB.REACTION_DB_ABOVE_FLOOR, NB.QUIET_HOLD_SECONDS);
+
+  /**
+   * The rest of the last word. Whisper's word ends are early, so cutting on one
+   * clips the final syllable; this follows the speech itself a little further.
+   */
+  const speechTailEnd = (t0: number, limit: number): number =>
+    loudTailEnd(
+      t0,
+      Math.min(limit, t0 + NB.SPEECH_TAIL_MAX_SECONDS),
+      NB.SPEECH_TAIL_DB_ABOVE_FLOOR,
+      NB.SPEECH_TAIL_QUIET_HOLD_SECONDS,
+    );
+
+  // ---- where the audio itself stops ----
+  // What a listener hears as the end of a line is a pause in the WAVEFORM.
+  // Whisper's word gaps cannot stand in for it on fast or overlapping speech:
+  // it reports gaps of exactly zero and starts the next word up to a second
+  // early, which ends a clip mid-syllable or a beat into the next person's
+  // first word. The pauses below are read off the loudness directly, and they
+  // are preferred over any word-derived stop.
+  const speechLevel = percentile(loudnessDb, 90);
+  const pauseGate = speechLevel - NB.PAUSE_DB_BELOW_SPEECH;
+  const pauses: Array<{ start: number; end: number }> = [];
+  for (let i = 0, quietFrom = -1; i <= loudnessDb.length; i += 1) {
+    const quiet = i < loudnessDb.length && loudnessDb[i] < pauseGate;
+    if (quiet && quietFrom < 0) quietFrom = i;
+    if (!quiet && quietFrom >= 0) {
+      const from = quietFrom * NB.FRAME_SECONDS;
+      const to = i * NB.FRAME_SECONDS;
+      if (to - from >= NB.PAUSE_MIN_AUDIO_SECONDS) pauses.push({ start: from, end: to });
+      quietFrom = -1;
+    }
+  }
+
+  const pausesWithin = (after: number) =>
+    pauses.filter(
+      (p) =>
+        p.start >= re - NB.END_SEARCH_BEFORE_SECONDS && p.start <= re + after && p.start > start + 1,
+    );
+  // A range can end in the middle of someone talking straight through; rather
+  // than cut on a syllable, look a little further out for the next real pause.
+  const inReach = pausesWithin(NB.END_SEARCH_AFTER_SECONDS);
+  const pauseCandidates = (inReach.length > 0
+    ? inReach
+    : pausesWithin(NB.END_SEARCH_AFTER_SECONDS + NB.PAUSE_SEARCH_EXTRA_SECONDS)
+  )
+    .map((p) => {
+      const length = p.end - p.start;
+      // Land inside the pause: the last syllable finishes, nothing of the next
+      // line is heard, and the fade-out has somewhere quiet to live.
+      const t = Math.min(p.start + NB.PAUSE_CUT_OFFSET_SECONDS, p.start + length / 2, windowSeconds);
+      const wordsCrossed = t > re ? words.filter((w) => w.start > re && w.start < t).length : 0;
+      const distancePenalty =
+        t > re
+          ? NB.END_PENALTY_AFTER_PER_SECOND * (t - re) + NB.END_PENALTY_PER_WORD_CROSSED * wordsCrossed
+          : NB.END_PENALTY_BEFORE_PER_SECOND * (re - t);
+      // Loud, word-free audio before the pause is the room reacting.
+      const spokenBefore = words.filter((w) => w.end <= p.start + NB.FRAME_SECONDS);
+      const lastWordEnd = spokenBefore.length > 0 ? spokenBefore[spokenBefore.length - 1].end : 0;
+      // Did the speaker finish the thought, or just take a breath? The words
+      // decide that; the audio only says where the gap is.
+      const lastWord = spokenBefore[spokenBefore.length - 1];
+      const finishedSentence = lastWord !== undefined && SENTENCE_END.test(lastWord.word.trim());
+      const endedPhrase = phraseEnds.some(
+        (t) => Math.abs(t - p.start) <= NB.PHRASE_END_TOLERANCE_SECONDS * 2,
+      );
+      // A long pause is a more definite ending than a short one, up to a point.
+      const score =
+        Math.min(length, NB.PAUSE_LENGTH_SCORE_CAP_SECONDS) +
+        (finishedSentence ? NB.PAUSE_SENTENCE_BONUS : 0) +
+        (endedPhrase ? NB.PAUSE_PHRASE_BONUS : 0) -
+        distancePenalty;
+      const endReason: NATURAL_RANGE["endReason"] =
+        p.start - lastWordEnd >= NB.REACTION_MIN_SECONDS ? "reaction" : "pause";
+      return { t, score, endReason };
+    });
+
+  if (pauseCandidates.length > 0) {
+    const best = pauseCandidates.reduce((a, b) => (b.score > a.score ? b : a));
+    if (best.t - start >= 1) {
+      return { start, end: best.t, endReason: best.endReason };
+    }
+  }
+
+  // No pause anywhere near: the speaker is talking straight through. Whisper
+  // gives no gaps to work with either, so the only remaining signal that a
+  // thought finished is the punctuation it wrote — take that on its own rather
+  // than cut mid-clause.
+  const runOnSpeech = pauseCandidates.length === 0;
 
   // Every stop near the requested end, scored on how much it looks like an
   // ending: quiet after it, a reaction after it, and closeness to the
@@ -118,17 +216,21 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
     .map((w, i) => ({ t: w.end, i }))
     .filter(
       ({ t, i }) =>
-        isStop(i) &&
+        (isStop(i) || (runOnSpeech && SENTENCE_END.test(words[i].word.trim()))) &&
         t >= re - NB.END_SEARCH_BEFORE_SECONDS &&
         t <= re + NB.END_SEARCH_AFTER_SECONDS &&
         t > start + 1,
     )
     .map(({ t, i }) => {
       const nextWordStart = words[i + 1]?.start ?? windowSeconds;
+      const nextWordLimit = Math.min(nextWordStart - NB.NEXT_WORD_GUARD_SECONDS, windowSeconds);
       const reactionEnd = reactionEndAfter(
         t,
-        Math.min(nextWordStart - NB.NEXT_WORD_GUARD_SECONDS, t + NB.REACTION_MAX_SECONDS, windowSeconds),
+        Math.min(nextWordLimit, t + NB.REACTION_MAX_SECONDS),
       );
+      // Whichever runs longer: the room reacting, or the speaker's own last
+      // syllable finishing after the timestamp Whisper gave it.
+      const tailEnd = Math.max(reactionEnd, speechTailEnd(t, nextWordLimit));
       // Later costs more than earlier: past the requested end is where the
       // next thing (another sentence, a song) begins — and every word spoken
       // between the requested end and this stop is live speech the clip would
@@ -141,7 +243,7 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
           : NB.END_PENALTY_BEFORE_PER_SECOND * (re - t);
       const score =
         Math.min(nextWordStart - t, NB.END_GAP_SCORE_CAP_SECONDS) + (reactionEnd - t) - distancePenalty;
-      return { t, nextWordStart, reactionEnd, score };
+      return { t, nextWordStart, reactionEnd, tailEnd, score };
     });
   if (candidates.length === 0) {
     // No stop in reach: keep the requested end (never mid-word), but still
@@ -149,15 +251,17 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
     const splitAtEnd = words.find((w) => w.start < re && re < w.end);
     const floor = splitAtEnd ? splitAtEnd.end : re;
     const nextWordStart = words.find((w) => w.start >= floor)?.start ?? windowSeconds;
+    const nextWordLimit = Math.min(nextWordStart - NB.NEXT_WORD_GUARD_SECONDS, windowSeconds);
     const reactionEnd = reactionEndAfter(
       floor,
-      Math.min(nextWordStart - NB.NEXT_WORD_GUARD_SECONDS, floor + NB.REACTION_MAX_SECONDS, windowSeconds),
+      Math.min(nextWordLimit, floor + NB.REACTION_MAX_SECONDS),
     );
+    const tailEnd = Math.max(reactionEnd, speechTailEnd(floor, nextWordLimit));
     return {
       start,
       end: Math.max(
         floor,
-        Math.min(reactionEnd + NB.TAIL_PAD_SECONDS, nextWordStart - NB.NEXT_WORD_GUARD_SECONDS, windowSeconds),
+        Math.min(tailEnd + NB.TAIL_PAD_SECONDS, nextWordStart - NB.NEXT_WORD_GUARD_SECONDS, windowSeconds),
       ),
       endReason: reactionEnd - floor >= NB.REACTION_MIN_SECONDS ? "reaction" : "unchanged",
     };
@@ -166,7 +270,7 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
   const end = Math.max(
     best.t,
     Math.min(
-      best.reactionEnd + NB.TAIL_PAD_SECONDS,
+      best.tailEnd + NB.TAIL_PAD_SECONDS,
       best.nextWordStart - NB.NEXT_WORD_GUARD_SECONDS,
       windowSeconds,
     ),
@@ -222,6 +326,43 @@ function selfCheck(): void {
   const silent = planNaturalRange({ ...base, loudnessDb: quiet });
   if (silent.endReason !== "pause" || silent.end > 5.3) {
     throw new Error(`end should land on the stop at 5.0, got ${silent.end} (${silent.endReason})`);
+  }
+
+  // The speaker is still finishing "punchline." at 5.0 — Whisper's word end is
+  // early, and the audio runs to 5.4. Ending on the number clips the syllable.
+  const trailing = planNaturalRange({
+    ...base,
+    loudnessDb: [...frames(5.4, -20), ...frames(4.6, -40)],
+  });
+  if (trailing.end < 5.4 || trailing.end >= words[8].start) {
+    throw new Error(`end should follow the last word's audio past 5.4 (and stop short of the next sentence), got ${trailing.end}`);
+  }
+
+  // Whisper at its worst — the case that shipped clips ending mid-sentence:
+  // zero-length gaps between every word, and the next line's first word timed a
+  // second before it is actually spoken. Only the waveform shows the real end.
+  const runOn: GROQ_TRANSCRIPTION_WORD[] = [
+    { word: "We", start: 2, end: 2.4 },
+    { word: "will", start: 2.4, end: 2.7 },
+    { word: "show", start: 2.7, end: 3.1 },
+    { word: "you", start: 3.1, end: 3.4 },
+    { word: "who", start: 3.4, end: 3.7 },
+    { word: "we", start: 3.7, end: 4.2 },
+    { word: "are", start: 4.2, end: 5 },
+    { word: "if", start: 5, end: 5.4 },
+    { word: "you", start: 5.4, end: 5.8 },
+  ];
+  const runOnPlan = planNaturalRange({
+    requestedStart: 2,
+    requestedEnd: 5.3,
+    windowSeconds: 10,
+    words: runOn,
+    segments: [{ id: 0, start: 2, end: 5.8, text: "We will show you who we are if you" }],
+    // Speech to 5.2, silence to 6.4, the next line from there.
+    loudnessDb: [...frames(5.2, -18), ...frames(1.2, -70), ...frames(3.6, -18)],
+  });
+  if (runOnPlan.end < 5.2 || runOnPlan.end > 5.6) {
+    throw new Error(`end should land inside the pause at 5.2–6.4, got ${runOnPlan.end}`);
   }
 
   // Every segment flagged as invented: nothing is trustworthy, keep the request.
