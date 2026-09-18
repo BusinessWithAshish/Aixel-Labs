@@ -16,8 +16,11 @@ import { cutClip, cutClipFromStream, probeMediaStreams } from "./ffmpeg-cut";
 import { findNaturalRange } from "./natural-boundaries";
 import { parseProxyUrlForBridge, ProxyConnectBridge } from "./proxy-bridge";
 import { reframeClipBySpeaker } from "./reframe";
+import { planLogoCover } from "./logo";
 import type {
   CLIP_RANGE,
+  CUT_LOGO_PLAN,
+  CUT_LOGO_REQUEST,
   CUT_CLIP_BOUNDARIES,
   CUT_CLIP_REFRAME,
   MEDIA_ASPECT_RATIO_VALUE,
@@ -58,6 +61,8 @@ export async function cutClipsFromVideo(
   boundaries: MEDIA_BOUNDARY_VALUE = MEDIA_NATURAL_BOUNDARIES.DEFAULT_MODE,
   /** Spoken-language hint for `boundaries: "natural"` (ISO 639-1). */
   language?: string,
+  /** Take a burned-in logo out of the source BEFORE any crop — see `cut/logo.ts`. */
+  logo?: CUT_LOGO_REQUEST,
 ): Promise<MEDIA_CUT_RESPONSE> {
   assertPersistentDisk(MEDIA_ERROR_MESSAGES.VERCEL);
   const resolved = await resolveVideoSourceForCut(videoSource);
@@ -92,6 +97,41 @@ export async function cutClipsFromVideo(
     // actually applied, so echoing back whatever the caller requested would
     // claim a framing decision that never happened.
     const responseAspectRatio: MEDIA_ASPECT_RATIO_VALUE = hasVideo ? aspectRatio : "original";
+
+    // Planned once per call, not per clip: the logo is nailed to one place in
+    // the source frame, so one probe answers for every range. Absent `logo`,
+    // nothing below changes at all — `logoFilter` stays undefined and every
+    // ffmpeg invocation is byte-identical to before.
+    let logoPlan: CUT_LOGO_PLAN | undefined;
+    if (logo && hasVideo) {
+      const firstStart = clips.length > 0 ? parseTimestampToSeconds(clips[0].start) : 0;
+      logoPlan = await planLogoCover({
+        logo,
+        probePath: join(MEDIA_CUT_OUTPUT_DIR, `.logo-probe-${randomUUID()}.mp4`),
+        probeStartSeconds: Math.min(firstStart, Math.max(0, durationSeconds - 1)),
+        sourceDurationSeconds: durationSeconds,
+        // Stream-direct already uses inputs 0 (video) and 1 (audio), so the
+        // image lands at 2 there and at 1 for a plain file source.
+        imageInputIndex: resolved.kind === "youtube" ? 2 : 1,
+        cutProbe: async (start, end, out) => {
+          if (resolved.kind === "youtube") {
+            await cutClipFromStream(
+              resolved.videoUrl,
+              resolved.audioUrl,
+              start,
+              end,
+              out,
+              "original",
+              ffmpegProxyUrl,
+            );
+          } else {
+            await cutClip(resolved.path, start, end, out, "original", hasVideo);
+          }
+        },
+      });
+    }
+    const logoFilter = logoPlan?.filter;
+    const logoImage = logoPlan?.replaceWith;
 
     const results = [];
     for (const clip of clips) {
@@ -162,9 +202,21 @@ export async function cutClipsFromVideo(
             current,
             rangeAspect,
             ffmpegProxyUrl,
+            logoFilter,
+            logoImage,
           );
         } else {
-          await cutClip(resolved.path, rangeStart, rangeEnd, current, rangeAspect, hasVideo);
+          await cutClip(
+            resolved.path,
+            rangeStart,
+            rangeEnd,
+            current,
+            rangeAspect,
+            hasVideo,
+            undefined,
+            logoFilter,
+            logoImage,
+          );
         }
 
         if (natural) {
@@ -243,7 +295,7 @@ export async function cutClipsFromVideo(
       });
     }
 
-    return { clips: results };
+    return { clips: results, ...(logoPlan ? { logo: logoPlan } : {}) };
   } finally {
     await bridge?.stop().catch(() => {});
     await cleanupResolvedMediaSource(resolved);

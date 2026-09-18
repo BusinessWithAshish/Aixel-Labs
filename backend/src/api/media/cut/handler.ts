@@ -15,5 +15,6 @@ export const mediaCutHandler = createMediaHandler({
       input.reframe,
       input.boundaries,
       input.language,
+      input.logo,
     ),
 });

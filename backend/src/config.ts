@@ -288,6 +288,7 @@ export const API_ENDPOINTS = {
     CUT: { route: "/cut", full: `${ENDPOINTS.MEDIA}/cut` },
     CONDENSE: { route: "/condense", full: `${ENDPOINTS.MEDIA}/condense` },
     CAPTION: { route: "/caption", full: `${ENDPOINTS.MEDIA}/caption` },
+    EFFECTS: { route: "/effects", full: `${ENDPOINTS.MEDIA}/effects` },
     SHARE: { route: "/share", full: `${ENDPOINTS.MEDIA}/share` },
     UPLOAD: {
       /** `:uploadId` is a literal Express param placeholder — substitute the real id when calling. */

@@ -190,8 +190,8 @@ tool entirely; `youtube`'s diarize response carries no such field either).
 
 ### `POST /media/cut`
 
-`{ videoSource, clips[{start,end,label?}], diarized?, aspectRatio?, reframe?, boundaries?, language? }` ->
-`{ clips: CUT_CLIP_RESULT[] }`, one entry per requested range with the actual
+`{ videoSource, clips[{start,end,label?}], diarized?, aspectRatio?, reframe?, boundaries?, language?, logo? }` ->
+`{ clips: CUT_CLIP_RESULT[], logo? }`, one entry per requested range with the actual
 boundaries used, the resolved `aspectRatio`, and the finished clip's local
 `clipPath` (under `MEDIA_CUT_OUTPUT_DIR`).
 
@@ -203,6 +203,37 @@ range falling outside the source's real duration yields an `error` on that
 entry rather than failing the whole call. Still the one op in this module
 that keeps its own YouTube-specific handling (the stream-direct path below)
 — not yet generalized, a deliberately parked follow-up.
+
+#### Removing a burned-in logo (`logo`)
+
+`logo: { regions: "auto" | [{x,y,width,height}] (SOURCE pixels), style?: fill|blur|pixelate, strength? }`
+takes a creator's bug or a sponsor ident out of the source **before anything
+crops**, and reports what it did once per call as `logo` (never per clip —
+the mark does not move between ranges).
+
+**Why here and not in `effects`.** In the source frame a logo is nailed to one
+place. In a clip already reframed to follow the speaker it is not: the crop
+slides different parts of the picture through the output, so the same mark
+lands in different places at different times, and in a `wide` segment somewhere
+else again. Covering it afterwards means tracking a moving target; covering it
+before the crop means covering a rectangle that never moves. The filter is
+prepended to the **first** cut only, so the natural-boundary trim and the
+speaker reframe inherit clean footage and need no knowledge of it.
+
+`regions: "auto"` cuts one short unframed probe (`MEDIA_HIDE.PROBE_SECONDS`)
+and finds overlays that are both **static across the probe and structured** —
+stillness alone selects the dark background of every locked-off set. Compactness
+is judged on the **un-dilated** extent, which is what separates a bug (roughly
+square) from the edge of a letterbox bar (a line); that edge is perfectly static
+with a hard gradient and otherwise scores like a logo. Explicit regions skip the
+probe entirely and are the better path once a creator's mark is known.
+
+`style: "fill"` (default) paints the region in the colour sampled from a thin
+ring just outside it — invisible on a plain set, where a blur still reads as a
+smudge. It is gated on **consensus** (the share of ring pixels matching the
+colour to be painted) and **drift** (whether that colour holds across frames);
+failing either falls back to `blur` and reports `fellBackFrom` with the
+measurements, rather than painting a patch that looks like a sticker.
 
 #### Natural boundaries (`boundaries: "natural"`)
 
@@ -368,6 +399,48 @@ opt out.
 `burn: false` writes only the `.srt` and skips the re-encode — for reviewing
 or editing the text before committing to a render. Video is re-encoded
 (pixels change); audio is stream-copied.
+
+### `POST /media/effects`
+
+`{ videoSource, grade?, hide?, logo?, preview?, at? }` ->
+`{ outputPath?, previews?, tileOrder?, applied?, hide?, logo?, durationSeconds, width, height }`.
+
+Also the `media` MCP tool's `effects` op. Colour-grades a clip, covers a region,
+and composites your own mark — as **one filtergraph**, so however many of the
+three are asked for it stays one decode and one encode. Audio is stream-copied
+untouched; video settings match `caption`'s burn, so a clip through both is
+encoded twice at one quality rather than degrading in steps.
+
+Order inside the op is fixed and deliberate: **grade → hide → logo**. Grading
+applies to the footage as shot; blurring after the grade means the patch is made
+of already-graded pixels and blends; the mark goes last so it is never graded
+(a channel mark that shifts hue with every preset stops being a constant) and
+never within reach of `hide`.
+
+**Run this before `caption`** — captions burn in white-with-outline, and grading
+afterwards shifts their colour.
+
+- **`grade`** — `{preset: neutral|punch|warm|cool|film|mono, contrast?, brightness?,
+  saturation?, gamma?, temperature?, sharpen?}`. Every field but `preset` is an
+  override appended on top of it. Presets are parametric (`MEDIA_GRADE_PRESETS`),
+  not `.cube` LUTs: nothing to license, every value readable and tunable here.
+  `punch` is a contrast look and `warm` a colour look — different in kind, not in
+  strength, because a first version that drove both with saturation made them
+  look like one idea twice. `film` carries temporal grain and therefore encodes
+  larger than the others.
+- **`preview: true`** — renders **no video**. Grabs stills and tiles the same
+  frame through every preset into one labelled contact sheet per frame. This is
+  how a look gets picked: a grade is judged by eye on real footage, never from
+  its numbers. Two frames by default (a third and two thirds in), because a grade
+  reads differently on a bright scene and a dark one. Labels go through libass,
+  not `drawtext` — this host's `ffmpeg-static` has no libfreetype.
+- **`hide`** — for a region already known in a finished clip. For a *creator's
+  logo*, use `cut`'s `logo` input instead (see above): it runs before the crop,
+  where the mark still holds still. `regions: "auto"` here always writes
+  `proofPath`, a still with every candidate outlined in red — look at it before
+  trusting a run.
+- **`logo`** — `{file, position?, scale?, opacity?, margin?}`, composited from a
+  local image. Never generated: a channel mark is a real file.
 
 ### `POST /media/share`
 

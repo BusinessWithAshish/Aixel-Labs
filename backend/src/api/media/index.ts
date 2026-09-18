@@ -11,6 +11,7 @@ import {
   mediaCaptionHandler,
   mediaShareHandler,
 } from "./handler";
+import { mediaEffectsHandler } from "./effects/handler";
 import {
   mediaUploadChunkHandler,
   mediaUploadCompleteHandler,
@@ -26,6 +27,7 @@ mediaRoutes.post(API_ENDPOINTS.MEDIA.DIARIZE.route, mediaDiarizeHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.CUT.route, mediaCutHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.CONDENSE.route, mediaCondenseHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.CAPTION.route, mediaCaptionHandler);
+mediaRoutes.post(API_ENDPOINTS.MEDIA.EFFECTS.route, mediaEffectsHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.SHARE.route, mediaShareHandler);
 
 mediaRoutes.post(API_ENDPOINTS.MEDIA.UPLOAD.INIT.route, mediaUploadInitHandler);
@@ -49,6 +51,7 @@ export { diarizeFromSource } from "./diarize/audio";
 export { cutClipsFromVideo } from "./cut/cut";
 export { condenseVideo } from "./condense/client";
 export { captionVideo } from "./caption/caption";
+export { applyEffects } from "./effects/effects";
 export { shareMedia } from "./share/share";
 
 /* Source resolution — shared by every op that takes a media source. */
@@ -112,6 +115,11 @@ export type {
   MEDIA_TRANSCRIBE_REQUEST_PARSED,
   MEDIA_TRANSCRIBE_RESPONSE,
 } from "./transcribe/types";
+
+export type {
+  MEDIA_EFFECTS_REQUEST_PARSED,
+  MEDIA_EFFECTS_RESPONSE,
+} from "./effects/types";
 
 export type {
   TIME_RANGE,

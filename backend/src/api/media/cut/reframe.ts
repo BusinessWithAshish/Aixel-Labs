@@ -112,6 +112,7 @@ async function runWorker(
   const args = ["-m", "reframe", sourcePath, "--out", planPath, "--aspect", aspectRatio];
   if (ffmpegPath) args.push("--ffmpeg", ffmpegPath);
   if (MEDIA_REFRAME.MODELS_DIR) args.push("--models-dir", MEDIA_REFRAME.MODELS_DIR);
+  args.push("--wide-overlap", String(MEDIA_REFRAME.WIDE_OVERLAP_SECONDS));
 
   try {
     await execFileAsync(python, args, {

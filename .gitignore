@@ -129,3 +129,6 @@ Thumbs.db
 *.egg
 
 /frontend/app/firebase-service.json
+# Generated tool output (brag video, graphify graph) — not source
+/brag-output/
+/graphify-out/

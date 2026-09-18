@@ -20,6 +20,10 @@ export const AIXEL_MEDIA = {
   /** Where `media.caption` writes the burned-in clip and its `.srt` sidecar. Separate from MEDIA_CUTS so a
    * captioned result is never confused with the raw cut it came from — both survive, and the caller picks. */
   MEDIA_CAPTIONS: join(AIXEL_MEDIA_ROOT, "private", "media-captions"),
+  /** Where `media.effects` writes graded/treated clips and its preset contact sheets. Separate from
+   * MEDIA_CUTS and MEDIA_CAPTIONS for the same reason those are separate from each other: a treated
+   * clip and the cut it came from both survive, and the caller picks which one goes on to the next step. */
+  MEDIA_EFFECTS: join(AIXEL_MEDIA_ROOT, "private", "media-effects"),
   /** Where the diarize ops write full transcripts, so \`segment\` can be handed a
    * path instead of the model re-sending a ~50K-token transcript as a tool
    * argument (see api/media/diarize/transcript-store.ts). */

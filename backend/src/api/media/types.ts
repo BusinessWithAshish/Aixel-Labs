@@ -9,6 +9,12 @@ import type {
 import type { MEDIA_DIARIZE_REQUEST_SCHEMA } from "./diarize/schemas";
 import type { MEDIA_CUT_REQUEST_SCHEMA } from "./cut/schemas";
 import type { MEDIA_FETCH_REQUEST_SCHEMA } from "./fetch/schemas";
+import type {
+  DETECTED_REGION,
+  HIDE_REGION,
+  HIDE_STYLE,
+  SURROUND_COLOUR,
+} from "./effects/types";
 
 export type MEDIA_DIARIZE_REQUEST = z.input<typeof MEDIA_DIARIZE_REQUEST_SCHEMA>;
 export type MEDIA_DIARIZE_REQUEST_PARSED = z.output<
@@ -151,4 +157,34 @@ export type CUT_CLIP_RESULT = {
 
 export type MEDIA_CUT_RESPONSE = {
   clips: CUT_CLIP_RESULT[];
+  /** Present only when `logo` was requested. One plan per call — the logo does not move between clips. */
+  logo?: CUT_LOGO_PLAN;
+};
+
+/** `cut`'s `logo` input — take a burned-in logo out of the source before any crop. */
+export type CUT_LOGO_REQUEST = {
+  regions: "auto" | HIDE_REGION[];
+  style?: HIDE_STYLE;
+  strength?: number;
+  /** `style: "replace"` — the mark pasted where the source's was, before any crop. */
+  replaceWith?: string;
+  /** Key a flat background out of `replaceWith`; `"auto"` samples its corner pixel. */
+  keyColor?: string;
+};
+
+/** What `cut` did about the logo, reported once per call (not per clip). */
+export type CUT_LOGO_PLAN = {
+  regions: HIDE_REGION[];
+  covers: {
+    region: HIDE_REGION;
+    style: HIDE_STYLE;
+    surround?: SURROUND_COLOUR;
+    fellBackFrom?: HIDE_STYLE;
+  }[];
+  detected?: DETECTED_REGION[];
+  /** The chain that was prepended to the first cut. Absent when nothing was covered. */
+  filter?: string;
+  /** The image the chain pastes from, when `replace` was used. */
+  replaceWith?: string;
+  note?: string;
 };

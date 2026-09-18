@@ -91,15 +91,25 @@ export async function getMediaDurationSeconds(inputPath: string): Promise<number
  */
 function buildAspectRatioFilter(
   aspectRatio: MEDIA_ASPECT_RATIO_VALUE,
+  /**
+   * Filters to run BEFORE the crop, on the full source frame — currently the
+   * logo cover (see `cut/logo.ts`). It must come first: its coordinates are
+   * source coordinates, and after the crop they would point somewhere else
+   * entirely. Everything downstream of this pass then works on footage the
+   * logo has already been taken out of, which is why the natural-boundary trim
+   * and the speaker reframe need no knowledge of it at all.
+   */
+  prefix?: string,
 ): string | undefined {
-  if (aspectRatio === "original") return undefined;
+  if (aspectRatio === "original") return prefix;
 
   const { ratioW, ratioH, outputWidth, outputHeight } =
     MEDIA_ASPECT_RATIO_DIMENSIONS[aspectRatio];
   const wider = `gt(iw*${ratioH},ih*${ratioW})`;
   const cropW = `if(${wider},ih*${ratioW}/${ratioH},iw)`;
   const cropH = `if(${wider},ih,iw*${ratioH}/${ratioW})`;
-  return `crop='${cropW}':'${cropH}',scale=${outputWidth}:${outputHeight},setsar=1`;
+  const crop = `crop='${cropW}':'${cropH}',scale=${outputWidth}:${outputHeight},setsar=1`;
+  return prefix ? `${prefix},${crop}` : crop;
 }
 
 /**
@@ -165,12 +175,19 @@ export async function cutClip(
   hasVideo: boolean,
   /** Short audio fades at the clip's edges, in seconds. Filters see the input's own timeline, so fade times are absolute. */
   fade?: { inSeconds: number; outSeconds: number },
+  /** Source-coordinate filters to run before any crop — see `buildAspectRatioFilter`. */
+  videoPrefix?: string,
+  /** Local image the prefix pastes from, when a cover uses `replace`. */
+  overlayImage?: string,
 ): Promise<void> {
   if (!ffmpegPath) {
     throw new Error(MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED);
   }
 
-  const videoFilter = hasVideo ? buildAspectRatioFilter(aspectRatio) : undefined;
+  const videoFilter = hasVideo ? buildAspectRatioFilter(aspectRatio, videoPrefix) : undefined;
+  // A replacement image is a second input, and a second input means
+  // `-filter_complex` with explicit labels rather than `-vf`.
+  const complex = Boolean(videoFilter && overlayImage);
   const audioFilter = fade
     ? `afade=t=in:st=${startSeconds.toFixed(3)}:d=${fade.inSeconds},` +
       `afade=t=out:st=${Math.max(startSeconds, endSeconds - fade.outSeconds).toFixed(3)}:d=${fade.outSeconds}`
@@ -181,13 +198,18 @@ export async function cutClip(
       "-y",
       "-i",
       inputPath,
+      ...(complex && overlayImage ? ["-i", overlayImage] : []),
       "-ss",
       startSeconds.toFixed(3),
       "-to",
       endSeconds.toFixed(3),
       ...(hasVideo
         ? [
-            ...(videoFilter ? ["-vf", videoFilter] : []),
+            ...(complex
+              ? ["-filter_complex", `[0:v]${videoFilter}[v]`, "-map", "[v]", "-map", "0:a?"]
+              : videoFilter
+                ? ["-vf", videoFilter]
+                : []),
             "-c:v",
             MEDIA.FFMPEG_VIDEO_CODEC,
             "-preset",
@@ -243,12 +265,16 @@ export async function cutClipFromStream(
   outputPath: string,
   aspectRatio: MEDIA_ASPECT_RATIO_VALUE,
   proxyUrl?: string,
+  /** Source-coordinate filters to run before any crop — see `buildAspectRatioFilter`. */
+  videoPrefix?: string,
+  /** Local image the prefix pastes from, when a cover uses `replace`. */
+  overlayImage?: string,
 ): Promise<void> {
   if (!ffmpegPath) {
     throw new Error(MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED);
   }
 
-  const videoFilter = buildAspectRatioFilter(aspectRatio);
+  const videoFilter = buildAspectRatioFilter(aspectRatio, videoPrefix);
   const fastSeek = Math.max(0, Number(startSeconds) - STREAM_DIRECT_FAST_SEEK_BACKUP_SECONDS);
   const accurateSeek = Number(startSeconds) - fastSeek;
   const duration = Number(endSeconds) - Number(startSeconds);
@@ -262,9 +288,16 @@ export async function cutClipFromStream(
   }
   // Accurate output-level seek recovers frame precision within the
   // fast-seek window; -t limits the output duration.
+  // The image is a third input here (0 = video stream, 1 = audio stream), and
+  // it must be added before the output-level seek options below.
+  if (videoFilter && overlayImage) args.push("-i", overlayImage);
   args.push("-ss", accurateSeek.toFixed(3), "-t", duration.toFixed(3));
-  args.push("-map", "0:v", "-map", "1:a");
-  if (videoFilter) args.push("-vf", videoFilter);
+  if (videoFilter && overlayImage) {
+    args.push("-filter_complex", `[0:v]${videoFilter}[v]`, "-map", "[v]", "-map", "1:a");
+  } else {
+    args.push("-map", "0:v", "-map", "1:a");
+    if (videoFilter) args.push("-vf", videoFilter);
+  }
   args.push(
     "-c:v", MEDIA.FFMPEG_VIDEO_CODEC,
     "-preset", MEDIA.FFMPEG_PRESET,

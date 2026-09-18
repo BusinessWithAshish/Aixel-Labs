@@ -10,6 +10,20 @@ import { AIXEL_MEDIA } from "../../media";
  */
 
 export const MEDIA_FIELD_DESCRIPTIONS = {
+  cutLogo:
+    "Take a burned-in logo (a creator's bug, a sponsor ident) out of the SOURCE before anything is cropped. This is the right place for it and `effects` is not: in the source frame the logo never moves, while in a clip that has been reframed to follow the speaker it lands somewhere different from moment to moment. Covering it here means the reframe, the captions and everything after simply never see it. `regions: \"auto\"` cuts one short unframed probe from the source and finds the logo itself; an explicit list of SOURCE-pixel rectangles skips the probe, which is the better path once a creator's mark is known. `style: \"fill\"` (default) paints the region in the colour of the background around it — invisible on a plain set — and falls back to `blur` when that background is not flat enough, reporting why.",
+  effectsHide:
+    "Cover part of every frame — a creator's bug, a sponsor ident, a broadcaster watermark. `regions: \"auto\"` finds burned-in overlays itself (static across the clip AND structured, so a plain dark background is not mistaken for one) and always writes a proof still with the boxes drawn on it, so what got covered can be checked rather than trusted. Explicit `[{x,y,width,height}]` regions in SOURCE PIXELS skip detection entirely — the right choice once a creator's mark is known, since it sits in the same place in everything they publish.",
+  effectsLogo:
+    "Composite your own mark onto every frame from a local image file (PNG with alpha normally). Applied LAST, after grade and hide, so your own mark is never graded or blurred.",
+  effectsVideoSource:
+    "Local filesystem path (normally a `cut` output) or a publicly-reachable URL of the video to treat. Grade BEFORE captioning: captions are burned white-with-outline, and grading afterwards shifts their colour.",
+  effectsGrade:
+    "The colour treatment. `preset` names one of the built-in looks; every other field is an override applied on top of it, so `{preset: \"warm\", saturation: 1.2}` is the warm look with more saturation. Omit `grade` entirely with `preview: true` to see every preset at once.",
+  effectsPreview:
+    "true = render no video. Instead, grab still frames from the clip, apply EVERY preset to each one, and tile them into a labelled contact sheet per frame so the looks can be compared side by side on the same footage. This is how a look gets chosen — a grade is judged by eye on real frames, not from its numbers.",
+  effectsAt:
+    "Preview only: which timestamps (seconds) to grab frames at, one sheet per timestamp. Defaults to two frames, a third and two thirds of the way in, because a grade reads very differently on a bright scene and a dark one.",
   sharePath:
     "Absolute path of a file this backend produced under the private media root (e.g. a `caption` or `cut` output).",
   mediaSource:
@@ -112,6 +126,20 @@ export const MEDIA_REFRAME = {
    */
   WIDE_BACKGROUND_SCALE: 0.25,
   WIDE_BACKGROUND_BLUR_RADIUS: 12,
+  /**
+   * Seconds two faces must talk over each other before the frame pulls out to
+   * show both.
+   *
+   * At the worker's own default of 1.5 s a short interjection never qualified:
+   * the host says two words over the guest — well under a second — the crop
+   * stays on the guest, and the viewer hears a voice with nobody on screen.
+   * 0.8 s catches a two-word interjection while staying above the 0.45 s
+   * minimum-run merge, so the frame does not flicker on every "mm-hmm".
+   *
+   * Passed explicitly rather than left to the worker so the value lives here
+   * with the rest of the tuning, not in Python.
+   */
+  WIDE_OVERLAP_SECONDS: 0.8,
 } as const;
 
 /** How `/video/cut` places a clip's edges: exactly as requested, or on the audio's natural stops. */
@@ -184,7 +212,22 @@ export const MEDIA_NATURAL_BOUNDARIES = {
   PAUSE_DB_BELOW_SPEECH: 25,
   /** A breath mid-sentence is ~0.2 s and looks identical in the waveform; the end of a thought runs longer. */
   PAUSE_MIN_AUDIO_SECONDS: 0.35,
-  PAUSE_CUT_OFFSET_SECONDS: 0.12,
+  /**
+   * How far INTO the chosen pause the cut lands — i.e. how much breathing room
+   * the clip gets after the last word.
+   *
+   * Measured 2026-09-18 across 11 shipped clips from two episodes: every one
+   * of them had effectively zero quiet at the end. The boundary picker was
+   * working correctly — it reported `endReason: "pause"` and had genuinely
+   * found a real pause — but at 0.12 s it cut almost on top of the last
+   * syllable, so a correctly-chosen ending still *felt* abrupt.
+   *
+   * The clamp below (`length / 2`) is what makes a larger value safe: the cut
+   * never goes past the middle of the pause, so a short pause still yields a
+   * short offset and nothing of the next line is ever heard. On a minimum
+   * 0.35 s pause this gives 0.175 s; on a generous one, the full value.
+   */
+  PAUSE_CUT_OFFSET_SECONDS: 0.4,
   /** How much a longer pause is worth when choosing between them (seconds, capped). */
   PAUSE_LENGTH_SCORE_CAP_SECONDS: 1,
   /**
@@ -372,6 +415,20 @@ export const MEDIA_ERROR_MESSAGES = {
   CAPTION_EMPTY:
     "Transcription produced no usable cues (silent or unintelligible audio) — no caption file was written",
   CAPTION_BURN_FAILED: "ffmpeg failed to burn in captions",
+  EFFECTS_NO_VIDEO:
+    "The source has no video track — a colour grade can only be applied to a video",
+  EFFECTS_RENDER_FAILED: "ffmpeg failed to render the graded clip",
+  EFFECTS_PREVIEW_FAILED: "ffmpeg failed to build the preset preview sheet",
+  EFFECTS_NOTHING_TO_DO:
+    "No treatment was asked for — pass at least one of `grade`, `hide` or `logo`, or `preview: true`",
+  EFFECTS_LOGO_MISSING: "The logo file does not exist or is not readable",
+  EFFECTS_REPLACE_NO_IMAGE:
+    "hide.style is \"replace\" but no hide.replaceWith image was given — replace pastes an image over the region, so it needs one",
+  EFFECTS_DETECT_FAILED: "Could not sample frames to detect static overlays",
+  EFFECTS_SURROUND_FAILED:
+    "Could not sample the background colour around the region (too close to the frame edge, or the source would not seek)",
+  EFFECTS_DETECT_NONE:
+    "No static overlay was found in this clip — pass explicit regions if there is one to cover",
   CAPTION_SUBTITLE_PARSE_FAILED:
     "Could not parse the supplied `subtitles` as SRT or VTT",
 } as const;
@@ -542,3 +599,352 @@ Words:
 
 /** Where `media.fetch` writes a genuine remote download — see AIXEL_MEDIA.MEDIA_FETCHED. */
 export const MEDIA_FETCH_DIR = AIXEL_MEDIA.MEDIA_FETCHED;
+
+/** Where `media.effects` writes graded clips and preview sheets. */
+export const MEDIA_EFFECTS_OUTPUT_DIR = AIXEL_MEDIA.MEDIA_EFFECTS;
+
+/**
+ * The built-in colour looks for `effects` op, each an ordered list of ffmpeg
+ * video filters applied in sequence.
+ *
+ * Parametric rather than `.cube` LUT files on purpose: nothing to license or
+ * ship, every value is readable and tunable in this file, and a preset can be
+ * adjusted after seeing it on real footage instead of being a black box. The
+ * numbers here are a deliberate starting point, not a finished house style —
+ * `preview: true` exists precisely so they get judged on real frames and
+ * changed.
+ *
+ * Keep them conservative. A grade that is obvious on a still is usually too
+ * strong across a whole clip, and every one of these runs on footage someone
+ * else shot and already graded once.
+ */
+export const MEDIA_GRADE_PRESETS = {
+  /** Do-no-harm: the smallest lift that still reads as "treated". */
+  neutral: ["eq=contrast=1.06:saturation=1.06:gamma=1.01"],
+  /**
+   * The social/Shorts default. A CONTRAST look, deliberately hue-neutral: an
+   * S-curve that crushes the shadows and lifts the highlights, real
+   * sharpening, and only a token saturation lift.
+   *
+   * It carries no colour of its own on purpose. The first version drove the
+   * effect with saturation plus `vibrance`, which on warm-lit skin read as
+   * orange and made this preset and `warm` look like the same idea at two
+   * strengths. Contrast and colour are the two independent axes available, so
+   * one preset gets each.
+   */
+  punch: [
+    "curves=all='0/0 0.25/0.20 0.5/0.5 0.75/0.80 1/1'",
+    "eq=saturation=1.10",
+    "unsharp=5:5:0.8:5:5:0.0",
+  ],
+  /**
+   * Teal-orange: a COLOUR look. Cool shadows, warm mids and highlights, and
+   * almost no contrast of its own so it stays distinguishable from `punch` on
+   * the same frame — the split-tone is the whole effect.
+   *
+   * Most of the warmth sits in the mids and highlights rather than the shadow
+   * push, because podcast footage is largely near-black: tint the shadows
+   * hard and the tint becomes the whole frame, which reads as `cool` rather
+   * than as teal-orange. Warming the subject and leaving the background dark
+   * is what makes the split visible.
+   */
+  warm: [
+    "colorbalance=rs=-0.02:bs=0.05:rm=0.03:bm=-0.02:rh=0.10:bh=-0.07",
+    "eq=contrast=1.04:saturation=1.06",
+  ],
+  /** Cold and moody: blue-shifted, desaturated, slightly harder. */
+  cool: [
+    "colorbalance=bs=0.09:bm=0.05:rh=-0.04",
+    "eq=contrast=1.10:saturation=0.82",
+  ],
+  /**
+   * Film. Four things together, because no one of them reads as film alone:
+   * a small toe lift with an S above it (so it does not wash out the way a
+   * plain lifted-black curve does on footage shot against black), a
+   * green-cool shadow / warm highlight split, muted colour, and GRAIN.
+   *
+   * The grain is what actually sells it. The first version was a lift and a
+   * desaturation, and the honest verdict on it was "I don't know if that's
+   * film-like or not" — which it was not, because every digital-looking
+   * frame is perfectly clean and this one still was. `noise` is temporal
+   * (`t`), so it moves frame to frame like real grain instead of sitting
+   * there as a fixed dirty overlay.
+   *
+   * It costs bitrate: grain is by definition incompressible detail, so a
+   * graded file comes out larger than the same clip under any other preset.
+   */
+  film: [
+    "curves=all='0/0.03 0.25/0.23 0.75/0.79 1/0.96'",
+    "colorbalance=gs=0.02:bs=0.015:rh=0.035:bh=-0.02",
+    "eq=contrast=1.02:saturation=0.86",
+    "noise=alls=7:allf=t+u",
+  ],
+  /** High-contrast black and white. A whole-channel identity choice, not a per-clip one. */
+  mono: ["hue=s=0", "eq=contrast=1.28:gamma=0.98"],
+} as const;
+
+export const MEDIA_GRADE_PRESET_NAMES = [
+  "neutral",
+  "punch",
+  "warm",
+  "cool",
+  "film",
+  "mono",
+] as const;
+
+export const MEDIA_EFFECTS = {
+  DEFAULT_PRESET: "neutral" as const,
+  /**
+   * Accepted ranges for the grade overrides. Bounds exist so a typo cannot
+   * produce an unwatchable clip: `eq` happily accepts a saturation of 50, and
+   * the result is a solid block of colour that still encodes and still uploads.
+   */
+  GRADE_BOUNDS: {
+    CONTRAST: { MIN: 0, MAX: 4 },
+    BRIGHTNESS: { MIN: -1, MAX: 1 },
+    SATURATION: { MIN: 0, MAX: 3 },
+    GAMMA: { MIN: 0.1, MAX: 10 },
+    /** Kelvin. Below ~6500 warms, above cools. */
+    TEMPERATURE: { MIN: 1000, MAX: 40000 },
+    SHARPEN: { MIN: 0, MAX: 2 },
+  },
+  /** Encode settings, identical to `caption`'s burn — one look for every re-encode this backend does. */
+  ENCODE: { preset: "veryfast", crf: "20", pixelFormat: "yuv420p" },
+  PREVIEW: {
+    /** Tiles per row. 4 keeps a 7-tile sheet (original + 6 presets) to two rows on a phone. */
+    COLUMNS: 4,
+    /** Each tile's width in pixels; height follows the source's own aspect ratio. */
+    TILE_WIDTH: 420,
+    /** Fractions of the duration used when `at` is not given. */
+    DEFAULT_AT_FRACTIONS: [0.33, 0.66],
+    /** Hard ceiling on sheets per call — each one is a full render pass. */
+    MAX_FRAMES: 5,
+    /** Label band: font size and inset as fractions of the tile width. */
+    LABEL_FONT_RATIO: 0.11,
+    LABEL_INSET_RATIO: 0.04,
+    /** The untreated frame is always tile 0, so there is something to compare against. */
+    ORIGINAL_LABEL: "ORIGINAL",
+  },
+} as const;
+
+export const MEDIA_HIDE_STYLES = ["fill", "blur", "pixelate", "replace"] as const;
+
+/**
+ * `replace` is only available on `effects`, never on `cut`.
+ *
+ * Not an arbitrary limit. `cut` applies its cover through `-vf`, a single-input
+ * filtergraph, and pasting an image needs a second input. More importantly it
+ * would be the wrong thing there: `cut` covers the source mark BEFORE the
+ * reframe crop, and after that crop the place the mark used to sit is often
+ * outside the finished frame entirely — so a replacement pasted there would
+ * appear and disappear as the crop moves. Replacing in place only makes sense
+ * when the frame is not being recropped.
+ */
+export const MEDIA_HIDE_STYLES_ON_CUT = ["fill", "blur", "pixelate"] as const;
+
+/** Where `effects.logo` anchors the mark. */
+export const MEDIA_LOGO_POSITIONS = [
+  "top-left",
+  "top-right",
+  "bottom-left",
+  "bottom-right",
+] as const;
+
+/**
+ * `effects.hide` — cover a region of every frame (a creator's bug, a sponsor
+ * ident, a broadcaster watermark).
+ *
+ * Auto-detection is temporal: an overlay sits still while the footage behind
+ * it changes, so a per-pixel standard deviation across frames sampled over the
+ * whole clip is near zero exactly where an overlay is burned in.
+ *
+ * Staticness alone is not enough, and this is the part that matters. Podcast
+ * footage is mostly a locked-off camera against a dark background, so half the
+ * frame is static too — and a plain variance threshold selects the background,
+ * not the logo. A logo is static AND *structured*: it has hard edges, because
+ * it is a graphic rather than a flat wall. Requiring both is what separates
+ * them, and it is why `MIN_GRADIENT` is not optional.
+ */
+export const MEDIA_HIDE = {
+  DEFAULT_STYLE: "fill" as const,
+  BOUNDS: {
+    /** Regions accepted per `effects` call. */
+    MAX_REGIONS: 6,
+    /** Regions accepted per `cut` call — a source carries fewer burned-in marks than a finished clip. */
+    MAX_REGIONS_ON_CUT: 4,
+    STRENGTH: { MIN: 0.02, MAX: 1 },
+  },
+  /** Seconds of unframed source `cut` probes to find the logo and sample its background. */
+  PROBE_SECONDS: 10,
+  /** Blur radius / pixel block, as a fraction of the region's smaller side. */
+  DEFAULT_STRENGTH: 0.25,
+  /**
+   * `style: "fill"` — paint the region flat in the colour of the background
+   * immediately around it. On a plain set this is invisible, where a blur
+   * still reads as a smudge someone put there deliberately.
+   *
+   * It is gated on two measurements (see `surround.ts`) because a flat patch
+   * over a background that is NOT flat looks worse than any blur.
+   */
+  SURROUND: {
+    /** Frames sampled when measuring the surrounding colour. */
+    FRAMES: 6,
+    EDGE_SKIP_FRACTION: 0.05,
+    /**
+     * Ring thickness sampled outside the region, as a fraction of its shorter
+     * side. Deliberately THIN: what decides whether a flat patch is visible is
+     * the seam at the box edge, so the pixels that matter are the ones
+     * immediately outside it. A thick ring reaches past the background into
+     * whatever else is nearby and rejects fills that would have been perfect.
+     */
+    RING_FRACTION: 0.12,
+    MIN_RING_PX: 8,
+    /**
+     * Gap left between the region and the ring. Logo edges are anti-aliased and
+     * often carry a soft glow, so sampling flush against the box averages the
+     * logo's own colour into the patch we are about to paint.
+     */
+    SAFETY_FRACTION: 0.06,
+    MIN_SAFETY_PX: 4,
+    /** Fewest ring pixels worth trusting a median from. */
+    MIN_SAMPLE_PIXELS: 400,
+    /**
+     * A pixel within this distance of the median (per channel) agrees with it.
+     *
+     * Consensus, not standard deviation, is the gate. Stddev is the wrong test:
+     * one bright corner clipping into the sampling ring drags it far above any
+     * sane threshold even when the entire seam is a single flat colour, and it
+     * rejected a fill that would have been invisible. `spread` is still
+     * reported, as a diagnostic only.
+     */
+    CONSENSUS_TOLERANCE: 10,
+    /** Share of ring pixels that must agree with the median for a flat patch to disappear. */
+    MIN_CONSENSUS: 0.8,
+    /** Per-channel movement of the median across frames, above which one colour cannot follow it. */
+    MAX_DRIFT: 10,
+  },
+  DETECT: {
+    /** Frames sampled across the clip. More is steadier and linearly slower. */
+    FRAMES: 12,
+    /** Ignore the first/last 5%: intros, fades and end cards are not representative. */
+    EDGE_SKIP_FRACTION: 0.05,
+    /** Analysis width; height follows the source aspect. Small on purpose — a logo is many pixels even here. */
+    WIDTH: 320,
+    /** Per-pixel temporal stddev (0-255) at or below which a pixel counts as static. */
+    STATIC_MAX_STDDEV: 4.0,
+    /** Spatial gradient at or above which a static pixel counts as structured rather than flat wall. */
+    MIN_GRADIENT: 16,
+    /**
+     * The weaker gradient used to GROW a region once it has been found.
+     *
+     * Two thresholds, like edge detection: the strong one decides what is a
+     * region at all, the weak one decides how far that region really extends.
+     * A mark is rarely uniformly contrasty — a sponsor strip's faintest rows,
+     * or the soft edge of a glow, sit below the strong threshold and get left
+     * behind, which is what made a blanket padding necessary before.
+     *
+     * Growing on the weak threshold instead gives a box that follows the mark's
+     * actual extent. That matters because these boxes get covered: too small
+     * leaves a sliver of someone else's logo, too large eats the frame around
+     * it — and on podcast footage the thing next to the logo is usually a face.
+     */
+    GROW_GRADIENT: 12,
+    /** A row/column must hold at least this share of weak-mask pixels to keep growing. */
+    GROW_MIN_SHARE: 0.25,
+    /** Hard stop, as a fraction of the region's own size, so growth cannot run away. */
+    GROW_MAX_FRACTION: 0.25,
+    /**
+     * Dilation radius, as a fraction of the analysis width.
+     *
+     * Small on purpose. Its job is to bridge a gap between parts of one mark
+     * (a logo and the sponsor strip under it); it is not a coverage mechanism.
+     * Measured on real footage, a radius of 6 analysis pixels grew the box by
+     * 72 source pixels on every edge and reached the top of the frame, while
+     * the mark's own mask rows were already contiguous and needed no bridging
+     * at all.
+     */
+    DILATE_FRACTION: 0.006,
+    /** A region's bounding box, as a fraction of frame area. Below: noise. Above: not an overlay. */
+    MIN_AREA_FRACTION: 0.0006,
+    MAX_AREA_FRACTION: 0.15,
+    /** An overlay hugs an edge. The box's nearest-edge gap must be under this fraction of that dimension. */
+    MAX_EDGE_GAP_FRACTION: 0.15,
+    /**
+     * A logo is COMPACT. These two reject the thing that otherwise looks
+     * identical to one: the edge of a letterbox bar.
+     *
+     * Where a black cinemascope bar meets the picture there is a perfectly
+     * static, hard-edged line — maximum staticness, high gradient, hugging a
+     * frame edge. It passes every other test here. Measured on real 2.39:1
+     * footage it produced three "logos" (1918x102, 940x102, 324x102, all
+     * confidence 0.74-0.81) which would have been blurred as bands straight
+     * across the shot.
+     *
+     * A box spanning more than half a dimension is not a bug, and neither is
+     * one more than 3x longer than it is tall. Known limitation: a channel
+     * whose bug is ONLY a wide strip would be missed — pass explicit regions
+     * for that rather than loosening these.
+     */
+    MAX_EXTENT_FRACTION: 0.5,
+    MAX_ASPECT: 3,
+    /**
+     * Grow each detected box by this fraction of its size. Anti-aliased logo
+     * edges sit just outside the mask, and a bug is often a lock-up plus a
+     * sponsor strip whose faintest row falls below the gradient threshold —
+     * measured on a real clip, a tight box left a visible sliver of the strip
+     * behind. Generous padding is nearly free for `fill` (the extra area is
+     * the same flat colour) and only mildly costly for `blur`.
+     */
+    PAD_FRACTION: 0.03,
+    /** Most regions returned, highest confidence first. */
+    MAX_REGIONS: 3,
+    /**
+     * How many auto-detected regions `style: "replace"` will actually use.
+     *
+     * One. Covering several regions is reasonable when erasing — blur or fill
+     * every candidate and a false positive costs a smudge on something already
+     * static. Replacing is different: each region gets OUR mark pasted into it,
+     * so a false positive is our logo stamped somewhere absurd. A source
+     * carries one bug, so take the best-scoring region and leave the rest.
+     * Explicit regions are unaffected — a caller asking for three means three.
+     */
+    MAX_REGIONS_ON_REPLACE: 1,
+    /** Below this, a region is reported but NOT blurred unless the caller asked for it by name. */
+    MIN_CONFIDENCE: 0.35,
+    /**
+     * The much higher bar `style: "replace"` must clear.
+     *
+     * Erasing a weak candidate is cheap — a blur over something already static
+     * is invisible. PASTING OUR MARK onto one is not: it puts the channel's
+     * logo in a random place on someone else's video.
+     *
+     * The gap is wide and measurable. Real burned-in marks scored 0.93-0.97
+     * across every source tested; the best noise region scored 0.79, and on a
+     * Joe Rogan episode — which carries no bug at all — the top "detection" was
+     * an empty patch of dark table that would have been stamped with our logo.
+     * A source with no mark must produce NO replacement, and the corner mark
+     * brands the clip on its own, so refusing here costs nothing.
+     */
+    MIN_CONFIDENCE_ON_REPLACE: 0.85,
+  },
+} as const;
+
+export const MEDIA_LOGO = {
+  DEFAULT_POSITION: "top-right" as const,
+  /**
+   * Chroma-key tolerance when a logo file has no alpha of its own (a JPEG
+   * avatar, say). `auto` samples the image's own corner pixel — right for a
+   * mark drawn on a flat background, wrong for a photograph.
+   */
+  KEY: { SIMILARITY: 0.12, BLEND: 0.05 },
+  BOUNDS: {
+    SCALE: { MIN: 0.01, MAX: 1 },
+    OPACITY: { MIN: 0, MAX: 1 },
+    MARGIN: { MIN: 0, MAX: 0.4 },
+  },
+  /** Mark width as a fraction of the frame width. */
+  DEFAULT_SCALE: 0.14,
+  DEFAULT_OPACITY: 0.9,
+  /** Inset from the frame edges, as a fraction of frame width. */
+  DEFAULT_MARGIN: 0.04,
+} as const;
