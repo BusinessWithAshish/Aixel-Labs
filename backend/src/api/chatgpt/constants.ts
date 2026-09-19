@@ -12,7 +12,7 @@ export const CHATGPT_ROUTES = {
 
 export const CHATGPT_FIELD_DESCRIPTIONS = {
   project_url:
-    "OPTIONAL. ChatGPT Project URL (https://chatgpt.com/g/g-p-…/project) — use one when a project's saved instructions should shape the turn (house style, a brand, a persona). Omit it to run in a plain ChatGPT chat with no project context at all.",
+    "ChatGPT Project URL (https://chatgpt.com/g/g-p-…/project). Brand style lives in the project.",
   prompt:
     "Full prompt — a chat question, an image-generation brief, or both. Caller builds this from soul/memory/skills.",
   mode: "'new' opens the project; 'revise' continues an existing conversation_url.",
@@ -20,11 +20,7 @@ export const CHATGPT_FIELD_DESCRIPTIONS = {
     "Required when mode=revise. ChatGPT /c/… URL from a prior successful call.",
   revise_notes: "Human revise feedback; appended into the prompt when mode=revise.",
   images:
-    "Absolute local file paths to attach to the message, in order, as real input images (e.g. a logo, reference posts to emulate). Omit or pass [] to attach nothing. To use a remote image (e.g. a competitor's post) as a reference, first download it with `media` op=fetch (imageOnly: true) and pass the returned path here — this module has no downloader of its own.",
-  attach_brand_logo:
-    "Also attach the server's configured brand logo (CHATGPT_LOGO_PATH) to this message. Default false. Only for callers that actually want that brand on the output — it is a specific organisation's mark, not a generic asset.",
-  timeout_seconds:
-    "Overall cap for waiting on the ChatGPT stream, in seconds. Defaults to the server's own cap. A turn that hangs holds the single-call lock for this long, so lower it for short text turns.",
+    "Absolute local file paths to attach to the message, in order, as real input images (e.g. the brand logo, reference posts to emulate). Omit to use the server default (just the brand logo); pass [] to attach nothing. To use a remote image (e.g. a competitor's post) as a reference, first download it with `media` op=fetch (imageOnly: true) and pass the returned path here — this module has no downloader of its own.",
 } as const;
 
 export const CHATGPT = {
@@ -47,24 +43,15 @@ export const CHATGPT = {
    * the always-on VNC Chrome) — no new display server needed.
    */
   DISPLAY: process.env.CHATGPT_DISPLAY || ":99",
-  /**
-   * Opt-in only, via `attach_brand_logo: true`. This is one organisation's
-   * mark — it is deliberately NOT attached by default, because a caller that
-   * did not ask for it (another brand, a standalone channel) would silently
-   * get someone else's branding baked into the image.
-   */
   LOGO_PATH:
     process.env.CHATGPT_LOGO_PATH ||
     "/home/ubuntu/AIXEL-LABS-ORG/brand/assets/aixellabs-lockup.png",
-  /** Plain chat, used when no project_url is given. */
-  NEW_CHAT_URL: "https://chatgpt.com/",
   MEDIA_ROOT: AIXEL_MEDIA.PUBLIC,
   MEDIA_PUBLIC_BASE: AIXEL_MEDIA.PUBLIC_BASE_URL,
   /** Soft upper bound for waiting on ChatGPT stream; CDP/session errors fail sooner. */
   DEFAULT_STREAM_TIMEOUT_SEC: 30 * 60,
   COMPOSER_WAIT_SEC: 90,
-  /** Let attachments finish uploading before the prompt is sent. */
-  ATTACH_SETTLE_MS: 8000,
+  LOGO_SETTLE_MS: 8000,
   STREAM_POLL_MS: 5000,
   CDP_CONNECT_TIMEOUT_MS: 30_000,
   CDP_EVAL_TIMEOUT_MS: 60_000,
