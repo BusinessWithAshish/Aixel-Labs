@@ -196,8 +196,12 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
       return { t, score, endReason };
     });
 
-  if (pauseCandidates.length > 0) {
-    const best = pauseCandidates.reduce((a, b) => (b.score > a.score ? b : a));
+  // Only a pause that is actually worth moving to. When two people talk over
+  // each other there is no real pause for several seconds, and the best of a
+  // bad set is still bad — taking it ran the clip into the next question.
+  const viablePauses = pauseCandidates.filter((c) => c.score >= NB.END_MIN_SCORE);
+  if (viablePauses.length > 0) {
+    const best = viablePauses.reduce((a, b) => (b.score > a.score ? b : a));
     if (best.t - start >= 1) {
       return { start, end: best.t, endReason: best.endReason };
     }
@@ -207,7 +211,7 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
   // gives no gaps to work with either, so the only remaining signal that a
   // thought finished is the punctuation it wrote — take that on its own rather
   // than cut mid-clause.
-  const runOnSpeech = pauseCandidates.length === 0;
+  const runOnSpeech = viablePauses.length === 0;
 
   // Every stop near the requested end, scored on how much it looks like an
   // ending: quiet after it, a reaction after it, and closeness to the
@@ -245,9 +249,12 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
         Math.min(nextWordStart - t, NB.END_GAP_SCORE_CAP_SECONDS) + (reactionEnd - t) - distancePenalty;
       return { t, nextWordStart, reactionEnd, tailEnd, score };
     });
-  if (candidates.length === 0) {
-    // No stop in reach: keep the requested end (never mid-word), but still
-    // keep a reaction right after it — applause often has no words at all.
+  // Same floor as the pauses: a stop has to beat simply keeping the end that
+  // was asked for, which came from reading the transcript.
+  const viable = candidates.filter((c) => c.score >= NB.END_MIN_SCORE);
+  if (viable.length === 0) {
+    // No stop worth moving to: keep the requested end (never mid-word), but
+    // still keep a reaction right after it — applause often has no words at all.
     const splitAtEnd = words.find((w) => w.start < re && re < w.end);
     const floor = splitAtEnd ? splitAtEnd.end : re;
     const nextWordStart = words.find((w) => w.start >= floor)?.start ?? windowSeconds;
@@ -266,7 +273,7 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
       endReason: reactionEnd - floor >= NB.REACTION_MIN_SECONDS ? "reaction" : "unchanged",
     };
   }
-  const best = candidates.reduce((a, b) => (b.score > a.score ? b : a));
+  const best = viable.reduce((a, b) => (b.score > a.score ? b : a));
   const end = Math.max(
     best.t,
     Math.min(
@@ -361,7 +368,9 @@ function selfCheck(): void {
     // Speech to 5.2, silence to 6.4, the next line from there.
     loudnessDb: [...frames(5.2, -18), ...frames(1.2, -70), ...frames(3.6, -18)],
   });
-  if (runOnPlan.end < 5.2 || runOnPlan.end > 5.6) {
+  // EPSILON: the intended landing point is exactly pause.start + the cut
+  // offset (5.2 + 0.4), which floating point renders as 5.6000000000000005.
+  if (runOnPlan.end < 5.2 || runOnPlan.end > 5.6 + 1e-6) {
     throw new Error(`end should land inside the pause at 5.2–6.4, got ${runOnPlan.end}`);
   }
 

@@ -54,17 +54,37 @@ Downloaded images land in `{AIXEL_MEDIA_ROOT}/private/media-fetched` — see
 
 ```json
 {
-  "project_url": "https://chatgpt.com/g/g-p-…/project",
   "prompt": "…",
   "mode": "new",
+  "project_url": "https://chatgpt.com/g/g-p-…/project",
   "conversation_url": null,
   "revise_notes": null,
-  "images": null
+  "images": null,
+  "attach_brand_logo": false,
+  "timeout_seconds": null
 }
 ```
 
-- `mode: "revise"` requires `conversation_url` from a prior success — continues that conversation instead of opening `project_url` fresh.
-- `images`: absolute local file paths attached to the message as real input images, in order (e.g. the brand logo, reference posts to emulate). Omit for the server default (just the brand logo, `CHATGPT_LOGO_PATH`); pass `[]` to attach nothing.
+- `prompt` and `mode` are the only required fields.
+- `project_url` is **optional**. Give one when a project's saved instructions
+  should shape the turn (house style, a brand, a persona); **omit it to run in
+  a plain ChatGPT chat with no project context at all**. There is no implicit
+  project — a caller that does not name one gets none.
+- `mode: "revise"` requires `conversation_url` from a prior success and
+  continues that conversation, **with or without a project**. The response's
+  `conversation_url` is what you pass back, so a plain-chat thread is reusable
+  exactly like a project one.
+- `conversation_url` in the response keeps the path the conversation actually
+  lives at, so a project conversation comes back as
+  `/g/g-p-…/c/…` rather than a bare `/c/…`.
+- `images`: absolute local file paths attached to the message as real input
+  images, in order. **Omit or pass `[]` to attach nothing.** Content type is
+  taken from the file extension.
+- `attach_brand_logo` (default `false`): also attach `CHATGPT_LOGO_PATH`. That
+  file is **one organisation's mark**, so it is opt-in — a caller for a
+  different brand, or for a standalone channel, must not silently inherit it.
+- `timeout_seconds`: cap on waiting for the stream, defaulting to the server's
+  own. A hung turn holds the single-call lock for this long.
 - Concurrent calls → `409` busy — this drives one shared browser session.
 
 ## Response
@@ -90,6 +110,23 @@ refused or the turn produced nothing usable.
 
 ```bash
 curl -sS http://127.0.0.1:8002/chatgpt/health | jq .
+
+# No project at all — plain chat, nothing attached
+curl -sS -X POST http://127.0.0.1:8002/chatgpt \
+  -H 'content-type: application/json' \
+  -d '{
+    "prompt":"In one sentence, what makes a SaaS landing page convert?",
+    "mode":"new"
+  }' | jq .
+
+# Continue that same plain-chat thread (no project involved)
+curl -sS -X POST http://127.0.0.1:8002/chatgpt \
+  -H 'content-type: application/json' \
+  -d '{
+    "prompt":"Now say it for a developer tool.",
+    "mode":"revise",
+    "conversation_url":"https://chatgpt.com/c/…"
+  }' | jq .
 
 # Plain chat turn, no image
 curl -sS -X POST http://127.0.0.1:8002/chatgpt \

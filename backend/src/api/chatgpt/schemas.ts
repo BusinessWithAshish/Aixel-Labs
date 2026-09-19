@@ -10,6 +10,8 @@ export const CHATGPT_REQUEST_SCHEMA = z
     project_url: z
       .string()
       .url()
+      .nullable()
+      .optional()
       .describe(CHATGPT_FIELD_DESCRIPTIONS.project_url),
     prompt: z
       .string()
@@ -33,6 +35,16 @@ export const CHATGPT_REQUEST_SCHEMA = z
       .array(z.string())
       .optional()
       .describe(CHATGPT_FIELD_DESCRIPTIONS.images),
+    attach_brand_logo: z
+      .boolean()
+      .optional()
+      .describe(CHATGPT_FIELD_DESCRIPTIONS.attach_brand_logo),
+    timeout_seconds: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(CHATGPT_FIELD_DESCRIPTIONS.timeout_seconds),
   })
   .superRefine((val, ctx) => {
     if (val.mode === "revise" && !val.conversation_url) {

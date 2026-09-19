@@ -176,7 +176,18 @@ export const MEDIA_NATURAL_BOUNDARIES = {
    * inside the next sentence.
    */
   END_SEARCH_BEFORE_SECONDS: 3,
-  END_SEARCH_AFTER_SECONDS: 6,
+  END_SEARCH_AFTER_SECONDS: 4,
+  /**
+   * A stop has to be worth moving to. Scores are built so that a stop at a
+   * finished sentence near the requested end lands around +2, while one several
+   * seconds and a dozen words later goes negative — the requested end came from
+   * reading the transcript, so a far-off pause is not an improvement on it. Below
+   * this floor nothing is moved and the requested end is kept (`endReason:
+   * "unchanged"`). Without it the best of a bad set always won, and on a podcast
+   * where two people talk over each other — no real pause for six seconds — the
+   * clip ran on into the next question.
+   */
+  END_MIN_SCORE: 0,
   /**
    * Among those stops the one that looks most like an ending wins: score =
    * quiet after it (capped) + reaction after it − distance from the requested

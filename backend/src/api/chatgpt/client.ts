@@ -163,12 +163,28 @@ async function openChat(tab: CdpTab, url: string): Promise<void> {
   throw new Error(`composer never appeared at ${url} — still logged in?`);
 }
 
+const IMAGE_MIME_BY_EXT: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+};
+
+/** The real type of an attachment. Everything used to go up labelled PNG, which mislabels every JPEG avatar or reference frame. */
+function imageMime(path: string): string {
+  const dot = path.lastIndexOf(".");
+  if (dot < 0) return "image/png";
+  return IMAGE_MIME_BY_EXT[path.slice(dot).toLowerCase()] ?? "image/png";
+}
+
 /** Attaches every path in one DataTransfer so all images land on the same message. */
 async function attachImages(tab: CdpTab, paths: string[]): Promise<void> {
   if (paths.length === 0) return;
   const files = await Promise.all(
     paths.map(async (p) => ({
       name: basename(p),
+      type: imageMime(p),
       b64: (await fs.readFile(p)).toString("base64"),
     })),
   );
@@ -180,7 +196,7 @@ async function attachImages(tab: CdpTab, paths: string[]): Promise<void> {
         const bin = atob(f.b64);
         const arr = new Uint8Array(bin.length);
         for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
-        dt.items.add(new File([arr], f.name, {type:"image/png"}));
+        dt.items.add(new File([arr], f.name, {type: f.type}));
       }
       const input = [...document.querySelectorAll('input[type=file]')]
                       .find(i => (i.accept||'').includes('image'));
@@ -193,7 +209,7 @@ async function attachImages(tab: CdpTab, paths: string[]): Promise<void> {
   if (result !== "ok") {
     throw new Error(`attach_images failed: ${String(result)}`);
   }
-  await sleep(CHATGPT.LOGO_SETTLE_MS);
+  await sleep(CHATGPT.ATTACH_SETTLE_MS);
 }
 
 async function sendPrompt(tab: CdpTab, prompt: string): Promise<void> {
@@ -229,15 +245,27 @@ async function sendPrompt(tab: CdpTab, prompt: string): Promise<void> {
   await sleep(3000);
 }
 
-async function conversationId(tab: CdpTab): Promise<string> {
+/**
+ * The conversation's id AND the URL it actually lives at. A conversation started
+ * inside a project lives at /g/g-p-<project>/c/<id>; returning a bare
+ * /c/<id> loses which project it belonged to, so the real href is kept.
+ */
+async function conversationRef(
+  tab: CdpTab,
+): Promise<{ cid: string; url: string }> {
   const js = `(() => {
     const href = location.href || '';
     const m = href.match(/\\/c\\/([0-9a-fA-F-]{8,})/);
-    return m ? m[1] : '';
+    return m ? (m[1] + '|' + href.split('?')[0]) : '';
   })()`;
   for (let i = 0; i < 60; i++) {
-    const cid = await tab.js(js);
-    if (cid) return String(cid);
+    const out = await tab.js(js);
+    if (out) {
+      const s = String(out);
+      const pipe = s.indexOf("|");
+      const cid = s.slice(0, pipe);
+      return { cid, url: s.slice(pipe + 1) || `https://chatgpt.com/c/${cid}` };
+    }
     await sleep(1000);
   }
   throw new Error("conversation id never appeared in the URL");
@@ -410,21 +438,27 @@ export async function generateChatGpt(
 
     chrome = await launchChatGptChrome();
     tab = await openNewTab(CHATGPT.CDP_HTTP);
+    // Where the turn happens, in priority order: the conversation being
+    // revised, else the project asked for, else a plain chat with no project
+    // context at all.
     const openUrl =
       req.mode === "revise" && req.conversation_url
         ? req.conversation_url
-        : req.project_url;
+        : (req.project_url ?? CHATGPT.NEW_CHAT_URL);
     await openChat(tab, openUrl);
 
-    const images = req.images ?? [CHATGPT.LOGO_PATH];
+    // Nothing is attached unless the caller asked for it. The brand logo is
+    // one organisation's mark and is opt-in for that reason.
+    const images = [...(req.images ?? [])];
+    if (req.attach_brand_logo) images.push(CHATGPT.LOGO_PATH);
     await attachImages(tab, images);
     const prompt = buildPrompt(req);
     await sendPrompt(tab, prompt);
-    const cid = await conversationId(tab);
+    const { cid, url: conversationUrl } = await conversationRef(tab);
     await waitUntilDone(
       tab,
       cid,
-      CHATGPT.DEFAULT_STREAM_TIMEOUT_SEC,
+      req.timeout_seconds ?? CHATGPT.DEFAULT_STREAM_TIMEOUT_SEC,
     );
     const result = await findResult(tab, cid);
 
@@ -447,7 +481,7 @@ export async function generateChatGpt(
     return {
       text: result.text,
       media_url: mediaUrl,
-      conversation_url: `https://chatgpt.com/c/${cid}`,
+      conversation_url: conversationUrl,
     };
   } finally {
     tab?.close();
