@@ -132,6 +132,63 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
       NB.SPEECH_TAIL_QUIET_HOLD_SECONDS,
     );
 
+  // ---- where a sentence ends (asked first) ----
+  // Whisper punctuates, and its segments are sub-second and do not overlap, so
+  // a segment closing with sentence punctuation answers *did the speaker finish
+  // the thought?* directly. A gap in the waveform only guesses at that, and on
+  // conversation it guesses badly: people pause mid-sentence and run straight
+  // through full stops, so an edge chosen on silence lands inside a sentence
+  // about as often as at the end of one. Silence still decides the exact
+  // instant, just below — it no longer decides WHICH stop.
+  // Both sources, because neither alone is stable: Whisper re-segments the same
+  // speech differently when the audio is re-encoded (the window here is a fresh
+  // cut), but the punctuation it writes on individual words survives that.
+  const sentenceEndTimes = [
+    ...words.filter((w) => SENTENCE_END.test(w.word.trim())).map((w) => w.end),
+    ...reliable.segments.filter((seg) => SENTENCE_END.test((seg.text ?? "").trim())).map((seg) => seg.end),
+  ].sort((a, b) => a - b);
+  // Two sources naming the same stop must not count twice or fight over 10ms.
+  const sentenceCandidates = sentenceEndTimes
+    .filter((t, i) => i === 0 || t - sentenceEndTimes[i - 1] > NB.PHRASE_END_TOLERANCE_SECONDS)
+    .filter(
+      (t) =>
+        t >= re - NB.END_SEARCH_BEFORE_SECONDS &&
+        t <= re + NB.END_SEARCH_AFTER_SECONDS &&
+        t > start + 1,
+    )
+    .map((t) => {
+      const wordsCrossed = t > re ? words.filter((w) => w.start > re && w.start < t).length : 0;
+      const distancePenalty =
+        t > re
+          ? NB.END_PENALTY_AFTER_PER_SECOND * (t - re) + NB.END_PENALTY_PER_WORD_CROSSED * wordsCrossed
+          : NB.END_PENALTY_BEFORE_PER_SECOND * (re - t);
+      return { t, score: NB.SENTENCE_END_BASE_SCORE - distancePenalty };
+    })
+    .filter((c) => c.score >= NB.END_MIN_SCORE);
+
+  if (sentenceCandidates.length > 0) {
+    const pick = sentenceCandidates.reduce((a, b) => (b.score > a.score ? b : a));
+    const nextWordStart = words.find((w) => w.start >= pick.t)?.start ?? windowSeconds;
+    const nextWordLimit = Math.min(nextWordStart - NB.NEXT_WORD_GUARD_SECONDS, windowSeconds);
+    // Keep the room's reaction, and let the speaker's own last syllable finish.
+    const reactionEnd = reactionEndAfter(
+      pick.t,
+      Math.min(nextWordLimit, pick.t + NB.REACTION_MAX_SECONDS),
+    );
+    const tailEnd = Math.max(reactionEnd, speechTailEnd(pick.t, nextWordLimit));
+    const end = Math.max(
+      pick.t,
+      Math.min(tailEnd + NB.TAIL_PAD_SECONDS, nextWordLimit, windowSeconds),
+    );
+    if (end - start >= 1) {
+      return {
+        start,
+        end,
+        endReason: reactionEnd - pick.t >= NB.REACTION_MIN_SECONDS ? "reaction" : "pause",
+      };
+    }
+  }
+
   // ---- where the audio itself stops ----
   // What a listener hears as the end of a line is a pause in the WAVEFORM.
   // Whisper's word gaps cannot stand in for it on fast or overlapping speech:
@@ -423,6 +480,14 @@ export async function findNaturalRange(
   windowSeconds: number,
   /** Spoken language hint (ISO 639-1). Auto-detect hears short Hinglish windows as English and drops the Hindi words, which then read as "reaction". */
   language?: string,
+  /**
+   * Read the window's audio from the ORIGINAL source instead of the re-encoded
+   * work file. Whisper's word timings and punctuation shift when the same
+   * speech is re-encoded — measured at 1.9s on one clip, which is more than the
+   * edge is allowed to move — so the decision must not be taken on a derived
+   * copy. `start`/`end` are absolute times in that source.
+   */
+  audioWindow?: { source: string; start: number; end: number; proxyUrl?: string },
 ): Promise<NATURAL_RANGE & { fallbackReason?: string }> {
   if (!ffmpegPath) {
     return { start: requestedStart, end: requestedEnd, endReason: "unchanged", fallbackReason: MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED };
@@ -431,7 +496,16 @@ export async function findNaturalRange(
   // input, which two clips in the same folder would overwrite.
   const flacPath = `${windowPath}.boundaries.flac`;
   try {
-    await execFileAsync(ffmpegPath, ["-y", "-v", "error", "-i", windowPath, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "flac", flacPath]);
+    const flacArgs = audioWindow
+      ? [
+          "-y", "-v", "error",
+          ...(audioWindow.proxyUrl ? ["-http_proxy", audioWindow.proxyUrl] : []),
+          "-ss", String(audioWindow.start),
+          "-to", String(audioWindow.end),
+          "-i", audioWindow.source,
+        ]
+      : ["-y", "-v", "error", "-i", windowPath];
+    await execFileAsync(ffmpegPath, [...flacArgs, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "flac", flacPath]);
     const [groq, loudnessDb] = await Promise.all([
       transcribeWithGroq(flacPath, { model: MEDIA_TRANSCRIBE.DEFAULT_MODEL, wordTimestamps: true, language }),
       loudnessFrames(flacPath),

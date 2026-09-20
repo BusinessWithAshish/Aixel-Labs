@@ -226,6 +226,16 @@ export async function cutClipsFromVideo(
             requestedEnd - rangeStart,
             rangeEnd - rangeStart,
             language,
+            // Decide the edges on the source's own audio. `current` is a
+            // re-encode, and Whisper times and punctuates re-encoded speech
+            // differently — enough to move the end further than the edge is
+            // allowed to travel.
+            {
+              source: resolved.kind === "youtube" ? resolved.audioUrl : resolved.path,
+              start: rangeStart,
+              end: rangeEnd,
+              ...(ffmpegProxyUrl ? { proxyUrl: ffmpegProxyUrl } : {}),
+            },
           );
           appliedStart = rangeStart + plan.start;
           appliedEnd = rangeStart + plan.end;

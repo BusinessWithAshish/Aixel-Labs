@@ -189,6 +189,15 @@ export const MEDIA_NATURAL_BOUNDARIES = {
    */
   END_MIN_SCORE: 0,
   /**
+   * What a real sentence end is worth before distance is charged against it.
+   * Whisper punctuates, and its segments are sub-second and do not overlap, so
+   * "this segment closes with a full stop" answers *did the speaker finish?*
+   * directly — where a gap in the waveform only guesses at it. Set so a sentence
+   * end within a couple of seconds clears END_MIN_SCORE while one several
+   * seconds and a dozen words away does not.
+   */
+  SENTENCE_END_BASE_SCORE: 2,
+  /**
    * Among those stops the one that looks most like an ending wins: score =
    * quiet after it (capped) + reaction after it − distance from the requested
    * end × a penalty, steeper after the requested end than before it (past it
