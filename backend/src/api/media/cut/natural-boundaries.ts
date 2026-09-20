@@ -162,7 +162,12 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
         t > re
           ? NB.END_PENALTY_AFTER_PER_SECOND * (t - re) + NB.END_PENALTY_PER_WORD_CROSSED * wordsCrossed
           : NB.END_PENALTY_BEFORE_PER_SECOND * (re - t);
-      return { t, score: NB.SENTENCE_END_BASE_SCORE - distancePenalty };
+      // Room after the stop, which is what makes an ending audible. A full stop
+      // the next speaker talks straight over reads as complete on the page and
+      // sounds severed in the clip — so silence is scored, not just position.
+      const room = (words.find((w) => w.start >= t)?.start ?? windowSeconds) - t;
+      const roomScore = Math.min(Math.max(room, 0), NB.SENTENCE_ROOM_CAP_SECONDS) * NB.SENTENCE_ROOM_WEIGHT;
+      return { t, room, score: NB.SENTENCE_END_BASE_SCORE + roomScore - distancePenalty };
     })
     .filter((c) => c.score >= NB.END_MIN_SCORE);
 
@@ -176,9 +181,16 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
       Math.min(nextWordLimit, pick.t + NB.REACTION_MAX_SECONDS),
     );
     const tailEnd = Math.max(reactionEnd, speechTailEnd(pick.t, nextWordLimit));
+    // Keep the quiet after the last word inside the clip, up to the target, so
+    // the clip ends in room tone and the fade has somewhere to live. Capped by
+    // the next word so the following line is never heard.
     const end = Math.max(
       pick.t,
-      Math.min(tailEnd + NB.TAIL_PAD_SECONDS, nextWordLimit, windowSeconds),
+      Math.min(
+        Math.max(tailEnd + NB.TAIL_PAD_SECONDS, pick.t + NB.TRAILING_QUIET_TARGET_SECONDS),
+        nextWordLimit,
+        windowSeconds,
+      ),
     );
     if (end - start >= 1) {
       return {
@@ -385,12 +397,19 @@ function selfCheck(): void {
   }
   if (laughed.end >= words[8].start) throw new Error("end must stay clear of the next sentence");
 
-  // Same clip without the laugh: the end falls back to the punchline's stop,
-  // not the requested 5.6 inside the silence after it.
+  // Same clip without the laugh: the end goes to the punchline's stop at 5.0
+  // plus the trailing room — NOT on toward the requested 5.6. The room is the
+  // point: a clip that ends on the last syllable sounds severed however right
+  // the word is, so a bounded amount of the silence after the stop is kept.
   const silent = planNaturalRange({ ...base, loudnessDb: quiet });
-  if (silent.endReason !== "pause" || silent.end > 5.3) {
-    throw new Error(`end should land on the stop at 5.0, got ${silent.end} (${silent.endReason})`);
+  const silentFloor = 5.0;
+  const silentCeiling = 5.0 + NB.TRAILING_QUIET_TARGET_SECONDS + 0.05;
+  if (silent.endReason !== "pause" || silent.end < silentFloor || silent.end > silentCeiling) {
+    throw new Error(
+      `end should land on the stop at 5.0 plus trailing room (${silentFloor}-${silentCeiling.toFixed(2)}), got ${silent.end} (${silent.endReason})`,
+    );
   }
+  if (silent.end >= words[8].start) throw new Error("trailing room must not reach the next sentence");
 
   // The speaker is still finishing "punchline." at 5.0 — Whisper's word end is
   // early, and the audio runs to 5.4. Ending on the number clips the syllable.

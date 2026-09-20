@@ -198,6 +198,19 @@ export const MEDIA_NATURAL_BOUNDARIES = {
    */
   SENTENCE_END_BASE_SCORE: 2,
   /**
+   * How much room after a sentence is worth. An ending is heard, not read: a
+   * full stop the next speaker talks straight over does not sound finished, however
+   * complete the sentence is. Weighted high enough that a stop with real silence
+   * after it beats a nearer one with none.
+   */
+  SENTENCE_ROOM_WEIGHT: 1.8,
+  SENTENCE_ROOM_CAP_SECONDS: 1,
+  /**
+   * Room to keep inside the clip when the gap allows, so the last word is
+   * followed by quiet rather than by the cut itself.
+   */
+  TRAILING_QUIET_TARGET_SECONDS: 0.45,
+  /**
    * Among those stops the one that looks most like an ending wins: score =
    * quiet after it (capped) + reaction after it − distance from the requested
    * end × a penalty, steeper after the requested end than before it (past it
@@ -281,7 +294,9 @@ export const MEDIA_NATURAL_BOUNDARIES = {
    * the final syllable itself, which reads as a clip cut off mid-sentence even
    * when the audio is all there.
    */
-  FADE_OUT_SECONDS: 0.15,
+  /** Long enough to read as an ending. At 0.15 the speech was still at full level
+   * two frames before the cut, which sounds like a fader pulled, not a clip ending. */
+  FADE_OUT_SECONDS: 0.35,
   /** Never run into the next word. */
   NEXT_WORD_GUARD_SECONDS: 0.05,
   /** Loudness resolution. */
