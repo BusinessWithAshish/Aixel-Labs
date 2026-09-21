@@ -175,7 +175,29 @@ export const MEDIA_NATURAL_BOUNDARIES = {
    * 1–3 s AFTER the real stop, and searching only later lands on a breath
    * inside the next sentence.
    */
-  END_SEARCH_BEFORE_SECONDS: 3,
+  /**
+   * Whisper's decoder prompt for the boundary pass. Punctuation is a formatting
+   * choice it makes, not a guarantee: measured on this pipeline it returned ZERO
+   * sentence-ending punctuation on two clips out of three (0 marks in 33 words,
+   * 0 in 31), which left the sentence-end logic below with nothing to match and
+   * silently dropped it back to picking edges off the waveform. Seeding the
+   * decode with punctuated prose biases it back — the same two clips then
+   * returned 4 and 5 sentence ends. Plain, unremarkable sentences on purpose:
+   * the prompt's content leaks into the transcript when audio is unclear.
+   */
+  BOUNDARY_PROMPT:
+    "Here is a conversation, written out in full sentences. He asked her a question. " +
+    "She thought about it, and then she answered. Was that the whole story? No, there was more to it.",
+  /**
+   * Widened from 3s once sentence ends became reliable. At 3s the correct end
+   * was simply out of reach on real clips — "I don't like it." sat 4.3s back and
+   * "…the hardest to manage." 3.7s back, so both clips ran on into the host's
+   * next question. Safe to widen only because the candidates are now real
+   * sentence ends scored on the room after them; widening it while the chooser
+   * was still the waveform picked a clean-sounding pause that cut a clip's
+   * payoff off.
+   */
+  END_SEARCH_BEFORE_SECONDS: 6,
   END_SEARCH_AFTER_SECONDS: 4,
   /**
    * A stop has to be worth moving to. Scores are built so that a stop at a

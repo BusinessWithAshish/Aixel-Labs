@@ -526,7 +526,14 @@ export async function findNaturalRange(
       : ["-y", "-v", "error", "-i", windowPath];
     await execFileAsync(ffmpegPath, [...flacArgs, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "flac", flacPath]);
     const [groq, loudnessDb] = await Promise.all([
-      transcribeWithGroq(flacPath, { model: MEDIA_TRANSCRIBE.DEFAULT_MODEL, wordTimestamps: true, language }),
+      transcribeWithGroq(flacPath, {
+        model: MEDIA_TRANSCRIBE.DEFAULT_MODEL,
+        wordTimestamps: true,
+        language,
+        // Without this Whisper often returns no punctuation at all, and the
+        // sentence-end logic has nothing to work with.
+        prompt: NB.BOUNDARY_PROMPT,
+      }),
       loudnessFrames(flacPath),
     ]);
     return planNaturalRange({

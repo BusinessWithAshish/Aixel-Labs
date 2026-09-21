@@ -219,6 +219,37 @@ export async function cutClipsFromVideo(
           );
         }
 
+        // Check the WINDOW before planning on it. A dropped stream is not an
+        // ffmpeg error — it reads the short input as end-of-input and exits 0 —
+        // and the finished-clip check below cannot catch that here, because the
+        // plan is derived from this same file: a truncated window shrinks
+        // `appliedEnd` to match itself and the comparison always passes. Seen
+        // in practice as an 8s clip of the episode's opening line standing in
+        // for a 41s range, which validated clean.
+        if (unframed) {
+          const window = await probeMediaStreams(current);
+          const wantSeconds = rangeEnd - rangeStart;
+          const windowShortBy = wantSeconds - (window.durationSeconds ?? 0);
+          if (
+            (hasVideo && !window.hasVideo) ||
+            windowShortBy >
+              Math.max(MEDIA.CLIP_TRUNCATION_SLACK_SECONDS, wantSeconds * MEDIA.CLIP_TRUNCATION_SLACK_RATIO)
+          ) {
+            results.push({
+              label: clip.label,
+              requestedStart: clip.start,
+              requestedEnd: clip.end,
+              cutStartSeconds,
+              cutEndSeconds,
+              snapped,
+              mediaType,
+              aspectRatio: responseAspectRatio,
+              error: MEDIA_ERROR_MESSAGES.CLIP_TRUNCATED,
+            });
+            continue;
+          }
+        }
+
         if (natural) {
           const plan = await findNaturalRange(
             current,
