@@ -8,6 +8,7 @@ import { MEDIA_ERROR_MESSAGES, MEDIA_NATURAL_BOUNDARIES as NB } from "../constan
 import { MEDIA_TRANSCRIBE } from "../transcribe/constants";
 import { dropUnreliableSpans } from "../transcribe/formatters";
 import { transcribeWithGroq } from "../transcribe/groq-client";
+import { resolveSemanticEnd } from "./semantic-end";
 import type { GROQ_TRANSCRIPTION_SEGMENT, GROQ_TRANSCRIPTION_WORD } from "../transcribe/types";
 import type { CUT_CLIP_BOUNDARIES } from "../types";
 
@@ -31,6 +32,11 @@ type PLAN_INPUT = {
   segments: GROQ_TRANSCRIPTION_SEGMENT[];
   /** dBFS per `NB.FRAME_SECONDS`. */
   loudnessDb: number[];
+  /**
+   * A stop chosen by reading the words (see `semantic-end.ts`). When set it
+   * wins outright: the audio then only places the exact instant inside it.
+   */
+  semanticEnd?: number;
 };
 
 function percentile(values: number[], p: number): number {
@@ -131,6 +137,32 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
       NB.SPEECH_TAIL_DB_ABOVE_FLOOR,
       NB.SPEECH_TAIL_QUIET_HOLD_SECONDS,
     );
+
+  // ---- a stop chosen by reading the words ----
+  // Asked before anything derived from the audio, because it answers the
+  // question the audio cannot: which of these stops finishes the thought.
+  if (input.semanticEnd !== undefined) {
+    const t = input.semanticEnd;
+    const nextWordStart = words.find((w) => w.start >= t)?.start ?? windowSeconds;
+    const nextWordLimit = Math.min(nextWordStart - NB.NEXT_WORD_GUARD_SECONDS, windowSeconds);
+    const reactionEnd = reactionEndAfter(t, Math.min(nextWordLimit, t + NB.REACTION_MAX_SECONDS));
+    const tailEnd = Math.max(reactionEnd, speechTailEnd(t, nextWordLimit));
+    const end = Math.max(
+      t,
+      Math.min(
+        Math.max(tailEnd + NB.TAIL_PAD_SECONDS, t + NB.TRAILING_QUIET_TARGET_SECONDS),
+        nextWordLimit,
+        windowSeconds,
+      ),
+    );
+    if (end - start >= 1) {
+      return {
+        start,
+        end,
+        endReason: reactionEnd - t >= NB.REACTION_MIN_SECONDS ? "reaction" : "pause",
+      };
+    }
+  }
 
   // ---- where a sentence ends (asked first) ----
   // Whisper punctuates, and its segments are sub-second and do not overlap, so
@@ -536,13 +568,21 @@ export async function findNaturalRange(
       }),
       loudnessFrames(flacPath),
     ]);
+    const words = groq.words ?? [];
+    // Which stop ends the thought is a question about the words, so it is asked
+    // of the words. Returns undefined on any failure and the heuristic runs.
+    const semantic =
+      NB.SEMANTIC_ENABLED && words.length > 0
+        ? await resolveSemanticEnd(words, requestedEnd)
+        : undefined;
     return planNaturalRange({
       requestedStart,
       requestedEnd,
       windowSeconds,
-      words: groq.words ?? [],
+      words,
       segments: groq.segments ?? [],
       loudnessDb,
+      ...(semantic ? { semanticEnd: semantic.end } : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

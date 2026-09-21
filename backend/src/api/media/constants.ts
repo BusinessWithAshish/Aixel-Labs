@@ -218,6 +218,20 @@ export const MEDIA_NATURAL_BOUNDARIES = {
    * end within a couple of seconds clears END_MIN_SCORE while one several
    * seconds and a dozen words away does not.
    */
+  /**
+   * The semantic end pass: a model reads the stops the audio offers and picks
+   * which one finishes the thought. It only chooses among real stops, and the
+   * exact instant inside the chosen one is still placed on the waveform.
+   * Everything here is sized to keep the call small and bounded — on failure or
+   * timeout the heuristic below takes over, so an ending never depends on it.
+   */
+  SEMANTIC_ENABLED: process.env.MEDIA_SEMANTIC_END !== "off",
+  /** A stop worth offering: a real gap after the word, or a sentence Whisper marked. */
+  SEMANTIC_MIN_GAP_SECONDS: 0.12,
+  SEMANTIC_CONTEXT_WORDS: 12,
+  SEMANTIC_MAX_CANDIDATES: 14,
+  SEMANTIC_MAX_ATTEMPTS: 2,
+  SEMANTIC_TIMEOUT_SECONDS: 90,
   SENTENCE_END_BASE_SCORE: 2,
   /**
    * How much room after a sentence is worth. An ending is heard, not read: a

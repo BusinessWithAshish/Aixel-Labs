@@ -12,7 +12,7 @@ import {
   MEDIA_REFRAME,
 } from "../constants";
 import { cleanupResolvedMediaSource, resolveVideoSourceForCut } from "../source";
-import { cutClip, cutClipFromStream, probeMediaStreams } from "./ffmpeg-cut";
+import { cutClip, cutClipFromStream, probeAudioSeconds, probeMediaStreams } from "./ffmpeg-cut";
 import { findNaturalRange } from "./natural-boundaries";
 import { parseProxyUrlForBridge, ProxyConnectBridge } from "./proxy-bridge";
 import { reframeClipBySpeaker } from "./reframe";
@@ -230,10 +230,20 @@ export async function cutClipsFromVideo(
           const window = await probeMediaStreams(current);
           const wantSeconds = rangeEnd - rangeStart;
           const windowShortBy = wantSeconds - (window.durationSeconds ?? 0);
+          // The container duration follows the video, so the audio has to be
+          // measured on its own: video and audio come from two separate stream
+          // inputs and either can die alone. An edge placed on audio that stops
+          // early lands wherever the silence starts.
+          const audioSeconds = window.hasAudio ? await probeAudioSeconds(current) : undefined;
+          const audioShortBy = audioSeconds === undefined ? 0 : wantSeconds - audioSeconds;
+          const slack = Math.max(
+            MEDIA.CLIP_TRUNCATION_SLACK_SECONDS,
+            wantSeconds * MEDIA.CLIP_TRUNCATION_SLACK_RATIO,
+          );
           if (
             (hasVideo && !window.hasVideo) ||
-            windowShortBy >
-              Math.max(MEDIA.CLIP_TRUNCATION_SLACK_SECONDS, wantSeconds * MEDIA.CLIP_TRUNCATION_SLACK_RATIO)
+            windowShortBy > slack ||
+            audioShortBy > slack
           ) {
             results.push({
               label: clip.label,

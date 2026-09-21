@@ -41,6 +41,33 @@ export type MEDIA_STREAM_PROBE = {
  * (`hasVideo: false`) skips every video-specific step (aspect-ratio reframe,
  * video codec, `-map` of a video stream) rather than assuming one exists.
  */
+/**
+ * How many seconds of AUDIO the file really decodes to.
+ *
+ * The container's Duration follows the longest stream, which is the video, so a
+ * truncated audio download is invisible to `probeMediaStreams`: seen in practice
+ * as a 25.6s clip whose audio stopped at 14.2s — eleven seconds of pictures in
+ * silence, written by an ffmpeg that exited 0. The stream-direct path maps video
+ * and audio from two separate inputs, so either can die on its own.
+ *
+ * Decoding to null is the only way to get this from ffmpeg alone (no ffprobe in
+ * ffmpeg-static), and it is cheap on a clip-length window.
+ */
+export async function probeAudioSeconds(inputPath: string): Promise<number | undefined> {
+  if (!ffmpegPath) return undefined;
+  let stderr = "";
+  try {
+    const out = await execFileAsync(ffmpegPath, ["-i", inputPath, "-map", "0:a:0", "-f", "null", "-"]);
+    stderr = out.stderr ?? "";
+  } catch (err) {
+    stderr = (err as { stderr?: string }).stderr ?? "";
+  }
+  const times = [...stderr.matchAll(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/g)];
+  if (times.length === 0) return undefined;
+  const last = times[times.length - 1];
+  return Number(last[1]) * 3600 + Number(last[2]) * 60 + Number(last[3]);
+}
+
 export async function probeMediaStreams(inputPath: string): Promise<MEDIA_STREAM_PROBE> {
   if (!ffmpegPath) {
     throw new Error(MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED);
