@@ -90,6 +90,14 @@ export const MEDIA_CUT_REQUEST_SCHEMA = z.object({
     .optional()
     .default(MEDIA_NATURAL_BOUNDARIES.DEFAULT_MODE)
     .describe(MEDIA_FIELD_DESCRIPTIONS.boundaries),
+  /**
+   * Ceiling for a clip's length, in seconds. Only `boundaries: "moment"` uses
+   * it: that mode chooses its own edges, so without a budget it can return a
+   * moment longer than the caller can publish. Over the ceiling the START gives
+   * way, never the ending — a clip that loses its payoff is worthless, one that
+   * loses run-up is merely tighter.
+   */
+  maxSeconds: z.number().positive().max(3600).optional(),
   language: z.string().trim().min(2).max(5).optional().describe(MEDIA_FIELD_DESCRIPTIONS.cutLanguage),
   logo: CUT_LOGO_SCHEMA.optional().describe(MEDIA_FIELD_DESCRIPTIONS.cutLogo),
 });

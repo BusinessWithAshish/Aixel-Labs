@@ -63,6 +63,8 @@ export async function cutClipsFromVideo(
   language?: string,
   /** Take a burned-in logo out of the source BEFORE any crop — see `cut/logo.ts`. */
   logo?: CUT_LOGO_REQUEST,
+  /** Ceiling for a clip's length — `boundaries: "moment"` only. */
+  maxSeconds?: number,
 ): Promise<MEDIA_CUT_RESPONSE> {
   assertPersistentDisk(MEDIA_ERROR_MESSAGES.VERCEL);
   const resolved = await resolveVideoSourceForCut(videoSource);
@@ -281,6 +283,7 @@ export async function cutClipsFromVideo(
                 clip.moment as string,
                 language,
                 audioWindow,
+                maxSeconds,
               )
             : await findNaturalRange(
             current,

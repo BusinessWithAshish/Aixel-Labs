@@ -98,6 +98,7 @@ export async function findMomentRange(
   pointerStart: number,
   pointerEnd: number,
   windowSeconds: number,
+  maxSeconds?: number,
 ): Promise<{ start: number; end: number; why?: string } | undefined> {
   const lines = buildLines(words);
   if (lines.length < 3) return undefined;
@@ -140,7 +141,16 @@ export async function findMomentRange(
     "- End where the point LANDS. Include a short reaction or laugh that follows",
     "  it; do not run on into the next topic to pad the length.",
     "",
-    'Return ONLY JSON: {"startIndex": <n>, "endIndex": <n>, "why": "<max 25 words>"}',
+    ...(maxSeconds
+      ? [
+          "",
+          `LENGTH: the clip must not exceed ${Math.round(maxSeconds)}s. If the moment will`,
+          "not fit, keep the ending and start later — losing run-up is fine, losing",
+          "the payoff is not.",
+        ]
+      : []),
+    "",
+    'Return ONLY JSON: {"startIndex": <n>, "endIndex": <n>, "startQuote": "<3-6 words>", "why": "<max 25 words>"}',
   ].join("\n");
 
   try {
@@ -200,13 +210,37 @@ export async function findMomentRange(
       console.warn(`[moment] rejected: ${(end - start).toFixed(1)}s is under the ${NB.MOMENT_MIN_SECONDS}s floor`);
       return undefined;
     }
-    if (Math.abs(start - pointerStart) > NB.MOMENT_MAX_START_DRIFT_SECONDS) {
-      console.warn(`[moment] rejected: start drifted ${(start - pointerStart).toFixed(1)}s from the pointer`);
+    // The guards are deliberately ASYMMETRIC. Tightening onto the real moment is
+    // the whole point of this mode — a pointer that claims 72s for a 32s moment
+    // is exactly the error being corrected, and a symmetric rail rejected that
+    // and fell back. Growing past the pointer is the dangerous direction: that
+    // is where the next question and the next topic live, and every forward
+    // move measured in this work made a clip worse.
+    if (start - pointerStart < -NB.MOMENT_MAX_START_DRIFT_SECONDS) {
+      console.warn(`[moment] rejected: start reached ${(start - pointerStart).toFixed(1)}s before the pointer`);
       return undefined;
     }
-    if (Math.abs(end - pointerEnd) > NB.MOMENT_MAX_END_DRIFT_SECONDS) {
-      console.warn(`[moment] rejected: end drifted ${(end - pointerEnd).toFixed(1)}s from the pointer`);
+    if (end - pointerEnd > NB.MOMENT_MAX_END_DRIFT_SECONDS) {
+      console.warn(`[moment] rejected: end ran ${(end - pointerEnd).toFixed(1)}s past the pointer`);
       return undefined;
+    }
+    // Still has to be the moment the pointer names, not a different one: the
+    // kept range must overlap it.
+    if (end <= pointerStart || start >= pointerEnd) {
+      console.warn(`[moment] rejected: ${start.toFixed(1)}-${end.toFixed(1)}s does not overlap the pointer`);
+      return undefined;
+    }
+    // Enforce the ceiling by moving the START, per the channel rule that a long
+    // moment loses run-up and never its ending. Snap to a word so the opening is
+    // not mid-syllable.
+    if (maxSeconds && end - start > maxSeconds) {
+      const target = end - maxSeconds;
+      const w = words.find((x) => x.start >= target);
+      const trimmed = w ? w.start : target;
+      if (end - trimmed >= NB.MOMENT_MIN_SECONDS) {
+        console.warn(`[moment] ${(end - start).toFixed(1)}s over the ${maxSeconds}s ceiling; start moved to ${trimmed.toFixed(1)}s`);
+        return { start: trimmed, end, why: data.why };
+      }
     }
     return { start, end, why: data.why };
   } catch (err) {

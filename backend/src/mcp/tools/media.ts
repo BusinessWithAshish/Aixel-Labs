@@ -50,6 +50,7 @@ const MEDIA_OPS: Record<string, DomainOp> = {
           input.boundaries,
           input.language,
           input.logo,
+          input.maxSeconds,
         ),
     },
   },

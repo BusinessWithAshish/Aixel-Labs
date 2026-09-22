@@ -16,5 +16,6 @@ export const mediaCutHandler = createMediaHandler({
       input.boundaries,
       input.language,
       input.logo,
+      input.maxSeconds,
     ),
 });
