@@ -30,31 +30,49 @@ function mediaTypeLabel(
   return "unknown";
 }
 
+/**
+ * The largest rendition only. The logged-out post query ships a dozen signed
+ * crops and sizes of every picture (and three identical video URLs), which
+ * put a 3-post carousel answer at 265 KB — past what an MCP caller can read.
+ * Ties and unknown sizes keep Instagram's own order, biggest first.
+ */
+function largestOnly<T extends { width: number | null; height: number | null }>(
+  list: T[],
+): T[] {
+  if (list.length === 0) return [];
+  const area = (x: T) => (x.width ?? 0) * (x.height ?? 0);
+  return [list.reduce((best, x) => (area(x) > area(best) ? x : best))];
+}
+
 function mapImages(
   candidates: IgFeedImageCandidate[] | undefined,
 ): IG_ADVANCED_POST_IMAGE[] {
   if (!candidates?.length) return [];
-  return candidates
-    .filter((c): c is IgFeedImageCandidate & { url: string } => Boolean(c.url))
-    .map((c) => ({
-      url: c.url,
-      width: c.width ?? null,
-      height: c.height ?? null,
-    }));
+  return largestOnly(
+    candidates
+      .filter((c): c is IgFeedImageCandidate & { url: string } => Boolean(c.url))
+      .map((c) => ({
+        url: c.url,
+        width: c.width ?? null,
+        height: c.height ?? null,
+      })),
+  );
 }
 
 function mapVideos(
   versions: IgFeedVideoVersion[] | undefined,
 ): IG_ADVANCED_POST_VIDEO[] {
   if (!versions?.length) return [];
-  return versions
-    .filter((v): v is IgFeedVideoVersion & { url: string } => Boolean(v.url))
-    .map((v) => ({
-      url: v.url,
-      width: v.width ?? null,
-      height: v.height ?? null,
-      type: v.type ?? null,
-    }));
+  return largestOnly(
+    versions
+      .filter((v): v is IgFeedVideoVersion & { url: string } => Boolean(v.url))
+      .map((v) => ({
+        url: v.url,
+        width: v.width ?? null,
+        height: v.height ?? null,
+        type: v.type ?? null,
+      })),
+  );
 }
 
 export function mapFeedUser(
@@ -70,8 +88,22 @@ export function mapFeedUser(
   };
 }
 
+/**
+ * Media id in the v1 feed's `{pk}_{ownerPk}` form. Logged-out GraphQL nodes
+ * carry a `POLARIS_{pk}` id instead, so it is rebuilt from pk + owner.
+ */
+function mediaId(item: IgFeedItem): string | null {
+  if (item.id && !item.id.startsWith("POLARIS_")) return item.id;
+  const pk = asStringId(item.pk);
+  const owner = asStringId(item.user?.pk ?? item.user?.id);
+  return pk && owner ? `${pk}_${owner}` : pk;
+}
+
 export function mapFeedItem(item: IgFeedItem): IG_ADVANCED_POST {
-  const images = mapImages(item.image_versions2?.candidates);
+  const images = mapImages(
+    item.image_versions2?.candidates ??
+      (item.display_uri ? [{ url: item.display_uri }] : undefined),
+  );
   const videos = mapVideos(item.video_versions);
   const shortcode = item.code ?? null;
   const mediaType = item.media_type ?? null;
@@ -81,10 +113,16 @@ export function mapFeedItem(item: IgFeedItem): IG_ADVANCED_POST {
     item.product_type === "clips" ||
     item.product_type === "igtv";
 
-  const carousel = (item.carousel_media ?? []).map(mapFeedItem);
+  // Slides share the parent's owner: it builds their `{pk}_{ownerPk}` id, and
+  // repeating it on every slide only adds weight.
+  const carousel = (item.carousel_media ?? []).map((slide) => ({
+    ...mapFeedItem({ ...slide, user: item.user ?? slide.user }),
+    user: null,
+    coauthors: [],
+  }));
 
   return {
-    id: item.id ?? null,
+    id: mediaId(item),
     pk: asStringId(item.pk),
     shortcode,
     url: shortcode ? `${INSTAGRAM_BASE_URL}/p/${shortcode}/` : null,

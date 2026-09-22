@@ -11,9 +11,10 @@ Working pipeline (verified `salon pune`):
    - `site:instagram.com/p {query}` → posts
    - `site:instagram.com/reel {query}` → reels
 2. Classify URLs → shortcodes
-3. `GET https://www.instagram.com/p|reel/{shortcode}/` (TLS + proxy)
-4. Parse **`og:url`**: `instagram.com/{username}/p|reel/{shortcode}/`
-5. Dedupe handles → optional `web_profile_info` / feed enrich
+3. Shortcode → media pk (`mediaIdFromShortcode`), then the logged-out `media`
+   GraphQL query (direct, see [../../README.md](../../README.md)) gives the
+   owner, likes, comments and caption
+4. Dedupe handles → optional profile enrich (`fetchFromEntities`)
 
 Also works anonymously: `GET /api/v1/tags/search/?q=` (hashtag discovery).
 

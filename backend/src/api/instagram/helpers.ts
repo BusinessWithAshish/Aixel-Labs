@@ -9,12 +9,7 @@ export {
   instagramProfileUrl,
   uniqueUsernames,
   collectBusinessPhoneNumbers,
-  mapInstagramWebProfileBody,
-  mapToResponse,
+  mapXigUserToResponse,
 } from "./compute";
 
-export {
-  fetchFromEntities,
-  fetchFromQuery,
-  instagramWebProfileInfoUrl,
-} from "./client";
+export { fetchFromEntities, fetchFromQuery } from "./client";

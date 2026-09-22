@@ -1,10 +1,8 @@
 import { fetchGsearch } from "../../../gsearch";
+import { runWithConcurrency } from "../../../youtube/concurrency";
 import { fetchFromEntities } from "../../client";
-import { IG_HEADERS, INSTAGRAM_BASE_URL } from "../../constants";
-import {
-  closeUrlFetchSession,
-  createUrlFetchSession,
-} from "../../../../utils/node-tls-client-session-handler";
+import { IG_GRAPHQL_CONCURRENCY } from "../../constants";
+import { fetchLoggedOutMedia } from "../../graphql";
 import {
   IG_ADVANCED_SEARCH_ERROR_MESSAGES,
   IG_ADVANCED_SEARCH_LIMITS,
@@ -14,11 +12,8 @@ import {
 import {
   buildContentGsearchQuery,
   classifyInstagramContentUrl,
+  mediaIdFromShortcode,
 } from "./compute/classify-url";
-import {
-  contentPageUrl,
-  resolveOwnerFromContentHtml,
-} from "./compute/resolve-owner";
 import type {
   IG_ADVANCED_CONTENT_HIT,
   IG_ADVANCED_SEARCH_REQUEST,
@@ -39,7 +34,8 @@ function normalizeKinds(
 }
 
 /**
- * Niche/query → GSearch Instagram posts/reels → resolve owners → optional profile enrich.
+ * Niche/query → GSearch Instagram posts/reels → resolve owners (logged-out post
+ * query) → optional profile enrich.
  */
 export async function fetchInstagramAdvancedSearch(
   input: IG_ADVANCED_SEARCH_REQUEST,
@@ -81,60 +77,45 @@ export async function fetchInstagramAdvancedSearch(
   }
 
   const toResolve = classified.slice(0, maxResolve);
-  const contents: IG_ADVANCED_CONTENT_HIT[] = [];
-  const handleSet = new Set<string>();
 
-  const session = await createUrlFetchSession({
-    headers: { ...IG_HEADERS, referer: INSTAGRAM_BASE_URL },
-  });
-
-  try {
-    for (const c of toResolve) {
-      let username = c.usernameFromPath;
-      let likeCount: number | null = null;
-      let commentCount: number | null = null;
-      let titleSnippet: string | null = null;
-      let resolveMethod: string | null = username
-        ? "gsearch-url-path"
-        : null;
-
-      if (!username && c.shortcode) {
-        const pageUrl = contentPageUrl(
-          c.kind as "post" | "reel",
-          c.shortcode,
-        );
-        try {
-          const res = await session.get(pageUrl, { followRedirects: true });
-          const html = await res.text();
-          if (res.status < 400) {
-            const owner = resolveOwnerFromContentHtml(html);
-            username = owner.username;
-            likeCount = owner.likeCount;
-            commentCount = owner.commentCount;
-            titleSnippet = owner.titleSnippet;
-            resolveMethod = owner.method;
-          }
-        } catch {
-          /* skip resolve failure */
-        }
-      }
-
-      if (username) handleSet.add(username.toLowerCase());
-
-      contents.push({
+  // Owner + counts come from the logged-out post query, direct from the VPS.
+  // `titleSnippet` keeps the `og:title` shape the post page used to give.
+  const contents: IG_ADVANCED_CONTENT_HIT[] = await runWithConcurrency(
+    toResolve,
+    IG_GRAPHQL_CONCURRENCY,
+    async (c) => {
+      const hit: IG_ADVANCED_CONTENT_HIT = {
         kind: c.kind,
         url: c.url,
         shortcode: c.shortcode,
-        username,
-        likeCount,
-        commentCount,
-        titleSnippet,
-        resolveMethod,
-      });
-    }
-  } finally {
-    await closeUrlFetchSession(session);
-  }
+        username: c.usernameFromPath,
+        likeCount: null,
+        commentCount: null,
+        titleSnippet: null,
+        resolveMethod: c.usernameFromPath ? "gsearch-url-path" : null,
+      };
+      const mediaId = c.shortcode ? mediaIdFromShortcode(c.shortcode) : null;
+      if (hit.username || !mediaId) return hit;
+
+      const media = await fetchLoggedOutMedia(mediaId).catch(() => null);
+      if (!media?.user?.username) return hit;
+      const owner = media.user.full_name || media.user.username;
+      const caption = media.caption?.text?.trim();
+      return {
+        ...hit,
+        username: media.user.username,
+        likeCount: media.like_count ?? null,
+        commentCount: media.comment_count ?? null,
+        titleSnippet: caption
+          ? `${owner} on Instagram: "${caption}`.slice(0, 180)
+          : `${owner} on Instagram`,
+        resolveMethod: "graphql",
+      };
+    },
+  );
+  const handleSet = new Set(
+    contents.flatMap((c) => (c.username ? [c.username.toLowerCase()] : [])),
+  );
 
   const usernames = [...handleSet];
   let leads: IG_ADVANCED_SEARCH_RESPONSE["leads"] = [];

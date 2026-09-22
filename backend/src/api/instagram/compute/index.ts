@@ -11,11 +11,9 @@ export {
   uniqueUsernames,
 } from "./username";
 export { collectBusinessPhoneNumbers } from "./phones";
-export { mapInstagramWebProfileBody, mapToResponse } from "./map-response";
 export {
-  extractSsrUserFromHtml,
-  mapSsrUserToResponse,
-  mapSsrProfileHtml,
+  mapXigUserToResponse,
   extractEmailsFromBio,
+  type XigProfilePageUser,
   type XigUserByUsername,
-} from "./ssr-profile";
+} from "./xig-user";

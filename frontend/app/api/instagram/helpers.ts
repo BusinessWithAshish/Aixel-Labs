@@ -1,112 +1,18 @@
-import {
-  ClientIdentifier,
-  Session,
-  destroyTLS,
-  initTLS,
-} from 'node-tls-client';
-import type { FetchInstagramProfileResult, InstagramResponse } from './types';
+import 'server-only';
 
-export const IG_APP_ID = '936619743392459';
-export const INSTAGRAM_BASE_URL = 'https://www.instagram.com';
-export const REQUEST_TIMEOUT_MS = 15_000;
-export const MAX_RETRIES = 3;
-export const RETRY_BASE_DELAY_MS = 1_000;
+import type { INSTAGRAM_RESPONSE } from '@aixellabs/backend/instagram';
+import { API_ENDPOINTS } from '@aixellabs/backend/config';
+import apiClient from '@/lib/api-client';
+import type { FetchInstagramProfileResult } from './types';
 
 export const INSTAGRAM_USERNAME_REGEX = /^[a-zA-Z0-9_.]+$/;
 export const INSTAGRAM_URL_REGEX = /https:\/\/www\.instagram\.com\/[a-zA-Z0-9_.]+/;
 
-export const IG_HEADERS: Record<string, string> = {
-    accept: '*/*',
-    'accept-language': 'en-US,en;q=0.9',
-    'accept-encoding': 'gzip, deflate, br, zstd',
-    priority: 'u=1, i',
-    'sec-ch-prefers-color-scheme': 'dark',
-    'sec-ch-ua': '"Chromium";v="141", "Not?A_Brand";v="8"',
-    'sec-ch-ua-full-version-list': '"Chromium";v="141.0.7390.122", "Not?A_Brand";v="8.0.0.0"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-model': '""',
-    'sec-ch-ua-platform': '"macOS"',
-    'sec-ch-ua-platform-version': '"26.2.0"',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-origin',
-    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
-    'x-ig-app-id': IG_APP_ID,
-    'x-ig-www-claim': '0',
-    'x-requested-with': 'XMLHttpRequest',
-    referer: INSTAGRAM_BASE_URL,
-};
-
-let tlsReady: Promise<void> | null = null;
-
-async function ensureTls(): Promise<void> {
-  if (!tlsReady) {
-    tlsReady = initTLS().catch((err) => {
-      tlsReady = null;
-      throw err;
-    });
-  }
-  await tlsReady;
-}
-
-export type IgFetchResponse = {
-  status: number;
-  ok: boolean;
-  headers: { get(name: string): string | null };
-  text(): Promise<string>;
-  json(): Promise<unknown>;
-};
-
-export async function igFetch(
-  url: string,
-  extraHeaders?: Record<string, string>,
-): Promise<IgFetchResponse> {
-  await ensureTls();
-
-  const session = new Session({
-    clientIdentifier: ClientIdentifier.chrome_131,
-    timeout: REQUEST_TIMEOUT_MS,
-    headers: { ...IG_HEADERS, ...extraHeaders },
-    insecureSkipVerify: true,
-    randomTlsExtensionOrder: true,
-  });
-
-  try {
-    const response = await session.get(url, { followRedirects: true });
-    const body = await response.text();
-    const headers = response.headers;
-
-    return {
-      status: response.status,
-      ok: response.status >= 200 && response.status < 300,
-      headers: {
-        get(name: string) {
-          const raw = headers[name.toLowerCase()];
-          if (Array.isArray(raw)) return raw[0] ?? null;
-          return typeof raw === 'string' ? raw : null;
-        },
-      },
-      text: async () => body,
-      json: async () => JSON.parse(body) as unknown,
-    };
-  } finally {
-    await session.close().catch(() => {});
-  }
-}
-
-for (const sig of ['SIGTERM', 'SIGINT'] as const) {
-  process.once(sig, () => {
-    void destroyTLS().catch(() => {});
-  });
-}
-
-export function sleep(ms: number) {
-    return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
-
-export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-    return Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms))]);
-}
+/** ISO alpha-2 the backend uses to format the profile's phone number. */
+const DEFAULT_COUNTRY = 'IN';
+/** Thumbnails the viewer shows, when the account is public and posts resolve. */
+const LATEST_POSTS_COUNT = 11;
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export function extractUsername(input: string): string | null {
     const trimmed = input.trim();
@@ -117,7 +23,7 @@ export function extractUsername(input: string): string | null {
             const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
             const parts = url.pathname.split('/').filter(Boolean);
             const candidate = parts[0];
-            if (!candidate || ['explore', 'accounts', 'p', 'reel', 'stories', 'tv'].includes(candidate)) {
+            if (!candidate || ['explore', 'accounts', 'p', 'reel', 'reels', 'stories', 'tv'].includes(candidate)) {
                 return null;
             }
             return candidate;
@@ -129,115 +35,59 @@ export function extractUsername(input: string): string | null {
     return trimmed.replace(/^@/, '') || null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapToResponse(user: any): InstagramResponse {
-    const bioEntities = user.biography_with_entities?.entities ?? [];
-    const bioHashtags = bioEntities.filter((e: any) => e.hashtag?.name).map((e: any) => e.hashtag.name);
-    const bioMentions = bioEntities.filter((e: any) => e.user?.username).map((e: any) => e.user.username);
-    const websites = (user.bio_links ?? []).map((l: any) => l.url).filter(Boolean);
-    const latestPostUrls = user.edge_owner_to_timeline_media?.edges.map((e: any) => e.node.display_url) ?? null;
-
-    return {
-        id: user.id ?? null,
-        fullName: user.full_name ?? null,
-        username: user.username ?? null,
-        instagramUrl: user.username ? `https://www.instagram.com/${user.username}/` : null,
-        websites: websites.length > 0 ? websites : null,
-        bio: user.biography ?? null,
-        bioHashtags: bioHashtags.length > 0 ? bioHashtags : null,
-        bioMentions: bioMentions.length > 0 ? bioMentions : null,
-        followers: user.edge_followed_by?.count ?? null,
-        following: user.edge_follow?.count ?? null,
-        posts: user.edge_owner_to_timeline_media?.count ?? null,
-        profilePicture: user.profile_pic_url ?? null,
-        profilePictureHd: user.profile_pic_url_hd ?? null,
-        isVerified: user.is_verified ?? null,
-        isBusiness: user.is_business_account ?? null,
-        isProfessional: user.is_professional_account ?? null,
-        isPrivate: user.is_private ?? null,
-        isJoinedRecently: user.if_joined_recently ?? null,
-        businessEmail: user.business_email ?? null,
-        businessPhoneNumber: user.business_phone_number ?? null,
-        businessCategoryName: user.business_category_name ?? null,
-        overallCategoryName: user.overall_category_name ?? null,
-        businessAddressJson: user.business_address_json ?? null,
-        latestPostUrls: latestPostUrls,
-    };
+/**
+ * Latest post thumbnails for the viewer grid. Best-effort: the Posts-tab
+ * endpoint is separate from the profile lookup, so any failure (private
+ * account, rate limit) just yields no thumbnails rather than failing the
+ * profile. One image per post — the grid item, not carousel slides.
+ */
+async function fetchLatestPostThumbnails(username: string): Promise<string[] | null> {
+    // Minimal shape of the Posts-tab response — only the grid thumbnail is read.
+    const res = await apiClient.post<{ posts: Array<{ imageUrl: string | null }> }>(
+        API_ENDPOINTS.INSTAGRAM.ADVANCED_POSTS.full,
+        { username, count: LATEST_POSTS_COUNT, pages: 1 },
+        { timeout: REQUEST_TIMEOUT_MS },
+    );
+    if (!res.success || !res.data) return null;
+    const urls = res.data.posts
+        .map((post) => post.imageUrl)
+        .filter((url): url is string => Boolean(url));
+    return urls.length > 0 ? urls : null;
 }
 
-export async function fetchInstagramProfile(username: string): Promise<FetchInstagramProfileResult> {
-    const url = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`;
-    let lastError: Error | null = null;
-
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const response = await withTimeout(igFetch(url), REQUEST_TIMEOUT_MS);
-
-            if (response.status === 404) {
-                return { ok: false, failure: 'instagram_user_not_found' };
-            }
-
-            if (response.status === 429 || response.status >= 500) {
-                const retryAfter = response.headers.get?.('retry-after');
-                const backoff = retryAfter ? parseInt(retryAfter, 10) * 1_000 : RETRY_BASE_DELAY_MS * 2 ** (attempt - 1) + Math.random() * 500;
-                lastError = new Error(`HTTP ${response.status} on attempt ${attempt}`);
-                if (attempt < MAX_RETRIES) {
-                    await sleep(backoff);
-                    continue;
-                }
-                return {
-                    ok: false,
-                    failure: 'retries_exhausted',
-                    detail: lastError.message,
-                };
-            }
-
-            if (response.status === 401 || response.status === 403) {
-                const body = await response.text().catch(() => '');
-                throw new Error(`Instagram auth failure (${response.status}). Body: ${body.slice(0, 200)}`);
-            }
-
-            if (!response.ok) {
-                return {
-                    ok: false,
-                    failure: 'bad_http_status',
-                    detail: `HTTP ${response.status}`,
-                };
-            }
-
-            let json: { data?: { user?: unknown } };
-            try {
-                json = await response.json();
-            } catch {
-                lastError = new Error(`JSON parse failed for @${username}`);
-                if (attempt < MAX_RETRIES) {
-                    await sleep(RETRY_BASE_DELAY_MS * attempt);
-                    continue;
-                }
-                return { ok: false, failure: 'parse_error', detail: lastError.message };
-            }
-
-            const user = json?.data?.user;
-            if (!user) {
-                // Very common: private accounts, age-restricted, or IG omitting user without a real session
-                return { ok: false, failure: 'no_user_payload' };
-            }
-
-            return { ok: true, profile: mapToResponse(user) };
-        } catch (err) {
-            const error = err as Error;
-            if (error.message.includes('auth failure')) throw error;
-            lastError = error;
-            if (attempt < MAX_RETRIES) {
-                await sleep(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1) + Math.random() * 500);
-            }
-        }
+/**
+ * Look up one Instagram profile through the backend `POST /instagram`
+ * endpoint (logged-out GraphQL — see `backend/src/api/instagram/README.md`),
+ * then attach latest post thumbnails from the Posts-tab endpoint. No scraping
+ * happens in the frontend; the backend owns the transport and mapping.
+ */
+export async function fetchInstagramProfile(
+    username: string,
+    country: string = DEFAULT_COUNTRY,
+): Promise<FetchInstagramProfileResult> {
+    let res;
+    try {
+        res = await apiClient.post<INSTAGRAM_RESPONSE[]>(
+            API_ENDPOINTS.INSTAGRAM.API.full,
+            { entities: [username], country, limit: 1 },
+            { timeout: REQUEST_TIMEOUT_MS },
+        );
+    } catch (err) {
+        return { ok: false, failure: 'request_failed', detail: err instanceof Error ? err.message : String(err) };
     }
 
-    console.error(`[instagram] Giving up on @${username} after ${MAX_RETRIES} attempts: ${lastError?.message}`);
-    return {
-        ok: false,
-        failure: 'request_failed',
-        detail: lastError?.message,
-    };
+    if (!res.success) {
+        // The backend only reports failure when every route was exhausted.
+        return { ok: false, failure: 'retries_exhausted', detail: res.error };
+    }
+
+    const profile = res.data?.[0];
+    if (!profile) {
+        // Backend omits handles it couldn't resolve — treat as not found.
+        return { ok: false, failure: 'instagram_user_not_found' };
+    }
+
+    const latestPostUrls = await fetchLatestPostThumbnails(username).catch(() => null);
+
+    return { ok: true, profile: { ...profile, latestPostUrls } };
 }

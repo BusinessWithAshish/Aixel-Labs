@@ -1,266 +1,80 @@
 import type { CountryCode } from "libphonenumber-js";
-import { randomUUID } from "crypto";
 
-import {
-  closeUrlFetchSession,
-  createUrlFetchSession,
-  type UrlFetchSession,
-} from "../../utils/node-tls-client-session-handler";
 import { fetchGsearch } from "../gsearch";
 import {
   GSEARCH_MAX_PAGES,
   GSEARCH_MAX_QUERY_CHARS,
   GSEARCH_PAGE_SIZE,
 } from "../gsearch/constants";
+import { runWithConcurrency } from "../youtube/concurrency";
 import {
-  IG_ASBD_ID,
-  IG_HEADERS,
-  IG_PRIME_HEADERS,
-  IG_PROFILE_MAX_RETRIES,
-  INSTAGRAM_BASE_URL,
+  IG_GRAPHQL_CONCURRENCY,
+  IG_PROFILE_EMBED_URL,
+  IG_PROFILE_PAGE_VARIABLES,
   INSTAGRAM_ERROR_MESSAGES,
-  INSTAGRAM_MOBILE_API_BASE,
   INSTAGRAM_QUERY_LIMITS,
   INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT,
-  INSTAGRAM_WEB_PROFILE_INFO_PATH,
 } from "./constants";
 import {
   generateInstagramSearchQuery,
-  instagramProfileUrl,
-  mapInstagramWebProfileBody,
-  mapSsrProfileHtml,
+  mapXigUserToResponse,
   uniqueUsernames,
+  type XigProfilePageUser,
+  type XigUserByUsername,
 } from "./compute";
+import { igLoggedOutQuery, readEmbedNumber } from "./graphql";
 import type { INSTAGRAM_REQUEST, INSTAGRAM_RESPONSE } from "./types";
-import {
-  RETRY_BASE_DELAY_MS,
-  jitter,
-  sleep,
-} from "../../utils/fetch-session-common";
-
-/** `INSTAGRAM_DEBUG=1` enables per-attempt prime/profile status logging. */
-function igDebug(): boolean {
-  return process.env.INSTAGRAM_DEBUG?.trim() === "1";
-}
-
-export function instagramWebProfileInfoUrl(username: string): string {
-  return `${INSTAGRAM_MOBILE_API_BASE}${INSTAGRAM_WEB_PROFILE_INFO_PATH}?username=${encodeURIComponent(username)}`;
-}
 
 function resolveLimit(limit: number | undefined): number {
   return limit ?? INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT;
 }
 
-/** 32-char lowercase-hex token matching Instagram's `csrftoken` shape. */
-function randomCsrfToken(): string {
-  return randomUUID().replace(/-/g, "").slice(0, 32).padEnd(32, "0");
+/** Total post count from the profile embed page — `null` for e.g. private accounts. */
+function fetchPostsCount(username: string): Promise<number | null> {
+  return readEmbedNumber(IG_PROFILE_EMBED_URL(username), "posts_count");
 }
-
-/** Pull `csrf_token` from the SSR HTML JSON blob the profile page ships. */
-function pickCsrfFromHtml(html: string): string | undefined {
-  return (
-    html.match(/"csrf_token"\s*:\s*"([^"]+)"/)?.[1] ??
-    html.match(/{"token":"([^"]+)","claim"/)?.[1]
-  );
-}
-
-type PrimeResult = {
-  csrfToken: string;
-  wwwClaim: string | null;
-  cookieHeader: string;
-  /** The profile HTML body — reused for the SSR fallback if `web_profile_info` 401s. */
-  html: string;
-  ok: boolean;
-  status: number;
-};
 
 /**
- * Prime a logged-out guest session by loading the profile's SSR HTML page on
- * `www.instagram.com/{username}/`. This seeds the session cookie jar with
- * `csrftoken` / `mid` / `datr` / `ig_did` (the cookies `web_profile_info`
- * gates on) and exposes the CSRF token both in `Set-Cookie` and in the SSR
- * JSON blob. We manually rebuild the `cookie` header from `res.cookies`
- * because the session jar is host-scoped and the profile call goes to a
- * different host (`i.instagram.com`). The HTML body is captured so the SSR
- * fallback can parse it without a second GET if `web_profile_info` soft-blocks.
+ * The business half of a profile — `account_type`, `category`, the HD
+ * picture — from the profile page query. Best-effort: on any failure the
+ * profile still ships, with those fields null.
  */
-async function primeGuestSession(
-  session: UrlFetchSession,
-  username: string,
-): Promise<PrimeResult> {
-  const res = await session.get(instagramProfileUrl(username), {
-    followRedirects: true,
-    headers: IG_PRIME_HEADERS,
-  });
-  const cookies = res.cookies ?? {};
-  const html = await res.text();
-  const csrfToken =
-    cookies.csrftoken || pickCsrfFromHtml(html) || randomCsrfToken();
-  const wwwClaim =
-    (res.headers["x-ig-set-www-claim"] as string | undefined) ?? null;
-
-  // Rebuild the cookie header for the cross-host profile call.
-  const cookieParts: string[] = [];
-  for (const [k, v] of Object.entries(cookies)) {
-    cookieParts.push(`${k}=${v}`);
-  }
-  const cookieHeader = cookieParts.join("; ");
-
-  if (igDebug()) {
-    console.log(
-      `[instagram] @${username} prime — HTTP ${res.status}, html ${html.length}b, csrf=${csrfToken ? "yes" : "no"}, cookies=[${Object.keys(cookies).join(",")}], wwwClaim=${wwwClaim ?? "none"}`,
+async function fetchProfilePage(pk: string): Promise<XigProfilePageUser | null> {
+  try {
+    const data = await igLoggedOutQuery<{ user: XigProfilePageUser | null }>(
+      "profilePage",
+      { id: pk, ...IG_PROFILE_PAGE_VARIABLES },
     );
+    return data?.user ?? null;
+  } catch (err) {
+    console.log(
+      `[instagram] profile page ${pk} — ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return null;
   }
-
-  return {
-    csrfToken,
-    wwwClaim,
-    cookieHeader,
-    html,
-    ok: res.ok,
-    status: res.status,
-  };
 }
 
 /**
- * Fetch one profile. Flow per attempt:
- *  1. Prime the guest session by loading the profile SSR HTML (always 200
- *     for public profiles — this is the guest-accessible surface).
- *  2. Call `web_profile_info` on `i.instagram.com`. On 200, map the full
- *     response (includes business category / email / phone on non-flagged IPs).
- *  3. On 401/403/429 (IP soft-block — `require_login: true`), fall back to
- *     parsing the SSR HTML `xig_user_by_username` blob we already fetched in
- *     step 1. Instagram does NOT ship the business contact block to logged-out
- *     readers, so `businessCategoryName`/`businessEmail`(from API) come back
- *     null — but emails/phones in the public `biography` are extracted, so
- *     the lead is real data, not empty.
- *  4. Only retry (rotate IP) if the SSR fallback itself had no user blob
- *     (rare — means the HTML didn't load properly).
- *
- * Returns the mapped response, or `null` if the profile is gone (404) or
- * unreachable after all retries.
+ * One profile: the logged-out profile query (by username, gives the pk), then
+ * the profile page query (by pk) and the embed page's post count in parallel.
+ * `null` when the account doesn't exist; throws when Instagram can't be
+ * reached on any route.
  */
 async function fetchOneProfile(
   username: string,
   countryCode: CountryCode,
 ): Promise<INSTAGRAM_RESPONSE | null> {
-  const profileUrl = instagramWebProfileInfoUrl(username);
-  const referer = instagramProfileUrl(username);
-
-  let lastStatus = 0;
-  let lastErr: Error | null = null;
-
-  for (let attempt = 1; attempt <= IG_PROFILE_MAX_RETRIES; attempt++) {
-    if (attempt > 1) {
-      await sleep(jitter(RETRY_BASE_DELAY_MS * 2 ** (attempt - 2)));
-    }
-
-    // Fresh sticky Evomi session per attempt so prime + profile share one
-    // exit IP; retries rotate the suffix (and thus the exit IP). Route
-    // through US residential exits — Instagram is US-based and US pools
-    // are far less soft-blocked for `web_profile_info` guest access than
-    // the random-country default.
-    const session = await createUrlFetchSession({
-      headers: IG_HEADERS,
-      proxyCountry: process.env.INSTAGRAM_PROXY_COUNTRY ?? "US",
-    });
-
-    try {
-      const prime = await primeGuestSession(session, username);
-
-      // Guest-only cookie header: primed csrftoken/mid/datr/ig_did. We do
-      // NOT inject logged-in `sessionid` — using account cookies risks
-      // checkpointing the account, and the SSR HTML fallback already
-      // covers flagged-IP cases without any login.
-      const apiHeaders: Record<string, string> = {
-        ...IG_HEADERS,
-        "x-asbd-id": IG_ASBD_ID,
-        "x-csrftoken": prime.csrfToken,
-        ...(prime.wwwClaim ? { "x-ig-www-claim": prime.wwwClaim } : {}),
-        ...(prime.cookieHeader ? { cookie: prime.cookieHeader } : {}),
-        referer,
-      };
-
-      const res = await session.get(profileUrl, {
-        followRedirects: true,
-        headers: apiHeaders,
-      });
-      lastStatus = res.status;
-
-      if (res.status === 404) {
-        // Permanent — don't retry, don't fall back.
-        if (igDebug()) console.log(`[instagram] @${username} — 404 (gone)`);
-        return null;
-      }
-
-      if (res.ok) {
-        const text = await res.text();
-        try {
-          if (igDebug()) {
-            console.log(
-              `[instagram] @${username} — web_profile_info 200, ${text.length}b (full data)`,
-            );
-          }
-          return mapInstagramWebProfileBody(text, countryCode);
-        } catch (err) {
-          // `web_profile_info` returned 200 but no `data.user` (age-restricted
-          // accounts return 200 with null user). Fall through to SSR fallback.
-          lastErr = err instanceof Error ? err : new Error(String(err));
-          if (igDebug()) {
-            console.log(
-              `[instagram] @${username} — 200 but map failed: ${lastErr.message}, trying SSR fallback`,
-            );
-          }
-        }
-      } else {
-        // 401 / 403 / 429 — IP soft-blocked. Don't waste the prime HTML; fall
-        // back to SSR parsing below.
-        const body = await res.text().catch(() => "");
-        lastErr = new Error(`HTTP ${res.status}`);
-        if (igDebug()) {
-          console.log(
-            `[instagram] @${username} — web_profile_info HTTP ${res.status}: ${body.slice(0, 120)} → SSR fallback`,
-          );
-        }
-      }
-
-      // SSR fallback: parse the `xig_user_by_username` blob from the prime
-      // HTML. This works on any IP (the SSR page is guest-accessible) and
-      // gives basic fields + bio-extracted emails/phones.
-      const ssr = mapSsrProfileHtml(prime.html, countryCode);
-      if (ssr) {
-        if (igDebug()) {
-          console.log(
-            `[instagram] @${username} — SSR fallback resolved (followers=${ssr.followers}, bio=${ssr.bio ? `${ssr.bio.length}ch` : "none"})`,
-          );
-        }
-        return ssr;
-      }
-
-      // SSR blob missing — the prime HTML didn't load properly (rare).
-      // Retry with a rotated IP.
-      lastErr = new Error("SSR fallback: no xig_user_by_username blob in HTML");
-      if (attempt < IG_PROFILE_MAX_RETRIES) continue;
-      return null;
-    } catch (err) {
-      lastErr = err instanceof Error ? err : new Error(String(err));
-      if (igDebug()) {
-        console.log(
-          `[instagram] @${username} attempt ${attempt} threw: ${lastErr.message}`,
-        );
-      }
-      if (attempt < IG_PROFILE_MAX_RETRIES) continue;
-      return null;
-    } finally {
-      await closeUrlFetchSession(session);
-    }
-  }
-
-  // Exhausted retries — log and skip this handle.
-  console.log(
-    `[instagram] @${username} — failed after ${IG_PROFILE_MAX_RETRIES} attempt(s) (last status ${lastStatus}, ${lastErr?.message ?? "no error"})`,
-  );
-  return null;
+  const postsCount = fetchPostsCount(username);
+  const data = await igLoggedOutQuery<{
+    xig_user_by_username: XigUserByUsername | null;
+  }>("profile", { username });
+  const user = data?.xig_user_by_username;
+  if (!user) return null;
+  const [page, posts] = await Promise.all([
+    fetchProfilePage(user.pk),
+    postsCount,
+  ]);
+  return mapXigUserToResponse(user, countryCode, { page, posts });
 }
 
 export async function fetchFromEntities(
@@ -278,18 +92,30 @@ export async function fetchFromEntities(
   }
 
   const countryCode = country as CountryCode;
-  const results: INSTAGRAM_RESPONSE[] = [];
+  let lastErr: Error | null = null;
 
-  // Sequential per-handle fetches; each handle gets its own primed guest
-  // session + sticky proxy IP. One blocked handle doesn't fail the batch.
-  for (const username of usernames) {
-    const profile = await fetchOneProfile(username, countryCode);
-    if (profile) results.push(profile);
-  }
+  // A missing handle is skipped; one that can't be reached is logged and
+  // skipped too, unless every handle failed that way — then the caller gets
+  // the error instead of an empty list that reads as "no such accounts".
+  const settled = await runWithConcurrency(
+    usernames,
+    IG_GRAPHQL_CONCURRENCY,
+    async (username) => {
+      try {
+        return await fetchOneProfile(username, countryCode);
+      } catch (err) {
+        lastErr = err instanceof Error ? err : new Error(String(err));
+        console.log(`[instagram] @${username} — ${lastErr.message}`);
+        return undefined;
+      }
+    },
+  );
+  const results = settled.filter((p): p is INSTAGRAM_RESPONSE => Boolean(p));
 
   console.log(
     `[instagram] entities: ${usernames.length} requested → ${results.length} resolved`,
   );
+  if (lastErr && settled.every((p) => p === undefined)) throw lastErr;
   return results;
 }
 

@@ -78,3 +78,20 @@ export function buildContentGsearchQuery(
 ): string {
   return `${IG_CONTENT_KIND_GSEARCH[kind]} ${niche.trim()}`.trim();
 }
+
+const SHORTCODE_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+/**
+ * Media pk from a post/reel shortcode (base64 over Instagram's alphabet).
+ * Private-post shortcodes append a suffix to the 11-character id part.
+ */
+export function mediaIdFromShortcode(shortcode: string): string | null {
+  let id = BigInt(0);
+  for (const ch of shortcode.slice(0, 11)) {
+    const v = SHORTCODE_ALPHABET.indexOf(ch);
+    if (v < 0) return null;
+    id = id * BigInt(64) + BigInt(v);
+  }
+  return id > BigInt(0) ? id.toString() : null;
+}

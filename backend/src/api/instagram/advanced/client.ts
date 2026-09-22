@@ -1,50 +1,101 @@
-import { IG_HEADERS, INSTAGRAM_BASE_URL } from "../constants";
-import { extractUsername, instagramProfileUrl } from "../compute/username";
+import { runWithConcurrency } from "../../youtube/concurrency";
+import { extractUsername } from "../compute/username";
+import { IG_GRAPHQL_CONCURRENCY, IG_GRAPHQL_PAGE_SIZE } from "../constants";
 import {
-  closeUrlFetchSession,
-  createUrlFetchSession,
-} from "../../../utils/node-tls-client-session-handler";
-import {
-  RETRY_BASE_DELAY_MS,
-  jitter,
-  shouldRetryHttpStatus,
-  sleep,
-} from "../../../utils/fetch-session-common";
+  fetchLoggedOutMedia,
+  igLoggedOutQuery,
+  readEmbedNumber,
+} from "../graphql";
 import {
   IG_ADVANCED_ERROR_MESSAGES,
   IG_ADVANCED_POSTS_LIMITS,
-  IG_FEED_USER_BY_USERNAME_PATH,
+  IG_MEDIA_TYPE,
+  IG_POST_EMBED_URL,
+  IG_REELS_SCAN_MAX_PAGES,
 } from "./constants";
-import { mapFeedItem, mapFeedUser } from "./compute";
+import { mapFeedItem } from "./compute";
 import type {
   IG_ADVANCED_POST,
   IG_ADVANCED_POSTS_REQUEST,
   IG_ADVANCED_POSTS_RESPONSE,
-  IgFeedUserTimelineResponse,
+  IgFeedItem,
+  IgPolarisConnection,
 } from "./types";
 
-const FEED_MAX_RETRIES = 4;
+type TimelineData = {
+  xig_user_by_username: {
+    pk?: string;
+    polaris_ordered_timeline_connection?: IgPolarisConnection<IgFeedItem> | null;
+  } | null;
+};
 
-function pickCsrfFromHtml(html: string): string | undefined {
-  return (
-    html.match(/"csrf_token"\s*:\s*"([^"]+)"/)?.[1] ??
-    html.match(/{"token":"([^"]+)","claim"/)?.[1]
-  );
-}
+type ClipsData = {
+  xig_user_by_username: {
+    polaris_clips_connection?: IgPolarisConnection<IgFeedItem> | null;
+  } | null;
+};
 
-function feedByUsernameUrl(
+/**
+ * Fills reel `playCount` from the Reels-tab connection — the only guest
+ * surface that still carries it — joined on pk. The tab runs newest first, so
+ * the scan stops once it pages past the oldest wanted reel; likes/comments
+ * are backfilled too when the post query couldn't load a reel.
+ */
+async function fillReelCounts(
   username: string,
-  count: number,
-  cursor?: string,
-): string {
-  const base = `${INSTAGRAM_BASE_URL}${IG_FEED_USER_BY_USERNAME_PATH}/${encodeURIComponent(username)}/username/?count=${count}`;
-  if (!cursor) return base;
-  return `${base}&max_id=${encodeURIComponent(cursor)}`;
+  posts: IG_ADVANCED_POST[],
+): Promise<void> {
+  const wanted = new Map<string, IG_ADVANCED_POST>();
+  for (const post of posts) {
+    if (post.productType === "clips" && post.pk) wanted.set(post.pk, post);
+  }
+  if (wanted.size === 0) return;
+  const oldest = [...wanted.keys()].reduce((min, pk) =>
+    BigInt(pk) < BigInt(min) ? pk : min,
+  );
+
+  let after: string | undefined;
+  for (let page = 0; page < IG_REELS_SCAN_MAX_PAGES && wanted.size > 0; page++) {
+    const data = await igLoggedOutQuery<ClipsData>("reels", {
+      username,
+      first: IG_GRAPHQL_PAGE_SIZE,
+      ...(after ? { after } : {}),
+    }).catch(() => null);
+    const conn = data?.xig_user_by_username?.polaris_clips_connection;
+    const edges = conn?.edges ?? [];
+    for (const { node } of edges) {
+      if (node?.pk == null) continue;
+      const pk = String(node.pk);
+      const post = wanted.get(pk);
+      if (!post) continue;
+      post.playCount = node.play_count ?? post.playCount;
+      post.likeCount ??= node.like_count ?? null;
+      post.commentCount ??= node.comment_count ?? null;
+      wanted.delete(pk);
+    }
+    const lastPk = edges.at(-1)?.node?.pk;
+    if (
+      !conn?.page_info?.has_next_page ||
+      !conn.page_info.end_cursor ||
+      lastPk == null ||
+      BigInt(lastPk) < BigInt(oldest)
+    ) {
+      break;
+    }
+    after = conn.page_info.end_cursor;
+  }
 }
 
 /**
- * Fetch public profile Posts-tab media (initial page + optional scroll pages).
- * Uses the same REST endpoint Instagram web fires on profile load / infinite scroll.
+ * Public profile Posts tab through Instagram's logged-out GraphQL:
+ *  1. page the Posts-tab connection until `count × pages` posts are in hand
+ *     (the server returns at most 12 per call, so a big `count` is several);
+ *  2. load each post's full record — likes, comments, `taken_at`, media URLs,
+ *     carousel slides — with the post query, falling back to the thin grid
+ *     node when that fails;
+ *  3. fill reel play counts from the Reels tab, and every video's view count
+ *     from its embed page.
+ * The feed/user REST endpoint this replaced now 401s every guest.
  */
 export async function fetchInstagramAdvancedPosts(
   input: IG_ADVANCED_POSTS_REQUEST,
@@ -56,124 +107,65 @@ export async function fetchInstagramAdvancedPosts(
 
   const count = input.count ?? IG_ADVANCED_POSTS_LIMITS.defaultCount;
   const pages = input.pages ?? IG_ADVANCED_POSTS_LIMITS.defaultPages;
+  const target = count * pages;
 
-  const session = await createUrlFetchSession({
-    headers: {
-      ...IG_HEADERS,
-      referer: INSTAGRAM_BASE_URL,
-    },
-  });
+  const nodes: IgFeedItem[] = [];
+  let userId: string | null = null;
+  let cursor = input.cursor;
+  let hasNextPage = false;
+  let endCursor: string | null = null;
+  let pagesFetched = 0;
 
-  try {
-    // Seed cookie jar (csrftoken / mid) the way the browser does before XHRs.
-    const profileRes = await session.get(instagramProfileUrl(username), {
-      followRedirects: true,
-    });
-    const profileHtml = await profileRes.text();
-    if (profileRes.status >= 400) {
-      throw new Error(
-        `${IG_ADVANCED_ERROR_MESSAGES.FEED_FAILED} (profile HTTP ${profileRes.status})`,
-      );
-    }
-
-    const csrf = pickCsrfFromHtml(profileHtml);
-    const apiHeaders: Record<string, string> = {
-      ...IG_HEADERS,
-      referer: instagramProfileUrl(username),
-      origin: INSTAGRAM_BASE_URL,
-      ...(csrf
-        ? {
-            "x-csrftoken": csrf,
-            cookie: `csrftoken=${csrf}`,
-          }
-        : {}),
-    };
-
-    const posts: IG_ADVANCED_POST[] = [];
-    let cursor = input.cursor;
-    let hasNextPage = false;
-    let endCursor: string | null = null;
-    let userId: string | null = null;
-    let pagesFetched = 0;
-
-    for (let page = 0; page < pages; page++) {
-      if (page > 0) await sleep(jitter(350));
-
-      const url = feedByUsernameUrl(username, count, cursor);
-      let body: IgFeedUserTimelineResponse | null = null;
-      let lastErr: Error | null = null;
-
-      for (let attempt = 1; attempt <= FEED_MAX_RETRIES; attempt++) {
-        if (attempt > 1) {
-          await sleep(jitter(RETRY_BASE_DELAY_MS * 2 ** (attempt - 2)));
-        }
-
-        const res = await session.get(url, {
-          followRedirects: true,
-          headers: apiHeaders,
-        });
-        const text = await res.text();
-
-        if (res.status >= 400) {
-          lastErr = new Error(
-            `${IG_ADVANCED_ERROR_MESSAGES.FEED_FAILED} (HTTP ${res.status}: ${text.slice(0, 180)})`,
-          );
-          if (
-            !shouldRetryHttpStatus(res.status) ||
-            attempt === FEED_MAX_RETRIES
-          ) {
-            throw lastErr;
-          }
-          continue;
-        }
-
-        try {
-          body = JSON.parse(text) as IgFeedUserTimelineResponse;
-          lastErr = null;
-          break;
-        } catch {
-          lastErr = new Error(
-            `${IG_ADVANCED_ERROR_MESSAGES.FEED_FAILED} (non-JSON body)`,
-          );
-          if (attempt === FEED_MAX_RETRIES) throw lastErr;
-        }
-      }
-
-      if (!body) {
-        throw lastErr ?? new Error(IG_ADVANCED_ERROR_MESSAGES.FEED_FAILED);
-      }
-
-      pagesFetched++;
-      const mappedUser = mapFeedUser(body.user);
-      if (mappedUser?.id) userId = mappedUser.id;
-
-      const items = body.items ?? [];
-      for (const item of items) {
-        posts.push(mapFeedItem(item));
-        if (!userId) {
-          const fromItem = mapFeedUser(item.user);
-          if (fromItem?.id) userId = fromItem.id;
-        }
-      }
-
-      hasNextPage = Boolean(body.more_available);
-      endCursor = body.next_max_id ?? null;
-      cursor = endCursor ?? undefined;
-
-      if (!hasNextPage || !endCursor) break;
-    }
-
-    return {
+  while (nodes.length < target) {
+    const data = await igLoggedOutQuery<TimelineData>("posts", {
       username,
-      userId,
-      posts,
-      pageInfo: {
-        hasNextPage,
-        endCursor,
-      },
-      pagesFetched,
-    };
-  } finally {
-    await closeUrlFetchSession(session);
+      first: Math.min(IG_GRAPHQL_PAGE_SIZE, target - nodes.length),
+      ...(cursor ? { after: cursor } : {}),
+    });
+    const user = data?.xig_user_by_username;
+    if (!user) {
+      throw new Error(`${IG_ADVANCED_ERROR_MESSAGES.PROFILE_NOT_FOUND} (@${username})`);
+    }
+    pagesFetched++;
+    userId ??= user.pk ?? null;
+
+    const conn = user.polaris_ordered_timeline_connection;
+    const edges = conn?.edges ?? [];
+    for (const { node } of edges) if (node) nodes.push(node);
+
+    hasNextPage = Boolean(conn?.page_info?.has_next_page);
+    endCursor = conn?.page_info?.end_cursor ?? null;
+    if (!hasNextPage || !endCursor || edges.length === 0) break;
+    cursor = endCursor;
   }
+
+  const posts = await runWithConcurrency(
+    nodes,
+    IG_GRAPHQL_CONCURRENCY,
+    async (node) => {
+      const [full, views] = await Promise.all([
+        node.pk != null
+          ? fetchLoggedOutMedia(String(node.pk)).catch(() => null)
+          : null,
+        node.media_type === IG_MEDIA_TYPE.VIDEO && node.code
+          ? readEmbedNumber(IG_POST_EMBED_URL(node.code), "video_view_count")
+          : null,
+      ]);
+      const post = mapFeedItem(full ?? node);
+      post.viewCount ??= views;
+      return post;
+    },
+  );
+  await fillReelCounts(username, posts);
+
+  return {
+    username,
+    userId,
+    posts,
+    pageInfo: {
+      hasNextPage,
+      endCursor,
+    },
+    pagesFetched,
+  };
 }

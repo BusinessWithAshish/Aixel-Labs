@@ -121,6 +121,8 @@ export type IgFeedItem = {
   comments_disabled?: boolean;
   like_and_view_counts_disabled?: boolean;
   location?: IgFeedLocation | null;
+  /** Grid thumbnail — the only image a Posts / Reels tab node carries. */
+  display_uri?: string;
   /** Media dimensions — the crawler SSR page's candidates carry `url` only, so this is the one size source there. */
   original_width?: number;
   original_height?: number;
@@ -132,11 +134,8 @@ export type IgFeedItem = {
   coauthor_producers?: IgFeedUser[];
 };
 
-export type IgFeedUserTimelineResponse = {
-  items?: IgFeedItem[];
-  more_available?: boolean;
-  next_max_id?: string;
-  num_results?: number;
-  user?: IgFeedUser;
-  status?: string;
+/** Relay connection shape of the logged-out Posts / Reels tab queries. */
+export type IgPolarisConnection<T> = {
+  edges?: Array<{ node?: T; cursor?: string }>;
+  page_info?: { end_cursor?: string | null; has_next_page?: boolean };
 };
