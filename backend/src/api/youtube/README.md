@@ -52,7 +52,7 @@ youtube/
 │   ├── suggested.ts          # Suggested videos pagination
 │   └── helpers.ts            # Public fetch API + re-exports
 ├── comments/
-├── download/                 # InnerTube (youtubei.js) → local filePath (VPS only; no MCP)
+├── download/                 # downloader site in headed Chrome → local filePath (VPS only); InnerTube stream URLs for media cut
 ├── video-meta/
 ├── handle/
 ├── channel/

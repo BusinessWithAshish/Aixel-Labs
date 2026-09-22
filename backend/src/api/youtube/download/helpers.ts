@@ -1,35 +1,24 @@
 /**
- * In-house YouTube media downloader built on `youtubei.js` (InnerTube).
- *
- * Why this exists: a previous `yt-dlp` shell-out path hit YouTube's "Sign
- * in to confirm you're not a bot" wall whenever the WEB client demanded a
- * Proof-of-Origin (PoToken) token we cannot mint server-side. The InnerTube
- * clients used here (`IOS`, `ANDROID_VR`, `VISIONOS`) are JS-less /
- * PoToken-exempt today, so they keep working on datacenter IPs where the web
- * client is blocked — no external binary, no browser cookies, no PoToken
- * provider.
+ * YouTube media onto local disk, and signed stream URLs for cutting.
  *
  * Layout:
- *  - `downloadYoutubeMedia` — public entry point, returns the file path on disk.
- *  - Audio: one adaptive audio stream → `.m4a`.
- *  - Video: separate video + audio adaptive streams → ffmpeg merge → `.mp4`.
- *    IOS/VISIONOS only return adaptive (not progressive) formats for most
- *    videos, so we always merge for the video path even when a progressive
- *    stream exists — keeps the code path single.
+ *  - `downloadYoutubeMedia` — public entry point, returns the file path on
+ *    disk. The bytes come from a third-party downloader website driven in a
+ *    headed Chrome (`site.ts`), not from YouTube, so nothing transits the
+ *    metered Evomi proxy. See that file for why.
+ *  - `getYoutubeStreamUrls` — deciphered googlevideo URLs for `media` op=cut's
+ *    stream-direct path, via `youtubei.js` (InnerTube) through Evomi. Only the
+ *    KB-sized player call and the clip ranges ffmpeg reads cross the proxy.
  */
 
-import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { createWriteStream } from "node:fs";
 import { mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
-import ffmpegPath from "ffmpeg-static";
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 import type { Innertube } from "youtubei.js";
 
-import { isYoutubePlaylistUrl, parseYoutubeVideoId, resolveYoutubeGeo } from "../helpers";
+import { isYoutubePlaylistUrl, parseYoutubeVideoId } from "../helpers";
 import { IS_VERCEL_RUNTIME } from "../../../config";
 import {
   buildEvomiProxyUrl,
@@ -39,33 +28,23 @@ import {
   YOUTUBE_DOWNLOAD_DIR,
   YOUTUBE_DOWNLOAD_ERROR_MESSAGES,
   YOUTUBE_DOWNLOAD_MEDIA,
-  YOUTUBE_DOWNLOAD_TIMEOUT_MS,
+  YOUTUBE_OEMBED_URL,
 } from "./constants";
 import { YoutubeDownloadError } from "./errors";
+import { downloadYoutubeViaSite } from "./site";
 import type {
   YOUTUBE_DOWNLOAD_MEDIA_VALUE,
   YOUTUBE_VIDEO_DOWNLOAD_REQUEST,
   YOUTUBE_VIDEO_DOWNLOAD_RESPONSE,
 } from "./types";
-
-const execFileAsync = promisify(execFile);
+import { YOUTUBE_VIDEO_URL } from "../constants";
 
 /**
- * InnerTube clients tried in order. All three are JS-less / PoToken-exempt
- * today. IOS returns the highest-quality adaptive mp4 streams; ANDROID_VR
- * and VISIONOS are alternates for videos where IOS returns no formats.
- *
+ * InnerTube client order for stream-direct resolution (`getYoutubeStreamUrls`,
+ * used by `media` op=cut). All three are JS-less / PoToken-exempt for signing.
  * These are string literals matching the `InnerTubeClient` union from
  * youtubei.js (note: the `ClientType` enum uses `"iOS"` for IOS, which the
- * `InnerTubeClient` type rejects). The enum value for `Innertube.create`'s
- * `client_type` is resolved lazily after the dynamic import (see below).
- */
-const INNERTUBE_CLIENT_CHAIN = ["IOS", "ANDROID_VR", "VISIONOS"] as const;
-type InnerTubeClientName = (typeof INNERTUBE_CLIENT_CHAIN)[number];
-
-/**
- * Client order for STREAM-DIRECT resolution (`getYoutubeStreamUrls`, used by
- * `media` op=cut) — deliberately different from the download chain above.
+ * `InnerTubeClient` type rejects).
  *
  * Measured 2026-09-10 on the same video and the same Evomi session, requesting
  * 1MB at 60% into the file: IOS URLs return 302/403, ANDROID_VR URLs 403, and
@@ -75,11 +54,9 @@ type InnerTubeClientName = (typeof INNERTUBE_CLIENT_CHAIN)[number];
  * seek, so resolving with IOS first made every cut fail with 403 even though
  * IOS "succeeds" at signing — the chain stopped at the first client that
  * returned URLs, not the first one whose URLs actually serve.
- *
- * The download path keeps its own chain: it reads sequentially from byte 0
- * with youtubei.js's chunking, which is not affected the same way.
  */
-const STREAM_CLIENT_CHAIN = ["VISIONOS", "IOS", "ANDROID_VR"] as const satisfies readonly InnerTubeClientName[];
+const STREAM_CLIENT_CHAIN = ["VISIONOS", "IOS", "ANDROID_VR"] as const;
+type InnerTubeClientName = (typeof STREAM_CLIENT_CHAIN)[number];
 
 /**
  * Tallest source resolution stream-direct cuts will read. Every byte of a cut
@@ -117,14 +94,13 @@ function chooseStreamVideoFormat(info: BasicInfo) {
  * `youtubei.js` is an ESM-only package, but this backend is CommonJS
  * (`"type": "commonjs"`). A top-level `import` would compile to a
  * `require()` that Node rejects at runtime (`ERR_REQUIRE_ESM`), crashing
- * every request — not just downloads — because this module is imported
+ * every request — not just cuts — because this module is imported
  * through the youtube router at startup. Two consequences:
  *
  *  1. The runtime values (`Innertube`, `ClientType`, `Platform`) are loaded
  *     with a native dynamic `import()` inside `loadInnertubeModule`, so
- *     they only load when a download actually runs. On Vercel the download
- *     endpoint returns 501 before reaching here, so the ESM module is never
- *     loaded.
+ *     they only load when stream URLs are actually resolved. On Vercel that
+ *     returns 501 before reaching here, so the ESM module is never loaded.
  *  2. The compile-time types come from `import type` (erased by TypeScript,
  *     no runtime `require()`).
  *
@@ -175,19 +151,16 @@ function loadInnertubeModule(): Promise<InnertubeModule> {
  * see a residential IP instead. This is the only reliable fix for a
  * network-layer IP block — client rotation and PoTokens don't help.
  *
- * Stickiness: within one download the agent must NOT change — googlevideo
- * stream URLs are signed to the requesting IP, so the InnerTube API call
- * and the stream fetch must egress from the same IP or YouTube rejects
- * the download. Each agent therefore carries one stable Evomi session
- * suffix (one pinned residential IP).
+ * Stickiness: googlevideo stream URLs are signed to the requesting IP, so
+ * the InnerTube API call and ffmpeg's stream fetch must egress from the same
+ * IP or YouTube rejects them. Each agent therefore carries one stable Evomi
+ * session suffix (one pinned residential IP), and hands ffmpeg that same
+ * proxy URL.
  *
- * Rotation: residential pools contain flagged exits. A sticky session that
- * drew a burnt IP would fail every download until process restart. When a
- * full download attempt (client chain + stream fetch + merge) fails while
- * proxied, the attempt loop in `downloadYoutubeMedia` rotates to a fresh
- * Evomi session (new exit IP) and retries — mirroring the fresh-session-
- * per-request convention of `createYoutubeFetchSession`, but only on
- * failure so successful downloads stay IP-consistent.
+ * Rotation: residential pools contain flagged exits. When a full attempt
+ * (the client chain) fails while proxied, `getYoutubeStreamUrls` retries on a
+ * fresh Evomi session (new exit IP) — mirroring the fresh-session-per-request
+ * convention of `createYoutubeFetchSession`.
  *
  * youtubei.js's HTTPClient passes a `Request` object as the first arg and
  * always sets `body` in init (even for GETs). undici needs the URL as a
@@ -203,8 +176,6 @@ type CountryInnertube = {
   /** The full Evomi proxy URL (with this session's `_session-` id) — ffmpeg reuses it so its stream fetches egress from the same residential IP that signed the URLs. */
   proxyUrl: string;
 };
-
-const innertubeByCountry = new Map<string, CountryInnertube>();
 
 function proxiedFetchFor(
   agent: ProxyAgent,
@@ -270,37 +241,22 @@ function createCountryInnertube(country: string): CountryInnertube {
   return { agent, innertube, sessionId, proxyUrl };
 }
 
-function rotateCountryInnertube(country: string): void {
-  const previous = innertubeByCountry.get(country);
-  if (previous) {
-    void previous.agent.close().catch(() => {});
-  }
-  innertubeByCountry.set(country, createCountryInnertube(country));
-}
-
 let directInnertubePromise: Promise<Innertube> | null = null;
 
-async function getInnertube(country: string): Promise<Innertube> {
-  if (!evomiConfigured()) {
-    if (!directInnertubePromise) {
-      directInnertubePromise = (async () => {
-        const { Innertube, ClientType } = await loadInnertubeModule();
-        return Innertube.create({
-          client_type: ClientType.IOS,
-          generate_session_locally: false,
-          retrieve_player: true,
-          enable_session_cache: true,
-        });
-      })();
-    }
-    return directInnertubePromise;
+/** Unproxied client, for when Evomi isn't configured (local dev on a residential IP). */
+function getDirectInnertube(): Promise<Innertube> {
+  if (!directInnertubePromise) {
+    directInnertubePromise = (async () => {
+      const { Innertube, ClientType } = await loadInnertubeModule();
+      return Innertube.create({
+        client_type: ClientType.IOS,
+        generate_session_locally: false,
+        retrieve_player: true,
+        enable_session_cache: true,
+      });
+    })();
   }
-  let entry = innertubeByCountry.get(country);
-  if (!entry) {
-    entry = createCountryInnertube(country);
-    innertubeByCountry.set(country, entry);
-  }
-  return entry.innertube;
+  return directInnertubePromise;
 }
 
 function expectedPath(
@@ -351,134 +307,34 @@ async function existingDownload(
   }
 }
 
-async function pipeStreamTo(
-  stream: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>,
-  dest: string,
-): Promise<number> {
-  const writeStream = createWriteStream(dest);
-  try {
-    for await (const chunk of stream as AsyncIterable<Buffer>) {
-      writeStream.write(chunk);
-    }
-    writeStream.end();
-    await new Promise<void>((resolve, reject) => {
-      writeStream.on("finish", resolve);
-      writeStream.on("error", reject);
-    });
-  } catch (err) {
-    writeStream.destroy();
-    throw err;
-  }
-  const info = await stat(dest);
-  return info.size;
-}
-
-async function mergeWithFfmpeg(
-  videoPath: string,
-  audioPath: string,
-  outPath: string,
-): Promise<void> {
-  if (!ffmpegPath) {
-    throw new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.MERGE_FAILED, 502);
-  }
-  try {
-    await execFileAsync(
-      ffmpegPath,
-      [
-        "-y",
-        "-i",
-        videoPath,
-        "-i",
-        audioPath,
-        "-c",
-        "copy",
-        "-movflags",
-        "+faststart",
-        outPath,
-      ],
-      { maxBuffer: 10 * 1024 * 1024, timeout: YOUTUBE_DOWNLOAD_TIMEOUT_MS },
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    throw new YoutubeDownloadError(
-      `${YOUTUBE_DOWNLOAD_ERROR_MESSAGES.MERGE_FAILED}: ${message}`,
-      502,
-    );
-  }
-}
-
-type InnertubeVideoInfo = Awaited<ReturnType<Innertube["getBasicInfo"]>>;
-
 /**
- * Full attempt across the client chain: for each client, fetch info and
- * immediately try the stream download with that same client. `getBasicInfo`
- * succeeding does not mean the stream will — e.g. IOS can return playable
- * metadata while its googlevideo stream fetch 403s, and VISIONOS then works
- * for the same video. Returning on the first *complete* success (info +
- * bytes on disk) avoids pinning a client whose info works but streams fail.
+ * Title via YouTube's oEmbed endpoint, which answers the VPS's own IP (only
+ * the player-bound InnerTube calls are walled), so this costs no proxy bytes.
+ * A 400/404 means the video does not exist — fail before a downloader site
+ * spends minutes on it. Anything else (401/403 for private or embed-disabled
+ * videos, a network error) is not a verdict: the sites decide.
  */
-async function attemptDownloadWithClientChain(
-  videoId: string,
-  media: YOUTUBE_DOWNLOAD_MEDIA_VALUE,
-  country: string,
-  outPath: string,
-): Promise<{ info: InnertubeVideoInfo; client: InnerTubeClientName }> {
-  let lastError: Error | null = null;
-  const yt = await getInnertube(country);
-  for (const client of INNERTUBE_CLIENT_CHAIN) {
-    try {
-      const info = await yt.getBasicInfo(videoId, { client });
-      if (!info?.basic_info) {
-        throw new Error("Empty InnerTube response");
-      }
-      await (media === YOUTUBE_DOWNLOAD_MEDIA.AUDIO
-        ? downloadAudio(info, client, outPath)
-        : downloadVideo(info, client, outPath));
-      return { info, client };
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-    }
+async function fetchOembedTitle(videoId: string): Promise<string | null> {
+  const url = `${YOUTUBE_OEMBED_URL}?format=json&url=${encodeURIComponent(YOUTUBE_VIDEO_URL(videoId))}`;
+  let res: Awaited<ReturnType<typeof undiciFetch>>;
+  try {
+    res = await undiciFetch(url, { signal: AbortSignal.timeout(10_000) });
+  } catch {
+    return null;
   }
-  throw new YoutubeDownloadError(
-    `${YOUTUBE_DOWNLOAD_ERROR_MESSAGES.NO_CLIENTS}: ${lastError?.message ?? "unknown error"}`,
-    502,
-  );
-}
-
-async function downloadAudio(
-  info: InnertubeVideoInfo,
-  client: InnerTubeClientName,
-  outPath: string,
-): Promise<number> {
-  const stream = await info.download({ type: "audio", quality: "best", client });
-  return pipeStreamTo(stream as unknown as AsyncIterable<Buffer>, outPath);
-}
-
-async function downloadVideo(
-  info: InnertubeVideoInfo,
-  client: InnerTubeClientName,
-  outPath: string,
-): Promise<number> {
-  const baseId = info.basic_info.id ?? "";
-  const videoPart = join(YOUTUBE_DOWNLOAD_DIR, `${baseId}.video.mp4`);
-  const audioPart = join(YOUTUBE_DOWNLOAD_DIR, `${baseId}.audio.m4a`);
-
-  const videoStream = await info.download({ type: "video", quality: "best", client });
-  await pipeStreamTo(videoStream as unknown as AsyncIterable<Buffer>, videoPart);
-
-  const audioStream = await info.download({ type: "audio", quality: "best", client });
-  await pipeStreamTo(audioStream as unknown as AsyncIterable<Buffer>, audioPart);
-
-  await mergeWithFfmpeg(videoPart, audioPart, outPath);
-
-  return stat(outPath).then((s) => s.size);
+  if (res.status === 400 || res.status === 404) {
+    throw new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.NOT_FOUND, 404);
+  }
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { title?: unknown } | null;
+  return typeof body?.title === "string" ? body.title : null;
 }
 
 /**
- * Download a YouTube video or audio stream to local disk via the in-house
- * InnerTube client. Accepts a raw video ID or a watch / shorts / youtu.be /
- * embed URL. If the file already exists on disk, the InnerTube client is
- * not spawned (cache hit).
+ * Download a YouTube video or audio track to local disk through a
+ * third-party downloader website (`site.ts`) — no Evomi bytes. Accepts a raw
+ * video ID or a watch / shorts / youtu.be / embed URL. If the file already
+ * exists on disk, no browser is started (cache hit).
  */
 export async function downloadYoutubeMedia(
   request: Pick<YOUTUBE_VIDEO_DOWNLOAD_REQUEST, "videoId" | "media"> &
@@ -490,44 +346,24 @@ export async function downloadYoutubeMedia(
 
   const videoId = resolveYoutubeDownloadVideoId(request.videoId);
   const media = request.media ?? YOUTUBE_DOWNLOAD_MEDIA.VIDEO;
-  const { country } = resolveYoutubeGeo({ country: request.country, region: request.region });
 
   const cached = await existingDownload(videoId, media);
   if (cached) return cached;
 
+  const title = await fetchOembedTitle(videoId);
   await mkdir(YOUTUBE_DOWNLOAD_DIR, { recursive: true });
   const outPath = expectedPath(videoId, media);
+  const durationSeconds = await downloadYoutubeViaSite(videoId, media, outPath, YOUTUBE_DOWNLOAD_DIR);
 
-  // Attempt loop with Evomi session rotation: one attempt = the full client
-  // chain (info + stream + merge per client). If an entire attempt fails
-  // while proxied, the exit IP is likely flagged — rotate to a fresh Evomi
-  // session (new residential IP) and retry. Within an attempt the agent is
-  // sticky, which googlevideo's IP-signed stream URLs require.
-  const attempts = evomiConfigured() ? 1 + INNERTUBE_PROXY_ROTATIONS : 1;
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    if (attempt > 0) rotateCountryInnertube(country);
-    try {
-      const { info } = await attemptDownloadWithClientChain(videoId, media, country, outPath);
-      const title = info.basic_info.title || videoId;
-      const durationSeconds = Number(info.basic_info.duration) || 0;
-
-      const fileStat = await stat(outPath);
-      return {
-        videoId,
-        title,
-        durationSeconds,
-        filePath: outPath,
-        mimeType: mimeTypeFor(media),
-        bytes: fileStat.size,
-        media,
-      };
-    } catch (err) {
-      lastError = err;
-      if (err instanceof YoutubeDownloadError && err.statusCode < 500) throw err;
-    }
-  }
-  throw lastError ?? new YoutubeDownloadError(YOUTUBE_DOWNLOAD_ERROR_MESSAGES.OUTPUT_MISSING, 502);
+  return {
+    videoId,
+    title: title || videoId,
+    durationSeconds,
+    filePath: outPath,
+    mimeType: mimeTypeFor(media),
+    bytes: (await stat(outPath)).size,
+    media,
+  };
 }
 
 export type YOUTUBE_STREAM_URLS = {
@@ -556,7 +392,6 @@ export type YOUTUBE_STREAM_URLS = {
  * residential proxy — not the whole source video (the bandwidth cost that
  * made the full-download path burn ~2 GB of Evomi quota in a few test runs).
  *
- * Same client chain + Evomi session rotation as `downloadYoutubeMedia`:
  * `getBasicInfo` succeeding does not mean the stream URL will fetch (IOS
  * can return playable metadata while its googlevideo stream 403s), so each
  * client must produce usable URLs before the chain returns. A failed full
@@ -612,18 +447,16 @@ export async function getYoutubeStreamUrls(
   }
   const resolvedId = resolveYoutubeDownloadVideoId(videoId);
   if (!evomiConfigured()) {
-    return attemptGetStreamUrlsWithClientChain(resolvedId, await getInnertube(country), undefined);
+    return attemptGetStreamUrlsWithClientChain(resolvedId, await getDirectInnertube(), undefined);
   }
-  // A FRESH proxy session per resolution — never the shared cached one.
-  // ffmpeg fetches these signed URLs over a NEW connection (via the CONNECT
-  // bridge), and googlevideo 403s unless that connection exits from the IP that
-  // signed them. The cached session's pooled keep-alive connection can be hours
-  // old, pinned to an IP its session id no longer maps to once Evomi's sticky
+  // A FRESH proxy session per resolution, never a long-lived one. ffmpeg
+  // fetches these signed URLs over a NEW connection (via the CONNECT bridge),
+  // and googlevideo 403s unless that connection exits from the IP that signed
+  // them. A long-lived session's pooled keep-alive connection can be hours old,
+  // pinned to an IP its session id no longer maps to once Evomi's sticky
   // lifetime lapses: signing then egresses from the old IP and ffmpeg from a new
   // one. A fresh session signs over a brand-new connection seconds before ffmpeg
-  // dials, so both land on the same IP. Dedicated rather than rotated in place,
-  // because rotating closes the shared agent and would kill a download running
-  // concurrently in the same country.
+  // dials, so both land on the same IP.
   const attempts = 1 + INNERTUBE_PROXY_ROTATIONS;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < attempts; attempt++) {
