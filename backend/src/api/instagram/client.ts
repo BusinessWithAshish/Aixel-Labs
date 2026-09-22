@@ -14,16 +14,25 @@ import {
   INSTAGRAM_ERROR_MESSAGES,
   INSTAGRAM_QUERY_LIMITS,
   INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT,
+  INSTAGRAM_SUGGESTED_LIMIT_DEFAULT,
 } from "./constants";
 import {
+  extractUsername,
   generateInstagramSearchQuery,
+  instagramProfileUrl,
   mapXigUserToResponse,
   uniqueUsernames,
   type XigProfilePageUser,
   type XigUserByUsername,
 } from "./compute";
 import { igLoggedOutQuery, readEmbedNumber } from "./graphql";
-import type { INSTAGRAM_REQUEST, INSTAGRAM_RESPONSE } from "./types";
+import type {
+  INSTAGRAM_REQUEST,
+  INSTAGRAM_RESPONSE,
+  INSTAGRAM_SUGGESTED_PROFILE,
+  INSTAGRAM_SUGGESTED_REQUEST,
+  INSTAGRAM_SUGGESTED_RESPONSE,
+} from "./types";
 
 function resolveLimit(limit: number | undefined): number {
   return limit ?? INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT;
@@ -163,4 +172,61 @@ export async function fetchFromQuery(
   );
 
   return await fetchFromEntities(entities, countryCode, limit);
+}
+
+/** One AYML entry as Instagram ships it to a logged-out viewer. */
+type AymlUser = {
+  pk?: string | null;
+  id?: string | null;
+  username?: string | null;
+  full_name?: string | null;
+  is_verified?: boolean | null;
+  profile_pic_url?: string | null;
+};
+
+type AymlData = {
+  xig_user_by_igid_v2: { ayml_logged_out?: AymlUser[] | null } | null;
+};
+
+function mapAymlUser(user: AymlUser): INSTAGRAM_SUGGESTED_PROFILE {
+  return {
+    id: user.pk ?? user.id ?? null,
+    username: user.username ?? null,
+    fullName: user.full_name ?? null,
+    instagramUrl: user.username ? instagramProfileUrl(user.username) : null,
+    isVerified: user.is_verified ?? null,
+    profilePicture: user.profile_pic_url ?? null,
+  };
+}
+
+/**
+ * "Accounts you might like" for one handle — the suggested/related accounts a
+ * profile page shows a logged-out viewer, via the AYML query (keyed by pk, so
+ * the profile query resolves the pk first). Instagram only populates this for
+ * notable accounts; a small account returns an empty list, not an error. A
+ * handle that doesn't exist returns `userId: null` and no suggestions.
+ */
+export async function fetchSuggestedProfiles(
+  input: INSTAGRAM_SUGGESTED_REQUEST,
+): Promise<INSTAGRAM_SUGGESTED_RESPONSE> {
+  const username = extractUsername(input.username);
+  if (!username) {
+    throw new Error(INSTAGRAM_ERROR_MESSAGES.INVALID_ENTITY_FORMAT);
+  }
+  const limit = input.limit ?? INSTAGRAM_SUGGESTED_LIMIT_DEFAULT;
+
+  const profile = await igLoggedOutQuery<{
+    xig_user_by_username: { pk?: string | null } | null;
+  }>("profile", { username });
+  const pk = profile?.xig_user_by_username?.pk ?? null;
+  if (!pk) return { username, userId: null, suggested: [] };
+
+  const data = await igLoggedOutQuery<AymlData>("suggested", { id: pk });
+  const list = data?.xig_user_by_igid_v2?.ayml_logged_out ?? [];
+  const suggested = list.slice(0, limit).map(mapAymlUser);
+
+  console.log(
+    `[instagram] suggested: @${username} (${pk}) → ${suggested.length}`,
+  );
+  return { username, userId: pk, suggested };
 }

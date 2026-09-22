@@ -67,6 +67,17 @@ export const IG_LOGGED_OUT_QUERIES = {
     docId: "28036671149327607",
     name: "PolarisProfilePageContentQuery",
   },
+  /**
+   * `{ id }` → `xig_user_by_igid_v2.ayml_logged_out[]`: the "Accounts you might
+   * like" / suggested-accounts list a profile page shows a logged-out viewer.
+   * Instagram only populates it for notable accounts — it is empty for most
+   * small accounts, and that emptiness is Instagram's, not an error. Fired as a
+   * live XHR (not preloaded), so rediscovery finds its id in the JS bundles.
+   */
+  suggested: {
+    docId: "26631739266527266",
+    name: "PolarisLoggedOutDesktopWWWAYMLQuery",
+  },
 } as const;
 
 /** Variables the profile page query requires besides `id` (it rejects a request without them). */
@@ -139,6 +150,10 @@ export const INSTAGRAM_QUERY_LIMITS = {
 /** Upper bound for `limit` on Instagram scraper request payloads. */
 export const INSTAGRAM_REQUEST_RESULT_LIMIT_MAX = 250;
 export const INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT = 100;
+
+/** The AYML (suggested accounts) list tops out around 50; cap and default there. */
+export const INSTAGRAM_SUGGESTED_LIMIT_MAX = 50;
+export const INSTAGRAM_SUGGESTED_LIMIT_DEFAULT = 50;
 
 /**
  * First path segment values that are Instagram site sections, not usernames.

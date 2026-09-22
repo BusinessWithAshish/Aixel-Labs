@@ -6,6 +6,8 @@ import {
   INSTAGRAM_ERROR_MESSAGES,
   INSTAGRAM_REQUEST_RESULT_LIMIT_DEFAULT,
   INSTAGRAM_REQUEST_RESULT_LIMIT_MAX,
+  INSTAGRAM_SUGGESTED_LIMIT_DEFAULT,
+  INSTAGRAM_SUGGESTED_LIMIT_MAX,
 } from "./constants";
 import {
   ISO_COUNTRY_CODE_SCHEMA,
@@ -127,5 +129,27 @@ export const INSTAGRAM_PROFILE_SEARCH_SCHEMA = INSTAGRAM_REQUEST_SCHEMA.omit({
     .min(1)
     .describe(
       "Free-text description of the type of Instagram profiles to find (e.g. 'fitness coaches in London', 'vegan food bloggers'). Biased toward matching profile page titles, not post/caption content — use search_instagram_content_leads instead when this comes back thin.",
+    ),
+});
+
+/**
+ * MCP-facing: "accounts you might like" for one handle. Mirrors
+ * `fetchSuggestedProfiles`'s params.
+ */
+export const INSTAGRAM_SUGGESTED_REQUEST_SCHEMA = z.object({
+  username: z
+    .string()
+    .min(1)
+    .describe(
+      "Instagram username (e.g. 'natgeo') or full profile URL whose suggested / related accounts to fetch.",
+    ),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(INSTAGRAM_SUGGESTED_LIMIT_MAX)
+    .optional()
+    .describe(
+      `Max suggested accounts to return (1-${INSTAGRAM_SUGGESTED_LIMIT_MAX}, default ${INSTAGRAM_SUGGESTED_LIMIT_DEFAULT}).`,
     ),
 });

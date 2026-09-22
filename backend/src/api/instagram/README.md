@@ -7,6 +7,9 @@ Browserless Instagram profile lookup + discovery via Google CSE (`gsearch`).
 `POST /instagram` — look up profiles by username/URL (`entities`) and/or discover
 handles via Google advanced search (`query` + optional keywords/hashtags).
 
+Suggested / related accounts for one handle are the `suggested_profiles` MCP op
+(`fetchSuggestedProfiles`), backed by the same logged-out GraphQL transport.
+
 `POST /instagram/advanced/posts` — public profile **Posts** tab (grid + scroll).
 See [`advanced/README.md`](./advanced/README.md).
 
@@ -43,6 +46,7 @@ browser uses: persisted Relay queries on `POST /api/graphql`
 | `reels` | `username, first, after?` | reel `play_count` / likes / comments |
 | `media` | `media_id` | one post: likes, comments, `taken_at`, media URLs, carousel |
 | `profilePage` | `id` + provider flags | `account_type`, public `category`, HD picture — the logged-in profile page query, which still answers guests |
+| `suggested` | `id` | `xig_user_by_igid_v2.ayml_logged_out[]` — "accounts you might like" for the handle; populated only for notable accounts, empty otherwise. Fired as a live XHR, so its id is found by bundle scan |
 
 - No cookies or priming: any `lsd` value, sent as form field **and**
   `x-fb-lsd` header, is accepted. Calls go **direct** from the VPS first (the

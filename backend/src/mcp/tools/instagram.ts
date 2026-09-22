@@ -1,8 +1,13 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { fetchFromEntities, fetchFromQuery } from "../../api/instagram/client";
+import {
+  fetchFromEntities,
+  fetchFromQuery,
+  fetchSuggestedProfiles,
+} from "../../api/instagram/client";
 import {
   INSTAGRAM_PROFILE_LOOKUP_SCHEMA,
   INSTAGRAM_PROFILE_SEARCH_SCHEMA,
+  INSTAGRAM_SUGGESTED_REQUEST_SCHEMA,
 } from "../../api/instagram/schemas";
 import { fetchInstagramAdvancedPosts } from "../../api/instagram/advanced/client";
 import { IG_ADVANCED_POSTS_REQUEST_SCHEMA } from "../../api/instagram/advanced/schemas";
@@ -32,6 +37,13 @@ const INSTAGRAM_OPS: Record<string, DomainOp> = {
     raw: {
       schema: INSTAGRAM_PROFILE_SEARCH_SCHEMA,
       run: fetchFromQuery,
+    },
+  },
+  suggested_profiles: {
+    defaultLayer: MCP_LAYER.RAW,
+    raw: {
+      schema: INSTAGRAM_SUGGESTED_REQUEST_SCHEMA,
+      run: fetchSuggestedProfiles,
     },
   },
   posts: {
@@ -78,6 +90,7 @@ Call with { op, layer?, input }. Invalid layer combo fails.
 Ops:
 - profile (raw only) — lookup by handle/URL. input: entities[], country, limit? isBusiness / isProfessional come from the account type (a creator account is professional, not business); businessCategoryName is the category the account shows publicly (null when it hides it); profilePictureHd is the full-size picture. businessEmail / businessPhoneNumber are parsed from the bio and its WhatsApp / tel: / mailto: links — Instagram's Contact-button email/phone, businessAddressJson, overallCategoryName and isJoinedRecently are login-only, so null there means "not exposed", not "none". Handles that don't exist are omitted.
 - search_profiles (raw only) — GSearch discovery biased to profile titles. input: query, country?, city?, state?, hashtags?, keywords?, excludeKeywords?, excludeHashtags?, limit?
+- suggested_profiles (raw only) — "accounts you might like" / related accounts Instagram shows on a profile, for one handle. Returns { username, userId, suggested[{ id, username, fullName, instagramUrl, isVerified, profilePicture }] }. Instagram only populates this for notable accounts, so \`suggested\` is often empty for small accounts — that's Instagram's behavior, not an error. input: username, limit? (max 50)
 - posts (raw only) — paginated Posts-tab media with likeCount, commentCount, takenAt, media URLs, carousel slides, playCount on reels and viewCount on every video (photos have no public view count). input: username, cursor? (pageInfo.endCursor), count?, pages?
 - download (raw only) — save public post / reel / carousel media to local disk (mp4 + jpg), direct fetch, no proxy. Returns per-post { ok, items[{ index, kind, filePath, bytes, width, height, cached }] }; hand filePath to \`media\` ops. Stories/highlights/private accounts unsupported. input: urls[] (1-10 post/reel/tv URLs or shortcodes), items? (carousel slide indexes, 0-based), media? (all|video|image), maxBytes?
 - content_leads (raw only) — GSearch content-first (/p/, /reel/) discovery. Use when search_profiles is thin. input: query, country?, kinds?, pages?, maxResolve?, enrichProfiles?
