@@ -38,7 +38,8 @@ export type MEDIA_BOUNDARY_VALUE = (typeof MEDIA_BOUNDARY_MODES)[number];
 
 /** How a clip's edges were placed when `boundaries: "natural"` was requested. */
 export type CUT_CLIP_BOUNDARIES = {
-  mode: "natural";
+  /** "moment": both edges chosen from the words in a wide window around the caller's pointer. */
+  mode: "natural" | "moment";
   /** "pause": ends on a word followed by quiet; "reaction": also keeps the laugh/applause after it; "unchanged": kept the requested end. */
   endReason: "pause" | "reaction" | "unchanged";
   /** Why the requested range was kept as-is, when the audio could not be analysed. */
@@ -132,6 +133,8 @@ export type CLIP_RANGE = {
   start: string;
   end: string;
   label?: string;
+  /** What this moment is about, for `boundaries: "moment"` — see cut/schemas.ts. */
+  moment?: string;
 };
 
 export type CUT_CLIP_RESULT = {

@@ -143,7 +143,7 @@ export const MEDIA_REFRAME = {
 } as const;
 
 /** How `/video/cut` places a clip's edges: exactly as requested, or on the audio's natural stops. */
-export const MEDIA_BOUNDARY_MODES = ["exact", "natural"] as const;
+export const MEDIA_BOUNDARY_MODES = ["exact", "natural", "moment"] as const;
 
 /**
  * `boundaries: "natural"` (see `cut/natural-boundaries.ts`). The requested
@@ -225,6 +225,26 @@ export const MEDIA_NATURAL_BOUNDARIES = {
    * Everything here is sized to keep the call small and bounded — on failure or
    * timeout the heuristic below takes over, so an ending never depends on it.
    */
+  /**
+   * `boundaries: "moment"`. The range a caller passes is a POINTER to a moment,
+   * not the cut: it comes from a captions transcript whose timestamps are whole
+   * seconds and whose lines overlap the next by ~2s, so it is routinely
+   * mid-sentence. Searching a few seconds either side of it optimises proximity
+   * to a wrong number — which is why every weighting fixed one clip and broke
+   * another. In this mode the range only says WHERE to look; both edges are then
+   * chosen from the words in a generous window around it, given what the moment
+   * is about.
+   */
+  MOMENT_WINDOW_BEFORE_SECONDS: 25,
+  MOMENT_WINDOW_AFTER_SECONDS: 25,
+  /** Guard rails on what the model may return, relative to the pointer. */
+  MOMENT_MAX_START_DRIFT_SECONDS: 25,
+  MOMENT_MAX_END_DRIFT_SECONDS: 25,
+  MOMENT_MIN_SECONDS: 8,
+  /** Lines given to the model break here, so they track sentences rather than breaths. */
+  MOMENT_LINE_BREAK_GAP_SECONDS: 0.9,
+  /** How far the start may walk back to reach the beginning of its sentence. */
+  MOMENT_START_SNAP_BACK_SECONDS: 6,
   SEMANTIC_ENABLED: process.env.MEDIA_SEMANTIC_END !== "off",
   /** A stop worth offering: a real gap after the word, or a sentence Whisper marked. */
   SEMANTIC_MIN_GAP_SECONDS: 0.12,

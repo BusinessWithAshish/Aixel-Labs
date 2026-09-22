@@ -19,6 +19,13 @@ const CLIP_RANGE_SCHEMA = z.object({
   start: z.union([z.string(), z.number()]).transform(String),
   end: z.union([z.string(), z.number()]).transform(String),
   label: z.string().optional(),
+  /**
+   * What this moment IS, in the caller's own words — the title or hook line.
+   * Used by `boundaries: "moment"` to find where the moment actually starts and
+   * lands in the audio. Without it the edges can only be guessed at from
+   * grammar; with it the payoff is findable.
+   */
+  moment: z.string().trim().min(3).max(300).optional(),
 });
 
 const CUT_LOGO_SCHEMA = z

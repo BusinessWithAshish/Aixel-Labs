@@ -8,6 +8,7 @@ import { MEDIA_ERROR_MESSAGES, MEDIA_NATURAL_BOUNDARIES as NB } from "../constan
 import { MEDIA_TRANSCRIBE } from "../transcribe/constants";
 import { dropUnreliableSpans } from "../transcribe/formatters";
 import { transcribeWithGroq } from "../transcribe/groq-client";
+import { findMomentRange } from "./moment-boundaries";
 import { resolveSemanticEnd } from "./semantic-end";
 import type { GROQ_TRANSCRIPTION_SEGMENT, GROQ_TRANSCRIPTION_WORD } from "../transcribe/types";
 import type { CUT_CLIP_BOUNDARIES } from "../types";
@@ -37,6 +38,15 @@ type PLAN_INPUT = {
    * wins outright: the audio then only places the exact instant inside it.
    */
   semanticEnd?: number;
+  /**
+   * An opening word chosen by reading the words. The onset search below hunts
+   * for the nearest speech onset within 1.5s, which on continuous speech drags
+   * the opening backward onto the tail of the previous sentence — measured as a
+   * clip that should have opened "But why would you write a blank cheque?"
+   * opening "it was the thing but why would you…" instead. When this is set the
+   * word is already chosen and only its first syllable needs protecting.
+   */
+  semanticStart?: number;
 };
 
 function percentile(values: number[], p: number): number {
@@ -92,7 +102,13 @@ export function planNaturalRange(input: PLAN_INPUT): NATURAL_RANGE {
   // ---- start ----
   let start = rs;
   const splitAtStart = words.find((w) => w.start < rs && rs < w.end);
-  if (splitAtStart) {
+  if (input.semanticStart !== undefined) {
+    // Already chosen by reading the words, and it IS a word's own start, so the
+    // mid-word guard has nothing to protect here. Applying it anyway snapped to
+    // a PRECEDING word — Whisper's word spans overlap on fast speech — which
+    // put the tail of the previous sentence back at the top of the clip.
+    start = input.semanticStart;
+  } else if (splitAtStart) {
     start = splitAtStart.start;
   } else {
     const onsets = words.filter(
@@ -592,6 +608,80 @@ export async function findNaturalRange(
       endReason: "unchanged",
       fallbackReason: `${MEDIA_ERROR_MESSAGES.NATURAL_BOUNDARIES_FAILED}: ${message.slice(0, 300)}`,
     };
+  } finally {
+    await rm(flacPath, { force: true }).catch(() => {});
+  }
+}
+
+/**
+ * `boundaries: "moment"` — both edges chosen from the words in a wide window,
+ * given what the moment is about, then placed on the audio by the same
+ * refinement the other modes use. The caller's range only says where to read.
+ */
+export async function findMomentBoundaries(
+  windowPath: string,
+  pointerStart: number,
+  pointerEnd: number,
+  windowSeconds: number,
+  moment: string,
+  language?: string,
+  audioWindow?: { source: string; start: number; end: number; proxyUrl?: string },
+): Promise<NATURAL_RANGE & { fallbackReason?: string; why?: string }> {
+  const unchanged: NATURAL_RANGE = { start: pointerStart, end: pointerEnd, endReason: "unchanged" };
+  if (!ffmpegPath) return { ...unchanged, fallbackReason: MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED };
+  const flacPath = `${windowPath}.moment.flac`;
+  try {
+    const flacArgs = audioWindow
+      ? [
+          "-y", "-v", "error",
+          ...(audioWindow.proxyUrl ? ["-http_proxy", audioWindow.proxyUrl] : []),
+          "-ss", String(audioWindow.start),
+          "-to", String(audioWindow.end),
+          "-i", audioWindow.source,
+        ]
+      : ["-y", "-v", "error", "-i", windowPath];
+    await execFileAsync(ffmpegPath, [...flacArgs, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "flac", flacPath]);
+    const [groq, loudnessDb] = await Promise.all([
+      transcribeWithGroq(flacPath, {
+        model: MEDIA_TRANSCRIBE.DEFAULT_MODEL,
+        wordTimestamps: true,
+        language,
+        prompt: NB.BOUNDARY_PROMPT,
+      }),
+      loudnessFrames(flacPath),
+    ]);
+    const words = groq.words ?? [];
+    if (words.length === 0) return { ...unchanged, fallbackReason: MEDIA_ERROR_MESSAGES.NATURAL_BOUNDARIES_FAILED };
+
+    const picked = await findMomentRange(words, moment, pointerStart, pointerEnd, windowSeconds);
+    if (!picked) {
+      // Fall back to the pointer-anchored placement rather than lose the clip.
+      const semantic = NB.SEMANTIC_ENABLED ? await resolveSemanticEnd(words, pointerEnd) : undefined;
+      return planNaturalRange({
+        requestedStart: pointerStart,
+        requestedEnd: pointerEnd,
+        windowSeconds,
+        words,
+        segments: groq.segments ?? [],
+        loudnessDb,
+        ...(semantic ? { semanticEnd: semantic.end } : {}),
+      });
+    }
+    // The words decided which stop; the audio still places the instant inside it.
+    const placed = planNaturalRange({
+      requestedStart: picked.start,
+      requestedEnd: picked.end,
+      windowSeconds,
+      words,
+      segments: groq.segments ?? [],
+      loudnessDb,
+      semanticStart: picked.start,
+      semanticEnd: picked.end,
+    });
+    return { ...placed, ...(picked.why ? { why: picked.why } : {}) };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ...unchanged, fallbackReason: `${MEDIA_ERROR_MESSAGES.NATURAL_BOUNDARIES_FAILED}: ${message.slice(0, 300)}` };
   } finally {
     await rm(flacPath, { force: true }).catch(() => {});
   }

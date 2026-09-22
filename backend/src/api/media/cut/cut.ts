@@ -13,7 +13,7 @@ import {
 } from "../constants";
 import { cleanupResolvedMediaSource, resolveVideoSourceForCut } from "../source";
 import { cutClip, cutClipFromStream, probeAudioSeconds, probeMediaStreams } from "./ffmpeg-cut";
-import { findNaturalRange } from "./natural-boundaries";
+import { findMomentBoundaries, findNaturalRange } from "./natural-boundaries";
 import { parseProxyUrlForBridge, ProxyConnectBridge } from "./proxy-bridge";
 import { reframeClipBySpeaker } from "./reframe";
 import { planLogoCover } from "./logo";
@@ -170,18 +170,23 @@ export async function cutClipsFromVideo(
       // edges need audio past the requested range, so either path cuts
       // unframed into a temp file and finishes the clip afterwards.
       const followSpeaker = reframe === "speaker" && hasVideo && aspectRatio !== "original";
-      const natural = boundaries === "natural";
+      const momentMode = boundaries === "moment" && typeof clip.moment === "string";
+      // "moment" reads far wider than "natural": the caller's range is a pointer
+      // into a coarse transcript, so the real edges can sit well outside it.
+      const natural = boundaries === "natural" || momentMode;
       // Natural edges are placed on the audio itself, so they start from the
       // raw requested times: the diarize snap and its padding are guesses at
       // the same thing from seconds-coarse segments.
       const requestedStart = parseTimestampToSeconds(clip.start);
       const requestedEnd = Math.min(parseTimestampToSeconds(clip.end), durationSeconds);
-      const rangeStart = natural
-        ? Math.max(0, requestedStart - MEDIA_NATURAL_BOUNDARIES.WINDOW_BEFORE_SECONDS)
-        : cutStartSeconds;
-      const rangeEnd = natural
-        ? Math.min(durationSeconds, requestedEnd + MEDIA_NATURAL_BOUNDARIES.WINDOW_AFTER_SECONDS)
-        : cutEndSeconds;
+      const windowBefore = momentMode
+        ? MEDIA_NATURAL_BOUNDARIES.MOMENT_WINDOW_BEFORE_SECONDS
+        : MEDIA_NATURAL_BOUNDARIES.WINDOW_BEFORE_SECONDS;
+      const windowAfter = momentMode
+        ? MEDIA_NATURAL_BOUNDARIES.MOMENT_WINDOW_AFTER_SECONDS
+        : MEDIA_NATURAL_BOUNDARIES.WINDOW_AFTER_SECONDS;
+      const rangeStart = natural ? Math.max(0, requestedStart - windowBefore) : cutStartSeconds;
+      const rangeEnd = natural ? Math.min(durationSeconds, requestedEnd + windowAfter) : cutEndSeconds;
       const unframed = followSpeaker || natural;
 
       let appliedStart = cutStartSeconds;
@@ -261,7 +266,23 @@ export async function cutClipsFromVideo(
         }
 
         if (natural) {
-          const plan = await findNaturalRange(
+          const audioWindow = {
+            source: resolved.kind === "youtube" ? resolved.audioUrl : resolved.path,
+            start: rangeStart,
+            end: rangeEnd,
+            ...(ffmpegProxyUrl ? { proxyUrl: ffmpegProxyUrl } : {}),
+          };
+          const plan = momentMode
+            ? await findMomentBoundaries(
+                current,
+                requestedStart - rangeStart,
+                requestedEnd - rangeStart,
+                rangeEnd - rangeStart,
+                clip.moment as string,
+                language,
+                audioWindow,
+              )
+            : await findNaturalRange(
             current,
             requestedStart - rangeStart,
             requestedEnd - rangeStart,
@@ -271,17 +292,12 @@ export async function cutClipsFromVideo(
             // re-encode, and Whisper times and punctuates re-encoded speech
             // differently — enough to move the end further than the edge is
             // allowed to travel.
-            {
-              source: resolved.kind === "youtube" ? resolved.audioUrl : resolved.path,
-              start: rangeStart,
-              end: rangeEnd,
-              ...(ffmpegProxyUrl ? { proxyUrl: ffmpegProxyUrl } : {}),
-            },
+            audioWindow,
           );
           appliedStart = rangeStart + plan.start;
           appliedEnd = rangeStart + plan.end;
           boundariesInfo = {
-            mode: "natural",
+            mode: momentMode ? "moment" : "natural",
             endReason: plan.endReason,
             ...(plan.fallbackReason ? { fallbackReason: plan.fallbackReason } : {}),
           };
