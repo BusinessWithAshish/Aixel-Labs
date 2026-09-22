@@ -22,6 +22,9 @@ export type ASK_CLAUDE_FOR_JSON_RESULT<T> = {
   data: T;
   usage: CLAUDE_USAGE | undefined;
   attempts: number;
+  /** The session this ran on. Hand it back as `sessionId` to keep a series of
+   *  related asks on one session — new sessions are the metered thing. */
+  sessionId: string | undefined;
 };
 
 /** Strips a ```json ... ``` (or bare ```) fence Claude sometimes wraps its answer in despite being told not to. Leaves unfenced text untouched. */
@@ -41,10 +44,18 @@ export async function askClaudeForJson<T>(options: {
   exhaustedErrorPrefix?: string;
   /** Per-attempt timeout; omitted = the `claude` op default. Long-input callers (a whole-episode ranking) need more. */
   timeoutSeconds?: number;
+  /**
+   * Continue an existing session instead of opening a new one. The daily budget
+   * counts NEW sessions, not turns, so a caller asking the same kind of question
+   * once per item — a clip's edges, say — must reuse one session across the
+   * batch or it spends one of the day's allowance per item and the rest of the
+   * run is refused.
+   */
+  sessionId?: string;
 }): Promise<ASK_CLAUDE_FOR_JSON_RESULT<T>> {
   const maxAttempts = options.maxAttempts ?? 3;
 
-  let sessionId: string | undefined;
+  let sessionId: string | undefined = options.sessionId;
   let lastUsage: CLAUDE_USAGE | undefined;
   let lastError = "";
   let task = options.prompt;
@@ -87,7 +98,7 @@ export async function askClaudeForJson<T>(options: {
       continue;
     }
 
-    return { data: validated.data, usage: lastUsage, attempts: attempt };
+    return { data: validated.data, usage: lastUsage, attempts: attempt, sessionId };
   }
 
   throw new Error(

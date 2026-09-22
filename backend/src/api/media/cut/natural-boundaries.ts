@@ -627,6 +627,8 @@ export async function findMomentBoundaries(
   language?: string,
   audioWindow?: { source: string; start: number; end: number; proxyUrl?: string },
   maxSeconds?: number,
+  /** One session for the whole batch — see `moment-boundaries.ts`. */
+  session?: { id?: string },
 ): Promise<NATURAL_RANGE & { fallbackReason?: string; why?: string }> {
   const unchanged: NATURAL_RANGE = { start: pointerStart, end: pointerEnd, endReason: "unchanged" };
   if (!ffmpegPath) return { ...unchanged, fallbackReason: MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED };
@@ -654,7 +656,7 @@ export async function findMomentBoundaries(
     const words = groq.words ?? [];
     if (words.length === 0) return { ...unchanged, fallbackReason: MEDIA_ERROR_MESSAGES.NATURAL_BOUNDARIES_FAILED };
 
-    const picked = await findMomentRange(words, moment, pointerStart, pointerEnd, windowSeconds, maxSeconds);
+    const picked = await findMomentRange(words, moment, pointerStart, pointerEnd, windowSeconds, maxSeconds, session);
     if (!picked) {
       // Fall back to the pointer-anchored placement rather than lose the clip —
       // but SAY SO. A silent fallback here is indistinguishable in the output

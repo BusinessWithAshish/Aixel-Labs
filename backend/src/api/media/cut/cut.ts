@@ -136,6 +136,10 @@ export async function cutClipsFromVideo(
     const logoImage = logoPlan?.replaceWith;
 
     const results = [];
+    // One delegation session for every clip in this call: the budget counts NEW
+    // sessions, not turns, so a session per clip spent the day's allowance
+    // mid-batch and five of six clips fell back to the pointer.
+    const momentSession: { id?: string } = {};
     for (const clip of clips) {
       const { cutStartSeconds, cutEndSeconds, snapped } = snapClipBoundaries(
         clip.start,
@@ -284,6 +288,7 @@ export async function cutClipsFromVideo(
                 language,
                 audioWindow,
                 maxSeconds,
+                momentSession,
               )
             : await findNaturalRange(
             current,

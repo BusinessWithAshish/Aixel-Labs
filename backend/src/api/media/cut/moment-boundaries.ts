@@ -99,6 +99,13 @@ export async function findMomentRange(
   pointerEnd: number,
   windowSeconds: number,
   maxSeconds?: number,
+  /**
+   * Shared across a batch so the clips after the first are follow-ups rather
+   * than new sessions. The delegation budget counts new sessions, so one per
+   * clip spent the day's allowance mid-run and every later clip fell back to
+   * the pointer — seen as five of six clips in one batch.
+   */
+  session?: { id?: string },
 ): Promise<{ start: number; end: number; why?: string } | undefined> {
   const lines = buildLines(words);
   if (lines.length < 3) return undefined;
@@ -160,13 +167,15 @@ export async function findMomentRange(
   ].join("\n");
 
   try {
-    const { data } = await askClaudeForJson({
+    const { data, sessionId } = await askClaudeForJson({
       prompt,
       zodValidator: RANGE_SCHEMA,
       maxAttempts: NB.SEMANTIC_MAX_ATTEMPTS,
       timeoutSeconds: NB.SEMANTIC_TIMEOUT_SECONDS,
       exhaustedErrorPrefix: "Could not place the clip's edges from its transcript",
+      ...(session?.id ? { sessionId: session.id } : {}),
     });
+    if (session && sessionId) session.id = sessionId;
     const a = lines.find((l) => l.index === data.startIndex);
     const b = lines.find((l) => l.index === data.endIndex);
     if (!a || !b) return undefined;
