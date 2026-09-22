@@ -138,8 +138,14 @@ export async function findMomentRange(
     "- Never end on a question that is not answered inside the clip. In an",
     "  interview a question at the end is the NEXT moment starting, however",
     "  punchy it sounds.",
-    "- End where the point LANDS. Include a short reaction or laugh that follows",
-    "  it; do not run on into the next topic to pad the length.",
+    "- End where the point LANDS. A short reaction to it may be included — a laugh,",
+    "  or the other person agreeing — but ONLY if that reaction finishes inside the",
+    "  clip. A reaction cut off part-way through is worse than no reaction at all:",
+    "  if it does not complete, end on the speaker's own last line instead. So for",
+    '  "…just don\'t do it." / "Interesting, I like that first line you said." /',
+    '  "That is such a fresh take." — either stop at "just don\'t do it." or carry',
+    '  through to "such a fresh take.", never in the middle at "…you said."',
+    "- Do not run on into the next topic to pad the length.",
     "",
     ...(maxSeconds
       ? [
