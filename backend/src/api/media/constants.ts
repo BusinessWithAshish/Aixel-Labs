@@ -489,6 +489,8 @@ export const MEDIA_ERROR_MESSAGES = {
   FFMPEG_REFRAME_FAILED: "ffmpeg failed to render the speaker-reframed clip",
   CLIP_TRUNCATED:
     "The clip came out shorter than its range — the source stream dropped mid-download; cut this range again",
+  MOMENT_PASS_FELL_BACK:
+    "The moment pass did not return a range (call failed, or its answer was out of bounds); edges were placed around the requested range instead",
   NATURAL_BOUNDARIES_FAILED: "Could not analyse the clip's audio for natural boundaries; kept the requested range",
   CAPTION_ROMANIZE_FAILED: "Could not rewrite captions in Roman script; kept the native script",
   GENERIC: "Media operation failed",

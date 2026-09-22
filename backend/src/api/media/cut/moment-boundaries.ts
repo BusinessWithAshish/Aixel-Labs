@@ -194,11 +194,23 @@ export async function findMomentRange(
     const end = Math.min(windowSeconds, b.end);
     // Guard rails: a pointer is vague, not meaningless. A range that wanders far
     // from it, inverts, or collapses is a misread, not a better edit.
-    if (end - start < NB.MOMENT_MIN_SECONDS) return undefined;
-    if (Math.abs(start - pointerStart) > NB.MOMENT_MAX_START_DRIFT_SECONDS) return undefined;
-    if (Math.abs(end - pointerEnd) > NB.MOMENT_MAX_END_DRIFT_SECONDS) return undefined;
+    // Each rejection says which guard fired: "it fell back" without a reason is
+    // what made the last round impossible to read.
+    if (end - start < NB.MOMENT_MIN_SECONDS) {
+      console.warn(`[moment] rejected: ${(end - start).toFixed(1)}s is under the ${NB.MOMENT_MIN_SECONDS}s floor`);
+      return undefined;
+    }
+    if (Math.abs(start - pointerStart) > NB.MOMENT_MAX_START_DRIFT_SECONDS) {
+      console.warn(`[moment] rejected: start drifted ${(start - pointerStart).toFixed(1)}s from the pointer`);
+      return undefined;
+    }
+    if (Math.abs(end - pointerEnd) > NB.MOMENT_MAX_END_DRIFT_SECONDS) {
+      console.warn(`[moment] rejected: end drifted ${(end - pointerEnd).toFixed(1)}s from the pointer`);
+      return undefined;
+    }
     return { start, end, why: data.why };
-  } catch {
+  } catch (err) {
+    console.warn(`[moment] call failed: ${err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)}`);
     return undefined;
   }
 }

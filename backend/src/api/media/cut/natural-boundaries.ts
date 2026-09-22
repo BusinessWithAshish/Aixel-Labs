@@ -655,9 +655,13 @@ export async function findMomentBoundaries(
 
     const picked = await findMomentRange(words, moment, pointerStart, pointerEnd, windowSeconds);
     if (!picked) {
-      // Fall back to the pointer-anchored placement rather than lose the clip.
+      // Fall back to the pointer-anchored placement rather than lose the clip —
+      // but SAY SO. A silent fallback here is indistinguishable in the output
+      // from the moment pass having run, which made every result unreadable:
+      // the same range produced a clean 18s clip by hand and a 45s one in a
+      // batch, with nothing to show which path had run.
       const semantic = NB.SEMANTIC_ENABLED ? await resolveSemanticEnd(words, pointerEnd) : undefined;
-      return planNaturalRange({
+      const plan = planNaturalRange({
         requestedStart: pointerStart,
         requestedEnd: pointerEnd,
         windowSeconds,
@@ -666,6 +670,7 @@ export async function findMomentBoundaries(
         loudnessDb,
         ...(semantic ? { semanticEnd: semantic.end } : {}),
       });
+      return { ...plan, fallbackReason: MEDIA_ERROR_MESSAGES.MOMENT_PASS_FELL_BACK };
     }
     // The words decided which stop; the audio still places the instant inside it.
     const placed = planNaturalRange({
