@@ -63,7 +63,7 @@ function findQuoteStart(
 }
 
 /** A line of transcript the model can point at, numbered so it answers with an index. */
-type LINE = { index: number; start: number; end: number; text: string };
+type LINE = { index: number; start: number; end: number; text: string; gapAfter: number };
 
 function buildLines(words: GROQ_TRANSCRIPTION_WORD[]): LINE[] {
   const lines: LINE[] = [];
@@ -75,6 +75,7 @@ function buildLines(words: GROQ_TRANSCRIPTION_WORD[]): LINE[] {
       start: buf[0].start,
       end: buf[buf.length - 1].end,
       text: buf.map((w) => w.word.trim()).join(" "),
+      gapAfter: 0, // filled once the next line's start is known
     });
     buf = [];
   };
@@ -88,6 +89,9 @@ function buildLines(words: GROQ_TRANSCRIPTION_WORD[]): LINE[] {
     if (endsSentence || gapAfter >= NB.MOMENT_LINE_BREAK_GAP_SECONDS || buf.length >= 30) flush();
   }
   flush();
+  for (let i = 0; i < lines.length; i += 1) {
+    lines[i].gapAfter = i + 1 < lines.length ? Math.max(0, lines[i + 1].start - lines[i].end) : Infinity;
+  }
   return lines;
 }
 
@@ -111,7 +115,10 @@ export async function findMomentRange(
   if (lines.length < 3) return undefined;
 
   const rendered = lines
-    .map((l) => `${l.index}. [${l.start.toFixed(1)}-${l.end.toFixed(1)}] ${l.text}`)
+    .map((l) => {
+      const pause = l.gapAfter === Infinity ? "end of window" : `${l.gapAfter.toFixed(2)}s pause after`;
+      return `${l.index}. [${l.start.toFixed(1)}-${l.end.toFixed(1)}] (${pause}) ${l.text}`;
+    })
     .join("\n");
 
   const prompt = [
@@ -153,6 +160,12 @@ export async function findMomentRange(
     '  "That is such a fresh take." — either stop at "just don\'t do it." or carry',
     '  through to "such a fresh take.", never in the middle at "…you said."',
     "- Do not run on into the next topic to pad the length.",
+    "- Each line shows the pause after it. Between two stops that are equally",
+    "  finished in meaning, take the one the speaker actually pauses after (about",
+    "  0.3s or more). Ending where the talking simply carries on leaves no silence",
+    "  for the fade to live in, and the clip sounds cut off even though the",
+    "  sentence is whole — the difference between a clip that ends and one that",
+    "  stops. Meaning still comes first; the pause only breaks a tie.",
     "",
     ...(maxSeconds
       ? [
