@@ -115,6 +115,9 @@ export async function cutClipsFromVideo(
         // Stream-direct already uses inputs 0 (video) and 1 (audio), so the
         // image lands at 2 there and at 1 for a plain file source.
         imageInputIndex: resolved.kind === "youtube" ? 2 : 1,
+        // A local episode is seekable and free to read, so detection gets the
+        // whole thing rather than a ten-second slice of one motionless shot.
+        sourcePath: resolved.kind === "youtube" ? undefined : resolved.path,
         cutProbe: async (start, end, out) => {
           if (resolved.kind === "youtube") {
             await cutClipFromStream(

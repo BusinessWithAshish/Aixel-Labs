@@ -923,8 +923,17 @@ export const MEDIA_HIDE = {
     EDGE_SKIP_FRACTION: 0.05,
     /** Analysis width; height follows the source aspect. Small on purpose — a logo is many pixels even here. */
     WIDTH: 320,
-    /** Per-pixel temporal stddev (0-255) at or below which a pixel counts as static. */
+    /** Per-pixel temporal spread (0-255) at or below which a pixel counts as static. */
     STATIC_MAX_STDDEV: 4.0,
+    /**
+     * Converts a median absolute deviation into the standard-deviation units
+     * `STATIC_MAX_STDDEV` is expressed in (MAD x 1/0.6745 = sigma for normal
+     * data), so the robust statistic reads on the same scale the threshold was
+     * tuned against. See the note in `effects/detect.ts` for why the spread is
+     * median-based at all: one cut to white among the sampled frames was enough
+     * to hide a logo from the old mean-and-stddev test completely.
+     */
+    MAD_TO_STDDEV: 0.6745,
     /** Spatial gradient at or above which a static pixel counts as structured rather than flat wall. */
     MIN_GRADIENT: 16,
     /**
@@ -1018,7 +1027,49 @@ export const MEDIA_HIDE = {
      * A source with no mark must produce NO replacement, and the corner mark
      * brands the clip on its own, so refusing here costs nothing.
      */
-    MIN_CONFIDENCE_ON_REPLACE: 0.85,
+    MIN_CONFIDENCE_ON_REPLACE: 0.7,
+    /**
+     * `replace` also needs the winner to be UNAMBIGUOUS: it must lead the next
+     * candidate by this much confidence.
+     *
+     * This is what 0.85 was really protecting against, and it protected badly.
+     * Confidence is 40% "staticness", and a translucent mark — the common kind —
+     * can never score well there, because its pixels genuinely do shift with the
+     * picture behind it. The PGX bug is a textbook overlay: perfect structure,
+     * hard against the corner, first of every candidate, and it still capped at
+     * 0.753 and was thrown away. Meanwhile a bar that high says nothing about
+     * whether the runner-up was just as plausible, which is the case where
+     * pasting our mark into the wrong rectangle actually happens.
+     *
+     * A margin tests the thing that matters. On that episode the gap was 0.753
+     * to 0.580; a field of lookalike candidates produces no such lead and still
+     * yields nothing.
+     */
+    MIN_MARGIN_ON_REPLACE: 0.1,
+    /**
+     * Geometry gates for `replace`, and these are what actually keep our mark
+     * off someone else's furniture. Confidence cannot do it alone: measured on
+     * a podcast with a poster-covered set and NO burned-in mark, the best noise
+     * region scored **0.891** — it would have been pasted over under the old
+     * 0.85 bar just as readily as under a lower one. Score says "this is a
+     * still, structured thing", and a framed poster on a locked-off set is
+     * exactly that.
+     *
+     * Shape separates them cleanly where score does not. A broadcaster's bug
+     * hugs a CORNER and is SMALL; set dressing sits against one edge, or out in
+     * the frame, or is simply too big. Measured across three sources:
+     *
+     *   real mark, PGX          corner gap  2.9%   area 0.94%
+     *   real mark, Figuring Out corner gap  3.5%   area 2.13%
+     *   noise, poster wall      corner gap 15.9%   area 2.12%
+     *   noise, top strip        corner gap  0.2%   area 6.18%
+     *   noise, side shelf       corner gap 23.0%   area 3.31%
+     *
+     * The corner gap is the worse of the two nearest edges, so being jammed
+     * against a single edge is not enough — a bug is in a CORNER.
+     */
+    MAX_CORNER_GAP_ON_REPLACE: 0.06,
+    MAX_AREA_ON_REPLACE: 0.03,
   },
 } as const;
 

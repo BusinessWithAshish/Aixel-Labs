@@ -33,6 +33,21 @@ import type { CUT_LOGO_PLAN, CUT_LOGO_REQUEST } from "../types";
  * teach this module about either, the caller passes a `cutProbe` that already
  * knows how — so one short unframed clip is cut with exactly the machinery
  * that cuts every other range, and detection runs on that.
+ *
+ * **Detect over the whole source whenever it is a local file.** The short probe
+ * exists only because a stream is expensive to re-open, and on a podcast it is
+ * actively misleading: ten seconds of a locked-off interview is ten seconds in
+ * which nothing moves, so "static" stops separating an overlay from the set —
+ * the wall, the shirt pinned behind the guest, the table and the show's own
+ * burned-in subtitles are all just as still as the logo. Measured on the PGX
+ * episode, the ten-second probe ranked the subtitle strip and the table above
+ * the mark and topped out at 0.70 confidence, under the 0.85 that `replace`
+ * demands, so the run covered nothing at all and the bug reached the clips.
+ * Sampled across the full episode instead, the same detector returns the mark
+ * as its FIRST region — because over an hour the set, the speakers and the
+ * shots all change, and only a burned-in overlay stays put. That is the whole
+ * premise of the test, and a ten-second window denies it the variation it
+ * needs. A local file costs nothing to seek, so it gets the whole source.
  */
 export async function planLogoCover(options: {
   logo: CUT_LOGO_REQUEST;
@@ -42,6 +57,12 @@ export async function planLogoCover(options: {
   /** Where in the source to look. Normally the first requested clip range. */
   probeStartSeconds: number;
   sourceDurationSeconds: number;
+  /**
+   * The local source file, when there is one. Given it, detection reads the
+   * whole episode and the short probe is never cut — see the note above on why
+   * ten seconds of a locked-off shot cannot tell an overlay from the set.
+   */
+  sourcePath?: string;
   /** Which ffmpeg input the replacement image will be: 1 for a file source, 2 for stream-direct. */
   imageInputIndex: number;
 }): Promise<CUT_LOGO_PLAN> {
@@ -60,18 +81,24 @@ export async function planLogoCover(options: {
   );
 
   try {
-    await cutProbe(probeStartSeconds, probeStartSeconds + probeLength, probePath);
-    const probe = await probeMediaStreams(probePath);
+    // A local source is read whole; only a stream pays for a probe cut.
+    const analysisPath = options.sourcePath ?? probePath;
+    if (!options.sourcePath) {
+      await cutProbe(probeStartSeconds, probeStartSeconds + probeLength, probePath);
+    }
+    const probe = await probeMediaStreams(analysisPath);
     if (!probe.hasVideo || !probe.width || !probe.height) {
       return { regions: [], covers: [], note: "probe had no video" };
     }
-    const duration = await getMediaDurationSeconds(probePath);
+    const duration = options.sourcePath
+      ? sourceDurationSeconds
+      : await getMediaDurationSeconds(probePath);
 
     let regions: HIDE_REGION[];
     let detected: DETECTED_REGION[] | undefined;
 
     if (logo.regions === "auto") {
-      detected = await detectStaticOverlays(probePath, probe.width, probe.height, duration);
+      detected = await detectStaticOverlays(analysisPath, probe.width, probe.height, duration);
       regions = detected
         .filter((r) => r.confidence >= MEDIA_HIDE.DETECT.MIN_CONFIDENCE)
         .map(({ x, y, width, height }) => ({ x, y, width, height }));
@@ -80,17 +107,43 @@ export async function planLogoCover(options: {
       // place on someone else's video, and a source with no mark at all must
       // yield no replacement. Best-scoring only, above MIN_CONFIDENCE_ON_REPLACE.
       if (style === "replace") {
-        regions = detected
-          .filter((r) => r.confidence >= MEDIA_HIDE.DETECT.MIN_CONFIDENCE_ON_REPLACE)
-          .slice(0, MEDIA_HIDE.DETECT.MAX_REGIONS_ON_REPLACE)
-          .map(({ x, y, width, height }) => ({ x, y, width, height }));
+        // Confident AND unambiguous: the winner has to clear the bar and lead
+        // the runner-up, so a field of equally plausible rectangles yields
+        // nothing rather than pasting our mark into whichever scored first.
+        // Shape first, then score. A bug hugs a corner and is small; a poster
+        // on a locked-off set is just as still and just as structured, and no
+        // confidence threshold tells them apart — see the constants.
+        const W = probe.width!;
+        const H = probe.height!;
+        const cornerGap = (r: DETECTED_REGION): number =>
+          Math.max(
+            Math.min(r.x / W, (W - (r.x + r.width)) / W),
+            Math.min(r.y / H, (H - (r.y + r.height)) / H),
+          );
+        const shaped = detected.filter(
+          (r) =>
+            cornerGap(r) <= MEDIA_HIDE.DETECT.MAX_CORNER_GAP_ON_REPLACE &&
+            (r.width * r.height) / (W * H) <= MEDIA_HIDE.DETECT.MAX_AREA_ON_REPLACE,
+        );
+        const ranked = [...shaped].sort((a, b) => b.confidence - a.confidence);
+        const best = ranked[0];
+        const margin = best ? best.confidence - (ranked[1]?.confidence ?? 0) : 0;
+        regions =
+          best &&
+          best.confidence >= MEDIA_HIDE.DETECT.MIN_CONFIDENCE_ON_REPLACE &&
+          margin >= MEDIA_HIDE.DETECT.MIN_MARGIN_ON_REPLACE
+            ? ranked
+                .slice(0, MEDIA_HIDE.DETECT.MAX_REGIONS_ON_REPLACE)
+                .filter((r) => r.confidence >= MEDIA_HIDE.DETECT.MIN_CONFIDENCE_ON_REPLACE)
+                .map(({ x, y, width, height }) => ({ x, y, width, height }))
+            : [];
       }
     } else {
       regions = logo.regions.map((r) => normalizeRegion(r, probe.width!, probe.height!));
     }
 
     if (regions.length === 0) {
-      return { regions: [], covers: [], detected, note: "no logo found in the probe" };
+      return { regions: [], covers: [], detected, note: "no logo found in the source" };
     }
 
     const covers: COVER_PLAN[] = [];
@@ -101,7 +154,7 @@ export async function planLogoCover(options: {
         // original shows around the edges.
         let surround: SURROUND_COLOUR | undefined;
         try {
-          surround = await sampleSurroundColour(probePath, region, probe.width, probe.height, duration);
+          surround = await sampleSurroundColour(analysisPath, region, probe.width, probe.height, duration);
         } catch {
           surround = undefined;
         }

@@ -145,6 +145,22 @@ function components(mask: Uint8Array, width: number, height: number): COMPONENT[
  * is what keeps a motionless prop in the middle of frame out of the results.
  * All three are reasons to pass explicit regions instead, which is the better
  * path anyway once a creator's mark is known.
+ *
+ * Both statistics here are MEDIAN-based, and that is not a refinement. A mean
+ * and a standard deviation let a SINGLE unrepresentative frame decide the whole
+ * result: sample a title card, a cut to white, or a B-roll insert, and every
+ * pixel's spread jumps at once — the logo's included — so nothing passes the
+ * still test and the detector reports no overlay at all. Measured on a PGX
+ * episode carrying a plain white cutaway: with that one frame among twelve the
+ * stillest pixel in the logo's own corner scored 24.7 and not one pixel read as
+ * static; dropping it alone took the minimum to 0.0 and the mark appeared
+ * immediately. The failure is silent and total, and it is why the clips from
+ * that episode went out with the source's bug still on them.
+ *
+ * A median absolute deviation survives up to half the frames being unlike the
+ * rest, so a cutaway or two costs nothing. It is scaled by 1/0.6745 into the
+ * same units a standard deviation would have reported on well-behaved footage,
+ * so `STATIC_MAX_STDDEV` keeps its existing meaning and needed no retuning.
  */
 export async function detectStaticOverlays(
   sourcePath: string,
@@ -162,45 +178,55 @@ export async function detectStaticOverlays(
     durationSeconds * (settings.EDGE_SKIP_FRACTION + (span * i) / Math.max(1, settings.FRAMES - 1)),
   );
 
-  const sum = new Float64Array(pixels);
-  const sumSquares = new Float64Array(pixels);
-  let sampled = 0;
+  // The frames are kept rather than folded into running sums: a median needs
+  // every value, and at 320px wide by 12 frames that is well under a megabyte.
+  const frames: Uint8Array[] = [];
   for (const at of timestamps) {
-    let frame: Uint8Array;
     try {
-      frame = await grabGrayFrame(sourcePath, at, width, height);
+      frames.push(await grabGrayFrame(sourcePath, at, width, height));
     } catch {
       continue; // A single unreadable seek is not a failed detection.
     }
-    for (let i = 0; i < pixels; i++) {
-      sum[i] += frame[i];
-      sumSquares[i] += frame[i] * frame[i];
-    }
-    sampled++;
   }
+  const sampled = frames.length;
   if (sampled < 3) throw new Error(MEDIA_ERROR_MESSAGES.EFFECTS_DETECT_FAILED);
 
-  const mean = new Float64Array(pixels);
-  const stddev = new Float64Array(pixels);
-  for (let i = 0; i < pixels; i++) {
-    mean[i] = sum[i] / sampled;
-    stddev[i] = Math.sqrt(Math.max(0, sumSquares[i] / sampled - mean[i] * mean[i]));
+  /** Median of `count` values held at the front of `scratch`, sorted in place. */
+  function medianOf(scratch: Float64Array, count: number): number {
+    const values = scratch.subarray(0, count);
+    values.sort();
+    const middle = count >> 1;
+    return count % 2 === 1 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
   }
 
-  // Gradient of the mean frame: how much structure sits at this pixel.
+  const median = new Float64Array(pixels);
+  const spread = new Float64Array(pixels);
+  const scratch = new Float64Array(sampled);
+  for (let i = 0; i < pixels; i++) {
+    for (let f = 0; f < sampled; f++) scratch[f] = frames[f][i];
+    const mid = medianOf(scratch, sampled);
+    median[i] = mid;
+    // Reuse the scratch for |value - median|, then take its median: the MAD.
+    for (let f = 0; f < sampled; f++) scratch[f] = Math.abs(frames[f][i] - mid);
+    spread[i] = medianOf(scratch, sampled) / MEDIA_HIDE.DETECT.MAD_TO_STDDEV;
+  }
+
+  // Gradient of the MEDIAN frame: how much structure sits at this pixel. The
+  // median frame matters as much as the median spread — averaging a cut to
+  // white into the reference washes out the very edges this then looks for.
   const gradient = new Float64Array(pixels);
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
       gradient[i] =
-        Math.abs(mean[i + 1] - mean[i - 1]) + Math.abs(mean[i + width] - mean[i - width]);
+        Math.abs(median[i + 1] - median[i - 1]) + Math.abs(median[i + width] - median[i - width]);
     }
   }
 
   const mask = new Uint8Array(pixels);
   for (let i = 0; i < pixels; i++) {
     mask[i] =
-      stddev[i] <= settings.STATIC_MAX_STDDEV && gradient[i] >= settings.MIN_GRADIENT ? 1 : 0;
+      spread[i] <= settings.STATIC_MAX_STDDEV && gradient[i] >= settings.MIN_GRADIENT ? 1 : 0;
   }
 
   const radius = Math.max(1, Math.round(width * settings.DILATE_FRACTION));
@@ -266,7 +292,7 @@ export async function detectStaticOverlays(
         if (!mask[i]) continue;
         maskPixels++;
         gradientSum += gradient[i];
-        stddevSum += stddev[i];
+        stddevSum += spread[i];
       }
     }
     if (maskPixels === 0) continue;
@@ -282,7 +308,7 @@ export async function detectStaticOverlays(
     // Grow the box out to the mark's real extent on the weak threshold before
     // padding. See GROW_GRADIENT in constants for why two thresholds.
     const weak = (x: number, y: number): boolean =>
-      stddev[y * width + x] <= settings.STATIC_MAX_STDDEV &&
+      spread[y * width + x] <= settings.STATIC_MAX_STDDEV &&
       gradient[y * width + x] >= settings.GROW_GRADIENT;
 
     let { minX: gMinX, maxX: gMaxX, minY: gMinY, maxY: gMaxY } = component;
