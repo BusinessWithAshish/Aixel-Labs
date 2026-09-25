@@ -51,6 +51,21 @@ export const CHATGPT = {
   /** Soft upper bound for waiting on ChatGPT stream; CDP/session errors fail sooner. */
   DEFAULT_STREAM_TIMEOUT_SEC: 30 * 60,
   COMPOSER_WAIT_SEC: 90,
+  /**
+   * ChatGPT's prompt input. Migrated from `#prompt-textarea` to a ProseMirror
+   * contenteditable div (aria-label "Ask ChatGPT") around 2026-09; both are
+   * listed so a UI rollback still matches. `querySelector` returns whichever is
+   * present. A stale value here reads as "composer never appeared" even though
+   * the page is logged in — that was the 2026-09-24 breakage.
+   */
+  COMPOSER_SELECTOR: "#prompt-textarea, .ProseMirror",
+  /**
+   * The composer's send button. Was `#composer-submit-button` /
+   * `[data-testid=send-button]` / aria-label "Send prompt"; the current UI uses
+   * aria-label "Send". All are listed for resilience.
+   */
+  SEND_BUTTON_SELECTOR:
+    'button[aria-label=Send], #composer-submit-button, button[data-testid=send-button], button[aria-label="Send prompt"]',
   LOGO_SETTLE_MS: 8000,
   STREAM_POLL_MS: 5000,
   CDP_CONNECT_TIMEOUT_MS: 30_000,

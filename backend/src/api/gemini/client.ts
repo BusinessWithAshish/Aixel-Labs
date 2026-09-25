@@ -90,9 +90,10 @@ async function attachFiles(tab: CdpTab, paths: string[]): Promise<void> {
     })),
   );
 
-  const opened = await tab.js(
-    `(() => { const b = document.querySelector(${S(GEMINI.UPLOAD_BUTTON_SELECTOR)}); if (!b) return false; b.click(); return true; })()`,
-  );
+  // Trusted click: an untrusted one is ignored, and then the attachment never
+  // registers while the code believes the menu opened — send is silently
+  // blocked by a ghost attachment for the rest of the turn.
+  const opened = await trustedClick(tab, GEMINI.UPLOAD_BUTTON_SELECTOR);
   if (!opened) throw new Error("could not open the Upload and tools menu");
   await sleep(GEMINI.MENU_SETTLE_MS);
 
@@ -146,12 +147,75 @@ async function dismissDialogs(tab: CdpTab): Promise<string> {
   );
 }
 
+/**
+ * Click an element with a REAL mouse event at its coordinates.
+ *
+ * `element.click()` is untrusted and Gemini's Angular app ignores it while the
+ * calling code happily reports success. That single pattern caused every
+ * generation failure investigated on 2026-09-21/22 — first on the send button,
+ * then again on the upload-menu button, where it left a ghost attachment that
+ * blocked send entirely. Use this for any button whose effect matters.
+ */
+async function trustedClick(tab: CdpTab, selector: string): Promise<boolean> {
+  const box = (await tab.js(
+    `(() => {
+      const b = document.querySelector(${JSON.stringify(selector)});
+      if (!b || b.disabled || b.getAttribute('aria-disabled') === 'true') return '';
+      b.scrollIntoView({ block: 'center' });
+      const r = b.getBoundingClientRect();
+      if (!r.width || !r.height) return '';
+      return JSON.stringify({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+    })()`,
+  )) as string;
+  if (!box) return false;
+  const { x, y } = JSON.parse(box) as { x: number; y: number };
+  for (const type of ["mousePressed", "mouseReleased"] as const) {
+    await tab.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+  }
+  return true;
+}
+
+/**
+ * Click Send with a REAL mouse event at the button's coordinates.
+ *
+ * `element.click()` dispatches an untrusted event, and Gemini's Angular app
+ * ignores it: the click reported success while nothing was ever submitted, so
+ * the Enter-key fallback below never ran and the caller went on to poll an
+ * empty conversation until the video timeout. Verified 2026-09-21 — swapping
+ * to a dispatched mouse event took generation from "never completes" to a
+ * finished clip in under a minute.
+ */
 async function clickSend(tab: CdpTab): Promise<boolean> {
-  return Boolean(
-    await tab.js(
-      `(() => { const b = document.querySelector(${S(GEMINI.SEND_SELECTOR)}); if (!b || b.disabled || b.getAttribute('aria-disabled') === 'true') return false; b.click(); return true; })()`,
-    ),
+  const box = (await tab.js(
+    `(() => {
+      const b = document.querySelector(${S(GEMINI.SEND_SELECTOR)});
+      if (!b || b.disabled || b.getAttribute('aria-disabled') === 'true') return '';
+      b.scrollIntoView({ block: 'center' });
+      const r = b.getBoundingClientRect();
+      if (!r.width || !r.height) return '';
+      return JSON.stringify({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+    })()`,
+  )) as string;
+  if (!box) return false;
+  const { x, y } = JSON.parse(box) as { x: number; y: number };
+  for (const type of ["mousePressed", "mouseReleased"] as const) {
+    await tab.send("Input.dispatchMouseEvent", {
+      type,
+      x,
+      y,
+      button: "left",
+      clickCount: 1,
+    });
+  }
+  return true;
+}
+
+/** The composer empties only once the turn is actually accepted — the one honest proof it sent. */
+async function composerEmptied(tab: CdpTab): Promise<boolean> {
+  const left = await tab.js(
+    `(() => { const e = document.querySelector(${S(GEMINI.EDITOR_SELECTOR)}); return e ? (e.innerText || '').trim().length : 0; })()`,
   );
+  return Number(left ?? 0) === 0;
 }
 
 async function sendPrompt(tab: CdpTab, prompt: string): Promise<void> {
@@ -167,13 +231,17 @@ async function sendPrompt(tab: CdpTab, prompt: string): Promise<void> {
   // any dialog, and retry a couple of times before falling back to Enter.
   let submitted = false;
   for (let attempt = 0; attempt < 3 && !submitted; attempt++) {
-    submitted = await clickSend(tab);
+    const clicked = await clickSend(tab);
     await sleep(1000);
     const dialog = await dismissDialogs(tab);
     if (dialog) {
       await sleep(800);
-      submitted = await clickSend(tab); // the click that Agree unblocked
+      await clickSend(tab); // the click that Agree unblocked
+      await sleep(1000);
     }
+    // Trust the composer, not the click: a click that "worked" but left the
+    // text sitting there did not send, and must fall through to Enter.
+    submitted = clicked && (await composerEmptied(tab));
   }
   if (!submitted) {
     for (const type of ["keyDown", "keyUp"] as const) {
@@ -240,16 +308,48 @@ async function waitForTurn(
   return last;
 }
 
-/** Poll a conversation (reloading it) until the finished <video> appears. */
+/**
+ * Poll a conversation (reloading it) until the finished <video> appears.
+ *
+ * Also watches for Gemini ANSWERING IN TEXT instead of producing a video —
+ * a spent video quota, a refusal, or an error. Without that check every one of
+ * those costs the full timeout and reports the same useless "still not ready",
+ * which is exactly how an exhausted video limit cost 12 minutes and looked
+ * like a hang (2026-09-21).
+ */
+const VIDEO_REFUSAL_RE =
+  /limit resets|reached your limit|out of|no longer available|can't create|cannot create|unable to create|not able to create|try again later|something went wrong/i;
+
 async function pollForVideo(tab: CdpTab, url: string, timeoutSec: number): Promise<void> {
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
-    const vids = (await tab
+    const state = (await tab
       .js(
-        `[...document.querySelectorAll('video')].filter(v => v.src || v.querySelector('source')).length`,
+        `(() => {
+          const vids = [...document.querySelectorAll('video')].filter(v => v.src || v.querySelector('source')).length;
+          const resp = document.querySelectorAll(${S(GEMINI.RESPONSE_SELECTOR)});
+          const last = resp.length ? resp[resp.length - 1] : null;
+          const text = last ? (last.innerText || '').trim().slice(0, 400) : '';
+          return JSON.stringify({ vids, text });
+        })()`,
       )
-      .catch(() => 0)) as number;
+      .catch(() => "")) as string;
+    let vids = 0;
+    let text = "";
+    if (state) {
+      try {
+        const parsed = JSON.parse(state) as { vids: number; text: string };
+        vids = parsed.vids;
+        text = parsed.text;
+      } catch {
+        /* keep polling on a malformed read */
+      }
+    }
     if (vids > 0) return;
+    // A text answer with no video on the way means it is not coming.
+    if (text && VIDEO_REFUSAL_RE.test(text)) {
+      throw new Error(`Gemini did not produce a video: ${text.replace(/\s+/g, " ").slice(0, 200)}`);
+    }
     await sleep(GEMINI.VIDEO_POLL_MS);
     await openChat(tab, url).catch(() => {});
   }

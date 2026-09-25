@@ -153,14 +153,19 @@ async function openChat(tab: CdpTab, url: string): Promise<void> {
   for (let i = 0; i < CHATGPT.COMPOSER_WAIT_SEC; i++) {
     await sleep(1000);
     const ready = await tab.js(
-      "!!document.querySelector('#prompt-textarea')",
+      `!!document.querySelector(${JSON.stringify(CHATGPT.COMPOSER_SELECTOR)})`,
     );
     if (ready) {
       await sleep(2000);
       return;
     }
   }
-  throw new Error(`composer never appeared at ${url} — still logged in?`);
+  throw new Error(
+    `composer never appeared at ${url} after ${CHATGPT.COMPOSER_WAIT_SEC}s ` +
+      `(selector ${CHATGPT.COMPOSER_SELECTOR}). The page may be logged in but ` +
+      `the composer selector is stale (ChatGPT changed its DOM), or the ` +
+      `${CHATGPT.PROFILE_DIR} session is logged out — check via VNC on ${CHATGPT.DISPLAY}.`,
+  );
 }
 
 /** Attaches every path in one DataTransfer so all images land on the same message. */
@@ -197,24 +202,43 @@ async function attachImages(tab: CdpTab, paths: string[]): Promise<void> {
 }
 
 async function sendPrompt(tab: CdpTab, prompt: string): Promise<void> {
-  await tab.js("document.querySelector('#prompt-textarea').focus()");
+  await tab.js(
+    `document.querySelector(${JSON.stringify(CHATGPT.COMPOSER_SELECTOR)}).focus()`,
+  );
   await sleep(300);
   await tab.send("Input.insertText", { text: prompt });
   await sleep(1000);
   const text = await tab.js(
-    "document.querySelector('#prompt-textarea').innerText",
+    `document.querySelector(${JSON.stringify(CHATGPT.COMPOSER_SELECTOR)}).innerText`,
   );
   if (!String(text || "").trim()) {
     throw new Error("composer stayed empty after insertText");
   }
-  const clicked = await tab.js(`(() => {
-    const b = document.querySelector('#composer-submit-button')
-      || document.querySelector('button[data-testid="send-button"]')
-      || document.querySelector('button[aria-label="Send prompt"]');
-    if (!b || b.disabled) return false;
-    b.click();
-    return true;
-  })()`);
+  // A REAL mouse event, not element.click(). The untrusted click is ignored by
+  // the app while still reporting success, which suppressed the Enter fallback
+  // below and left the turn unsent. Same defect was proven and fixed in the
+  // gemini module on 2026-09-21.
+  const box = (await tab.js(`(() => {
+    const b = document.querySelector(${JSON.stringify(CHATGPT.SEND_BUTTON_SELECTOR)});
+    if (!b || b.disabled) return '';
+    b.scrollIntoView({ block: 'center' });
+    const r = b.getBoundingClientRect();
+    if (!r.width || !r.height) return '';
+    return JSON.stringify({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  })()`)) as string;
+  let clicked = false;
+  if (box) {
+    const { x, y } = JSON.parse(box) as { x: number; y: number };
+    for (const type of ["mousePressed", "mouseReleased"] as const) {
+      await tab.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+    }
+    await sleep(1200);
+    // Trust the composer, not the click: text still sitting there means it never sent.
+    const left = await tab.js(
+      `(() => { const e = document.querySelector(${JSON.stringify(CHATGPT.COMPOSER_SELECTOR)}); return e ? (e.innerText || '').trim().length : 0; })()`,
+    );
+    clicked = Number(left ?? 0) === 0;
+  }
   if (!clicked) {
     for (const type of ["keyDown", "keyUp"] as const) {
       await tab.send("Input.dispatchKeyEvent", {
