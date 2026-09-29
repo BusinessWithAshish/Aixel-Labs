@@ -40,3 +40,6 @@ facebook/
 ## Smoke / FE
 
 Used by frontend lead-gen Facebook flow. No Mongo in this module.
+
+Also reachable via the `facebook` MCP tool, op `search` (`searchFacebookPages`
+in `client.ts`) — same service, no HTTP loopback.

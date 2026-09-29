@@ -16,6 +16,8 @@ import {
   facebookMbasicPageUrl,
   facebookPageUrl,
   generateFacebookSearchQuery,
+  hasEntities,
+  hasQuery,
   isSparseFacebookLead,
   mapFacebookPageHtml,
   mergeFacebookLeads,
@@ -164,6 +166,29 @@ export async function fetchFromEntities(
     out.push(lead);
   }
   return out;
+}
+
+/** Orchestrates the entities/query branching shared by HTTP and MCP callers. */
+export async function searchFacebookPages(
+  data: FACEBOOK_REQUEST,
+): Promise<FACEBOOK_RESPONSE[]> {
+  const { entities, query } = data;
+
+  if (!hasEntities(entities) && !hasQuery(query)) {
+    throw new Error(FACEBOOK_ERROR_MESSAGES.MISSING_QUERY_OR_ENTITIES);
+  }
+
+  if (hasQuery(query) && !hasEntities(entities)) {
+    return fetchFromQuery(data);
+  }
+
+  if (hasEntities(entities) && !hasQuery(query)) {
+    return fetchFromEntities(entities!, data.limit);
+  }
+
+  const entitiesData = await fetchFromEntities(entities!, data.limit);
+  const queryData = await fetchFromQuery(data);
+  return [...entitiesData, ...queryData].slice(0, resolveLimit(data.limit));
 }
 
 export async function fetchFromQuery(

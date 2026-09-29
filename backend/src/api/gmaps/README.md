@@ -31,3 +31,7 @@ gmaps/
 
 Frontend Maps lead-gen calls **internal** (query / placeType / cities) and can
 pass **urls**; **advanced** resolves a batch of place URLs to rich details.
+
+Also reachable via the `gmaps` MCP tool: ops `search` (internal's
+`searchGmapsInternal`), `details` (`fetchGmapsPlaceDetails`), `advanced`
+(`resolveGmapsAdvancedPlaces`) — same services, no HTTP loopback.

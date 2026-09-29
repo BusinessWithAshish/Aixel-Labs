@@ -100,6 +100,7 @@ export const LINKEDIN_BY_PEOPLE_REQUEST_SCHEMA = z.object({
           "Industry sectors to filter by (optional). E.g. ['Technology', 'Finance', 'Healthcare'].",
         ),
     })
+    .optional()
     .describe("Optional enrichment filters applied after initial discovery."),
 
   limit: z

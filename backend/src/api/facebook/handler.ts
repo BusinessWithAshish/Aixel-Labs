@@ -1,12 +1,7 @@
 import { FACEBOOK_REQUEST_SCHEMA } from "./schemas";
 import type { FACEBOOK_RESPONSE } from "./types";
 import { Request, Response } from "express";
-import {
-  fetchFromQuery,
-  fetchFromEntities,
-  hasEntities,
-  hasQuery,
-} from "./helpers";
+import { searchFacebookPages } from "./client";
 import { ALApiResponse } from "../types";
 import { FACEBOOK_ERROR_MESSAGES } from "./constants";
 
@@ -22,56 +17,20 @@ export async function facebookApiHandler(req: Request, res: Response) {
   }
 
   try {
-    const { entities, query } = parsed.data;
-
-    if (!hasEntities(entities) && !hasQuery(query)) {
-      res.status(400).json({
-        success: false,
-        error: FACEBOOK_ERROR_MESSAGES.MISSING_QUERY_OR_ENTITIES,
-      });
-      return;
-    }
-
-    if (hasQuery(query) && !hasEntities(entities)) {
-      const data = await fetchFromQuery(parsed.data);
-      const response: ALApiResponse<FACEBOOK_RESPONSE[]> = {
-        success: true,
-        data,
-      };
-      res.status(200).json(response);
-      return;
-    }
-
-    if (hasEntities(entities) && !hasQuery(query)) {
-      const data = await fetchFromEntities(entities!, parsed.data.limit);
-      const response: ALApiResponse<FACEBOOK_RESPONSE[]> = {
-        success: true,
-        data,
-      };
-      res.status(200).json(response);
-      return;
-    }
-
-    const entitiesData = await fetchFromEntities(entities!, parsed.data.limit);
-    const queryData = await fetchFromQuery(parsed.data);
-    const data = [...entitiesData, ...queryData].slice(
-      0,
-      parsed.data.limit ?? 100,
-    );
+    const data = await searchFacebookPages(parsed.data);
     const response: ALApiResponse<FACEBOOK_RESPONSE[]> = {
       success: true,
       data,
     };
     res.status(200).json(response);
-    return;
   } catch (err) {
     const msg =
       err instanceof Error ? err.message : FACEBOOK_ERROR_MESSAGES.GENERIC;
+    const status = msg === FACEBOOK_ERROR_MESSAGES.MISSING_QUERY_OR_ENTITIES ? 400 : 500;
     const response: ALApiResponse<never> = {
       success: false,
       error: msg,
     };
-    res.status(500).json(response);
-    return;
+    res.status(status).json(response);
   }
 }

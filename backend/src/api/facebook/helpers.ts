@@ -15,4 +15,4 @@ export {
   preferRicherLead,
 } from "./compute";
 
-export { fetchFromEntities, fetchFromQuery } from "./client";
+export { fetchFromEntities, fetchFromQuery, searchFacebookPages } from "./client";

@@ -8,7 +8,7 @@ HTTP handlers — **no HTTP loopback**.
 | Mount       | `ENDPOINTS.MCP` → `/mcp`                            |
 | Server name | `aixel-intelligence`                                |
 | Factory     | `createAixelIntelligenceMcpServer()` in `server.ts` |
-| Tool count  | `MCP_TOOL_COUNT` (**10**)                           |
+| Tool count  | `MCP_TOOL_COUNT` (**14**)                           |
 
 HTTP stays exploded (one POST per function). MCP collapses to **one tool per
 domain**. Every tool takes the same top-level shape:
@@ -21,8 +21,6 @@ domain**. Every tool takes the same top-level shape:
 - Invalid `op`/`layer` combo **fails** — no silent fallback.
 - `input` is parsed with the existing API `*_REQUEST_SCHEMA` (not a parallel MCP Zod tree).
 - JSON Schema cannot vary `input` per `op`; the **tool description** is the dispatch table.
-
-Lead-gen (Maps / Facebook / LinkedIn) stays **HTTP-only**.
 
 ## Tools
 
@@ -38,6 +36,10 @@ Lead-gen (Maps / Facebook / LinkedIn) stays **HTTP-only**.
 | `chatgpt`       | `ask`                                                                                                                                          | raw only (browser-driven, no intel overlay). **Needs a headful-browser host** — enabled only where an X display is present (auto-detected, refused on Vercel; no env flag). `stage_image` was removed, it had no ChatGPT-specific logic — use `media` op=fetch instead |
 | `claude`        | `ask`, `budget_status`                                                                                                                                              | raw only (CLI-driven, no intel overlay). Runs on any machine with `claude` installed and authenticated — **not** VPS-gated (unlike `chatgpt`), fails with a plain error if the CLI is missing/unauthenticated |
 | `gemini`        | `ask`                                                                                                                                          | raw only (browser-driven, no intel overlay). **Needs a headful-browser host** (X display auto-detected; refused on Vercel; no env flag). Text/image/video in and out on the logged-in gemini.google.com session (flat Google AI subscription). Its own Chrome instance (separate profile + port 9333) — independent of `chatgpt`, the two run concurrently. Video output is async (Veo, minutes); media staged to public URLs. Attach refs via `images`/`videos` (local paths — use `media` op=fetch for remote). |
+| `gmaps`         | `search`, `details`, `advanced`                                                                                                                | raw only. `search` is the primary Maps lead search (query/placeType across cities, `countryCode` always required); `urls` is not implemented on `search` — use `advanced` for a batch of place URLs. `details` resolves one place (placeId/featureId/url). |
+| `facebook`      | `search`                                                                                                                                        | raw only. Discovers Pages via Google CSE (`site:facebook.com`) and/or enriches known Page vanities/URLs from Page HTML. |
+| `linkedin`      | `people`, `company`                                                                                                                             | raw only. Google CSE discovery + guest-view profile/company scrape; `searchType` in `input` must match the op. |
+| `crawl`         | `scrape`                                                                                                                                        | raw only. Sync TLS crawl of a company's own domain/URL into an emails/phones/socials contact profile — no browser-worker/Botasaurus. |
 
 ### Instagram discovery — which op
 
@@ -94,7 +96,7 @@ the parked moments scorer's `audienceSignals` (format via
 ```
 mcp/
 ├── router.ts        # Express mount + health
-├── server.ts        # factory + MCP_TOOL_COUNT (registers 9 domain tools)
+├── server.ts        # factory + MCP_TOOL_COUNT (registers 14 domain tools)
 ├── domain-tool.ts   # registerDomainTool({ op, layer, input })
 ├── tool-result.ts   # ok / fail wrappers
 ├── tools/           # one file per domain

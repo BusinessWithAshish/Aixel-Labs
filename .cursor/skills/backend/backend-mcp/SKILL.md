@@ -48,12 +48,12 @@ Mount: `ENDPOINTS.MCP` (`/mcp`) via `routes.ts` — platform skill owns that wir
 |----------|--------|
 | Name | `aixel-intelligence` |
 | Version | `1.0.0` |
-| Tools | `MCP_TOOL_COUNT` = **10** (keep in sync with domain registrations) |
+| Tools | `MCP_TOOL_COUNT` = **14** (keep in sync with domain registrations) |
 | Package | `@modelcontextprotocol/sdk` |
 
 Domains: `youtube`, `trends`, `instagram`, `twitter`, `gsearch`, `media`,
-`segment`, `chatgpt`, `claude`. Lead-gen (Maps / Facebook /
-LinkedIn) is HTTP-only unless product asks otherwise.
+`segment`, `chatgpt`, `claude`, `gemini`, `gmaps`, `facebook`, `linkedin`,
+`crawl`.
 
 Health: `GET /mcp/health` → `{ status, server, tools }`.
 

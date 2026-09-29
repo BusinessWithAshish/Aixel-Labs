@@ -28,6 +28,9 @@ import {
   extractPlaceObject,
   extractReviewCount,
 } from "./compute/parse-place";
+import { mapPlaceDetails } from "./compute";
+import { GMAPS_DETAILS_ERROR_MESSAGES } from "./constants";
+import type { GMAPS_DETAILS_RESPONSE } from "./types";
 
 export { parseFeatureIdFromUrl, parsePlaceIdFromUrl } from "./parse-place-url";
 
@@ -388,4 +391,16 @@ export async function fetchGmapsPlaceDetailsRaw(
   } finally {
     await closeUrlFetchSession(session);
   }
+}
+
+/** Fetch + map a single place, orchestration shared by the HTTP handler and the MCP tool. */
+export async function fetchGmapsPlaceDetails(
+  req: GMAPS_DETAILS_REQUEST,
+): Promise<GMAPS_DETAILS_RESPONSE> {
+  const { data, richness } = await fetchGmapsPlaceDetailsRaw(req);
+  const place = mapPlaceDetails(data, richness);
+  if (!place.placeId && !place.featureId && !place.name) {
+    throw new Error(GMAPS_DETAILS_ERROR_MESSAGES.PLACE_NOT_FOUND);
+  }
+  return place;
 }

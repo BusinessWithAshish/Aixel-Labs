@@ -44,3 +44,7 @@ linkedin/
 
 Company search is the default product path; people search may be gated by a
 frontend feature flag.
+
+Also reachable via the `linkedin` MCP tool, ops `people` / `company`
+(`fetchLinkedInByPeople` / `fetchLinkedInByCompany` in `helpers/`) — same
+services, no HTTP loopback.

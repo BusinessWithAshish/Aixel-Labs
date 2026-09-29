@@ -32,3 +32,6 @@ One item per input domain. `id` is a stable hash of the registrable domain
 cd backend && pnpm exec tsx scripts/crawl-smoke.ts
 cd backend && pnpm exec tsx scripts/crawl-batch-smoke.ts
 ```
+
+Also reachable via the `crawl` MCP tool, op `scrape` (`scrapeCrawl` in
+`client.ts`) — same service, no HTTP loopback.
