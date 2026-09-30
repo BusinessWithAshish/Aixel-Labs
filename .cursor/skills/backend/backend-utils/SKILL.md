@@ -34,6 +34,34 @@ by the frontend (no `@aixellabs/backend/utils` package export).
 | `async-helpers.ts` | `sleep`, `jitter`, `withTimeout`, header merge, `shortUrl` |
 | `browser-worker.ts` | Optional remote Chrome via `BROWSER_WORKER_URL` — **no live api/ importers** today |
 | `guerrilla-mail.ts` | Temp inbox helper — **no live importers** today |
+| `google-consent.ts` | Solves Google's GDPR/EU consent interstitial (`consent.google.com`) once per TLS session by replaying its own accept-all form — no browser. Used by `gmaps` and `google-trends`; reach for it any time a `google.com` property starts redirecting instead of serving content |
+
+## Debugging a scraper that suddenly gets blocked
+
+When a TLS-client scraper that has worked for a long time suddenly starts
+getting blocked/redirected/rate-limited with no code change on our side
+(found live 2026-09-30 on `gmaps` + `google-trends`), don't guess at new
+headers — **spin up a throwaway headed Chrome, open CDP's `Network` domain,
+and watch what a real logged-out browser actually does** for the exact same
+URL: the full redirect chain, response headers/cookies, and (for XHR/fetch
+endpoints) the request/response bodies. That's how the `google-consent.ts`
+fix above was found: our TLS session wasn't following a new 302 to Google's
+consent wall (`node-tls-client`'s `followRedirects` defaults to `false`),
+and once on that page, curl-replaying its literal `<form action="…/save">`
+fields turned out to be enough — no persistent browser dependency needed in
+the final fix.
+
+There's no standing utility for this anymore (it was written, used once, and
+removed — a throwaway tool for a throwaway browser). Rebuild it each time:
+launch headed Chrome (`--remote-debugging-port`, a **fresh `--user-data-dir`**
+so there's no accumulated cookies/reputation, `DISPLAY` from the Xvfb the
+`aixel-xvfb` systemd unit already runs — see `CHATGPT.DISPLAY` in
+`api/chatgpt/constants.ts` for why headed, not `--headless=new`), connect via
+the CDP HTTP API's `/json/new` + the returned `webSocketDebuggerUrl`, enable
+`Network`, navigate, and read back `Network.requestWillBeSent` /
+`Network.responseReceived` / `Network.getResponseBody`. Once you see the
+real flow, port the *specific* fix (a header, a cookie, a form POST) into the
+TLS-client code — don't leave the browser itself running in production.
 
 ## Default stack
 

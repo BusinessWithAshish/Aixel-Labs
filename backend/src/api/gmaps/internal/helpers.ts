@@ -10,6 +10,7 @@ import {
   type UrlFetchSession,
 } from "../../../utils/node-tls-client-session-handler";
 import { mergeHttpHeaderRecords } from "../../../utils/async-helpers";
+import { fetchGoogleWithConsent } from "../../../utils/google-consent";
 import { EARTH_RADIUS, GMAPS, TILE_SIZE, BrowserProfile } from "./constants";
 import type { GMAPS_INTERNAL_RESPONSE } from "./types";
 
@@ -157,7 +158,7 @@ export const extractPsi = async (
   const slug = query.toLowerCase().trim().replace(/\s+/g, "+");
   const url =
     GMAPS.MAPS_SEARCH_URL + slug + `?hl=${hl}` + `&gl=${gl.toLowerCase()}`;
-  const resp = await session.get(url, { headers: navHeaders(profile) });
+  const resp = await fetchGoogleWithConsent(session, url, navHeaders(profile));
 
   if (resp.status >= 400) {
     throw new Error(`[extractPsi] HTTP ${resp.status}`);

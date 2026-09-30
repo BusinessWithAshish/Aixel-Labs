@@ -35,3 +35,13 @@ pass **urls**; **advanced** resolves a batch of place URLs to rich details.
 Also reachable via the `gmaps` MCP tool: ops `search` (internal's
 `searchGmapsInternal`), `details` (`fetchGmapsPlaceDetails`), `advanced`
 (`resolveGmapsAdvancedPlaces`) — same services, no HTTP loopback.
+
+Every `session.get` in `internal/helpers.ts` and `details/client.ts` goes
+through `utils/google-consent.ts` — this server's IP geolocates as EU, so a
+cookie-less request gets redirected to Google's consent wall instead of
+served directly (that's also why every request explicitly sets
+`followRedirects` now — `node-tls-client` defaults it to `false`, which is
+why this used to fail silently instead of surfacing the redirect). If Google
+starts blocking again with a short-body/redirect error, see "Debugging a
+scraper that suddenly gets blocked" in the `backend-utils` skill before
+guessing at headers.

@@ -140,7 +140,6 @@ export const GMAPS = {
   // ── TLS session options ─────────────────────────────────────
   TLS_TIMEOUT_SECS: 30,
   TLS_RANDOM_EXTENSIONS: true, // randomise extension order per session
-  TLS_FOLLOW_REDIRECTS: true,
 } as const;
 
 // ── Derived type helpers ──────────────────────────────────────

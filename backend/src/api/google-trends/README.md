@@ -27,7 +27,11 @@ Validated by `schemas.ts` → `GOOGLE_TRENDS_REQUEST_SCHEMA`.
 
 Fetches `https://trends.google.com/trending?geo=…&hl=…&hours=…`, parses the SSR
 `AF_initDataCallback` `ds:0` block, then applies category/status/sort/limit as
-post-processing.
+post-processing. The fetch goes through `utils/google-consent.ts` — this
+server's IP geolocates as EU, so a cookie-less request gets redirected to
+Google's consent wall instead of served directly. If this starts failing
+again with a redirect/short-body error, don't guess at headers — see
+"Debugging a scraper that suddenly gets blocked" in the `backend-utils` skill.
 
 ## Interest over time (raw)
 

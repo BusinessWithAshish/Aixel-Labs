@@ -334,6 +334,32 @@ function pickLongerBio(a: string | null, b: string | null): string | null {
   return a.length >= b.length ? a : b;
 }
 
+/**
+ * Facebook serves a login-wall shell instead of the real Page for most
+ * logged-out requests now. It's real HTML with a real <title>/<h1>/og:title —
+ * not a 4xx — so it parses "successfully" unless the exact shell strings are
+ * caught here. Observed live 2026-09: og:title "Log in or sign up to view",
+ * og:description "See posts, photos and more on Facebook." (or "...on
+ * Instagram." variants), on both mbasic and www.
+ *
+ * Only the compound phrases below are trusted at any length — they're
+ * Facebook's own canned strings and essentially impossible for a real
+ * business name/bio to contain verbatim. The single loose words ("log in",
+ * "create new account", "see more from") stay gated to short strings only
+ * (unchanged from the original heuristic) so a long legitimate bio that
+ * happens to mention "log in" once isn't wiped out.
+ */
+const FACEBOOK_LOGIN_WALL_TITLE_RE = /log\s*in\s*(?:or|\/)\s*sign\s*up/i;
+const FACEBOOK_LOGIN_WALL_STRICT_RE =
+  /see posts,?\s*photos and more|content isn't available|this content isn't available/i;
+const FACEBOOK_LOGIN_WALL_LOOSE_RE = /log in|create new account|see more from/i;
+
+function isFacebookLoginWallBio(value: string | null): boolean {
+  if (!value) return false;
+  if (FACEBOOK_LOGIN_WALL_STRICT_RE.test(value)) return true;
+  return value.length < 80 && FACEBOOK_LOGIN_WALL_LOOSE_RE.test(value);
+}
+
 /** Merge two parses — fill nulls so /about + home/mbasic don't clobber each other. */
 export function mergeFacebookLeads(
   a: FACEBOOK_RESPONSE,
@@ -507,17 +533,18 @@ export function mapFacebookPageHtml(
   const emailList = [...emails];
 
   let bio = ldDesc ?? ogDesc ?? null;
-  if (
-    bio &&
-    /log in|create new account|see more from/i.test(bio) &&
-    bio.length < 80
-  ) {
-    bio = ldDesc ?? null;
+  if (bio && isFacebookLoginWallBio(bio)) {
+    bio = ldDesc && !isFacebookLoginWallBio(ldDesc) ? ldDesc : null;
   }
 
-  // Generic Facebook shell titles are not page names
+  // Generic Facebook shell titles ("Facebook", "Log in or sign up to view",
+  // "Log in to Facebook", ...) are not page names — the login wall, not data.
   const resolvedName =
-    name && !/^facebook$/i.test(name.trim()) ? name : null;
+    name &&
+    !/^facebook$/i.test(name.trim()) &&
+    !FACEBOOK_LOGIN_WALL_TITLE_RE.test(name.trim())
+      ? name
+      : null;
 
   return {
     id,

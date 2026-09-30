@@ -19,6 +19,7 @@ import {
   type UrlFetchSession,
 } from "../../../utils/node-tls-client-session-handler";
 import { mergeHttpHeaderRecords } from "../../../utils/async-helpers";
+import { fetchGoogleWithConsent } from "../../../utils/google-consent";
 import {
   parseFeatureIdFromUrl,
   parseGlFromUrl,
@@ -139,9 +140,7 @@ async function resolveFeatureIdFromPlaceId(
   placeId: string,
 ): Promise<string | null> {
   const url = `${GMAPS_DETAILS_PLACE_PAGE_URL}${encodeURIComponent(placeId)}`;
-  const resp = await session.get(url, {
-    headers: navHeaders(profile),
-  });
+  const resp = await fetchGoogleWithConsent(session, url, navHeaders(profile));
   const html = await resp.text();
   return parseFeatureIdFromUrl(html);
 }
@@ -224,9 +223,11 @@ export async function fetchPlacePreview(
     url += `&psi=${opts.psi}.${Date.now()}.1`;
   }
 
-  const resp = await session.get(url, {
-    headers: xhrHeaders(profile, opts.hl),
-  });
+  const resp = await fetchGoogleWithConsent(
+    session,
+    url,
+    xhrHeaders(profile, opts.hl),
+  );
 
   if (resp.status === 429) throw new Error("[gmaps/details] Rate limited (429)");
   if (resp.status === 403) throw new Error("[gmaps/details] Forbidden (403)");
@@ -278,7 +279,7 @@ async function warmPlacePage(
     url = `https://www.google.com/maps?hl=${opts.hl}&gl=${gl}`;
   }
 
-  const resp = await session.get(url, { headers: navHeaders(profile) });
+  const resp = await fetchGoogleWithConsent(session, url, navHeaders(profile));
   const html = await resp.text();
   return {
     psi: extractPsiFromHtml(html),

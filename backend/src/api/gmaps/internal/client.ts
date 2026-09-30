@@ -25,6 +25,32 @@ import { GMAPS_EMPTY, buildGmapsSearchQuery } from "../place-types";
 /** Thrown for the request-shape checks the Zod schema can't express (still a 400 over HTTP). */
 export class GmapsInternalValidationError extends Error {}
 
+/**
+ * Thrown when every city was blocked (bot detection, 429, 403, network
+ * failure) rather than genuinely returning zero places. Callers must not
+ * treat this the same as a confirmed-empty `[]` result — the underlying
+ * `errors` list names why each city failed.
+ */
+export class GmapsBlockedError extends Error {
+  constructor(
+    message: string,
+    public readonly errors: string[],
+  ) {
+    super(message);
+  }
+}
+
+/** A page/PSI-level failure worth aborting a city's retries over immediately. */
+function isBlockingError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("429") ||
+    msg.includes("403") ||
+    /bot detection/i.test(msg) ||
+    /HTTP 302/.test(msg)
+  );
+}
+
 /** Primary Maps lead search — same logic HTTP and MCP call, no loopback. */
 export async function searchGmapsInternal(
   parsed: GMAPS_INTERNAL_REQUEST,
@@ -79,6 +105,7 @@ export async function searchGmapsInternal(
   );
 
   const allPlaces: GMAPS_INTERNAL_RESPONSE[] = [];
+  const blockedCityErrors: string[] = [];
   let consecutiveFails = 0;
 
   // ── City loop ───────────────────────────────────────────────
@@ -89,10 +116,14 @@ export async function searchGmapsInternal(
       console.warn(
         `[gmaps] Halting — ${GMAPS.MAX_CONSECUTIVE_FAILURES} consecutive failures`,
       );
+      blockedCityErrors.push(
+        `Halted after ${GMAPS.MAX_CONSECUTIVE_FAILURES} consecutive city failures`,
+      );
       break;
     }
 
     let citySuccess = false;
+    let lastBlockError: string | null = null;
 
     // ── Retry loop per city ────────────────────────────────────
     for (
@@ -164,15 +195,17 @@ export async function searchGmapsInternal(
           }
         }
 
-        if (!cityPlaces.length)
-          throw new Error("Zero results across all pages");
-
+        // A page loop that completed with zero places (no exception thrown
+        // above) is a confirmed empty result, not a failure — don't retry it
+        // and don't let it masquerade as a block below.
         allPlaces.push(...cityPlaces);
         citySuccess = true;
         consecutiveFails = 0;
         console.log(`[gmaps] ✓ City done: ${cityPlaces.length} places`);
       } catch (err) {
-        console.error(`[gmaps] Attempt ${attempt} failed: ${err}`);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[gmaps] Attempt ${attempt} failed: ${msg}`);
+        if (isBlockingError(err)) lastBlockError = msg;
 
         if (attempt < GMAPS.MAX_RETRIES) {
           const backoff = GMAPS.DELAY_RETRY_BASE * attempt;
@@ -186,12 +219,26 @@ export async function searchGmapsInternal(
     if (!citySuccess) {
       consecutiveFails++;
       console.warn(`[gmaps] ✗ City failed after ${GMAPS.MAX_RETRIES} attempts`);
+      blockedCityErrors.push(
+        `"${cityQuery}": ${lastBlockError ?? "failed after retries"}`,
+      );
     }
 
     // Inter-city delay (skip after the last query)
     if (qi < queries.length - 1) {
       await delay(GMAPS.DELAY_CITY_MIN, GMAPS.DELAY_CITY_MAX);
     }
+  }
+
+  // Every city was blocked/failed and nothing came back — surface that as a
+  // real error instead of a `[]` that looks identical to a confirmed-empty
+  // search. A genuinely empty city (fetches succeeded, zero places) never
+  // reaches here because it doesn't push onto blockedCityErrors above.
+  if (allPlaces.length === 0 && blockedCityErrors.length > 0) {
+    throw new GmapsBlockedError(
+      `Google Maps search blocked or failed for all ${queries.length} cit${queries.length === 1 ? "y" : "ies"}: ${blockedCityErrors.join("; ")}`,
+      blockedCityErrors,
+    );
   }
 
   // ── Deduplicate by placeId, preferring entries with rating/reviewCount ──

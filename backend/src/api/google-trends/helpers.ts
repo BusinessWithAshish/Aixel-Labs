@@ -21,6 +21,7 @@ import {
   type UrlFetchSession,
 } from "../../utils/node-tls-client-session-handler";
 import { evomiConfigured } from "../../utils/fetch-session-common";
+import { fetchGoogleWithConsent } from "../../utils/google-consent";
 
 export { buildTrendingUrl } from "./url";
 export { extractAfInitData, mapTrendEntries, mapTrendEntry } from "./parse";
@@ -34,6 +35,12 @@ export { filterByCategory, filterByStatus, sortTrends } from "./filter";
  * The page is server-side rendered — every trending entry for the requested
  * `geo`/`hl`/`hours` window is embedded in the HTML, so a single GET is enough.
  * `category`/`status`/`sort`/`limit` are applied as post-processing.
+ *
+ * Plain TLS-client GET, wrapped with `fetchGoogleWithConsent` — this
+ * server's IP now geolocates as EU, so a cookie-less request to any
+ * google.com property (this one included) gets redirected to the GDPR
+ * consent interstitial instead of served directly. See
+ * `utils/google-consent.ts` for how that's solved without a browser.
  */
 export async function fetchGoogleTrendsTrending(
   request: GOOGLE_TRENDS_REQUEST,
@@ -50,14 +57,13 @@ export async function fetchGoogleTrendsTrending(
 
   let html: string;
   try {
-    const response = await session.get(url, {
-      headers: {
-        "user-agent": GOOGLE_TRENDS_USER_AGENT,
-        accept: GOOGLE_TRENDS_ACCEPT_HEADER,
-        "accept-language": `${req.hl},${req.hl.split("-")[0]};q=0.9`,
-      },
-    });
-    if (!response.ok) {
+    const headers = {
+      "user-agent": GOOGLE_TRENDS_USER_AGENT,
+      accept: GOOGLE_TRENDS_ACCEPT_HEADER,
+      "accept-language": `${req.hl},${req.hl.split("-")[0]};q=0.9`,
+    };
+    const response = await fetchGoogleWithConsent(session, url, headers);
+    if (response.status >= 400) {
       throw new Error(`Google Trends page request failed: ${response.status}`);
     }
     html = await response.text();

@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response } from "express";
-import { GmapsInternalValidationError, searchGmapsInternal } from "./client";
+import { GmapsBlockedError, GmapsInternalValidationError, searchGmapsInternal } from "./client";
 import type { GMAPS_INTERNAL_RESPONSE } from "./types";
 import { ALApiResponse } from "../../types";
 import { GMAPS_REQUEST_SCHEMA } from "../schemas";
@@ -30,6 +30,10 @@ export const gmapsInternalHandler = async (req: Request, res: Response) => {
   } catch (err) {
     if (err instanceof GmapsInternalValidationError) {
       res.status(400).json({ success: false, error: err.message });
+      return;
+    }
+    if (err instanceof GmapsBlockedError) {
+      res.status(502).json({ success: false, error: err.message } satisfies ALApiResponse<never>);
       return;
     }
     const msg = err instanceof Error ? err.message : "Failed to search Google Maps";
