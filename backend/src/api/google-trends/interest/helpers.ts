@@ -16,7 +16,7 @@ import {
   parseRelatedSearches,
   parseTimeseries,
 } from "./parse";
-import { fetchJsonWithSession } from "./fetch";
+import { fetchJsonWithSession, primeGoogleTrendsSession } from "./fetch";
 import {
   GOOGLE_TRENDS_INTEREST_REQUEST_SCHEMA,
   GOOGLE_TRENDS_COMPARE_REQUEST_SCHEMA,
@@ -82,6 +82,10 @@ export async function fetchGoogleTrendsInterestCore(
   let rawExplore: string;
   let exploreWidgets;
   try {
+    // Seeds a real NID cookie before explore — without it this is a
+    // deterministic 429. See GOOGLE_TRENDS_NID_PRIME_URL's doc comment.
+    await primeGoogleTrendsSession(session);
+
     const payload = buildExploreRequestPayload(comparisonItems, category, property);
     const exploreUrl = buildExploreUrl(payload, hl, tz);
     rawExplore = await fetchJsonWithSession(

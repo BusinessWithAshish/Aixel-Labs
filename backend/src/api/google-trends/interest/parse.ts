@@ -11,13 +11,19 @@ import type {
 } from "./types";
 
 /**
- * Strips the `)]}'\n` anti-hijacking prefix Google prepends to its
- * `/trends/api/*` JSON responses, then parses the body as JSON.
+ * Strips the anti-hijacking prefix Google prepends to `/trends/api/*` JSON
+ * responses, then parses the body as JSON. `/trends/api/explore` sends
+ * `)]}'\n{...}` but the `/trends/api/widgetdata/*` responses send
+ * `)]}',\n{...}` — an extra comma after the prefix (found live 2026-09-30,
+ * once the NID-priming fix got real widgetdata responses through for the
+ * first time). Stripping only the fixed 4-char prefix left that comma
+ * dangling in front of the JSON object, which JSON.parse rejects — so this
+ * also eats one optional leading comma before the remaining whitespace.
  */
 export function stripAntiHijackPrefix(body: string): string {
   const trimmed = body.trimStart();
   if (trimmed.startsWith(GOOGLE_TRENDS_EXPLORE_RESPONSE_PREFIX)) {
-    return trimmed.slice(GOOGLE_TRENDS_EXPLORE_RESPONSE_PREFIX.length).trimStart();
+    return trimmed.slice(GOOGLE_TRENDS_EXPLORE_RESPONSE_PREFIX.length).replace(/^,?\s*/, "");
   }
   return trimmed;
 }

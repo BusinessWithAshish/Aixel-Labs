@@ -172,6 +172,19 @@ export const GOOGLE_TRENDS_INTEREST_ACCEPT_HEADER =
 export const GOOGLE_TRENDS_INTEREST_REFERER =
   "https://trends.google.com/trends/explore";
 
+/**
+ * Lightweight RPC endpoint that 405s with no useful body but sets a real
+ * `NID` cookie — found live 2026-09-30 (see "Interest over time" in
+ * README.md for the investigation). Hitting this once per session before
+ * `/trends/api/explore` turns a deterministic 429 into a 200: confirmed
+ * reproducible across every fresh session tried (4/4), unlike the consent
+ * redirect (`trending`) or Facebook's probabilistic gate, which needed
+ * retries. The explore/widgetdata calls never see this cookie directly —
+ * it just needs to be sitting in the session's cookie jar first.
+ */
+export const GOOGLE_TRENDS_NID_PRIME_URL =
+  "https://trends.google.com/_/TrendsUi/data/batchexecute";
+
 // ─── Limits ───────────────────────────────────────────────────────────────────
 
 /** Maximum number of trending entries to return. The page can return 2000+ for 7-day windows. */
