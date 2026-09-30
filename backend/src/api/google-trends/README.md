@@ -41,6 +41,24 @@ single-keyword (`GOOGLE_TRENDS_INTEREST_REQUEST_SCHEMA`) and multi-keyword
 compare (`GOOGLE_TRENDS_COMPARE_REQUEST_SCHEMA`, 2–5 keywords). Breakout rising
 queries store `growth: null` and `isBreakout: true`.
 
+**Currently 429s — investigated 2026-09-30, no fix found.** Unlike `trending`
+above (a solvable consent redirect) or `facebook`'s probabilistic gate (solved
+by retrying), `/trends/api/explore` returns an identical 429 across every path
+tried: this server's direct IP, 8 fresh Evomi proxy sessions across two
+`geo` values, and — the clearest signal — a completely fresh, cookie-less
+real Chrome browser with zero request history, blocked instantly on the
+plain `trends.google.com/trends/explore` HTML page itself, before any API
+call fired. That rules out a request-shape or session-reputation fix: even
+a genuine, first-ever browser visit from this network path gets the same
+block. This looks like a broader rate-limit/block on this server's (and
+its proxy pool's) available network paths for this specific API surface,
+not something retrying or header changes can route around. If retried in
+the future, check whether it's still blocked from a completely different
+network path (different proxy provider, different datacenter) before
+assuming it's fixable the same way `trending`/`facebook` were — see
+"Debugging a scraper that suddenly gets blocked" in the `backend-utils` skill
+for the investigation method.
+
 ## Intelligence
 
 Under `./intelligence/`. Reuses raw interest fetchers; adds a nested
