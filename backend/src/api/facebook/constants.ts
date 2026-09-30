@@ -33,6 +33,19 @@ export const FACEBOOK_GSEARCH_EXCLUDE_SEPARATOR = " -";
 export const FACEBOOK_REQUEST_RESULT_LIMIT_MAX = 250;
 export const FACEBOOK_REQUEST_RESULT_LIMIT_DEFAULT = 100;
 
+/**
+ * Facebook's guest gate on `/about` is probabilistic per TLS session, not a
+ * deterministic block — live testing (2026-09-30) measured real content
+ * landing roughly 1 in 6 fresh sessions, with the rest returning a full page
+ * shell that client-side redirects to login (no exploitable static
+ * header/cookie fix found). A fresh `fetchUrls` session gets a newly
+ * randomised TLS fingerprint each attempt (`randomTlsExtensionOrder`), so
+ * persistence is the actual lever: this many additional `/about` attempts
+ * push the cumulative hit rate past ~90% for a still-sparse vanity.
+ */
+export const FACEBOOK_SPARSE_RETRY_MAX = 10;
+export const FACEBOOK_SPARSE_RETRY_DELAY_MS = { min: 600, max: 1_500 } as const;
+
 export const FB_HEADERS: Record<string, string> = {
   accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "accept-language": "en-US,en;q=0.9",
@@ -132,6 +145,7 @@ export const FACEBOOK_META_WEBSITE_HOST_SUFFIXES = [
   "fb.com",
   "fb.me",
   "meta.com",
+  "meta.ai",
   "messenger.com",
   "instagram.com",
   "whatsapp.com",

@@ -70,6 +70,14 @@ browser uses: persisted Relay queries on `POST /api/graphql`
   `businessAddressJson` (the page query nulls `address_*` for guests — 0 of 33
   businesses tested), `overallCategoryName`, `isJoinedRecently` ("About this
   account" is a logged-in Bloks app), photo view counts.
+- Reconfirmed 2026-09-30 via a throwaway-Chrome network capture (see
+  "Debugging a scraper that suddenly gets blocked" in the `backend-utils`
+  skill): a completely fresh, cookie-less real browser navigating straight to
+  `instagram.com/<handle>/` is redirected to `/accounts/login/` before
+  rendering anything — no profile preview at all, not even the fields this
+  module's GraphQL transport already gets. Getting the remaining fields would
+  need a real authenticated session, not a client-request-shape fix — that's
+  a product/risk decision (Instagram ToS + account-ban exposure), not a bug.
 
 ## Architecture
 

@@ -1,4 +1,5 @@
 import { fetchUrls } from "../../utils/node-tls-client-session-handler";
+import { jitter, sleep } from "../../utils/fetch-session-common";
 import { fetchGsearch } from "../gsearch";
 import {
   GSEARCH_MAX_PAGES,
@@ -10,10 +11,11 @@ import {
   FACEBOOK_ERROR_MESSAGES,
   FACEBOOK_QUERY_LIMITS,
   FACEBOOK_REQUEST_RESULT_LIMIT_DEFAULT,
+  FACEBOOK_SPARSE_RETRY_DELAY_MS,
+  FACEBOOK_SPARSE_RETRY_MAX,
 } from "./constants";
 import {
   facebookAboutUrl,
-  facebookMbasicPageUrl,
   facebookPageUrl,
   generateFacebookSearchQuery,
   hasEntities,
@@ -92,8 +94,13 @@ function mergeLeadListIntoVanityMap(
 }
 
 /**
- * Enrich Page vanity names: try www `/about`, then home + mbasic when sparse,
- * then one more `/about` retry for intermittent thin shells.
+ * Enrich Page vanity names via `/about`, retrying still-sparse vanities with
+ * fresh sessions up to FACEBOOK_SPARSE_RETRY_MAX times (see its doc comment —
+ * Facebook's guest gate is probabilistic per TLS session, not a static block,
+ * so persistence is what actually recovers real content), then one
+ * differently-shaped bare-www-page attempt as a last resort. `mbasic` is
+ * deliberately not used — live testing (2026-09-30) found it now
+ * unconditionally redirects to login, so it only burns an attempt.
  */
 export async function fetchFromEntities(
   entities: string[] | (string | null)[],
@@ -117,42 +124,36 @@ export async function fetchFromEntities(
   });
   mergeLeadListIntoVanityMap(vanities, primary, byVanity);
 
-  const needFallback = sparseVanities(vanities, byVanity);
+  for (let attempt = 0; attempt < FACEBOOK_SPARSE_RETRY_MAX; attempt++) {
+    const stillSparse = sparseVanities(vanities, byVanity);
+    if (stillSparse.length === 0) break;
 
-  if (needFallback.length > 0) {
-    // mbasic first — it's a lightweight text-only shell, while the full www
-    // page ships megabytes of inline state. Only escalate to www for
-    // vanities still sparse after mbasic instead of always fetching both.
-    const mbasicResults = await fetchUrls<FACEBOOK_RESPONSE>({
-      targets: needFallback.map(facebookMbasicPageUrl),
+    await sleep(
+      FACEBOOK_SPARSE_RETRY_DELAY_MS.min +
+        jitter(FACEBOOK_SPARSE_RETRY_DELAY_MS.max - FACEBOOK_SPARSE_RETRY_DELAY_MS.min),
+    );
+
+    console.log(
+      `[facebook] /about still sparse for ${stillSparse.length} vanit${stillSparse.length === 1 ? "y" : "ies"}, retry ${attempt + 1}/${FACEBOOK_SPARSE_RETRY_MAX}`,
+    );
+    const retryResults = await fetchUrls<FACEBOOK_RESPONSE>({
+      targets: stillSparse.map(facebookAboutUrl),
       headers: FB_HEADERS,
       mapper: (text, ctx) => mapPageBody(text, ctx.url),
     });
-    mergeLeadListIntoVanityMap(needFallback, mbasicResults, byVanity);
-
-    const stillSparseAfterMbasic = sparseVanities(needFallback, byVanity);
-
-    if (stillSparseAfterMbasic.length > 0) {
-      const wwwResults = await fetchUrls<FACEBOOK_RESPONSE>({
-        targets: stillSparseAfterMbasic.map(facebookPageUrl),
-        headers: FB_HEADERS,
-        mapper: (text, ctx) => mapPageBody(text, ctx.url),
-      });
-      mergeLeadListIntoVanityMap(stillSparseAfterMbasic, wwwResults, byVanity);
-    }
+    mergeLeadListIntoVanityMap(stillSparse, retryResults, byVanity);
   }
 
-  // Soft-blocked /about responses are intermittent — one retry often recovers
-  // website / email / phone field_type payloads.
-  const needAboutRetry = sparseVanities(vanities, byVanity);
-
-  if (needAboutRetry.length > 0) {
-    const retryResults = await fetchUrls<FACEBOOK_RESPONSE>({
-      targets: needAboutRetry.map(facebookAboutUrl),
+  // Last resort: the bare www Page (no /about) is a differently-shaped
+  // request that occasionally lands when /about has kept rolling gated.
+  const stillSparseAfterRetries = sparseVanities(vanities, byVanity);
+  if (stillSparseAfterRetries.length > 0) {
+    const wwwResults = await fetchUrls<FACEBOOK_RESPONSE>({
+      targets: stillSparseAfterRetries.map(facebookPageUrl),
       headers: FB_HEADERS,
       mapper: (text, ctx) => mapPageBody(text, ctx.url),
     });
-    mergeLeadListIntoVanityMap(needAboutRetry, retryResults, byVanity);
+    mergeLeadListIntoVanityMap(stillSparseAfterRetries, wwwResults, byVanity);
   }
 
   const out: FACEBOOK_RESPONSE[] = [];

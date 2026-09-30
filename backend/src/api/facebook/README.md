@@ -1,7 +1,26 @@
 # Facebook Pages API
 
 Discover Facebook Pages via Google CSE (`site:facebook.com`) then enrich from
-Page HTML (mbasic / www). Mounted at **`POST /facebook`**.
+Page HTML (`/about`, then a bare-www fallback). Mounted at **`POST /facebook`**.
+
+**Facebook's guest gate on `/about` is probabilistic per TLS session, not a
+static block.** Live testing (2026-09-30, via a throwaway-Chrome network
+capture — see "Debugging a scraper that suddenly gets blocked" in the
+`backend-utils` skill) found: a real logged-out browser *does* get genuine
+Page data (name, followers, category, website) with zero cookies — no static
+header/cookie fix was found to reliably reproduce it, but a fresh session
+lands the real page roughly 1 in 6 tries, the rest getting a full-size page
+shell whose `<meta http-equiv="refresh">` points at `/login` (parsed as
+sparse, not returned as fake data). `mbasic.facebook.com` now unconditionally
+redirects to login — dropped from the fallback chain entirely, it was pure
+wasted attempts. The fix is `FACEBOOK_SPARSE_RETRY_MAX` in `constants.ts`:
+keep retrying `/about` with fresh sessions (Evomi gives each one a different
+exit IP already) until real content lands. This is not a 100% guarantee on
+every call — a heavily-scraped target (verified live: `cocacola` specifically,
+after repeated testing in one sitting) can still exhaust the budget, while a
+less-hammered page of the same size (`starbucks`) came back with full data
+first try in the same session. If a specific Page keeps coming back `[]`,
+retrying the call later usually recovers it.
 
 ## Endpoint
 
