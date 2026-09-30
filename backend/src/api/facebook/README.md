@@ -47,6 +47,21 @@ Provide `entities` and/or `query` (handler validates useful input).
 `ALApiResponse<FACEBOOK_RESPONSE[]>` — see `types.ts`. Stable lead `id` for
 product save.
 
+`emails` / `address` / `likes` / `verified` are all actively used by the
+frontend (`FacebookLeadCard.tsx` render, `lead-filter-matchers.ts` filters,
+`lead-sort.ts` for `likes`, and swept into CSV export generically) — keep
+them in the response even when null, don't remove. Checked 2026-09-30 which
+of these are realistically ever non-null: `emails`/`address` are frequently
+absent on large corporate/brand Pages (no public contact email, no single
+physical location) but do populate for smaller local businesses — that's
+real data sparsity, not a bug. `likes` looks structurally dead platform-wide:
+a real captured Page body (Coca-Cola) shows only "106M followers" — Facebook
+has dropped the public Like-count display from Pages entirely in favor of
+Followers-only, so `parseCountNearLabel(text, /likes?/i)` has nothing left to
+find on current Facebook, regardless of gating. `verified` still needs a
+positive test case (a page with an actual checkmark) to confirm its selectors
+still match current markup — not yet confirmed dead or alive.
+
 ## Layout
 
 ```
