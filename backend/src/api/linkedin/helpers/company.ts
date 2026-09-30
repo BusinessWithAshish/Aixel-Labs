@@ -419,7 +419,13 @@ export const fetchLinkedInByCompany = async (
   } = discovery_filters;
 
   const parts = [
-    company_name?.trim() ? `"${company_name.trim()}"` : undefined,
+    // intitle:, not a bare quoted phrase — LinkedIn company page titles are
+    // "<Name> | LinkedIn", so this matches the named company specifically
+    // instead of any page whose body text merely mentions it (previously:
+    // searching "Anthropic" returned ~100 loosely-related pages — university
+    // clubs, unrelated AI startups, even a hedge fund — instead of the
+    // handful of pages actually named Anthropic).
+    company_name?.trim() ? `intitle:"${company_name.trim()}"` : undefined,
     industry?.length
       ? `(${industry.map((i) => `"${i}"`).join(" OR ")})`
       : undefined,

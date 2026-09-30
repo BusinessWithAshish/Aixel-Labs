@@ -487,7 +487,12 @@ export function buildLinkedInPeopleSearchQuery(
 
   const parts = [
     LINKEDIN_BY_PEOPLE_ADVANCED_SEARCH_QUERY.trim(),
-    name?.trim() ? `"${name.trim()}"` : undefined,
+    // intitle:, not a bare quoted phrase — LinkedIn profile titles are
+    // "<Name> - <Headline> | LinkedIn", so this matches profiles actually
+    // named this instead of any profile whose page merely mentions the name
+    // (e.g. a colleague reference, a shared post). bio stays a body-text
+    // match on purpose — that content lives in the profile, not the title.
+    name?.trim() ? `intitle:"${name.trim()}"` : undefined,
     bio?.trim() ? `"${bio.trim()}"` : undefined,
     job_titles?.length ? orQuoted(job_titles) : undefined,
     keywords?.length ? orQuoted(keywords) : undefined,

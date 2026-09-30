@@ -290,6 +290,17 @@ export function extractFromHtml(
   const address = harvestJsonLd($, pageUrl, emails, phones, socials, country);
 
   $("script, style, noscript").remove();
+  // cheerio's .text() concatenates every text node with no separator, so
+  // adjacent block elements fuse into one word at the boundary — e.g.
+  // "...support@anthropic.com.</p><p>You agree..." became the bodyText
+  // "...support@anthropic.com.You agree...", and the email regex's
+  // domain-part then greedily consumed ".You" as if it were part of the
+  // domain (producing the bogus "support@anthropic.com.you"). Insert a real
+  // space after each block/line boundary before reading text so extraction
+  // regexes never see two blocks as one unbroken run of characters.
+  $(
+    "br, p, div, li, tr, td, th, h1, h2, h3, h4, h5, h6, section, article, header, footer, blockquote",
+  ).after(" ");
   const bodyText = $("body").text().replace(/\s+/g, " ");
   harvestEmailsFromText(
     bodyText,
