@@ -178,6 +178,18 @@
       "types": "./src/api/linkedin/types.ts",
       "default": "./src/api/linkedin/types.ts"
     },
+    "./business/constants": {
+      "types": "./src/api/business/constants.ts",
+      "default": "./src/api/business/constants.ts"
+    },
+    "./business/types": {
+      "types": "./src/api/business/types.ts",
+      "default": "./src/api/business/types.ts"
+    },
+    "./business/compute": {
+      "types": "./src/api/business/engine/compute.ts",
+      "default": "./src/api/business/engine/compute.ts"
+    },
     "./db/mongo-client": {
       "types": "./src/db/mongo-client.ts",
       "default": "./src/db/mongo-client.ts"
