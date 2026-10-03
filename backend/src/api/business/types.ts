@@ -185,13 +185,15 @@ export type BusinessGameState = {
 
 export type BusinessPublicState = Omit<BusinessGameState, "rng" | "deck">;
 
-export type BusinessRoomConfig = { seats: number; minutes: number; missLimit: number };
+/** `teams`: two teams (Alpha against Beta) instead of everyone for themselves. */
+export type BusinessRoomConfig = { seats: number; minutes: number; missLimit: number; teams: boolean };
 
 export type BusinessSeatView = {
   seat: number;
   name: string;
   color: string;
   connected: boolean;
+  /** Team play, in the lobby: 0 = Alpha, 1 = Beta, -1 = not placed yet. Ignored in a solo room. */
   team: number;
 };
 

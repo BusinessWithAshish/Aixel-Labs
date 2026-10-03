@@ -93,12 +93,13 @@ export const BUSINESS_CLIENT_MESSAGE_SCHEMA = z.discriminatedUnion("t", [
     seats: SEATS.optional(),
     minutes: MINUTES.optional(),
     missLimit: MISS_LIMIT.optional(),
+    teams: z.boolean().optional(),
   }),
   z.object({ t: z.literal("start") }),
   z.object({ t: z.literal("peek"), code: CODE }),
   z.object({ t: z.literal("kick"), seat: SEAT }),
-  /** Host, lobby: put a seat in a team. Seats with the same number play together. */
-  z.object({ t: z.literal("team"), seat: SEAT, team: SEAT }),
+  /** Host, lobby, team play: put a seat in Alpha (0) or Beta (1), or back with the unplaced players (-1). */
+  z.object({ t: z.literal("team"), seat: SEAT, team: z.number().int().min(-1).max(1) }),
   /** Host, during the match: stop or restart every clock. */
   z.object({ t: z.literal("pause"), on: z.boolean() }),
   /** Host: end the room for everyone. */

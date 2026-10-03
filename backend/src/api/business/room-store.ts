@@ -33,7 +33,7 @@ type Seat = {
   color: string;
   tokenHash: string;
   connections: number;
-  /** Seats with the same number play as one team. By default every seat is its own team. */
+  /** Team play: 0 = Alpha, 1 = Beta, -1 = not placed yet. Ignored in a solo room. */
   team: number;
   /** Epoch ms since which nobody is connected to this seat, or null while someone is. */
   offlineAt: number | null;
@@ -69,10 +69,8 @@ function newCode(): string {
 
 function addSeat(room: BusinessRoom, name: string) {
   const token = randomBytes(24).toString("hex");
-  // The lowest team number nobody has yet: a new player starts on their own.
-  let team = 0;
-  while (room.seats.some((s) => s.team === team)) team++;
-  room.seats.push({ name, color: BUSINESS_LOBBY_COLOR, tokenHash: hashToken(token), connections: 0, team, offlineAt: null });
+  // A new player is not in a team until the host places them.
+  room.seats.push({ name, color: BUSINESS_LOBBY_COLOR, tokenHash: hashToken(token), connections: 0, team: -1, offlineAt: null });
   return { seat: room.seats.length - 1, token };
 }
 
@@ -111,6 +109,7 @@ export function configureRoom(room: BusinessRoom, seat: number, patch: Partial<B
   if (patch.seats !== undefined) room.config.seats = Math.max(patch.seats, room.seats.length);
   if (patch.minutes !== undefined) room.config.minutes = patch.minutes;
   if (patch.missLimit !== undefined) room.config.missLimit = patch.missLimit;
+  if (patch.teams !== undefined) room.config.teams = patch.teams;
 }
 
 /** Host only, lobby only: frees a seat. Later seats move up one. */
@@ -121,7 +120,7 @@ export function kickSeat(room: BusinessRoom, seat: number, target: number) {
   room.seats.splice(target, 1);
 }
 
-/** Host, lobby: move a seat into a team. Any split works, as long as two teams remain at the start. */
+/** Host, lobby: place a seat in Alpha (0) or Beta (1), or take it out again (-1). Any split works, 1 v 4 included. */
 export function setTeam(room: BusinessRoom, seat: number, target: number, team: number) {
   if (seat !== room.hostSeat) throw new BusinessRoomError(BUSINESS_ERRORS.NOT_HOST);
   if (room.state) throw new BusinessRoomError(BUSINESS_ERRORS.ROOM_STARTED);
@@ -166,8 +165,14 @@ export function startRoom(room: BusinessRoom, seat: number, now: number) {
   if (seat !== room.hostSeat) throw new BusinessRoomError(BUSINESS_ERRORS.NOT_HOST);
   if (room.state) throw new BusinessRoomError(BUSINESS_ERRORS.ROOM_STARTED);
   if (room.seats.length < BUSINESS_RULES.MIN_SEATS) throw new BusinessRoomError(BUSINESS_ERRORS.NEED_PLAYERS);
+  if (room.config.teams) {
+    if (room.seats.some((s) => s.team < 0)) throw new BusinessRoomError("Put every player in a team first.");
+    if (new Set(room.seats.map((s) => s.team)).size < 2) throw new BusinessRoomError("Both teams need at least one player.");
+  } else {
+    // Solo: every player is a team of one.
+    room.seats.forEach((s, i) => (s.team = i));
+  }
   const teams = [...new Set(room.seats.map((s) => s.team))];
-  if (teams.length < 2) throw new BusinessRoomError("Everyone is on one team. Make at least two teams.");
   // Colours are dealt at random at the start, one per team, so nobody picks one in the lobby.
   const colors = [...BUSINESS_PLAYER_COLORS];
   for (let i = colors.length - 1; i > 0; i--) {

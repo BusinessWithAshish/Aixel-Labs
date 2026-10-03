@@ -531,29 +531,57 @@ function playMarket(state: BusinessGameState, stake: number, now: number) {
 /* ---------- bankruptcy ---------- */
 
 /**
- * Takes a player out of the match. `forfeit` is set when they leave or are
- * removed for missing turns: nobody is owed, so everything returns to the bank.
+ * Takes a player out of the match, however they went (bankrupt, left, or
+ * removed for missed turns), and settles what they owe in cash:
+ *
+ *  1. A property shared with a player goes to that lender: it was the security.
+ *  2. Everything else is sold to the bank: each house at its resale price, each
+ *     property at its mortgage value (nothing for one already mortgaged to the
+ *     bank), plus any cash in hand. That is the pot.
+ *  3. The pot pays the players they owe: unpaid rent or loan money from this
+ *     turn, and every cash loan still running. Enough for all: each is paid in
+ *     full and the rest goes to the bank. Not enough: each gets their share in
+ *     proportion to what they are owed, and the rest is lost.
+ *
+ * Nobody ever receives the properties themselves; they all return to the bank.
  */
 function doBankrupt(state: BusinessGameState, seat: number, forfeit?: string) {
   const p = state.players[seat];
-  const creditor = forfeit
-    ? null
-    : (state.owed
-        .filter((d) => d.to !== null && !state.players[d.to].bankrupt)
-        .sort((a, b) => b.amount - a.amount)[0]?.to ?? null);
-
+  let pot = Math.max(0, p.cash);
   for (const i of ownedBy(state, seat)) {
     const prop = state.props[i];
-    prop.houses = 0;
     if (prop.lend) {
       prop.owner = prop.lend.to;
+      prop.houses = 0;
       delete prop.lend;
-    } else if (creditor !== null) {
-      prop.owner = creditor;
-    } else {
-      delete state.props[i];
+      continue;
     }
+    pot += prop.houses * houseResale(i);
+    if (!prop.mortgaged) pot += mortgageValue(i);
+    delete state.props[i];
   }
+
+  // What each other player is owed, in seat order.
+  const claims = new Map<number, number>();
+  const claim = (to: number, amount: number) => {
+    if (!state.players[to].bankrupt) claims.set(to, (claims.get(to) ?? 0) + amount);
+  };
+  if (seat === state.turn) for (const d of state.owed) if (d.to !== null) claim(d.to, d.amount);
+  for (const loan of state.loans) if (loan.borrower === seat) claim(loan.lender, loan.due);
+
+  const total = [...claims.values()].reduce((sum, a) => sum + a, 0);
+  const shares = [...claims].sort((a, b) => a[0] - b[0]);
+  let left = Math.min(pot, total);
+  const paid: string[] = [];
+  shares.forEach(([to, owed], k) => {
+    // In proportion to what each is owed; the last one takes the odd rupees.
+    const part = k === shares.length - 1 ? left : Math.min(left, Math.floor((Math.min(pot, total) * owed) / total));
+    left -= part;
+    state.players[to].cash += part;
+    paid.push(`${state.players[to].name} ${rs(part)} of ${rs(owed)}`);
+    if (part > 0) log(state, `${state.players[to].name} received ${rs(part)} from ${p.name}'s sale.`, to, undefined, { kind: "repay", from: seat, to, amount: part });
+  });
+
   for (const i of Object.keys(state.props).map(Number)) {
     if (state.props[i].lend?.to === seat) delete state.props[i].lend;
   }
@@ -563,18 +591,11 @@ function doBankrupt(state: BusinessGameState, seat: number, forfeit?: string) {
   p.cash = 0;
   p.bankrupt = true;
   p.jail = 0;
-  const fx: BusinessFx = { kind: "out", from: seat, to: null, amount: 0 };
-  log(
-    state,
-    forfeit
-      ? `${p.name} ${forfeit}. Their properties return to the bank.`
-      : creditor !== null
-      ? `${p.name} is bankrupt. ${state.players[creditor].name} takes their properties.`
-      : `${p.name} is bankrupt. Their properties return to the bank.`,
-    seat,
-    undefined,
-    fx,
-  );
+  const why = forfeit ? `${p.name} ${forfeit}.` : `${p.name} is bankrupt.`;
+  const outcome = paid.length
+    ? ` Everything is sold to the bank for ${rs(pot)}: ${paid.join(", ")}.`
+    : " Their properties return to the bank.";
+  log(state, why + outcome, seat, undefined, { kind: "out", from: seat, to: null, amount: 0 });
 }
 
 /* ---------- offers ---------- */

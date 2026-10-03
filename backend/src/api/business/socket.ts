@@ -75,7 +75,7 @@ function handle(ws: WebSocket, msg: BusinessClientMessage) {
   if (msg.t === "ping") return send(ws, { t: "pong" });
 
   if (msg.t === "create") {
-    const { room, seat, token } = createRoom(msg.name, { seats: msg.seats, minutes: msg.minutes, missLimit: msg.missLimit }, now);
+    const { room, seat, token } = createRoom(msg.name, { seats: msg.seats, minutes: msg.minutes, missLimit: msg.missLimit, teams: false }, now);
     attach(ws, room, seat);
     send(ws, { t: "joined", code: room.code, seat, token });
     return broadcast(room);
@@ -95,7 +95,7 @@ function handle(ws: WebSocket, msg: BusinessClientMessage) {
 
   const session = sessions.get(ws);
   if (!session) throw new BusinessRoomError(BUSINESS_ERRORS.BAD_TOKEN);
-  if (msg.t === "config") configureRoom(session.room, session.seat, { seats: msg.seats, minutes: msg.minutes, missLimit: msg.missLimit });
+  if (msg.t === "config") configureRoom(session.room, session.seat, { seats: msg.seats, minutes: msg.minutes, missLimit: msg.missLimit, teams: msg.teams });
   else if (msg.t === "start") startRoom(session.room, session.seat, now);
   else if (msg.t === "kick") {
     kickSeat(session.room, session.seat, msg.seat);
