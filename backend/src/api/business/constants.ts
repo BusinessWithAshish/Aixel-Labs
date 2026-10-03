@@ -30,6 +30,10 @@ export const BUSINESS_RULES = {
   LOAN_MAX_CASH_SHARE: 0.7,
   LOAN_MAX_INTEREST_PCT: 100,
   DEAL_MAX_LAPS: 6,
+  /** Across the whole table, at most this many cash loans may be running at once. */
+  MAX_LOANS: 3,
+  /** Across the whole table, at most this many properties may be shared with a player at once. */
+  MAX_SHARED: 3,
   MARKET_MIN_STAKE: 10,
   MARKET_MAX_STAKE: 1000,
   /** Two dice: 2–5 loses this share of the stake, 6–8 nothing, 9–12 wins the stake again. */

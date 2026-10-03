@@ -184,6 +184,20 @@ export function canRaiseCash(state: State, seat: number): boolean {
   );
 }
 
+/**
+ * A property can change hands in a trade unless something is built in its
+ * colour set or it is shared with a player. One mortgaged to the bank can be
+ * traded: it stays mortgaged, and the new owner has to redeem it.
+ */
+export function canTrade(state: State, owner: number, space: number): string | null {
+  const prop = state.props[space];
+  const name = BUSINESS_BOARD[space].name;
+  if (!prop || prop.owner !== owner) return `${state.players[owner].name} does not own ${name}.`;
+  if (prop.lend) return `${name} is mortgaged to a player.`;
+  if (!setIsBare(state, space)) return `Sell the houses in ${name}'s set first.`;
+  return null;
+}
+
 export function validateOffer(
   state: State,
   from: number,
@@ -198,6 +212,8 @@ export function validateOffer(
 
   if (terms.kind === "loan") {
     if (!pair(terms.lender, terms.borrower)) return "A loan is between the two of you.";
+    if (state.loans.length >= BUSINESS_RULES.MAX_LOANS)
+      return `Only ${BUSINESS_RULES.MAX_LOANS} loans can run at a time. One has to be paid back first.`;
     if (terms.amount > maxLoan(state, terms.lender))
       return `${state.players[terms.lender].name} can lend at most ₹${maxLoan(state, terms.lender)}.`;
     return null;
@@ -209,6 +225,8 @@ export function validateOffer(
     if (!prop || prop.owner !== terms.owner) return "The owner does not hold that property.";
     if (prop.mortgaged) return "That property is mortgaged to the bank.";
     if (prop.lend) return "That property is already mortgaged to a player.";
+    if (Object.values(state.props).filter((q) => q.lend).length >= BUSINESS_RULES.MAX_SHARED)
+      return `Only ${BUSINESS_RULES.MAX_SHARED} properties can be shared with players at a time.`;
     if (!setIsBare(state, terms.space)) return "Sell the houses in this set first.";
     if (state.players[terms.lender].cash < terms.advance)
       return `${state.players[terms.lender].name} does not have ₹${terms.advance}.`;
@@ -234,11 +252,8 @@ export function validateOffer(
   if (get.cash > Math.max(0, b.cash)) return `${b.name} does not have ₹${get.cash}.`;
   const check = (spaces: number[], owner: number): string | null => {
     for (const i of spaces) {
-      const prop = state.props[i];
-      if (!prop || prop.owner !== owner)
-        return `${state.players[owner].name} does not own ${BUSINESS_BOARD[i].name}.`;
-      if (prop.lend) return `${BUSINESS_BOARD[i].name} is mortgaged to a player.`;
-      if (!setIsBare(state, i)) return `Sell the houses in ${BUSINESS_BOARD[i].name}'s set first.`;
+      const reason = canTrade(state, owner, i);
+      if (reason) return reason;
     }
     return null;
   };
