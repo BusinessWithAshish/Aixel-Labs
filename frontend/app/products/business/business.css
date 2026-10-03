@@ -1060,6 +1060,18 @@
     font-size: 3.3cqw;
 }
 /* One big mark over the property. Red bank: mortgaged to the bank. Handshake in the lender's colour: shared with a player. */
+/* Raising cash: everything that is not the player's own steps back, and their properties stand out. */
+.bb .tile.dim,
+.bb .mk.dim {
+    opacity: 0.22;
+}
+.bb .board.spot .tile:not(.dim) {
+    box-shadow: 0 0 0 0.35cqw #fff, 0 0 2cqw rgba(255, 255, 255, 0.7);
+    z-index: 1;
+}
+.bb .board.spot .centre > *:not(.overlay) {
+    opacity: 0.3;
+}
 /* Mortgaged to the bank: the tile itself goes dark under the red mark. */
 .bb .tile.mort > .band,
 .bb .tile.mort > .pic {
@@ -2552,6 +2564,11 @@
 }
 .bb div.minicard {
     cursor: default;
+}
+/* Cannot be chosen (built on, or mortgaged): faded, and it says why when tapped. */
+.bb .minicard.off {
+    opacity: 0.38;
+    cursor: not-allowed;
 }
 .bb .minicard.on {
     box-shadow: 0 0 0 3px var(--gold), 0 3px 0 3px rgba(0, 0, 0, 0.35);

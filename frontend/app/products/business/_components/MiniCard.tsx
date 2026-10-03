@@ -7,6 +7,7 @@ import type { BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
 import { cssVars, SPACE_ICONS } from '../_lib/art';
 import { fmt } from '../_lib/client';
+import { notify } from '../_lib/toast';
 import { Houses } from './Board';
 
 type MiniCardProps = {
@@ -14,6 +15,8 @@ type MiniCardProps = {
     space: number;
     /** Lit up, with a tick: chosen for a deal. */
     picked?: boolean;
+    /** Cannot be chosen: the card fades, does nothing when tapped, and explains itself on a tap. */
+    off?: string | null;
     onClick?: () => void;
 };
 
@@ -23,7 +26,7 @@ type MiniCardProps = {
  * railways and utilities), then the name and price. Mortgage marks match the
  * board too: a red bank over a darkened card, a handshake on the band.
  */
-export function MiniCard({ state, space, picked, onClick }: MiniCardProps) {
+export function MiniCard({ state, space, picked, off, onClick }: MiniCardProps) {
     const tile = BUSINESS_BOARD[space];
     const set = tile.set ? BUSINESS_SETS[tile.set] : null;
     const prop = state.props[space];
@@ -31,8 +34,8 @@ export function MiniCard({ state, space, picked, onClick }: MiniCardProps) {
     const Tag = onClick ? 'button' : 'div';
     return (
         <Tag
-            {...(onClick ? { type: 'button' as const, onClick } : {})}
-            className={cn('minicard', `k-${tile.kind}`, picked && 'on', prop?.mortgaged && 'mort')}
+            {...(onClick ? { type: 'button' as const, onClick: off ? () => notify(off, 'error') : onClick, 'aria-disabled': !!off } : {})}
+            className={cn('minicard', `k-${tile.kind}`, picked && 'on', prop?.mortgaged && 'mort', off && 'off')}
             style={set ? cssVars({ '--sc': set.color }) : undefined}
         >
             <span className="mc-ph">

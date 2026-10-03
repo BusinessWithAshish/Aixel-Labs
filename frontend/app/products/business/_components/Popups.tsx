@@ -475,8 +475,9 @@ export function DebtPopup({
     send,
     onRaise,
     onAskLoan,
-}: Base & { onRaise: () => void; onAskLoan: () => void }) {
-    const [step, setStep] = useState<'choose' | 'options' | 'confirm'>('choose');
+    initialStep = 'choose',
+}: Base & { onRaise: () => void; onAskLoan: () => void; initialStep?: 'choose' | 'options' | 'confirm' }) {
+    const [step, setStep] = useState(initialStep);
     const short = -state.players[me].cash;
     const owned = ownedBy(state, me);
     const canBank = owned.some((i) => canMortgage(state, me, i) === null);

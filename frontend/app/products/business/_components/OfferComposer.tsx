@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, IndianRupee } from 'lucide-react';
 import { BUSINESS_RULES } from '@aixellabs/backend/business/constants';
-import { canMortgage, lapInterest, lenderCut, loanDue, maxLoan, ownedBy, validateOffer } from '@aixellabs/backend/business/compute';
+import { canMortgage, canTrade, lapInterest, lenderCut, loanDue, maxLoan, ownedBy, validateOffer } from '@aixellabs/backend/business/compute';
 import type { BusinessInterestMode, BusinessOfferTerms, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { rs } from '../_lib/client';
@@ -45,18 +45,24 @@ function SpacePicker({
     spaces,
     picked,
     onToggle,
+    blocked,
 }: {
     state: BusinessPublicState;
     spaces: number[];
     picked: number[];
     onToggle: (space: number) => void;
+    /** Why a property cannot be chosen, or null when it can. Blocked ones stay in the row, faded. */
+    blocked?: (space: number) => string | null;
 }) {
     if (!spaces.length) return <p className="small">No properties to choose.</p>;
+    // What can be chosen comes first, so the faded cards never hide it.
+    const order = blocked ? [...spaces].sort((a, b) => Number(!!blocked(a)) - Number(!!blocked(b))) : spaces;
     return (
         <MiniCards>
-            {spaces.map((i) => (
-                <MiniCard key={i} state={state} space={i} picked={picked.includes(i)} onClick={() => onToggle(i)} />
-            ))}
+            {order.map((i) => {
+                const reason = blocked?.(i) ?? null;
+                return <MiniCard key={i} state={state} space={i} picked={picked.includes(i)} off={reason} onClick={() => onToggle(i)} />;
+            })}
         </MiniCards>
     );
 }
@@ -178,7 +184,9 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
             </>
         );
     } else if (otherPlayer) {
-        const tradable = (seat: number) => ownedBy(state, seat).filter((i) => !state.props[i].lend);
+        // Every property is shown; the ones that cannot be traded (built on, or shared with a player) are faded.
+        const tradable = (seat: number) => ownedBy(state, seat);
+        const blockedFor = (seat: number) => (i: number) => canTrade(state, seat, i);
         terms = { kind: 'trade', give: { cash: giveCash, spaces: give }, get: { cash: getCash, spaces: get } };
         // "Send" is what leaves your hands, "ask for" is what you want back.
         body = (
@@ -188,7 +196,7 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
                         <ArrowUpRight className="lu" />
                         You send
                     </small>
-                    <SpacePicker state={state} spaces={tradable(me)} picked={give} onToggle={toggle(give, setGive)} />
+                    <SpacePicker state={state} spaces={tradable(me)} picked={give} onToggle={toggle(give, setGive)} blocked={blockedFor(me)} />
                     <Slider label="Cash you send" value={giveCash} display={rs(giveCash)} min={0} max={round10(mePlayer.cash)} step={10} onChange={setGiveCash} />
                 </div>
                 <div className="dealside get">
@@ -196,7 +204,7 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
                         <ArrowDownLeft className="lu" />
                         You ask {otherPlayer.name} for
                     </small>
-                    <SpacePicker state={state} spaces={tradable(otherPlayer.seat)} picked={get} onToggle={toggle(get, setGet)} />
+                    <SpacePicker state={state} spaces={tradable(otherPlayer.seat)} picked={get} onToggle={toggle(get, setGet)} blocked={blockedFor(otherPlayer.seat)} />
                     <Slider label="Cash you ask for" value={getCash} display={rs(getCash)} min={0} max={round10(otherPlayer.cash)} step={10} onChange={setGetCash} />
                 </div>
             </>

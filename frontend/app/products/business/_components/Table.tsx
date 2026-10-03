@@ -399,9 +399,11 @@ type TableProps = {
     onPause: (on: boolean) => void;
     /** Host only: end the room for everyone. */
     onClose: () => void;
+    /** Open already in the "raising cash on the board" view (used by the design preview). */
+    startRaising?: boolean;
 };
 
-export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause, onClose }: TableProps) {
+export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause, onClose, startRaising = false }: TableProps) {
     const router = useRouter();
     const state = room.state as BusinessPublicState;
     const me = room.you;
@@ -424,7 +426,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
         state.offers.some((o) => o.to === me) ||
         (!walk.busy && (state.pending !== null || state.phase === 'loandue' || (state.phase === 'debt' && state.turn === me)));
     const deals = useDeals(state, walk.busy, covered, walk.launch);
-    const [raising, setRaising] = useState(false);
+    const [raising, setRaising] = useState(startRaising);
     const pending = state.pending;
 
     useEffect(() => {
@@ -700,6 +702,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                 onSelect={openSpace}
                 onMarket={() => setView({ t: 'market' })}
                 onChance={() => setView({ t: 'chance' })}
+                spotlight={myTurn && state.phase === 'debt' && raising ? me : null}
                 overlay={deals.deal && <DealBanner state={state} deal={deals.deal} />}
             />
 

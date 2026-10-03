@@ -225,9 +225,13 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   new interest and laps. The lender accepts or rejects; on a reject or no answer
   the whole amount is paid.
 - **Trade:** cash and properties both ways. Cities in a set with houses, and
-  properties mortgaged to a player, cannot be traded. A property mortgaged to
+  properties shared with a player, cannot be traded. A property mortgaged to
   the bank can be traded: it stays mortgaged, and the new owner earns no rent
-  from it until they redeem it (55% of the price).
+  from it until they redeem it (55% of the price). The trade screen shows
+  every property and fades the ones that cannot be traded; tapping one says why.
+- **Table-wide limits:** at most 3 cash loans may be running at once, and at
+  most 3 properties may be shared with players at once, counted across all
+  players. A new one needs an old one to be paid back first.
 - **One mortgage at a time:** a property mortgaged to the bank cannot also be
   shared with a player, and a property shared with a player cannot be
   mortgaged to the bank.

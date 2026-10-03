@@ -98,10 +98,12 @@ type TileProps = {
     ownerColor: string | undefined;
     lenderColor: string | undefined;
     selected: boolean;
+    /** Faded: while a player is raising cash, everything that is not theirs steps back. */
+    dim: boolean;
     onSelect: (index: number) => void;
 };
 
-const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, selected, onSelect }: TileProps) {
+const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, selected, dim, onSelect }: TileProps) {
     const [row, col] = cell(index);
     const where = side(index);
     const set = space.set ? BUSINESS_SETS[space.set] : null;
@@ -113,7 +115,7 @@ const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, s
     return (
         <button
             type="button"
-            className={cn('tile', where, `k-${space.kind}`, selected && 'sel', prop?.mortgaged && 'mort', houses > 0 && 'built', space.name.length > 8 && 'long')}
+            className={cn('tile', where, `k-${space.kind}`, selected && 'sel', dim && 'dim', prop?.mortgaged && 'mort', houses > 0 && 'built', space.name.length > 8 && 'long')}
             style={{ gridArea: `${row} / ${col}` }}
             aria-label={space.price ? `${space.name}, ${rs(space.price)}` : space.name}
             onClick={() => onSelect(index)}
@@ -168,9 +170,11 @@ type BoardProps = {
     onChance: () => void;
     /** Shown over the middle of the board, e.g. who just paid whom. */
     overlay?: React.ReactNode;
+    /** A seat raising cash: only that player's properties stay lit, so they are easy to find and tap. */
+    spotlight?: number | null;
 };
 
-export function Board({ state, shown, moving, pace, selected, onSelect, onMarket, onChance, overlay }: BoardProps) {
+export function Board({ state, shown, moving, pace, selected, onSelect, onMarket, onChance, overlay, spotlight = null }: BoardProps) {
     const groups = new Map<number, number[]>();
     shown.forEach((pos, seat) => {
         if (state.players[seat].bankrupt) return;
@@ -180,7 +184,7 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
     return (
         <div className="board-area">
             <div className="board-box">
-                <div className="board plain">
+                <div className={cn('board plain', spotlight !== null && 'spot')}>
                     {BUSINESS_BOARD.map((space, i) => {
                         const prop = state.props[i];
                         return (
@@ -192,6 +196,7 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                                 ownerColor={prop ? state.players[prop.owner].color : undefined}
                                 lenderColor={prop?.lend ? state.players[prop.lend.to].color : undefined}
                                 selected={selected === i}
+                                dim={spotlight !== null && prop?.owner !== spotlight}
                                 onSelect={onSelect}
                             />
                         );
@@ -232,7 +237,7 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                         const prop = state.props[i];
                         const color = state.players[prop.owner].color;
                         return (
-                            <span key={i} className={cn('mk', side(i))} style={markerSpot(i)}>
+                            <span key={i} className={cn('mk', side(i), spotlight !== null && prop.owner !== spotlight && 'dim')} style={markerSpot(i)}>
                                 <HomeMark color={color} />
                             </span>
                         );
