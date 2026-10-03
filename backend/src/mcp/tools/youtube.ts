@@ -52,7 +52,7 @@ import { suggestIntelligenceService } from "../../api/youtube/intelligence/sugge
 import { transcriptIntelligenceService } from "../../api/youtube/intelligence/transcript/service";
 import { commentsIntelligenceService } from "../../api/youtube/intelligence/comments/service";
 import { MCP_LAYER, registerDomainTool, type DomainOp } from "../domain-tool";
-import type { z } from "zod";
+import { z } from "zod";
 
 type ChannelInput = z.infer<typeof YOUTUBE_CHANNEL_REQUEST_SCHEMA>;
 
@@ -72,11 +72,53 @@ async function fetchChannelRaw(input: ChannelInput) {
   });
 }
 
+// Picture URLs are OFF by default on the MCP tool, and one flag turns them back on.
+//
+// Every search item carries two signed thumbnail URLs and a channel-logo URL, and every
+// suggested item one thumbnail: 36% of a 20-item search result (10.4K of 29K chars, measured
+// 2026-10-02). An agent cannot look at a URL, but it does pay for it — a tool result stays in the
+// session and is re-sent on every later turn, and a scout accumulates about six searches. Nothing
+// is removed from the data: the HTTP routes return it exactly as before, and an agent that needs
+// the pictures (thumbnail analysis, building a cover) passes `includeThumbnails: true`.
+const INCLUDE_THUMBNAILS_FIELD = {
+  includeThumbnails: z
+    .boolean()
+    .default(false)
+    .describe(
+      "true = keep each item's thumbnail and channel-logo URLs. Default false: they are ~36% of the result and useless unless you are going to fetch or analyse the images.",
+    ),
+};
+
+const THUMBNAIL_FIELDS = ["thumbnails", "thumbnail", "channelLogoUrl"] as const;
+
+function withOptionalThumbnails(
+  run: (input: any) => Promise<unknown> | unknown,
+): (input: any) => Promise<unknown> {
+  return async ({ includeThumbnails, ...input }) => {
+    const result = await run(input);
+    if (includeThumbnails) return result;
+    const items = (result as { items?: unknown } | null)?.items;
+    if (!Array.isArray(items)) return result;
+    return {
+      ...(result as object),
+      items: items.map((item) => {
+        if (!item || typeof item !== "object") return item;
+        const slim: Record<string, unknown> = { ...(item as Record<string, unknown>) };
+        for (const field of THUMBNAIL_FIELDS) delete slim[field];
+        return slim;
+      }),
+    };
+  };
+}
+
+const MCP_SEARCH_SCHEMA = YOUTUBE_SEARCH_REQUEST_SCHEMA.extend(INCLUDE_THUMBNAILS_FIELD);
+const MCP_SUGGESTED_SCHEMA = YOUTUBE_VIDEO_SUGGESTED_REQUEST_SCHEMA.extend(INCLUDE_THUMBNAILS_FIELD);
+
 const YOUTUBE_OPS: Record<string, DomainOp> = {
   search: {
     defaultLayer: MCP_LAYER.INTEL,
-    raw: { schema: YOUTUBE_SEARCH_REQUEST_SCHEMA, run: fetchYoutubeSearch },
-    intel: { schema: YOUTUBE_SEARCH_REQUEST_SCHEMA, run: searchIntelligenceService },
+    raw: { schema: MCP_SEARCH_SCHEMA, run: withOptionalThumbnails(fetchYoutubeSearch) },
+    intel: { schema: MCP_SEARCH_SCHEMA, run: withOptionalThumbnails(searchIntelligenceService) },
   },
   suggest: {
     defaultLayer: MCP_LAYER.INTEL,
@@ -91,12 +133,12 @@ const YOUTUBE_OPS: Record<string, DomainOp> = {
   suggested: {
     defaultLayer: MCP_LAYER.INTEL,
     raw: {
-      schema: YOUTUBE_VIDEO_SUGGESTED_REQUEST_SCHEMA,
-      run: fetchYoutubeVideoSuggestedVideos,
+      schema: MCP_SUGGESTED_SCHEMA,
+      run: withOptionalThumbnails(fetchYoutubeVideoSuggestedVideos),
     },
     intel: {
-      schema: YOUTUBE_VIDEO_SUGGESTED_REQUEST_SCHEMA,
-      run: videoSuggestionsIntelligenceService,
+      schema: MCP_SUGGESTED_SCHEMA,
+      run: withOptionalThumbnails(videoSuggestionsIntelligenceService),
     },
   },
   transcript: {
@@ -202,10 +244,10 @@ const YOUTUBE_DESCRIPTION = `YouTube search, video, comments, channel, and compu
 Call with { op, layer?, input }. layer defaults to intel when that overlay exists, else raw. Invalid combo fails.
 
 Ops:
-- search (raw|intel, default intel) — keyword search. input: query, filter? (\`video\` or \`channel\` only — there is no upload-date filter; judge recency from publishedAt in intel results), limit?, country?, region?
+- search (raw|intel, default intel) — keyword search. input: query, filter? (\`video\` or \`channel\` only — there is no upload-date filter; judge recency from publishedAt in intel results), limit?, country?, region?, includeThumbnails? (default false — thumbnail/logo URLs are left out unless you ask)
 - suggest (raw|intel, default intel) — typeahead suggestions. input: query, country?, region?
 - video (raw|intel, default intel) — one video's details. input: videoId, country?, region?
-- suggested (raw|intel, default intel) — related/suggested videos. input: videoId, limit?, country?, region?
+- suggested (raw|intel, default intel) — related/suggested videos. input: videoId, limit?, country?, region?, includeThumbnails? (default false)
 - transcript (raw|intel, default intel) — captions. intel input may include title. input: videoId, language?, country?, region?, title?
 - comments (raw|intel, default intel) — InnerTube comment threads. intel adds timestamp mentions + 10s clusters for clip priors. input: videoId, sort?, limit?, continuation?, country?, region?, includeComments? (intel: false = clusters and counts only, no comment bodies — use this when all you need is clip priors; keeps the result small)
 - chapters (raw only) — creator-authored chapter markers via get_watch. Empty chapters[] is valid (not every video has them). Use comments intel for clip priors, not this. input: videoId, country?, region?
