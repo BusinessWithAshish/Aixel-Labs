@@ -8,7 +8,7 @@ import { canMortgage, canSellHouse, lapInterest, lenderCut, loanDue, maxLoan, ow
 import type { BusinessInterestMode, BusinessLoan, BusinessLogEntry, BusinessOffer, BusinessPending, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { cn } from '@/lib/utils';
-import { cssVars, Die, photoUrl } from '../_lib/art';
+import { cssVars, Die, HomeMark } from '../_lib/art';
 import { sfx, sfxShared } from '../_lib/sound';
 import { rs } from '../_lib/client';
 import { Avatar, Cash, GButton, Pop, Ribbon, Slider } from './bits';
@@ -291,7 +291,7 @@ export function GuidePopup({ onClose }: { onClose: () => void }) {
             <div className="list">
                 {row(
                     <span className="mk demo">
-                        <House fill={owner} />
+                        <HomeMark color={owner} />
                     </span>,
                     'Owned',
                     'A house in the owner\u2019s colour sits next to the property.',
@@ -308,10 +308,10 @@ export function GuidePopup({ onClose }: { onClose: () => void }) {
                         <Houses count={5} color={owner} />
                     </span>,
                     'Hotel',
-                    'A hotel badge: the fifth build turns four houses into a hotel.',
+                    'One bigger building: the fifth build turns four houses into a hotel.',
                 )}
-                {row(<BankIcon className="bdg demo" />, 'Mortgaged to the bank', 'The photo turns grey and it earns no rent.')}
-                {row(<Handshake className="bdg demo" style={cssVars({ '--bc': '#FFB703' })} />, 'Mortgaged to a player', 'Badge in the lender\u2019s colour. Rent is shared with them.')}
+                {row(<BankIcon className="bdg demo" style={cssVars({ '--bc': '#E5383B' })} />, 'Mortgaged to the bank', 'A big red bank mark covers the property. It earns no rent.')}
+                {row(<Handshake className="bdg demo" style={cssVars({ '--bc': '#FFB703' })} />, 'Mortgaged to a player', 'A big handshake in the lender\u2019s colour covers it. Rent is shared with them.')}
             </div>
             <p className="small center">Houses and mortgages never mix: sell the houses in a colour set before mortgaging any of it, and get every property back before building.</p>
             <GButton tone="gold" onClick={onClose}>
@@ -374,7 +374,7 @@ export function MenuPopup({
                     <p className="center" style={{ fontWeight: 800 }}>
                         {host
                             ? 'You are the host. If you leave, the room closes for everyone and the match ends.'
-                            : 'Leaving ends your match. It counts as bankruptcy and your properties go back to the bank.'}
+                            : 'Leaving ends your match. It counts as bankruptcy: everything you own is sold to the bank, and players you owe are paid from it.'}
                     </p>
                     <GButton tone="green" size="big" onClick={() => setConfirm(false)}>
                         Keep playing
@@ -391,7 +391,6 @@ export function MenuPopup({
 export function AuctionPopup({ state, me, send, pending, now }: Base & { pending: Extract<BusinessPending, { type: 'auction' }>; now: number }) {
     const tile = BUSINESS_BOARD[pending.space];
     const set = tile.set ? BUSINESS_SETS[tile.set] : null;
-    const photo = photoUrl(pending.space, 480);
     const secs = Math.max(0, Math.ceil((pending.endsAt - now) / 1000));
     const min = pending.by === null ? pending.open : pending.bid + BUSINESS_RULES.BID_STEP;
     const [amount, setAmount] = useState(min);
@@ -418,7 +417,7 @@ export function AuctionPopup({ state, me, send, pending, now }: Base & { pending
                     className="lot"
                     style={cssVars({
                         '--lc': set?.color ?? '#241A3D',
-                        backgroundImage: `linear-gradient(90deg, rgba(10,6,30,.8), rgba(10,6,30,.25))${photo ? `, url(${photo}), url(${photoUrl(pending.space, 160)})` : ''}`,
+                        '--lt': set?.text ?? '#FFFFFF',
                     })}
                 >
                     <span>{tile.name}</span>
@@ -533,7 +532,7 @@ export function DebtPopup({
             {step === 'confirm' && (
                 <>
                     <p className="center" style={{ fontWeight: 800 }}>
-                        Bankruptcy ends your match. Your properties go to whoever you owe.
+                        Bankruptcy ends your match. Everything you own is sold to the bank, and that money goes to the players you owe.
                     </p>
                     <div className="btns">
                         <GButton tone="red" size="big" onClick={() => send({ type: 'bankrupt' })}>
@@ -711,7 +710,6 @@ export function OfferInbox({ state, me, send, offer, now }: Base & { offer: Busi
     } else if (t.kind === 'mortgage') {
         const tile = BUSINESS_BOARD[t.space];
         const set = tile.set ? BUSINESS_SETS[tile.set] : null;
-        const photo = photoUrl(t.space, 480);
         title = 'Mortgage deal';
         ask = `${from.name} offers you a share of`;
         body = (
@@ -720,7 +718,7 @@ export function OfferInbox({ state, me, send, offer, now }: Base & { offer: Busi
                     className="lot"
                     style={cssVars({
                         '--lc': set?.color ?? '#241A3D',
-                        backgroundImage: `linear-gradient(90deg, rgba(10,6,30,.8), rgba(10,6,30,.25))${photo ? `, url(${photo}), url(${photoUrl(t.space, 160)})` : ''}`,
+                        '--lt': set?.text ?? '#FFFFFF',
                     })}
                 >
                     <span>{tile.name}</span>

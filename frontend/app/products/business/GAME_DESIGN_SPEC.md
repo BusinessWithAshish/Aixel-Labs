@@ -76,17 +76,26 @@ So a property whose rent is shared with a lender can never have houses or a
 hotel, and rent sharing only ever applies to base rent (or the full-set rent).
 
 On the board, houses are drawn on the property's colour band in the owner's
-colour (two rows of two at most; a hotel is a hotel icon on a badge). The band
+colour, all the same size (two rows of two at most; a hotel is one bigger
+building with windows). A property mortgaged to the bank goes dark under one
+big red bank mark. A property shared with a player keeps its look and carries
+a handshake in the lender's colour on its colour band. The band
 is a fixed size. The owner's marker sits just inside the board, centred on the
 property. The board has no photos: each property is a cream card with the name
 and the price written along the tile (bottom to top on the top and bottom
 rows, left to right on the sides). Railways (grey-blue) and utilities (yellow)
 have no colour band, since nothing is built on them; their icon sits there
-instead. Photos show on property cards. City names are six letters or fewer so
+instead. There are no photos anywhere: property cards, the small cards in the
+player panel and in offers, and auction lots all use the set colour on cream. City names are six letters or fewer so
 they fit a phone.
 
-Teams: with up to 6 players there can be 2 to 6 teams of any sizes (2v2, 2v3,
-2v2v1, 3v3, 2v2v2, 4v1v1 …). Six teams is the same as everyone playing solo.
+Screen: a full-screen button sits in the top bar wherever the browser allows it
+(not iPhone Safari). In a short, wide window (a phone on its side) the board
+fills the height on the left and the players sit on the right; in a short,
+narrow window (split screen with another app) the board keeps a playable size
+and the table scrolls.
+
+Teams: two teams only (Alpha and Beta), of any sizes, or everyone solo.
 
 Building needs the whole colour set with nothing mortgaged, and must be even:
 no city more than one house ahead of another in its set. Four houses upgrade
@@ -131,16 +140,22 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   shows a pop-up saying why, instead of nothing.
 - **Trades:** everyone sees a "trade done" banner between the two players;
   what was swapped is never shown.
+- Building a house shows no banner: the house just appears on the board.
 - **Money moves** (buying, rent, salary, Chance cards, taxes, the Market, loans)
   are shown to everyone as a banner in the middle of the board, with who paid
   whom and a sound for each kind. Private deals stay private: only the two
   players see their loan and mortgage banners.
-- **Teams:** in the lobby the host taps the letter on a seat to move that
-  player to another team; any split works (2v2, 3v1, 2v2v2, …) as long as two
-  teams remain. Teammates share one colour, pay no rent to each other, and win
-  together: the match ends when one team is left, or at the bell the team worth
-  the most wins. Colour sets, cash and deals stay personal; teammates can trade.
-  With no teams set, every player is a team of one.
+- **Teams:** the lobby has two tabs, "Team vs Team" and "Solo"; the host picks.
+  Team play is always two sides, Team Alpha and Team Beta, of any sizes (2v2,
+  3v3, 1v4, …). The lobby shows three columns: Team Alpha, Players (not placed
+  yet) and Team Beta. The host moves players with the arrows; guests see the
+  same columns without arrows. The match starts once every player is placed
+  and both teams have someone. Teammates share one colour, pay no rent to each
+  other, and win together: the match ends when one team is left, or at the
+  bell the team worth the most wins. Colour sets, cash and deals stay
+  personal; teammates can trade.
+- **Start:** when the host presses Start, everyone sees a 3, 2, 1, Go! countdown
+  before the table.
 - **Pause:** the host has a pause button during the match. Everyone sees a
   "Game paused" curtain, every clock stops, and the time is given back on resume.
 - **Host leaving:** the room closes for everyone. Any other player leaving
@@ -210,7 +225,12 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   new interest and laps. The lender accepts or rejects; on a reject or no answer
   the whole amount is paid.
 - **Trade:** cash and properties both ways. Cities in a set with houses, and
-  properties mortgaged to a player, cannot be traded.
+  properties mortgaged to a player, cannot be traded. A property mortgaged to
+  the bank can be traded: it stays mortgaged, and the new owner earns no rent
+  from it until they redeem it (55% of the price).
+- **One mortgage at a time:** a property mortgaged to the bank cannot also be
+  shared with a player, and a property shared with a player cannot be
+  mortgaged to the bank.
 
 Offers are made on your own turn, to one player at a time, and expire after
 45 seconds or when the turn ends. Sending an offer keeps the turn open long
@@ -229,8 +249,22 @@ negative the player cannot continue and has two choices:
 - **Repay debt:** sell houses, mortgage to the bank or to a player, trade, or
   ask for a loan, until cash is zero or more. Options that the player has
   nothing for are disabled; asking for a loan is always available.
-- **Bankruptcy:** the player is out. Their properties go to the player they owe
-  the most, or back to the bank if they only owe the bank. Houses are removed.
+- **Bankruptcy:** the player is out. The same settlement applies however they
+  go out (bankrupt, leaving, or removed for missed turns), and debts are settled
+  in cash only. Nobody ever receives a bankrupt player's properties:
+  1. A property shared with a player goes to that lender (it was the security).
+  2. Everything else is sold to the bank: each house at half its cost, each
+     property at half its price (nothing for one already mortgaged to the
+     bank), plus any cash in hand. That is the pot.
+  3. The pot pays the players owed: unpaid rent or loan money from this turn,
+     and every cash loan still running (due or not). If the pot covers
+     everything, each is paid in full and the rest goes to the bank. If not,
+     each gets a share in proportion to what they are owed, and the rest of
+     their money is lost. The bank never tops it up.
+  4. All the properties return to the bank, unowned, and can be bought again.
+  A loan the bankrupt player had given to someone is cancelled: the borrower
+  keeps the money. A property someone had shared with the bankrupt player is
+  theirs again in full.
 
 ## 8. Integrity
 

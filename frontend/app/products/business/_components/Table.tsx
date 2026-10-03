@@ -641,7 +641,6 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                 <button type="button" className="ib" aria-label="Main menu" onClick={() => setView({ t: 'menu' })}>
                     <LogOut className="lu" />
                 </button>
-                <span className="tag gold">{room.code}</span>
                 {host && !over ? (
                     <button type="button" className="ib gold" aria-label="Pause the game for everyone" onClick={() => onPause(true)}>
                         <Pause className="lu" />

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Copy, Hourglass, LogOut, Share2, TimerOff, Users, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Crown, Hourglass, LogOut, Share2, Swords, TimerOff, User, Users, WifiOff, X } from 'lucide-react';
 import {
     BUSINESS_MATCH_MINUTES,
     BUSINESS_MISS_LIMITS,
@@ -25,15 +25,42 @@ type LobbyProps = {
     onClose: () => void;
 };
 
-const TEAM_LETTERS = 'ABCDEF';
+/** Team play is always two sides. */
+const SIDES = [
+    { team: 0, name: 'Team Alpha' },
+    { team: 1, name: 'Team Beta' },
+] as const;
 
 const CONFIRM_MS = 3000;
 
 export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, onClose }: LobbyProps) {
     const router = useRouter();
     const host = room.you === room.hostSeat;
-    const teams = new Set(room.seats.map((s) => s.team)).size;
-    const teamPlay = teams < room.seats.length;
+    const teamPlay = room.config.teams;
+    const open = room.config.seats - room.seats.length;
+    /** Why the match cannot start yet, as the Start button's label; null when it can. */
+    const blocked =
+        room.seats.length < BUSINESS_RULES.MIN_SEATS
+            ? 'Waiting for players'
+            : !teamPlay
+              ? null
+              : room.seats.some((s) => s.team < 0)
+                ? 'Put every player in a team'
+                : SIDES.some(({ team }) => !room.seats.some((s) => s.team === team))
+                  ? 'Both teams need a player'
+                  : null;
+    const place = (seat: number, team: number) => {
+        sfx('click');
+        onTeam(seat, team);
+    };
+    /** A player's name, with a crown for the host and an offline mark when away. */
+    const who = (seat: BusinessRoomView['seats'][number], i: number, short = false) => (
+        <span className="who">
+            {i === room.hostSeat && <Crown className="lu host" aria-label="Host" />}
+            <span>{i === room.you && !short ? `${seat.name} (you)` : seat.name}</span>
+            {!seat.connected && <WifiOff className="lu off" aria-label="Away" />}
+        </span>
+    );
     const [leaving, setLeaving] = useState(false);
     useEffect(() => {
         if (!leaving) return;
@@ -168,67 +195,110 @@ export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, on
                 </dl>
             )}
 
-            <div className="slots">
-                {Array.from({ length: seats }, (_, i) => {
-                    const seat = room.seats[i];
-                    if (!seat)
-                        return (
-                            <div key={i} className="slot empty">
-                                <span className="av">+</span>
-                                Seat {i + 1}
-                            </div>
-                        );
-                    return (
-                        <div key={i} className="slot">
-                            <Avatar name={seat.name} color={seat.color} />
-                            {seat.name}
-                            {/* Same letter, same team. The host taps a letter to move that player to the next team. */}
-                            {host ? (
-                                <button
-                                    type="button"
-                                    className={`team t${seat.team}`}
-                                    aria-label={`${seat.name} is in team ${TEAM_LETTERS[seat.team]}. Tap to change.`}
-                                    onClick={() => {
-                                        sfx('click');
-                                        onTeam(i, (seat.team + 1) % Math.max(2, room.seats.length));
-                                    }}
-                                >
-                                    {TEAM_LETTERS[seat.team]}
-                                </button>
-                            ) : (
-                                <span className={`team t${seat.team}`}>{TEAM_LETTERS[seat.team]}</span>
-                            )}
-                            {i === room.hostSeat ? (
-                                <span className="tag gold">Host</span>
-                            ) : seat.connected ? (
-                                <span className="tag green">Joined</span>
-                            ) : (
-                                <span className="tag orange">Away</span>
-                            )}
-                            {host && i !== room.hostSeat && (
-                                <button
-                                    type="button"
-                                    className={confirm === i ? 'kick sure' : 'kick'}
-                                    aria-label={`Remove ${seat.name}`}
-                                    onClick={() => {
-                                        sfx('click');
-                                        if (confirm !== i) return setConfirm(i);
-                                        setConfirm(null);
-                                        onKick(i);
-                                        notify(`${seat.name} was removed`, 'info');
-                                    }}
-                                >
-                                    {confirm === i ? `Tap to remove ${seat.name}` : <X className="lu" />}
-                                </button>
-                            )}
-                        </div>
-                    );
-                })}
+            {/* Two ways to play. The host picks; everyone sees which one is on. */}
+            <div className="seg two modes">
+                <GButton size="sm" tone="gold" className={teamPlay ? undefined : 'off'} disabled={!host && !teamPlay} onClick={() => host && onConfigure({ teams: true })}>
+                    <Swords className="lu" />
+                    Team vs Team
+                </GButton>
+                <GButton size="sm" tone="gold" className={teamPlay ? 'off' : undefined} disabled={!host && teamPlay} onClick={() => host && onConfigure({ teams: false })}>
+                    <User className="lu" />
+                    Solo
+                </GButton>
             </div>
 
+            {teamPlay ? (
+                /* Team Alpha on the left, Team Beta on the right, and everyone not placed yet in the middle. */
+                <div className="sides">
+                    {SIDES.map(({ team, name }) => (
+                        <div key={team} className={`sidecol s${team}`}>
+                            <h4>{name}</h4>
+                            {room.seats.map((seat, i) =>
+                                seat.team === team ? (
+                                    <div key={i} className={`chip${i === room.you ? ' me' : ''}`}>
+                                        {host && team === 1 && (
+                                            <button type="button" className="mv" aria-label={`Take ${seat.name} out of Team Beta`} onClick={() => place(i, -1)}>
+                                                <ChevronLeft className="lu" />
+                                            </button>
+                                        )}
+                                        {who(seat, i, true)}
+                                        {host && team === 0 && (
+                                            <button type="button" className="mv" aria-label={`Take ${seat.name} out of Team Alpha`} onClick={() => place(i, -1)}>
+                                                <ChevronRight className="lu" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : null,
+                            )}
+                            {!room.seats.some((seat) => seat.team === team) && <p className="none">Nobody yet</p>}
+                        </div>
+                    ))}
+                    <div className="sidecol pool">
+                        <h4>Players</h4>
+                        {room.seats.map((seat, i) =>
+                            seat.team < 0 ? (
+                                <div key={i} className={`chip${i === room.you ? ' me' : ''}`}>
+                                    {host && (
+                                        <button type="button" className="mv a" aria-label={`Put ${seat.name} in Team Alpha`} onClick={() => place(i, 0)}>
+                                            <ChevronLeft className="lu" />
+                                        </button>
+                                    )}
+                                    {who(seat, i, true)}
+                                    {host && (
+                                        <button type="button" className="mv b" aria-label={`Put ${seat.name} in Team Beta`} onClick={() => place(i, 1)}>
+                                            <ChevronRight className="lu" />
+                                        </button>
+                                    )}
+                                </div>
+                            ) : null,
+                        )}
+                        {open > 0 && (
+                            <p className="none">
+                                {open} open seat{open === 1 ? '' : 's'}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <div className="slots">
+                    {Array.from({ length: seats }, (_, i) => {
+                        const seat = room.seats[i];
+                        if (!seat)
+                            return (
+                                <div key={i} className="slot empty">
+                                    <span className="av">+</span>
+                                    Seat {i + 1}
+                                </div>
+                            );
+                        return (
+                            <div key={i} className={`slot${i === room.you ? ' me' : ''}`}>
+                                <Avatar name={seat.name} color={seat.color} />
+                                {who(seat, i)}
+                                {host && i !== room.hostSeat && (
+                                    <button
+                                        type="button"
+                                        className={confirm === i ? 'kick sure' : 'kick'}
+                                        aria-label={`Remove ${seat.name}`}
+                                        onClick={() => {
+                                            sfx('click');
+                                            if (confirm !== i) return setConfirm(i);
+                                            setConfirm(null);
+                                            onKick(i);
+                                            notify(`${seat.name} was removed`, 'info');
+                                        }}
+                                    >
+                                        {confirm === i ? `Tap to remove ${seat.name}` : <X className="lu" />}
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
             {host ? (
-                <GButton tone="green" size="big" disabled={room.seats.length < BUSINESS_RULES.MIN_SEATS || teams < 2} onClick={onStart}>
-                    {teams < 2 && room.seats.length > 1 ? 'Make two teams to start' : teamPlay ? `Start ${teams}-team game` : 'Start game'}
+                <GButton tone="green" size="big" disabled={!!blocked} onClick={onStart}>
+                    {blocked ?? (teamPlay ? 'Start Alpha vs Beta' : 'Start game')}
                 </GButton>
             ) : (
                 <p className="waiting">Waiting for the host to start…</p>

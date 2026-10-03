@@ -1,10 +1,10 @@
 'use client';
 
 import { ArrowLeftRight, ChevronsRight, Gauge, Handshake, Landmark, LockKeyhole, Siren, UserX } from 'lucide-react';
-import { BUSINESS_BOARD } from '@aixellabs/backend/business/constants';
+import { BUSINESS_BOARD, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
 import type { BusinessFx, BusinessLogEntry, BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
-import { photoUrl } from '../_lib/art';
+import { cssVars } from '../_lib/art';
 import { rs } from '../_lib/client';
 import type { BusinessSound } from '../_lib/sound';
 import { Avatar } from './bits';
@@ -36,7 +36,8 @@ function dealTone(fx: BusinessFx): string {
 }
 
 export function dealFromLog(entry: BusinessLogEntry): Deal | null {
-    if (!entry.fx) return null;
+    // Building is quiet: the new house simply appears on the board.
+    if (!entry.fx || entry.fx.kind === 'build') return null;
     // These are news even without an amount: trades, players going out or to Jail, a flat
     // Market, and other players' loans (announced without their numbers).
     const newsAnyway = ['trade', 'out', 'jail', 'market', 'loan'];
@@ -92,14 +93,16 @@ function Party({ state, seat, space }: { state: BusinessPublicState; seat: numbe
             </span>
         );
     }
-    const photo = space === undefined ? null : photoUrl(space, 160);
-    if (photo)
+    if (space !== undefined) {
+        // The property itself, as a little tile in its set colour.
+        const tile = BUSINESS_BOARD[space];
         return (
             <span className="dl-party">
-                <span className="dl-ph" style={{ backgroundImage: `url(${photo})` }} />
-                <b>{BUSINESS_BOARD[space as number].name}</b>
+                <span className="dl-ph" style={cssVars({ '--sc': tile.set ? BUSINESS_SETS[tile.set].color : '#241A3D' })} />
+                <b>{tile.name}</b>
             </span>
         );
+    }
     return (
         <span className="dl-party">
             <span className="av dl-bank">

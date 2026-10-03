@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { CircleHelp, Handshake, Hotel, House, Landmark as BankIcon, TrendingUp } from 'lucide-react';
+import { CircleHelp, Handshake, Landmark as BankIcon, TrendingUp } from 'lucide-react';
 import {
     BUSINESS_BOARD,
     BUSINESS_RULES,
@@ -10,7 +10,7 @@ import {
 } from '@aixellabs/backend/business/constants';
 import type { BusinessProperty, BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
-import { cssVars, Pawn, SPACE_ICONS } from '../_lib/art';
+import { cssVars, HomeMark, HotelMark, HouseMark, Pawn, SPACE_ICONS } from '../_lib/art';
 import { rs } from '../_lib/client';
 import { Logo } from './bits';
 
@@ -71,23 +71,21 @@ function markerSpot(i: number): { left: string; top: string } {
 
 /**
  * What is built on a city, drawn on its colour band the way a board game shows
- * it: one small house per house (two rows of two at most), or a hotel badge, in
- * the owner's colour. The band never changes size.
+ * it: one small house per house, all the same size (two rows of two at most), or
+ * one hotel building, in the owner's colour. The band never changes size.
  */
 export function Houses({ count, color }: { count: number; color: string }) {
     const tint = cssVars({ '--hc': color });
     if (count >= BUSINESS_RULES.MAX_HOUSES)
         return (
-            <span className="hs hotel" style={tint} role="img" aria-label="Hotel">
-                <Hotel aria-hidden="true" />
+            <span className="bh hotel" style={tint} role="img" aria-label="Hotel">
+                <HotelMark />
             </span>
         );
     return (
-        <span className={cn('hs', count > 2 && 'two')} style={tint} role="img" aria-label={`${count} house${count === 1 ? '' : 's'}`}>
+        <span className="bh" style={tint} role="img" aria-label={`${count} house${count === 1 ? '' : 's'}`}>
             {Array.from({ length: count }, (_, k) => (
-                <svg key={k} viewBox="0 0 10 10" aria-hidden="true">
-                    <path d="M5 0.8 9.2 4.4v4.8H0.8V4.4z" />
-                </svg>
+                <HouseMark key={k} />
             ))}
         </span>
     );
@@ -142,8 +140,17 @@ const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, s
                     {where === 'corner' ? <span className="cn">{CORNER_LABELS[space.kind]}</span> : <span className="nm">{space.name}</span>}
                 </span>
             )}
-            {prop?.lend && <Handshake className="bdg" style={cssVars({ '--bc': lenderColor ?? '#6A35E0' })} />}
-            {prop?.mortgaged && <BankIcon className="bdg" />}
+            {/* A big red bank over the property when it is mortgaged to the bank; a handshake in the lender's colour on its colour band when it is shared with a player. */}
+            {prop?.mortgaged && (
+                <span className="cover bank">
+                    <BankIcon />
+                </span>
+            )}
+            {prop?.lend && (
+                <span className="cover share" style={cssVars({ '--bc': lenderColor ?? '#6A35E0' })}>
+                    <Handshake />
+                </span>
+            )}
         </button>
     );
 });
@@ -226,13 +233,7 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                         const color = state.players[prop.owner].color;
                         return (
                             <span key={i} className={cn('mk', side(i))} style={markerSpot(i)}>
-                                <House fill={color} />
-                                {/* Mortgaged to a player: a handshake in the lender's colour hangs off the house. */}
-                                {prop.lend && (
-                                    <i className="lend" style={cssVars({ '--bc': state.players[prop.lend.to].color })}>
-                                        <Handshake />
-                                    </i>
-                                )}
+                                <HomeMark color={color} />
                             </span>
                         );
                     })}

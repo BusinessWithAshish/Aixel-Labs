@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Check, Handshake, Hotel, House, IndianRupee, Landmark as BankIcon } from 'lucide-react';
-import { BUSINESS_BOARD, BUSINESS_RULES, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
+import { Check, Handshake, IndianRupee, Landmark as BankIcon } from 'lucide-react';
+import { BUSINESS_BOARD, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
 import type { BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
-import { cssVars, photoUrl } from '../_lib/art';
+import { cssVars, SPACE_ICONS } from '../_lib/art';
 import { fmt } from '../_lib/client';
+import { Houses } from './Board';
 
 type MiniCardProps = {
     state: BusinessPublicState;
@@ -16,29 +17,29 @@ type MiniCardProps = {
     onClick?: () => void;
 };
 
-/** A property card shrunk to a thumbnail: photo, colour band with the name, price, and what is built on it. */
+/**
+ * A property as it looks on the board, shrunk to a thumbnail: the colour band
+ * with the same houses or hotel in the owner's colour (an icon instead for
+ * railways and utilities), then the name and price. Mortgage marks match the
+ * board too: a red bank over a darkened card, a handshake on the band.
+ */
 export function MiniCard({ state, space, picked, onClick }: MiniCardProps) {
     const tile = BUSINESS_BOARD[space];
     const set = tile.set ? BUSINESS_SETS[tile.set] : null;
     const prop = state.props[space];
-    const photo = photoUrl(space, 160);
-    const hotel = prop?.houses === BUSINESS_RULES.MAX_HOUSES;
+    const Icon = tile.icon ? SPACE_ICONS[tile.icon] : null;
     const Tag = onClick ? 'button' : 'div';
     return (
         <Tag
             {...(onClick ? { type: 'button' as const, onClick } : {})}
-            className={cn('minicard', picked && 'on', prop?.mortgaged && 'mort')}
-            style={cssVars({ '--sc': set?.color ?? '#241A3D', '--st': set?.text ?? '#FFFFFF' })}
+            className={cn('minicard', `k-${tile.kind}`, picked && 'on', prop?.mortgaged && 'mort')}
+            style={set ? cssVars({ '--sc': set.color }) : undefined}
         >
-            <span className="mc-ph" style={photo ? { backgroundImage: `url(${photo})` } : undefined}>
-                {prop && prop.houses > 0 && (
-                    <span className={cn('mc-h', hotel && 'hotel')}>
-                        {hotel ? <Hotel className="lu" /> : <House className="lu" />}
-                        {hotel ? null : prop.houses}
-                    </span>
-                )}
-                {prop?.mortgaged && <BankIcon className="mc-b" />}
+            <span className="mc-ph">
+                {tile.kind !== 'city' && Icon && <Icon className="mc-sign" />}
+                {prop && prop.houses > 0 && <Houses count={prop.houses} color={state.players[prop.owner].color} />}
                 {prop?.lend && <Handshake className="mc-b" style={cssVars({ '--bc': state.players[prop.lend.to].color })} />}
+                {prop?.mortgaged && <BankIcon className="mc-b bank" />}
                 {picked && <Check className="mc-ok" />}
             </span>
             <span className="mc-band">{tile.name}</span>

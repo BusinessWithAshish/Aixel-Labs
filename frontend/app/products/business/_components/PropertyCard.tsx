@@ -26,7 +26,7 @@ import {
 import type { BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
 import type { BusinessSend } from '../_hooks/use-business-room';
-import { cssVars, photoUrl, SPACE_ICONS } from '../_lib/art';
+import { cssVars, SPACE_ICONS } from '../_lib/art';
 import { fmt, rs } from '../_lib/client';
 import { Cash, GButton } from './bits';
 
@@ -71,9 +71,6 @@ export function PropertyCard({ space, state, me, send, mode = 'view', onMortgage
     const prop = state.props[space];
     const owner = prop ? state.players[prop.owner] : null;
     const Icon = tile.icon ? SPACE_ICONS[tile.icon] : null;
-    // The small copy is already cached from the board, so it shows at once while the sharp one loads.
-    const photo = photoUrl(space, 640);
-    const thumb = photoUrl(space, 160);
     const live = !!prop && !prop.mortgaged;
     const myTurn = state.turn === me;
     const manage = myTurn && (state.phase === 'roll' || state.phase === 'end');
@@ -159,7 +156,7 @@ export function PropertyCard({ space, state, me, send, mode = 'view', onMortgage
 
     return (
         <div className="prop" style={cssVars({ '--pc': pc, '--pt': set?.text ?? '#FFFFFF' })}>
-            <div className={cn('prop-hd', !photo && 'plain')} style={photo ? { backgroundImage: `url(${photo}), url(${thumb})` } : undefined}>
+            <div className="prop-hd plain">
                 <span className="prop-set">
                     {set && <i />}
                     {set ? `${set.name} set` : tile.kind === 'gojail' ? 'Corner' : tile.kind}

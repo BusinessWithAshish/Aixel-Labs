@@ -30,63 +30,47 @@ export const SPACE_ICONS: Record<string, LucideIcon> = {
 };
 
 /**
- * Board index → Unsplash photo id (free to use under the Unsplash licence).
- * Served straight from the Unsplash CDN at the size each spot needs.
+ * The owner's marker beside a property: a little home with a pitched roof, a
+ * chimney and a door, in the owner's colour.
  */
-const PHOTOS: Record<number, string> = {
-    0: '1517976487492-5750f3195933', // Launch
-    1: '1679806893392-29f024308936', // Gaya
-    2: '1706790574525-d218c4c52b5c', // Puri
-    3: '1559480423-85de1db621ed', // Chance
-    4: '1597074866923-dc0589150358', // Shimla
-    5: '1600242466690-c1c04f081762', // Leh
-    6: '1707655315272-33a54a771068', // Ooty
-    7: '1442570468985-f63ed5de9086', // North Rail
-    8: '1554224155-6726b3ff858f', // Income Tax
-    9: '1603195586852-f6beb37b36eb', // Ajmer
-    10: '1590572852289-02c47eb0f3f9', // Kota
-    11: '1477587458883-47145ed94245', // Jaipur
-    12: '1696996161128-4eea344474f2', // Jail
-    13: '1564507592333-c60657eea523', // Agra
-    14: '1673102166075-7fe2c11c6773', // Patna
-    15: '1763277211600-e726e224c5ae', // Kanpur
-    16: '1560221328-12fe60f83ab8', // Market
-    17: '1473341304170-971dccb5ac1e', // Power
-    18: '1703955516799-908293c45470', // Coast Rail
-    19: '1559480423-85de1db621ed', // Chance
-    20: '1605070208589-90fa3015e068', // Nagpur
-    21: '1673369791309-2112df102fe7', // Bhopal
-    22: '1754245646627-855c7da68bd1', // Indore
-    23: '1560221328-12fe60f83ab8', // Market
-    24: '1634299406775-90f32b656536', // Take a Break
-    25: '1567005753256-c0529035b300', // Goa
-    26: '1659126574791-13313aa424bd', // Mysuru
-    27: '1629064511726-841ce84f39df', // Kochi
-    28: '1559480423-85de1db621ed', // Chance
-    29: '1649042964070-8eb14ea4da7d', // Metro
-    30: '1506399309177-3b43e99fead2', // Telecom
-    31: '1560221328-12fe60f83ab8', // Market
-    32: '1609991148865-40902bd1f594', // Ranchi
-    33: '1737171789632-d8cd7aea5852', // Surat
-    34: '1713437333017-0d52c1ca50e9', // Mohali
-    35: '1559480423-85de1db621ed', // Chance
-    36: '1608095476825-d4e0f916372f', // Go to Jail
-    37: '1753199694052-2d6f8a6aa274', // Thane
-    38: '1694667509674-676629c9d069', // Nashik
-    39: '1692458236947-33d25789b2aa', // Rajkot
-    40: '1560221328-12fe60f83ab8', // Market
-    41: '1708673438435-28b7fd3e3aa4', // Airport
-    42: '1589629041152-fb71b9c5dbcd', // Pune
-    43: '1688978022482-00702c9eb83c', // Noida
-    44: '1655979521437-ae1875109d79', // Vizag
-    45: '1601121141461-9d6647bca1ed', // Luxury Tax
-    46: '1587474260584-136574528ed5', // Delhi
-    47: '1595658658481-d53d3f999875', // Mumbai
-};
+export function HomeMark({ color }: { color: string }) {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2.6 22 11.4h-2.6V21H4.6v-9.6H2z" fill={color} stroke="#fff" strokeWidth="2.2" strokeLinejoin="round" />
+            <path d="M12 2.6 22 11.4H2z" fill="rgba(0,0,0,.28)" />
+            <path d="M16.2 4.4h2.4v4l-2.4-2.1z" fill={color} stroke="#fff" strokeWidth="1.1" strokeLinejoin="round" />
+            <rect x="10" y="14.2" width="4" height="6.8" rx="0.8" fill="#fff" />
+        </svg>
+    );
+}
 
-export function photoUrl(space: number, width: number): string | null {
-    const id = PHOTOS[space];
-    return id ? `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${width}&h=${width}&q=60` : null;
+/** One built house, as drawn on a property's colour band. */
+export function HouseMark() {
+    return (
+        <svg viewBox="0 0 12 12" aria-hidden="true">
+            <path className="hm-body" d="M6 1 11.4 5.6H10V11H2V5.6H0.6z" />
+            <path d="M6 1 11.4 5.6H0.6z" fill="rgba(0,0,0,.3)" />
+            <rect x="5" y="7.2" width="2" height="3.8" fill="#fff" />
+        </svg>
+    );
+}
+
+/** A hotel, as drawn on a property's colour band: a wide building with a pediment and lit windows. */
+export function HotelMark() {
+    return (
+        <svg viewBox="0 0 20 15" aria-hidden="true">
+            <path className="hm-body" d="M10 0.9 18.6 4.4H17V14H3V4.4H1.4z" />
+            <path d="M10 0.9 18.6 4.4H1.4z" fill="rgba(0,0,0,.3)" />
+            <g fill="#fff">
+                <rect x="5" y="6" width="2.2" height="2.2" />
+                <rect x="8.9" y="6" width="2.2" height="2.2" />
+                <rect x="12.8" y="6" width="2.2" height="2.2" />
+                <rect x="5" y="9.8" width="2.2" height="2.2" />
+                <rect x="12.8" y="9.8" width="2.2" height="2.2" />
+                <rect x="8.7" y="9.8" width="2.6" height="4.2" />
+            </g>
+        </svg>
+    );
 }
 
 /** `label` is the player's initial on the pawn's head: teammates share a colour, so it tells their pawns apart. */

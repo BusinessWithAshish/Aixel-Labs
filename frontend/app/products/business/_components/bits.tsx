@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { Eye, EyeOff, IndianRupee, Lightbulb, Music, Volume2, VolumeX } from 'lucide-react';
+import { Eye, EyeOff, IndianRupee, Lightbulb, Maximize, Minimize, Music, Volume2, VolumeX } from 'lucide-react';
 import { BUSINESS_RULES } from '@aixellabs/backend/business/constants';
 import { cn } from '@/lib/utils';
 import { cssVars } from '../_lib/art';
@@ -119,7 +119,37 @@ export function Logo({ className }: { className?: string }) {
     );
 }
 
-/** Sound-effects and music switches, shown on every screen. */
+/**
+ * Full screen on and off. Shown only where the browser can do it for a page
+ * (iPhone Safari cannot), so the button never sits there doing nothing.
+ */
+export function FullscreenToggle() {
+    const [can, setCan] = useState(false);
+    const [full, setFull] = useState(false);
+    useEffect(() => {
+        setCan(document.fullscreenEnabled === true);
+        const sync = () => setFull(document.fullscreenElement !== null);
+        sync();
+        document.addEventListener('fullscreenchange', sync);
+        return () => document.removeEventListener('fullscreenchange', sync);
+    }, []);
+    if (!can) return null;
+    return (
+        <button
+            type="button"
+            className="ib"
+            aria-label={full ? 'Leave full screen' : 'Play in full screen'}
+            onClick={() => {
+                const done = full ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+                done.catch(() => notify('Full screen is not available here.', 'error'));
+            }}
+        >
+            {full ? <Minimize className="lu" /> : <Maximize className="lu" />}
+        </button>
+    );
+}
+
+/** Sound-effects and music switches (and full screen), shown on every screen. */
 export function AudioToggles() {
     const [muted, setMutedState] = useState(false);
     const [music, setMusicState] = useState(false);
@@ -129,6 +159,7 @@ export function AudioToggles() {
     }, []);
     return (
         <>
+            <FullscreenToggle />
             <button
                 type="button"
                 className={cn('ib', muted && 'offc')}

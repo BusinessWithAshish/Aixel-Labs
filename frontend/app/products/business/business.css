@@ -545,46 +545,147 @@
 .bb .slot {
     position: relative;
 }
-/* Team letter on each lobby seat. Same letter, same team. */
-.bb .slot .team {
-    position: absolute;
-    top: 4px;
-    left: 4px;
+/* Lobby, team play: Team Alpha on the left, Team Beta on the right, players not placed yet in the middle. */
+.bb .modes .gbtn {
+    gap: 6px;
+}
+.bb .sides {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    min-height: 168px;
+}
+.bb .sidecol {
+    --tm: rgba(255, 255, 255, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 4px 6px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.22);
+    box-shadow: inset 0 0 0 2px var(--tm);
+    overflow: hidden;
+    min-width: 0;
+}
+.bb .sidecol.s0 {
+    --tm: #ffd166;
+    order: 1;
+}
+.bb .sidecol.pool {
+    order: 2;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.22);
+}
+.bb .sidecol.s1 {
+    --tm: #8ecbff;
+    order: 3;
+}
+.bb .sidecol h4 {
+    margin: 0 -4px 2px;
+    padding: 4px 4px 3px;
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: center;
+    color: #2a1b4d;
+    background: var(--tm);
+}
+.bb .sidecol.pool h4 {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.16);
+}
+.bb .sidecol .none {
+    margin: auto 0;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--muted);
+}
+.bb .sidecol .chip {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-height: 26px;
+    padding: 0 2px;
+    border-radius: 9px;
+    font-family: var(--bb-display);
+    font-weight: 700;
+    font-size: 12.5px;
+    line-height: 1.1;
+    color: var(--text);
+    background: linear-gradient(180deg, var(--plate), var(--plate-2));
+    box-shadow: inset 0 1px 0 var(--line), 0 2px 0 var(--edge);
+}
+.bb .sidecol .chip.me {
+    box-shadow: inset 0 0 0 2px #fff, 0 2px 0 var(--edge);
+}
+.bb .sidecol .chip .who {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    padding: 0 2px;
+}
+.bb .sidecol .chip .who > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bb .sidecol .chip .who .lu {
+    flex: none;
+    width: 12px;
+    height: 12px;
+}
+.bb .who .host {
+    color: var(--gold);
+    fill: var(--gold);
+}
+.bb .who .off {
+    color: #ff9a2e;
+}
+.bb .sidecol .mv {
+    flex: none;
     width: 22px;
     height: 22px;
     padding: 0;
-    border: 2px solid var(--frame);
+    border: 0;
     border-radius: 7px;
     display: grid;
     place-items: center;
-    font-family: var(--bb-display);
-    font-weight: 800;
-    font-size: 13px;
-    line-height: 1;
     color: #2a1b4d;
     background: #fff;
-    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
-}
-.bb .slot button.team {
     cursor: pointer;
 }
-.bb .slot .team.t0 {
+.bb .sidecol .mv.a {
     background: #ffd166;
 }
-.bb .slot .team.t1 {
+.bb .sidecol .mv.b {
     background: #8ecbff;
 }
-.bb .slot .team.t2 {
-    background: #a8f0c4;
+.bb .sidecol .mv .lu {
+    width: 15px;
+    height: 15px;
+    stroke-width: 3;
 }
-.bb .slot .team.t3 {
-    background: #ffb3c7;
+.bb .sidecol .mv:active {
+    transform: scale(0.9);
 }
-.bb .slot .team.t4 {
-    background: #d6bcff;
+.bb .slot.me {
+    box-shadow: inset 0 0 0 2px #fff, 0 3px 0 var(--edge);
 }
-.bb .slot .team.t5 {
-    background: #ffc59a;
+.bb .slot .who {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 0 4px;
+}
+.bb .slot .who .lu {
+    flex: none;
+    width: 14px;
+    height: 14px;
 }
 /* Host only: remove a player from the lobby. Two taps, so a slip does not kick anyone. */
 .bb .slot .kick {
@@ -808,7 +909,7 @@
     flex-basis: 33%;
 }
 /* Houses on the band, in the owner's colour, with a white edge so they read on every set colour. */
-.bb .hs {
+.bb .bh {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -817,49 +918,38 @@
     width: 100%;
     line-height: 0;
 }
-.bb .hs svg {
-    width: 2.6cqw;
-    height: 2.6cqw;
-    fill: var(--hc, #fff);
-    stroke: #fff;
-    stroke-width: 1.3;
-    stroke-linejoin: round;
+/* Every house is the same size, whether there is one or four: two fit in a row, so three and four make two rows. */
+.bb .bh {
+    padding: 0 0.6cqw;
+}
+.bb .bh svg {
+    width: 2cqw;
+    height: 2cqw;
     filter: drop-shadow(0 0 0.12cqw #150a3a) drop-shadow(0 0.15cqw 0 rgba(0, 0, 0, 0.5));
 }
-/* Three or four: two rows of two, sized to stay inside the band. */
-.bb .hs.two {
-    padding: 0 0.5cqw;
-}
-.bb .hs.two svg {
-    width: 1.9cqw;
-    height: 1.9cqw;
-}
-/* A hotel: the hotel icon on a badge in the owner's colour. */
-.bb .hs.hotel svg {
-    width: 3.7cqw;
-    height: 3.7cqw;
-    padding: 0.35cqw;
-    border-radius: 0.8cqw;
-    fill: none;
+.bb .bh .hm-body {
+    fill: var(--hc, #fff);
     stroke: #fff;
-    stroke-width: 2.4;
-    background: var(--hc, #e5383b);
-    box-shadow: 0 0 0 0.25cqw #fff, 0 0 0 0.4cqw #150a3a;
-    filter: none;
+    stroke-width: 1.1;
+    stroke-linejoin: round;
 }
-/* Side columns: the band is narrow and tall, so one or two houses stack. */
-.bb .tile.s-left .hs:not(.two):not(.hotel),
-.bb .tile.s-right .hs:not(.two):not(.hotel) {
-    flex-direction: column;
-}
-.bb .tile.s-left .hs.two,
-.bb .tile.s-right .hs.two {
+.bb .bh.hotel {
     padding: 0;
 }
-.bb .tile.s-left .hs.hotel svg,
-.bb .tile.s-right .hs.hotel svg {
-    width: 3.5cqw;
+/* A hotel: one bigger building in the owner's colour. */
+.bb .bh.hotel svg {
+    width: 4.6cqw;
     height: 3.5cqw;
+}
+/* Side columns: the band is narrow and tall; two still sit side by side. */
+.bb .tile.s-left .bh:not(.hotel),
+.bb .tile.s-right .bh:not(.hotel) {
+    padding: 0;
+}
+.bb .tile.s-left .bh.hotel svg,
+.bb .tile.s-right .bh.hotel svg {
+    width: 4.1cqw;
+    height: 3.1cqw;
 }
 /* Railways and utilities have no colour band (nothing is ever built there): their icon takes its place. */
 .bb .tile .band.sign {
@@ -879,12 +969,13 @@
 .bb .tile.k-rail .band.sign {
     color: #2c3a6b;
 }
+/* Utilities: mint-teal, a colour no property set uses. */
 .bb .board.plain .tile.k-utility,
 .bb .board.plain .tile.k-utility .pic {
-    background: #ffe9a8;
+    background: #bdeee4;
 }
 .bb .tile.k-utility .band.sign {
-    color: #a85f00;
+    color: #0b7a6b;
 }
 /* Name and price sit together. On the photo board the price lives on the band instead, until houses take it over. */
 .bb .tile .lbl {
@@ -968,9 +1059,52 @@
 .bb .board.plain .tile.s-right .px {
     font-size: 3.3cqw;
 }
-.bb .board.plain .tile.mort .pic {
-    filter: none;
-    background: #b9b3c9;
+/* One big mark over the property. Red bank: mortgaged to the bank. Handshake in the lender's colour: shared with a player. */
+/* Mortgaged to the bank: the tile itself goes dark under the red mark. */
+.bb .tile.mort > .band,
+.bb .tile.mort > .pic {
+    filter: brightness(0.45) saturate(0.7);
+}
+.bb .tile .cover {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+}
+.bb .tile .cover svg {
+    width: 5cqw;
+    height: 5cqw;
+    padding: 0.7cqw;
+    border-radius: 1.1cqw;
+    stroke: #fff;
+    stroke-width: 2.2;
+    background: var(--bc, #1e1b26);
+    box-shadow: 0 0 0 0.3cqw #fff, 0 0.4cqw 0 0.3cqw rgba(0, 0, 0, 0.45);
+}
+/* Shared with a player: the handshake sits on the colour band only (the band is never built on while shared). */
+.bb .tile.s-bottom .cover.share {
+    bottom: 70%;
+}
+.bb .tile.s-top .cover.share {
+    top: 70%;
+}
+.bb .tile.s-left .cover.share {
+    left: 67%;
+}
+.bb .tile.s-right .cover.share {
+    right: 67%;
+}
+.bb .tile .cover.share svg {
+    width: 3.5cqw;
+    height: 3.5cqw;
+    padding: 0.45cqw;
+    border-radius: 0.8cqw;
+    box-shadow: 0 0 0 0.25cqw #fff;
+}
+.bb .tile .cover.bank svg {
+    background: #e5383b;
 }
 /* Mortgage badges sit on the colour band (never built on while mortgaged), clear of the name. */
 .bb .board.plain .tile.s-bottom .bdg {
@@ -1007,23 +1141,20 @@
 .bb .board.plain .tile.s-top .body .nm {
     display: none;
 }
-.bb .gdemo .hs {
+.bb .gdemo .bh {
     width: 40px;
     padding: 5px 3px;
     border-radius: 6px;
     background: #ff8a1f;
     gap: 2px;
 }
-.bb .gdemo .hs svg {
+.bb .gdemo .bh svg {
     width: 14px;
     height: 14px;
 }
-.bb .gdemo .hs.hotel svg {
-    width: 26px;
-    height: 26px;
-    padding: 3px;
-    border-radius: 6px;
-    box-shadow: 0 0 0 2px #fff;
+.bb .gdemo .bh.hotel svg {
+    width: 30px;
+    height: 23px;
 }
 .bb .tile .pic {
     position: relative;
@@ -1198,9 +1329,6 @@
     z-index: 2;
     box-shadow: 0 0 2.4cqw #fff;
 }
-.bb .tile.mort .pic {
-    filter: grayscale(1) brightness(0.6);
-}
 .bb .tile .bdg {
     position: absolute;
     left: 0.25cqw;
@@ -1251,8 +1379,6 @@
     inset: 0;
     width: 100%;
     height: 100%;
-    stroke: #fff;
-    stroke-width: 2.2;
 }
 /* The roof points away from its property, into the board: up from the bottom row, right from the left column, and so on. */
 .bb .mk.s-left svg {
@@ -1282,26 +1408,6 @@
     font-size: 2.3cqw;
     line-height: 1;
     color: #fff;
-}
-.bb .mk .lend {
-    position: absolute;
-    left: -40%;
-    bottom: -38%;
-    width: 72%;
-    height: 72%;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    background: var(--bc);
-    box-shadow: 0 0 0 0.25cqw #fff;
-}
-.bb .mk .lend svg {
-    position: static;
-    width: 74%;
-    height: 74%;
-    transform: none;
-    stroke: #fff;
-    stroke-width: 2.6;
 }
 .bb .li.mdeal > :last-child {
     margin-left: 4px;
@@ -1574,17 +1680,21 @@
     .bb .board.plain .tile.s-right .px {
         font-size: 2.5cqw;
     }
-    .bb .hs svg {
+    .bb .bh svg {
         width: 2cqw;
         height: 2cqw;
     }
-    .bb .hs.two svg {
-        width: 1.9cqw;
-        height: 1.9cqw;
+    .bb .tile .cover svg {
+        width: 4cqw;
+        height: 4cqw;
     }
-    .bb .hs.hotel svg {
+    .bb .tile .cover.share svg {
         width: 2.8cqw;
         height: 2.8cqw;
+    }
+    .bb .bh.hotel svg {
+        width: 3.6cqw;
+        height: 2.7cqw;
     }
     .bb .tile .band.sign svg {
         width: 2.6cqw;
@@ -1688,6 +1798,53 @@
 .bb .ib.gold {
     color: #4a2a00;
     background: linear-gradient(180deg, #ffe07a, #f5ae1b);
+}
+/* 3, 2, 1, Go! when the host starts the match. */
+.bb .countdown {
+    position: fixed;
+    inset: 0;
+    z-index: 85;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: radial-gradient(circle at 50% 45%, rgba(90, 54, 201, 0.92), rgba(12, 6, 34, 0.96));
+}
+.bb .countdown b {
+    font-family: var(--bb-display);
+    font-weight: 800;
+    font-size: min(46vw, 220px);
+    line-height: 1;
+    color: var(--gold);
+    text-shadow: 0 8px 0 #8a5200, 0 16px 30px rgba(0, 0, 0, 0.6);
+    animation: bb-count 0.8s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.bb .countdown span {
+    font-family: var(--bb-display);
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+@keyframes bb-count {
+    0% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
+    35% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    80% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(0.8);
+        opacity: 0.2;
+    }
 }
 /* The host paused the match: a curtain over everything, for everyone. */
 .bb .paused {
@@ -2142,14 +2299,12 @@
     gap: 8px;
     padding: 8px 12px;
     min-height: 54px;
-    background-size: cover;
-    background-position: center;
-    color: #fff;
+    background: var(--lc, #241a3d);
+    color: var(--lt, #fff);
     font-family: var(--bb-display);
     font-weight: 800;
     font-size: 17px;
-    text-shadow: 0 1px 3px #000;
-    box-shadow: inset 0 0 0 3px var(--lc, #fff), 0 3px 0 rgba(0, 0, 0, 0.35);
+    box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.55), 0 3px 0 rgba(0, 0, 0, 0.35);
 }
 .bb .bigbid {
     display: flex;
@@ -2380,7 +2535,7 @@
 }
 .bb .minicard {
     flex: none;
-    width: 78px;
+    width: 84px;
     border: 0;
     padding: 0;
     border-radius: 10px;
@@ -2401,22 +2556,23 @@
 .bb .minicard.on {
     box-shadow: 0 0 0 3px var(--gold), 0 3px 0 3px rgba(0, 0, 0, 0.35);
 }
-.bb .minicard.mort .mc-ph {
-    filter: grayscale(1) brightness(0.8);
+/* Same scheme as a board tile: the set's colour band on top, then the name and price on cream. */
+.bb .minicard {
+    background: var(--cream);
 }
 .bb .mc-ph {
     position: relative;
-    height: 50px;
-    background: #333 center / cover;
+    height: 38px;
+    background: var(--sc, #241a3d);
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.25);
 }
 .bb .mc-band {
-    background: var(--sc);
-    color: var(--st);
+    color: var(--ink);
     font-family: var(--bb-display);
     font-weight: 800;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.1;
-    padding: 3px 4px 2px;
+    padding: 6px 4px 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2436,48 +2592,73 @@
     height: 11px;
     stroke-width: 3;
 }
-.bb .mc-h {
-    position: absolute;
-    left: 3px;
-    top: 3px;
-    display: inline-flex;
-    align-items: center;
-    gap: 1px;
-    padding: 1px 5px 0 3px;
-    border-radius: 99px;
-    background: #1fa85a;
-    color: #fff;
-    font-family: var(--bb-num);
-    font-size: 13px;
-    line-height: 1.1;
-    box-shadow: 0 0 0 1.5px #fff;
+/* Houses and hotel exactly as on the board, sized for the small card. */
+.bb .minicard .mc-ph {
+    display: grid;
+    place-items: center;
 }
-.bb .mc-h.hotel {
-    background: #e5383b;
+.bb .minicard .bh {
+    width: 46px;
+    padding: 0;
+    gap: 1px 4px;
 }
-.bb .mc-h .lu {
-    width: 11px;
-    height: 11px;
+.bb .minicard .bh svg {
+    width: 16px;
+    height: 16px;
+    filter: drop-shadow(0 0 0.5px #150a3a) drop-shadow(0 1.5px 0 rgba(0, 0, 0, 0.45));
 }
+.bb .minicard .bh.hotel svg {
+    width: 38px;
+    height: 28px;
+}
+/* Railways and utilities: their board tint and icon, no colour band. */
+.bb .minicard.k-rail {
+    --sc: #d7dcec;
+}
+.bb .minicard.k-rail .mc-sign {
+    color: #2c3a6b;
+}
+.bb .minicard.k-utility {
+    --sc: #bdeee4;
+}
+.bb .minicard.k-utility .mc-sign {
+    color: #0b7a6b;
+}
+.bb .mc-sign {
+    width: 24px;
+    height: 24px;
+    stroke-width: 2.2;
+}
+/* Shared with a player: the handshake on the band, in the lender's colour. */
 .bb .mc-b {
     position: absolute;
-    right: 3px;
-    top: 3px;
-    width: 20px;
-    height: 20px;
-    padding: 3px;
-    border-radius: 50%;
+    inset: 0;
+    margin: auto;
+    width: 26px;
+    height: 26px;
+    padding: 4px;
+    border-radius: 7px;
     color: #fff;
     background: var(--bc, #1e1b26);
-    box-shadow: 0 0 0 1.5px #fff;
+    box-shadow: 0 0 0 2px #fff, 0 2px 0 2px rgba(0, 0, 0, 0.35);
+}
+/* Mortgaged to the bank: a red bank on a darkened band; the name and price stay readable. */
+.bb .mc-b.bank {
+    background: #e5383b;
+}
+.bb .minicard.mort .mc-ph {
+    background: color-mix(in srgb, var(--sc, #241a3d) 45%, #0c0818);
+}
+.bb .minicard.mort {
+    background: #cfc8dc;
 }
 .bb .mc-ok {
     position: absolute;
     inset: 0;
     margin: auto;
-    width: 30px;
-    height: 30px;
-    padding: 5px;
+    width: 24px;
+    height: 24px;
+    padding: 4px;
     border-radius: 50%;
     color: #4a2a00;
     background: var(--gold);
@@ -2654,8 +2835,6 @@
     position: relative;
     flex: none;
     background-color: var(--pc);
-    background-size: cover;
-    background-position: center;
     color: #fff;
     padding: 10px 12px;
     min-height: 74px;
@@ -2968,6 +3147,69 @@
     }
 }
 
+/*
+ * Short windows: a phone on its side, or the game sharing the screen with
+ * another app. The square board would shrink to nothing above the players, so:
+ *  - wide and short: the board takes the full height on the left, and the top
+ *    bar, players and message bar stack on the right;
+ *  - narrow and short: the board keeps a playable size and the table scrolls.
+ */
+@media (max-height: 520px) and (min-width: 600px) {
+    .bb .screen:not(.form) {
+        max-width: none;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        gap: 6px 12px;
+        align-items: center;
+    }
+    .bb .screen:not(.form) .board-area {
+        grid-column: 1;
+        grid-row: 1 / 4;
+        width: calc(100dvh - 16px);
+        height: calc(100dvh - 16px);
+        max-height: none;
+        margin: 0;
+    }
+    .bb .screen:not(.form) .hudwrap {
+        grid-column: 2;
+        grid-row: 1;
+    }
+    .bb .screen:not(.form) .hud {
+        flex-wrap: wrap;
+        row-gap: 4px;
+    }
+    .bb .screen:not(.form) .pp .cash {
+        font-size: 15px;
+    }
+    .bb .screen:not(.form) .dock {
+        grid-column: 2;
+        grid-row: 2;
+    }
+    .bb .screen:not(.form) .tick {
+        grid-column: 2;
+        grid-row: 3;
+        margin: 0;
+    }
+}
+@media (max-height: 440px) and (max-width: 599px) {
+    .bb .screen:not(.form) {
+        overflow-y: auto;
+        scrollbar-width: none;
+    }
+    .bb .screen:not(.form)::-webkit-scrollbar {
+        display: none;
+    }
+    .bb .screen:not(.form) .board-area {
+        flex: none;
+        height: min(calc(100vw - 8px), 320px);
+        margin-top: 0;
+    }
+    .bb .screen:not(.form) .tick {
+        margin-bottom: 0;
+    }
+}
+
 @keyframes bb-bump {
     0% {
         transform: scale(0.9);
@@ -3085,10 +3327,11 @@
     font-size: 5cqw;
     border-width: 0.6cqw;
 }
+/* A property in a banner: a little tile, its set colour over cream. */
 .bb .dl-ph {
-    border-radius: 2cqw;
+    border-radius: 1.6cqw;
     border: 0.6cqw solid #fff;
-    background: #333 center / cover;
+    background: linear-gradient(180deg, var(--sc, #241a3d) 0 42%, var(--cream) 42%);
 }
 .bb .dl-bank {
     --c: #f5ae1b;

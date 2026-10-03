@@ -13,12 +13,16 @@ import { AudioToggles, Avatar, GButton, Logo, Ribbon, Tips } from './bits';
 import { Lobby } from './Lobby';
 import { Table } from './Table';
 
+const COUNT_FROM = 3;
+
 /** One room URL: join form, lobby, then the table, depending on what the server says. */
 export function BusinessRoom({ code }: { code: string }) {
     const { room, status, invite, online, rtt, clockOffset, send, join, start, configure, kick, setTeam, pause, close } = useBusinessRoom(code);
     const homeHref = gameBasePath(usePathname()) || '/';
     const [name, setName] = useState('');
     const wasStarted = useRef<boolean | null>(null);
+    /** 3, 2, 1, then 0 for "Go!", then null. */
+    const [count, setCount] = useState<number | null>(null);
 
     useEffect(() => {
         const profile = loadProfile();
@@ -28,9 +32,17 @@ export function BusinessRoom({ code }: { code: string }) {
     // A fanfare for everyone in the lobby when the host starts the match.
     useEffect(() => {
         if (!room) return;
-        if (wasStarted.current === false && room.started) sfx('start');
+        // The host pressed Start: everyone gets a 3, 2, 1 before the table.
+        if (wasStarted.current === false && room.started) setCount(COUNT_FROM);
         wasStarted.current = room.started;
     }, [room]);
+
+    useEffect(() => {
+        if (count === null) return;
+        sfx(count > 0 ? 'tick' : 'start');
+        const timer = window.setTimeout(() => setCount(count > 0 ? count - 1 : null), count > 0 ? 800 : 900);
+        return () => window.clearTimeout(timer);
+    }, [count]);
 
     const menuLink = (
         <Link href={homeHref} className="gbtn blue">
@@ -140,6 +152,12 @@ export function BusinessRoom({ code }: { code: string }) {
         <>
             <GameToasts />
             {body}
+            {count !== null && (
+                <div className="countdown" role="status" aria-live="assertive">
+                    <b key={count}>{count > 0 ? count : 'Go!'}</b>
+                    <span>Colours are dealt. Get ready.</span>
+                </div>
+            )}
         </>
     );
 }
