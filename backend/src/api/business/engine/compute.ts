@@ -55,7 +55,8 @@ export function mortgageValue(space: number): number {
 }
 
 export function redeemCost(space: number): number {
-  return Math.ceil((BUSINESS_BOARD[space].price ?? 0) * BUSINESS_RULES.REDEEM_RATE);
+  // In whole percent: 100 × 0.55 is 55.00000000000001 in floating point, which would round up to 56.
+  return Math.ceil(((BUSINESS_BOARD[space].price ?? 0) * Math.round(BUSINESS_RULES.REDEEM_RATE * 100)) / 100);
 }
 
 /** Index into the rent ladder for a city: 0 alone, 1 colour set, 2–5 houses, 6 hotel. */

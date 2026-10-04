@@ -157,7 +157,8 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
 - **Start:** when the host presses Start, everyone sees a 3, 2, 1, Go! countdown
   before the table.
 - **Pause:** the host has a pause button during the match. Everyone sees a
-  "Game paused" curtain, every clock stops, and the time is given back on resume.
+  "Game paused" curtain, every clock stops, and the time is given back on resume. If the host
+  drops off while it is paused, the match restarts by itself after a minute.
 - **Host leaving:** the room closes for everyone. Any other player leaving
   counts as bankruptcy.
 - **Dropping off:** a player whose connection is lost keeps their seat. They
@@ -183,8 +184,8 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   price, minimum raise ₹5, 15-second countdown shown on screen. A bid in the
   last 5 seconds resets the countdown to 5. No bids: it stays unowned.
 - **Owned property:** pay rent. No rent on a property mortgaged to the bank.
-- **Chance:** one deck of 12 cards — five pay, five cost (including ₹25 per
-  property owned, and ₹40 per house / ₹115 per hotel), "go back 3 spaces" and
+- **Chance:** one deck of 12 cards — four pay (₹50–₹200), six cost (₹100–₹250,
+  ₹40 per property owned, and ₹50 per house / ₹150 per hotel), "go back 3 spaces" and
   "go to Jail".
 - **Market:** a player who owns a property may stake ₹10–₹1,000 (never more
   than their cash) and two dice are rolled: 2–5 loses half the stake, 6–8

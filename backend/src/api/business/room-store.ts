@@ -24,6 +24,8 @@ const MAX_ROOMS = 500;
  * the turn timer runs out first, that turn is simply missed, like any other.
  */
 const BOT_GRACE_MS = 10_000;
+/** A paused match restarts by itself once the host has been gone this long. */
+const PAUSE_HOST_AWAY_MS = 60_000;
 /** Gap between two bot moves; longer after a roll, while everyone watches the pawn walk. */
 const BOT_PACE_MS = 1600;
 const BOT_AFTER_ROLL_MS = 4200;
@@ -199,6 +201,12 @@ export function tickRooms(now: number): BusinessRoom[] {
     if (now - room.touchedAt > IDLE_TTL_MS) {
       rooms.delete(room.code);
       continue;
+    }
+    // A host who paused and then dropped off would freeze the match for good: it restarts without them.
+    const host = room.seats[room.hostSeat];
+    if (room.state && room.pausedAt !== null && host.offlineAt !== null && now - host.offlineAt > PAUSE_HOST_AWAY_MS) {
+      setPaused(room, room.hostSeat, false, now);
+      changed.push(room);
     }
     if (!room.state || room.pausedAt !== null) continue;
     if (playForAbsent(room, now)) changed.push(room);

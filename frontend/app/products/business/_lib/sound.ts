@@ -76,6 +76,13 @@ const SOUNDS = {
         fx(2637, 0.28, 'sine', 0.035, 0.18);
         fx(330, 0.18, 'triangle', 0.1);
     },
+    /** A house going up: two hammer taps, then a bright "done". */
+    build: () => {
+        fx(240, 0.06, 'square', 0.09);
+        fx(240, 0.06, 'square', 0.09, 0.13);
+        fx(1047, 0.1, 'triangle', 0.09, 0.28);
+        fx(1568, 0.3, 'sine', 0.08, 0.36);
+    },
     /** Cash coming in: rent, salary, a lucky card. */
     income: () => {
         fx(1175, 0.07, 'sine', 0.12);

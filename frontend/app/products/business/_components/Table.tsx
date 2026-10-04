@@ -313,9 +313,10 @@ function useDeals(state: BusinessPublicState, busy: boolean, hold: boolean, laun
 
     useEffect(() => {
         if (busy) return;
-        const fresh = state.log
-            .filter((entry) => entry.n > seen.current && !early.current.has(entry.n))
-            .reverse()
+        const unseen = state.log.filter((entry) => entry.n > seen.current && !early.current.has(entry.n)).reverse();
+        // A new house has no banner, but everyone hears it go up.
+        if (unseen.some((entry) => entry.fx?.kind === 'build')) sfxQueued('build');
+        const fresh = unseen
             .map(dealFromLog)
             .filter((d): d is Deal => d !== null);
         seen.current = Math.max(seen.current, state.logSeq);

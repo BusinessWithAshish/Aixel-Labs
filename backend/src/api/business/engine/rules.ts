@@ -891,6 +891,10 @@ export function applyCommand(
       guard(canMortgage(state, seat, cmd.space));
       state.props[cmd.space].mortgaged = true;
       me.cash += mortgageValue(cmd.space);
+      // A trade offered before this would hand over a mortgaged property at the old price.
+      state.offers = state.offers.filter(
+        (o) => !(o.terms.kind === "trade" && [...o.terms.give.spaces, ...o.terms.get.spaces].includes(cmd.space)),
+      );
       log(state, `${me.name} mortgaged ${BUSINESS_BOARD[cmd.space].name} to the bank for ${rs(mortgageValue(cmd.space))}.`, seat, undefined, {
         kind: "bank",
         from: null,
@@ -1050,7 +1054,8 @@ export function tick(prev: BusinessGameState, now: number): BusinessGameState {
     // No bot plays for an absent player. A turn where any of their timers ran out
     // counts as missed (once per turn); rolling the dice clears the count.
     // An auction is everyone's clock, debt has its own ending, and a result pop-up only needs an OK.
-    const counts = state.phase !== "auction" && state.phase !== "debt" && state.phase !== "result";
+    // A due loan is not a missed turn either: the lender may simply not have answered an extension.
+    const counts = state.phase !== "auction" && state.phase !== "debt" && state.phase !== "result" && state.phase !== "loandue";
     if (counts && !state.lapsed) {
       state.lapsed = true;
       p.missed++;
@@ -1090,7 +1095,9 @@ export function tick(prev: BusinessGameState, now: number): BusinessGameState {
         advance(state, now);
         break;
       case "loandue":
-        // No answer: the loan is paid in full (continueTurn settles it, as the turn has lapsed).
+        // No answer: the loan is paid in full, and the turn goes on.
+        for (const loan of state.loans.filter((l) => l.borrower === p.seat && l.dueNow)) settleLoan(state, loan);
+        state.offers = state.offers.filter((o) => o.terms.kind !== "renew" || o.from !== p.seat);
         continueTurn(state, now);
         break;
       case "end":

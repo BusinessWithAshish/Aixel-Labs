@@ -137,8 +137,11 @@ export function attachBusinessSocket(server: Server) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
 
   server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+    // Node drops its own listener on upgrade: without one, a reset connection would crash the process.
+    socket.on("error", () => {});
     const path = (req.url ?? "").split("?")[0];
-    if (path !== BUSINESS_ROUTES.WS) return;
+    // No other upgrade handler exists on this server, so anything else is closed here.
+    if (path !== BUSINESS_ROUTES.WS) return void socket.destroy();
     if (!originAllowed(req.headers.origin)) {
       socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
       socket.destroy();
@@ -184,7 +187,12 @@ export function attachBusinessSocket(server: Server) {
   });
 
   const timer = setInterval(() => {
-    for (const room of tickRooms(Date.now())) broadcast(room);
+    // Runs for every room for as long as the server is up: one bad room must not take the process down.
+    try {
+      for (const room of tickRooms(Date.now())) broadcast(room);
+    } catch (err) {
+      console.error("[business] tick error:", err);
+    }
   }, TICK_MS);
   timer.unref();
 }

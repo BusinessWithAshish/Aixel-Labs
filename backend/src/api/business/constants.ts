@@ -41,9 +41,9 @@ export const BUSINESS_RULES = {
   MARKET_FLAT_MAX: 8,
   MARKET_LOSS_RATE: 0.5,
   DEFAULT_MISS_LIMIT: 3,
-  TAX_PER_PROPERTY: 25,
-  REPAIR_PER_HOUSE: 40,
-  REPAIR_PER_HOTEL: 115,
+  TAX_PER_PROPERTY: 40,
+  REPAIR_PER_HOUSE: 50,
+  REPAIR_PER_HOTEL: 150,
   MIN_SEATS: 2,
   MAX_SEATS: 6,
   LOG_LIMIT: 80,
@@ -213,18 +213,18 @@ export type BusinessCardEffect =
 
 export type BusinessCard = { text: string; effect: BusinessCardEffect };
 
-/** One Chance deck: five cards pay, five cost, two move the player. */
+/** One Chance deck: four cards pay, six cost, two move the player. It takes more than it gives. */
 export const BUSINESS_CHANCE_CARDS: readonly BusinessCard[] = [
   { text: "The bank pays you a dividend. Collect ₹50.", effect: { type: "cash", amount: 50 } },
   { text: "Your annuity matures. Collect ₹100.", effect: { type: "cash", amount: 100 } },
+  { text: "Festival bonus. Collect ₹150.", effect: { type: "cash", amount: 150 } },
   { text: "The bank made a mistake in your favour. Collect ₹200.", effect: { type: "cash", amount: 200 } },
-  { text: "Your loan is approved. Collect ₹150.", effect: { type: "cash", amount: 150 } },
-  { text: "Festival bonus. Collect ₹100.", effect: { type: "cash", amount: 100 } },
-  { text: "Property tax. Pay ₹25 for every property you own.", effect: { type: "tax" } },
-  { text: "Repairs. Pay ₹40 per house and ₹115 per hotel.", effect: { type: "repair" } },
+  { text: "Property tax. Pay ₹40 for every property you own.", effect: { type: "tax" } },
+  { text: "Repairs. Pay ₹50 per house and ₹150 per hotel.", effect: { type: "repair" } },
   { text: "Doctor's fees. Pay ₹100.", effect: { type: "cash", amount: -100 } },
   { text: "School fees. Pay ₹150.", effect: { type: "cash", amount: -150 } },
-  { text: "Speeding fine. Pay ₹50.", effect: { type: "cash", amount: -50 } },
+  { text: "Car breakdown. Pay ₹200.", effect: { type: "cash", amount: -200 } },
+  { text: "Wedding in the family. Pay ₹250.", effect: { type: "cash", amount: -250 } },
   { text: "Go back 3 spaces.", effect: { type: "back", steps: 3 } },
   { text: "Go to Jail.", effect: { type: "jail" } },
 ];
