@@ -97,3 +97,14 @@ export function createRoomRequest(
         };
     });
 }
+
+/** Whether `gap` works in flex layouts. It cannot be asked of CSS (`@supports` says yes for grids), so it is measured once. */
+export function supportsFlexGap(): boolean {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'display:flex;flex-direction:column;row-gap:1px;position:absolute;visibility:hidden';
+    probe.append(document.createElement('div'), document.createElement('div'));
+    document.body.appendChild(probe);
+    const works = probe.scrollHeight === 1;
+    probe.remove();
+    return works;
+}

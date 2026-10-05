@@ -274,7 +274,9 @@ export const minutesLabel = (m: number) => (m === 0 ? 'No limit' : m === 60 ? '1
 export const missLabel = (n: number) => `${n} turns`;
 
 const TIPS = [
-    `Pass Launch to collect ${rs(BUSINESS_RULES.SALARY)} salary.`,
+    `Your salary at Launch grows by ${rs(BUSINESS_RULES.SALARY_STEP)} with every lap you complete.`,
+    'Railway rent climbs with every house built on the board.',
+    'Taxes take a share of the cash you hold.',
     'Own a full colour set and rent there triples.',
     'Short of cash? Mortgage a property, or ask a player for a loan.',
     `Market: roll ${BUSINESS_RULES.MARKET_FLAT_MAX + 1} to 12 and your stake doubles.`,

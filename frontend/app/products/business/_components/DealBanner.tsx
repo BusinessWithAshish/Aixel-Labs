@@ -21,7 +21,7 @@ export function dealSound(fx: BusinessFx): BusinessSound | null {
     if (fx.kind === 'buy') return 'buy';
     if (fx.kind === 'rent') return 'rent';
     if (fx.kind === 'salary') return 'salary';
-    if (fx.kind === 'loan' || fx.kind === 'repay' || fx.kind === 'trade' || fx.kind === 'interest') return 'loan';
+    if (fx.kind === 'loan' || fx.kind === 'repay' || fx.kind === 'trade' || fx.kind === 'interest' || fx.kind === 'split') return 'loan';
     return fx.to === null ? 'pay' : 'income';
 }
 
@@ -35,12 +35,21 @@ function dealTone(fx: BusinessFx): string {
     return fx.to === null ? 'red' : 'green';
 }
 
+/**
+ * Moves a player makes on their own properties (build, sell a house, mortgage, redeem) show on
+ * the board itself, so they get a sound and no banner. Null for everything that has a banner.
+ */
+export function quietSound(fx: BusinessFx): BusinessSound | null {
+    if (fx.kind === 'build') return 'build';
+    if (fx.kind === 'bank') return fx.to === null ? 'pay' : 'income';
+    return null;
+}
+
 export function dealFromLog(entry: BusinessLogEntry): Deal | null {
-    // Building is quiet: the new house simply appears on the board.
-    if (!entry.fx || entry.fx.kind === 'build') return null;
+    if (!entry.fx || quietSound(entry.fx)) return null;
     // These are news even without an amount: trades, players going out or to Jail, a flat
     // Market, and other players' loans (announced without their numbers).
-    const newsAnyway = ['trade', 'out', 'jail', 'market', 'loan'];
+    const newsAnyway = ['trade', 'out', 'jail', 'market', 'loan', 'split'];
     if (entry.fx.amount <= 0 && !newsAnyway.includes(entry.fx.kind)) return null;
     return { id: entry.n, fx: entry.fx, text: entry.text };
 }
@@ -64,8 +73,8 @@ function caption(state: BusinessPublicState, deal: Deal): string {
         case 'market':
             return fx.amount === 0 ? 'Flat market: nothing won or lost' : fx.to === null ? 'Market crash' : 'Market boom';
         case 'loan':
-            if (fx.amount === 0) return space ? `${name(fx.to)} mortgaged ${space} to ${name(fx.from)}` : `${name(fx.from)} lent ${name(fx.to)} cash`;
-            return space ? `Mortgage on ${space}` : 'Cash loan';
+            if (fx.amount === 0) return `${name(fx.from)} lent ${name(fx.to)} cash`;
+            return 'Cash loan';
         case 'interest':
             return 'Loan interest for this lap';
         case 'jail':
@@ -80,6 +89,8 @@ function caption(state: BusinessPublicState, deal: Deal): string {
             return `${name(fx.from)} and ${name(fx.to)} made a trade`;
         case 'out':
             return `${name(fx.from)} is out of the match`;
+        case 'split':
+            return fx.amount === 0 && !deal.text.includes('no longer') ? `${name(fx.from)} and ${name(fx.to)} split a colour set` : 'Split ended: the houses went back to the bank';
     }
 }
 
@@ -148,7 +159,7 @@ export function DealBanner({ state, deal }: { state: BusinessPublicState; deal: 
             </div>
         );
     }
-    if (fx.kind === 'trade') {
+    if (fx.kind === 'trade' || fx.kind === 'split') {
         // Only that a trade happened, never what was in it.
         return (
             <div key={deal.id} className="deal blue">
@@ -159,7 +170,7 @@ export function DealBanner({ state, deal }: { state: BusinessPublicState; deal: 
                     </span>
                     <Party state={state} seat={fx.to} />
                 </div>
-                <div className="dl-cap">Trade done</div>
+                <div className="dl-cap">{fx.kind === 'trade' ? 'Trade done' : caption(state, deal)}</div>
             </div>
         );
     }

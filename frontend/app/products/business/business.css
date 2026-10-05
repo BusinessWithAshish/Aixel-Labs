@@ -1,10 +1,19 @@
 /*
  * Big Business game skin. Everything is scoped under `.bb` so none of it
  * leaks into the rest of the app. Every screen fills the viewport exactly
- * (100dvh) and never scrolls the page; the board sizes itself to whatever
- * room is left, using container units (cqw / cqh).
+ * and never scrolls the page; the board sizes itself to whatever room is left.
+ *
+ * Old phones and tablets are supported (iPhone/iPad from iOS 12, Android Chrome from 2019), so:
+ *  - Board sizes are multiples of `--u`, one hundredth of the board's side, measured in the
+ *    browser (`_hooks/use-board-unit.ts`) instead of container units.
+ *  - The screen height is `--vh` (set just below), never `dvh` directly.
+ *  - No `inset` shorthand, and every `color-mix()` has a plain colour on the line above it,
+ *    which browsers without `color-mix()` keep.
  */
 .bb {
+    /* Until the board is measured, and for anything outside it: a hundredth of the screen width. */
+    --u: 1vw;
+    --vh: 100vh;
     --bg0: #120a2e;
     --bg1: #2a1569;
     --plate: #44289f;
@@ -28,7 +37,7 @@
     --frame: #0c0818;
 
     width: 100%;
-    height: 100dvh;
+    height: var(--vh);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -41,6 +50,30 @@
     font-weight: 600;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    /* No accidental text selection, copy bubble or search panel on a long press (Android and iPhone). */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+/* Text boxes still select and paste normally. */
+.bb input,
+.bb textarea {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+}
+/* Pictures and links cannot be dragged out or long-pressed into a "save" or "open" menu. */
+.bb img,
+.bb svg,
+.bb a {
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
+}
+/* The visible height on phones whose browser bars slide away. */
+@supports (height: 100dvh) {
+    .bb {
+        --vh: 100dvh;
+    }
 }
 .bb *,
 .bb *::before,
@@ -104,7 +137,7 @@
     line-height: 0.92;
     text-align: center;
     text-shadow: 0 0.09em 0 #8a5200, 0 0.18em 0.35em rgba(0, 0, 0, 0.5);
-    font-size: clamp(30px, 6.5dvh, 46px);
+    font-size: clamp(30px, calc(0.065 * var(--vh)), 46px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -714,7 +747,10 @@
 }
 /* Second tap: the whole card becomes the confirm button. */
 .bb .slot .kick.sure {
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     width: auto;
     height: auto;
     border-radius: 12px;
@@ -817,13 +853,12 @@
     flex: 1 1 auto;
     min-height: 0;
     /* The board runs almost edge to edge, so every property is as wide as the screen allows. */
-    margin-inline: -6px;
+    margin-left: -6px;
+    margin-right: -6px;
     /* Never taller than the board can be wide, so spare height goes around the whole table instead of into gaps. */
     max-height: calc(min(100vw, 640px) - 8px);
     margin-top: auto;
-    container-type: size;
-    display: grid;
-    place-items: center;
+    position: relative;
 }
 .bb .tick {
     margin-bottom: auto;
@@ -845,11 +880,14 @@
 .bb .banners:empty {
     display: none;
 }
+/* The board is a square of 100 units, centred in its area. It is taken out of the flow so its own size never feeds back into the area's. */
 .bb .board-box {
-    width: min(100cqw, 100cqh);
-    height: min(100cqw, 100cqh);
-    container-type: inline-size;
-    position: relative;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: calc(100 * var(--u));
+    height: calc(100 * var(--u));
+    transform: translate(-50%, -50%);
 }
 .bb .board {
     width: 100%;
@@ -858,19 +896,21 @@
     /* Mirrored in Board.tsx (PAD, GAP, CORNER_FR): change both together. */
     grid-template-columns: 2.4fr repeat(11, 1fr) 2.4fr;
     grid-template-rows: 2.4fr repeat(11, 1fr) 2.4fr;
-    gap: 0.3cqw;
-    padding: 0.6cqw;
-    border-radius: 2.4cqw;
+    gap: calc(0.3 * var(--u));
+    padding: calc(0.6 * var(--u));
+    border-radius: calc(2.4 * var(--u));
     background: var(--frame);
-    box-shadow: 0 0.8cqw 0 #000;
+    box-shadow: 0 calc(0.8 * var(--u)) 0 #000;
 }
 .bb .tile {
     position: relative;
+    -webkit-appearance: none;
+    appearance: none;
     display: flex;
     flex-direction: column;
     padding: 0;
     border: 0;
-    border-radius: 0.5cqw;
+    border-radius: calc(0.5 * var(--u));
     background: var(--cream);
     color: var(--ink);
     text-align: center;
@@ -890,23 +930,25 @@
 }
 /* Price plate in the set colour, on the edge that faces the middle of the board. */
 .bb .tile .band {
-    /* A fixed share of the tile, whatever is built on it. */
-    flex: 0 0 30%;
+    /* A fixed share of the tile, whatever is built on it. Given as a length, not a percentage:
+       Safari (every browser on iPhone and iPad) cannot resolve a percentage inside a button and
+       collapses an empty band to nothing. A tile is calc(14.46 * var(--u)) deep. */
+    flex: 0 0 calc(4.34 * var(--u));
     display: grid;
     place-items: center;
     font-family: var(--bb-num);
     font-weight: 700;
-    font-size: 3.5cqw;
+    font-size: calc(3.5 * var(--u));
     line-height: 1;
     font-variant-numeric: tabular-nums;
-    box-shadow: inset 0 0 0 0.12cqw rgba(0, 0, 0, 0.25);
-    padding-top: 0.2cqw;
+    box-shadow: inset 0 0 0 calc(0.12 * var(--u)) rgba(0, 0, 0, 0.25);
+    padding-top: calc(0.2 * var(--u));
     min-width: 0;
     min-height: 0;
 }
 .bb .tile.s-left .band,
 .bb .tile.s-right .band {
-    flex-basis: 33%;
+    flex-basis: calc(4.77 * var(--u));
 }
 /* Houses on the band, in the owner's colour, with a white edge so they read on every set colour. */
 .bb .bh {
@@ -914,18 +956,18 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 0.25cqw;
+    gap: calc(0.25 * var(--u));
     width: 100%;
     line-height: 0;
 }
 /* Every house is the same size, whether there is one or four: two fit in a row, so three and four make two rows. */
 .bb .bh {
-    padding: 0 0.6cqw;
+    padding: 0 calc(0.6 * var(--u));
 }
 .bb .bh svg {
-    width: 2cqw;
-    height: 2cqw;
-    filter: drop-shadow(0 0 0.12cqw #150a3a) drop-shadow(0 0.15cqw 0 rgba(0, 0, 0, 0.5));
+    width: calc(2 * var(--u));
+    height: calc(2 * var(--u));
+    filter: drop-shadow(0 0 calc(0.12 * var(--u)) #150a3a) drop-shadow(0 calc(0.15 * var(--u)) 0 rgba(0, 0, 0, 0.5));
 }
 .bb .bh .hm-body {
     fill: var(--hc, #fff);
@@ -938,8 +980,8 @@
 }
 /* A hotel: one bigger building in the owner's colour. */
 .bb .bh.hotel svg {
-    width: 4.6cqw;
-    height: 3.5cqw;
+    width: calc(4.6 * var(--u));
+    height: calc(3.5 * var(--u));
 }
 /* Side columns: the band is narrow and tall; two still sit side by side. */
 .bb .tile.s-left .bh:not(.hotel),
@@ -948,8 +990,8 @@
 }
 .bb .tile.s-left .bh.hotel svg,
 .bb .tile.s-right .bh.hotel svg {
-    width: 4.1cqw;
-    height: 3.1cqw;
+    width: calc(4.1 * var(--u));
+    height: calc(3.1 * var(--u));
 }
 /* Railways and utilities have no colour band (nothing is ever built there): their icon takes its place. */
 .bb .tile .band.sign {
@@ -958,8 +1000,8 @@
     padding: 0;
 }
 .bb .tile .band.sign svg {
-    width: 3.4cqw;
-    height: 3.4cqw;
+    width: calc(3.4 * var(--u));
+    height: calc(3.4 * var(--u));
     stroke-width: 2.3;
 }
 .bb .board.plain .tile.k-rail,
@@ -987,20 +1029,20 @@
 .bb .board:not(.plain) .tile.built .px {
     display: block;
     position: absolute;
-    right: 0.3cqw;
-    top: 0.3cqw;
-    padding: 0.15cqw 0.6cqw 0;
+    right: calc(0.3 * var(--u));
+    top: calc(0.3 * var(--u));
+    padding: calc(0.15 * var(--u)) calc(0.6 * var(--u)) 0;
     border-radius: 99px;
     background: rgba(12, 8, 24, 0.82);
     color: #fff;
     font-family: var(--bb-num);
     font-weight: 700;
-    font-size: 2.6cqw;
+    font-size: calc(2.6 * var(--u));
     line-height: 1;
 }
 .bb .board:not(.plain) .tile.s-top.built .px {
     top: auto;
-    bottom: 0.3cqw;
+    bottom: calc(0.3 * var(--u));
 }
 
 /*
@@ -1018,7 +1060,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.15cqw;
+    gap: calc(0.15 * var(--u));
     line-height: 1;
 }
 .bb .board.plain .tile.s-bottom .lbl,
@@ -1036,7 +1078,7 @@
     background: none;
     color: var(--ink);
     text-shadow: none;
-    font-size: 2.1cqw;
+    font-size: calc(2.1 * var(--u));
     font-weight: 800;
     line-height: 1;
     letter-spacing: 0;
@@ -1044,20 +1086,20 @@
     overflow: visible;
 }
 .bb .board.plain .tile.long .pic .nm {
-    font-size: 1.7cqw;
+    font-size: calc(1.7 * var(--u));
 }
 .bb .board.plain .tile .px {
     display: block;
     font-family: var(--bb-num);
     font-weight: 700;
-    font-size: 3.5cqw;
+    font-size: calc(3.5 * var(--u));
     line-height: 0.85;
     color: var(--ink);
     font-variant-numeric: tabular-nums;
 }
 .bb .board.plain .tile.s-left .px,
 .bb .board.plain .tile.s-right .px {
-    font-size: 3.3cqw;
+    font-size: calc(3.3 * var(--u));
 }
 /* One big mark over the property. Red bank: mortgaged to the bank. Handshake in the lender's colour: shared with a player. */
 /* Raising cash: everything that is not the player's own steps back, and their properties stand out. */
@@ -1066,7 +1108,7 @@
     opacity: 0.22;
 }
 .bb .board.spot .tile:not(.dim) {
-    box-shadow: 0 0 0 0.35cqw #fff, 0 0 2cqw rgba(255, 255, 255, 0.7);
+    box-shadow: 0 0 0 calc(0.35 * var(--u)) #fff, 0 0 calc(2 * var(--u)) rgba(255, 255, 255, 0.7);
     z-index: 1;
 }
 .bb .board.spot .centre > *:not(.overlay) {
@@ -1079,21 +1121,24 @@
 }
 .bb .tile .cover {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: 1;
     display: grid;
     place-items: center;
     pointer-events: none;
 }
 .bb .tile .cover svg {
-    width: 5cqw;
-    height: 5cqw;
-    padding: 0.7cqw;
-    border-radius: 1.1cqw;
+    width: calc(5 * var(--u));
+    height: calc(5 * var(--u));
+    padding: calc(0.7 * var(--u));
+    border-radius: calc(1.1 * var(--u));
     stroke: #fff;
     stroke-width: 2.2;
     background: var(--bc, #1e1b26);
-    box-shadow: 0 0 0 0.3cqw #fff, 0 0.4cqw 0 0.3cqw rgba(0, 0, 0, 0.45);
+    box-shadow: 0 0 0 calc(0.3 * var(--u)) #fff, 0 calc(0.4 * var(--u)) 0 calc(0.3 * var(--u)) rgba(0, 0, 0, 0.45);
 }
 /* Shared with a player: the handshake sits on the colour band only (the band is never built on while shared). */
 .bb .tile.s-bottom .cover.share {
@@ -1109,44 +1154,44 @@
     right: 67%;
 }
 .bb .tile .cover.share svg {
-    width: 3.5cqw;
-    height: 3.5cqw;
-    padding: 0.45cqw;
-    border-radius: 0.8cqw;
-    box-shadow: 0 0 0 0.25cqw #fff;
+    width: calc(3.5 * var(--u));
+    height: calc(3.5 * var(--u));
+    padding: calc(0.45 * var(--u));
+    border-radius: calc(0.8 * var(--u));
+    box-shadow: 0 0 0 calc(0.25 * var(--u)) #fff;
 }
 .bb .tile .cover.bank svg {
     background: #e5383b;
 }
 /* Mortgage badges sit on the colour band (never built on while mortgaged), clear of the name. */
 .bb .board.plain .tile.s-bottom .bdg {
-    top: 0.3cqw;
+    top: calc(0.3 * var(--u));
     bottom: auto;
     left: 50%;
-    margin-left: -1.5cqw;
+    margin-left: calc(-1.5 * var(--u));
 }
 .bb .board.plain .tile.s-top .bdg {
     top: auto;
-    bottom: 0.3cqw;
+    bottom: calc(0.3 * var(--u));
     left: 50%;
-    margin-left: -1.5cqw;
+    margin-left: calc(-1.5 * var(--u));
 }
 .bb .board.plain .tile.s-left .bdg {
     left: auto;
-    right: 0.5cqw;
+    right: calc(0.5 * var(--u));
     bottom: 50%;
-    margin-bottom: -1.5cqw;
+    margin-bottom: calc(-1.5 * var(--u));
 }
 .bb .board.plain .tile.s-right .bdg {
     right: auto;
-    left: 0.5cqw;
+    left: calc(0.5 * var(--u));
     bottom: 50%;
-    margin-bottom: -1.5cqw;
+    margin-bottom: calc(-1.5 * var(--u));
 }
 /* Without a photo behind them, the other spaces show their name under the icon. */
 .bb .board.plain .tile .body .nm {
     display: block;
-    font-size: 1.55cqw;
+    font-size: calc(1.55 * var(--u));
     line-height: 1;
 }
 .bb .board.plain .tile.s-bottom .body .nm,
@@ -1182,13 +1227,13 @@
 .bb .tile .nm {
     display: none;
     width: 100%;
-    padding: 1.4cqw 0.2cqw 0.3cqw;
-    font-size: 1.15cqw;
+    padding: calc(1.4 * var(--u)) calc(0.2 * var(--u)) calc(0.3 * var(--u));
+    font-size: calc(1.15 * var(--u));
     font-weight: 800;
     line-height: 1.05;
     color: #fff;
     background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.82));
-    text-shadow: 0 0.1cqw 0.2cqw #000;
+    text-shadow: 0 calc(0.1 * var(--u)) calc(0.2 * var(--u)) #000;
 }
 /*
  * Phone-size board: every property keeps its name, written along the long side
@@ -1196,13 +1241,13 @@
  * side columns). The wide board below switches back to a caption.
  */
 .bb .tile.long .pic .nm {
-    font-size: 1.85cqw;
+    font-size: calc(1.85 * var(--u));
 }
 .bb .tile .pic .nm {
     display: block;
-    font-size: 2.15cqw;
+    font-size: calc(2.15 * var(--u));
     line-height: 1.05;
-    padding: 0.25cqw 0.3cqw;
+    padding: calc(0.25 * var(--u)) calc(0.3 * var(--u));
     overflow: hidden;
     letter-spacing: -0.01em;
 }
@@ -1219,15 +1264,15 @@
 /* Side columns: one line across the photo, sized so the longest city still fits. */
 .bb .tile.s-left .pic .nm,
 .bb .tile.s-right .pic .nm {
-    font-size: 1.85cqw;
+    font-size: calc(1.85 * var(--u));
     white-space: nowrap;
     text-overflow: ellipsis;
-    padding: 1.2cqw 0.2cqw 0.2cqw;
+    padding: calc(1.2 * var(--u)) calc(0.2 * var(--u)) calc(0.2 * var(--u));
     letter-spacing: -0.02em;
 }
 .bb .tile.s-left.long .pic .nm,
 .bb .tile.s-right.long .pic .nm {
-    font-size: 1.55cqw;
+    font-size: calc(1.55 * var(--u));
 }
 .bb .tile .body {
     flex: 1;
@@ -1235,8 +1280,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.3cqw;
-    padding: 0.2cqw;
+    gap: calc(0.3 * var(--u));
+    padding: calc(0.2 * var(--u));
     min-width: 0;
     min-height: 0;
 }
@@ -1251,17 +1296,21 @@
 .bb .tile .body.ph::before {
     content: '';
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: -1;
+    background: var(--tint, #241a3d);
     background: linear-gradient(160deg, color-mix(in srgb, var(--tint, #241a3d) 88%, transparent), color-mix(in srgb, var(--tint, #241a3d) 52%, transparent));
 }
 .bb .tile .body.ph .nm,
 .bb .tile .body.ph .cn {
     color: #fff;
-    text-shadow: 0 0.1cqw 0.3cqw #000;
+    text-shadow: 0 calc(0.1 * var(--u)) calc(0.3 * var(--u)) #000;
 }
 .bb .tile .body.ph .ticon {
-    filter: drop-shadow(0 0.15cqw 0.2cqw rgba(0, 0, 0, 0.6));
+    filter: drop-shadow(0 calc(0.15 * var(--u)) calc(0.2 * var(--u)) rgba(0, 0, 0, 0.6));
 }
 .bb .tile.k-market {
     --tint: #1f4bbf;
@@ -1291,8 +1340,8 @@
     text-shadow: none;
 }
 .bb .tile .ticon {
-    width: 4cqw;
-    height: 4cqw;
+    width: calc(4 * var(--u));
+    height: calc(4 * var(--u));
     stroke-width: 2.1;
     flex: none;
 }
@@ -1312,13 +1361,13 @@
     color: #fff;
 }
 .bb .tile.corner .ticon {
-    width: 6cqw;
-    height: 6cqw;
+    width: calc(6 * var(--u));
+    height: calc(6 * var(--u));
 }
 .bb .tile.corner .cn {
     font-family: var(--bb-display);
     font-weight: 800;
-    font-size: 2cqw;
+    font-size: calc(2 * var(--u));
     letter-spacing: 0.04em;
     text-transform: uppercase;
     line-height: 1;
@@ -1336,40 +1385,43 @@
     background: linear-gradient(160deg, #ff7c8b, #b4263a);
 }
 .bb .tile.sel {
-    outline: 0.5cqw solid #fff;
-    outline-offset: -0.1cqw;
+    outline: calc(0.5 * var(--u)) solid #fff;
+    outline-offset: calc(-0.1 * var(--u));
     z-index: 2;
-    box-shadow: 0 0 2.4cqw #fff;
+    box-shadow: 0 0 calc(2.4 * var(--u)) #fff;
 }
 .bb .tile .bdg {
     position: absolute;
-    left: 0.25cqw;
-    bottom: 0.25cqw;
-    width: 3cqw;
-    height: 3cqw;
+    left: calc(0.25 * var(--u));
+    bottom: calc(0.25 * var(--u));
+    width: calc(3 * var(--u));
+    height: calc(3 * var(--u));
     stroke: #fff;
     stroke-width: 2.2;
     background: var(--bc, #1e1b26);
-    border-radius: 0.6cqw;
-    padding: 0.3cqw;
+    border-radius: calc(0.6 * var(--u));
+    padding: calc(0.3 * var(--u));
     z-index: 1;
 }
 .bb .tile.s-top .bdg {
     bottom: auto;
-    top: 0.25cqw;
+    top: calc(0.25 * var(--u));
 }
 .bb .tile.s-left .bdg {
-    left: 0.25cqw;
+    left: calc(0.25 * var(--u));
 }
 .bb .tile.s-right .bdg {
     left: auto;
-    right: 0.25cqw;
+    right: calc(0.25 * var(--u));
 }
 /* Ownership markers: a house in the owner's colour, just inside the board next to the property. */
 .bb .mlayer,
 .bb .tlayer {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     pointer-events: none;
 }
 .bb .mlayer {
@@ -1381,14 +1433,17 @@
 .bb .mk {
     position: absolute;
     z-index: 1;
-    width: 2.8cqw;
-    height: 2.8cqw;
+    width: calc(2.8 * var(--u));
+    height: calc(2.8 * var(--u));
     transform: translate(-50%, -50%);
-    filter: drop-shadow(0 0.25cqw 0 rgba(0, 0, 0, 0.55));
+    filter: drop-shadow(0 calc(0.25 * var(--u)) 0 rgba(0, 0, 0, 0.55));
 }
 .bb .mk svg {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     width: 100%;
     height: 100%;
 }
@@ -1414,10 +1469,10 @@
     display: grid;
     place-items: center;
     background: #1fa85a;
-    box-shadow: 0 0 0 0.25cqw #fff;
+    box-shadow: 0 0 0 calc(0.25 * var(--u)) #fff;
     font-family: var(--bb-num);
     font-weight: 700;
-    font-size: 2.3cqw;
+    font-size: calc(2.3 * var(--u));
     line-height: 1;
     color: #fff;
 }
@@ -1485,15 +1540,15 @@
 }
 .bb .tk svg {
     display: block;
-    width: 4.1cqw;
-    height: 5.5cqw;
+    width: calc(4.1 * var(--u));
+    height: calc(5.5 * var(--u));
     overflow: visible;
 }
 .bb .tk.now {
     z-index: 1;
 }
 .bb .tk.now svg {
-    filter: drop-shadow(0 0 0.35cqw #fff) drop-shadow(0 0 0.35cqw #fff);
+    filter: drop-shadow(0 0 calc(0.35 * var(--u)) #fff) drop-shadow(0 0 calc(0.35 * var(--u)) #fff);
     animation: bb-idle 1.1s ease-in-out infinite;
 }
 .bb .tk.moving svg {
@@ -1504,83 +1559,83 @@
 }
 .bb .centre {
     grid-area: 2 / 2 / 13 / 13;
-    border-radius: 1.2cqw;
+    border-radius: calc(1.2 * var(--u));
     background: radial-gradient(90% 70% at 50% 40%, #5a36c9 0%, #35198a 55%, #231060 100%);
-    box-shadow: inset 0 0 0 0.3cqw rgba(255, 255, 255, 0.14), inset 0 0 6cqw rgba(0, 0, 0, 0.45);
+    box-shadow: inset 0 0 0 calc(0.3 * var(--u)) rgba(255, 255, 255, 0.14), inset 0 0 calc(6 * var(--u)) rgba(0, 0, 0, 0.45);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2.4cqw;
-    padding: 5cqw;
+    gap: calc(2.4 * var(--u));
+    padding: calc(5 * var(--u));
     text-align: center;
     min-width: 0;
 }
 .bb .centre .logo {
-    font-size: 6.6cqw;
+    font-size: calc(6.6 * var(--u));
 }
 .bb .decks {
     display: flex;
-    gap: 4cqw;
+    gap: calc(4 * var(--u));
     align-items: stretch;
 }
 .bb .deck {
-    width: 15cqw;
-    border-radius: 1.6cqw;
+    width: calc(15 * var(--u));
+    border-radius: calc(1.6 * var(--u));
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1cqw;
+    gap: calc(1 * var(--u));
     color: #fff;
     font-family: var(--bb-display);
     font-weight: 800;
-    font-size: 2.3cqw;
+    font-size: calc(2.3 * var(--u));
     line-height: 1.05;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    border: 0.5cqw solid var(--frame);
+    border: calc(0.5 * var(--u)) solid var(--frame);
     cursor: pointer;
     padding: 0;
 }
 .bb .deck.ch {
-    min-height: 19cqw;
+    min-height: calc(19 * var(--u));
     background: linear-gradient(160deg, #ffb45e, #e0600a);
     transform: rotate(-7deg);
-    box-shadow: 0.8cqw 0.8cqw 0 #8a3b00;
+    box-shadow: calc(0.8 * var(--u)) calc(0.8 * var(--u)) 0 #8a3b00;
 }
 .bb .deck.ch svg {
-    width: 5.4cqw;
-    height: 5.4cqw;
+    width: calc(5.4 * var(--u));
+    height: calc(5.4 * var(--u));
 }
 .bb .deck.mk2 {
-    width: 21cqw;
-    padding: 1.1cqw;
-    gap: 0.9cqw;
+    width: calc(21 * var(--u));
+    padding: calc(1.1 * var(--u));
+    gap: calc(0.9 * var(--u));
     background: linear-gradient(160deg, #4da3ff, #1b4fc2);
-    box-shadow: 0.8cqw 0.8cqw 0 #12348a;
+    box-shadow: calc(0.8 * var(--u)) calc(0.8 * var(--u)) 0 #12348a;
 }
 .bb .deck.mk2 > span {
     display: flex;
     align-items: center;
-    gap: 1cqw;
+    gap: calc(1 * var(--u));
 }
 .bb .deck.mk2 svg {
-    width: 3.2cqw;
-    height: 3.2cqw;
+    width: calc(3.2 * var(--u));
+    height: calc(3.2 * var(--u));
 }
 .bb .odds {
     display: flex;
     flex-direction: column;
-    gap: 0.5cqw;
+    gap: calc(0.5 * var(--u));
     width: 100%;
 }
 .bb .odds b {
-    border-radius: 1cqw;
-    padding: 0.4cqw;
+    border-radius: calc(1 * var(--u));
+    padding: calc(0.4 * var(--u));
     font-family: var(--bb-display);
     font-weight: 800;
-    font-size: 1.8cqw;
+    font-size: calc(1.8 * var(--u));
     letter-spacing: 0.02em;
     text-transform: none;
     line-height: 1.1;
@@ -1621,105 +1676,109 @@
 }
 .bb .rules {
     background: rgba(0, 0, 0, 0.28);
-    border-radius: 1.6cqw;
-    padding: 1.1cqw 2.4cqw;
-    font-size: 2cqw;
+    border-radius: calc(1.6 * var(--u));
+    padding: calc(1.1 * var(--u)) calc(2.4 * var(--u));
+    font-size: calc(2 * var(--u));
     font-weight: 700;
     line-height: 1.45;
-    box-shadow: inset 0 0 0 0.2cqw rgba(255, 255, 255, 0.22);
+    box-shadow: inset 0 0 0 calc(0.2 * var(--u)) rgba(255, 255, 255, 0.22);
 }
 .bb .rules b {
     color: var(--gold);
     font-weight: 800;
 }
-@container (min-width: 520px) {
-    .bb .tile .nm {
-        display: block;
-    }
-    .bb .tile .pic .nm,
-    .bb .tile.s-bottom .pic .nm,
-    .bb .tile.s-top .pic .nm,
-    .bb .tile.s-left .pic .nm,
-    .bb .tile.s-right .pic .nm {
-        display: block;
-        writing-mode: horizontal-tb;
-        transform: none;
-        width: 100%;
-        height: auto;
-        white-space: normal;
-        font-size: 1.15cqw;
-        padding: 1.4cqw 0.2cqw 0.3cqw;
-        background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.82));
-    }
-    .bb .tile .band {
-        font-size: 2.4cqw;
-        flex-basis: 24%;
-    }
-    .bb .tile.s-left .band,
-    .bb .tile.s-right .band {
-        flex-basis: 34%;
-    }
-    .bb .tile .ticon {
-        width: 3cqw;
-        height: 3cqw;
-    }
-    .bb .tile.corner .ticon {
-        width: 5cqw;
-        height: 5cqw;
-    }
-    .bb .tile.corner .cn {
-        font-size: 1.6cqw;
-    }
-    .bb .tile .bdg {
-        width: 2.2cqw;
-        height: 2.2cqw;
-    }
-    .bb .mk {
-        width: 2.8cqw;
-        height: 2.8cqw;
-    }
-    .bb .tile.long .pic .nm {
-        font-size: 1.15cqw;
-    }
-    .bb .board.plain .tile .pic .nm {
-        font-size: 1.5cqw;
-    }
-    .bb .board.plain .tile.long .pic .nm {
-        font-size: 1.25cqw;
-    }
-    .bb .board.plain .tile .px,
-    .bb .board.plain .tile.s-left .px,
-    .bb .board.plain .tile.s-right .px {
-        font-size: 2.5cqw;
-    }
-    .bb .bh svg {
-        width: 2cqw;
-        height: 2cqw;
-    }
-    .bb .tile .cover svg {
-        width: 4cqw;
-        height: 4cqw;
-    }
-    .bb .tile .cover.share svg {
-        width: 2.8cqw;
-        height: 2.8cqw;
-    }
-    .bb .bh.hotel svg {
-        width: 3.6cqw;
-        height: 2.7cqw;
-    }
-    .bb .tile .band.sign svg {
-        width: 2.6cqw;
-        height: 2.6cqw;
-    }
-    .bb .mk b {
-        font-size: 1.9cqw;
-    }
-    .bb .tk svg {
-        width: 3.2cqw;
-        height: 4.3cqw;
-    }
+/*
+ * A board 520px or wider (tablets, landscape) has room for more on each tile. The board's area gets
+ * `bb-wide` (use-board-unit.ts). It stands in for `.bb` in these selectors so they weigh the same as
+ * the rules they adjust, and the plain board's own rules still win where they did.
+ */
+.bb-wide .tile .nm {
+    display: block;
 }
+.bb-wide .tile .pic .nm,
+.bb-wide .tile.s-bottom .pic .nm,
+.bb-wide .tile.s-top .pic .nm,
+.bb-wide .tile.s-left .pic .nm,
+.bb-wide .tile.s-right .pic .nm {
+    display: block;
+    writing-mode: horizontal-tb;
+    transform: none;
+    width: 100%;
+    height: auto;
+    white-space: normal;
+    font-size: calc(1.15 * var(--u));
+    padding: calc(1.4 * var(--u)) calc(0.2 * var(--u)) calc(0.3 * var(--u));
+    background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.82));
+}
+.bb-wide .tile .band {
+    font-size: calc(2.4 * var(--u));
+    flex-basis: calc(3.47 * var(--u));
+}
+.bb-wide .tile.s-left .band,
+.bb-wide .tile.s-right .band {
+    flex-basis: calc(4.92 * var(--u));
+}
+.bb-wide .tile .ticon {
+    width: calc(3 * var(--u));
+    height: calc(3 * var(--u));
+}
+.bb-wide .tile.corner .ticon {
+    width: calc(5 * var(--u));
+    height: calc(5 * var(--u));
+}
+.bb-wide .tile.corner .cn {
+    font-size: calc(1.6 * var(--u));
+}
+.bb-wide .tile .bdg {
+    width: calc(2.2 * var(--u));
+    height: calc(2.2 * var(--u));
+}
+.bb-wide .mk {
+    width: calc(2.8 * var(--u));
+    height: calc(2.8 * var(--u));
+}
+.bb-wide .tile.long .pic .nm {
+    font-size: calc(1.15 * var(--u));
+}
+.bb-wide .board.plain .tile .pic .nm {
+    font-size: calc(1.5 * var(--u));
+}
+.bb-wide .board.plain .tile.long .pic .nm {
+    font-size: calc(1.25 * var(--u));
+}
+.bb-wide .board.plain .tile .px,
+.bb-wide .board.plain .tile.s-left .px,
+.bb-wide .board.plain .tile.s-right .px {
+    font-size: calc(2.5 * var(--u));
+}
+.bb-wide .bh svg {
+    width: calc(2 * var(--u));
+    height: calc(2 * var(--u));
+}
+.bb-wide .tile .cover svg {
+    width: calc(4 * var(--u));
+    height: calc(4 * var(--u));
+}
+.bb-wide .tile .cover.share svg {
+    width: calc(2.8 * var(--u));
+    height: calc(2.8 * var(--u));
+}
+.bb-wide .bh.hotel svg {
+    width: calc(3.6 * var(--u));
+    height: calc(2.7 * var(--u));
+}
+.bb-wide .tile .band.sign svg {
+    width: calc(2.6 * var(--u));
+    height: calc(2.6 * var(--u));
+}
+.bb-wide .mk b {
+    font-size: calc(1.9 * var(--u));
+}
+.bb-wide .tk svg {
+    width: calc(3.2 * var(--u));
+    height: calc(4.3 * var(--u));
+}
+
 
 /* ---------- dock ---------- */
 .bb .dock {
@@ -1754,6 +1813,7 @@
 .bb .pp.now {
     background: linear-gradient(180deg, var(--plate), var(--plate-2)) padding-box,
         conic-gradient(var(--tc, #ffc83d) calc(var(--p, 100) * 1%), rgba(255, 255, 255, 0.12) 0) border-box;
+    box-shadow: 0 3px 0 var(--edge);
     box-shadow: 0 3px 0 var(--edge), 0 0 14px color-mix(in srgb, var(--tc, #ffc83d) 60%, transparent);
 }
 .bb .pp.gone {
@@ -1814,7 +1874,10 @@
 /* 3, 2, 1, Go! when the host starts the match. */
 .bb .countdown {
     position: fixed;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: 85;
     display: flex;
     flex-direction: column;
@@ -1861,7 +1924,10 @@
 /* The host paused the match: a curtain over everything, for everyone. */
 .bb .paused {
     position: fixed;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: 80;
     display: grid;
     place-items: center;
@@ -1962,7 +2028,10 @@
 }
 .bb .d3 .f {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     border-radius: 6px;
     background: linear-gradient(160deg, #fff, #e6dcc6);
     box-shadow: inset 0 0 0 1px #b9ad95;
@@ -2162,7 +2231,10 @@
 /* ---------- pop-ups: always over the whole screen, never clipped by the board ---------- */
 .bb .pop {
     position: fixed;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: 40;
     display: grid;
     place-items: center;
@@ -2192,7 +2264,7 @@
 }
 .bb .pop-card {
     width: min(100%, 340px);
-    max-height: calc(100dvh - 108px);
+    max-height: calc(var(--vh) - 108px);
     overflow-y: auto;
     scrollbar-width: none;
     display: flex;
@@ -2649,7 +2721,10 @@
 /* Shared with a player: the handshake on the band, in the lender's colour. */
 .bb .mc-b {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     margin: auto;
     width: 26px;
     height: 26px;
@@ -2664,6 +2739,7 @@
     background: #e5383b;
 }
 .bb .minicard.mort .mc-ph {
+    background: #241a3d;
     background: color-mix(in srgb, var(--sc, #241a3d) 45%, #0c0818);
 }
 .bb .minicard.mort {
@@ -2671,7 +2747,10 @@
 }
 .bb .mc-ok {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     margin: auto;
     width: 24px;
     height: 24px;
@@ -2846,7 +2925,7 @@
     box-shadow: 0 6px 0 rgba(0, 0, 0, 0.5), 0 14px 28px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
-    max-height: calc(100dvh - 128px);
+    max-height: calc(var(--vh) - 128px);
 }
 .bb .prop-hd {
     position: relative;
@@ -2864,7 +2943,10 @@
 .bb .prop-hd::before {
     content: '';
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     background: linear-gradient(90deg, rgba(10, 6, 30, 0.82), rgba(10, 6, 30, 0.25));
 }
 .bb .prop-hd.plain::before {
@@ -2931,6 +3013,7 @@
 .bb .sect {
     border-radius: 12px;
     overflow: hidden;
+    border: 2px solid #b8aed0;
     border: 2px solid color-mix(in srgb, var(--pc) 55%, #b8aed0);
 }
 .bb .sect-h {
@@ -2942,6 +3025,7 @@
     font-size: 11px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
+    background: #f1ecfa;
     background: color-mix(in srgb, var(--pc) 28%, #fff);
     color: var(--ink);
 }
@@ -2954,6 +3038,7 @@
     font-weight: 800;
     font-size: 12.5px;
     min-height: 23px;
+    border-top: 1px solid #d8d0e6;
     border-top: 1px solid color-mix(in srgb, var(--pc) 30%, #d8d0e6);
 }
 .bb .rr.cur {
@@ -3168,7 +3253,7 @@
  * Short windows: a phone on its side, or the game sharing the screen with
  * another app. The square board would shrink to nothing above the players, so:
  *  - wide and short: the board takes the full height on the left, and the top
- *    bar, players and message bar stack on the right;
+ *    bar, toolbar, players and message bar stack on the right;
  *  - narrow and short: the board keeps a playable size and the table scrolls.
  */
 @media (max-height: 520px) and (min-width: 600px) {
@@ -3176,15 +3261,15 @@
         max-width: none;
         display: grid;
         grid-template-columns: auto minmax(0, 1fr);
-        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-rows: auto auto minmax(0, 1fr) auto;
         gap: 6px 12px;
         align-items: center;
     }
     .bb .screen:not(.form) .board-area {
         grid-column: 1;
-        grid-row: 1 / 4;
-        width: calc(100dvh - 16px);
-        height: calc(100dvh - 16px);
+        grid-row: 1 / 5;
+        width: calc(var(--vh) - 16px);
+        height: calc(var(--vh) - 16px);
         max-height: none;
         margin: 0;
     }
@@ -3199,13 +3284,17 @@
     .bb .screen:not(.form) .pp .cash {
         font-size: 15px;
     }
-    .bb .screen:not(.form) .dock {
+    .bb .screen:not(.form) .tools {
         grid-column: 2;
         grid-row: 2;
     }
-    .bb .screen:not(.form) .tick {
+    .bb .screen:not(.form) .dock {
         grid-column: 2;
         grid-row: 3;
+    }
+    .bb .screen:not(.form) .tick {
+        grid-column: 2;
+        grid-row: 4;
         margin: 0;
     }
 }
@@ -3273,7 +3362,7 @@
         transform: translateY(0) scale(1, 1);
     }
     50% {
-        transform: translateY(-1.8cqw) scale(1.08, 1.14);
+        transform: translateY(calc(-1.8 * var(--u))) scale(1.08, 1.14);
     }
 }
 @keyframes bb-idle {
@@ -3282,7 +3371,7 @@
         transform: translateY(0);
     }
     50% {
-        transform: translateY(-0.6cqw);
+        transform: translateY(calc(-0.6 * var(--u)));
     }
 }
 /* ---------- money moves: banner over the board centre, floats on the plates ---------- */
@@ -3291,7 +3380,10 @@
 }
 .bb .centre .overlay {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     display: grid;
     place-items: center;
     pointer-events: none;
@@ -3299,16 +3391,18 @@
 }
 .bb .deal {
     --dc: #ffc83d;
-    width: 64cqw;
-    padding: 2.6cqw 2.4cqw 2.2cqw;
-    border-radius: 3cqw;
-    border: 0.8cqw solid var(--frame);
+    width: calc(64 * var(--u));
+    padding: calc(2.6 * var(--u)) calc(2.4 * var(--u)) calc(2.2 * var(--u));
+    border-radius: calc(3 * var(--u));
+    border: calc(0.8 * var(--u)) solid var(--frame);
+    background: #1b0d4a;
     background: linear-gradient(180deg, color-mix(in srgb, var(--dc) 38%, #2a1670), #1b0d4a);
-    box-shadow: inset 0 0.5cqw 0 rgba(255, 255, 255, 0.18), 0 1.2cqw 0 rgba(0, 0, 0, 0.45), 0 0 6cqw color-mix(in srgb, var(--dc) 45%, transparent);
+    box-shadow: inset 0 calc(0.5 * var(--u)) 0 rgba(255, 255, 255, 0.18), 0 calc(1.2 * var(--u)) 0 rgba(0, 0, 0, 0.45);
+    box-shadow: inset 0 calc(0.5 * var(--u)) 0 rgba(255, 255, 255, 0.18), 0 calc(1.2 * var(--u)) 0 rgba(0, 0, 0, 0.45), 0 0 calc(6 * var(--u)) color-mix(in srgb, var(--dc) 45%, transparent);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.6cqw;
+    gap: calc(1.6 * var(--u));
     animation: bb-dealin 0.32s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 .bb .deal.green {
@@ -3328,26 +3422,26 @@
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     width: 100%;
-    gap: 1cqw;
+    gap: calc(1 * var(--u));
 }
 .bb .dl-party {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.8cqw;
+    gap: calc(0.8 * var(--u));
     min-width: 0;
 }
 .bb .dl-party .av,
 .bb .dl-ph {
-    width: 10cqw;
-    height: 10cqw;
-    font-size: 5cqw;
-    border-width: 0.6cqw;
+    width: calc(10 * var(--u));
+    height: calc(10 * var(--u));
+    font-size: calc(5 * var(--u));
+    border-width: calc(0.6 * var(--u));
 }
 /* A property in a banner: a little tile, its set colour over cream. */
 .bb .dl-ph {
-    border-radius: 1.6cqw;
-    border: 0.6cqw solid #fff;
+    border-radius: calc(1.6 * var(--u));
+    border: calc(0.6 * var(--u)) solid #fff;
     background: linear-gradient(180deg, var(--sc, #241a3d) 0 42%, var(--cream) 42%);
 }
 .bb .dl-bank {
@@ -3355,12 +3449,12 @@
     color: #4a2a00;
 }
 .bb .dl-bank svg {
-    width: 5.6cqw;
-    height: 5.6cqw;
+    width: calc(5.6 * var(--u));
+    height: calc(5.6 * var(--u));
 }
 .bb .dl-party b {
     font-family: var(--bb-display);
-    font-size: 3.3cqw;
+    font-size: calc(3.3 * var(--u));
     line-height: 1.1;
     max-width: 100%;
     white-space: nowrap;
@@ -3372,20 +3466,20 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 20cqw;
+    width: calc(20 * var(--u));
 }
 .bb .dl-amt {
     font-family: var(--bb-num);
     font-weight: 700;
-    font-size: 6.4cqw;
+    font-size: calc(6.4 * var(--u));
     line-height: 1;
     color: var(--dc);
-    text-shadow: 0 0.4cqw 0 rgba(0, 0, 0, 0.5);
+    text-shadow: 0 calc(0.4 * var(--u)) 0 rgba(0, 0, 0, 0.5);
     animation: bb-slide 0.9s ease-in-out;
 }
 .bb .dl-chev {
-    width: 8cqw;
-    height: 8cqw;
+    width: calc(8 * var(--u));
+    height: calc(8 * var(--u));
     color: var(--dc);
     stroke-width: 3;
     animation: bb-chev 0.7s ease-in-out infinite;
@@ -3393,7 +3487,7 @@
 .bb .dl-cap {
     font-family: var(--bb-display);
     font-weight: 800;
-    font-size: 3.6cqw;
+    font-size: calc(3.6 * var(--u));
     line-height: 1.15;
     text-align: center;
     color: #fff;
@@ -3406,22 +3500,22 @@
     position: relative;
 }
 .bb .dl-party.out .av {
-    width: 14cqw;
-    height: 14cqw;
-    font-size: 7cqw;
+    width: calc(14 * var(--u));
+    height: calc(14 * var(--u));
+    font-size: calc(7 * var(--u));
     filter: grayscale(0.7);
 }
 .bb .dl-x {
     position: absolute;
-    right: -2cqw;
-    bottom: -1cqw;
-    width: 7cqw;
-    height: 7cqw;
-    padding: 1cqw;
+    right: calc(-2 * var(--u));
+    bottom: calc(-1 * var(--u));
+    width: calc(7 * var(--u));
+    height: calc(7 * var(--u));
+    padding: calc(1 * var(--u));
     border-radius: 50%;
     color: #fff;
     background: var(--red);
-    box-shadow: 0 0 0 0.6cqw var(--frame);
+    box-shadow: 0 0 0 calc(0.6 * var(--u)) var(--frame);
 }
 .bb .deal.grey {
     --dc: #b9b1d4;
@@ -3437,17 +3531,20 @@
 .bb .bars::after {
     content: '';
     position: absolute;
-    inset: -0.6cqw;
+    top: calc(-0.6;
+    right: *;
+    bottom: var(--u));
+    left: *;
     border-radius: 50%;
-    background: repeating-linear-gradient(90deg, transparent 0 2.6cqw, rgba(27, 21, 48, 0.75) 2.6cqw 3.3cqw);
+    background: repeating-linear-gradient(90deg, transparent 0 calc(2.6 * var(--u)), rgba(27, 21, 48, 0.75) calc(2.6 * var(--u)) calc(3.3 * var(--u)));
     animation: bb-bars 0.4s ease-out;
 }
 .bb .dl-siren {
     position: absolute;
-    top: 1.6cqw;
-    right: 2cqw;
-    width: 7cqw;
-    height: 7cqw;
+    top: calc(1.6 * var(--u));
+    right: calc(2 * var(--u));
+    width: calc(7 * var(--u));
+    height: calc(7 * var(--u));
     color: #ff5568;
     animation: bb-pulse 0.5s ease-in-out infinite;
 }
@@ -3456,15 +3553,15 @@
 }
 .bb .dl-sub {
     font-weight: 700;
-    font-size: 3cqw;
+    font-size: calc(3 * var(--u));
     color: var(--muted);
 }
 @keyframes bb-police {
     0% {
-        box-shadow: 0 1.2cqw 0 rgba(0, 0, 0, 0.45), 0 0 8cqw #ff3b4e;
+        box-shadow: 0 calc(1.2 * var(--u)) 0 rgba(0, 0, 0, 0.45), 0 0 calc(8 * var(--u)) #ff3b4e;
     }
     50% {
-        box-shadow: 0 1.2cqw 0 rgba(0, 0, 0, 0.45), 0 0 8cqw #2f8bff;
+        box-shadow: 0 calc(1.2 * var(--u)) 0 rgba(0, 0, 0, 0.45), 0 0 calc(8 * var(--u)) #2f8bff;
     }
 }
 @keyframes bb-bars {
@@ -3514,7 +3611,7 @@
 }
 @keyframes bb-dealin {
     from {
-        transform: scale(0.6) translateY(4cqw);
+        transform: scale(0.6) translateY(calc(4 * var(--u)));
         opacity: 0;
     }
     to {
@@ -3524,11 +3621,11 @@
 }
 @keyframes bb-slide {
     from {
-        transform: translateX(-8cqw) scale(0.6);
+        transform: translateX(calc(-8 * var(--u))) scale(0.6);
         opacity: 0;
     }
     60% {
-        transform: translateX(1cqw) scale(1.1);
+        transform: translateX(calc(1 * var(--u))) scale(1.1);
         opacity: 1;
     }
     to {
@@ -3538,11 +3635,11 @@
 @keyframes bb-chev {
     0%,
     100% {
-        transform: translateX(-1.2cqw);
+        transform: translateX(calc(-1.2 * var(--u)));
         opacity: 0.6;
     }
     50% {
-        transform: translateX(1.2cqw);
+        transform: translateX(calc(1.2 * var(--u)));
         opacity: 1;
     }
 }
@@ -3750,7 +3847,10 @@
 }
 .bb .confetti {
     position: fixed;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     overflow: hidden;
     pointer-events: none;
     z-index: 70;
@@ -3790,4 +3890,256 @@
         animation: none !important;
         transition: none !important;
     }
+}
+
+/* ---------- your turn ---------- */
+/* The whole screen changes while it is your turn: a gold frame glows around it. */
+.bb .screen.myturn::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 4;
+    pointer-events: none;
+    border: 3px solid var(--gold, #ffc83d);
+    box-shadow: inset 0 0 26px rgba(255, 200, 61, 0.55), inset 0 0 90px rgba(255, 200, 61, 0.16);
+    animation: bb-turnglow 1.6s ease-in-out infinite;
+}
+@keyframes bb-turnglow {
+    50% {
+        border-color: #fff3c4;
+        box-shadow: inset 0 0 38px rgba(255, 200, 61, 0.8), inset 0 0 120px rgba(255, 200, 61, 0.26);
+    }
+}
+/* Stamped across the screen for a moment as the turn begins. It never blocks a tap. */
+.bb .turnsplash {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    background: radial-gradient(circle at center, rgba(255, 200, 61, 0.34), rgba(18, 10, 46, 0.5) 62%);
+    animation: bb-turnsplash 1.5s ease-out forwards;
+}
+.bb .turnsplash b {
+    padding: 10px 26px;
+    border-radius: 16px;
+    border: 3px solid #fff3c4;
+    background: linear-gradient(180deg, #ffd95a, #ff9f1a);
+    box-shadow: 0 6px 0 #7a3d00, 0 0 40px rgba(255, 200, 61, 0.8);
+    color: #2a1b4d;
+    font-family: var(--bb-display, inherit);
+    font-size: clamp(30px, 11vw, 60px);
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transform: rotate(-4deg);
+    animation: bb-turnstamp 1.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+@keyframes bb-turnsplash {
+    0% { opacity: 0; }
+    12%, 70% { opacity: 1; }
+    100% { opacity: 0; }
+}
+@keyframes bb-turnstamp {
+    0% { transform: rotate(-4deg) scale(2.2); }
+    22%, 75% { transform: rotate(-4deg) scale(1); }
+    100% { transform: rotate(-4deg) scale(0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .bb .screen.myturn::before { animation: none; }
+}
+
+/* ---------- toolbar: between the board and the players, on your turn only ---------- */
+.bb .tools {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+.bb .tools.concealed {
+    visibility: hidden;
+}
+.bb .tool {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 6px 4px 5px;
+    border: 0;
+    border-radius: 11px;
+    color: #fff;
+    font: inherit;
+    font-weight: 800;
+    font-size: 11px;
+    line-height: 1.05;
+    background: linear-gradient(180deg, #5b3bc4, #3a2291);
+    box-shadow: 0 3px 0 var(--edge);
+    cursor: pointer;
+}
+.bb .tool svg {
+    flex: none;
+    width: 15px;
+    height: 15px;
+    stroke-width: 2.4;
+}
+.bb .tool span {
+    min-width: 0;
+    text-align: left;
+}
+.bb .tool:active:not(:disabled) {
+    transform: translateY(2px);
+}
+/* Each tool has its own colour, kept apart from the board's colour sets: teal, amber, rose, indigo. */
+.bb .tool.t-deal {
+    background: linear-gradient(180deg, #2dd4bf, #0f766e);
+    box-shadow: 0 3px 0 #064e48;
+}
+.bb .tool.t-build {
+    background: linear-gradient(180deg, #fbbf24, #b45309);
+    box-shadow: 0 3px 0 #6b3206;
+}
+.bb .tool.t-cash {
+    background: linear-gradient(180deg, #fb7185, #be123c);
+    box-shadow: 0 3px 0 #6f0a22;
+}
+.bb .tool.t-mine {
+    background: linear-gradient(180deg, #818cf8, #4338ca);
+    box-shadow: 0 3px 0 #272080;
+}
+.bb .tool svg,
+.bb .tool span {
+    filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
+}
+/* The open tool: a white ring, so it reads as pressed in whatever its colour. */
+.bb .tool.on {
+    box-shadow: 0 0 0 2px #fff, 0 3px 0 rgba(0, 0, 0, 0.5);
+    transform: translateY(1px);
+}
+.bb .tool:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+/* The turn clock standing still while a deal is made. */
+.bb .tchip.held {
+    color: #9fd0ff;
+    animation: bb-pulse 1.4s ease-in-out infinite;
+}
+.bb .dealwith {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.bb .dealwith .dw {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px 10px;
+    padding: 8px 12px;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.bb .dealwith .dw .av {
+    grid-row: span 2;
+}
+.bb .dealwith .dw small {
+    grid-column: 2 / -1;
+    opacity: 0.75;
+    font-size: 11.5px;
+}
+/* What a split means, in short lines. */
+.bb .splitrules {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    opacity: 0.92;
+}
+.bb .splitsets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.bb .splitsets button {
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 5px 10px;
+    font: inherit;
+    font-weight: 800;
+    font-size: 12px;
+    color: var(--st, #fff);
+    background: var(--sc);
+    cursor: pointer;
+}
+.bb .splitsets button.on {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px var(--gold, #ffc83d);
+}
+.bb .pctrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-weight: 800;
+}
+/* A split set with houses: the handshake shrinks to a corner badge so the houses stay in view. */
+.bb .tile.built .cover.share {
+    place-items: start end;
+    padding: calc(0.2 * var(--u));
+}
+.bb .tile.built .cover.share svg {
+    width: calc(2.2 * var(--u));
+    height: calc(2.2 * var(--u));
+    padding: calc(0.25 * var(--u));
+    border-radius: calc(0.5 * var(--u));
+    box-shadow: 0 0 0 calc(0.18 * var(--u)) #fff;
+}
+.bb .mc-b.corner {
+    top: 4px;
+    right: 4px;
+    bottom: auto;
+    left: auto;
+    margin: 0;
+    width: 18px;
+    height: 18px;
+    padding: 2px;
+    border-radius: 5px;
+}
+
+/*
+ * Browsers from before 2021 have no `gap` in flex rows and columns (grids are fine). The app marks
+ * them with `nogap` and the main rows and stacks get a margin instead, so nothing sits edge to edge.
+ */
+.bb.nogap .hud > * + *,
+.bb.nogap .btns > * + *,
+.bb.nogap .banner > * + *,
+.bb.nogap .tick > * + *,
+.bb.nogap .dice > * + *,
+.bb.nogap .row > * + *,
+.bb.nogap .mcards > * + *,
+.bb.nogap .li > * + * {
+    margin-left: 8px;
+}
+.bb.nogap .screen > * + *,
+.bb.nogap .pop-card > * + *,
+.bb.nogap .dock .col > * + *,
+.bb.nogap .mid > * + *,
+.bb.nogap .list > * + *,
+.bb.nogap .banners > * + *,
+.bb.nogap .log > * + * {
+    margin-top: 8px;
 }

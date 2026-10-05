@@ -3,14 +3,16 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Copy, Crown, Hourglass, LogOut, Share2, Swords, TimerOff, User, Users, WifiOff, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Coins, Copy, Crown, Hourglass, LogOut, Share2, Swords, TimerOff, User, Users, WifiOff, X } from 'lucide-react';
 import {
     BUSINESS_MATCH_MINUTES,
     BUSINESS_MISS_LIMITS,
+    BUSINESS_SALARY_CAPS,
     BUSINESS_RULES,
 } from '@aixellabs/backend/business/constants';
 import type { BusinessRoomConfig, BusinessRoomView } from '@aixellabs/backend/business/types';
 import { sfx } from '../_lib/sound';
+import { rs } from '../_lib/client';
 import { notify } from '../_lib/toast';
 import { AudioToggles, Avatar, Choices, GButton, minutesLabel, missLabel, Ribbon, Stepper, Tips } from './bits';
 
@@ -75,7 +77,8 @@ export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, on
         return () => window.clearTimeout(timer);
     }, [confirm]);
     const link = typeof window === 'undefined' ? '' : window.location.href;
-    const { seats, minutes, missLimit } = room.config;
+    const { seats, minutes, missLimit, salaryCap } = room.config;
+    const capLabel = (cap: number) => (cap === 0 ? 'No cap' : rs(cap));
 
     const copy = async (text: string, what: string) => {
         try {
@@ -164,6 +167,16 @@ export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, on
                         onPick={(value) => onConfigure({ minutes: value })}
                     />
                     <div className="row">
+                        <span>Salary cap</span>
+                        <span className="small">Most one lap can pay</span>
+                    </div>
+                    <Choices
+                        options={BUSINESS_SALARY_CAPS}
+                        value={salaryCap as (typeof BUSINESS_SALARY_CAPS)[number]}
+                        label={capLabel}
+                        onPick={(value) => onConfigure({ salaryCap: value })}
+                    />
+                    <div className="row">
                         <span>Out after missing</span>
                         <span className="small">Turns in a row</span>
                     </div>
@@ -186,6 +199,11 @@ export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, on
                         <Hourglass className="lu" />
                         <dt>Match length</dt>
                         <dd>{minutes === 0 ? 'No limit' : minutesLabel(minutes)}</dd>
+                    </div>
+                    <div>
+                        <Coins className="lu" />
+                        <dt>Salary cap</dt>
+                        <dd>{capLabel(salaryCap)}</dd>
                     </div>
                     <div>
                         <TimerOff className="lu" />

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { Check, Handshake, IndianRupee, Landmark as BankIcon } from 'lucide-react';
 import { BUSINESS_BOARD, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
+import { splitAt } from '@aixellabs/backend/business/compute';
 import type { BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
 import { cssVars, SPACE_ICONS } from '../_lib/art';
@@ -30,6 +31,7 @@ export function MiniCard({ state, space, picked, off, onClick }: MiniCardProps) 
     const tile = BUSINESS_BOARD[space];
     const set = tile.set ? BUSINESS_SETS[tile.set] : null;
     const prop = state.props[space];
+    const split = splitAt(state, space);
     const Icon = tile.icon ? SPACE_ICONS[tile.icon] : null;
     const Tag = onClick ? 'button' : 'div';
     return (
@@ -41,7 +43,9 @@ export function MiniCard({ state, space, picked, off, onClick }: MiniCardProps) 
             <span className="mc-ph">
                 {tile.kind !== 'city' && Icon && <Icon className="mc-sign" />}
                 {prop && prop.houses > 0 && <Houses count={prop.houses} color={state.players[prop.owner].color} />}
-                {prop?.lend && <Handshake className="mc-b" style={cssVars({ '--bc': state.players[prop.lend.to].color })} />}
+                {split && prop && (
+                    <Handshake className={cn('mc-b', prop.houses > 0 && 'corner')} style={cssVars({ '--bc': state.players[prop.owner === split.major ? split.minor : split.major].color })} />
+                )}
                 {prop?.mortgaged && <BankIcon className="mc-b bank" />}
                 {picked && <Check className="mc-ok" />}
             </span>

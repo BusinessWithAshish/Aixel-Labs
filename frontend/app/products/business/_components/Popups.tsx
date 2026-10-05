@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, CircleHelp, Coffee, Dices, HandCoins, Handshake, House, IndianRupee, LockKeyhole, Landmark as BankIcon, Map, Minus, ScrollText, TrendingDown, TrendingUp } from 'lucide-react';
 import { BUSINESS_BOARD, BUSINESS_RULES, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
-import { canMortgage, canSellHouse, lapInterest, lenderCut, loanDue, maxLoan, ownedBy, validateOffer } from '@aixellabs/backend/business/compute';
+import { canMortgage, canSellHouse, lapInterest, loanDue, maxLoan, ownedBy, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
 import type { BusinessInterestMode, BusinessLoan, BusinessLogEntry, BusinessOffer, BusinessPending, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ import { rs } from '../_lib/client';
 import { Avatar, Cash, GButton, Pop, Ribbon, Slider } from './bits';
 import { Houses } from './Board';
 import { CashChip, MiniCard, MiniCards } from './MiniCard';
+import { SplitView } from './SplitView';
 import { InterestMode } from './OfferComposer';
 
 const LOSE_MAX = BUSINESS_RULES.MARKET_LOSE_MAX;
@@ -26,7 +27,7 @@ function MarketOdds({ hit }: { hit?: number }) {
         <div className={cn('odds big', band && 'lit', band && `lit-${band}`)}>
             <b className="bad">
                 2–{LOSE_MAX}
-                <small>lose half your stake</small>
+                <small>lose your stake</small>
             </b>
             <b className="mid">
                 {LOSE_MAX + 1}–{FLAT_MAX}
@@ -147,9 +148,8 @@ export function MarketPopup({ state, me, send }: Base) {
     const cash = state.players[me].cash;
     const max = Math.floor(Math.min(cash, BUSINESS_RULES.MARKET_MAX_STAKE) / 10) * 10;
     const [stake, setStake] = useState(Math.min(100, max));
-    const loss = Math.floor(stake * BUSINESS_RULES.MARKET_LOSS_RATE);
     const rows = [
-        { tone: 'bad', range: `2–${LOSE_MAX}`, label: 'Crash', delta: -loss, Icon: TrendingDown },
+        { tone: 'bad', range: `2–${LOSE_MAX}`, label: 'Crash', delta: -stake, Icon: TrendingDown },
         { tone: 'mid', range: `${LOSE_MAX + 1}–${FLAT_MAX}`, label: 'Flat', delta: 0, Icon: Minus },
         { tone: 'good', range: `${FLAT_MAX + 1}–12`, label: 'Boom', delta: stake, Icon: TrendingUp },
     ];
@@ -243,7 +243,7 @@ export function ChanceBook({ onClose }: { onClose: () => void }) {
             <Ribbon>Chance</Ribbon>
             <div className="minis">
                 {tile('good', <IndianRupee className="lu" />, '+ Cash', 'up to ₹200')}
-                {tile('bad', <IndianRupee className="lu" />, '− Cash', 'fees and taxes')}
+                {tile('bad', <IndianRupee className="lu" />, '− Cash', 'a share of your cash')}
                 {tile('mid', <ArrowLeft className="lu" />, 'Back 3', 'spaces')}
                 {tile('jail', <LockKeyhole className="lu" />, 'Jail', 'straight there')}
             </div>
@@ -311,7 +311,7 @@ export function GuidePopup({ onClose }: { onClose: () => void }) {
                     'One bigger building: the fifth build turns four houses into a hotel.',
                 )}
                 {row(<BankIcon className="bdg demo" style={cssVars({ '--bc': '#E5383B' })} />, 'Mortgaged to the bank', 'A big red bank mark covers the property. It earns no rent.')}
-                {row(<Handshake className="bdg demo" style={cssVars({ '--bc': '#FFB703' })} />, 'Mortgaged to a player', 'A big handshake in the lender\u2019s colour covers it. Rent is shared with them.')}
+                {row(<Handshake className="bdg demo" style={cssVars({ '--bc': '#FFB703' })} />, 'Split set', 'A handshake in the partner\u2019s colour on each city. Rent from the whole set is shared.')}
             </div>
             <p className="small center">Houses and mortgages never mix: sell the houses in a colour set before mortgaging any of it, and get every property back before building.</p>
             <GButton tone="gold" onClick={onClose}>
@@ -635,12 +635,10 @@ export function describeOffer(state: BusinessPublicState, offer: BusinessOffer):
     if (t.kind === 'renew') {
         return [`extend the loan: pay ${rs(t.pay)} now${t.extra ? `, borrow ${rs(t.extra)} more` : ''}.`, interestLine(0, t.interestPct, t.interestMode, t.laps)];
     }
-    if (t.kind === 'mortgage') {
-        return [
-            `${P[t.owner].name} mortgages ${BUSINESS_BOARD[t.space].name} to ${P[t.lender].name}.`,
-            `${P[t.lender].name} pays ${rs(t.advance)} now and gets ${t.share}% of its rent.`,
-            `${P[t.owner].name} has ${t.laps} lap${t.laps === 1 ? '' : 's'} to pay back ${rs(t.advance)}, or ${P[t.lender].name} takes the property.`,
-        ];
+    if (t.kind === 'split') return [`split the ${BUSINESS_SETS[t.set].name} set, ${t.minorPct}% to the player with one city.`];
+    if (t.kind === 'unsplit') {
+        const split = state.splits.find((s) => s.id === t.split);
+        return [`end the ${split ? BUSINESS_SETS[split.set].name : ''} split. Every house there goes back to the bank.`];
     }
     const side = (cash: number, spaces: number[]) =>
         [cash ? rs(cash) : null, ...spaces.map((i) => BUSINESS_BOARD[i].name)].filter(Boolean).join(' + ') || 'nothing';
@@ -708,31 +706,16 @@ export function OfferInbox({ state, me, send, offer, now }: Base & { offer: Busi
                 <p className="small center">Reject and {from.name} must pay all {rs(owed)} now.</p>
             </>
         );
-    } else if (t.kind === 'mortgage') {
-        const tile = BUSINESS_BOARD[t.space];
-        const set = tile.set ? BUSINESS_SETS[tile.set] : null;
-        title = 'Mortgage deal';
-        ask = `${from.name} offers you a share of`;
-        body = (
-            <>
-                <div
-                    className="lot"
-                    style={cssVars({
-                        '--lc': set?.color ?? '#241A3D',
-                        '--lt': set?.text ?? '#FFFFFF',
-                    })}
-                >
-                    <span>{tile.name}</span>
-                    <Cash value={tile.price ?? 0} />
-                </div>
-                <div className="stats">
-                    <Stat label="You pay now" value={rs(t.advance)} />
-                    <Stat label="Your rent share" value={`${t.share}%`} />
-                    <Stat label="Paid back within" value={laps(t.laps)} />
-                </div>
-                <p className="small center">On a ₹100 rent you get ₹{lenderCut(100, t.share)}. Not paid back in time: the property is yours.</p>
-            </>
-        );
+    } else if (t.kind === 'split') {
+        const pair = splitPair(state, t.set);
+        title = 'Split property';
+        ask = `${from.name} wants to split the ${BUSINESS_SETS[t.set].name} set`;
+        body = pair && <SplitView state={state} set={t.set} major={pair.major} minor={pair.minor} minorPct={t.minorPct} />;
+    } else if (t.kind === 'unsplit') {
+        const split = state.splits.find((s) => s.id === t.split);
+        title = 'End the split';
+        ask = `${from.name} wants to end your split`;
+        body = split && <SplitView state={state} set={split.set} major={split.major} minor={split.minor} minorPct={split.minorPct} ending />;
     } else {
         ask = `${from.name} offers you a trade`;
         // Seen from the receiver: what the proposer sends is what you get.

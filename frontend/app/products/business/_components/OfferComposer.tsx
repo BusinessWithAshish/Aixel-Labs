@@ -1,18 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, IndianRupee } from 'lucide-react';
-import { BUSINESS_RULES } from '@aixellabs/backend/business/constants';
-import { canMortgage, canTrade, lapInterest, lenderCut, loanDue, maxLoan, ownedBy, validateOffer } from '@aixellabs/backend/business/compute';
+import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { BUSINESS_RULES, BUSINESS_SETS, type BusinessSetKey } from '@aixellabs/backend/business/constants';
+import { canTrade, lapInterest, loanDue, maxLoan, ownedBy, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
 import type { BusinessInterestMode, BusinessOfferTerms, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { rs } from '../_lib/client';
 import { Avatar, Cash, GButton, Pop, Ribbon, Slider } from './bits';
 import { MiniCard, MiniCards } from './MiniCard';
+import { nextSplitPct, SplitView } from './SplitView';
+import { cssVars } from '../_lib/art';
 
 export type OfferDraft =
     | { kind: 'loan'; with?: number }
-    | { kind: 'mortgage'; with?: number; space?: number }
+    | { kind: 'split'; with: number }
+    | { kind: 'unsplit'; with: number; split: number }
     | { kind: 'trade'; with: number };
 
 type ComposerProps = {
@@ -81,7 +84,7 @@ export function InterestMode({ value, onChange }: { value: BusinessInterestMode;
     );
 }
 
-/** Builds a loan, a mortgage to a player, or a trade, and sends it as one offer. */
+/** Builds a loan, a split, the end of a split, or a trade, and sends it as one offer. */
 export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps) {
     const others = state.players.filter((p) => p.seat !== me && !p.bankrupt);
     const [other, setOther] = useState<number | undefined>(draft.with ?? (others.length === 1 ? others[0].seat : undefined));
@@ -91,11 +94,16 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
     const [interest, setInterest] = useState(10);
     const [mode, setMode] = useState<BusinessInterestMode>('end');
     const [laps, setLaps] = useState(3);
-    // mortgage
-    const mortgageable = ownedBy(state, me).filter((i) => canMortgage(state, me, i) === null);
-    const [space, setSpace] = useState<number | undefined>(draft.kind === 'mortgage' ? (draft.space ?? mortgageable[0]) : undefined);
-    const [advance, setAdvance] = useState(150);
-    const [share, setShare] = useState(50);
+    // split
+    const splittable =
+        draft.kind === 'split'
+            ? (Object.keys(BUSINESS_SETS) as BusinessSetKey[]).filter((k) => {
+                  const pair = splitPair(state, k);
+                  return pair && !state.splits.some((s) => s.set === k) && [pair.major, pair.minor].sort().join() === [me, draft.with].sort().join();
+              })
+            : [];
+    const [splitSet, setSplitSet] = useState<BusinessSetKey | undefined>(splittable[0]);
+    const [minorPct, setMinorPct] = useState<number>(BUSINESS_RULES.SPLIT_DEFAULT_PCT);
     // trade
     const [give, setGive] = useState<number[]>([]);
     const [get, setGet] = useState<number[]>([]);
@@ -150,38 +158,57 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
                 </div>
             </>
         );
-    } else if (draft.kind === 'mortgage') {
-        title = 'Mortgage to a player';
-        const cap = otherPlayer ? round10(otherPlayer.cash) : 0;
-        const value = Math.min(advance, cap);
-        if (other !== undefined && space !== undefined && value >= 10)
-            terms = { kind: 'mortgage', space, owner: me, lender: other, advance: value, share, laps };
-        const cut = lenderCut(25, share);
-        body = (
+    } else if (draft.kind === 'split') {
+        title = 'Split property';
+        const pair = splitSet ? splitPair(state, splitSet) : null;
+        if (splitSet) terms = { kind: 'split', set: splitSet, minorPct };
+        body = splittable.length ? (
             <>
-                <span className="small">Which property?</span>
-                <SpacePicker state={state} spaces={mortgageable} picked={space === undefined ? [] : [space]} onToggle={setSpace} />
-                <Slider label={`${otherPlayer?.name ?? 'They'} pay${otherPlayer ? 's' : ''} you now`} value={value} display={rs(value)} min={10} max={cap} step={10} onChange={setAdvance} />
-                <Slider label={`${otherPlayer?.name ?? 'Their'}${otherPlayer ? "'s" : ''} share of the rent`} value={share} display={`${share}%`} min={0} max={100} step={5} onChange={setShare} />
-                <div className="rentsplit">
-                    <div className="share" style={{ color: '#5BE39A' }}>
-                        {100 - share}%<small>to you</small>
+                {splittable.length > 1 && (
+                    <div className="splitsets">
+                        {splittable.map((k) => (
+                            <button
+                                key={k}
+                                type="button"
+                                className={k === splitSet ? 'on' : undefined}
+                                style={cssVars({ '--sc': BUSINESS_SETS[k].color, '--st': BUSINESS_SETS[k].text })}
+                                onClick={() => setSplitSet(k)}
+                            >
+                                {BUSINESS_SETS[k].name}
+                            </button>
+                        ))}
                     </div>
-                    <div className="donut" style={{ background: `conic-gradient(${otherPlayer?.color ?? '#FFB703'} 0 ${share}%, ${mePlayer.color} 0)` }}>
-                        <b>
-                            <IndianRupee style={{ width: 16, height: 16 }} />
-                        </b>
-                    </div>
-                    <div className="share" style={{ color: '#FFD25E' }}>
-                        {share}%<small>to {otherPlayer?.name ?? 'them'}</small>
-                    </div>
-                </div>
-                <p className="small center">
-                    On a ₹25 rent you get ₹{25 - cut} and they get ₹{cut}. An odd rupee always goes to the owner.
-                </p>
-                <Slider label="You pay back within" value={laps} display={`${laps} lap${laps === 1 ? '' : 's'}`} min={1} max={BUSINESS_RULES.DEAL_MAX_LAPS} step={1} onChange={setLaps} />
-                <p className="small center">Pay back {rs(value)} in time and the deal ends. If not, they take the property.</p>
+                )}
+                {pair && splitSet && (
+                    <>
+                        <div className="pctrow">
+                            <GButton size="sm" disabled={minorPct <= BUSINESS_RULES.SPLIT_MIN_PCT} onClick={() => setMinorPct(nextSplitPct(minorPct, false))}>
+                                −5%
+                            </GButton>
+                            <span>
+                                {state.players[pair.minor].name} gets {minorPct}%
+                            </span>
+                            <GButton size="sm" disabled={minorPct >= BUSINESS_RULES.SPLIT_MAX_PCT} onClick={() => setMinorPct(nextSplitPct(minorPct, true))}>
+                                +5%
+                            </GButton>
+                        </div>
+                        <SplitView state={state} set={splitSet} major={pair.major} minor={pair.minor} minorPct={minorPct} />
+                    </>
+                )}
             </>
+        ) : (
+            <p className="small center">
+                A split needs a three-city colour set where one of you holds two cities and the other holds the third.
+            </p>
+        );
+    } else if (draft.kind === 'unsplit') {
+        title = 'End the split';
+        const split = state.splits.find((s) => s.id === draft.split);
+        if (split) terms = { kind: 'unsplit', split: split.id };
+        body = split ? (
+            <SplitView state={state} set={split.set} major={split.major} minor={split.minor} minorPct={split.minorPct} ending />
+        ) : (
+            <p className="small center">This split has already ended.</p>
         );
     } else if (otherPlayer) {
         // Every property is shown; the ones that cannot be traded (built on, or shared with a player) are faded.
@@ -216,7 +243,7 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
     return (
         <Pop onClose={onClose}>
             <Ribbon>{title}</Ribbon>
-            {draft.kind !== 'trade' || !otherPlayer ? (
+            {draft.kind === 'loan' || !otherPlayer ? (
                 <>
                     <span className="small">With which player?</span>
                     <PlayerPicker state={state} me={me} value={other} onPick={setOther} />

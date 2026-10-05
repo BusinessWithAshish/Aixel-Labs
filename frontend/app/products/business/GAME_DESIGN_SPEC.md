@@ -11,7 +11,7 @@ The rule numbers below are the single source of truth in code:
   Clients send intents and draw what the server says.
 - **Fast turns:** every phase has a timer and a default action, so an inactive
   player never blocks the table.
-- **Deals are enforced:** loans and mortgages between players are visible,
+- **Deals are enforced:** loans and split sets between players are visible,
   timed and settled by the server.
 
 ## 2. Match setup
@@ -19,8 +19,8 @@ The rule numbers below are the single source of truth in code:
 | Setting | Rule |
 |---|---|
 | Players | 2–6 humans, solo or in teams. A simple bot stands in only for a player who has dropped off. |
-| Starting cash | ₹2,500 (play money) |
-| Salary | ₹500 each time a player passes or lands on Launch |
+| Starting cash | ₹2,000 (play money) |
+| Salary | Paid on passing or landing on Launch, growing with each lap the player completes: ₹100 for lap 1, ₹200 for lap 2, ₹300 for lap 3, with no ceiling |
 | Board | 48 spaces: 28 cities in 10 colour sets, 4 railways/airport, 2 utilities, 4 Chance, 4 Market, 2 levies, 4 corners |
 | Dice | Two six-sided dice, rolled on the server |
 | Match length | Host picks 30, 45 or 60 minutes, or no limit. At the bell the richest player wins; with no limit the match runs until one player is left. |
@@ -49,10 +49,13 @@ Clockwise from Launch. Corners: Launch (0), Jail (12), Take a Break (24), Go to 
 | Black | Delhi 400, Mumbai 400 | 200 |
 
 - **Railways and airport** (North Rail, Coast Rail, Metro,
-  Airport): ₹200 each. Rent 25 / 50 / 100 / 200 for 1 / 2 / 3 / 4 owned.
+  Airport): ₹200 each. Rent 25 / 50 / 100 / 200 for 1 / 2 / 3 / 4 owned,
+  plus ₹5 per railway owned for every house standing anywhere on the board
+  (a hotel counts as five).
 - **Utilities** (Power, Telecom): ₹150 each. Rent is 4 × the dice
   total with one, 10 × with both.
-- **Taxes:** Income Tax ₹200, Luxury Tax ₹100.
+- **Taxes:** a share of the cash the player holds: Income Tax 10%, Luxury Tax 20%,
+  never less than ₹50.
 
 ### Rent ladder (cities)
 
@@ -66,20 +69,16 @@ Clockwise from Launch. Corners: Launch (0), Jail (12), Take a Break (24), Go to 
 | 4 houses | 6 × price |
 | Hotel | 7.5 × price |
 
-**Houses and mortgages never mix.** A colour set either has buildings or has
-a mortgage in it, never both:
-- To mortgage any property of a set (to the bank or to a player), every house
-  in that set must be sold first.
-- To build anywhere in a set, the player must own all of it outright: nothing
-  mortgaged to the bank, nothing mortgaged to a player.
-So a property whose rent is shared with a lender can never have houses or a
-hotel, and rent sharing only ever applies to base rent (or the full-set rent).
+**Houses and bank mortgages never mix.** To mortgage any property of a set,
+every house in that set must be sold first; to build anywhere in a set,
+nothing in it may be mortgaged to the bank. A split set (section 6) counts as
+complete, so its partner with two cities can build there.
 
 On the board, houses are drawn on the property's colour band in the owner's
 colour, all the same size (two rows of two at most; a hotel is one bigger
 building with windows). A property mortgaged to the bank goes dark under one
-big red bank mark. A property shared with a player keeps its look and carries
-a handshake in the lender's colour on its colour band. The band
+big red bank mark. Each city of a split set keeps its look and carries a handshake
+in the other partner's colour on its colour band. The band
 is a fixed size. The owner's marker sits just inside the board, centred on the
 property. The board has no photos: each property is a cream card with the name
 and the price written along the tile (bottom to top on the top and bottom
@@ -110,13 +109,13 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
 | Phase | Timer | If the timer runs out |
 |---|---:|---|
 | Roll | 45 s | The turn is missed. |
-| Buy decision | 20 s | The property goes to auction |
-| Auction | 15 s | Highest bid wins |
+| Buy decision | 30 s | The property goes to auction |
+| Auction | 20 s after the last bid | Highest bid wins |
 | Chance card | 12 s | The card is applied |
-| Market | 25 s | Skipped |
+| Market | 45 s | Skipped |
 | Take a Break | 15 s | Keeps playing |
 | Debt | 75 s | The player is bankrupt |
-| End of turn | 30 s | Turn passes |
+| End of turn | 90 s | Turn passes |
 
 - **Doubles** give another roll, up to two extra. A third double in a row sends
   the player to Jail.
@@ -140,11 +139,12 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   shows a pop-up saying why, instead of nothing.
 - **Trades:** everyone sees a "trade done" banner between the two players;
   what was swapped is never shown.
-- Building a house shows no banner: the house just appears on the board.
+- Building or selling a house, mortgaging and redeeming show no banner: they
+  appear on the board, with a sound for everyone, and in the activity log.
 - **Money moves** (buying, rent, salary, Chance cards, taxes, the Market, loans)
   are shown to everyone as a banner in the middle of the board, with who paid
   whom and a sound for each kind. Private deals stay private: only the two
-  players see their loan and mortgage banners.
+  players see the amounts and shares of their loans and splits.
 - **Teams:** the lobby has two tabs, "Team vs Team" and "Solo"; the host picks.
   Team play is always two sides, Team Alpha and Team Beta, of any sizes (2v2,
   3v3, 1v4, …). The lobby shows three columns: Team Alpha, Players (not placed
@@ -181,21 +181,22 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
 - **Unowned property:** buy at the printed price, or send it to auction. A
   player who cannot afford it goes straight to auction.
 - **Auction:** open bidding, everyone still in the match may bid. Opens at half
-  price, minimum raise ₹5, 15-second countdown shown on screen. A bid in the
-  last 5 seconds resets the countdown to 5. No bids: it stays unowned.
+  price, minimum raise ₹5, 20-second countdown shown on screen. Every bid starts
+  it again from 20. No bids: it stays unowned.
 - **Owned property:** pay rent. No rent on a property mortgaged to the bank.
-- **Chance:** one deck of 12 cards — four pay (₹50–₹200), six cost (₹100–₹250,
-  ₹40 per property owned, and ₹50 per house / ₹150 per hotel), "go back 3 spaces" and
+- **Chance:** one deck of 12 cards — four pay (₹50–₹200), six cost (5%, 8%, 10% or 15% of the cash
+  held, at least ₹50; property tax at 2% per property owned, up to 20%;
+  repairs at 2% per house, a hotel counting as five, up to 25%), "go back 3 spaces" and
   "go to Jail".
 - **Market:** a player who owns a property may stake ₹10–₹1,000 (never more
-  than their cash) and two dice are rolled: 2–5 loses half the stake, 6–8
+  than their cash) and two dice are rolled: 2–5 loses the whole stake, 6–8
   nothing, 9–12 wins the stake again. The two outer ranges are equally likely
-  (10 in 36 each), so on average the player gains about 14% of the stake.
+  (10 in 36 each), so on average the Market neither pays nor costs.
 - **Take a Break:** choose to rest (skip your next turn) or keep playing.
 - **Go to Jail:** move to Jail, no salary. Everyone sees a Jail banner: "Sent
   to Jail", "Chance: go straight to Jail", or for three doubles in a row
   "Overspeeding!".
-- **Launch:** passing or landing on Launch pays ₹500. Going back onto Launch
+- **Launch:** passing or landing on Launch pays the salary for the player's current lap. Going back onto Launch
   with "go back 3 spaces" pays the salary again (only the salary; it does not
   count as a new lap for loans and deals). The salary banner shows the moment
   the pawn reaches Launch, before whatever it lands on.
@@ -206,14 +207,23 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
 
 - **Bank mortgage:** receive half the price. The property earns no rent.
   Redeem for 55% of the price. Not allowed while the colour set has houses.
-- **Shared rent, both ways:** when a property is mortgaged to a player, each
-  of the two pays the other's part if they land on it: the lender pays the
-  owner's share, the owner pays the lender's share. Everyone else pays both.
-  Nobody is exempt, so a two-player game with shared properties still moves money.
-- **Mortgage to a player:** the owner keeps the property. The other player pays
-  an agreed amount now and receives an agreed share (0–100%) of every rent; an
-  odd rupee goes to the owner. The owner has an agreed number of laps (1–6) to
-  pay the amount back; if not, the property moves to the lender.
+- **Split property** (replaces mortgaging to a player): a three-city colour
+  set held two-and-one by two players can be split between them. Either of
+  them offers it; the other accepts or rejects. The player with one city gets
+  an agreed share, 10% to 90% in steps of 5 (33% by default), and the player
+  with two gets the rest. While split:
+  - Each city keeps its owner, and the set counts as complete: full-set rent.
+  - Rent from any of the three cities is shared by the two shares (an odd rupee
+    goes to the partner with two cities). The partners pay no rent there.
+  - Only the partner with two cities builds and sells houses, on all three.
+    The other partner pays their share of every house, even if it leaves them
+    short (they then start their next turn raising the cash), and gets their
+    share back when a house is sold.
+  - Its cities cannot be traded or mortgaged to the bank.
+  - Ending it: either partner offers, the other accepts or rejects. Every house
+    in the set goes back to the bank at half its cost, that money is shared by
+    the two shares, and rent is no longer shared.
+  - Teammates cannot split with each other. Two-city sets cannot be split yet.
 - **Cash loan:** pure cash between two players. They agree the amount, the
   interest (0–100%), the laps to repay (1–6), and when interest is paid:
   **each lap** (the interest is paid to the lender every time the borrower
@@ -226,38 +236,50 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   new interest and laps. The lender accepts or rejects; on a reject or no answer
   the whole amount is paid.
 - **Trade:** cash and properties both ways. Cities in a set with houses, and
-  properties shared with a player, cannot be traded. A property mortgaged to
+  cities of a split set, cannot be traded. A property mortgaged to
   the bank can be traded: it stays mortgaged, and the new owner earns no rent
   from it until they redeem it (55% of the price). The trade screen shows
   every property and fades the ones that cannot be traded; tapping one says why.
 - **Table-wide limits:** at most 3 cash loans may be running at once, and at
-  most 3 properties may be shared with players at once, counted across all
-  players. A new one needs an old one to be paid back first.
-- **One mortgage at a time:** a property mortgaged to the bank cannot also be
-  shared with a player, and a property shared with a player cannot be
-  mortgaged to the bank.
+  most 3 colour sets may be split at once, counted across all players. A new
+  one needs an old one to end first.
 
 Offers are made on your own turn, to one player at a time, and expire after
-45 seconds or when the turn ends. Sending an offer keeps the turn open long
-enough for the other player to answer.
-Offers, and the log lines about loans, mortgages to a player and trades, are
-shown only to the two players involved. The rest of the table sees a banner
-that the deal happened (who with whom, and the property for a mortgage), never
-the amounts or terms. A property mortgaged to a player carries a handshake in
-the lender's colour on its board marker, and the player panel lists each one.
+60 seconds; they outlive the turn they were made in. The turn clock stands
+still for as long as its player has the trade screens open, and while their
+offer waits for an answer, for at most 3 minutes in one turn. Nothing ticks
+while it stands still.
+
+**Toolbar.** On your turn a bar sits between the board and the players:
+Trade (pick a player, then trade, cash loan or split), Build (only cities
+that can take the next house are lit; one tap adds one house), Sell
+(only properties that can be sold down or mortgaged are lit; one tap sells a
+house, evenly across the set, or mortgages a property with nothing built in
+its set, with no card in between) and Mine
+(your properties lit). Each tool has its own colour. A long press never
+selects text or opens the browser's copy or search menu. The activity log
+keeps the last 250 lines and records every offer (sent, withdrawn, expired,
+accepted), trade contents, loan interest, laps left, repayments, extensions,
+auction bids and debts; amounts in private deals show only to the two players. The turn itself is announced with a "Your turn" stamp, a gold
+frame around the screen and a vibration where the phone allows it.
+Offers, and the log lines about loans, splits and trades, are shown only to
+the two players involved. The rest of the table sees a banner that the deal
+happened (who with whom), never the amounts, shares or terms. The player panel
+lists each player's split sets, with an End button for your own.
 
 ## 7. Debt and bankruptcy
 
 A payment always goes through; the payer's cash may go negative. While it is
 negative the player cannot continue and has two choices:
 
-- **Repay debt:** sell houses, mortgage to the bank or to a player, trade, or
+- **Repay debt:** sell houses, mortgage to the bank, trade, or
   ask for a loan, until cash is zero or more. Options that the player has
   nothing for are disabled; asking for a loan is always available.
 - **Bankruptcy:** the player is out. The same settlement applies however they
   go out (bankrupt, leaving, or removed for missed turns), and debts are settled
   in cash only. Nobody ever receives a bankrupt player's properties:
-  1. A property shared with a player goes to that lender (it was the security).
+  1. A split set they are in stops being split: its houses go back to the bank
+     at half their cost, and each partner gets their share of that money.
   2. Everything else is sold to the bank: each house at half its cost, each
      property at half its price (nothing for one already mortgaged to the
      bank), plus any cash in hand. That is the pot.
@@ -268,8 +290,19 @@ negative the player cannot continue and has two choices:
      their money is lost. The bank never tops it up.
   4. All the properties return to the bank, unowned, and can be bought again.
   A loan the bankrupt player had given to someone is cancelled: the borrower
-  keeps the money. A property someone had shared with the bankrupt player is
-  theirs again in full.
+  keeps the money.
+
+## Old phones and tablets
+
+The game is written to run on iPhones and iPads from iOS 12 and Android
+Chrome from 2019, not only current ones. `business.css` explains the rules at
+its top; in short: every size on the board is a multiple of `--u` (a hundredth
+of the board's side, measured by `_hooks/use-board-unit.ts`), the screen
+height is `--vh`, there is no `inset` shorthand, each `color-mix()` has a
+plain colour above it, and browsers without `gap` in flex layouts get margins
+through the `nogap` class. Checked in Safari and Chrome at phone, tablet and
+landscape sizes; devices older than iOS 15 are supported by construction and
+have not been tried on a real device.
 
 ## 8. Integrity
 

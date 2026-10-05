@@ -145,7 +145,7 @@ export function BusinessRoom({ code }: { code: string }) {
     } else if (!room.started || !room.state) {
         body = <Lobby room={room} homeHref={homeHref} onStart={start} onConfigure={configure} onKick={kick} onTeam={setTeam} onClose={close} />;
     } else {
-        body = <Table room={room} send={send} clockOffset={clockOffset} online={online} rtt={rtt} homeHref={homeHref} onPause={pause} onClose={close} />;
+        body = <Table room={room} send={send} clockOffset={clockOffset} online={online} rtt={rtt} homeHref={homeHref} onPause={pause} onClose={close} curtain={count !== null || wasStarted.current === false} />;
     }
 
     return (

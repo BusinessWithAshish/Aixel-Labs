@@ -8,6 +8,8 @@ import {
     BUSINESS_SETS,
     type BusinessSpace,
 } from '@aixellabs/backend/business/constants';
+import { splitAt } from '@aixellabs/backend/business/compute';
+import { useBoardUnit } from '../_hooks/use-board-unit';
 import type { BusinessProperty, BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
 import { cssVars, HomeMark, HotelMark, HouseMark, Pawn, SPACE_ICONS } from '../_lib/art';
@@ -19,7 +21,7 @@ const CORNER_LABELS: Record<string, string> = { launch: 'Launch', jail: 'Jail', 
 
 /**
  * Board geometry as percentages of the board width. These mirror the CSS grid
- * in business.css (0.6cqw padding, 0.3cqw gaps, corner tracks 2.4fr): change both together.
+ * in business.css (padding 0.6 units, gaps 0.3 units, corner tracks 2.4fr): change both together.
  * A thin frame and deep tiles: on a phone each property is as wide as the board allows and
  * 2.4 times as deep, which is what gives its name and price room.
  */
@@ -142,13 +144,13 @@ const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, s
                     {where === 'corner' ? <span className="cn">{CORNER_LABELS[space.kind]}</span> : <span className="nm">{space.name}</span>}
                 </span>
             )}
-            {/* A big red bank over the property when it is mortgaged to the bank; a handshake in the lender's colour on its colour band when it is shared with a player. */}
+            {/* A big red bank over the property when it is mortgaged to the bank; a handshake in the partner's colour on its colour band when its set is split. */}
             {prop?.mortgaged && (
                 <span className="cover bank">
                     <BankIcon />
                 </span>
             )}
-            {prop?.lend && (
+            {lenderColor && (
                 <span className="cover share" style={cssVars({ '--bc': lenderColor ?? '#6A35E0' })}>
                     <Handshake />
                 </span>
@@ -172,9 +174,19 @@ type BoardProps = {
     overlay?: React.ReactNode;
     /** A seat raising cash: only that player's properties stay lit, so they are easy to find and tap. */
     spotlight?: number | null;
+    /** When given, only these spaces stay lit (the ones a tap would act on); it wins over `spotlight`. */
+    lit?: ReadonlySet<number> | null;
 };
 
-export function Board({ state, shown, moving, pace, selected, onSelect, onMarket, onChance, overlay, spotlight = null }: BoardProps) {
+export function Board({ state, shown, moving, pace, selected, onSelect, onMarket, onChance, overlay, spotlight = null, lit = null }: BoardProps) {
+    /** On a city of a split set: the colour of the partner who does not own that city. */
+    const partnerColor = (i: number, owner?: number) => {
+        const split = splitAt(state, i);
+        if (!split || owner === undefined) return undefined;
+        return state.players[owner === split.major ? split.minor : split.major].color;
+    };
+    const area = useBoardUnit<HTMLDivElement>();
+    const faded = (i: number, owner?: number) => (lit ? !lit.has(i) : spotlight !== null && owner !== spotlight);
     const groups = new Map<number, number[]>();
     shown.forEach((pos, seat) => {
         if (state.players[seat].bankrupt) return;
@@ -182,9 +194,9 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
     });
 
     return (
-        <div className="board-area">
+        <div className="board-area" ref={area}>
             <div className="board-box">
-                <div className={cn('board plain', spotlight !== null && 'spot')}>
+                <div className={cn('board plain', (spotlight !== null || lit) && 'spot')}>
                     {BUSINESS_BOARD.map((space, i) => {
                         const prop = state.props[i];
                         return (
@@ -194,9 +206,9 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                                 space={space}
                                 prop={prop}
                                 ownerColor={prop ? state.players[prop.owner].color : undefined}
-                                lenderColor={prop?.lend ? state.players[prop.lend.to].color : undefined}
+                                lenderColor={partnerColor(i, prop?.owner)}
                                 selected={selected === i}
-                                dim={spotlight !== null && prop?.owner !== spotlight}
+                                dim={faded(i, prop?.owner)}
                                 onSelect={onSelect}
                             />
                         );
@@ -214,7 +226,7 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                                     Market
                                 </span>
                                 <div className="odds">
-                                    <b className="bad">2–{BUSINESS_RULES.MARKET_LOSE_MAX} lose half</b>
+                                    <b className="bad">2–{BUSINESS_RULES.MARKET_LOSE_MAX} lose stake</b>
                                     <b className="mid">
                                         {BUSINESS_RULES.MARKET_LOSE_MAX + 1}–{BUSINESS_RULES.MARKET_FLAT_MAX} nothing
                                     </b>
@@ -223,7 +235,7 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                             </button>
                         </div>
                         <div className="rules">
-                            Pass Launch <b>+{rs(BUSINESS_RULES.SALARY)}</b>
+                            Salary <b>+{rs(BUSINESS_RULES.SALARY_STEP)}</b> more each lap
                             <br />
                             Full colour set <b>3× rent</b>
                         </div>
@@ -237,7 +249,7 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                         const prop = state.props[i];
                         const color = state.players[prop.owner].color;
                         return (
-                            <span key={i} className={cn('mk', side(i), spotlight !== null && prop.owner !== spotlight && 'dim')} style={markerSpot(i)}>
+                            <span key={i} className={cn('mk', side(i), faded(i, prop.owner) && 'dim')} style={markerSpot(i)}>
                                 <HomeMark color={color} />
                             </span>
                         );

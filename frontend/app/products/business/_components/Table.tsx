@@ -2,15 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, LockKeyhole, LogOut, Pause, Play, ScrollText, Signal, SignalHigh, SignalLow, SignalMedium, Timer, WifiOff } from 'lucide-react';
+import { ArrowLeftRight, Bot, Building2, Hammer, HandCoins, LockKeyhole, LogOut, Pause, Play, ScrollText, Signal, SignalHigh, SignalLow, SignalMedium, Timer, WifiOff } from 'lucide-react';
 import { BUSINESS_BOARD, BUSINESS_JAIL_INDEX, BUSINESS_PHASE_SECONDS, BUSINESS_RULES } from '@aixellabs/backend/business/constants';
-import type { BusinessPublicState, BusinessRoomView } from '@aixellabs/backend/business/types';
+import type { BusinessCommand, BusinessPublicState, BusinessRoomView } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { cssVars, Die } from '../_lib/art';
 import { fmt, rs } from '../_lib/client';
+import { buzz } from '../_lib/haptic';
 import { sfx, sfxQueued, sfxShared } from '../_lib/sound';
-import { DealBanner, dealFromLog, dealSound, type Deal } from './DealBanner';
+import { canBuild, canMortgage, canSellHouse, houseCost, ownedBy, setSpaces } from '@aixellabs/backend/business/compute';
+import { DealBanner, dealFromLog, dealSound, quietSound, type Deal } from './DealBanner';
 import { notify } from '../_lib/toast';
 import { AudioToggles, Avatar, Cash, GButton, Pop } from './bits';
 import { Board } from './Board';
@@ -253,6 +255,8 @@ function useTableEvents(state: BusinessPublicState, me: number, busy: boolean) {
     return shownCash;
 }
 
+const TURN_SPLASH_MS = 1500;
+
 type Float = { id: number; seat: number; amount: number };
 
 /**
@@ -314,8 +318,11 @@ function useDeals(state: BusinessPublicState, busy: boolean, hold: boolean, laun
     useEffect(() => {
         if (busy) return;
         const unseen = state.log.filter((entry) => entry.n > seen.current && !early.current.has(entry.n)).reverse();
-        // A new house has no banner, but everyone hears it go up.
-        if (unseen.some((entry) => entry.fx?.kind === 'build')) sfxQueued('build');
+        // Building, selling a house, mortgaging and redeeming show on the board, not in a banner: everyone hears them.
+        for (const entry of unseen) {
+            const sound = entry.fx && quietSound(entry.fx);
+            if (sound) sfxQueued(sound);
+        }
         const fresh = unseen
             .map(dealFromLog)
             .filter((d): d is Deal => d !== null);
@@ -383,11 +390,24 @@ type View =
     | { t: 'space'; i: number }
     | { t: 'player'; seat: number }
     | { t: 'offer'; draft: OfferDraft }
+    | { t: 'deal' }
     | { t: 'market' }
     | { t: 'chance' }
     | { t: 'log' }
     | { t: 'guide' }
     | { t: 'menu' };
+
+/** What the board is showing while the player works on their own properties. */
+type Mode = null | 'mine' | 'build' | 'cash';
+
+const MODE_HINT: Record<Exclude<Mode, null>, [string, string]> = {
+    build: ['Build: tap a lit city to add a house. A set fills up evenly.', 'Nothing to build on right now. You need a full colour set and the cash.'],
+    cash: ['Sell: tap a lit property. Houses are sold one a tap, evenly; with none left it is mortgaged.', 'Nothing left to sell or mortgage.'],
+    mine: ['Your properties are lit. Tap one to see it.', 'You do not own a property yet.'],
+};
+
+/** In Build and Sell a second tap is ignored until the first has landed on the board, or this long has passed. */
+const TAP_GUARD_MS = 1500;
 
 type TableProps = {
     room: BusinessRoomView;
@@ -402,9 +422,11 @@ type TableProps = {
     onClose: () => void;
     /** Open already in the "raising cash on the board" view (used by the design preview). */
     startRaising?: boolean;
+    /** Something covers the whole table (the start countdown): turn announcements wait for it. */
+    curtain?: boolean;
 };
 
-export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause, onClose, startRaising = false }: TableProps) {
+export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause, onClose, startRaising = false, curtain = false }: TableProps) {
     const router = useRouter();
     const state = room.state as BusinessPublicState;
     const me = room.you;
@@ -428,13 +450,31 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
         (!walk.busy && (state.pending !== null || state.phase === 'loandue' || (state.phase === 'debt' && state.turn === me)));
     const deals = useDeals(state, walk.busy, covered, walk.launch);
     const [raising, setRaising] = useState(startRaising);
+    // The moment the turn becomes yours: a stamp across the screen and a buzz in the hand.
+    const [splash, setSplash] = useState(0);
+    const turnSeen = useRef<number | null>(null);
+    useEffect(() => {
+        if (walk.busy || curtain || turnSeen.current === state.turn) return;
+        turnSeen.current = state.turn;
+        if (!myTurn) return;
+        setSplash(state.rev);
+        buzz(2);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.turn, walk.busy, curtain]);
+    useEffect(() => {
+        if (!splash) return;
+        const timer = window.setTimeout(() => setSplash(0), TURN_SPLASH_MS);
+        return () => window.clearTimeout(timer);
+    }, [splash]);
     const pending = state.pending;
 
     useEffect(() => {
         if (state.phase !== 'debt') setRaising(false);
     }, [state.phase]);
 
-    const secsLeft = state.deadline === null ? null : Math.max(0, Math.ceil((state.deadline - now) / 1000));
+    // While the turn clock stands still (a deal is being made) it shows the time that was left when it stopped.
+    const held = state.hold !== null;
+    const secsLeft = state.deadline === null ? null : Math.max(0, Math.ceil((state.deadline - (state.hold?.at ?? now)) / 1000));
     const phaseSeconds =
         state.phase === 'auction'
             ? BUSINESS_RULES.AUCTION_SECONDS
@@ -466,9 +506,9 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
         return () => timers.forEach((t) => window.clearTimeout(t));
     }, [state.endsAt, over, paused, clockOffset]);
 
-    // The last five seconds of any timer tick, for everyone at the table.
+    // The last five seconds of any timer tick, for everyone at the table. Nothing ticks while the clock stands still.
     useEffect(() => {
-        if (over || paused || state.deadline === null) return;
+        if (over || paused || held || state.deadline === null) return;
         // Scheduled on the server clock, so every window at the table ticks at the same moment.
         const deadline = state.deadline;
         const left = deadline - (Date.now() + clockOffset);
@@ -480,7 +520,68 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
         if (state.phase !== 'auction' && state.phase !== 'debt' && state.phase !== 'result' && left >= 0)
             timers.push(window.setTimeout(() => sfxShared('timeout'), left));
         return () => timers.forEach((t) => window.clearTimeout(t));
-    }, [state.deadline, state.phase, over, paused, clockOffset]);
+    }, [state.deadline, state.phase, over, paused, held, clockOffset]);
+
+    // --- the toolbar: trade, build, raise cash, see your own properties ---
+    const [mode, setMode] = useState<Mode>(null);
+    const managing = myTurn && !walk.busy && (state.phase === 'roll' || state.phase === 'end');
+    const inDebt = myTurn && state.phase === 'debt' && raising;
+    const showTools = managing || inDebt;
+    useEffect(() => {
+        if (!showTools) setMode(null);
+    }, [showTools]);
+    // Raising cash to clear a debt starts in that view.
+    const boardMode: Mode = showTools ? (mode ?? (inDebt ? 'cash' : null)) : null;
+    // Mine, plus the third city of any set I split as the partner with two (I manage its houses).
+    const mine = [...new Set([...ownedBy(state, me), ...state.splits.filter((s) => s.major === me).flatMap((s) => setSpaces(s.set))])];
+    const lit =
+        boardMode === null
+            ? null
+            : new Set(
+                  boardMode === 'build'
+                      ? mine.filter((i) => canBuild(state, me, i) === null)
+                      : boardMode === 'cash'
+                        ? mine.filter((i) => canSellHouse(state, me, i) === null || canMortgage(state, me, i) === null)
+                        : mine,
+              );
+    const others = state.players.filter((p) => p.seat !== me && !p.bankrupt);
+    const tapSent = useRef({ rev: -1, at: 0 });
+
+    // The turn clock stands still while its player is making a deal.
+    const dealing = myTurn && !over && (view?.t === 'deal' || view?.t === 'offer' || (view?.t === 'player' && view.seat !== me));
+    const turnRef = useRef({ mine: false, phase: state.phase });
+    turnRef.current = { mine: myTurn, phase: state.phase };
+    useEffect(() => {
+        const canHold = () => turnRef.current.mine && ['roll', 'end', 'debt', 'loandue'].includes(turnRef.current.phase);
+        if (!dealing || !canHold()) return;
+        send({ type: 'hold', on: true });
+        return () => {
+            if (canHold()) send({ type: 'hold', on: false });
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dealing]);
+
+    /** In Build and Sell a tap acts at once, with no card in between. Null when the tap should open the card instead. */
+    const tapAction = (i: number): BusinessCommand | string | null => {
+        if (boardMode === 'build') return canBuild(state, me, i) ?? { type: 'build', space: i };
+        if (boardMode !== 'cash') return null;
+        // Houses go first, one a tap; a property with nothing built in its set is mortgaged.
+        if (canSellHouse(state, me, i) === null) return { type: 'sellHouse', space: i };
+        return canMortgage(state, me, i) ?? { type: 'mortgage', space: i };
+    };
+    const tapTile = (i: number) => {
+        if (boardMode !== 'build' && boardMode !== 'cash') return openSpace(i);
+        if (!mine.includes(i)) return;
+        const action = tapAction(i);
+        if (action === null) return openSpace(i);
+        if (typeof action === 'string') return notify(action, 'error');
+        // One move per tap that has landed: a fast double tap can never build or sell twice.
+        const last = tapSent.current;
+        if (last.rev === state.rev && performance.now() - last.at < TAP_GUARD_MS) return;
+        tapSent.current = { rev: state.rev, at: performance.now() };
+        buzz();
+        send(action);
+    };
 
     const openSpace = (i: number) => {
         const kind = BUSINESS_BOARD[i].kind;
@@ -590,6 +691,23 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                 onOffer={(draft) => setView({ t: 'offer', draft })}
             />
         );
+    else if (view?.t === 'deal')
+        pop = (
+            <Pop onClose={() => setView(null)}>
+                <h3 className="pop-title">Make a deal with</h3>
+                <div className="dealwith">
+                    {others.map((p) => (
+                        <button key={p.seat} type="button" className="plate dw" onClick={() => setView({ t: 'player', seat: p.seat })}>
+                            <Avatar name={p.name} color={p.color} />
+                            <b>{p.name}</b>
+                            <Cash value={p.cash} />
+                            <small>{ownedBy(state, p.seat).length} properties</small>
+                        </button>
+                    ))}
+                </div>
+                <p className="small center">Your turn clock waits while you make a deal.</p>
+            </Pop>
+        );
     else if (view?.t === 'offer') pop = <OfferComposer state={state} me={me} send={send} draft={view.draft} onClose={() => setView(null)} />;
     else if (view?.t === 'space')
         pop = (
@@ -599,7 +717,6 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                     state={state}
                     me={me}
                     send={send}
-                    onMortgageToPlayer={(space) => setView({ t: 'offer', draft: { kind: 'mortgage', space } })}
                 />
             </Pop>
         );
@@ -608,7 +725,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
         if (pending.type === 'buy' && myTurn)
             pop = (
                 <Pop bare>
-                    <PropertyCard space={pending.space} state={state} me={me} send={send} mode="buy" onMortgageToPlayer={() => undefined} />
+                    <PropertyCard space={pending.space} state={state} me={me} send={send} mode="buy" />
                 </Pop>
             );
         else if (pending.type === 'auction') pop = <AuctionPopup state={state} me={me} send={send} pending={pending} now={now} />;
@@ -637,7 +754,12 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
     }
 
     return (
-        <main className="screen">
+        <main className={cn('screen', myTurn && !paused && 'myturn')}>
+            {splash > 0 && !paused && (
+                <div key={splash} className="turnsplash" aria-hidden="true">
+                    <b>Your turn</b>
+                </div>
+            )}
             {/* Notices hang under the top bar, over the table, so showing or hiding one never moves anything. */}
             <div className="hudwrap">
             <div className="hud">
@@ -662,11 +784,19 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                 <AudioToggles />
             </div>
                 <div className="banners">
-            {myTurn && state.phase === 'debt' && raising && (
+            {inDebt && boardMode === 'cash' && (
                 <div className="banner">
-                    <span>Raise {rs(-mePlayer.cash)}. Tap your properties to sell or mortgage, or tap a player.</span>
+                    <span>Raise {rs(-mePlayer.cash)}. Tap a lit property: a house is sold, or it is mortgaged. Or make a deal.</span>
                     <GButton size="sm" tone="gold" onClick={() => setRaising(false)}>
                         Options
+                    </GButton>
+                </div>
+            )}
+            {boardMode !== null && !(inDebt && boardMode === 'cash') && lit && (
+                <div className="banner info">
+                    <span>{MODE_HINT[boardMode][lit.size ? 0 : 1]}{boardMode === 'build' && lit.size > 0 && ` From ${rs(Math.min(...[...lit].map(houseCost)))}.`}</span>
+                    <GButton size="sm" tone="gold" onClick={() => setMode(null)}>
+                        Done
                     </GButton>
                 </div>
             )}
@@ -700,20 +830,47 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                 moving={walk.moving}
                 pace={walk.pace}
                 selected={selected}
-                onSelect={openSpace}
+                onSelect={tapTile}
                 onMarket={() => setView({ t: 'market' })}
                 onChance={() => setView({ t: 'chance' })}
-                spotlight={myTurn && state.phase === 'debt' && raising ? me : null}
+                lit={lit}
                 overlay={deals.deal && <DealBanner state={state} deal={deals.deal} />}
             />
 
+
+            {/* Only the player on turn has the toolbar; its space is kept so the board never jumps. */}
+            <div className={cn('tools', !showTools && 'concealed')} aria-hidden={!showTools}>
+                {(
+                    [
+                        ['deal', 'Trade', ArrowLeftRight, others.length > 0],
+                        ['build', 'Build', Hammer, managing],
+                        ['cash', 'Sell', HandCoins, true],
+                        ['mine', 'Mine', Building2, true],
+                    ] as const
+                ).map(([key, label, Icon, enabled]) => (
+                    <button
+                        key={key}
+                        type="button"
+                        className={cn('tool', `t-${key}`, boardMode === key && 'on')}
+                        disabled={!showTools || !enabled}
+                        onClick={() => {
+                            sfx('click');
+                            if (key === 'deal') return setView(others.length === 1 ? { t: 'player', seat: others[0].seat } : { t: 'deal' });
+                            setMode(mode === key ? null : key);
+                        }}
+                    >
+                        <Icon className="lu" />
+                        <span>{label}</span>
+                    </button>
+                ))}
+            </div>
 
             <div className="dock">
                 <div className="col">{state.players.filter((p) => p.seat % 2 === 0).map((p) => plate(p.seat))}</div>
                 <div className="mid">
                     {!over && secsLeft !== null && (
-                        <span className={cn('tchip', secsLeft <= 5 && 'low')}>
-                            <Timer className="lu" />
+                        <span className={cn('tchip', held ? 'held' : secsLeft <= 5 && 'low')}>
+                            {held ? <Pause className="lu" /> : <Timer className="lu" />}
                             {secsLeft}s
                         </span>
                     )}
@@ -729,6 +886,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                         disabled={!mainAction || walk.busy}
                         onClick={() => {
                             sfx('click');
+                            buzz();
                             mainAction?.();
                         }}
                     >

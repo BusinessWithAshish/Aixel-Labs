@@ -4,7 +4,6 @@ import type { ReactNode } from 'react';
 import { Gavel, Hammer, Handshake, Hotel, House, IndianRupee, KeyRound, Landmark as BankIcon, Receipt } from 'lucide-react';
 import {
     BUSINESS_BOARD,
-    BUSINESS_RAIL_RENT,
     BUSINESS_RULES,
     BUSINESS_SETS,
 } from '@aixellabs/backend/business/constants';
@@ -14,10 +13,14 @@ import {
     canRedeem,
     canSellHouse,
     countKind,
+    housesOnBoard,
     houseCost,
     houseResale,
     isBuyable,
     mortgageValue,
+    splitAt,
+    splitShares,
+    railRent,
     redeemCost,
     rentLadder,
     rentLevel,
@@ -31,7 +34,7 @@ import { fmt, rs } from '../_lib/client';
 import { Cash, GButton } from './bits';
 
 const DESCRIPTIONS: Record<string, string> = {
-    launch: `Collect ${rs(BUSINESS_RULES.SALARY)} every time you pass or land here.`,
+    launch: `Collect your salary every time you pass or land here: ${rs(BUSINESS_RULES.SALARY_STEP)} for your first lap, ${rs(BUSINESS_RULES.SALARY_STEP * 2)} for the second, and ${rs(BUSINESS_RULES.SALARY_STEP)} more with every lap after that.`,
     chance: 'Draw a Chance card. Half of them pay you, half of them cost you.',
     jail: `Just visiting, unless you were sent here. Roll doubles to leave free. After two misses you leave on the third turn and pay ${rs(BUSINESS_RULES.JAIL_FEE)}.`,
     break: 'Your choice: rest and skip your next turn, or keep playing.',
@@ -62,10 +65,9 @@ type PropertyCardProps = {
     send: BusinessSend;
     /** 'buy' adds the Buy / Auction buttons for the player who just landed here. */
     mode?: 'view' | 'buy';
-    onMortgageToPlayer: (space: number) => void;
 };
 
-export function PropertyCard({ space, state, me, send, mode = 'view', onMortgageToPlayer }: PropertyCardProps) {
+export function PropertyCard({ space, state, me, send, mode = 'view' }: PropertyCardProps) {
     const tile = BUSINESS_BOARD[space];
     const set = tile.set ? BUSINESS_SETS[tile.set] : null;
     const prop = state.props[space];
@@ -75,7 +77,10 @@ export function PropertyCard({ space, state, me, send, mode = 'view', onMortgage
     const myTurn = state.turn === me;
     const manage = myTurn && (state.phase === 'roll' || state.phase === 'end');
     const raise = manage || (myTurn && state.phase === 'debt');
-    const mine = prop?.owner === me;
+    const split = splitAt(state, space);
+    // In a split set the partner with two cities manages the houses on all three.
+    const mine = prop?.owner === me || split?.major === me;
+    const houseShare = split ? splitShares(split, houseCost(space)) : null;
 
     let sections: ReactNode = null;
     if (tile.kind === 'city' && tile.set) {
@@ -131,10 +136,13 @@ export function PropertyCard({ space, state, me, send, mode = 'view', onMortgage
                         key={n}
                         icons={Icon ? Array.from({ length: n }, (_, k) => <Icon key={k} className="lu" />) : null}
                         label={`${n} owned`}
-                        amount={<Rupees value={BUSINESS_RAIL_RENT[n]} />}
+                        amount={<Rupees value={railRent(state, n)} />}
                         current={owned === n}
                     />
                 ))}
+                <p className="small center">
+                    Includes +{rs(BUSINESS_RULES.RAIL_RENT_PER_HOUSE)} per railway owned for each of the {housesOnBoard(state)} houses on the board (a hotel counts as 5).
+                </p>
             </div>
         );
     } else if (tile.kind === 'utility') {
@@ -151,7 +159,6 @@ export function PropertyCard({ space, state, me, send, mode = 'view', onMortgage
         );
     }
 
-    const canPayBack = !!prop?.lend && state.players[me].cash >= prop.lend.advance;
     const pc = set?.color ?? '#241A3D';
 
     return (
@@ -208,18 +215,18 @@ export function PropertyCard({ space, state, me, send, mode = 'view', onMortgage
                                 <span>Mortgaged to the bank. It earns no rent.</span>
                             </div>
                         )}
-                        {prop?.lend && (
+                        {split && (
                             <div className="pstat pl">
                                 <Handshake className="lu" />
                                 <span>
-                                    Mortgaged to {state.players[prop.lend.to].name} for {rs(prop.lend.advance)}. They get {prop.lend.share}% of
-                                    the rent. {prop.lend.lapsLeft} lap{prop.lend.lapsLeft === 1 ? '' : 's'} left to pay back.
+                                    Split set: {state.players[split.major].name} {100 - split.minorPct}% · {state.players[split.minor].name} {split.minorPct}%. Rent from
+                                    all three cities is shared, and the two of them pay none here.
                                 </span>
                             </div>
                         )}
                     </>
                 ) : (
-                    <p className="pdesc">{tile.kind === 'levy' ? `Pay ${rs(tile.fee ?? 0)} to the bank.` : DESCRIPTIONS[tile.kind]}</p>
+                    <p className="pdesc">{tile.kind === 'levy' ? `Pay ${tile.pct}% of the cash you hold to the bank (at least ${rs(BUSINESS_RULES.PCT_MIN)}).` : DESCRIPTIONS[tile.kind]}</p>
                 )}
 
                 {mode === 'buy' && (
@@ -245,36 +252,25 @@ export function PropertyCard({ space, state, me, send, mode = 'view', onMortgage
                         {manage && canBuild(state, me, space) === null && (
                             <GButton tone="green" onClick={() => send({ type: 'build', space })}>
                                 <Hammer className="lu" />
-                                {prop.houses === BUSINESS_RULES.MAX_HOUSES - 1 ? 'Hotel' : 'House'} {rs(houseCost(space))}
+                                {prop.houses === BUSINESS_RULES.MAX_HOUSES - 1 ? 'Hotel' : 'House'} {rs(houseShare ? houseShare.major : houseCost(space))}
+                                {houseShare && ` + ${rs(houseShare.minor)} from ${state.players[split!.minor].name}`}
                             </GButton>
                         )}
                         {canSellHouse(state, me, space) === null && (
                             <GButton tone="orange" onClick={() => send({ type: 'sellHouse', space })}>
-                                Sell house +{rs(houseResale(space))}
+                                Sell house +{rs(split ? splitShares(split, houseResale(space)).major : houseResale(space))}
                             </GButton>
                         )}
                         {canMortgage(state, me, space) === null && (
-                            <>
-                                <GButton tone="blue" onClick={() => send({ type: 'mortgage', space })}>
-                                    <BankIcon className="lu" />
-                                    Bank +{rs(mortgageValue(space))}
-                                </GButton>
-                                <GButton onClick={() => onMortgageToPlayer(space)}>
-                                    <Handshake className="lu" />
-                                    To a player
-                                </GButton>
-                            </>
+                            <GButton tone="blue" onClick={() => send({ type: 'mortgage', space })}>
+                                <BankIcon className="lu" />
+                                Mortgage +{rs(mortgageValue(space))}
+                            </GButton>
                         )}
                         {manage && prop.mortgaged && (
                             <GButton tone="gold" disabled={canRedeem(state, me, space) !== null} onClick={() => send({ type: 'redeem', space })}>
                                 <KeyRound className="lu" />
                                 Redeem {rs(redeemCost(space))}
-                            </GButton>
-                        )}
-                        {manage && prop.lend && (
-                            <GButton tone="gold" disabled={!canPayBack} onClick={() => send({ type: 'repayMortgage', space })}>
-                                <KeyRound className="lu" />
-                                Pay {state.players[prop.lend.to].name} {rs(prop.lend.advance)}
                             </GButton>
                         )}
                     </div>

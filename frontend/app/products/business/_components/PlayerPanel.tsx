@@ -1,12 +1,12 @@
 'use client';
 
 import { ArrowLeftRight, HandCoins, Handshake } from 'lucide-react';
-import { canMortgage, netWorth, ownedBy } from '@aixellabs/backend/business/compute';
+import { netWorth, ownedBy, splitPair } from '@aixellabs/backend/business/compute';
 import type { BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { rs } from '../_lib/client';
 import { Avatar, Cash, GButton, Pop } from './bits';
-import { BUSINESS_BOARD } from '@aixellabs/backend/business/constants';
+import { BUSINESS_SETS, type BusinessSetKey } from '@aixellabs/backend/business/constants';
 import { MiniCard, MiniCards } from './MiniCard';
 import type { OfferDraft } from './OfferComposer';
 
@@ -28,11 +28,13 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer }
     const canDeal = myTurn && ['roll', 'end', 'debt'].includes(state.phase) && !state.players[me].bankrupt;
     const canRepay = myTurn && (state.phase === 'roll' || state.phase === 'end');
     const loans = state.loans.filter((l) => l.lender === seat || l.borrower === seat);
-    /** Properties this player has mortgaged to someone, or holds a mortgage on. */
-    const deals = Object.keys(state.props)
-        .map(Number)
-        .filter((i) => state.props[i].lend && (state.props[i].owner === seat || state.props[i].lend!.to === seat));
-    const iCanMortgage = ownedBy(state, me).some((i) => canMortgage(state, me, i) === null);
+    /** Colour sets this player shares with someone. */
+    const splits = state.splits.filter((s) => s.major === seat || s.minor === seat);
+    /** A set the two of you could split: one of you holds two of its cities, the other the third. */
+    const canSplit = (Object.keys(BUSINESS_SETS) as BusinessSetKey[]).some((k) => {
+        const pair = splitPair(state, k);
+        return pair && !state.splits.some((s) => s.set === k) && [pair.major, pair.minor].sort().join() === [me, seat].sort().join();
+    });
 
     return (
         <Pop onClose={onClose}>
@@ -59,26 +61,30 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer }
                 <p className="small">Nothing yet.</p>
             )}
 
-            {deals.length > 0 && (
+            {splits.length > 0 && (
                 <>
-                    <span className="small">Mortgaged to a player</span>
+                    <span className="small">Split sets</span>
                     <div className="list">
-                        {deals.map((i) => {
-                            const prop = state.props[i];
-                            const lend = prop.lend!;
-                            const owner = state.players[prop.owner];
-                            const lender = state.players[lend.to];
+                        {splits.map((sp) => {
+                            const major = state.players[sp.major];
+                            const minor = state.players[sp.minor];
+                            const partner = sp.major === me ? sp.minor : sp.minor === me ? sp.major : null;
                             return (
-                                <button key={i} type="button" className="li mdeal" onClick={() => onSpace(i)}>
-                                    <Avatar name={owner.name} color={owner.color} size="sm" />
-                                    <Handshake className="lu" style={{ color: lender.color }} />
-                                    <Avatar name={lender.name} color={lender.color} size="sm" />
+                                <div key={sp.id} className="li mdeal">
+                                    <Avatar name={major.name} color={major.color} size="sm" />
+                                    <Handshake className="lu" style={{ color: BUSINESS_SETS[sp.set].color }} />
+                                    <Avatar name={minor.name} color={minor.color} size="sm" />
                                     <span>
-                                        <b>{BUSINESS_BOARD[i].name}</b>
+                                        <b>{BUSINESS_SETS[sp.set].name} set</b>
                                         <br />
-                                        {lender.name} gets {lend.share}% of rent · {lend.lapsLeft} lap{lend.lapsLeft === 1 ? '' : 's'} left
+                                        {major.name} {100 - sp.minorPct}% · {minor.name} {sp.minorPct}%
                                     </span>
-                                </button>
+                                    {partner !== null && partner === seat && (
+                                        <GButton size="sm" tone="red" disabled={!canDeal} onClick={() => onOffer({ kind: 'unsplit', with: seat, split: sp.id })}>
+                                            End
+                                        </GButton>
+                                    )}
+                                </div>
                             );
                         })}
                     </div>
@@ -124,9 +130,9 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer }
                             Cash loan
                         </GButton>
                     </div>
-                    <GButton disabled={!canDeal || !iCanMortgage} onClick={() => onOffer({ kind: 'mortgage', with: seat })}>
+                    <GButton disabled={!canDeal || !canSplit} onClick={() => onOffer({ kind: 'split', with: seat })}>
                         <Handshake className="lu" />
-                        Mortgage a property to {p.name}
+                        Split a set with {p.name}
                     </GButton>
                     {!canDeal && <p className="small center">You can make offers on your own turn.</p>}
                 </>
