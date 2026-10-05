@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { BusinessCard } from "./constants";
+import type { BusinessCard, BusinessSetKey } from "./constants";
 import type {
   BUSINESS_CLIENT_MESSAGE_SCHEMA,
   BUSINESS_COMMAND_SCHEMA,
@@ -36,18 +36,24 @@ export type BusinessPlayer = {
   bankrupt: boolean;
   /** Turns in a row this player let the roll timer run out. */
   missed: number;
+  /** Laps completed: the salary grows with each one. */
+  laps: number;
   /** Players with the same number play together: one colour, no rent between them, they win together. */
   team: number;
 };
 
-/** A mortgage to another player: the owner keeps title, the lender shares rent. */
-export type BusinessLend = {
-  to: number;
-  /** Lender's share of every rent, 0–100. */
-  share: number;
-  advance: number;
-  /** Owner's laps left before title moves to the lender. */
-  lapsLeft: number;
+/**
+ * A three-city colour set shared by its two owners: `major` holds two cities, `minor` one. Each city
+ * keeps its owner, but the set counts as complete, rent from any of its cities is shared by
+ * `minorPct` / the rest, and only `major` builds, with each paying their share of every house.
+ */
+export type BusinessSplit = {
+  id: number;
+  set: BusinessSetKey;
+  major: number;
+  minor: number;
+  /** The minor partner's share, in percent. */
+  minorPct: number;
 };
 
 export type BusinessProperty = {
@@ -56,7 +62,6 @@ export type BusinessProperty = {
   houses: number;
   /** Mortgaged to the bank: earns no rent. */
   mortgaged: boolean;
-  lend?: BusinessLend;
 };
 
 /** "lap": interest is paid every time the borrower passes Launch. "end": all of it with the loan. */
@@ -125,7 +130,9 @@ export type BusinessFxKind =
   /** Two players swapped something. Everyone sees that it happened, never what. */
   | "trade"
   /** `from` left the match. */
-  | "out";
+  | "out"
+  /** `from` and `to` split a colour set, or ended a split (`amount` 0 = started). */
+  | "split";
 
 /** Money moving with a log line. `from`/`to` are seats; null is the bank. */
 export type BusinessFx = {
@@ -162,6 +169,10 @@ export type BusinessGameState = {
   /** Unpaid parts of payments the active player could not cover. */
   owed: BusinessOwed[];
   loans: BusinessLoan[];
+  /** Colour sets split between two players. */
+  splits: BusinessSplit[];
+  /** The turn began in debt (a partner's share of a house): once it is cleared, the roll comes next. */
+  opening: boolean;
   offers: BusinessOffer[];
   log: BusinessLogEntry[];
   logSeq: number;
@@ -172,8 +183,14 @@ export type BusinessGameState = {
   endsAt: number | null;
   /** Missed turns in a row that remove a player. */
   missLimit: number;
+  /** The most one lap's salary can pay; 0 = no cap. */
+  salaryCap: number;
   /** A timer already ran out on the active player this turn (counted once per turn). */
   lapsed: boolean;
+  /** The turn clock is standing still (its player is writing an offer, or one is waiting for an answer) until `until`. */
+  hold: { at: number; until: number; offer: boolean } | null;
+  /** Milliseconds the clock has already stood still this turn. */
+  held: number;
   winner: number | null;
   /** The team that won. With no teams set up, every player is a team of one. */
   winnerTeam: number | null;
@@ -186,7 +203,8 @@ export type BusinessGameState = {
 export type BusinessPublicState = Omit<BusinessGameState, "rng" | "deck">;
 
 /** `teams`: two teams (Alpha against Beta) instead of everyone for themselves. */
-export type BusinessRoomConfig = { seats: number; minutes: number; missLimit: number; teams: boolean };
+/** `salaryCap`: the most a lap's salary can pay; 0 = no cap. */
+export type BusinessRoomConfig = { seats: number; minutes: number; missLimit: number; teams: boolean; salaryCap: number };
 
 export type BusinessSeatView = {
   seat: number;

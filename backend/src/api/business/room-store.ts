@@ -112,6 +112,7 @@ export function configureRoom(room: BusinessRoom, seat: number, patch: Partial<B
   if (patch.minutes !== undefined) room.config.minutes = patch.minutes;
   if (patch.missLimit !== undefined) room.config.missLimit = patch.missLimit;
   if (patch.teams !== undefined) room.config.teams = patch.teams;
+  if (patch.salaryCap !== undefined) room.config.salaryCap = patch.salaryCap;
 }
 
 /** Host only, lobby only: frees a seat. Later seats move up one. */
@@ -145,6 +146,10 @@ export function setPaused(room: BusinessRoom, seat: number, on: boolean, now: nu
   if (s.endsAt !== null) s.endsAt += lost;
   if (s.pending?.type === "auction") s.pending.endsAt += lost;
   for (const offer of s.offers) offer.expiresAt += lost;
+  if (s.hold) {
+    s.hold.at += lost;
+    s.hold.until += lost;
+  }
   s.rev++;
   room.state = s;
   room.pausedAt = null;

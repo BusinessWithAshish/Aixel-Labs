@@ -13,9 +13,9 @@ import {
   type BusinessSetKey,
   type BusinessSpaceKind,
 } from "../constants";
-import type { BusinessInterestMode, BusinessOfferTerms, BusinessPublicState } from "../types";
+import type { BusinessInterestMode, BusinessOfferTerms, BusinessPublicState, BusinessSplit } from "../types";
 
-type State = Pick<BusinessPublicState, "players" | "props" | "loans">;
+type State = Pick<BusinessPublicState, "players" | "props" | "loans" | "splits">;
 
 export function isBuyable(space: number): boolean {
   const kind = BUSINESS_BOARD[space].kind;
@@ -39,6 +39,53 @@ export function ownedBy(state: State, seat: number): number[] {
 
 export function ownsSet(state: State, seat: number, set: BusinessSetKey): boolean {
   return setSpaces(set).every((i) => state.props[i]?.owner === seat);
+}
+
+/** The split covering a colour set, if it is split. */
+export function splitOf(state: State, set: BusinessSetKey | undefined): BusinessSplit | undefined {
+  return set ? state.splits.find((s) => s.set === set) : undefined;
+}
+
+/** The split a property belongs to, if any. */
+export function splitAt(state: State, space: number): BusinessSplit | undefined {
+  return splitOf(state, BUSINESS_BOARD[space].set);
+}
+
+/** Splits a sum by a split's shares: the minor partner's part, rounded down, and the rest for the major one. */
+export function splitShares(split: BusinessSplit, amount: number): { major: number; minor: number } {
+  const minor = Math.floor((amount * split.minorPct) / 100);
+  return { major: amount - minor, minor };
+}
+
+/**
+ * The two owners who could split a set: one holding two of its three cities, the other one.
+ * Null when the set is not owned that way.
+ */
+export function splitPair(state: State, set: BusinessSetKey): { major: number; minor: number } | null {
+  const ids = setSpaces(set);
+  if (ids.length !== 3 || ids.some((i) => !state.props[i])) return null;
+  const owners = ids.map((i) => state.props[i].owner);
+  const counts = new Map<number, number>();
+  for (const o of owners) counts.set(o, (counts.get(o) ?? 0) + 1);
+  if (counts.size !== 2) return null;
+  const [[a, an], [b]] = [...counts];
+  return an === 2 ? { major: a, minor: b } : { major: b, minor: a };
+}
+
+/** The set counts as complete for rent and building: one owner, or split between two. */
+export function setComplete(state: State, set: BusinessSetKey): boolean {
+  const ids = setSpaces(set);
+  const owner = state.props[ids[0]]?.owner;
+  return owner !== undefined && (ids.every((i) => state.props[i]?.owner === owner) || !!splitOf(state, set));
+}
+
+/** Who builds and sells houses in a set: its single owner, or the major partner of a split. */
+export function builderOf(state: State, set: BusinessSetKey): number | null {
+  const split = splitOf(state, set);
+  if (split) return split.major;
+  const ids = setSpaces(set);
+  const owner = state.props[ids[0]]?.owner;
+  return owner !== undefined && ids.every((i) => state.props[i]?.owner === owner) ? owner : null;
 }
 
 export function countKind(state: State, seat: number, kind: BusinessSpaceKind): number {
@@ -65,7 +112,7 @@ export function rentLevel(state: State, space: number): number {
   const set = BUSINESS_BOARD[space].set;
   if (!prop || !set) return 0;
   if (prop.houses > 0) return prop.houses + 1;
-  return ownsSet(state, prop.owner, set) ? 1 : 0;
+  return setComplete(state, set) ? 1 : 0;
 }
 
 /** Rent for every step of a city's ladder, in ladder order. */
@@ -74,12 +121,34 @@ export function rentLadder(space: number): number[] {
   return BUSINESS_RENT_LADDER.map((m) => Math.round(price * m));
 }
 
+/** Houses standing anywhere on the board; a hotel counts as five. */
+export function housesOnBoard(state: State): number {
+  return Object.values(state.props).reduce((sum, p) => sum + p.houses, 0);
+}
+
+/** Railway rent for an owner of `count` railways: the base, plus a little for every house on the board, per railway owned. */
+export function railRent(state: State, count: number): number {
+  return count > 0 ? BUSINESS_RAIL_RENT[count] + BUSINESS_RULES.RAIL_RENT_PER_HOUSE * housesOnBoard(state) * count : 0;
+}
+
+/** Salary for a player's `lap`-th lap: it grows by one step every lap, up to the host's cap (0 = none). */
+export function salaryFor(lap: number, cap = 0): number {
+  const salary = Math.max(1, lap) * BUSINESS_RULES.SALARY_STEP;
+  return cap > 0 ? Math.min(cap, salary) : salary;
+}
+
+/** A share of the cash in hand, with a floor so an empty pocket is no way out. */
+export function shareOfCash(cash: number, pct: number): number {
+  if (pct <= 0) return 0;
+  return Math.max(BUSINESS_RULES.PCT_MIN, Math.round((Math.max(0, cash) * pct) / 100));
+}
+
 export function rentFor(state: State, space: number, diceSum: number): number {
   const prop = state.props[space];
   const tile = BUSINESS_BOARD[space];
   if (!prop || prop.mortgaged) return 0;
   if (tile.kind === "city") return rentLadder(space)[rentLevel(state, space)];
-  if (tile.kind === "rail") return BUSINESS_RAIL_RENT[countKind(state, prop.owner, "rail")];
+  if (tile.kind === "rail") return railRent(state, countKind(state, prop.owner, "rail"));
   if (tile.kind === "utility") {
     const both = countKind(state, prop.owner, "utility") === 2;
     return (both ? BUSINESS_UTILITY_MULTIPLIER.BOTH : BUSINESS_UTILITY_MULTIPLIER.ONE) * diceSum;
@@ -95,22 +164,25 @@ export function canBuild(state: State, seat: number, space: number): string | nu
   const tile = BUSINESS_BOARD[space];
   const prop = state.props[space];
   if (tile.kind !== "city" || !tile.set) return "Only cities can have houses.";
-  if (!prop || prop.owner !== seat) return "You do not own this city.";
-  if (!ownsSet(state, seat, tile.set)) return "Own the whole colour set first.";
+  const split = splitOf(state, tile.set);
+  if (!prop || (prop.owner !== seat && split?.major !== seat)) return "You do not own this city.";
+  if (builderOf(state, tile.set) !== seat)
+    return split ? `Only ${state.players[split.major].name}, who holds two cities of this set, builds here.` : "Own the whole colour set first.";
   const ids = setSpaces(tile.set);
-  // Houses and mortgages never mix: the whole set must be fully the builder's own.
+  // Houses and mortgages never mix: the whole set must be free of the bank.
   if (ids.some((i) => state.props[i].mortgaged)) return "Redeem every city in this set from the bank first.";
-  if (ids.some((i) => state.props[i].lend)) return "A city in this set is mortgaged to a player. Pay them back first.";
   if (prop.houses >= BUSINESS_RULES.MAX_HOUSES) return "This city already has a hotel.";
   if (prop.houses > Math.min(...setHouses(state, tile.set))) return "Build evenly across the set.";
-  if (state.players[seat].cash < houseCost(space)) return "Not enough cash.";
+  // In a split the builder pays their share; the partner's share is taken from them even if it leaves them short.
+  const own = split ? splitShares(split, houseCost(space)).major : houseCost(space);
+  if (state.players[seat].cash < own) return "Not enough cash.";
   return null;
 }
 
 export function canSellHouse(state: State, seat: number, space: number): string | null {
   const tile = BUSINESS_BOARD[space];
   const prop = state.props[space];
-  if (!prop || prop.owner !== seat || !tile.set) return "You do not own this city.";
+  if (!prop || !tile.set || builderOf(state, tile.set) !== seat) return "You do not own this city.";
   if (prop.houses <= 0) return "Nothing is built here.";
   if (prop.houses < Math.max(...setHouses(state, tile.set))) return "Sell evenly across the set.";
   return null;
@@ -130,7 +202,7 @@ export function canMortgage(state: State, seat: number, space: number): string |
   const prop = state.props[space];
   if (!prop || prop.owner !== seat) return "You do not own this property.";
   if (prop.mortgaged) return "Already mortgaged to the bank.";
-  if (prop.lend) return "Already mortgaged to a player.";
+  if (splitAt(state, space)) return "This city is in a split set. End the split first.";
   if (!setIsBare(state, space)) return "Sell the houses in this set first.";
   return null;
 }
@@ -157,19 +229,19 @@ export function lapInterest(amount: number, interestPct: number): number {
   return Math.round((amount * interestPct) / 100);
 }
 
-/** Lender's part of a rent under a player mortgage. An odd rupee stays with the owner. */
-export function lenderCut(rent: number, share: number): number {
-  return Math.floor((rent * share) / 100);
-}
-
 export function netWorth(state: State, seat: number): number {
   let worth = state.players[seat].cash;
   for (const i of ownedBy(state, seat)) {
     const prop = state.props[i];
     const price = BUSINESS_BOARD[i].price ?? 0;
     worth += prop.mortgaged ? price - mortgageValue(i) : price;
-    worth += prop.houses * houseCost(i);
-    if (prop.lend) worth -= prop.lend.advance;
+    // Houses in a split set belong to both partners by their shares (added below).
+    if (!splitAt(state, i)) worth += prop.houses * houseCost(i);
+  }
+  for (const split of state.splits) {
+    if (split.major !== seat && split.minor !== seat) continue;
+    const built = setSpaces(split.set).reduce((sum, i) => sum + (state.props[i]?.houses ?? 0) * houseCost(i), 0);
+    worth += splitShares(split, built)[split.major === seat ? "major" : "minor"];
   }
   for (const loan of state.loans) {
     if (loan.borrower === seat) worth -= loan.due;
@@ -194,7 +266,7 @@ export function canTrade(state: State, owner: number, space: number): string | n
   const prop = state.props[space];
   const name = BUSINESS_BOARD[space].name;
   if (!prop || prop.owner !== owner) return `${state.players[owner].name} does not own ${name}.`;
-  if (prop.lend) return `${name} is mortgaged to a player.`;
+  if (splitAt(state, space)) return `${name} is in a split set. End the split first.`;
   if (!setIsBare(state, space)) return `Sell the houses in ${name}'s set first.`;
   return null;
 }
@@ -220,17 +292,21 @@ export function validateOffer(
     return null;
   }
 
-  if (terms.kind === "mortgage") {
-    if (!pair(terms.owner, terms.lender)) return "A mortgage is between the two of you.";
-    const prop = state.props[terms.space];
-    if (!prop || prop.owner !== terms.owner) return "The owner does not hold that property.";
-    if (prop.mortgaged) return "That property is mortgaged to the bank.";
-    if (prop.lend) return "That property is already mortgaged to a player.";
-    if (Object.values(state.props).filter((q) => q.lend).length >= BUSINESS_RULES.MAX_SHARED)
-      return `Only ${BUSINESS_RULES.MAX_SHARED} properties can be shared with players at a time.`;
-    if (!setIsBare(state, terms.space)) return "Sell the houses in this set first.";
-    if (state.players[terms.lender].cash < terms.advance)
-      return `${state.players[terms.lender].name} does not have ₹${terms.advance}.`;
+  if (terms.kind === "split") {
+    const name = BUSINESS_SETS[terms.set].name;
+    if (splitOf(state, terms.set)) return `The ${name} set is already split.`;
+    const owners = splitPair(state, terms.set);
+    if (!owners || !pair(owners.major, owners.minor)) return `Only a three-city set held two and one by the two of you can be split.`;
+    if (a.team === b.team) return "Teammates already pay each other no rent.";
+    if (setSpaces(terms.set).some((i) => state.props[i].mortgaged)) return "Redeem every city in this set from the bank first.";
+    if (state.splits.length >= BUSINESS_RULES.MAX_SPLITS)
+      return `Only ${BUSINESS_RULES.MAX_SPLITS} sets can be split at a time. One split has to end first.`;
+    return null;
+  }
+
+  if (terms.kind === "unsplit") {
+    const split = state.splits.find((s) => s.id === terms.split);
+    if (!split || !pair(split.major, split.minor)) return "That split is not between the two of you.";
     return null;
   }
 

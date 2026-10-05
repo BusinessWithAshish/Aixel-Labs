@@ -10,8 +10,13 @@ export const BUSINESS_ROUTES = {
 } as const;
 
 export const BUSINESS_RULES = {
-  START_CASH: 2500,
-  SALARY: 500,
+  START_CASH: 2000,
+  /** Salary grows with every lap a player completes: lap 1 pays this, lap 2 twice this, and so on. */
+  SALARY_STEP: 100,
+  /** Every house on the board (a hotel counts as five) adds this to the rent, for each railway the owner has. */
+  RAIL_RENT_PER_HOUSE: 5,
+  /** A levy or a percentage card never takes less than this. */
+  PCT_MIN: 50,
   JAIL_FEE: 100,
   /** Missed doubles allowed before the fee is forced on the third turn. */
   JAIL_TRIES: 3,
@@ -22,9 +27,8 @@ export const BUSINESS_RULES = {
   REDEEM_RATE: 0.55,
   HOUSE_RESALE_RATE: 0.5,
   AUCTION_OPEN_RATE: 0.5,
-  AUCTION_SECONDS: 15,
-  /** A bid in the last seconds resets the countdown to this many seconds. */
-  AUCTION_EXTEND_SECONDS: 5,
+  /** Time to bid. Every bid starts the countdown again from this, so nobody is rushed out. */
+  AUCTION_SECONDS: 20,
   BID_STEP: 5,
   /** A lender may lend at most this share of the cash they hold. */
   LOAN_MAX_CASH_SHARE: 0.7,
@@ -32,36 +36,51 @@ export const BUSINESS_RULES = {
   DEAL_MAX_LAPS: 6,
   /** Across the whole table, at most this many cash loans may be running at once. */
   MAX_LOANS: 3,
-  /** Across the whole table, at most this many properties may be shared with a player at once. */
-  MAX_SHARED: 3,
+  /** Across the whole table, at most this many colour sets may be split between two players at once. */
+  MAX_SPLITS: 3,
+  /** A split gives the player with one city of the set this share of it, in percent… */
+  SPLIT_DEFAULT_PCT: 33,
+  SPLIT_MIN_PCT: 10,
+  SPLIT_MAX_PCT: 90,
+  /** …set in steps of this many percent. */
+  SPLIT_STEP_PCT: 5,
   MARKET_MIN_STAKE: 10,
   MARKET_MAX_STAKE: 1000,
-  /** Two dice: 2–5 loses this share of the stake, 6–8 nothing, 9–12 wins the stake again. */
+  /** Two dice: 2–5 loses the stake, 6–8 nothing, 9–12 wins the stake again. */
   MARKET_LOSE_MAX: 5,
   MARKET_FLAT_MAX: 8,
-  MARKET_LOSS_RATE: 0.5,
   DEFAULT_MISS_LIMIT: 3,
-  TAX_PER_PROPERTY: 40,
-  REPAIR_PER_HOUSE: 50,
-  REPAIR_PER_HOTEL: 150,
+  /** Chance "Property tax": this share of the cash held for every property owned, up to the cap. */
+  TAX_PCT_PER_PROPERTY: 2,
+  TAX_PCT_MAX: 20,
+  /** Chance "Repairs": this share of the cash held for every house (a hotel counts as five), up to the cap. */
+  REPAIR_PCT_PER_HOUSE: 2,
+  REPAIR_PCT_MAX: 25,
   MIN_SEATS: 2,
   MAX_SEATS: 6,
-  LOG_LIMIT: 80,
-  OFFER_SECONDS: 45,
+  /** Lines the activity keeps, newest first. Enough for a whole match of a few players. */
+  LOG_LIMIT: 250,
+  OFFER_SECONDS: 60,
+  /**
+   * The turn clock stands still while its player is making a deal, and while their offer waits for
+   * an answer: for at most this long in one turn, so the table is never held up for good.
+   */
+  HOLD_TURN_SECONDS: 180,
 } as const;
 
 /** Seconds a phase may sit before the server takes the default action. */
 export const BUSINESS_PHASE_SECONDS = {
   roll: 45,
-  buy: 20,
+  buy: 30,
   card: 12,
   result: 8,
-  market: 25,
+  market: 45,
   break: 15,
   debt: 75,
   /** A loan came due: pay it, or ask the lender to extend it. */
   loandue: 40,
-  end: 30,
+  /** After the roll is dealt with: time to build, trade and make deals. */
+  end: 90,
 } as const;
 
 /** Match lengths the host can pick. 0 = no limit: play until one player is left. */
@@ -69,6 +88,12 @@ export const BUSINESS_MATCH_MINUTES = [30, 45, 60, 0] as const;
 
 /** Turns in a row a player may miss before they are removed. Picked by the host. */
 export const BUSINESS_MISS_LIMITS = [2, 3, 5] as const;
+
+/**
+ * Highest salary a lap can pay, picked by the host. 0 = no cap (the default). With no cap and no
+ * time limit a long match can run on and on; ₹500 keeps such a match finite.
+ */
+export const BUSINESS_SALARY_CAPS = [0, 500, 1000, 1500] as const;
 
 /** Rent as a multiple of price: alone, colour set, 1–4 houses, hotel. */
 export const BUSINESS_RENT_LADDER = [0.1, 0.3, 1, 2.5, 4.5, 6, 7.5] as const;
@@ -122,7 +147,8 @@ export type BusinessSpace = {
   icon?: string;
   set?: BusinessSetKey;
   price?: number;
-  fee?: number;
+  /** A levy takes this share (in percent) of the cash the player holds. */
+  pct?: number;
 };
 
 const city = (name: string, set: BusinessSetKey, price: number): BusinessSpace => ({
@@ -160,7 +186,7 @@ export const BUSINESS_BOARD: readonly BusinessSpace[] = [
   city("Leh", "sky", 80),
   city("Ooty", "sky", 100),
   rail("North Rail"),
-  { kind: "levy", name: "Income Tax", icon: "receipt", fee: 200 },
+  { kind: "levy", name: "Income Tax", icon: "receipt", pct: 10 },
   city("Ajmer", "pink", 120),
   city("Kota", "pink", 120),
   city("Jaipur", "pink", 140),
@@ -197,7 +223,7 @@ export const BUSINESS_BOARD: readonly BusinessSpace[] = [
   city("Pune", "purple", 360),
   city("Noida", "purple", 360),
   city("Vizag", "purple", 380),
-  { kind: "levy", name: "Luxury Tax", icon: "receipt", fee: 100 },
+  { kind: "levy", name: "Luxury Tax", icon: "receipt", pct: 20 },
   city("Delhi", "black", 400),
   city("Mumbai", "black", 400),
 ];
@@ -206,6 +232,8 @@ export const BUSINESS_JAIL_INDEX = 12;
 
 export type BusinessCardEffect =
   | { type: "cash"; amount: number }
+  /** Pay this share (in percent) of the cash you hold. */
+  | { type: "pct"; pct: number }
   | { type: "tax" }
   | { type: "repair" }
   | { type: "back"; steps: number }
@@ -219,12 +247,12 @@ export const BUSINESS_CHANCE_CARDS: readonly BusinessCard[] = [
   { text: "Your annuity matures. Collect ₹100.", effect: { type: "cash", amount: 100 } },
   { text: "Festival bonus. Collect ₹150.", effect: { type: "cash", amount: 150 } },
   { text: "The bank made a mistake in your favour. Collect ₹200.", effect: { type: "cash", amount: 200 } },
-  { text: "Property tax. Pay ₹40 for every property you own.", effect: { type: "tax" } },
-  { text: "Repairs. Pay ₹50 per house and ₹150 per hotel.", effect: { type: "repair" } },
-  { text: "Doctor's fees. Pay ₹100.", effect: { type: "cash", amount: -100 } },
-  { text: "School fees. Pay ₹150.", effect: { type: "cash", amount: -150 } },
-  { text: "Car breakdown. Pay ₹200.", effect: { type: "cash", amount: -200 } },
-  { text: "Wedding in the family. Pay ₹250.", effect: { type: "cash", amount: -250 } },
+  { text: "Property tax. Pay 2% of your cash for every property you own (20% at most).", effect: { type: "tax" } },
+  { text: "Repairs. Pay 2% of your cash for every house, a hotel counting as 5 (25% at most).", effect: { type: "repair" } },
+  { text: "Doctor's fees. Pay 5% of your cash.", effect: { type: "pct", pct: 5 } },
+  { text: "School fees. Pay 8% of your cash.", effect: { type: "pct", pct: 8 } },
+  { text: "Car breakdown. Pay 10% of your cash.", effect: { type: "pct", pct: 10 } },
+  { text: "Wedding in the family. Pay 15% of your cash.", effect: { type: "pct", pct: 15 } },
   { text: "Go back 3 spaces.", effect: { type: "back", steps: 3 } },
   { text: "Go to Jail.", effect: { type: "jail" } },
 ];

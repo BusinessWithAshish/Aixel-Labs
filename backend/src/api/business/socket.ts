@@ -75,7 +75,7 @@ function handle(ws: WebSocket, msg: BusinessClientMessage) {
   if (msg.t === "ping") return send(ws, { t: "pong" });
 
   if (msg.t === "create") {
-    const { room, seat, token } = createRoom(msg.name, { seats: msg.seats, minutes: msg.minutes, missLimit: msg.missLimit, teams: false }, now);
+    const { room, seat, token } = createRoom(msg.name, { seats: msg.seats, minutes: msg.minutes, missLimit: msg.missLimit, teams: false, salaryCap: 0 }, now);
     attach(ws, room, seat);
     send(ws, { t: "joined", code: room.code, seat, token });
     return broadcast(room);

@@ -26,6 +26,7 @@ import type {
   BusinessPlayer,
   BusinessPublicState,
   BusinessRoomConfig,
+  BusinessSplit,
 } from "../types";
 import {
   canBuild,
@@ -36,12 +37,17 @@ import {
   houseResale,
   isBuyable,
   lapInterest,
-  lenderCut,
+  setSpaces,
+  splitAt,
+  splitPair,
+  splitShares,
   loanDue,
   mortgageValue,
   netWorth,
   ownedBy,
   ownsSet,
+  salaryFor,
+  shareOfCash,
   redeemCost,
   rentFor,
   validateOffer,
@@ -93,6 +99,31 @@ function log(state: BusinessGameState, text: string, seat?: number, only?: numbe
   if (state.log.length > BUSINESS_RULES.LOG_LIMIT) state.log.length = BUSINESS_RULES.LOG_LIMIT;
 }
 
+const laps = (n: number) => `${n} lap${n === 1 ? "" : "s"}`;
+
+/** An offer in words, for the activity of the two players it is between. */
+function describeTerms(state: BusinessGameState, from: number, to: number, terms: BusinessOfferTerms): string {
+  const P = state.players;
+  const interest = (pct: number, mode: "lap" | "end") => `${pct}% interest ${mode === "lap" ? "paid at every Launch" : "paid at the end"}`;
+  switch (terms.kind) {
+    case "loan":
+      return `${P[terms.lender].name} lends ${P[terms.borrower].name} ${rs(terms.amount)} at ${interest(terms.interestPct, terms.interestMode)}, to repay within ${laps(terms.laps)}`;
+    case "renew":
+      return `extend the loan: ${rs(terms.pay)} paid now, ${rs(terms.extra)} more lent, ${interest(terms.interestPct, terms.interestMode)}, ${laps(terms.laps)}`;
+    case "split":
+      return `split the ${BUSINESS_SETS[terms.set].name} set, ${terms.minorPct}% to the partner with one city`;
+    case "unsplit": {
+      const split = state.splits.find((s) => s.id === terms.split);
+      return `end the split of the ${split ? BUSINESS_SETS[split.set].name : ""} set`;
+    }
+    case "trade": {
+      const side = (cash: number, spaces: number[]) =>
+        [cash ? rs(cash) : null, ...spaces.map((i) => BUSINESS_BOARD[i].name)].filter(Boolean).join(" + ") || "nothing";
+      return `${P[from].name} gives ${side(terms.give.cash, terms.give.spaces)}, ${P[to].name} gives ${side(terms.get.cash, terms.get.spaces)}`;
+    }
+  }
+}
+
 /** Everyone except these seats: who gets the public notice of a private deal. */
 function othersThan(state: BusinessGameState, ...seats: number[]): number[] {
   return state.players.map((p) => p.seat).filter((s) => !seats.includes(s));
@@ -114,9 +145,34 @@ function setPhase(
 ) {
   state.phase = phase;
   state.pending = pending;
+  state.hold = null;
   if (phase === "over") state.deadline = null;
   else if (pending?.type === "auction") state.deadline = pending.endsAt;
   else state.deadline = now + BUSINESS_PHASE_SECONDS[phase as keyof typeof BUSINESS_PHASE_SECONDS] * 1000;
+}
+
+/** The turn clock starts again; the time it stood still is given back. */
+function releaseHold(state: BusinessGameState, now: number) {
+  const hold = state.hold;
+  if (!hold) return;
+  const stood = Math.max(0, Math.min(now, hold.until) - hold.at);
+  if (state.deadline !== null) state.deadline += stood;
+  state.held += stood;
+  state.hold = null;
+}
+
+/** Stops the turn clock until `until`, within what is left of the allowance for this turn. Returns false when none is left. */
+function startHold(state: BusinessGameState, now: number, until: number, offer: boolean): boolean {
+  releaseHold(state, now);
+  const left = BUSINESS_RULES.HOLD_TURN_SECONDS * 1000 - state.held;
+  if (left <= 0 || state.deadline === null) return false;
+  state.hold = { at: now, until: Math.min(until, now + left), offer };
+  return true;
+}
+
+/** An offer was answered, withdrawn or ran out: if the turn clock was waiting on it, it runs again. */
+function offerGone(state: BusinessGameState, now: number) {
+  if (state.hold?.offer && !state.offers.some((o) => o.from === state.turn)) releaseHold(state, now);
 }
 
 /**
@@ -173,11 +229,16 @@ function checkOver(state: BusinessGameState): boolean {
 
 function advance(state: BusinessGameState, now: number) {
   if (checkOver(state)) return;
-  state.offers = [];
+  // An offer outlives the turn it was made in: the other player still has its own clock to answer.
+  // Only a request to extend a due loan ends here, as the loan has been settled by now.
+  state.offers = state.offers.filter((o) => o.terms.kind !== "renew");
   state.owed = [];
   state.doubles = 0;
   state.again = false;
   state.lapsed = false;
+  state.hold = null;
+  state.held = 0;
+  state.opening = false;
   let i = state.turn;
   for (let k = 0; k < state.players.length * 2; k++) {
     i = (i + 1) % state.players.length;
@@ -192,6 +253,13 @@ function advance(state: BusinessGameState, now: number) {
     break;
   }
   state.turn = i;
+  // Short before the turn begins (their share of a house a split partner built): that comes first.
+  const next = state.players[i];
+  if (next.cash < 0) {
+    state.opening = true;
+    log(state, `${next.name} starts the turn ${rs(-next.cash)} short and must raise it first.`, next.seat);
+    return setPhase(state, "debt", now);
+  }
   setPhase(state, "roll", now);
 }
 
@@ -199,9 +267,16 @@ function advance(state: BusinessGameState, now: number) {
 function continueTurn(state: BusinessGameState, now: number) {
   const p = active(state);
   if (p.bankrupt) return advance(state, now);
-  if (p.cash < 0) return setPhase(state, "debt", now);
+  if (p.cash < 0) {
+    if (state.phase !== "debt") log(state, `${p.name} is ${rs(-p.cash)} short and must raise it.`, p.seat);
+    return setPhase(state, "debt", now);
+  }
   if (state.phase === "debt") log(state, `${p.name} paid off the debt.`, p.seat);
   settleOwed(state);
+  if (state.opening) {
+    state.opening = false;
+    return setPhase(state, "roll", now);
+  }
   // A loan came due while moving: settle it (or agree an extension) before the turn goes on.
   const dueLoan = state.loans.find((l) => l.borrower === p.seat && l.dueNow);
   if (dueLoan) {
@@ -234,6 +309,7 @@ function settleLoan(state: BusinessGameState, loan: BusinessLoan) {
   const p = state.players[loan.borrower];
   state.loans = state.loans.filter((l) => l.id !== loan.id);
   pay(state, p.seat, loan.lender, loan.due);
+  log(state, `${p.name} paid back a loan to ${state.players[loan.lender].name}.`, p.seat, othersThan(state, p.seat, loan.lender));
   log(state, `${p.name} paid back the loan from ${state.players[loan.lender].name}: ${rs(loan.due)}.`, p.seat, [p.seat, loan.lender], {
     kind: "repay",
     from: p.seat,
@@ -245,12 +321,15 @@ function settleLoan(state: BusinessGameState, loan: BusinessLoan) {
 /* ---------- movement and landing ---------- */
 
 function paySalary(state: BusinessGameState, p: BusinessPlayer, landed: boolean) {
-  p.cash += BUSINESS_RULES.SALARY;
-  log(state, `${p.name} ${landed ? "landed on" : "passed"} Launch: +${rs(BUSINESS_RULES.SALARY)} salary.`, p.seat, undefined, {
+  // A full lap counts one more; landing on Launch again (going back 3) pays the current lap's salary.
+  if (!landed) p.laps++;
+  const salary = salaryFor(p.laps, state.salaryCap);
+  p.cash += salary;
+  log(state, `${p.name} ${landed ? "landed on" : "passed"} Launch: +${rs(salary)} salary.`, p.seat, undefined, {
     kind: "salary",
     from: null,
     to: p.seat,
-    amount: BUSINESS_RULES.SALARY,
+    amount: salary,
   });
 }
 
@@ -263,6 +342,7 @@ function passLaunch(state: BusinessGameState, p: BusinessPlayer) {
     if (loan.perLap > 0) {
       const lender = state.players[loan.lender];
       pay(state, p.seat, lender.seat, loan.perLap);
+      log(state, `${p.name} paid ${lender.name} loan interest.`, p.seat, othersThan(state, p.seat, lender.seat));
       log(state, `${p.name} paid ${lender.name} ${rs(loan.perLap)} interest on the loan.`, p.seat, [p.seat, lender.seat], {
         kind: "interest",
         from: p.seat,
@@ -271,21 +351,13 @@ function passLaunch(state: BusinessGameState, p: BusinessPlayer) {
       });
     }
     loan.lapsLeft--;
-    if (loan.lapsLeft > 0) continue;
+    if (loan.lapsLeft > 0) {
+      log(state, `${p.name}'s loan from ${state.players[loan.lender].name}: ${laps(loan.lapsLeft)} left to repay ${rs(loan.due)}.`, p.seat, [p.seat, loan.lender]);
+      continue;
+    }
     // No automatic charge: the borrower is asked to pay or extend once the landing is done.
     loan.dueNow = true;
     log(state, `${p.name}'s loan from ${state.players[loan.lender].name} is due: ${rs(loan.due)}.`, p.seat, [p.seat, loan.lender]);
-  }
-
-  for (const i of ownedBy(state, p.seat)) {
-    const prop = state.props[i];
-    if (!prop.lend) continue;
-    prop.lend.lapsLeft--;
-    if (prop.lend.lapsLeft > 0) continue;
-    const lender = prop.lend.to;
-    prop.owner = lender;
-    delete prop.lend;
-    log(state, `${p.name} did not pay back in time. ${BUSINESS_BOARD[i].name} now belongs to ${state.players[lender].name}.`, lender);
   }
 }
 
@@ -316,34 +388,72 @@ function finishAuction(state: BusinessGameState, now: number) {
 }
 
 /**
- * Rent goes to the owner, and part of it to the lender when the property is
- * mortgaged to a player. Nobody pays themselves or a teammate: a lender who
- * lands on a property they hold a share of pays only the owner's part.
+ * Rent goes to the owner. In a split set it goes to both partners by their shares, whichever of
+ * its cities was landed on, and the partners themselves pay nothing there. Nobody pays a teammate.
  */
 function chargeRent(state: BusinessGameState, p: BusinessPlayer, space: number) {
   const prop = state.props[space];
   const name = BUSINESS_BOARD[space].name;
-  const owner = state.players[prop.owner];
   const rent = rentFor(state, space, state.dice[0] + state.dice[1]);
-  const lender = prop.lend ? state.players[prop.lend.to] : null;
-  const cut = prop.lend ? lenderCut(rent, prop.lend.share) : 0;
-  const free = (q: BusinessPlayer) => q.team === p.team;
-  const toOwner = free(owner) ? 0 : rent - cut;
-  const toLender = lender && !free(lender) ? cut : 0;
+  const split = splitAt(state, space);
+  const free = (seat: number) => seat === p.seat || state.players[seat].team === p.team;
 
-  if (toOwner + toLender === 0) {
-    const mate = owner.seat !== p.seat ? owner : lender;
-    log(state, `${p.name} landed on ${name}. No rent between ${mate && mate.seat !== p.seat ? "teammates" : "its owners"}.`, p.seat);
+  if (!split) {
+    const owner = state.players[prop.owner];
+    if (free(owner.seat)) {
+      log(state, `${p.name} landed on ${name}. No rent between teammates.`, p.seat);
+      return;
+    }
+    pay(state, p.seat, owner.seat, rent);
+    log(state, `${p.name} paid ${rs(rent)} rent to ${owner.name} for ${name}.`, p.seat, undefined, { kind: "rent", from: p.seat, to: owner.seat, amount: rent, space });
     return;
   }
-  pay(state, p.seat, owner.seat, toOwner);
-  if (lender) pay(state, p.seat, lender.seat, toLender);
-  const paid = toOwner + toLender;
-  const text =
-    toOwner && toLender
-      ? `${p.name} paid ${rs(paid)} rent on ${name}: ${rs(toOwner)} to ${owner.name}, ${rs(toLender)} to ${lender?.name}.`
-      : `${p.name} paid ${rs(paid)} rent to ${toOwner ? owner.name : lender?.name} for ${name}.`;
-  log(state, text, p.seat, undefined, { kind: "rent", from: p.seat, to: toOwner ? owner.seat : (lender?.seat ?? owner.seat), amount: paid, space });
+
+  if (split.major === p.seat || split.minor === p.seat) {
+    log(state, `${p.name} landed on ${name}. Partners in a split set pay no rent there.`, p.seat);
+    return;
+  }
+  const shares = splitShares(split, rent);
+  const major = state.players[split.major];
+  const minor = state.players[split.minor];
+  const toMajor = free(major.seat) ? 0 : shares.major;
+  const toMinor = free(minor.seat) ? 0 : shares.minor;
+  if (toMajor + toMinor === 0) {
+    log(state, `${p.name} landed on ${name}. No rent between teammates.`, p.seat);
+    return;
+  }
+  pay(state, p.seat, major.seat, toMajor);
+  pay(state, p.seat, minor.seat, toMinor);
+  log(state, `${p.name} paid ${rs(toMajor + toMinor)} rent on ${name}: ${rs(toMajor)} to ${major.name}, ${rs(toMinor)} to ${minor.name}.`, p.seat, undefined, {
+    kind: "rent",
+    from: p.seat,
+    to: toMajor ? major.seat : minor.seat,
+    amount: toMajor + toMinor,
+    space,
+  });
+}
+
+/**
+ * Ends a split. Every house in the set goes back to the bank at its resale price, and that money
+ * is shared by the partners' shares. The cities stay with their owners.
+ */
+function endSplit(state: BusinessGameState, split: BusinessSplit, why: string) {
+  let refund = 0;
+  for (const i of setSpaces(split.set)) {
+    const prop = state.props[i];
+    if (!prop) continue;
+    refund += prop.houses * houseResale(i);
+    prop.houses = 0;
+  }
+  const shares = splitShares(split, refund);
+  state.players[split.major].cash += shares.major;
+  state.players[split.minor].cash += shares.minor;
+  state.splits = state.splits.filter((s) => s.id !== split.id);
+  const major = state.players[split.major];
+  const minor = state.players[split.minor];
+  const set = BUSINESS_SETS[split.set].name;
+  const houses = refund ? ` Its houses went back to the bank for ${rs(refund)}: ${rs(shares.major)} to ${major.name}, ${rs(shares.minor)} to ${minor.name}.` : "";
+  log(state, `${why} The ${set} set is no longer split.${houses}`, split.major, undefined, { kind: "split", from: split.major, to: split.minor, amount: refund });
 }
 
 function land(state: BusinessGameState, now: number) {
@@ -358,7 +468,7 @@ function land(state: BusinessGameState, now: number) {
       log(state, `${p.name} cannot afford ${tile.name}. It goes to auction.`, p.seat);
       return startAuction(state, space, now);
     }
-    if (prop.owner === p.seat && !prop.lend) log(state, `${p.name} owns ${tile.name}. Nothing to pay.`, p.seat);
+    if (prop.owner === p.seat) log(state, `${p.name} owns ${tile.name}. Nothing to pay.`, p.seat);
     else if (prop.mortgaged) log(state, `${tile.name} is mortgaged to the bank. No rent due.`, p.seat);
     else chargeRent(state, p, space);
     return continueTurn(state, now);
@@ -382,16 +492,18 @@ function land(state: BusinessGameState, now: number) {
         title: "Market closed",
         text: `To play the Market you need at least one property and ${rs(BUSINESS_RULES.MARKET_MIN_STAKE)} in cash.`,
       });
-    case "levy":
-      pay(state, p.seat, null, tile.fee ?? 0);
-      log(state, `${p.name} paid the ${tile.name}: ${rs(tile.fee ?? 0)} to the bank.`, p.seat, undefined, {
+    case "levy": {
+      const fee = shareOfCash(p.cash, tile.pct ?? 0);
+      pay(state, p.seat, null, fee);
+      log(state, `${p.name} paid the ${tile.name}: ${tile.pct}% of their cash, ${rs(fee)}, to the bank.`, p.seat, undefined, {
         kind: "tax",
         from: p.seat,
         to: null,
-        amount: tile.fee ?? 0,
+        amount: fee,
         space,
       });
       break;
+    }
     case "break":
       return setPhase(state, "break", now, { type: "break" });
     case "gojail":
@@ -479,12 +591,14 @@ function applyCard(state: BusinessGameState, now: number) {
 
   let delta = 0;
   if (effect.type === "cash") delta = effect.amount;
-  if (effect.type === "tax") delta = -BUSINESS_RULES.TAX_PER_PROPERTY * ownedBy(state, p.seat).length;
+  if (effect.type === "pct") delta = -shareOfCash(p.cash, effect.pct);
+  if (effect.type === "tax") {
+    const owned = ownedBy(state, p.seat).length;
+    delta = -shareOfCash(p.cash, Math.min(BUSINESS_RULES.TAX_PCT_MAX, owned * BUSINESS_RULES.TAX_PCT_PER_PROPERTY));
+  }
   if (effect.type === "repair") {
-    for (const i of ownedBy(state, p.seat)) {
-      const h = state.props[i].houses;
-      delta -= h === BUSINESS_RULES.MAX_HOUSES ? BUSINESS_RULES.REPAIR_PER_HOTEL : h * BUSINESS_RULES.REPAIR_PER_HOUSE;
-    }
+    const houses = ownedBy(state, p.seat).reduce((sum, i) => sum + state.props[i].houses, 0);
+    delta = -shareOfCash(p.cash, Math.min(BUSINESS_RULES.REPAIR_PCT_MAX, houses * BUSINESS_RULES.REPAIR_PCT_PER_HOUSE));
   }
   log(state, `${p.name} drew a Chance card: ${text}`, p.seat, undefined, {
     kind: "card",
@@ -509,16 +623,16 @@ function playMarket(state: BusinessGameState, stake: number, now: number) {
   const sum = dice[0] + dice[1];
   let pending: BusinessPending;
   if (sum <= BUSINESS_RULES.MARKET_LOSE_MAX) {
-    const loss = Math.floor(stake * BUSINESS_RULES.MARKET_LOSS_RATE);
+    const loss = stake;
     pay(state, p.seat, null, loss);
-    pending = { type: "result", dice, tone: "bad", title: "Market crash", text: `${p.name} rolled ${sum} and loses half the stake: ${rs(loss)}.` };
+    pending = { type: "result", dice, tone: "bad", title: "Market crash", text: `${p.name} rolled ${sum} and loses the stake: ${rs(loss)}.` };
   } else if (sum <= BUSINESS_RULES.MARKET_FLAT_MAX) {
     pending = { type: "result", dice, tone: "mid", title: "Flat market", text: `${p.name} rolled ${sum}. Nothing gained, nothing lost.` };
   } else {
     p.cash += stake;
     pending = { type: "result", dice, tone: "good", title: "Market boom", text: `${p.name} rolled ${sum} and doubles the stake: +${rs(stake)}.` };
   }
-  const won = pending.tone === "good" ? stake : pending.tone === "bad" ? -Math.floor(stake * BUSINESS_RULES.MARKET_LOSS_RATE) : 0;
+  const won = pending.tone === "good" ? stake : pending.tone === "bad" ? -stake : 0;
   log(state, `Market: ${pending.text}`, p.seat, undefined, {
     kind: "market",
     from: won >= 0 ? null : p.seat,
@@ -534,7 +648,8 @@ function playMarket(state: BusinessGameState, stake: number, now: number) {
  * Takes a player out of the match, however they went (bankrupt, left, or
  * removed for missed turns), and settles what they owe in cash:
  *
- *  1. A property shared with a player goes to that lender: it was the security.
+ *  1. A split set they are in stops being split; its houses go back to the bank and
+ *     each partner gets their share of the money (theirs goes into the pot).
  *  2. Everything else is sold to the bank: each house at its resale price, each
  *     property at its mortgage value (nothing for one already mortgaged to the
  *     bank), plus any cash in hand. That is the pot.
@@ -547,15 +662,10 @@ function playMarket(state: BusinessGameState, stake: number, now: number) {
  */
 function doBankrupt(state: BusinessGameState, seat: number, forfeit?: string) {
   const p = state.players[seat];
+  for (const split of state.splits.filter((s) => s.major === seat || s.minor === seat)) endSplit(state, split, `${p.name} is out.`);
   let pot = Math.max(0, p.cash);
   for (const i of ownedBy(state, seat)) {
     const prop = state.props[i];
-    if (prop.lend) {
-      prop.owner = prop.lend.to;
-      prop.houses = 0;
-      delete prop.lend;
-      continue;
-    }
     pot += prop.houses * houseResale(i);
     if (!prop.mortgaged) pot += mortgageValue(i);
     delete state.props[i];
@@ -582,9 +692,6 @@ function doBankrupt(state: BusinessGameState, seat: number, forfeit?: string) {
     if (part > 0) log(state, `${state.players[to].name} received ${rs(part)} from ${p.name}'s sale.`, to, undefined, { kind: "repay", from: seat, to, amount: part });
   });
 
-  for (const i of Object.keys(state.props).map(Number)) {
-    if (state.props[i].lend?.to === seat) delete state.props[i].lend;
-  }
   state.loans = state.loans.filter((l) => l.lender !== seat && l.borrower !== seat);
   state.offers = state.offers.filter((o) => o.from !== seat && o.to !== seat);
   if (seat === state.turn) state.owed = [];
@@ -632,24 +739,29 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
     });
     return;
   }
-  if (terms.kind === "mortgage") {
-    P[terms.lender].cash -= terms.advance;
-    P[terms.owner].cash += terms.advance;
-    state.props[terms.space].lend = { to: terms.lender, share: terms.share, advance: terms.advance, lapsLeft: terms.laps };
-    log(state, `${P[terms.owner].name} mortgaged ${BUSINESS_BOARD[terms.space].name} to ${P[terms.lender].name}.`, terms.owner, othersThan(state, from, to), {
-      kind: "loan",
-      from: terms.lender,
-      to: terms.owner,
+  if (terms.kind === "split") {
+    const owners = splitPair(state, terms.set);
+    if (!owners) return;
+    const split: BusinessSplit = { id: ++state.idSeq, set: terms.set, major: owners.major, minor: owners.minor, minorPct: terms.minorPct };
+    state.splits.push(split);
+    const set = BUSINESS_SETS[terms.set].name;
+    log(state, `${P[split.major].name} and ${P[split.minor].name} split the ${set} set.`, split.major, othersThan(state, from, to), {
+      kind: "split",
+      from: split.major,
+      to: split.minor,
       amount: 0,
-      space: terms.space,
     });
-    log(state, `${P[terms.owner].name} mortgaged ${BUSINESS_BOARD[terms.space].name} to ${P[terms.lender].name} for ${rs(terms.advance)} and ${terms.share}% of the rent.`, terms.owner, [from, to], {
-      kind: "loan",
-      from: terms.lender,
-      to: terms.owner,
-      amount: terms.advance,
-      space: terms.space,
+    log(state, `${P[split.major].name} and ${P[split.minor].name} split the ${set} set: ${100 - terms.minorPct}% and ${terms.minorPct}%.`, split.major, [from, to], {
+      kind: "split",
+      from: split.major,
+      to: split.minor,
+      amount: 0,
     });
+    return;
+  }
+  if (terms.kind === "unsplit") {
+    const split = state.splits.find((s) => s.id === terms.split);
+    if (split) endSplit(state, split, `${P[from].name} and ${P[to].name} agreed to end their split.`);
     return;
   }
   if (terms.kind === "renew") {
@@ -664,6 +776,7 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
     loan.due = loanDue(loan.amount, terms.interestPct, terms.interestMode);
     loan.lapsLeft = terms.laps;
     loan.dueNow = false;
+    log(state, `${P[from].name} and ${P[to].name} extended a loan.`, from, othersThan(state, from, to));
     log(
       state,
       `${P[from].name} and ${P[to].name} extended a loan: ${rs(loan.amount)} for ${terms.laps} more lap${terms.laps === 1 ? "" : "s"}.`,
@@ -679,6 +792,7 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
   for (const i of terms.get.spaces) state.props[i].owner = from;
   // Public: everyone sees that a trade happened. What was swapped shows only on the board.
   log(state, `${P[from].name} and ${P[to].name} made a trade.`, from, undefined, { kind: "trade", from, to, amount: 0 });
+  log(state, `The trade: ${describeTerms(state, from, to, terms)}.`, from, [from, to]);
 }
 
 /* ---------- public API ---------- */
@@ -704,6 +818,7 @@ export function createGame(
       skip: false,
       bankrupt: false,
       missed: 0,
+      laps: 0,
       team: s.team,
     })),
     props: {},
@@ -714,6 +829,8 @@ export function createGame(
     pending: null,
     owed: [],
     loans: [],
+    splits: [],
+    opening: false,
     offers: [],
     log: [],
     logSeq: 0,
@@ -721,7 +838,10 @@ export function createGame(
     deadline: null,
     endsAt: config.minutes > 0 ? now + config.minutes * 60_000 : null,
     missLimit: config.missLimit,
+    salaryCap: config.salaryCap ?? 0,
     lapsed: false,
+    hold: null,
+    held: 0,
     winner: null,
     winnerTeam: null,
     ranking: null,
@@ -818,9 +938,10 @@ export function applyCommand(
       if (cmd.amount < min) fail(`Bid at least ${rs(min)}.`);
       if (cmd.amount > me.cash) fail("Not enough cash.");
       a.bid = cmd.amount;
+      log(state, `Auction: ${me.name} bids ${rs(cmd.amount)} for ${BUSINESS_BOARD[a.space].name}.`, seat);
       a.by = seat;
-      const floor = now + BUSINESS_RULES.AUCTION_EXTEND_SECONDS * 1000;
-      if (a.endsAt < floor) a.endsAt = floor;
+      // Every bid gives the others the full time again.
+      a.endsAt = now + BUSINESS_RULES.AUCTION_SECONDS * 1000;
       state.deadline = a.endsAt;
       break;
     }
@@ -860,9 +981,16 @@ export function applyCommand(
     case "build": {
       need(...MANAGE_PHASES);
       guard(canBuild(state, seat, cmd.space));
-      me.cash -= houseCost(cmd.space);
+      const split = splitAt(state, cmd.space);
+      const cost = houseCost(cmd.space);
+      // In a split set the partner pays their share too, even if it leaves them short.
+      const shares = split ? splitShares(split, cost) : { major: cost, minor: 0 };
+      me.cash -= shares.major;
+      if (split) state.players[split.minor].cash -= shares.minor;
       const built = ++state.props[cmd.space].houses;
-      log(state, `${me.name} built ${built === BUSINESS_RULES.MAX_HOUSES ? "a hotel" : "a house"} in ${BUSINESS_BOARD[cmd.space].name}.`, seat, undefined, {
+      const what = built === BUSINESS_RULES.MAX_HOUSES ? "a hotel" : "a house";
+      const paidBy = split ? ` ${state.players[split.minor].name} paid ${rs(shares.minor)} of its ${rs(cost)}.` : "";
+      log(state, `${me.name} built ${what} in ${BUSINESS_BOARD[cmd.space].name}.${paidBy}`, seat, undefined, {
         kind: "build",
         from: seat,
         to: null,
@@ -875,13 +1003,18 @@ export function applyCommand(
     case "sellHouse":
       need(...RAISE_PHASES);
       guard(canSellHouse(state, seat, cmd.space));
+      const split = splitAt(state, cmd.space);
+      const resale = houseResale(cmd.space);
+      const shares = split ? splitShares(split, resale) : { major: resale, minor: 0 };
       state.props[cmd.space].houses--;
-      me.cash += houseResale(cmd.space);
-      log(state, `${me.name} sold a house in ${BUSINESS_BOARD[cmd.space].name} for ${rs(houseResale(cmd.space))}.`, seat, undefined, {
+      me.cash += shares.major;
+      if (split) state.players[split.minor].cash += shares.minor;
+      const sharedWith = split ? ` ${state.players[split.minor].name} got ${rs(shares.minor)} of it.` : "";
+      log(state, `${me.name} sold a house in ${BUSINESS_BOARD[cmd.space].name} for ${rs(resale)}.${sharedWith}`, seat, undefined, {
         kind: "bank",
         from: null,
         to: seat,
-        amount: houseResale(cmd.space),
+        amount: shares.major,
         space: cmd.space,
       });
       break;
@@ -922,6 +1055,7 @@ export function applyCommand(
       need(...RAISE_PHASES);
       guard(validateOffer(state, seat, cmd.to, cmd.terms));
       state.offers = state.offers.filter((o) => o.from !== seat);
+      log(state, `${me.name} offered ${state.players[cmd.to].name}: ${describeTerms(state, seat, cmd.to, cmd.terms)}.`, seat, [seat, cmd.to]);
       state.offers.push({
         id: ++state.idSeq,
         from: seat,
@@ -929,20 +1063,30 @@ export function applyCommand(
         terms: cmd.terms,
         expiresAt: now + BUSINESS_RULES.OFFER_SECONDS * 1000,
       });
-      // Keep the turn open long enough for the other player to answer.
-      if (state.deadline !== null) state.deadline = Math.max(state.deadline, now + (BUSINESS_RULES.OFFER_SECONDS + 2) * 1000);
+      // The turn clock stands still while the other player decides.
+      startHold(state, now, now + BUSINESS_RULES.OFFER_SECONDS * 1000, true);
       break;
     }
+
+    case "hold":
+      // Writing an offer: the turn clock waits, so a deal is never rushed.
+      need(...RAISE_PHASES);
+      if (state.hold?.offer) break;
+      if (cmd.on) startHold(state, now, Infinity, false);
+      else releaseHold(state, now);
+      break;
 
     case "respond": {
       const offer = state.offers.find((o) => o.id === cmd.id);
       if (!offer || offer.to !== seat) fail("That offer is no longer open.");
       state.offers = state.offers.filter((o) => o.id !== offer.id);
+      offerGone(state, now);
       if (!cmd.accept) {
         log(state, `${me.name} declined ${state.players[offer.from].name}'s offer.`, seat, [seat, offer.from]);
         break;
       }
       guard(validateOffer(state, offer.from, offer.to, offer.terms));
+      log(state, `${me.name} accepted ${state.players[offer.from].name}'s offer.`, seat, [seat, offer.from]);
       executeOffer(state, offer.from, offer.to, offer.terms);
       break;
     }
@@ -951,6 +1095,8 @@ export function applyCommand(
       const offer = state.offers.find((o) => o.id === cmd.id);
       if (!offer || offer.from !== seat) fail("That offer is no longer open.");
       state.offers = state.offers.filter((o) => o.id !== offer.id);
+      log(state, `${me.name} withdrew the offer to ${state.players[offer.to].name}.`, seat, [seat, offer.to]);
+      offerGone(state, now);
       break;
     }
 
@@ -970,31 +1116,13 @@ export function applyCommand(
       me.cash -= loan.due;
       state.players[loan.lender].cash += loan.due;
       state.loans = state.loans.filter((l) => l.id !== loan.id);
-      log(state, `${me.name} repaid ${state.players[loan.lender].name} ${rs(loan.due)}.`, seat, [seat, loan.lender], {
+      log(state, `${me.name} paid back a loan to ${state.players[loan.lender].name}.`, seat, othersThan(state, seat, loan.lender));
+      log(state, `${me.name} repaid ${state.players[loan.lender].name} ${rs(loan.due)} early.`, seat, [seat, loan.lender], {
         kind: "repay",
         from: seat,
         to: loan.lender,
         amount: loan.due,
       });
-      break;
-    }
-
-    case "repayMortgage": {
-      need(...MANAGE_PHASES);
-      const prop = state.props[cmd.space];
-      if (!prop || prop.owner !== seat || !prop.lend) fail("That property is not mortgaged to a player.");
-      if (me.cash < prop.lend.advance) fail("Not enough cash.");
-      const lender = state.players[prop.lend.to];
-      me.cash -= prop.lend.advance;
-      lender.cash += prop.lend.advance;
-      log(state, `${me.name} paid ${lender.name} ${rs(prop.lend.advance)} and took ${BUSINESS_BOARD[cmd.space].name} back.`, seat, [seat, lender.seat], {
-        kind: "repay",
-        from: seat,
-        to: lender.seat,
-        amount: prop.lend.advance,
-        space: cmd.space,
-      });
-      delete prop.lend;
       break;
     }
 
@@ -1040,11 +1168,17 @@ export function tick(prev: BusinessGameState, now: number): BusinessGameState {
   if (prev.phase === "over") return prev;
   const offersExpired = prev.offers.some((o) => o.expiresAt <= now);
   const timeUp = prev.endsAt !== null && now >= prev.endsAt;
-  const phaseDue = prev.deadline !== null && now >= prev.deadline;
-  if (!offersExpired && !timeUp && !phaseDue) return prev;
+  const holdOver = prev.hold !== null && now >= prev.hold.until;
+  // While the clock stands still the phase cannot run out.
+  const phaseDue = prev.hold === null && prev.deadline !== null && now >= prev.deadline;
+  if (!offersExpired && !timeUp && !phaseDue && !holdOver) return prev;
 
   const state = structuredClone(prev);
+  for (const o of state.offers.filter((x) => x.expiresAt <= now))
+    log(state, `${state.players[o.from].name}'s offer to ${state.players[o.to].name} ran out with no answer.`, o.from, [o.from, o.to]);
   state.offers = state.offers.filter((o) => o.expiresAt > now);
+  if (holdOver) releaseHold(state, now);
+  else offerGone(state, now);
 
   if (timeUp) {
     log(state, "Time is up. The richest player wins.");

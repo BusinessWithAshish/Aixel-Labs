@@ -25,14 +25,6 @@ const BORROW_BELOW_CASH = 300;
 const BORROW_MAX_INTEREST_PCT = 30;
 /** Highest total interest (rate × laps) the bot borrows at when it is paid every lap. */
 const BORROW_MAX_LAP_INTEREST_PCT = 40;
-/** As a mortgage lender: the largest advance, as a share of the property's price. */
-const MORTGAGE_LEND_MAX_ADVANCE_PCT = 60;
-/** As a mortgage lender: the smallest share of the rent worth lending for. */
-const MORTGAGE_LEND_MIN_SHARE = 30;
-/** As the owner: the smallest advance, as a share of the price, worth pledging a property for. */
-const MORTGAGE_OWN_MIN_ADVANCE_PCT = 40;
-/** As the owner: the largest share of the rent the bot gives away. */
-const MORTGAGE_OWN_MAX_SHARE = 50;
 /** Extending a due loan: the borrower pays at least this share of it now… */
 const RENEW_MIN_PAY_PCT = 30;
 /** …or the new interest is at least this. */
@@ -127,18 +119,6 @@ function acceptLoan(state: BusinessGameState, seat: number, terms: Extract<Busin
   return terms.interestPct <= BORROW_MAX_INTEREST_PCT;
 }
 
-function acceptMortgage(state: BusinessGameState, seat: number, terms: Extract<BusinessOfferTerms, { kind: "mortgage" }>): boolean {
-  const worth = price(terms.space);
-  if (terms.lender === seat) {
-    return (
-      terms.advance * 100 <= worth * MORTGAGE_LEND_MAX_ADVANCE_PCT &&
-      terms.share >= MORTGAGE_LEND_MIN_SHARE &&
-      state.players[seat].cash - terms.advance >= LEND_RESERVE
-    );
-  }
-  return terms.advance * 100 >= worth * MORTGAGE_OWN_MIN_ADVANCE_PCT && terms.share <= MORTGAGE_OWN_MAX_SHARE;
-}
-
 function acceptRenew(state: BusinessGameState, seat: number, terms: Extract<BusinessOfferTerms, { kind: "renew" }>): boolean {
   const loan = state.loans.find((l) => l.id === terms.loan);
   if (!loan || loan.lender !== seat) return false;
@@ -159,8 +139,10 @@ function acceptOffer(state: BusinessGameState, seat: number, offer: BusinessOffe
       return acceptTrade(state, seat, offer, terms);
     case "loan":
       return acceptLoan(state, seat, terms);
-    case "mortgage":
-      return acceptMortgage(state, seat, terms);
+    case "split":
+    case "unsplit":
+      // Sharing or giving up a colour set is the absent player's call, never the stand-in's.
+      return false;
     case "renew":
       return acceptRenew(state, seat, terms);
     default:

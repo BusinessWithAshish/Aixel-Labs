@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BUSINESS_BOARD, BUSINESS_MATCH_MINUTES, BUSINESS_MISS_LIMITS, BUSINESS_RULES } from "./constants";
+import { BUSINESS_BOARD, BUSINESS_MATCH_MINUTES, BUSINESS_MISS_LIMITS, BUSINESS_RULES, BUSINESS_SALARY_CAPS, BUSINESS_SETS, type BusinessSetKey } from "./constants";
 
 const SPACE = z.number().int().min(0).max(BUSINESS_BOARD.length - 1);
 const SEAT = z.number().int().min(0).max(BUSINESS_RULES.MAX_SEATS - 1);
@@ -28,13 +28,20 @@ export const BUSINESS_OFFER_TERMS_SCHEMA = z.discriminatedUnion("kind", [
     laps: LAPS,
   }),
   z.object({
-    kind: z.literal("mortgage"),
-    space: SPACE,
-    owner: SEAT,
-    lender: SEAT,
-    advance: CASH.min(10),
-    share: z.number().int().min(0).max(100),
-    laps: LAPS,
+    /** Share a colour set with its other owner. */
+    kind: z.literal("split"),
+    set: z.enum(Object.keys(BUSINESS_SETS) as [BusinessSetKey, ...BusinessSetKey[]]),
+    minorPct: z
+      .number()
+      .int()
+      .min(BUSINESS_RULES.SPLIT_MIN_PCT)
+      .max(BUSINESS_RULES.SPLIT_MAX_PCT)
+      .refine((p) => p % BUSINESS_RULES.SPLIT_STEP_PCT === 0 || p === BUSINESS_RULES.SPLIT_DEFAULT_PCT),
+  }),
+  z.object({
+    /** End a split: every house in the set goes back to the bank. */
+    kind: z.literal("unsplit"),
+    split: z.number().int(),
   }),
   z.object({
     kind: z.literal("trade"),
@@ -63,10 +70,10 @@ export const BUSINESS_COMMAND_SCHEMA = z.discriminatedUnion("type", [
   z.object({ type: z.literal("offer"), to: SEAT, terms: BUSINESS_OFFER_TERMS_SCHEMA }),
   z.object({ type: z.literal("respond"), id: z.number().int(), accept: z.boolean() }),
   z.object({ type: z.literal("cancelOffer"), id: z.number().int() }),
+  z.object({ type: z.literal("hold"), on: z.boolean() }),
   z.object({ type: z.literal("repayLoan"), id: z.number().int() }),
   /** A due loan: pay all of it now, even if that leaves the borrower short. */
   z.object({ type: z.literal("settleLoan"), id: z.number().int() }),
-  z.object({ type: z.literal("repayMortgage"), space: SPACE }),
   z.object({ type: z.literal("bankrupt") }),
   /** Forfeit: the player leaves the match and their properties return to the bank. */
   z.object({ type: z.literal("leave") }),
@@ -84,6 +91,11 @@ const MISS_LIMIT = z
   .int()
   .refine((m) => (BUSINESS_MISS_LIMITS as readonly number[]).includes(m));
 
+const SALARY_CAP = z
+  .number()
+  .int()
+  .refine((m) => (BUSINESS_SALARY_CAPS as readonly number[]).includes(m));
+
 export const BUSINESS_CLIENT_MESSAGE_SCHEMA = z.discriminatedUnion("t", [
   z.object({ t: z.literal("create"), name: NAME, seats: SEATS, minutes: MINUTES, missLimit: MISS_LIMIT }),
   z.object({ t: z.literal("join"), code: CODE, name: NAME }),
@@ -94,6 +106,7 @@ export const BUSINESS_CLIENT_MESSAGE_SCHEMA = z.discriminatedUnion("t", [
     minutes: MINUTES.optional(),
     missLimit: MISS_LIMIT.optional(),
     teams: z.boolean().optional(),
+    salaryCap: SALARY_CAP.optional(),
   }),
   z.object({ t: z.literal("start") }),
   z.object({ t: z.literal("peek"), code: CODE }),
