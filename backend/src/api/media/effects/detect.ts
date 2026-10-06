@@ -367,6 +367,30 @@ export async function detectStaticOverlays(
 }
 
 /** Clamp a caller-supplied region into the frame, on even coordinates. */
+/**
+ * Fit a region for `style: "erase"`: optionally grown, and always held one
+ * pixel inside the frame, because `delogo` reads the row and column just
+ * outside its box and refuses a box that touches an edge.
+ */
+export function eraseRegion(
+  region: HIDE_REGION,
+  sourceWidth: number,
+  sourceHeight: number,
+  grow: boolean,
+): HIDE_REGION {
+  const padX = grow
+    ? Math.max(MEDIA_HIDE.DETECT.ERASE_MIN_PAD_PX, Math.round(region.width * MEDIA_HIDE.DETECT.ERASE_PAD_FRACTION))
+    : 0;
+  const padY = grow
+    ? Math.max(MEDIA_HIDE.DETECT.ERASE_MIN_PAD_PX, Math.round(region.height * MEDIA_HIDE.DETECT.ERASE_PAD_FRACTION))
+    : 0;
+  const x = Math.max(1, region.x - padX);
+  const y = Math.max(1, region.y - padY);
+  const right = Math.min(sourceWidth - 1, region.x + region.width + padX);
+  const bottom = Math.min(sourceHeight - 1, region.y + region.height + padY);
+  return { x, y, width: Math.max(2, right - x), height: Math.max(2, bottom - y) };
+}
+
 export function normalizeRegion(
   region: HIDE_REGION,
   sourceWidth: number,

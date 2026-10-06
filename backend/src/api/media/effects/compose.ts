@@ -223,6 +223,15 @@ export function buildCoverChain(
       label = next;
       return;
     }
+    if (cover.style === "erase") {
+      // Rebuilt from the surrounding pixels. The region is already inside the
+      // frame by a pixel (`eraseRegion`), which `delogo` requires.
+      steps.push(
+        `${label}delogo=x=${region.x}:y=${region.y}:w=${region.width}:h=${region.height}${next}`,
+      );
+      label = next;
+      return;
+    }
     if (cover.style === "fill") {
       steps.push(
         `${label}drawbox=x=${region.x}:y=${region.y}:w=${region.width}:h=${region.height}` +

@@ -17,7 +17,7 @@ import {
 import { cleanupResolvedMediaSource, resolveMediaSource } from "../source";
 import { probeMediaStreams } from "../cut/ffmpeg-cut";
 import { buildFilterGraph, HIDE_DEFAULTS, proofFilter } from "./compose";
-import { detectStaticOverlays, normalizeRegion } from "./detect";
+import { detectStaticOverlays, eraseRegion, normalizeRegion } from "./detect";
 import { cornerColour, sampleSurroundColour } from "./surround";
 import { buildGradeFilters, everyPresetChain } from "./grade";
 import { buildPresetSheet } from "./preview";
@@ -360,6 +360,10 @@ async function planCovers(
       const colour =
         backing && backing !== "sampled" ? backing : (surround?.hex ?? "0x000000");
       plans.push({ region, style: "replace", replaceWith, replaceKeyColour, colour, strength, surround });
+      continue;
+    }
+    if (style === "erase") {
+      plans.push({ region: eraseRegion(region, frameWidth, frameHeight, false), style, strength });
       continue;
     }
     if (style !== "fill") {

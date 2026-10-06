@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import { MEDIA_HIDE } from "../constants";
 import { buildCoverChain } from "../effects/compose";
 import { cornerColour } from "../effects/surround";
-import { detectStaticOverlays, normalizeRegion } from "../effects/detect";
+import { detectStaticOverlays, eraseRegion, normalizeRegion } from "../effects/detect";
 import { sampleSurroundColour } from "../effects/surround";
 import type {
   COVER_PLAN,
@@ -144,6 +144,10 @@ export async function planLogoCover(options: {
 
     if (regions.length === 0) {
       return { regions: [], covers: [], detected, note: "no logo found in the source" };
+    }
+    if (style === "erase") {
+      // Grow only what detection drew; a caller's own rectangle means what it says.
+      regions = regions.map((r) => eraseRegion(r, probe.width!, probe.height!, logo.regions === "auto"));
     }
 
     const covers: COVER_PLAN[] = [];

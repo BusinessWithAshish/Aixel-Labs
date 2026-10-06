@@ -820,7 +820,15 @@ export const MEDIA_EFFECTS = {
   },
 } as const;
 
-export const MEDIA_HIDE_STYLES = ["fill", "blur", "pixelate", "replace"] as const;
+/**
+ * `erase` rebuilds the region from the pixels around it (ffmpeg `delogo`).
+ * It exists because the other three all leave something behind on real
+ * footage: measured on a show whose corner bug ALTERNATES between two marks, a
+ * blur of the detected box left a glowing blob with the top of the second mark
+ * poking out above it, and a heavier blur over a padded box became a flat
+ * tinted rectangle. `delogo` over the padded box left nothing to see.
+ */
+export const MEDIA_HIDE_STYLES = ["fill", "blur", "pixelate", "erase", "replace"] as const;
 
 /**
  * `replace` is only available on `effects`, never on `cut`.
@@ -833,7 +841,7 @@ export const MEDIA_HIDE_STYLES = ["fill", "blur", "pixelate", "replace"] as cons
  * appear and disappear as the crop moves. Replacing in place only makes sense
  * when the frame is not being recropped.
  */
-export const MEDIA_HIDE_STYLES_ON_CUT = ["fill", "blur", "pixelate"] as const;
+export const MEDIA_HIDE_STYLES_ON_CUT = ["fill", "blur", "pixelate", "erase"] as const;
 
 /** Where `effects.logo` anchors the mark. */
 export const MEDIA_LOGO_POSITIONS = [
@@ -998,6 +1006,16 @@ export const MEDIA_HIDE = {
      * the same flat colour) and only mildly costly for `blur`.
      */
     PAD_FRACTION: 0.03,
+    /**
+     * Extra growth for `style: "erase"` on auto-detected regions, per side, as a
+     * fraction of the box. Detection finds what is STATIC, and a bug that
+     * alternates between two marks is only static where they overlap — the box
+     * came back 102x70 for a mark that really spans about 110x95. Erasing
+     * interpolates from the surrounding pixels, so a generous box costs nothing
+     * on a soft background and a tight one leaves the mark's edge behind.
+     */
+    ERASE_PAD_FRACTION: 0.35,
+    ERASE_MIN_PAD_PX: 16,
     /** Most regions returned, highest confidence first. */
     MAX_REGIONS: 3,
     /**
