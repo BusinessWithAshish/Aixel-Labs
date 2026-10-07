@@ -11,7 +11,7 @@ import { cssVars, Die } from '../_lib/art';
 import { fmt, rs } from '../_lib/client';
 import { buzz } from '../_lib/haptic';
 import { sfx, sfxQueued, sfxShared } from '../_lib/sound';
-import { canBuild, canMortgage, canSellHouse, houseCost, ownedBy, setSpaces } from '@aixellabs/backend/business/compute';
+import { canBuild, canMortgage, canSellHouse, houseCost, ownedBy, setSpaces, shareOfCash, visitingJail } from '@aixellabs/backend/business/compute';
 import { DealBanner, dealFromLog, dealSound, quietSound, type Deal } from './DealBanner';
 import { notify } from '../_lib/toast';
 import { AudioToggles, Avatar, Cash, GButton, Pop } from './bits';
@@ -508,7 +508,8 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
 
     // The last five seconds of any timer tick, for everyone at the table. Nothing ticks while the clock stands still.
     useEffect(() => {
-        if (over || paused || held || state.deadline === null) return;
+        // A card or a result only needs an OK: no ticking there either.
+        if (over || paused || held || state.deadline === null || state.phase === 'card' || state.phase === 'result') return;
         // Scheduled on the server clock, so every window at the table ticks at the same moment.
         const deadline = state.deadline;
         const left = deadline - (Date.now() + clockOffset);
@@ -517,7 +518,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
             if (left - k * 1000 >= 0) timers.push(window.setTimeout(() => sfxShared('tick'), left - k * 1000));
         }
         // The buzzer when it runs out on a player (an auction just closes).
-        if (state.phase !== 'auction' && state.phase !== 'debt' && state.phase !== 'result' && left >= 0)
+        if (state.phase !== 'auction' && state.phase !== 'debt' && left >= 0)
             timers.push(window.setTimeout(() => sfxShared('timeout'), left));
         return () => timers.forEach((t) => window.clearTimeout(t));
     }, [state.deadline, state.phase, over, paused, held, clockOffset]);
@@ -729,7 +730,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                 </Pop>
             );
         else if (pending.type === 'auction') pop = <AuctionPopup state={state} me={me} send={send} pending={pending} now={now} />;
-        else if (pending.type === 'card') pop = <CardPopup state={state} me={me} send={send} text={pending.card.text} />;
+        else if (pending.type === 'card') pop = <CardPopup state={state} me={me} send={send} card={pending.card} />;
         else if (pending.type === 'result') pop = <ResultPopup state={state} me={me} send={send} pending={pending} />;
         else if (pending.type === 'market' && myTurn) pop = <MarketPopup state={state} me={me} send={send} />;
         else if (pending.type === 'break' && myTurn) pop = <BreakPopup state={state} me={me} send={send} />;
@@ -800,13 +801,28 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                     </GButton>
                 </div>
             )}
+            {/* Playing on with a debt that was put off: a reminder that the next turn opens with it. */}
+            {myTurn && state.phase !== 'debt' && mePlayer.cash < 0 && !walk.busy && (
+                <div className="banner">
+                    <span>You are {rs(-mePlayer.cash)} short. Raise it now with Sell or Trade, or it must be paid when your next turn starts.</span>
+                </div>
+            )}
             {myTurn && state.phase === 'roll' && mePlayer.jail > 0 && !walk.busy && (
                 <div className="banner info">
                     <span>
                         <LockKeyhole className="lu" /> In Jail, try {mePlayer.jail} of {BUSINESS_RULES.JAIL_TRIES}. Roll doubles to leave free.
                     </span>
-                    <GButton size="sm" tone="gold" disabled={mePlayer.cash < BUSINESS_RULES.JAIL_FEE} onClick={() => send({ type: 'payJail' })}>
-                        Pay {rs(BUSINESS_RULES.JAIL_FEE)}
+                    {/* A player visiting Jail can get you out for a price you agree; otherwise leaving costs a share of your cash. */}
+                    {others
+                        .filter((p) => visitingJail(state, p.seat))
+                        .slice(0, 1)
+                        .map((p) => (
+                            <GButton key={p.seat} size="sm" tone="blue" onClick={() => setView({ t: 'offer', draft: { kind: 'bail', with: p.seat, prisoner: me } })}>
+                                Bail
+                            </GButton>
+                        ))}
+                    <GButton size="sm" tone="gold" disabled={mePlayer.cash < BUSINESS_RULES.PCT_MIN} onClick={() => send({ type: 'payJail' })}>
+                        Pay {rs(shareOfCash(mePlayer.cash, BUSINESS_RULES.JAIL_PCT))}
                     </GButton>
                 </div>
             )}

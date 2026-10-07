@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supportsFlexGap } from '../_lib/client';
 import { installAudioUnlock, stopMusic } from '../_lib/sound';
+import { Diagnostics } from './Diagnostics';
 
 /** Backend WebSocket URL as resolved on the server (see the route layout). */
 const BusinessConfigContext = createContext<string | null>(null);
@@ -29,7 +30,15 @@ export function BusinessConfigProvider({ wsUrl, children }: { wsUrl: string | nu
             document.removeEventListener('contextmenu', noMenu);
         };
     }, []);
-    return <BusinessConfigContext.Provider value={wsUrl}>{children}</BusinessConfigContext.Provider>;
+    // `?diag=1` on any game address shows what this device supports (see Diagnostics).
+    const [diag, setDiag] = useState(false);
+    useEffect(() => setDiag(window.location.search.indexOf('diag') >= 0), []);
+    return (
+        <BusinessConfigContext.Provider value={wsUrl}>
+            {children}
+            {diag && <Diagnostics />}
+        </BusinessConfigContext.Provider>
+    );
 }
 
 export const useBusinessServerWsUrl = () => useContext(BusinessConfigContext);

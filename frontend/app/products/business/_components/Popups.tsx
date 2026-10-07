@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, CircleHelp, Coffee, Dices, HandCoins, Handshake, House, IndianRupee, LockKeyhole, Landmark as BankIcon, Map, Minus, ScrollText, TrendingDown, TrendingUp } from 'lucide-react';
-import { BUSINESS_BOARD, BUSINESS_RULES, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
-import { canMortgage, canSellHouse, lapInterest, loanDue, maxLoan, ownedBy, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
+import { ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, CircleHelp, Coffee, Dices, HandCoins, Handshake, House, IndianRupee, LockKeyhole, Landmark as BankIcon, Map, Minus, ScrollText, Siren, TrendingDown, TrendingUp } from 'lucide-react';
+import { BUSINESS_BOARD, BUSINESS_RULES, BUSINESS_SETS, type BusinessCard } from '@aixellabs/backend/business/constants';
+import { canMortgage, canSellHouse, cardDelta, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
 import type { BusinessInterestMode, BusinessLoan, BusinessLogEntry, BusinessOffer, BusinessPending, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { cn } from '@/lib/utils';
@@ -43,14 +43,17 @@ function MarketOdds({ hit }: { hit?: number }) {
 
 type Base = { state: BusinessPublicState; me: number; send: BusinessSend };
 
-export function CardPopup({ state, me, send, text }: Base & { text: string }) {
+export function CardPopup({ state, me, send, card }: Base & { card: BusinessCard }) {
     const p = state.players[state.turn];
+    // A card names a share ("10% of your cash"): the amount it comes to is shown with it.
+    const delta = cardDelta(state, state.turn, card.effect);
     return (
         <Pop>
             <div className="bigcard ch">
                 <CircleHelp className="lu" />
                 <small>Chance</small>
-                {text}
+                {card.text}
+                {delta !== 0 && <b className={delta > 0 ? 'cardamt good' : 'cardamt bad'}>{delta > 0 ? `+${rs(delta)}` : `−${rs(-delta)}`}</b>}
             </div>
             {state.turn === me ? (
                 <GButton tone="gold" size="big" onClick={() => send({ type: 'ack' })}>
@@ -118,24 +121,49 @@ export function ResultPopup({ state, me, send, pending }: Base & { pending: Extr
     );
 }
 
-export function BreakPopup({ send }: Base) {
+export function BreakPopup({ state, me, send, startPicking = false }: Base & { startPicking?: boolean }) {
+    const [picking, setPicking] = useState(startPicking);
+    /** Anyone still playing who is not already in Jail can be sent there. */
+    const targets = state.players.filter((p) => p.seat !== me && !p.bankrupt && !p.jail);
     return (
         <Pop>
             <Ribbon>Take a break</Ribbon>
-            <div className="stackc">
-                <Coffee style={{ width: 44, height: 44 }} />
-            </div>
+            <div className="stackc">{picking ? <Siren style={{ width: 44, height: 44 }} /> : <Coffee style={{ width: 44, height: 44 }} />}</div>
             <p className="center" style={{ fontWeight: 800 }}>
-                Rest and skip your next turn, or keep playing?
+                {picking ? 'Who goes to Jail?' : 'Rest and skip your next turn, keep playing, or send someone to Jail?'}
             </p>
-            <div className="btns">
-                <GButton tone="blue" size="big" onClick={() => send({ type: 'break', rest: true })}>
-                    Rest
-                </GButton>
-                <GButton tone="green" size="big" onClick={() => send({ type: 'break', rest: false })}>
-                    Keep playing
-                </GButton>
-            </div>
+            {picking ? (
+                <>
+                    <div className="dealwith">
+                        {targets.map((p) => (
+                            <button key={p.seat} type="button" className="plate dw" onClick={() => send({ type: 'break', rest: false, jail: p.seat })}>
+                                <Avatar name={p.name} color={p.color} />
+                                <b>{p.name}</b>
+                                <Cash value={p.cash} />
+                                <small>Straight to Jail</small>
+                            </button>
+                        ))}
+                    </div>
+                    <GButton tone="red" onClick={() => setPicking(false)}>
+                        Back
+                    </GButton>
+                </>
+            ) : (
+                <>
+                    <div className="btns">
+                        <GButton tone="blue" size="big" onClick={() => send({ type: 'break', rest: true })}>
+                            Rest
+                        </GButton>
+                        <GButton tone="green" size="big" onClick={() => send({ type: 'break', rest: false })}>
+                            Keep playing
+                        </GButton>
+                    </div>
+                    <GButton tone="orange" disabled={!targets.length} onClick={() => setPicking(true)}>
+                        <Siren className="lu" />
+                        Send someone to Jail
+                    </GButton>
+                </>
+            )}
         </Pop>
     );
 }
@@ -242,7 +270,7 @@ export function ChanceBook({ onClose }: { onClose: () => void }) {
         <Pop onClose={onClose}>
             <Ribbon>Chance</Ribbon>
             <div className="minis">
-                {tile('good', <IndianRupee className="lu" />, '+ Cash', 'up to ₹200')}
+                {tile('good', <IndianRupee className="lu" />, '+ Cash', 'a share of your cash or property')}
                 {tile('bad', <IndianRupee className="lu" />, '− Cash', 'a share of your cash')}
                 {tile('mid', <ArrowLeft className="lu" />, 'Back 3', 'spaces')}
                 {tile('jail', <LockKeyhole className="lu" />, 'Jail', 'straight there')}
@@ -479,6 +507,8 @@ export function DebtPopup({
 }: Base & { onRaise: () => void; onAskLoan: () => void; initialStep?: 'choose' | 'options' | 'confirm' }) {
     const [step, setStep] = useState(initialStep);
     const short = -state.players[me].cash;
+    /** A debt can be put off once: the turn goes on, and the next one opens with it. */
+    const canDefer = !state.players[me].deferred;
     const owned = ownedBy(state, me);
     const canBank = owned.some((i) => canMortgage(state, me, i) === null);
     const canSell = owned.some((i) => canSellHouse(state, me, i) === null);
@@ -491,11 +521,16 @@ export function DebtPopup({
             {step === 'choose' && (
                 <>
                     <p className="center" style={{ fontWeight: 800 }}>
-                        You cannot play on until this is paid.
+                        {canDefer ? 'Pay it now, or play on and pay it by your next turn.' : 'You put this off once already. It has to be paid now.'}
                     </p>
                     <GButton tone="green" size="big" onClick={() => setStep('options')}>
                         Repay debt
                     </GButton>
+                    {canDefer && (
+                        <GButton tone="blue" onClick={() => send({ type: 'defer' })}>
+                            Pay by my next turn
+                        </GButton>
+                    )}
                     <GButton tone="red" onClick={() => setStep('confirm')}>
                         Declare bankruptcy
                     </GButton>
@@ -635,6 +670,7 @@ export function describeOffer(state: BusinessPublicState, offer: BusinessOffer):
     if (t.kind === 'renew') {
         return [`extend the loan: pay ${rs(t.pay)} now${t.extra ? `, borrow ${rs(t.extra)} more` : ''}.`, interestLine(0, t.interestPct, t.interestMode, t.laps)];
     }
+    if (t.kind === 'bail') return [`bail ${P[t.prisoner].name} out of Jail for ${rs(t.amount)}.`];
     if (t.kind === 'split') return [`split the ${BUSINESS_SETS[t.set].name} set, ${t.minorPct}% to the player with one city.`];
     if (t.kind === 'unsplit') {
         const split = state.splits.find((s) => s.id === t.split);
@@ -704,6 +740,22 @@ export function OfferInbox({ state, me, send, offer, now }: Base & { offer: Busi
                     <Stat label="Within" value={laps(t.laps)} />
                 </div>
                 <p className="small center">Reject and {from.name} must pay all {rs(owed)} now.</p>
+            </>
+        );
+    } else if (t.kind === 'bail') {
+        const mine = t.prisoner === me;
+        title = 'Bail';
+        ask = mine ? `${from.name} will bail you out of Jail` : `${from.name} asks you for bail`;
+        body = (
+            <>
+                <div className="bigbid">
+                    <Cash value={t.amount} />
+                </div>
+                <p className="small center">
+                    {mine
+                        ? `You pay ${from.name} ${rs(t.amount)} and walk free. Otherwise leaving Jail costs you ${rs(shareOfCash(you.cash, BUSINESS_RULES.JAIL_PCT))}.`
+                        : `${from.name} pays you ${rs(t.amount)} and walks free.`}
+                </p>
             </>
         );
     } else if (t.kind === 'split') {

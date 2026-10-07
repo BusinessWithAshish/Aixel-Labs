@@ -4143,3 +4143,42 @@
 .bb.nogap .log > * + * {
     margin-top: 8px;
 }
+
+/* Device diagnostics (address ends in ?diag=1): plain text over the game, for a screenshot. */
+.bb .diag {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 99;
+    margin: 0;
+    padding: 6px 8px;
+    max-height: 55%;
+    overflow: auto;
+    font: 10px/1.35 monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #d6ffd6;
+    background: rgba(0, 0, 0, 0.86);
+    pointer-events: none;
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+/* What a Chance card comes to in rupees, under its text. */
+.bb .cardamt {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 5px 14px 2px;
+    border-radius: 12px;
+    font-family: var(--bb-num);
+    font-size: 30px;
+    line-height: 1;
+    background: rgba(0, 0, 0, 0.32);
+}
+.bb .cardamt.good {
+    color: #b9ffd0;
+}
+.bb .cardamt.bad {
+    color: #ffd0d0;
+}

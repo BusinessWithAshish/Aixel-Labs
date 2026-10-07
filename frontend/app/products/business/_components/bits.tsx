@@ -280,7 +280,7 @@ const TIPS = [
     'Own a full colour set and rent there triples.',
     'Short of cash? Mortgage a property, or ask a player for a loan.',
     `Market: roll ${BUSINESS_RULES.MARKET_FLAT_MAX + 1} to 12 and your stake doubles.`,
-    'Roll doubles in Jail to walk out free.',
+    'Roll doubles in Jail to walk out free, or ask a player visiting Jail for bail.',
     'Tap any property on the board to see its rents.',
     'Loans and trades stay private between the two players.',
     'Miss too many turns in a row and you are out.',

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { BUSINESS_RULES, BUSINESS_SETS, type BusinessSetKey } from '@aixellabs/backend/business/constants';
-import { canTrade, lapInterest, loanDue, maxLoan, ownedBy, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
+import { canTrade, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
 import type { BusinessInterestMode, BusinessOfferTerms, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { rs } from '../_lib/client';
@@ -15,6 +15,7 @@ import { cssVars } from '../_lib/art';
 export type OfferDraft =
     | { kind: 'loan'; with?: number }
     | { kind: 'split'; with: number }
+    | { kind: 'bail'; with: number; prisoner: number }
     | { kind: 'unsplit'; with: number; split: number }
     | { kind: 'trade'; with: number };
 
@@ -200,6 +201,22 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
             <p className="small center">
                 A split needs a three-city colour set where one of you holds two cities and the other holds the third.
             </p>
+        );
+    } else if (draft.kind === 'bail') {
+        title = 'Bail';
+        const prisoner = state.players[draft.prisoner];
+        const helper = state.players[draft.prisoner === me ? draft.with : me];
+        const cap = round10(prisoner.cash);
+        const value = Math.min(amount, cap);
+        terms = { kind: 'bail', prisoner: prisoner.seat, amount: value };
+        body = (
+            <>
+                <Slider label={`${prisoner.name} pays ${helper.name}`} value={value} display={rs(value)} min={0} max={cap} step={10} onChange={setAmount} />
+                <p className="small center">
+                    {helper.name} is visiting Jail and gets {prisoner.name} out at once. Without bail, leaving Jail costs {prisoner.name}{' '}
+                    {rs(shareOfCash(prisoner.cash, BUSINESS_RULES.JAIL_PCT))} ({BUSINESS_RULES.JAIL_PCT}% of their cash), shared among everyone else.
+                </p>
+            </>
         );
     } else if (draft.kind === 'unsplit') {
         title = 'End the split';

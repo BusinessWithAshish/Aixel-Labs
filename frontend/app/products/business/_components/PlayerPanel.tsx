@@ -1,7 +1,7 @@
 'use client';
 
-import { ArrowLeftRight, HandCoins, Handshake } from 'lucide-react';
-import { netWorth, ownedBy, splitPair } from '@aixellabs/backend/business/compute';
+import { ArrowLeftRight, HandCoins, Handshake, KeyRound } from 'lucide-react';
+import { netWorth, ownedBy, splitPair, visitingJail } from '@aixellabs/backend/business/compute';
 import type { BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { rs } from '../_lib/client';
@@ -28,6 +28,8 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer }
     const canDeal = myTurn && ['roll', 'end', 'debt'].includes(state.phase) && !state.players[me].bankrupt;
     const canRepay = myTurn && (state.phase === 'roll' || state.phase === 'end');
     const loans = state.loans.filter((l) => l.lender === seat || l.borrower === seat);
+    /** Bail is between a player held in Jail and one visiting it: the seat that would be freed, or null. */
+    const bailFor = p.jail > 0 && visitingJail(state, me) ? seat : state.players[me].jail > 0 && visitingJail(state, seat) ? me : null;
     /** Colour sets this player shares with someone. */
     const splits = state.splits.filter((s) => s.major === seat || s.minor === seat);
     /** A set the two of you could split: one of you holds two of its cities, the other the third. */
@@ -134,6 +136,12 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer }
                         <Handshake className="lu" />
                         Split a set with {p.name}
                     </GButton>
+                    {bailFor !== null && (
+                        <GButton tone="orange" disabled={!canDeal} onClick={() => onOffer({ kind: 'bail', with: seat, prisoner: bailFor })}>
+                            <KeyRound className="lu" />
+                            {bailFor === me ? `Ask ${p.name} for bail` : `Bail ${p.name} out of Jail`}
+                        </GButton>
+                    )}
                     {!canDeal && <p className="small center">You can make offers on your own turn.</p>}
                 </>
             )}

@@ -21,7 +21,7 @@ export function dealSound(fx: BusinessFx): BusinessSound | null {
     if (fx.kind === 'buy') return 'buy';
     if (fx.kind === 'rent') return 'rent';
     if (fx.kind === 'salary') return 'salary';
-    if (fx.kind === 'loan' || fx.kind === 'repay' || fx.kind === 'trade' || fx.kind === 'interest' || fx.kind === 'split') return 'loan';
+    if (fx.kind === 'loan' || fx.kind === 'repay' || fx.kind === 'trade' || fx.kind === 'interest' || fx.kind === 'split' || fx.kind === 'bail') return 'loan';
     return fx.to === null ? 'pay' : 'income';
 }
 
@@ -49,7 +49,7 @@ export function dealFromLog(entry: BusinessLogEntry): Deal | null {
     if (!entry.fx || quietSound(entry.fx)) return null;
     // These are news even without an amount: trades, players going out or to Jail, a flat
     // Market, and other players' loans (announced without their numbers).
-    const newsAnyway = ['trade', 'out', 'jail', 'market', 'loan', 'split'];
+    const newsAnyway = ['trade', 'out', 'jail', 'market', 'loan', 'split', 'bail'];
     if (entry.fx.amount <= 0 && !newsAnyway.includes(entry.fx.kind)) return null;
     return { id: entry.n, fx: entry.fx, text: entry.text };
 }
@@ -78,7 +78,7 @@ function caption(state: BusinessPublicState, deal: Deal): string {
         case 'interest':
             return 'Loan interest for this lap';
         case 'jail':
-            return fx.why === 'speeding' ? 'Overspeeding! 3 doubles in a row' : fx.why === 'card' ? 'Chance: go straight to Jail' : `${name(fx.from)} is sent to Jail`;
+            return fx.why === 'speeding' ? 'Overspeeding! 3 doubles in a row' : fx.why === 'card' ? 'Chance: go straight to Jail' : fx.why === 'sent' ? 'Sent to Jail from a break' : `${name(fx.from)} is sent to Jail`;
         case 'repay':
             return space ? `Took ${space} back` : 'Loan paid back';
         case 'bank':
@@ -89,6 +89,8 @@ function caption(state: BusinessPublicState, deal: Deal): string {
             return `${name(fx.from)} and ${name(fx.to)} made a trade`;
         case 'out':
             return `${name(fx.from)} is out of the match`;
+        case 'bail':
+            return `${name(fx.to)} bailed ${name(fx.from)} out of Jail`;
         case 'split':
             return fx.amount === 0 && !deal.text.includes('no longer') ? `${name(fx.from)} and ${name(fx.to)} split a colour set` : 'Split ended: the houses went back to the bank';
     }
@@ -159,7 +161,7 @@ export function DealBanner({ state, deal }: { state: BusinessPublicState; deal: 
             </div>
         );
     }
-    if (fx.kind === 'trade' || fx.kind === 'split') {
+    if (fx.kind === 'trade' || fx.kind === 'split' || fx.kind === 'bail') {
         // Only that a trade happened, never what was in it.
         return (
             <div key={deal.id} className="deal blue">

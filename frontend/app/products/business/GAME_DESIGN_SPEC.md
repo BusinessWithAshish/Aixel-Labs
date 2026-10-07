@@ -50,10 +50,11 @@ Clockwise from Launch. Corners: Launch (0), Jail (12), Take a Break (24), Go to 
 
 - **Railways and airport** (North Rail, Coast Rail, Metro,
   Airport): ₹200 each. Rent 25 / 50 / 100 / 200 for 1 / 2 / 3 / 4 owned,
-  plus ₹5 per railway owned for every house standing anywhere on the board
-  (a hotel counts as five).
-- **Utilities** (Power, Telecom): ₹150 each. Rent is 4 × the dice
-  total with one, 10 × with both.
+  plus ₹5 for every house standing anywhere on the board (a hotel counts as
+  five), the same whether the owner has one railway or four.
+- **Utilities** (Power, Telecom): ₹150 each. Rent is the dice total times 4
+  with one and 10 with both; every house on the board adds 1 to that number
+  (a hotel counts as five). With 8 houses built: 12 × and 18 ×.
 - **Taxes:** a share of the cash the player holds: Income Tax 10%, Luxury Tax 20%,
   never less than ₹50.
 
@@ -184,15 +185,18 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   price, minimum raise ₹5, 20-second countdown shown on screen. Every bid starts
   it again from 20. No bids: it stays unowned.
 - **Owned property:** pay rent. No rent on a property mortgaged to the bank.
-- **Chance:** one deck of 12 cards — four pay (₹50–₹200), six cost (5%, 8%, 10% or 15% of the cash
-  held, at least ₹50; property tax at 2% per property owned, up to 20%;
-  repairs at 2% per house, a hotel counting as five, up to 25%), "go back 3 spaces" and
-  "go to Jail".
+- **Chance:** one deck of 12 cards, none of them a fixed sum. Four pay: a
+  dividend of 5% of what your properties cost, and 5%, 8% or 10% of the cash
+  you hold (each at least ₹50 and at most ₹300). Six cost: 5%, 8%, 10% or 15%
+  of the cash held (at least ₹50); property tax at 2% per property owned, up to
+  20%; repairs at 2% per house, a hotel counting as five, up to 25%. Two move
+  the player: "go back 3 spaces" and "go to Jail".
 - **Market:** a player who owns a property may stake ₹10–₹1,000 (never more
   than their cash) and two dice are rolled: 2–5 loses the whole stake, 6–8
   nothing, 9–12 wins the stake again. The two outer ranges are equally likely
   (10 in 36 each), so on average the Market neither pays nor costs.
-- **Take a Break:** choose to rest (skip your next turn) or keep playing.
+- **Take a Break:** choose to rest (skip your next turn), keep playing, or
+  send any other player straight to Jail.
 - **Go to Jail:** move to Jail, no salary. Everyone sees a Jail banner: "Sent
   to Jail", "Chance: go straight to Jail", or for three doubles in a row
   "Overspeeding!".
@@ -201,7 +205,12 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   count as a new lap for loans and deals). The salary banner shows the moment
   the pawn reaches Launch, before whatever it lands on.
 - **Jail:** roll doubles to leave free. After two misses, on the third turn you
-  leave anyway and pay ₹100. You may also pay ₹100 before rolling.
+  leave anyway and 30% of the cash you hold (at least ₹50) is shared equally
+  among the other players. You may also pay that before rolling.
+- **Bail:** a player standing on the Jail space as a visitor can get a player
+  held there out at once, for any price the two agree (the prisoner pays the
+  visitor). Either of them offers it on their own turn, like a trade. Nobody
+  else can offer bail, so with no visitor the 30% applies.
 
 ## 6. Raising cash
 
@@ -272,6 +281,11 @@ lists each player's split sets, with an End button for your own.
 A payment always goes through; the payer's cash may go negative. While it is
 negative the player cannot continue and has two choices:
 
+- **Putting a debt off:** a player who goes short may play on once: they pick
+  "Pay by my next turn" (or let the Pay up timer run out) and the turn carries
+  on. Their next turn opens with the debt, and then it has to be cleared before
+  they roll: raise it, or go bankrupt. Whoever is owed is paid as soon as the
+  cash is there, whether from selling, a deal, or rent that came in meanwhile.
 - **Repay debt:** sell houses, mortgage to the bank, trade, or
   ask for a loan, until cash is zero or more. Options that the player has
   nothing for are disabled; asking for a loan is always available.

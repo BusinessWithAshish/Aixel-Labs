@@ -6,6 +6,7 @@ import {
     BUSINESS_BOARD,
     BUSINESS_RULES,
     BUSINESS_SETS,
+    BUSINESS_UTILITY_MULTIPLIER,
 } from '@aixellabs/backend/business/constants';
 import {
     canBuild,
@@ -20,6 +21,7 @@ import {
     mortgageValue,
     splitAt,
     splitShares,
+    utilityMultiplier,
     railRent,
     redeemCost,
     rentLadder,
@@ -35,9 +37,9 @@ import { Cash, GButton } from './bits';
 
 const DESCRIPTIONS: Record<string, string> = {
     launch: `Collect your salary every time you pass or land here: ${rs(BUSINESS_RULES.SALARY_STEP)} for your first lap, ${rs(BUSINESS_RULES.SALARY_STEP * 2)} for the second, and ${rs(BUSINESS_RULES.SALARY_STEP)} more with every lap after that.`,
-    chance: 'Draw a Chance card. Half of them pay you, half of them cost you.',
-    jail: `Just visiting, unless you were sent here. Roll doubles to leave free. After two misses you leave on the third turn and pay ${rs(BUSINESS_RULES.JAIL_FEE)}.`,
-    break: 'Your choice: rest and skip your next turn, or keep playing.',
+    chance: 'Draw a Chance card. Four pay you and six cost you, each a share of your cash or property; two move you.',
+    jail: `Just visiting, unless you were sent here. Roll doubles to leave free. Leave without doubles and ${BUSINESS_RULES.JAIL_PCT}% of your cash is shared among the other players, unless a player visiting Jail bails you out.`,
+    break: 'Your choice: rest and skip your next turn, keep playing, or send another player to Jail.',
     gojail: 'Go straight to Jail. No salary on the way.',
 };
 
@@ -141,7 +143,7 @@ export function PropertyCard({ space, state, me, send, mode = 'view' }: Property
                     />
                 ))}
                 <p className="small center">
-                    Includes +{rs(BUSINESS_RULES.RAIL_RENT_PER_HOUSE)} per railway owned for each of the {housesOnBoard(state)} houses on the board (a hotel counts as 5).
+                    Includes +{rs(BUSINESS_RULES.RAIL_RENT_PER_HOUSE)} for each of the {housesOnBoard(state)} houses on the board (a hotel counts as 5).
                 </p>
             </div>
         );
@@ -153,8 +155,11 @@ export function PropertyCard({ space, state, me, send, mode = 'view' }: Property
                     <span>Rent</span>
                     <span>From the dice roll</span>
                 </div>
-                <Row icons={Icon ? <Icon className="lu" /> : null} label="One utility" amount="4 × dice" current={owned === 1} />
-                <Row icons={Icon ? <Icon className="lu" /> : null} label="Both utilities" amount="10 × dice" current={owned === 2} />
+                <Row icons={Icon ? <Icon className="lu" /> : null} label="One utility" amount={`${utilityMultiplier(state, 1)} × dice`} current={owned === 1} />
+                <Row icons={Icon ? <Icon className="lu" /> : null} label="Both utilities" amount={`${utilityMultiplier(state, 2)} × dice`} current={owned === 2} />
+                <p className="small center">
+                    Starts at {BUSINESS_UTILITY_MULTIPLIER.ONE} and {BUSINESS_UTILITY_MULTIPLIER.BOTH}; each of the {housesOnBoard(state)} houses on the board adds 1 (a hotel counts as 5).
+                </p>
             </div>
         );
     }
