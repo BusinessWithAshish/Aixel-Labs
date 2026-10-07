@@ -53,6 +53,19 @@ export function creditsToneClassName(credits: number): string {
     }
 }
 
+/**
+ * How often a member's balance is topped back up to their tenant's
+ * `defaultCredits`. A refill never lowers a balance, so credits from a coupon
+ * or an admin survive it.
+ */
+export const CREDITS_REFILL_PERIOD_DAYS = 30;
+
+/** True when a balance last refilled at `refilledAt` (never, when absent) is due again at `now`. */
+export function isCreditsRefillDue(refilledAt: Date | null | undefined, now: Date = new Date()): boolean {
+    if (!refilledAt) return true;
+    return now.getTime() - new Date(refilledAt).getTime() >= CREDITS_REFILL_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+}
+
 /** Upper bound for manually assigned user credit balances. */
 export const MAX_USER_CREDITS = 100_000;
 

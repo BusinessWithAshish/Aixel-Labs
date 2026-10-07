@@ -18,7 +18,7 @@ Canonical patterns for `frontend/app/actions/`. UI-specific flows live in siblin
 |------|------|--------------|
 | `auth-actions.ts` | Session cookie create / sign-out | Custom (cookies + `@/server/auth`) |
 | `theme-actions.ts` | Theme color cookie + `revalidatePath` | None (cookie-only, void) |
-| `credit-db.ts` | Credits read + atomic debit | **Not** `'use server'` — `import 'server-only'` |
+| `credit-db.ts` | Credits read + atomic debit + lazy monthly refill (`CREDITS_REFILL_PERIOD_DAYS`) | **Not** `'use server'` — `import 'server-only'` |
 | `tenant-actions.ts` | Tenant CRUD + public lookup by name | `runAuthenticatedAction` / `runPublicAction` |
 | `user-actions.ts` | Admin user CRUD/bulk + self name/credits | `runAuthenticatedAction` |
 | `coupon-actions.ts` | Admin coupon CRUD + user redeem | `runAuthenticatedAction` |

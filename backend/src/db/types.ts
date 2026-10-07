@@ -108,6 +108,7 @@ export type TenantDoc<Id = ObjectId> = {
   app_theme_color?: string;
   app_description?: string;
   defaultModuleAccess?: ModuleAccess;
+  /** Credits a new member starts with, and what a member's balance is topped back up to each refill period. */
   defaultCredits?: number;
 };
 
@@ -124,6 +125,8 @@ export type UserDoc<Id = ObjectId> = {
   tenantName: string;
   moduleAccess?: ModuleAccess;
   credits?: number;
+  /** When the balance was last topped back up to the tenant's `defaultCredits`. */
+  creditsRefilledAt?: Date;
 };
 
 export type User = UserDoc<string>;

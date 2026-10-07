@@ -66,7 +66,8 @@ Always use `MongoCollections.*` — never raw collection name strings in new cod
 
 - `Modules`, `*_SUB_MODULES`, `SubModule`, `ModuleAccess` live **only** in `types.ts`.
 - Full-access runtime grant for admins: FE `getDefaultModuleAccess()` — admins store `moduleAccess: {}`.
-- Tenant defaults: `TenantDoc.defaultModuleAccess` / `defaultCredits` (create-time).
+- Tenant defaults: `TenantDoc.defaultModuleAccess` / `defaultCredits` (create-time). `defaultCredits` is also the
+  allowance a member's balance is topped back up to each refill period (`UserDoc.creditsRefilledAt`).
 
 ## Leads contract
 

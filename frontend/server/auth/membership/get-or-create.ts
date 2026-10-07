@@ -90,6 +90,7 @@ export async function getOrCreateMembership(
             tenantName,
             moduleAccess: decision.isAdmin ? {} : (tenant.defaultModuleAccess ?? {}),
             credits: tenant.defaultCredits ?? 0,
+            creditsRefilledAt: new Date(),
         };
         await users.insertOne(doc);
         return { ok: true };
