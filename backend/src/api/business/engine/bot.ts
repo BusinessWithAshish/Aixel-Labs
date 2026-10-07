@@ -139,6 +139,9 @@ function acceptOffer(state: BusinessGameState, seat: number, offer: BusinessOffe
       return acceptTrade(state, seat, offer, terms);
     case "loan":
       return acceptLoan(state, seat, terms);
+    case "bail":
+      // Getting out for less than the fine is worth it; being paid to help always is.
+      return terms.prisoner !== seat || terms.amount * 100 <= Math.max(0, state.players[seat].cash) * BUSINESS_RULES.JAIL_PCT;
     case "split":
     case "unsplit":
       // Sharing or giving up a colour set is the absent player's call, never the stand-in's.
@@ -177,7 +180,8 @@ function debtCommand(state: BusinessGameState, seat: number): BusinessCommand {
   // Cheapest first, so the properties that earn the most are the last to stop paying rent.
   const pledge = owned.filter((i) => canMortgage(state, seat, i) === null).sort((x, y) => price(x) - price(y) || x - y)[0];
   if (pledge !== undefined) return { type: "mortgage", space: pledge };
-  return { type: "bankrupt" };
+  // Nothing left to sell: put the debt off if that is still possible, so the absent player may yet be paid.
+  return state.players[seat].deferred ? { type: "bankrupt" } : { type: "defer" };
 }
 
 /**

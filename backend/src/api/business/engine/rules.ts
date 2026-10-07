@@ -46,6 +46,7 @@ import {
   netWorth,
   ownedBy,
   ownsSet,
+  cardDelta,
   salaryFor,
   shareOfCash,
   redeemCost,
@@ -112,6 +113,8 @@ function describeTerms(state: BusinessGameState, from: number, to: number, terms
       return `extend the loan: ${rs(terms.pay)} paid now, ${rs(terms.extra)} more lent, ${interest(terms.interestPct, terms.interestMode)}, ${laps(terms.laps)}`;
     case "split":
       return `split the ${BUSINESS_SETS[terms.set].name} set, ${terms.minorPct}% to the partner with one city`;
+    case "bail":
+      return `bail ${P[terms.prisoner].name} out of Jail for ${rs(terms.amount)}`;
     case "unsplit": {
       const split = state.splits.find((s) => s.id === terms.split);
       return `end the split of the ${split ? BUSINESS_SETS[split.set].name : ""} set`;
@@ -232,7 +235,16 @@ function advance(state: BusinessGameState, now: number) {
   // An offer outlives the turn it was made in: the other player still has its own clock to answer.
   // Only a request to extend a due loan ends here, as the loan has been settled by now.
   state.offers = state.offers.filter((o) => o.terms.kind !== "renew");
+  // A debt that was put off travels with its player; anything else unpaid ends with the turn.
+  const leaving = state.players[state.turn];
+  if (leaving.cash >= 0 && !leaving.bankrupt) {
+    // Raised during the turn it was put off in: the people owed are paid now.
+    settleOwed(state);
+    leaving.deferred = false;
+  }
+  leaving.owed = leaving.cash < 0 && !leaving.bankrupt ? state.owed : [];
   state.owed = [];
+  state.grace = false;
   state.doubles = 0;
   state.again = false;
   state.lapsed = false;
@@ -253,8 +265,16 @@ function advance(state: BusinessGameState, now: number) {
     break;
   }
   state.turn = i;
-  // Short before the turn begins (their share of a house a split partner built): that comes first.
+  // Short before the turn begins (a debt put off last turn, or their share of a house a split
+  // partner built): that comes first.
   const next = state.players[i];
+  state.owed = next.owed;
+  next.owed = [];
+  if (next.cash >= 0) {
+    // Money that came in while the others played has covered it.
+    settleOwed(state);
+    next.deferred = false;
+  }
   if (next.cash < 0) {
     state.opening = true;
     log(state, `${next.name} starts the turn ${rs(-next.cash)} short and must raise it first.`, next.seat);
@@ -263,16 +283,31 @@ function advance(state: BusinessGameState, now: number) {
   setPhase(state, "roll", now);
 }
 
+/**
+ * A player in debt may put it off once: they play on (or let the turn pass) and have until their
+ * next turn to raise the cash. That next turn opens with the debt, and then it must be cleared.
+ */
+function deferDebt(state: BusinessGameState, p: BusinessPlayer, now: number) {
+  p.deferred = true;
+  state.grace = true;
+  log(state, `${p.name} is ${rs(-p.cash)} short and will raise it by their next turn.`, p.seat);
+  continueTurn(state, now);
+}
+
 /** Called whenever a landing (or any step of the turn) has been fully resolved. */
 function continueTurn(state: BusinessGameState, now: number) {
   const p = active(state);
   if (p.bankrupt) return advance(state, now);
-  if (p.cash < 0) {
+  if (p.cash < 0 && !state.grace) {
     if (state.phase !== "debt") log(state, `${p.name} is ${rs(-p.cash)} short and must raise it.`, p.seat);
     return setPhase(state, "debt", now);
   }
-  if (state.phase === "debt") log(state, `${p.name} paid off the debt.`, p.seat);
-  settleOwed(state);
+  if (p.cash >= 0) {
+    if (state.phase === "debt" || p.deferred) log(state, `${p.name} paid off the debt.`, p.seat);
+    settleOwed(state);
+    p.deferred = false;
+    state.grace = false;
+  }
   if (state.opening) {
     state.opening = false;
     return setPhase(state, "roll", now);
@@ -294,6 +329,19 @@ function continueTurn(state: BusinessGameState, now: number) {
   }
   state.again = false;
   setPhase(state, "end", now);
+}
+
+/**
+ * Leaving Jail without doubles: a share of the cash in hand, split evenly among the other players
+ * (an odd rupee or two goes to the bank). Bail from a visitor is the way round it.
+ */
+function payJailFine(state: BusinessGameState, p: BusinessPlayer): number {
+  const fine = shareOfCash(p.cash, BUSINESS_RULES.JAIL_PCT);
+  const others = alive(state).filter((q) => q.seat !== p.seat);
+  const each = others.length ? Math.floor(fine / others.length) : 0;
+  for (const q of others) pay(state, p.seat, q.seat, each);
+  pay(state, p.seat, null, fine - each * others.length);
+  return fine;
 }
 
 function sendToJail(state: BusinessGameState, p: BusinessPlayer, why: "speeding" | "gojail" | "card", text: string) {
@@ -544,12 +592,12 @@ function doRoll(state: BusinessGameState, now: number) {
     }
     if (p.jail >= BUSINESS_RULES.JAIL_TRIES) {
       p.jail = 0;
-      pay(state, p.seat, null, BUSINESS_RULES.JAIL_FEE);
-      log(state, `${p.name} missed doubles three times, pays ${rs(BUSINESS_RULES.JAIL_FEE)} and leaves Jail.`, p.seat, undefined, {
+      const fine = payJailFine(state, p);
+      log(state, `${p.name} missed doubles three times and leaves Jail: ${BUSINESS_RULES.JAIL_PCT}% of their cash, ${rs(fine)}, is shared among the other players.`, p.seat, undefined, {
         kind: "tax",
         from: p.seat,
         to: null,
-        amount: BUSINESS_RULES.JAIL_FEE,
+        amount: fine,
       });
       return moveBy(state, a + b, now);
     }
@@ -589,17 +637,7 @@ function applyCard(state: BusinessGameState, now: number) {
     return continueTurn(state, now);
   }
 
-  let delta = 0;
-  if (effect.type === "cash") delta = effect.amount;
-  if (effect.type === "pct") delta = -shareOfCash(p.cash, effect.pct);
-  if (effect.type === "tax") {
-    const owned = ownedBy(state, p.seat).length;
-    delta = -shareOfCash(p.cash, Math.min(BUSINESS_RULES.TAX_PCT_MAX, owned * BUSINESS_RULES.TAX_PCT_PER_PROPERTY));
-  }
-  if (effect.type === "repair") {
-    const houses = ownedBy(state, p.seat).reduce((sum, i) => sum + state.props[i].houses, 0);
-    delta = -shareOfCash(p.cash, Math.min(BUSINESS_RULES.REPAIR_PCT_MAX, houses * BUSINESS_RULES.REPAIR_PCT_PER_HOUSE));
-  }
+  const delta = cardDelta(state, p.seat, effect);
   log(state, `${p.name} drew a Chance card: ${text}`, p.seat, undefined, {
     kind: "card",
     from: delta >= 0 ? null : p.seat,
@@ -676,7 +714,8 @@ function doBankrupt(state: BusinessGameState, seat: number, forfeit?: string) {
   const claim = (to: number, amount: number) => {
     if (!state.players[to].bankrupt) claims.set(to, (claims.get(to) ?? 0) + amount);
   };
-  if (seat === state.turn) for (const d of state.owed) if (d.to !== null) claim(d.to, d.amount);
+  const unpaid = [...p.owed, ...(seat === state.turn ? state.owed : [])];
+  for (const d of unpaid) if (d.to !== null) claim(d.to, d.amount);
   for (const loan of state.loans) if (loan.borrower === seat) claim(loan.lender, loan.due);
 
   const total = [...claims.values()].reduce((sum, a) => sum + a, 0);
@@ -695,6 +734,8 @@ function doBankrupt(state: BusinessGameState, seat: number, forfeit?: string) {
   state.loans = state.loans.filter((l) => l.lender !== seat && l.borrower !== seat);
   state.offers = state.offers.filter((o) => o.from !== seat && o.to !== seat);
   if (seat === state.turn) state.owed = [];
+  p.owed = [];
+  p.deferred = false;
   p.cash = 0;
   p.bankrupt = true;
   p.jail = 0;
@@ -759,6 +800,16 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
     });
     return;
   }
+  if (terms.kind === "bail") {
+    const prisoner = P[terms.prisoner];
+    const helper = P[terms.prisoner === from ? to : from];
+    prisoner.cash -= terms.amount;
+    helper.cash += terms.amount;
+    prisoner.jail = 0;
+    log(state, `${helper.name} bailed ${prisoner.name} out of Jail.`, helper.seat, othersThan(state, from, to), { kind: "bail", from: prisoner.seat, to: helper.seat, amount: 0 });
+    log(state, `${helper.name} bailed ${prisoner.name} out of Jail for ${rs(terms.amount)}.`, helper.seat, [from, to], { kind: "bail", from: prisoner.seat, to: helper.seat, amount: terms.amount });
+    return;
+  }
   if (terms.kind === "unsplit") {
     const split = state.splits.find((s) => s.id === terms.split);
     if (split) endSplit(state, split, `${P[from].name} and ${P[to].name} agreed to end their split.`);
@@ -819,6 +870,8 @@ export function createGame(
       bankrupt: false,
       missed: 0,
       laps: 0,
+      deferred: false,
+      owed: [],
       team: s.team,
     })),
     props: {},
@@ -831,6 +884,7 @@ export function createGame(
     loans: [],
     splits: [],
     opening: false,
+    grace: false,
     offers: [],
     log: [],
     logSeq: 0,
@@ -901,10 +955,12 @@ export function applyCommand(
     case "payJail":
       need("roll");
       if (!me.jail) fail("You are not in Jail.");
-      if (me.cash < BUSINESS_RULES.JAIL_FEE) fail("Not enough cash.");
-      me.cash -= BUSINESS_RULES.JAIL_FEE;
+      if (me.cash < BUSINESS_RULES.PCT_MIN) fail("Not enough cash.");
       me.jail = 0;
-      log(state, `${me.name} paid ${rs(BUSINESS_RULES.JAIL_FEE)} and left Jail.`, seat, undefined, { kind: "tax", from: seat, to: null, amount: BUSINESS_RULES.JAIL_FEE });
+      {
+        const fine = payJailFine(state, me);
+        log(state, `${me.name} paid to leave Jail: ${BUSINESS_RULES.JAIL_PCT}% of their cash, ${rs(fine)}, shared among the other players.`, seat, undefined, { kind: "tax", from: seat, to: null, amount: fine });
+      }
       break;
 
     case "buy": {
@@ -968,8 +1024,18 @@ export function applyCommand(
 
     case "break":
       need("break");
-      me.skip = cmd.rest;
-      log(state, cmd.rest ? `${me.name} chose to rest and will skip the next turn.` : `${me.name} took a short break and keeps playing.`, seat);
+      if (cmd.jail !== undefined) {
+        // The break can be spent on sending another player to Jail.
+        const target = state.players[cmd.jail];
+        if (!target || target.seat === seat || target.bankrupt) fail("Pick another player.");
+        if (target.jail) fail(`${target.name} is already in Jail.`);
+        target.pos = BUSINESS_JAIL_INDEX;
+        target.jail = 1;
+        log(state, `${me.name} used the break to send ${target.name} to Jail.`, target.seat, undefined, { kind: "jail", from: target.seat, to: null, amount: 0, why: "sent" });
+      } else {
+        me.skip = cmd.rest;
+        log(state, cmd.rest ? `${me.name} chose to rest and will skip the next turn.` : `${me.name} took a short break and keeps playing.`, seat);
+      }
       continueTurn(state, now);
       break;
 
@@ -1126,6 +1192,12 @@ export function applyCommand(
       break;
     }
 
+    case "defer":
+      need("debt");
+      if (me.deferred) fail("You already put this off once. Raise the cash now.");
+      deferDebt(state, me, now);
+      break;
+
     case "bankrupt":
       need("debt");
       doBankrupt(state, seat);
@@ -1225,8 +1297,13 @@ export function tick(prev: BusinessGameState, now: number): BusinessGameState {
         continueTurn(state, now);
         break;
       case "debt":
-        doBankrupt(state, p.seat);
-        advance(state, now);
+        // Out of time: the debt is put off if that is still open to them, otherwise they are out.
+        if (!p.deferred) {
+          deferDebt(state, p, now);
+        } else {
+          doBankrupt(state, p.seat);
+          advance(state, now);
+        }
         break;
       case "loandue":
         // No answer: the loan is paid in full, and the turn goes on.

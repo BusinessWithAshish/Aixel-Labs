@@ -38,6 +38,10 @@ export type BusinessPlayer = {
   missed: number;
   /** Laps completed: the salary grows with each one. */
   laps: number;
+  /** In debt and already put it off once: at their next turn it must be raised before anything else. */
+  deferred: boolean;
+  /** Unpaid parts of what they owe, carried over while a debt is put off. */
+  owed: BusinessOwed[];
   /** Players with the same number play together: one colour, no rent between them, they win together. */
   team: number;
 };
@@ -132,7 +136,9 @@ export type BusinessFxKind =
   /** `from` left the match. */
   | "out"
   /** `from` and `to` split a colour set, or ended a split (`amount` 0 = started). */
-  | "split";
+  | "split"
+  /** `to` got `from` out of Jail; `from` paid them `amount` (0 for players outside the deal). */
+  | "bail";
 
 /** Money moving with a log line. `from`/`to` are seats; null is the bank. */
 export type BusinessFx = {
@@ -142,7 +148,7 @@ export type BusinessFx = {
   /** 0 with `kind` loan/mortgage: a private deal announced to the others without its numbers. */
   amount: number;
   space?: number;
-  why?: "speeding" | "gojail" | "card";
+  why?: "speeding" | "gojail" | "card" | "sent";
 };
 
 /** `only` lists the seats allowed to read the entry (a private deal). Absent = everyone. */
@@ -171,6 +177,8 @@ export type BusinessGameState = {
   loans: BusinessLoan[];
   /** Colour sets split between two players. */
   splits: BusinessSplit[];
+  /** The active player put their debt off for this turn: it is played on without paying up. */
+  grace: boolean;
   /** The turn began in debt (a partner's share of a house): once it is cleared, the roll comes next. */
   opening: boolean;
   offers: BusinessOffer[];

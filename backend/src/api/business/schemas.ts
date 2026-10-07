@@ -39,6 +39,12 @@ export const BUSINESS_OFFER_TERMS_SCHEMA = z.discriminatedUnion("kind", [
       .refine((p) => p % BUSINESS_RULES.SPLIT_STEP_PCT === 0 || p === BUSINESS_RULES.SPLIT_DEFAULT_PCT),
   }),
   z.object({
+    /** A player visiting Jail gets `prisoner` out, for a price the prisoner pays them. */
+    kind: z.literal("bail"),
+    prisoner: SEAT,
+    amount: CASH,
+  }),
+  z.object({
     /** End a split: every house in the set goes back to the bank. */
     kind: z.literal("unsplit"),
     split: z.number().int(),
@@ -61,7 +67,8 @@ export const BUSINESS_COMMAND_SCHEMA = z.discriminatedUnion("type", [
   z.object({ type: z.literal("passBid") }),
   z.object({ type: z.literal("ack") }),
   z.object({ type: z.literal("market"), stake: CASH }),
-  z.object({ type: z.literal("break"), rest: z.boolean() }),
+  /** `jail`: use the break to send that player to Jail (then `rest` is ignored). */
+  z.object({ type: z.literal("break"), rest: z.boolean(), jail: SEAT.optional() }),
   z.object({ type: z.literal("endTurn") }),
   z.object({ type: z.literal("build"), space: SPACE }),
   z.object({ type: z.literal("sellHouse"), space: SPACE }),
@@ -75,6 +82,8 @@ export const BUSINESS_COMMAND_SCHEMA = z.discriminatedUnion("type", [
   /** A due loan: pay all of it now, even if that leaves the borrower short. */
   z.object({ type: z.literal("settleLoan"), id: z.number().int() }),
   z.object({ type: z.literal("bankrupt") }),
+  /** In debt: play on for now and raise the cash by the next turn. Allowed once per debt. */
+  z.object({ type: z.literal("defer") }),
   /** Forfeit: the player leaves the match and their properties return to the bank. */
   z.object({ type: z.literal("leave") }),
 ]);

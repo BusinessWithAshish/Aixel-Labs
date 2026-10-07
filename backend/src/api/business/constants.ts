@@ -13,11 +13,14 @@ export const BUSINESS_RULES = {
   START_CASH: 2000,
   /** Salary grows with every lap a player completes: lap 1 pays this, lap 2 twice this, and so on. */
   SALARY_STEP: 100,
-  /** Every house on the board (a hotel counts as five) adds this to the rent, for each railway the owner has. */
+  /** Every house on the board (a hotel counts as five) adds this to a railway's rent, however many railways the owner has. */
   RAIL_RENT_PER_HOUSE: 5,
-  /** A levy or a percentage card never takes less than this. */
+  /** A levy or a percentage card never takes or pays less than this. */
   PCT_MIN: 50,
-  JAIL_FEE: 100,
+  /** A Chance card that pays never pays more than this, so the richest player is not the one it helps most. */
+  CARD_GAIN_MAX: 300,
+  /** Leaving Jail without doubles costs this share of the cash held, shared out among the other players. */
+  JAIL_PCT: 30,
   /** Missed doubles allowed before the fee is forced on the third turn. */
   JAIL_TRIES: 3,
   MAX_EXTRA_ROLLS: 2,
@@ -73,7 +76,7 @@ export const BUSINESS_PHASE_SECONDS = {
   roll: 45,
   buy: 30,
   card: 12,
-  result: 8,
+  result: 12,
   market: 45,
   break: 15,
   debt: 75,
@@ -98,6 +101,7 @@ export const BUSINESS_SALARY_CAPS = [0, 500, 1000, 1500] as const;
 /** Rent as a multiple of price: alone, colour set, 1–4 houses, hotel. */
 export const BUSINESS_RENT_LADDER = [0.1, 0.3, 1, 2.5, 4.5, 6, 7.5] as const;
 export const BUSINESS_RAIL_RENT = [0, 25, 50, 100, 200] as const;
+/** Utility rent is the dice total times this. Every house on the board (a hotel counts as five) adds one to it. */
 export const BUSINESS_UTILITY_MULTIPLIER = { ONE: 4, BOTH: 10 } as const;
 
 /** Shown in the lobby. Real colours are dealt at random when the match starts. */
@@ -231,7 +235,10 @@ export const BUSINESS_BOARD: readonly BusinessSpace[] = [
 export const BUSINESS_JAIL_INDEX = 12;
 
 export type BusinessCardEffect =
-  | { type: "cash"; amount: number }
+  /** Collect this share (in percent) of the cash you hold. */
+  | { type: "gain"; pct: number }
+  /** Collect this share (in percent) of what the properties you own cost. */
+  | { type: "dividend"; pct: number }
   /** Pay this share (in percent) of the cash you hold. */
   | { type: "pct"; pct: number }
   | { type: "tax" }
@@ -241,12 +248,17 @@ export type BusinessCardEffect =
 
 export type BusinessCard = { text: string; effect: BusinessCardEffect };
 
-/** One Chance deck: four cards pay, six cost, two move the player. It takes more than it gives. */
+/**
+ * One Chance deck: four cards pay, six cost, two move the player. It takes more than it gives.
+ * Nothing is a fixed sum: every card is a share of the player's cash or property, so it matters
+ * as much late in a match as early. What a card pays or takes is at least `PCT_MIN`, and a
+ * paying card gives at most `CARD_GAIN_MAX`.
+ */
 export const BUSINESS_CHANCE_CARDS: readonly BusinessCard[] = [
-  { text: "The bank pays you a dividend. Collect ₹50.", effect: { type: "cash", amount: 50 } },
-  { text: "Your annuity matures. Collect ₹100.", effect: { type: "cash", amount: 100 } },
-  { text: "Festival bonus. Collect ₹150.", effect: { type: "cash", amount: 150 } },
-  { text: "The bank made a mistake in your favour. Collect ₹200.", effect: { type: "cash", amount: 200 } },
+  { text: "The bank pays a dividend on your properties. Collect 5% of what they cost.", effect: { type: "dividend", pct: 5 } },
+  { text: "Your annuity matures. Collect 5% of your cash.", effect: { type: "gain", pct: 5 } },
+  { text: "Festival bonus. Collect 8% of your cash.", effect: { type: "gain", pct: 8 } },
+  { text: "The bank made a mistake in your favour. Collect 10% of your cash.", effect: { type: "gain", pct: 10 } },
   { text: "Property tax. Pay 2% of your cash for every property you own (20% at most).", effect: { type: "tax" } },
   { text: "Repairs. Pay 2% of your cash for every house, a hotel counting as 5 (25% at most).", effect: { type: "repair" } },
   { text: "Doctor's fees. Pay 5% of your cash.", effect: { type: "pct", pct: 5 } },
