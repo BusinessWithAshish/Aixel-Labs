@@ -106,6 +106,27 @@ export async function planLogoCover(options: {
       // higher bar than erasing: a weak candidate becomes our logo in a random
       // place on someone else's video, and a source with no mark at all must
       // yield no replacement. Best-scoring only, above MIN_CONFIDENCE_ON_REPLACE.
+      if (style === "erase") {
+        // Erasing rebuilds the picture under the box, so a false positive is not
+        // a harmless smudge the way a blur is: measured on a real episode, three
+        // weak candidates (one 496x403 over the speakers' heads) were all
+        // "erased" and the actual bug was not among them. Hold it to the same
+        // SHAPE test as `replace` — a bug hugs a corner and is small — and cover
+        // nothing rather than something that is not a logo.
+        const W = probe.width!;
+        const H = probe.height!;
+        regions = detected
+          .filter(
+            (r) =>
+              r.confidence >= MEDIA_HIDE.DETECT.MIN_CONFIDENCE &&
+              Math.max(
+                Math.min(r.x / W, (W - (r.x + r.width)) / W),
+                Math.min(r.y / H, (H - (r.y + r.height)) / H),
+              ) <= MEDIA_HIDE.DETECT.MAX_CORNER_GAP_ON_REPLACE &&
+              (r.width * r.height) / (W * H) <= MEDIA_HIDE.DETECT.MAX_AREA_ON_REPLACE,
+          )
+          .map(({ x, y, width, height }) => ({ x, y, width, height }));
+      }
       if (style === "replace") {
         // Confident AND unambiguous: the winner has to clear the bar and lead
         // the runner-up, so a field of equally plausible rectangles yields
