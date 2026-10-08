@@ -263,17 +263,17 @@ The bot is honest and timid:
 
 Each has a banner in the middle of the table and its own sound.
 
-| Event             | What it looks like                                                                                                               | Sound (existing name) |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| Round opened      | The rank appears as a big card on the felt and lights up on the rank strip                                                       | `chime`               |
+| Event             | What it looks like                                                                                                                                | Sound (existing name) |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| Round opened      | The rank appears as a big card on the felt and lights up on the rank strip                                                                        | `chime`               |
 | Cards played      | The cards fly one by one from the player's seat to the pile, their card count ticks down, and a bubble on the seat says "2 K's" (one card: "1 K") | `card`                |
-| Pass              | A "Pass" bubble on the seat, then the seat is marked Passed                                                                      | `turn`                |
-| Bluff called      | "Ashish calls Bluff on Zoya!"                                                                                                    | `siren`               |
-| Reveal: a bluff   | Cards flip, red "Bluff!" stamp, pile flies to the liar                                                                           | `jail`                |
-| Reveal: the truth | Cards flip, green "Truth!" stamp, pile flies to the caller                                                                       | `paidOff`             |
-| Pile to the trash | The pile's cards fly into the bin one by one, the bin shakes, its number goes up                                                 | `pay`                 |
-| Rank closed       | "Aces are closed", the rank is struck out on the strip                                                                           | `timeout`             |
-| Out of cards      | "Meera is out of cards: 1st place"                                                                                               | `income`              |
-| Missed turn       | Strike dot lights up on the player                                                                                               | `timeout`             |
-| Your turn         | "Your turn" stamp, gold frame, haptic                                                                                            | `myTurn`              |
-| Match over        | Winner screen with podium                                                                                                        | `win` / `lose`        |
+| Pass              | A "Pass" bubble on the seat, then the seat is marked Passed                                                                                       | `turn`                |
+| Bluff called      | "Ashish calls Bluff on Zoya!"                                                                                                                     | `siren`               |
+| Reveal: a bluff   | Cards flip, red "Bluff!" stamp, pile flies to the liar                                                                                            | `jail`                |
+| Reveal: the truth | Cards flip, green "Truth!" stamp, pile flies to the caller                                                                                        | `paidOff`             |
+| Pile to the trash | The pile's cards fly into the bin one by one, the bin shakes, its number goes up                                                                  | `pay`                 |
+| Rank closed       | "Aces are closed", the rank is struck out on the strip                                                                                            | `timeout`             |
+| Out of cards      | "Meera is out of cards: 1st place"                                                                                                                | `income`              |
+| Missed turn       | Strike dot lights up on the player                                                                                                                | `timeout`             |
+| Your turn         | "Your turn" stamp, gold frame, haptic                                                                                                             | `myTurn`              |
+| Match over        | Winner screen with podium                                                                                                                         | `win` / `lose`        |

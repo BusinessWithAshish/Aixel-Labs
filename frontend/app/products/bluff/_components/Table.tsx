@@ -508,7 +508,7 @@ export function Table({
             <div className="bl-call">
                 <span className="line">
                     <Avatar name={state.players[last.seat].name} color={state.players[last.seat].color} size="sm" />
-                    {who(last.seat)} put {last.count} as {bluffRankName(round.rank, last.count)}
+                    {who(last.seat)} put {last.count} {bluffRankName(round.rank, last.count)}
                 </span>
             </div>
         );
@@ -698,7 +698,7 @@ export function Table({
                                 <Gavel className="lu" /> {who(reveal.caller)} called{' '}
                                 {reveal.target === me ? 'you' : state.players[reveal.target].name}:{' '}
                                 <b>
-                                    {reveal.cards.length} as {bluffRankName(round.rank as BluffRank, reveal.cards.length)}
+                                    {reveal.cards.length} {bluffRankName(round.rank as BluffRank, reveal.cards.length)}
                                 </b>
                             </div>
                             <div className="bl-flips">

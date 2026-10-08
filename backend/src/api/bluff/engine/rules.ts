@@ -147,7 +147,7 @@ function doPlay(state: BluffGameState, p: BluffPlayer, ids: number[], rank: Bluf
   state.round.lastPlay = { id: ++state.playSeq, seat: p.seat, count: played.length };
   log(
     state,
-    opened ? `${p.name} opened ${bluffRankName(said)} with ${cardsWord(played.length)}.` : `${p.name} played ${cardsWord(played.length)} as ${bluffRankName(said, played.length)}.`,
+    opened ? `${p.name} opened with ${played.length} ${bluffRankName(said, played.length)}.` : `${p.name} put ${played.length} ${bluffRankName(said, played.length)}.`,
     p.seat,
     { kind: "play", seat: p.seat, count: played.length, rank: said, opened },
   );

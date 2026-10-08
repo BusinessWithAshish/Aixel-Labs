@@ -90,7 +90,6 @@ Business test scripts.
 anything else → socket.destroy()
 ```
 
-
 ## 4. Backend wiring
 
 - `config.ts`: `ENDPOINTS.BLUFF = "/bluff"`, plus `API_ENDPOINTS` entries.
