@@ -1016,6 +1016,12 @@ export const MEDIA_HIDE = {
      */
     ERASE_PAD_FRACTION: 0.35,
     ERASE_MIN_PAD_PX: 16,
+    /**
+     * And never more than this per side. A third of a small bug is a few dozen
+     * pixels; a third of a 295px lock-up grew the box to 502x216 and left a
+     * smeared patch over the people sitting behind it in every wide shot.
+     */
+    ERASE_MAX_PAD_PX: 40,
     /** Most regions returned, highest confidence first. */
     MAX_REGIONS: 3,
     /**

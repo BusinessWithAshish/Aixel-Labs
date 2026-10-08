@@ -378,12 +378,13 @@ export function eraseRegion(
   sourceHeight: number,
   grow: boolean,
 ): HIDE_REGION {
-  const padX = grow
-    ? Math.max(MEDIA_HIDE.DETECT.ERASE_MIN_PAD_PX, Math.round(region.width * MEDIA_HIDE.DETECT.ERASE_PAD_FRACTION))
-    : 0;
-  const padY = grow
-    ? Math.max(MEDIA_HIDE.DETECT.ERASE_MIN_PAD_PX, Math.round(region.height * MEDIA_HIDE.DETECT.ERASE_PAD_FRACTION))
-    : 0;
+  const pad = (side: number): number =>
+    Math.min(
+      MEDIA_HIDE.DETECT.ERASE_MAX_PAD_PX,
+      Math.max(MEDIA_HIDE.DETECT.ERASE_MIN_PAD_PX, Math.round(side * MEDIA_HIDE.DETECT.ERASE_PAD_FRACTION)),
+    );
+  const padX = grow ? pad(region.width) : 0;
+  const padY = grow ? pad(region.height) : 0;
   const x = Math.max(1, region.x - padX);
   const y = Math.max(1, region.y - padY);
   const right = Math.min(sourceWidth - 1, region.x + region.width + padX);
