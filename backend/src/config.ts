@@ -9,6 +9,7 @@ import { IG_DOWNLOAD_ROUTES } from "./api/instagram/download/constants";
 import { GMAPS_DETAILS_ROUTES } from "./api/gmaps/details/constants";
 import { GMAPS_ADVANCED_ROUTES } from "./api/gmaps/advanced/constants";
 import { TWITTER_API_ROUTES } from "./api/twitter/constants";
+import { BLUFF_ROUTES } from "./api/bluff/constants";
 import { BUSINESS_ROUTES } from "./api/business/constants";
 
 export enum ENDPOINTS {
@@ -25,6 +26,7 @@ export enum ENDPOINTS {
   SEGMENT = "/segment",
   CRAWL = "/crawl",
   BUSINESS = "/business",
+  BLUFF = "/bluff",
   CHATGPT = "/chatgpt",
   CLAUDE = "/claude",
   GEMINI = "/gemini",
@@ -317,8 +319,13 @@ export const API_ENDPOINTS = {
   },
   BUSINESS: {
     ROOM: { route: BUSINESS_ROUTES.ROOM, full: `${ENDPOINTS.BUSINESS}${BUSINESS_ROUTES.ROOM}` },
-    /** WebSocket upgrade path, handled by `attachBusinessSocket` (not an Express route). */
+    /** WebSocket upgrade path, routed by `attachGameSockets` (not an Express route). */
     WS: { route: BUSINESS_ROUTES.WS, full: BUSINESS_ROUTES.WS },
+  },
+  BLUFF: {
+    ROOM: { route: BLUFF_ROUTES.ROOM, full: `${ENDPOINTS.BLUFF}${BLUFF_ROUTES.ROOM}` },
+    /** WebSocket upgrade path, routed by `attachGameSockets` (not an Express route). */
+    WS: { route: BLUFF_ROUTES.WS, full: BLUFF_ROUTES.WS },
   },
   CHATGPT: {
     GENERATE: {

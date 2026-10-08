@@ -13,6 +13,7 @@ import googleTrendsRoutes from "./api/google-trends/index";
 import mediaRoutes from "./api/media/index";
 import segmentRoutes from "./api/segment/index";
 import crawlRoutes from "./api/crawl/index";
+import bluffRoutes from "./api/bluff/index";
 import businessRoutes from "./api/business/index";
 import chatgptRoutes from "./api/chatgpt/index";
 import claudeRoutes from "./api/claude/index";
@@ -33,6 +34,7 @@ export function registerRoutes(app: Express) {
   app.use(ENDPOINTS.SEGMENT, segmentRoutes);
   app.use(ENDPOINTS.CRAWL, crawlRoutes);
   app.use(ENDPOINTS.BUSINESS, businessRoutes);
+  app.use(ENDPOINTS.BLUFF, bluffRoutes);
   app.use(ENDPOINTS.CHATGPT, chatgptRoutes);
   app.use(ENDPOINTS.CLAUDE, claudeRoutes);
   app.use(ENDPOINTS.GEMINI, geminiRoutes);

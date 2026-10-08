@@ -7,7 +7,7 @@ import rateLimit from "express-rate-limit";
 import morgan from "morgan";
 import path from "path";
 import { registerRoutes } from "./routes";
-import { attachBusinessSocket } from "./api/business/socket";
+import { attachGameSockets } from "./api/game-sockets";
 import type { Express } from "express";
 import {
   ALLOWED_ORIGINS_DEV_REGEX,
@@ -185,9 +185,9 @@ if (!process.env.VERCEL) {
    * commonly capped well under an hour) — set it there, not here, if it
    * ever needs to change.
    */
-  // Big Business plays over one WebSocket on this same HTTP server. It needs a
-  // long-lived process, so it is attached here and never on Vercel.
-  attachBusinessSocket(server);
+  // The games (Big Business, Bluff) each play over a WebSocket on this same HTTP
+  // server. They need a long-lived process, so they are attached here and never on Vercel.
+  attachGameSockets(server);
 
   server.requestTimeout = 60 * 60 * 1000;
   server.headersTimeout = 60 * 60 * 1000 - 1000;
