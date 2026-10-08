@@ -15,6 +15,7 @@ import { useBusinessServerWsUrl } from '../../business/_components/BusinessConfi
 import { clampName, loadProfile, saveProfile } from '../../business/_lib/client';
 import { GameToasts, notify } from '../../business/_lib/toast';
 import { createRoomRequest, forgetLastRoom, gameBasePath, loadLastRoom, peekRoomRequest, saveSeat } from '../_lib/client';
+import { InstallApp } from '../../business/_components/InstallApp';
 import { BluffLogo, BluffTips, secondsLabel } from './bits';
 
 /** First screen: your name, then either host a room or join one. Fits one phone screen. */
@@ -160,6 +161,7 @@ export function BluffHome() {
                     </GButton>
                 </section>
             </div>
+            <InstallApp />
             <BluffTips />
         </main>
     );
