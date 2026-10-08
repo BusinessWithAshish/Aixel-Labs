@@ -25,6 +25,7 @@ import { BUSINESS_UPDATES, LATEST_UPDATE, type BusinessUpdate } from '../_lib/wh
 import { GameToasts, notify } from '../_lib/toast';
 import { AudioToggles, Choices, GButton, Logo, minutesLabel, missLabel, Stepper, Tips } from './bits';
 import { useBusinessServerWsUrl } from './BusinessConfig';
+import { InstallApp } from './InstallApp';
 import { WhatsNew } from './WhatsNew';
 
 /** First screen: your name, then either host a room or join one. Fits one phone screen. */
@@ -152,6 +153,7 @@ export function BusinessHome() {
                     </GButton>
                 </section>
             </div>
+            <InstallApp />
             <button type="button" className="newslink" onClick={() => setNews(BUSINESS_UPDATES)}>
                 What&apos;s new
             </button>

@@ -111,7 +111,8 @@
     width: 100%;
     max-width: 640px;
     margin: 0 auto;
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    /* Clear of the notch and the home bar, which the installed app draws under. */
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 10px calc(8px + env(safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -4280,7 +4281,7 @@
 /* Looking at the board while the match is paused: a slim bar instead of the curtain. */
 .bb .pausebar {
     position: fixed;
-    top: 8px;
+    top: calc(8px + env(safe-area-inset-top, 0px));
     left: 50%;
     z-index: 60;
     transform: translateX(-50%);
@@ -4584,4 +4585,19 @@
     font-weight: 800;
     text-decoration: underline;
     cursor: pointer;
+}
+
+/* "Install the app" on the main screen. */
+.bb .install {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.bb .install p {
+    margin: 6px 0 0;
+}
+.bb .install p svg {
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
 }

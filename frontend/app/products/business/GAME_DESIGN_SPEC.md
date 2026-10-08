@@ -357,6 +357,19 @@ A second tap on Join never seats the same player twice.
   a first-time player sees nothing. A "What's new" link shows them all again.
   Add an entry there with each release that changes how the game plays.
 
+## Installing it as an app
+
+On its own address (business.…) the game can be added to a phone's home screen
+and opens there full-screen, as an app of its own: only the game, never the
+rest of the site. Files: `public/business/manifest.webmanifest` and the icons
+beside it; the tags are set in the game's `layout.tsx`, and only on that
+address. Under the main site's `/products/business` no manifest is offered,
+because there it would install the whole site. There is no service worker: the
+game needs the server to play, so there is nothing to run offline, and no
+cached copy that could go stale after a release. The main screen has an
+"Install the app" button (Android asks directly; an iPhone is told to use
+Share → Add to Home Screen) and hides it once installed.
+
 ## Old phones and tablets
 
 The game is written to run on iPhones and iPads from iOS 12 and Android
