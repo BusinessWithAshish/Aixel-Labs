@@ -42,7 +42,9 @@ const BUILD_RESERVE = 600;
 /** Cash the bot keeps after buying the property it landed on. */
 const BUY_RESERVE = 150;
 
-type TradeSide = { cash: number; spaces: number[] };
+type TradeSide = { cash: number; spaces: number[]; cards: number };
+/** What a "get out of Jail free" card is worth to the bot in a trade. */
+const JAIL_CARD_VALUE = 150;
 
 function price(space: number): number {
   return BUSINESS_BOARD[space].price ?? 0;
@@ -72,8 +74,8 @@ function tradeValues(
   receive: TradeSide,
   give: TradeSide,
 ): { received: number; given: number } {
-  let received = receive.cash + receive.spaces.reduce((sum, i) => sum + propertyValue(state, i), 0);
-  let given = give.cash + give.spaces.reduce((sum, i) => sum + propertyValue(state, i), 0);
+  let received = receive.cash + receive.cards * JAIL_CARD_VALUE + receive.spaces.reduce((sum, i) => sum + propertyValue(state, i), 0);
+  let given = give.cash + give.cards * JAIL_CARD_VALUE + give.spaces.reduce((sum, i) => sum + propertyValue(state, i), 0);
 
   const ownerAfter = (i: number): number | undefined => {
     if (receive.spaces.includes(i)) return seat;

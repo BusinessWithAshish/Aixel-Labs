@@ -120,9 +120,11 @@ function describeTerms(state: BusinessGameState, from: number, to: number, terms
       return `end the split of the ${split ? BUSINESS_SETS[split.set].name : ""} set`;
     }
     case "trade": {
-      const side = (cash: number, spaces: number[]) =>
-        [cash ? rs(cash) : null, ...spaces.map((i) => BUSINESS_BOARD[i].name)].filter(Boolean).join(" + ") || "nothing";
-      return `${P[from].name} gives ${side(terms.give.cash, terms.give.spaces)}, ${P[to].name} gives ${side(terms.get.cash, terms.get.spaces)}`;
+      const side = (s: { cash: number; spaces: number[]; cards: number }) =>
+        [s.cash ? rs(s.cash) : null, ...s.spaces.map((i) => BUSINESS_BOARD[i].name), s.cards ? `${s.cards} Jail card${s.cards === 1 ? "" : "s"}` : null]
+          .filter(Boolean)
+          .join(" + ") || "nothing";
+      return `${P[from].name} gives ${side(terms.give)}, ${P[to].name} gives ${side(terms.get)}`;
     }
   }
 }
@@ -412,7 +414,7 @@ function passLaunch(state: BusinessGameState, p: BusinessPlayer) {
 function startAuction(state: BusinessGameState, space: number, now: number) {
   const endsAt = now + BUSINESS_RULES.AUCTION_SECONDS * 1000;
   const open = Math.floor((BUSINESS_BOARD[space].price ?? 0) * BUSINESS_RULES.AUCTION_OPEN_RATE);
-  setPhase(state, "auction", now, { type: "auction", space, open, bid: 0, by: null, passed: [], endsAt });
+  setPhase(state, "auction", now, { type: "auction", space, open, bid: 0, by: null, bids: {}, passed: [], endsAt });
 }
 
 function finishAuction(state: BusinessGameState, now: number) {
@@ -636,6 +638,11 @@ function applyCard(state: BusinessGameState, now: number) {
     sendToJail(state, p, "card", `${p.name} drew "Go to Jail" and goes straight there.`);
     return continueTurn(state, now);
   }
+  if (effect.type === "jailcard") {
+    p.jailCards++;
+    log(state, `${p.name} drew a Chance card: ${text}`, p.seat);
+    return continueTurn(state, now);
+  }
 
   const delta = cardDelta(state, p.seat, effect);
   log(state, `${p.name} drew a Chance card: ${text}`, p.seat, undefined, {
@@ -735,6 +742,7 @@ function doBankrupt(state: BusinessGameState, seat: number, forfeit?: string) {
   state.offers = state.offers.filter((o) => o.from !== seat && o.to !== seat);
   if (seat === state.turn) state.owed = [];
   p.owed = [];
+  p.jailCards = 0;
   p.deferred = false;
   p.cash = 0;
   p.bankrupt = true;
@@ -806,6 +814,9 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
     prisoner.cash -= terms.amount;
     helper.cash += terms.amount;
     prisoner.jail = 0;
+    // The price of a rescue: the helper comes to the Jail in person, from wherever they stand, as a
+    // visitor. It is a step back, not a lap: no Launch on the way and no salary.
+    helper.pos = BUSINESS_JAIL_INDEX;
     log(state, `${helper.name} bailed ${prisoner.name} out of Jail.`, helper.seat, othersThan(state, from, to), { kind: "bail", from: prisoner.seat, to: helper.seat, amount: 0 });
     log(state, `${helper.name} bailed ${prisoner.name} out of Jail for ${rs(terms.amount)}.`, helper.seat, [from, to], { kind: "bail", from: prisoner.seat, to: helper.seat, amount: terms.amount });
     return;
@@ -841,6 +852,8 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
   P[to].cash += terms.give.cash - terms.get.cash;
   for (const i of terms.give.spaces) state.props[i].owner = to;
   for (const i of terms.get.spaces) state.props[i].owner = from;
+  P[from].jailCards += terms.get.cards - terms.give.cards;
+  P[to].jailCards += terms.give.cards - terms.get.cards;
   // Public: everyone sees that a trade happened. What was swapped shows only on the board.
   log(state, `${P[from].name} and ${P[to].name} made a trade.`, from, undefined, { kind: "trade", from, to, amount: 0 });
   log(state, `The trade: ${describeTerms(state, from, to, terms)}.`, from, [from, to]);
@@ -869,6 +882,7 @@ export function createGame(
       skip: false,
       bankrupt: false,
       missed: 0,
+      jailCards: 0,
       laps: 0,
       deferred: false,
       owed: [],
@@ -893,6 +907,7 @@ export function createGame(
     endsAt: config.minutes > 0 ? now + config.minutes * 60_000 : null,
     missLimit: config.missLimit,
     salaryCap: config.salaryCap ?? 0,
+    bailAnyone: config.bailAnyone ?? false,
     lapsed: false,
     hold: null,
     held: 0,
@@ -924,6 +939,16 @@ export function publicView(state: BusinessGameState, seat: number): BusinessPubl
 
 const MANAGE_PHASES: BusinessPhase[] = ["roll", "end"];
 const RAISE_PHASES: BusinessPhase[] = ["roll", "end", "debt", "loandue"];
+
+/** The host ends the match on the spot: whoever is richest wins, exactly as at the bell. */
+export function endMatch(prev: BusinessGameState): BusinessGameState {
+  if (prev.phase === "over") return prev;
+  const state = structuredClone(prev);
+  state.rev++;
+  log(state, "The host ended the match. The richest player wins.");
+  finish(state, null);
+  return state;
+}
 
 /** Validates and applies one player command. Throws `BusinessRuleError` when it is not allowed. */
 export function applyCommand(
@@ -963,6 +988,15 @@ export function applyCommand(
       }
       break;
 
+    case "useJailCard":
+      need("roll");
+      if (!me.jail) fail("You are not in Jail.");
+      if (me.jailCards < 1) fail("You have no Jail card.");
+      me.jailCards--;
+      me.jail = 0;
+      log(state, `${me.name} used a "get out of Jail free" card.`, seat);
+      break;
+
     case "buy": {
       need("buy");
       if (state.pending?.type !== "buy") fail(BUSINESS_ERRORS.WRONG_PHASE);
@@ -994,6 +1028,7 @@ export function applyCommand(
       if (cmd.amount < min) fail(`Bid at least ${rs(min)}.`);
       if (cmd.amount > me.cash) fail("Not enough cash.");
       a.bid = cmd.amount;
+      a.bids[seat] = cmd.amount;
       log(state, `Auction: ${me.name} bids ${rs(cmd.amount)} for ${BUSINESS_BOARD[a.space].name}.`, seat);
       a.by = seat;
       // Every bid gives the others the full time again.
@@ -1024,14 +1059,29 @@ export function applyCommand(
 
     case "break":
       need("break");
-      if (cmd.jail !== undefined) {
+      if (cmd.random) {
+        // A gamble: anyone still free may be picked, the sender included.
+        const free = alive(state).filter((q) => !q.jail);
+        const target = free[Math.floor(random(state) * free.length)] ?? me;
+        const own = target.seat === seat;
+        target.pos = BUSINESS_JAIL_INDEX;
+        target.jail = 1;
+        if (own) {
+          // Caught by their own trap: no extra roll either.
+          state.again = false;
+          state.doubles = 0;
+        }
+        const text = own ? `${me.name} sent a random player to Jail, and it was ${me.name}.` : `${me.name} sent a random player to Jail: ${target.name}.`;
+        // `to` is who did it, so the table sees the culprit beside the victim.
+        log(state, text, target.seat, undefined, { kind: "jail", from: target.seat, to: seat, amount: 0, why: "random" });
+      } else if (cmd.jail !== undefined) {
         // The break can be spent on sending another player to Jail.
         const target = state.players[cmd.jail];
         if (!target || target.seat === seat || target.bankrupt) fail("Pick another player.");
         if (target.jail) fail(`${target.name} is already in Jail.`);
         target.pos = BUSINESS_JAIL_INDEX;
         target.jail = 1;
-        log(state, `${me.name} used the break to send ${target.name} to Jail.`, target.seat, undefined, { kind: "jail", from: target.seat, to: null, amount: 0, why: "sent" });
+        log(state, `${me.name} used the break to send ${target.name} to Jail.`, target.seat, undefined, { kind: "jail", from: target.seat, to: seat, amount: 0, why: "sent" });
       } else {
         me.skip = cmd.rest;
         log(state, cmd.rest ? `${me.name} chose to rest and will skip the next turn.` : `${me.name} took a short break and keeps playing.`, seat);

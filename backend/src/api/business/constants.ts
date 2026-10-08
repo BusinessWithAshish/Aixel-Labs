@@ -59,6 +59,10 @@ export const BUSINESS_RULES = {
   /** Chance "Repairs": this share of the cash held for every house (a hotel counts as five), up to the cap. */
   REPAIR_PCT_PER_HOUSE: 2,
   REPAIR_PCT_MAX: 25,
+  /** Longest name a player may take: it has to fit on a player plate. */
+  NAME_MAX: 12,
+  /** A pause ends by itself after this long, so one tap cannot stop a match for good. */
+  PAUSE_MAX_SECONDS: 300,
   MIN_SEATS: 2,
   MAX_SEATS: 6,
   /** Lines the activity keeps, newest first. Enough for a whole match of a few players. */
@@ -78,7 +82,8 @@ export const BUSINESS_PHASE_SECONDS = {
   card: 12,
   result: 12,
   market: 45,
-  break: 15,
+  /** Rest, keep playing, or pick someone to send to Jail: a real decision, so it gets real time. */
+  break: 90,
   debt: 75,
   /** A loan came due: pay it, or ask the lender to extend it. */
   loandue: 40,
@@ -107,14 +112,18 @@ export const BUSINESS_UTILITY_MULTIPLIER = { ONE: 4, BOTH: 10 } as const;
 /** Shown in the lobby. Real colours are dealt at random when the match starts. */
 export const BUSINESS_LOBBY_COLOR = "#6F6592";
 
-/** Six colours that never look alike: no two greens, no orange next to red. */
+/**
+ * Six colours that never look alike at a glance, on a pawn the size of a fingernail: four strong
+ * hues, then white and dark grey. No orange (reads as red), no pink or purple (read as each other
+ * and as blue), no second green.
+ */
 export const BUSINESS_PLAYER_COLORS = [
   "#FF3B4E", // red
   "#2F8BFF", // blue
   "#FFC400", // yellow
   "#22C55E", // green
-  "#A259FF", // purple
-  "#FF7AD9", // pink
+  "#F4F6FB", // white
+  "#4A4A55", // dark grey
 ] as const;
 
 export const BUSINESS_SETS = {
@@ -244,12 +253,15 @@ export type BusinessCardEffect =
   | { type: "tax" }
   | { type: "repair" }
   | { type: "back"; steps: number }
-  | { type: "jail" };
+  | { type: "jail" }
+  /** A "get out of Jail free" card: kept until it is used, and tradeable like cash. */
+  | { type: "jailcard" };
 
 export type BusinessCard = { text: string; effect: BusinessCardEffect };
 
 /**
- * One Chance deck: four cards pay, six cost, two move the player. It takes more than it gives.
+ * One Chance deck: four cards pay, six cost, two move the player, and one is a card to keep
+ * ("get out of Jail free"). It takes more than it gives.
  * Nothing is a fixed sum: every card is a share of the player's cash or property, so it matters
  * as much late in a match as early. What a card pays or takes is at least `PCT_MIN`, and a
  * paying card gives at most `CARD_GAIN_MAX`.
@@ -267,6 +279,7 @@ export const BUSINESS_CHANCE_CARDS: readonly BusinessCard[] = [
   { text: "Wedding in the family. Pay 15% of your cash.", effect: { type: "pct", pct: 15 } },
   { text: "Go back 3 spaces.", effect: { type: "back", steps: 3 } },
   { text: "Go to Jail.", effect: { type: "jail" } },
+  { text: "Get out of Jail free. Keep this card until you need it, or trade it.", effect: { type: "jailcard" } },
 ];
 
 export const BUSINESS_ERRORS = {

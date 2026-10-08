@@ -15,8 +15,10 @@ import {
   commandRoom,
   configureRoom,
   createRoom,
+  endRoomMatch,
   joinRoom,
   kickSeat,
+  moveSeat,
   resumeSeat,
   seatPresence,
   setPaused,
@@ -75,12 +77,15 @@ function handle(ws: WebSocket, msg: BusinessClientMessage) {
   if (msg.t === "ping") return send(ws, { t: "pong" });
 
   if (msg.t === "create") {
-    const { room, seat, token } = createRoom(msg.name, { seats: msg.seats, minutes: msg.minutes, missLimit: msg.missLimit, teams: false, salaryCap: 0 }, now);
+    const { room, seat, token } = createRoom(msg.name, { seats: msg.seats, minutes: msg.minutes, missLimit: msg.missLimit, teams: false, salaryCap: 0, bailAnyone: true }, now);
     attach(ws, room, seat);
     send(ws, { t: "joined", code: room.code, seat, token });
     return broadcast(room);
   }
   if (msg.t === "join") {
+    // A second tap on Join must not seat the same player twice.
+    const already = sessions.get(ws);
+    if (already && already.room.code === msg.code) return broadcast(already.room);
     const { room, seat, token } = joinRoom(msg.code, msg.name, now);
     attach(ws, room, seat);
     send(ws, { t: "joined", code: room.code, seat, token });
@@ -95,7 +100,7 @@ function handle(ws: WebSocket, msg: BusinessClientMessage) {
 
   const session = sessions.get(ws);
   if (!session) throw new BusinessRoomError(BUSINESS_ERRORS.BAD_TOKEN);
-  if (msg.t === "config") configureRoom(session.room, session.seat, { seats: msg.seats, minutes: msg.minutes, missLimit: msg.missLimit, teams: msg.teams });
+  if (msg.t === "config") configureRoom(session.room, session.seat, { seats: msg.seats, minutes: msg.minutes, missLimit: msg.missLimit, teams: msg.teams, salaryCap: msg.salaryCap, bailAnyone: msg.bailAnyone });
   else if (msg.t === "start") startRoom(session.room, session.seat, now);
   else if (msg.t === "kick") {
     kickSeat(session.room, session.seat, msg.seat);
@@ -108,10 +113,17 @@ function handle(ws: WebSocket, msg: BusinessClientMessage) {
       } else if (s.seat > msg.seat) s.seat--;
     }
   }
+  else if (msg.t === "move") {
+    const moved = moveSeat(session.room, session.seat, msg.seat, msg.to);
+    for (const s of sessions.values()) if (s.room === session.room) s.seat = moved[s.seat];
+  }
   else if (msg.t === "team") setTeam(session.room, session.seat, msg.seat, msg.team);
   else if (msg.t === "pause") setPaused(session.room, session.seat, msg.on, now);
-  else if (msg.t === "close" || (msg.t === "cmd" && msg.cmd.type === "leave" && session.seat === session.room.hostSeat)) {
-    // The host leaving ends the room for everyone.
+  else if (msg.t === "end") endRoomMatch(session.room, session.seat);
+  else if ((msg.t === "close" || (msg.t === "cmd" && msg.cmd.type === "leave" && session.seat === session.room.hostSeat)) && endRoomMatch(session.room, session.seat)) {
+    // The host leaving a running match ends it properly: everyone gets the result, not a closed door.
+  } else if (msg.t === "close" || (msg.t === "cmd" && msg.cmd.type === "leave" && session.seat === session.room.hostSeat)) {
+    // With no match running, the host leaving closes the room for everyone.
     closeRoom(session.room, session.seat);
     for (const [other, s] of sessions) {
       if (s.room !== session.room) continue;

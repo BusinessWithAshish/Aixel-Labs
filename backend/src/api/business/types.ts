@@ -36,6 +36,8 @@ export type BusinessPlayer = {
   bankrupt: boolean;
   /** Turns in a row this player let the roll timer run out. */
   missed: number;
+  /** "Get out of Jail free" cards held: used to walk out, or traded like cash. */
+  jailCards: number;
   /** Laps completed: the salary grows with each one. */
   laps: number;
   /** In debt and already put it off once: at their next turn it must be raised before anything else. */
@@ -104,6 +106,8 @@ export type BusinessPending =
       open: number;
       bid: number;
       by: number | null;
+      /** Each player's own latest bid, for the live standings. */
+      bids: Record<number, number>;
       passed: number[];
       endsAt: number;
     }
@@ -129,7 +133,7 @@ export type BusinessFxKind =
   | "build"
   /** Interest paid on a loan as its borrower passes Launch. */
   | "interest"
-  /** `from` went to Jail; `why` says how. */
+  /** `from` went to Jail; `why` says how. When another player sent them (`sent`, `random`), `to` is that player. */
   | "jail"
   /** Two players swapped something. Everyone sees that it happened, never what. */
   | "trade"
@@ -148,7 +152,7 @@ export type BusinessFx = {
   /** 0 with `kind` loan/mortgage: a private deal announced to the others without its numbers. */
   amount: number;
   space?: number;
-  why?: "speeding" | "gojail" | "card" | "sent";
+  why?: "speeding" | "gojail" | "card" | "sent" | "random";
 };
 
 /** `only` lists the seats allowed to read the entry (a private deal). Absent = everyone. */
@@ -193,6 +197,8 @@ export type BusinessGameState = {
   missLimit: number;
   /** The most one lap's salary can pay; 0 = no cap. */
   salaryCap: number;
+  /** Any player may bail a prisoner out, not only one visiting Jail. */
+  bailAnyone: boolean;
   /** A timer already ran out on the active player this turn (counted once per turn). */
   lapsed: boolean;
   /** The turn clock is standing still (its player is writing an offer, or one is waiting for an answer) until `until`. */
@@ -211,8 +217,11 @@ export type BusinessGameState = {
 export type BusinessPublicState = Omit<BusinessGameState, "rng" | "deck">;
 
 /** `teams`: two teams (Alpha against Beta) instead of everyone for themselves. */
-/** `salaryCap`: the most a lap's salary can pay; 0 = no cap. */
-export type BusinessRoomConfig = { seats: number; minutes: number; missLimit: number; teams: boolean; salaryCap: number };
+/**
+ * `salaryCap`: the most a lap's salary can pay; 0 = no cap.
+ * `bailAnyone`: any player may bail a prisoner out; otherwise only a player visiting Jail.
+ */
+export type BusinessRoomConfig = { seats: number; minutes: number; missLimit: number; teams: boolean; salaryCap: number; bailAnyone: boolean };
 
 export type BusinessSeatView = {
   seat: number;

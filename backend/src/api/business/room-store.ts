@@ -5,7 +5,7 @@
 import { createHash, randomBytes, randomInt } from "crypto";
 import { BUSINESS_ERRORS, BUSINESS_LOBBY_COLOR, BUSINESS_PLAYER_COLORS, BUSINESS_RULES } from "./constants";
 import { botCommand } from "./engine/bot";
-import { applyCommand, BusinessRuleError, createGame, publicView, tick } from "./engine/rules";
+import { applyCommand, BusinessRuleError, createGame, endMatch, publicView, tick } from "./engine/rules";
 import type {
   BusinessCommand,
   BusinessGameState,
@@ -113,6 +113,7 @@ export function configureRoom(room: BusinessRoom, seat: number, patch: Partial<B
   if (patch.missLimit !== undefined) room.config.missLimit = patch.missLimit;
   if (patch.teams !== undefined) room.config.teams = patch.teams;
   if (patch.salaryCap !== undefined) room.config.salaryCap = patch.salaryCap;
+  if (patch.bailAnyone !== undefined) room.config.bailAnyone = patch.bailAnyone;
 }
 
 /** Host only, lobby only: frees a seat. Later seats move up one. */
@@ -121,6 +122,22 @@ export function kickSeat(room: BusinessRoom, seat: number, target: number) {
   if (room.state) throw new BusinessRoomError(BUSINESS_ERRORS.ROOM_STARTED);
   if (target === room.hostSeat || !room.seats[target]) throw new BusinessRoomError("That seat cannot be removed.");
   room.seats.splice(target, 1);
+}
+
+/**
+ * Host, lobby: moves a seat to another place in the turn order. Returns where every seat went
+ * (old index → new index), so sockets can follow their player.
+ */
+export function moveSeat(room: BusinessRoom, seat: number, from: number, to: number): number[] {
+  if (seat !== room.hostSeat) throw new BusinessRoomError(BUSINESS_ERRORS.NOT_HOST);
+  if (room.state) throw new BusinessRoomError(BUSINESS_ERRORS.ROOM_STARTED);
+  if (!room.seats[from] || !room.seats[to]) throw new BusinessRoomError("That seat cannot be moved.");
+  const order = room.seats.map((_, i) => i);
+  order.splice(to, 0, ...order.splice(from, 1));
+  room.seats = order.map((i) => room.seats[i]);
+  const moved = room.seats.map((_, i) => order.indexOf(i));
+  room.hostSeat = moved[room.hostSeat];
+  return moved;
 }
 
 /** Host, lobby: place a seat in Alpha (0) or Beta (1), or take it out again (-1). Any split works, 1 v 4 included. */
@@ -154,6 +171,15 @@ export function setPaused(room: BusinessRoom, seat: number, on: boolean, now: nu
   room.state = s;
   room.pausedAt = null;
   room.botAt = now + BOT_PACE_MS;
+}
+
+/** Host, during the match: it ends now and everyone sees the result. Returns false when no match is running. */
+export function endRoomMatch(room: BusinessRoom, seat: number): boolean {
+  if (seat !== room.hostSeat) throw new BusinessRoomError(BUSINESS_ERRORS.NOT_HOST);
+  if (!room.state || room.state.phase === "over") return false;
+  room.state = endMatch(room.state);
+  room.pausedAt = null;
+  return true;
 }
 
 /** Host only: the room ends for everyone. */
@@ -207,9 +233,10 @@ export function tickRooms(now: number): BusinessRoom[] {
       rooms.delete(room.code);
       continue;
     }
-    // A host who paused and then dropped off would freeze the match for good: it restarts without them.
+    // A pause ends by itself: after its time limit, or sooner if the host who called it has dropped off.
     const host = room.seats[room.hostSeat];
-    if (room.state && room.pausedAt !== null && host.offlineAt !== null && now - host.offlineAt > PAUSE_HOST_AWAY_MS) {
+    const hostGone = host.offlineAt !== null && now - host.offlineAt > PAUSE_HOST_AWAY_MS;
+    if (room.state && room.pausedAt !== null && (hostGone || now - room.pausedAt > BUSINESS_RULES.PAUSE_MAX_SECONDS * 1000)) {
       setPaused(room, room.hostSeat, false, now);
       changed.push(room);
     }

@@ -7,6 +7,9 @@ const CASH = z.number().int().min(0).max(1_000_000);
 const LAPS = z.number().int().min(1).max(BUSINESS_RULES.DEAL_MAX_LAPS);
 const INTEREST_MODE = z.enum(["lap", "end"]);
 
+/** One side of a trade: cash, properties, and "get out of Jail free" cards. */
+const TRADE_SIDE = z.object({ cash: CASH, spaces: z.array(SPACE).max(28), cards: z.number().int().min(0).max(9).default(0) });
+
 export const BUSINESS_OFFER_TERMS_SCHEMA = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("loan"),
@@ -52,9 +55,9 @@ export const BUSINESS_OFFER_TERMS_SCHEMA = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("trade"),
     /** What the proposer hands over. */
-    give: z.object({ cash: CASH, spaces: z.array(SPACE).max(28) }),
+    give: TRADE_SIDE,
     /** What the proposer receives. */
-    get: z.object({ cash: CASH, spaces: z.array(SPACE).max(28) }),
+    get: TRADE_SIDE,
   }),
 ]);
 
@@ -67,8 +70,10 @@ export const BUSINESS_COMMAND_SCHEMA = z.discriminatedUnion("type", [
   z.object({ type: z.literal("passBid") }),
   z.object({ type: z.literal("ack") }),
   z.object({ type: z.literal("market"), stake: CASH }),
-  /** `jail`: use the break to send that player to Jail (then `rest` is ignored). */
-  z.object({ type: z.literal("break"), rest: z.boolean(), jail: SEAT.optional() }),
+  /** `jail`: use the break to send that player to Jail; `random`: send whoever the dice pick, the sender included. */
+  z.object({ type: z.literal("break"), rest: z.boolean(), jail: SEAT.optional(), random: z.boolean().optional() }),
+  /** In Jail: hand in a "get out of Jail free" card and walk out. */
+  z.object({ type: z.literal("useJailCard") }),
   z.object({ type: z.literal("endTurn") }),
   z.object({ type: z.literal("build"), space: SPACE }),
   z.object({ type: z.literal("sellHouse"), space: SPACE }),
@@ -88,7 +93,12 @@ export const BUSINESS_COMMAND_SCHEMA = z.discriminatedUnion("type", [
   z.object({ type: z.literal("leave") }),
 ]);
 
-const NAME = z.string().trim().min(1).max(14);
+/** Counted in characters as a person sees them, so an emoji is one, not two. */
+const NAME = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((name) => [...name].length <= BUSINESS_RULES.NAME_MAX);
 const CODE = z.string().trim().toUpperCase().regex(/^[A-Z0-9]{6}$/);
 const SEATS = z.number().int().min(BUSINESS_RULES.MIN_SEATS).max(BUSINESS_RULES.MAX_SEATS);
 const MINUTES = z
@@ -116,10 +126,15 @@ export const BUSINESS_CLIENT_MESSAGE_SCHEMA = z.discriminatedUnion("t", [
     missLimit: MISS_LIMIT.optional(),
     teams: z.boolean().optional(),
     salaryCap: SALARY_CAP.optional(),
+    bailAnyone: z.boolean().optional(),
   }),
   z.object({ t: z.literal("start") }),
+  /** Host, during the match: end it now. The richest player wins. */
+  z.object({ t: z.literal("end") }),
   z.object({ t: z.literal("peek"), code: CODE }),
   z.object({ t: z.literal("kick"), seat: SEAT }),
+  /** Host, lobby: move a seat to another place in the turn order. */
+  z.object({ t: z.literal("move"), seat: SEAT, to: SEAT }),
   /** Host, lobby, team play: put a seat in Alpha (0) or Beta (1), or back with the unplaced players (-1). */
   z.object({ t: z.literal("team"), seat: SEAT, team: z.number().int().min(-1).max(1) }),
   /** Host, during the match: stop or restart every clock. */

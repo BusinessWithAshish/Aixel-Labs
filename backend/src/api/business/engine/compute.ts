@@ -17,7 +17,7 @@ import {
 } from "../constants";
 import type { BusinessInterestMode, BusinessOfferTerms, BusinessPublicState, BusinessSplit } from "../types";
 
-type State = Pick<BusinessPublicState, "players" | "props" | "loans" | "splits">;
+type State = Pick<BusinessPublicState, "players" | "props" | "loans" | "splits" | "bailAnyone">;
 
 export function isBuyable(space: number): boolean {
   const kind = BUSINESS_BOARD[space].kind;
@@ -319,6 +319,9 @@ export function validateOffer(
   if (!a || !b || from === to) return "Pick another player.";
   if (a.bankrupt || b.bankrupt) return "That player is out of the match.";
   const pair = (x: number, y: number) => (x === from && y === to) || (x === to && y === from);
+  // A player held in Jail deals in nothing but their bail (and a loan of theirs that has fallen due).
+  const held = a.jail ? a : b.jail ? b : null;
+  if (held && terms.kind !== "bail" && terms.kind !== "renew") return `${held.name} is in Jail: only bail can be offered.`;
 
   if (terms.kind === "loan") {
     if (!pair(terms.lender, terms.borrower)) return "A loan is between the two of you.";
@@ -346,7 +349,7 @@ export function validateOffer(
     const helper = terms.prisoner === from ? to : from;
     if (!pair(terms.prisoner, helper)) return "Bail is between the two of you.";
     if (!prisoner.jail) return `${prisoner.name} is not in Jail.`;
-    if (!visitingJail(state, helper)) return `Only a player visiting Jail can bail ${prisoner.name} out.`;
+    if (!state.bailAnyone && !visitingJail(state, helper)) return `Only a player visiting Jail can bail ${prisoner.name} out.`;
     if (terms.amount > Math.max(0, prisoner.cash)) return `${prisoner.name} does not have ₹${terms.amount}.`;
     return null;
   }
@@ -369,7 +372,9 @@ export function validateOffer(
   }
 
   const { give, get } = terms;
-  if (!give.cash && !get.cash && !give.spaces.length && !get.spaces.length) return "The trade is empty.";
+  if (!give.cash && !get.cash && !give.spaces.length && !get.spaces.length && !give.cards && !get.cards) return "The trade is empty.";
+  if (give.cards > a.jailCards) return `${a.name} does not have that many Jail cards.`;
+  if (get.cards > b.jailCards) return `${b.name} does not have that many Jail cards.`;
   if (new Set([...give.spaces, ...get.spaces]).size !== give.spaces.length + get.spaces.length)
     return "A property is listed twice.";
   if (give.cash > Math.max(0, a.cash)) return `${a.name} does not have ₹${give.cash}.`;
