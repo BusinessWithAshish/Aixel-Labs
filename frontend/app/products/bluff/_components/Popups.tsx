@@ -53,7 +53,7 @@ export function CallPopup({
                 ))}
             </div>
             <GButton tone="green" size="big" disabled={!rank} onClick={() => rank && onPlay(rank)}>
-                {rank ? `Play as ${bluffRankName(rank, cards.length)}` : 'Pick a rank'}
+                {rank ? `Play ${cards.length} ${bluffRankName(rank, cards.length)}` : 'Pick a rank'}
             </GButton>
             <GButton onClick={onClose}>Back</GButton>
             <p className="small center">
@@ -69,7 +69,7 @@ const RULES: [string, string][] = [
     ['Get rid of your cards', 'The first player with no cards wins.'],
     ['The opener names a rank', 'Put 1 to 4 cards face down and say a rank. You are allowed to lie.'],
     [
-        'Play as that rank, or pass',
+        'Play the same rank, or pass',
         'Everyone after adds cards as the same rank. If you pass, you sit out until the round ends.',
     ],
     ['Anyone can call Bluff', 'A lie? The liar takes the pile. The truth? The caller takes it.'],

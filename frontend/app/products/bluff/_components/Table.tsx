@@ -537,7 +537,7 @@ export function Table({
                 : !picked.length
                   ? 'Pick cards'
                   : round.rank
-                    ? `Play as ${round.rank}`
+                    ? `Play ${round.rank}${picked.length === 1 ? '' : "'s"}`
                     : 'Play…';
 
     const leave = () => {
