@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { House, Users } from 'lucide-react';
-import { BUSINESS_LOBBY_COLOR } from '@aixellabs/backend/business/constants';
+import { BUSINESS_LOBBY_COLOR, BUSINESS_RULES } from '@aixellabs/backend/business/constants';
 import { useBusinessRoom } from '../_hooks/use-business-room';
-import { gameBasePath, loadProfile, saveProfile } from '../_lib/client';
+import { clampName, gameBasePath, loadProfile, saveProfile } from '../_lib/client';
 import { sfx } from '../_lib/sound';
 import { GameToasts } from '../_lib/toast';
 import { AudioToggles, Avatar, GButton, Logo, Ribbon, Tips } from './bits';
@@ -14,12 +14,21 @@ import { Lobby } from './Lobby';
 import { Table } from './Table';
 
 const COUNT_FROM = 3;
+/** How long the Join button stays off after a tap while the room has not answered. */
+const JOIN_RETRY_MS = 4000;
 
 /** One room URL: join form, lobby, then the table, depending on what the server says. */
 export function BusinessRoom({ code }: { code: string }) {
-    const { room, status, invite, online, rtt, clockOffset, send, join, start, configure, kick, setTeam, pause, close } = useBusinessRoom(code);
+    const { room, status, invite, online, rtt, clockOffset, send, join, start, configure, kick, move, setTeam, pause, close, end } = useBusinessRoom(code);
     const homeHref = gameBasePath(usePathname()) || '/';
     const [name, setName] = useState('');
+    const [joining, setJoining] = useState(false);
+    useEffect(() => {
+        if (!joining) return;
+        // If the room never answers (a dropped connection), the button comes back.
+        const timer = window.setTimeout(() => setJoining(false), JOIN_RETRY_MS);
+        return () => window.clearTimeout(timer);
+    }, [joining]);
     const wasStarted = useRef<boolean | null>(null);
     /** 3, 2, 1, then 0 for "Go!", then null. */
     const [count, setCount] = useState<number | null>(null);
@@ -115,13 +124,15 @@ export function BusinessRoom({ code }: { code: string }) {
                     <>
                         <label className="field">
                             Your name
-                            <input type="text" value={name} maxLength={14} placeholder="Type your name" onChange={(e) => setName(e.target.value)} />
+                            <input type="text" value={name} placeholder="Type your name" onChange={(e) => setName(clampName(e.target.value, BUSINESS_RULES.NAME_MAX))} />
                         </label>
                         <GButton
                             tone="green"
                             size="big"
-                            disabled={!name.trim() || !online}
+                            disabled={!name.trim() || !online || joining}
                             onClick={() => {
+                                // One tap, one seat: the button stays off until the room answers.
+                                setJoining(true);
                                 saveProfile({ name: name.trim() });
                                 join(name.trim());
                             }}
@@ -143,9 +154,9 @@ export function BusinessRoom({ code }: { code: string }) {
             </main>
         );
     } else if (!room.started || !room.state) {
-        body = <Lobby room={room} homeHref={homeHref} onStart={start} onConfigure={configure} onKick={kick} onTeam={setTeam} onClose={close} />;
+        body = <Lobby room={room} homeHref={homeHref} onStart={start} onConfigure={configure} onKick={kick} onMove={move} onTeam={setTeam} onClose={close} />;
     } else {
-        body = <Table room={room} send={send} clockOffset={clockOffset} online={online} rtt={rtt} homeHref={homeHref} onPause={pause} onClose={close} curtain={count !== null || wasStarted.current === false} />;
+        body = <Table room={room} send={send} clockOffset={clockOffset} online={online} rtt={rtt} homeHref={homeHref} onPause={pause} onClose={close} onEnd={end} curtain={count !== null || wasStarted.current === false} />;
     }
 
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeftRight, ChevronsRight, Gauge, Handshake, Landmark, LockKeyhole, Siren, UserX } from 'lucide-react';
+import { ArrowLeftRight, ChevronsRight, Dices, Gauge, Gavel, Handshake, KeyRound, Landmark, LockKeyhole, Siren, UserX } from 'lucide-react';
 import { BUSINESS_BOARD, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
 import type { BusinessFx, BusinessLogEntry, BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
@@ -78,7 +78,7 @@ function caption(state: BusinessPublicState, deal: Deal): string {
         case 'interest':
             return 'Loan interest for this lap';
         case 'jail':
-            return fx.why === 'speeding' ? 'Overspeeding! 3 doubles in a row' : fx.why === 'card' ? 'Chance: go straight to Jail' : fx.why === 'sent' ? 'Sent to Jail from a break' : `${name(fx.from)} is sent to Jail`;
+            return fx.why === 'speeding' ? 'Overspeeding! 3 doubles in a row' : fx.why === 'card' ? 'Chance: go straight to Jail' :  `${name(fx.from)} is sent to Jail`;
         case 'repay':
             return space ? `Took ${space} back` : 'Loan paid back';
         case 'bank':
@@ -144,6 +144,46 @@ export function DealBanner({ state, deal }: { state: BusinessPublicState; deal: 
             </div>
         );
     }
+    if (fx.kind === 'jail' && fx.from !== null && fx.to !== null) {
+        // One player put another away: the culprit, grinning, beside the victim behind bars.
+        const victim = state.players[fx.from];
+        const culprit = state.players[fx.to];
+        const backfired = victim.seat === culprit.seat;
+        const [line, sub] = backfired
+            ? [`${culprit.name} spun the wheel…`, 'and locked themselves up. Instant karma.']
+            : fx.why === 'random'
+              ? [`${culprit.name} spun the wheel of doom`, `${victim.name} drew the short straw. Off to Jail!`]
+              : [`${culprit.name} threw ${victim.name} in Jail`, 'No trial. No mercy. Mwahaha.'];
+        return (
+            <div key={deal.id} className="deal red jailed evil">
+                <div className={cn('dl-row', backfired && 'solo')}>
+                    {!backfired && (
+                        <>
+                            <span className="dl-party villain">
+                                <span className="horns" aria-hidden="true" />
+                                <Avatar name={culprit.name} color={culprit.color} />
+                                <b>{culprit.name}</b>
+                            </span>
+                            <span className="dl-arrow" aria-hidden="true">
+                                {fx.why === 'random' ? <Dices className="dl-chev swap" /> : <Gavel className="dl-chev swap" />}
+                            </span>
+                        </>
+                    )}
+                    <span className="dl-party out">
+                        {/* Caught by their own trap: the horns stay on, behind the bars. */}
+                        {backfired && <span className="horns" aria-hidden="true" />}
+                        <span className="bars">
+                            <Avatar name={victim.name} color={victim.color} />
+                        </span>
+                        <LockKeyhole className="dl-x" />
+                        <b>{victim.name}</b>
+                    </span>
+                </div>
+                <div className="dl-cap">{line}</div>
+                <div className="dl-sub">{sub}</div>
+            </div>
+        );
+    }
     if (fx.kind === 'jail' && fx.from !== null) {
         const p = state.players[fx.from];
         const Icon = fx.why === 'speeding' ? Gauge : Siren;
@@ -161,7 +201,23 @@ export function DealBanner({ state, deal }: { state: BusinessPublicState; deal: 
             </div>
         );
     }
-    if (fx.kind === 'trade' || fx.kind === 'split' || fx.kind === 'bail') {
+    if (fx.kind === 'bail') {
+        // A rescue, not a swap: the helper, a key, and the player it frees. `to` is the helper.
+        return (
+            <div key={deal.id} className="deal blue">
+                <div className="dl-row">
+                    <Party state={state} seat={fx.to} />
+                    <span className="dl-arrow" aria-hidden="true">
+                        {fx.amount > 0 && <span className="dl-amt">{rs(fx.amount)}</span>}
+                        <KeyRound className="dl-chev swap" />
+                    </span>
+                    <Party state={state} seat={fx.from} />
+                </div>
+                <div className="dl-cap">{caption(state, deal)}</div>
+            </div>
+        );
+    }
+    if (fx.kind === 'trade' || fx.kind === 'split') {
         // Only that a trade happened, never what was in it.
         return (
             <div key={deal.id} className="deal blue">

@@ -11,13 +11,14 @@ import type {
     BusinessServerMessage,
 } from '@aixellabs/backend/business/types';
 import { useBusinessServerWsUrl } from '../_components/BusinessConfig';
-import { businessWsUrl, loadSeat, saveSeat } from '../_lib/client';
+import { businessWsUrl, loadSeat, rememberRoom, saveSeat } from '../_lib/client';
 import { notify } from '../_lib/toast';
 
 export type BusinessRoomStatus = 'connecting' | 'need-join' | 'ready' | 'missing' | 'kicked' | 'closed';
 
 const RETRY_MS = 1500;
-const PING_MS = 4000;
+/** How often the delay to the server is measured. */
+const PING_MS = 2000;
 
 /** Owns the room socket: resumes the seat, keeps the latest snapshot, sends intents, reconnects. */
 export function useBusinessRoom(code: string) {
@@ -45,12 +46,17 @@ export function useBusinessRoom(code: string) {
         let retry: number | undefined;
         let ping: number | undefined;
         let pingSentAt = 0;
+        let pingWaiting = false;
 
         const connect = () => {
             const ws = new WebSocket(businessWsUrl(serverUrl));
             wsRef.current = ws;
             const sendPing = () => {
                 if (ws.readyState !== WebSocket.OPEN) return;
+                // The last ping is still unanswered: the delay shown climbs with the wait, so a network
+                // that is breaking up shows at once instead of holding its last good number.
+                if (pingWaiting) return setRtt(Math.round(performance.now() - pingSentAt));
+                pingWaiting = true;
                 pingSentAt = performance.now();
                 ws.send('{"t":"ping"}');
             };
@@ -64,6 +70,7 @@ export function useBusinessRoom(code: string) {
                     setStatus((prev) => (prev === 'kicked' || prev === 'closed' ? prev : 'need-join'));
                     ws.send(JSON.stringify({ t: 'peek', code }));
                 }
+                pingWaiting = false;
                 sendPing();
                 ping = window.setInterval(sendPing, PING_MS);
             };
@@ -71,6 +78,7 @@ export function useBusinessRoom(code: string) {
             ws.onmessage = (event) => {
                 const msg = JSON.parse(event.data as string) as BusinessServerMessage;
                 if (msg.t === 'pong') {
+                    pingWaiting = false;
                     setRtt(Math.round(performance.now() - pingSentAt));
                 } else if (msg.t === 'peek') {
                     setInvite(msg.room);
@@ -84,6 +92,7 @@ export function useBusinessRoom(code: string) {
                     saveSeat(code, { token: msg.token, seat: msg.seat });
                 } else if (msg.t === 'room') {
                     setRoom(msg.room);
+                    rememberRoom(code);
                     setClockOffset(msg.room.now - Date.now());
                     setStatus('ready');
                 } else if (msg.t === 'error') {
@@ -122,11 +131,13 @@ export function useBusinessRoom(code: string) {
     const start = useCallback(() => post({ t: 'start' }), [post]);
     const configure = useCallback((patch: Partial<BusinessRoomConfig>) => post({ t: 'config', ...patch }), [post]);
     const kick = useCallback((seat: number) => post({ t: 'kick', seat }), [post]);
+    const move = useCallback((seat: number, to: number) => post({ t: 'move', seat, to }), [post]);
     const setTeam = useCallback((seat: number, team: number) => post({ t: 'team', seat, team }), [post]);
     const pause = useCallback((on: boolean) => post({ t: 'pause', on }), [post]);
     const close = useCallback(() => post({ t: 'close' }), [post]);
+    const end = useCallback(() => post({ t: 'end' }), [post]);
 
-    return { room, status, invite, online, rtt, clockOffset, send, join, start, configure, kick, setTeam, pause, close };
+    return { room, status, invite, online, rtt, clockOffset, send, join, start, configure, kick, move, setTeam, pause, close, end };
 }
 
 export type BusinessSend = (cmd: BusinessCommand) => void;

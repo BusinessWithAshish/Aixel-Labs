@@ -7,7 +7,7 @@ import { canTrade, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPai
 import type { BusinessInterestMode, BusinessOfferTerms, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { rs } from '../_lib/client';
-import { Avatar, Cash, GButton, Pop, Ribbon, Slider } from './bits';
+import { Avatar, Cash, GButton, Pop, Ribbon, Slider, Stepper } from './bits';
 import { MiniCard, MiniCards } from './MiniCard';
 import { nextSplitPct, SplitView } from './SplitView';
 import { cssVars } from '../_lib/art';
@@ -110,6 +110,8 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
     const [get, setGet] = useState<number[]>([]);
     const [giveCash, setGiveCash] = useState(0);
     const [getCash, setGetCash] = useState(0);
+    const [giveCards, setGiveCards] = useState(0);
+    const [getCards, setGetCards] = useState(0);
 
     const mePlayer = state.players[me];
     const otherPlayer = other === undefined ? null : state.players[other];
@@ -213,7 +215,7 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
             <>
                 <Slider label={`${prisoner.name} pays ${helper.name}`} value={value} display={rs(value)} min={0} max={cap} step={10} onChange={setAmount} />
                 <p className="small center">
-                    {helper.name} is visiting Jail and gets {prisoner.name} out at once. Without bail, leaving Jail costs {prisoner.name}{' '}
+                    {helper.name} gets {prisoner.name} out of Jail at once. Without bail, leaving Jail costs {prisoner.name}{' '}
                     {rs(shareOfCash(prisoner.cash, BUSINESS_RULES.JAIL_PCT))} ({BUSINESS_RULES.JAIL_PCT}% of their cash), shared among everyone else.
                 </p>
             </>
@@ -231,7 +233,7 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
         // Every property is shown; the ones that cannot be traded (built on, or shared with a player) are faded.
         const tradable = (seat: number) => ownedBy(state, seat);
         const blockedFor = (seat: number) => (i: number) => canTrade(state, seat, i);
-        terms = { kind: 'trade', give: { cash: giveCash, spaces: give }, get: { cash: getCash, spaces: get } };
+        terms = { kind: 'trade', give: { cash: giveCash, spaces: give, cards: giveCards }, get: { cash: getCash, spaces: get, cards: getCards } };
         // "Send" is what leaves your hands, "ask for" is what you want back.
         body = (
             <>
@@ -242,6 +244,12 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
                     </small>
                     <SpacePicker state={state} spaces={tradable(me)} picked={give} onToggle={toggle(give, setGive)} blocked={blockedFor(me)} />
                     <Slider label="Cash you send" value={giveCash} display={rs(giveCash)} min={0} max={round10(mePlayer.cash)} step={10} onChange={setGiveCash} />
+                    {mePlayer.jailCards > 0 && (
+                        <div className="pctrow">
+                            <span>Jail free cards you send</span>
+                            <Stepper value={giveCards} min={0} max={mePlayer.jailCards} onChange={setGiveCards} />
+                        </div>
+                    )}
                 </div>
                 <div className="dealside get">
                     <small>
@@ -250,6 +258,12 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
                     </small>
                     <SpacePicker state={state} spaces={tradable(otherPlayer.seat)} picked={get} onToggle={toggle(get, setGet)} blocked={blockedFor(otherPlayer.seat)} />
                     <Slider label="Cash you ask for" value={getCash} display={rs(getCash)} min={0} max={round10(otherPlayer.cash)} step={10} onChange={setGetCash} />
+                    {otherPlayer.jailCards > 0 && (
+                        <div className="pctrow">
+                            <span>Jail free cards you ask for</span>
+                            <Stepper value={getCards} min={0} max={otherPlayer.jailCards} onChange={setGetCards} />
+                        </div>
+                    )}
                 </div>
             </>
         );

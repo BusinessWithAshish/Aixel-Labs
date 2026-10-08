@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeftRight, Bot, Building2, Hammer, HandCoins, LockKeyhole, LogOut, Pause, Play, ScrollText, Signal, SignalHigh, SignalLow, SignalMedium, Timer, WifiOff } from 'lucide-react';
+import { ArrowLeftRight, Bot, Building2, Eye, Hammer, HandCoins, LockKeyhole, LogOut, Pause, Play, ScrollText, Signal, SignalHigh, SignalLow, SignalMedium, Timer, WifiOff } from 'lucide-react';
 import { BUSINESS_BOARD, BUSINESS_JAIL_INDEX, BUSINESS_PHASE_SECONDS, BUSINESS_RULES } from '@aixellabs/backend/business/constants';
 import type { BusinessCommand, BusinessPublicState, BusinessRoomView } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
@@ -377,12 +377,14 @@ function TweenCash({ value }: { value: number }) {
 }
 
 function signalOf(online: boolean, rtt: number | null) {
-    if (!online) return { Icon: WifiOff, tone: 'bad', label: 'Offline. Reconnecting…' };
-    if (rtt === null) return { Icon: SignalLow, tone: 'offc', label: 'Checking the connection…' };
-    if (rtt < 150) return { Icon: Signal, tone: 'good', label: `Strong connection (${rtt} ms)` };
-    if (rtt < 350) return { Icon: SignalHigh, tone: 'good', label: `Good connection (${rtt} ms)` };
-    if (rtt < 700) return { Icon: SignalMedium, tone: 'warn', label: `Slow connection (${rtt} ms)` };
-    return { Icon: SignalLow, tone: 'bad', label: `Weak connection (${rtt} ms)` };
+    if (!online) return { Icon: WifiOff, tone: 'bad', text: 'offline', label: 'Offline. Reconnecting…' };
+    if (rtt === null) return { Icon: SignalLow, tone: 'offc', text: '…', label: 'Checking the connection…' };
+    // Past a few seconds the number says nothing more: the reply is simply not coming.
+    const text = rtt >= 5000 ? 'no reply' : `${rtt}ms`;
+    if (rtt < 150) return { Icon: Signal, tone: 'good', text, label: `Strong connection (${rtt} ms)` };
+    if (rtt < 350) return { Icon: SignalHigh, tone: 'good', text, label: `Good connection (${rtt} ms)` };
+    if (rtt < 700) return { Icon: SignalMedium, tone: 'warn', text, label: `Slow connection (${rtt} ms)` };
+    return { Icon: SignalLow, tone: 'bad', text, label: `Weak connection (${rtt} ms)` };
 }
 
 type View =
@@ -420,13 +422,15 @@ type TableProps = {
     onPause: (on: boolean) => void;
     /** Host only: end the room for everyone. */
     onClose: () => void;
+    /** Host only: end the match now; the richest player wins. */
+    onEnd?: () => void;
     /** Open already in the "raising cash on the board" view (used by the design preview). */
     startRaising?: boolean;
     /** Something covers the whole table (the start countdown): turn announcements wait for it. */
     curtain?: boolean;
 };
 
-export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause, onClose, startRaising = false, curtain = false }: TableProps) {
+export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause, onClose, onEnd, startRaising = false, curtain = false }: TableProps) {
     const router = useRouter();
     const state = room.state as BusinessPublicState;
     const me = room.you;
@@ -523,6 +527,14 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
         return () => timers.forEach((t) => window.clearTimeout(t));
     }, [state.deadline, state.phase, over, paused, held, clockOffset]);
 
+    // --- a pause: how long until it ends by itself, and a look at the board meanwhile ---
+    const [pausePeek, setPausePeek] = useState<null | 'board' | 'mine'>(null);
+    useEffect(() => {
+        if (!paused) setPausePeek(null);
+    }, [paused]);
+    const pauseLeft = room.pausedAt === null ? 0 : Math.max(0, BUSINESS_RULES.PAUSE_MAX_SECONDS * 1000 - (liveNow - room.pausedAt));
+    const pauseClock = `${Math.floor(pauseLeft / 60000)}:${String(Math.floor((pauseLeft % 60000) / 1000)).padStart(2, '0')}`;
+
     // --- the toolbar: trade, build, raise cash, see your own properties ---
     const [mode, setMode] = useState<Mode>(null);
     const managing = myTurn && !walk.busy && (state.phase === 'roll' || state.phase === 'end');
@@ -546,6 +558,8 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                         : mine,
               );
     const others = state.players.filter((p) => p.seat !== me && !p.bankrupt);
+    /** Who could bail this player out: players visiting Jail, or everyone if the host allowed that. */
+    const bailers = others.filter((p) => state.bailAnyone || visitingJail(state, p.seat));
     const tapSent = useRef({ rev: -1, at: 0 });
 
     // The turn clock stands still while its player is making a deal.
@@ -668,8 +682,16 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                 onGuide={() => setView({ t: 'guide' })}
                 onLog={() => setView({ t: 'log' })}
                 onClose={() => setView(null)}
+                onEnd={
+                    host && onEnd
+                        ? () => {
+                              onEnd();
+                              setView(null);
+                          }
+                        : undefined
+                }
                 onLeave={() => {
-                    // The host leaving ends the room for everyone.
+                    // The host leaving ends the match for everyone: they all get the result.
                     if (host) onClose();
                     else send({ type: 'leave' });
                     router.push(homeHref);
@@ -779,8 +801,10 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                     {state.endsAt === null ? 'No limit' : clock}
                 </span>
                 <span className="sp" />
-                <button type="button" className={cn('ib', signal.tone)} aria-label={signal.label} onClick={() => notify(signal.label, online ? 'info' : 'error')}>
+                {/* Bars and the delay to the server, refreshed with every ping, so a weak or breaking network shows as it happens. */}
+                <button type="button" className={cn('ib net', signal.tone)} aria-label={signal.label} onClick={() => notify(signal.label, online ? 'info' : 'error')}>
                     <signal.Icon className="lu" />
+                    {signal.text}
                 </button>
                 <AudioToggles />
             </div>
@@ -813,14 +837,20 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                         <LockKeyhole className="lu" /> In Jail, try {mePlayer.jail} of {BUSINESS_RULES.JAIL_TRIES}. Roll doubles to leave free.
                     </span>
                     {/* A player visiting Jail can get you out for a price you agree; otherwise leaving costs a share of your cash. */}
-                    {others
-                        .filter((p) => visitingJail(state, p.seat))
-                        .slice(0, 1)
-                        .map((p) => (
-                            <GButton key={p.seat} size="sm" tone="blue" onClick={() => setView({ t: 'offer', draft: { kind: 'bail', with: p.seat, prisoner: me } })}>
-                                Bail
-                            </GButton>
-                        ))}
+                    {mePlayer.jailCards > 0 && (
+                        <GButton size="sm" tone="green" onClick={() => send({ type: 'useJailCard' })}>
+                            Use card
+                        </GButton>
+                    )}
+                    {bailers.length > 0 && (
+                        <GButton
+                            size="sm"
+                            tone="blue"
+                            onClick={() => setView(bailers.length === 1 ? { t: 'offer', draft: { kind: 'bail', with: bailers[0].seat, prisoner: me } } : { t: 'deal' })}
+                        >
+                            Bail
+                        </GButton>
+                    )}
                     <GButton size="sm" tone="gold" disabled={mePlayer.cash < BUSINESS_RULES.PCT_MIN} onClick={() => send({ type: 'payJail' })}>
                         Pay {rs(shareOfCash(mePlayer.cash, BUSINESS_RULES.JAIL_PCT))}
                     </GButton>
@@ -849,7 +879,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                 onSelect={tapTile}
                 onMarket={() => setView({ t: 'market' })}
                 onChance={() => setView({ t: 'chance' })}
-                lit={lit}
+                lit={paused && pausePeek === 'mine' ? new Set(mine) : lit}
                 overlay={deals.deal && <DealBanner state={state} deal={deals.deal} />}
             />
 
@@ -899,7 +929,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                         type="button"
                         className={cn('roll', mainClass, !myTurn && 'concealed')}
                         aria-hidden={!myTurn}
-                        disabled={!mainAction || walk.busy}
+                        disabled={!mainAction || walk.busy || paused}
                         onClick={() => {
                             sfx('click');
                             buzz();
@@ -923,12 +953,16 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
             </div>
 
             {pop}
-            {paused && !over && (
+            {paused && !over && pausePeek === null && (
                 <div className="paused" role="status">
                     <div className="pausecard">
                         <Pause className="lu" />
                         <h2>Game paused</h2>
                         <p>{host ? 'You paused the game. Every timer is stopped.' : `${room.seats[room.hostSeat]?.name ?? 'The host'} paused the game for a moment.`}</p>
+                        <span className="tchip">
+                            <Timer className="lu" />
+                            Resumes by itself in {pauseClock}
+                        </span>
                         {host ? (
                             <GButton tone="green" size="big" onClick={() => onPause(false)}>
                                 <Play className="lu" />
@@ -937,7 +971,28 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                         ) : (
                             <span className="small">It carries on when the host resumes.</span>
                         )}
+                        <div className="btns">
+                            <GButton tone="blue" onClick={() => setPausePeek('board')}>
+                                <Eye className="lu" />
+                                View board
+                            </GButton>
+                            <GButton onClick={() => setPausePeek('mine')}>
+                                <Building2 className="lu" />
+                                My properties
+                            </GButton>
+                        </div>
                     </div>
+                </div>
+            )}
+            {/* Looking at the board during a pause: nothing can be played, and one tap goes back. */}
+            {paused && !over && pausePeek !== null && (
+                <div className="pausebar" role="status">
+                    <span>
+                        <Pause className="lu" /> Paused · {pauseClock}
+                    </span>
+                    <GButton size="sm" tone="gold" onClick={() => setPausePeek(null)}>
+                        Back
+                    </GButton>
                 </div>
             )}
             {pop && timed && secsLeft !== null && (

@@ -13,6 +13,7 @@ import {
     Wifi,
     Zap,
 } from 'lucide-react';
+import { inkOn } from './client';
 
 /** Board icon names (see BUSINESS_BOARD) mapped to Lucide components. */
 export const SPACE_ICONS: Record<string, LucideIcon> = {
@@ -87,7 +88,7 @@ export function Pawn({ color, label }: { color: string; label?: string }) {
             />
             <circle cx="12" cy="8.5" r="6" fill={color} stroke="#150A3A" strokeWidth="1.7" />
             {label ? (
-                <text x="12" y="11.4" textAnchor="middle" fontSize="8.5" fontWeight="800" fill="#fff" stroke="#150A3A" strokeWidth="0.5" paintOrder="stroke">
+                <text x="12" y="11.4" textAnchor="middle" fontSize="8.5" fontWeight="800" fill={inkOn(color)}>
                     {label}
                 </text>
             ) : (

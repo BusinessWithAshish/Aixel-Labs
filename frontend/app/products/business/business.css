@@ -355,8 +355,8 @@
     font-family: var(--bb-display);
     font-weight: 800;
     font-size: 16px;
-    color: #fff;
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+    /* `--ci`: ink that shows on this player's colour (dark on white or yellow). */
+    color: var(--ci, #fff);
     background: radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.55), transparent 45%), var(--c);
     border: 3px solid #fff;
     box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
@@ -1540,8 +1540,8 @@
 }
 .bb .tk svg {
     display: block;
-    width: calc(4.1 * var(--u));
-    height: calc(5.5 * var(--u));
+    width: calc(5.4 * var(--u));
+    height: calc(7.2 * var(--u));
     overflow: visible;
 }
 .bb .tk.now {
@@ -3531,10 +3531,10 @@
 .bb .bars::after {
     content: '';
     position: absolute;
-    top: calc(-0.6;
-    right: *;
-    bottom: var(--u));
-    left: *;
+    top: calc(-0.6 * var(--u));
+    right: calc(-0.6 * var(--u));
+    bottom: calc(-0.6 * var(--u));
+    left: calc(-0.6 * var(--u));
     border-radius: 50%;
     background: repeating-linear-gradient(90deg, transparent 0 calc(2.6 * var(--u)), rgba(27, 21, 48, 0.75) calc(2.6 * var(--u)) calc(3.3 * var(--u)));
     animation: bb-bars 0.4s ease-out;
@@ -4165,20 +4165,423 @@
     user-select: text;
 }
 
-/* What a Chance card comes to in rupees, under its text. */
-.bb .cardamt {
-    display: inline-block;
-    margin-top: 8px;
-    padding: 5px 14px 2px;
-    border-radius: 12px;
-    font-family: var(--bb-num);
-    font-size: 30px;
+/* ---------- the Jail corner: a barred cell above, the visitors' walkway below ---------- */
+.bb .tile.k-jail {
+    background: #2a1d10;
+}
+.bb .jailbox {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+}
+.bb .jailbox .cellroom {
+    flex: 0 0 58%;
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: calc(0.5 * var(--u)) calc(0.7 * var(--u));
+    color: #ffe9c7;
+    /* Bars over a dim cell. */
+    background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0, rgba(0, 0, 0, 0.55) calc(0.45 * var(--u)), transparent calc(0.45 * var(--u)), transparent calc(1.9 * var(--u))),
+        linear-gradient(160deg, #a8621c, #5e3408);
+    box-shadow: inset 0 calc(-0.4 * var(--u)) 0 rgba(0, 0, 0, 0.45);
+}
+.bb .jailbox .cellroom .ticon {
+    width: calc(2.4 * var(--u));
+    height: calc(2.4 * var(--u));
+}
+.bb .jailbox .cellroom .cn {
+    font-size: calc(1.7 * var(--u));
+    padding: calc(0.15 * var(--u)) calc(0.5 * var(--u));
+    border-radius: calc(0.5 * var(--u));
+    background: rgba(0, 0, 0, 0.55);
+}
+.bb .jailbox .walkway {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: calc(0.35 * var(--u)) calc(0.6 * var(--u));
+    font-family: var(--bb-display);
+    font-weight: 800;
+    font-size: calc(1.25 * var(--u));
     line-height: 1;
-    background: rgba(0, 0, 0, 0.32);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #5e3408;
+    background: linear-gradient(180deg, #ffe2b8, #ffc98a);
 }
-.bb .cardamt.good {
-    color: #b9ffd0;
+
+/* ---------- auction standings ---------- */
+.bb .aucboard {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
-.bb .cardamt.bad {
-    color: #ffd0d0;
+.bb .aucboard li {
+    display: grid;
+    grid-template-columns: 22px auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: 11px;
+    background: rgba(0, 0, 0, 0.26);
+    font-weight: 800;
+    transition: background 0.2s, transform 0.2s;
+}
+.bb .aucboard li.me {
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+.bb .aucboard li.lead {
+    color: #3f1e00;
+    background: linear-gradient(180deg, #ffe07a, #f5ae1b);
+    transform: scale(1.02);
+}
+.bb .aucboard li.gone {
+    opacity: 0.45;
+}
+.bb .aucboard .rk {
+    display: grid;
+    place-items: center;
+    font-family: var(--bb-num);
+    font-size: 17px;
+}
+.bb .aucboard .rk svg {
+    width: 17px;
+    height: 17px;
+}
+.bb .aucboard b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bb .aucboard .st {
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    opacity: 0.8;
+}
+.bb .aucboard .amt {
+    min-width: 54px;
+    text-align: right;
+    font-family: var(--bb-num);
+    font-size: 19px;
+    line-height: 1;
+}
+
+/* Looking at the board while the match is paused: a slim bar instead of the curtain. */
+.bb .pausebar {
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    z-index: 60;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    padding: 6px 8px 6px 14px;
+    border-radius: 99px;
+    font-weight: 800;
+    white-space: nowrap;
+    background: linear-gradient(180deg, #44289f, #2c1873);
+    box-shadow: 0 0 0 2px var(--gold, #ffc83d), 0 4px 0 var(--edge);
+}
+.bb .pausebar > span {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 10px;
+    font-family: var(--bb-num);
+    font-size: 18px;
+    line-height: 1;
+}
+.bb .pausebar svg {
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
+}
+
+/* Lobby: each card shows its place in the turn order; the host drags a card onto another to change it. */
+.bb .slot .ord {
+    position: absolute;
+    top: 3px;
+    left: 5px;
+    font-family: var(--bb-num);
+    font-size: 13px;
+    line-height: 1;
+    opacity: 0.75;
+}
+.bb .slot.movable {
+    cursor: grab;
+    touch-action: none;
+}
+.bb .slot.dragging {
+    opacity: 0.55;
+    transform: scale(0.96);
+    cursor: grabbing;
+}
+.bb .slot.over {
+    box-shadow: inset 0 0 0 3px var(--gold, #ffc83d), 0 3px 0 var(--edge);
+}
+
+/* ---------- the Chance card: a playing card with its own frame ---------- */
+.bb .chcard {
+    --cc: #e0600a;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Room for its frame and the shadow under it, so the button below stays clear. */
+    margin: 8px 8px 22px;
+    padding: 30px 18px 22px;
+    border-radius: 20px;
+    text-align: center;
+    color: #2a1b4d;
+    background: linear-gradient(180deg, #fffaf0, #ffe9c4);
+    box-shadow: 0 0 0 4px var(--cc), 0 0 0 7px #fff, 0 12px 0 rgba(0, 0, 0, 0.35);
+    animation: bb-popin 0.3s ease-out;
+}
+.bb .chcard.good {
+    --cc: #1f9d55;
+}
+.bb .chcard.bad {
+    --cc: #d62839;
+}
+.bb .chcard.move {
+    --cc: #2470cc;
+}
+.bb .chcard.keep {
+    --cc: #c98a00;
+}
+.bb .chcard > * + * {
+    margin-top: 8px;
+}
+.bb .chcard small {
+    font-family: var(--bb-display);
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--cc);
+}
+.bb .chcard .chmark {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    margin: 0;
+    font-family: var(--bb-display);
+    font-weight: 800;
+    font-size: 20px;
+    line-height: 1;
+    color: var(--cc);
+}
+.bb .chcard .chmark.br {
+    top: auto;
+    left: auto;
+    right: 12px;
+    bottom: 8px;
+    transform: rotate(180deg);
+}
+.bb .chcard .chemblem {
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    color: #fff;
+    background: var(--cc);
+    box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.22), 0 0 0 5px rgba(0, 0, 0, 0.06);
+}
+.bb .chcard .chemblem svg {
+    width: 32px;
+    height: 32px;
+    stroke-width: 2.4;
+}
+.bb .chcard .chkind {
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.6;
+}
+.bb .chcard p {
+    margin-bottom: 0;
+    font-family: var(--bb-display);
+    font-weight: 800;
+    font-size: 19px;
+    line-height: 1.22;
+}
+.bb .chcard .chamt {
+    padding: 6px 18px 2px;
+    border-radius: 14px;
+    font-family: var(--bb-num);
+    font-size: 36px;
+    line-height: 1;
+    color: #fff;
+    background: var(--cc);
+}
+.bb .minicard.jailchip {
+    color: #5e3408;
+    background: linear-gradient(180deg, #ffe07a, #f5ae1b);
+}
+
+/* One player sent another to Jail: the culprit wears horns and gloats, the victim sits behind bars. */
+.bb .deal.evil .dl-row {
+    align-items: flex-start;
+}
+.bb .deal.evil .dl-party {
+    position: relative;
+}
+/* Both the same size here: it is a pair, not one big portrait. */
+.bb .deal.evil .dl-party.out .av {
+    width: calc(11 * var(--u));
+    height: calc(11 * var(--u));
+    font-size: calc(5.5 * var(--u));
+}
+.bb .deal.evil .villain .av {
+    width: calc(11 * var(--u));
+    height: calc(11 * var(--u));
+    font-size: calc(5.5 * var(--u));
+    animation: bb-gloat 0.7s ease-in-out infinite;
+}
+.bb .deal.evil .dl-x {
+    top: calc(6.5 * var(--u));
+    right: calc(-2.5 * var(--u));
+    bottom: auto;
+    width: calc(5.5 * var(--u));
+    height: calc(5.5 * var(--u));
+}
+.bb .deal.evil .horns {
+    position: absolute;
+    z-index: 1;
+    top: calc(-2.4 * var(--u));
+    left: 50%;
+    width: calc(9 * var(--u));
+    height: calc(3.6 * var(--u));
+    transform: translateX(-50%);
+    animation: bb-gloat 0.7s ease-in-out infinite;
+}
+/* Two red horns: a triangle at each end. */
+.bb .deal.evil .horns::before,
+.bb .deal.evil .horns::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    border-style: solid;
+    border-color: transparent transparent #ff3b4e;
+    border-width: 0 calc(1.1 * var(--u)) calc(3.6 * var(--u));
+    filter: drop-shadow(0 calc(0.25 * var(--u)) 0 rgba(0, 0, 0, 0.45));
+}
+.bb .deal.evil .horns::before {
+    left: 0;
+    transform: rotate(-22deg);
+}
+.bb .deal.evil .horns::after {
+    right: 0;
+    transform: rotate(22deg);
+}
+/* The sender picked themselves: one portrait, in the middle, with the lock on its corner. */
+.bb .deal.evil .dl-row.solo {
+    grid-template-columns: auto;
+    justify-content: center;
+}
+.bb .deal.evil .dl-row.solo .dl-x {
+    right: 50%;
+    margin-right: calc(-8.5 * var(--u));
+}
+.bb .deal.evil .dl-row.solo .horns {
+    animation: none;
+}
+@keyframes bb-gloat {
+    50% {
+        transform: translateY(calc(-0.5 * var(--u))) rotate(-6deg);
+    }
+}
+
+/* A share in a split, marked with its player's colour: a swatch beside the number, since dark or white ink would not read on this card. */
+.bb .rentsplit .share[style*='--pc']::before {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 6px;
+    border-radius: 50%;
+    vertical-align: middle;
+    background: var(--pc);
+    box-shadow: 0 0 0 2px #fff;
+}
+/* ---------- connection: bars and the live delay in milliseconds ---------- */
+.bb .ib.net {
+    width: auto;
+    padding: 0 9px 0 7px;
+    border-radius: 99px;
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--bb-num);
+    font-size: 14px;
+    line-height: 1;
+    white-space: nowrap;
+}
+.bb .ib.net svg {
+    margin-right: 4px;
+}
+.bb .ib.net.bad,
+.bb .ib.net.warn {
+    animation: bb-pulse 1s ease-in-out infinite;
+}
+
+/* ---------- "What's new" on the main screen ---------- */
+.bb .news {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    scrollbar-width: none;
+    min-height: 0;
+}
+.bb .news section + section {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+}
+.bb .news h4 {
+    display: flex;
+    align-items: center;
+    margin: 0 0 6px;
+    font-family: var(--bb-display);
+    font-size: 17px;
+    color: var(--gold, #ffc83d);
+}
+.bb .news h4 svg {
+    width: 17px;
+    height: 17px;
+    margin-right: 6px;
+}
+.bb .news ul {
+    margin: 0;
+    padding-left: 18px;
+    list-style: disc;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+.bb .news li + li {
+    margin-top: 4px;
+}
+.bb .newslink {
+    align-self: center;
+    padding: 2px 10px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 800;
+    text-decoration: underline;
+    cursor: pointer;
 }

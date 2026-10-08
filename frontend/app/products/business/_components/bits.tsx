@@ -5,7 +5,7 @@ import { Eye, EyeOff, IndianRupee, Lightbulb, Maximize, Minimize, Music, Volume2
 import { BUSINESS_RULES } from '@aixellabs/backend/business/constants';
 import { cn } from '@/lib/utils';
 import { cssVars } from '../_lib/art';
-import { fmt, rs } from '../_lib/client';
+import { fmt, rs, initial, inkOn } from '../_lib/client';
 import { isMusicOn, isMuted, setMusicOn, setMuted, sfx, startMusic } from '../_lib/sound';
 import { notify } from '../_lib/toast';
 
@@ -47,8 +47,8 @@ export function Cash({ value, className }: { value: number; className?: string }
 
 export function Avatar({ name, color, size }: { name: string; color: string; size?: 'sm' | 'lg' }) {
     return (
-        <span className={cn('av', size)} style={cssVars({ '--c': color })}>
-            {name.charAt(0).toUpperCase()}
+        <span className={cn('av', size)} style={cssVars({ '--c': color, '--ci': inkOn(color) })}>
+            {initial(name)}
         </span>
     );
 }

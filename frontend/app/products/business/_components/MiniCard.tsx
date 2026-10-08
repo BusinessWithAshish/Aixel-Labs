@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Check, Handshake, IndianRupee, Landmark as BankIcon } from 'lucide-react';
+import { Check, Handshake, IndianRupee, KeyRound, Landmark as BankIcon } from 'lucide-react';
 import { BUSINESS_BOARD, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
 import { splitAt } from '@aixellabs/backend/business/compute';
 import type { BusinessPublicState } from '@aixellabs/backend/business/types';
@@ -107,6 +107,17 @@ export function MiniCards({ children }: { children: React.ReactNode }) {
 }
 
 /** Cash as a coin chip that sits in the same row as the cards of a deal. */
+/** "Get out of Jail free" cards a player holds: not on the board, so they show here beside the properties. */
+export function JailCardChip({ count }: { count: number }) {
+    return (
+        <div className="minicard cashchip jailchip">
+            <KeyRound className="lu" />
+            <b>× {count}</b>
+            <span>Jail free</span>
+        </div>
+    );
+}
+
 export function CashChip({ value }: { value: number }) {
     return (
         <div className="minicard cashchip">

@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { CircleHelp, Handshake, Landmark as BankIcon, TrendingUp } from 'lucide-react';
 import {
     BUSINESS_BOARD,
+    BUSINESS_JAIL_INDEX,
     BUSINESS_RULES,
     BUSINESS_SETS,
     type BusinessSpace,
@@ -13,7 +14,7 @@ import { useBoardUnit } from '../_hooks/use-board-unit';
 import type { BusinessProperty, BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
 import { cssVars, HomeMark, HotelMark, HouseMark, Pawn, SPACE_ICONS } from '../_lib/art';
-import { rs } from '../_lib/client';
+import { rs, initial } from '../_lib/client';
 import { Logo } from './bits';
 
 const N = BUSINESS_BOARD.length;
@@ -34,6 +35,13 @@ const DEPTH = UNIT * CORNER_FR;
 const INNER = PAD + DEPTH + GAP;
 /** How far inside that edge an ownership marker sits (its centre). Keep it under UNIT/2 minus 0.7 marker widths. */
 const MARKER_INSET = 1.05;
+
+/**
+ * The Jail corner is split in two (business.css `.jailbox`): the cell takes its top 58%, the
+ * visitors' walkway the rest. A pawn's feet sit at its `top`, so these move them into each room.
+ */
+const JAIL_CELL_LIFT = DEPTH * 0.06;
+const JAIL_WALK_DROP = DEPTH * 0.43;
 
 /** Grid cell for a board index: Launch bottom-right, then clockwise. */
 function cell(i: number): [row: number, col: number] {
@@ -139,10 +147,21 @@ const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, s
                     </span>
                 </>
             ) : (
-                <span className="body">
-                    {Icon && <Icon className="ticon" />}
-                    {where === 'corner' ? <span className="cn">{CORNER_LABELS[space.kind]}</span> : <span className="nm">{space.name}</span>}
-                </span>
+                space.kind === 'jail' ? (
+                    // Two rooms in one corner: the cell for players held there, and the walkway for visitors.
+                    <span className="jailbox">
+                        <span className="cellroom">
+                            {Icon && <Icon className="ticon" />}
+                            <span className="cn">Jail</span>
+                        </span>
+                        <span className="walkway">Visiting</span>
+                    </span>
+                ) : (
+                    <span className="body">
+                        {Icon && <Icon className="ticon" />}
+                        {where === 'corner' ? <span className="cn">{CORNER_LABELS[space.kind]}</span> : <span className="nm">{space.name}</span>}
+                    </span>
+                )
             )}
             {/* A big red bank over the property when it is mortgaged to the bank; a handshake in the partner's colour on its colour band when its set is split. */}
             {prop?.mortgaged && (
@@ -260,21 +279,25 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                     {state.players.map((p) => {
                         const pos = shown[p.seat] % N;
                         const [row, col] = cell(pos);
-                        const group = groups.get(pos) ?? [p.seat];
+                        // On the Jail corner the held players stand in the cell and the visitors on the walkway below it.
+                        const atJail = pos === BUSINESS_JAIL_INDEX;
+                        const held = atJail && p.jail > 0 && moving !== p.seat;
+                        const group = (groups.get(pos) ?? [p.seat]).filter((seat) => !atJail || state.players[seat].jail > 0 === p.jail > 0);
                         // Spread pawns sharing a space, but never wider than the space itself.
                         const offset = (group.indexOf(p.seat) - (group.length - 1) / 2) * Math.min(2.6, 7 / group.length);
+                        const lift = atJail ? (held ? JAIL_CELL_LIFT : JAIL_WALK_DROP) : 0;
                         return (
                             <span
                                 key={p.seat}
                                 className={cn('tk', p.seat === state.turn && 'now', moving === p.seat && 'moving', p.bankrupt && 'out')}
                                 style={{
                                     left: `${trackCentre(col) + offset}%`,
-                                    top: `${trackCentre(row)}%`,
+                                    top: `${trackCentre(row) + lift}%`,
                                     // A walking pawn glides at a steady speed, one space per beat, with no pause between spaces.
                                     ...(moving === p.seat ? { transition: `left ${pace}ms linear, top ${pace}ms linear` } : {}),
                                 }}
                             >
-                                <Pawn color={p.color} label={p.name.charAt(0).toUpperCase()} />
+                                <Pawn color={p.color} label={initial(p.name)} />
                             </span>
                         );
                     })}

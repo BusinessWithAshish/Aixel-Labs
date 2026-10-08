@@ -8,10 +8,24 @@ import {
     BUSINESS_RULES,
 } from '@aixellabs/backend/business/constants';
 import { cn } from '@/lib/utils';
-import { createRoomRequest, gameBasePath, loadProfile, saveProfile, saveSeat } from '../_lib/client';
+import {
+    clampName,
+    createRoomRequest,
+    forgetLastRoom,
+    gameBasePath,
+    loadLastRoom,
+    loadProfile,
+    loadSeenUpdate,
+    peekRoomRequest,
+    saveProfile,
+    saveSeat,
+    saveSeenUpdate,
+} from '../_lib/client';
+import { BUSINESS_UPDATES, LATEST_UPDATE, type BusinessUpdate } from '../_lib/whats-new';
 import { GameToasts, notify } from '../_lib/toast';
 import { AudioToggles, Choices, GButton, Logo, minutesLabel, missLabel, Stepper, Tips } from './bits';
 import { useBusinessServerWsUrl } from './BusinessConfig';
+import { WhatsNew } from './WhatsNew';
 
 /** First screen: your name, then either host a room or join one. Fits one phone screen. */
 export function BusinessHome() {
@@ -26,10 +40,27 @@ export function BusinessHome() {
     const [code, setCode] = useState('');
     const [busy, setBusy] = useState(false);
 
+    /** News to show: what a returning player has not seen yet, or everything when they ask for it. */
+    const [news, setNews] = useState<readonly BusinessUpdate[] | null>(null);
+    /** A room this browser still holds a seat in, if that room is still open. */
+    const [lastRoom, setLastRoom] = useState<string | null>(null);
+
     useEffect(() => {
         const profile = loadProfile();
         if (profile) setName(profile.name);
+        // A returning player is told what changed since their last visit. A first-time player has
+        // nothing to compare with: the game as it stands is simply the game.
+        const seen = loadSeenUpdate();
+        if (profile && (seen ?? 0) < LATEST_UPDATE) setNews(BUSINESS_UPDATES.filter((update) => update.id > (seen ?? 0)));
+        else saveSeenUpdate(LATEST_UPDATE);
     }, []);
+
+    useEffect(() => {
+        const code = loadLastRoom();
+        if (!code) return;
+        // Offer the way back only while the room is really there.
+        peekRoomRequest(serverUrl, code).then(() => setLastRoom(code), forgetLastRoom);
+    }, [serverUrl]);
 
     const ready = name.trim().length > 0;
 
@@ -59,9 +90,17 @@ export function BusinessHome() {
                 <AudioToggles />
             </div>
             <Logo />
+            {lastRoom && (
+                <div className="banner info">
+                    <span>You still have a seat in room {lastRoom}.</span>
+                    <GButton size="sm" tone="gold" onClick={() => router.push(`${base}/${lastRoom}`)}>
+                        Back to it
+                    </GButton>
+                </div>
+            )}
             <label className="field">
                 Your name
-                <input type="text" value={name} maxLength={14} placeholder="Type your name" onChange={(e) => setName(e.target.value)} />
+                <input type="text" value={name} placeholder="Type your name" onChange={(e) => setName(clampName(e.target.value, BUSINESS_RULES.NAME_MAX))} />
             </label>
 
             <div className="seg two">
@@ -113,7 +152,19 @@ export function BusinessHome() {
                     </GButton>
                 </section>
             </div>
+            <button type="button" className="newslink" onClick={() => setNews(BUSINESS_UPDATES)}>
+                What&apos;s new
+            </button>
             <Tips />
+            {news && (
+                <WhatsNew
+                    updates={news}
+                    onClose={() => {
+                        saveSeenUpdate(LATEST_UPDATE);
+                        setNews(null);
+                    }}
+                />
+            )}
         </main>
     );
 }

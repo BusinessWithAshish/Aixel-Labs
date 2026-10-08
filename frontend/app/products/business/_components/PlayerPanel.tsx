@@ -7,7 +7,7 @@ import type { BusinessSend } from '../_hooks/use-business-room';
 import { rs } from '../_lib/client';
 import { Avatar, Cash, GButton, Pop } from './bits';
 import { BUSINESS_SETS, type BusinessSetKey } from '@aixellabs/backend/business/constants';
-import { MiniCard, MiniCards } from './MiniCard';
+import { JailCardChip, MiniCard, MiniCards } from './MiniCard';
 import type { OfferDraft } from './OfferComposer';
 
 type PlayerPanelProps = {
@@ -28,8 +28,11 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer }
     const canDeal = myTurn && ['roll', 'end', 'debt'].includes(state.phase) && !state.players[me].bankrupt;
     const canRepay = myTurn && (state.phase === 'roll' || state.phase === 'end');
     const loans = state.loans.filter((l) => l.lender === seat || l.borrower === seat);
-    /** Bail is between a player held in Jail and one visiting it: the seat that would be freed, or null. */
-    const bailFor = p.jail > 0 && visitingJail(state, me) ? seat : state.players[me].jail > 0 && visitingJail(state, seat) ? me : null;
+    /** Bail is between a player held in Jail and one visiting it (or anyone, if the host allowed that): the seat that would be freed, or null. */
+    const canBail = (helper: number) => state.bailAnyone || visitingJail(state, helper);
+    const bailFor = p.jail > 0 && canBail(me) ? seat : state.players[me].jail > 0 && canBail(seat) ? me : null;
+    /** A player held in Jail deals in nothing but their bail. */
+    const jailed = p.jail > 0 ? p : state.players[me].jail > 0 ? state.players[me] : null;
     /** Colour sets this player shares with someone. */
     const splits = state.splits.filter((s) => s.major === seat || s.minor === seat);
     /** A set the two of you could split: one of you holds two of its cities, the other the third. */
@@ -53,8 +56,9 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer }
             )}
 
             <span className="small">Properties ({owned.length})</span>
-            {owned.length ? (
+            {owned.length || p.jailCards ? (
                 <MiniCards>
+                    {p.jailCards > 0 && <JailCardChip count={p.jailCards} />}
                     {owned.map((i) => (
                         <MiniCard key={i} state={state} space={i} onClick={() => onSpace(i)} />
                     ))}
@@ -123,16 +127,16 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer }
             {seat !== me && !p.bankrupt && (
                 <>
                     <div className="opts">
-                        <GButton tone="blue" className="opt" disabled={!canDeal} onClick={() => onOffer({ kind: 'trade', with: seat })}>
+                        <GButton tone="blue" className="opt" disabled={!canDeal || !!jailed} onClick={() => onOffer({ kind: 'trade', with: seat })}>
                             <ArrowLeftRight className="lu" />
                             Trade
                         </GButton>
-                        <GButton tone="gold" className="opt" disabled={!canDeal} onClick={() => onOffer({ kind: 'loan', with: seat })}>
+                        <GButton tone="gold" className="opt" disabled={!canDeal || !!jailed} onClick={() => onOffer({ kind: 'loan', with: seat })}>
                             <HandCoins className="lu" />
                             Cash loan
                         </GButton>
                     </div>
-                    <GButton disabled={!canDeal || !canSplit} onClick={() => onOffer({ kind: 'split', with: seat })}>
+                    <GButton disabled={!canDeal || !canSplit || !!jailed} onClick={() => onOffer({ kind: 'split', with: seat })}>
                         <Handshake className="lu" />
                         Split a set with {p.name}
                     </GButton>
@@ -142,6 +146,7 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer }
                             {bailFor === me ? `Ask ${p.name} for bail` : `Bail ${p.name} out of Jail`}
                         </GButton>
                     )}
+                    {jailed && <p className="small center">{jailed.seat === me ? 'You are' : `${jailed.name} is`} in Jail: only bail can be offered.</p>}
                     {!canDeal && <p className="small center">You can make offers on your own turn.</p>}
                 </>
             )}

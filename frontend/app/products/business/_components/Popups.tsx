@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, CircleHelp, Coffee, Dices, HandCoins, Handshake, House, IndianRupee, LockKeyhole, Landmark as BankIcon, Map, Minus, ScrollText, Siren, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, CircleHelp, Coffee, Crown, Flag, Dices, HandCoins, Handshake, House, IndianRupee, KeyRound, LockKeyhole, Landmark as BankIcon, Map, Minus, ScrollText, Siren, TrendingDown, TrendingUp } from 'lucide-react';
 import { BUSINESS_BOARD, BUSINESS_RULES, BUSINESS_SETS, type BusinessCard } from '@aixellabs/backend/business/constants';
 import { canMortgage, canSellHouse, cardDelta, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
 import type { BusinessInterestMode, BusinessLoan, BusinessLogEntry, BusinessOffer, BusinessPending, BusinessPublicState } from '@aixellabs/backend/business/types';
@@ -13,7 +13,7 @@ import { sfx, sfxShared } from '../_lib/sound';
 import { rs } from '../_lib/client';
 import { Avatar, Cash, GButton, Pop, Ribbon, Slider } from './bits';
 import { Houses } from './Board';
-import { CashChip, MiniCard, MiniCards } from './MiniCard';
+import { CashChip, JailCardChip, MiniCard, MiniCards } from './MiniCard';
 import { SplitView } from './SplitView';
 import { InterestMode } from './OfferComposer';
 
@@ -43,17 +43,36 @@ function MarketOdds({ hit }: { hit?: number }) {
 
 type Base = { state: BusinessPublicState; me: number; send: BusinessSend };
 
+/** What kind of card it is decides its colour and its emblem. */
+const CARD_LOOK: Record<BusinessCard['effect']['type'], { tone: string; Icon: typeof CircleHelp; kind: string }> = {
+    gain: { tone: 'good', Icon: TrendingUp, kind: 'You collect' },
+    dividend: { tone: 'good', Icon: BankIcon, kind: 'You collect' },
+    pct: { tone: 'bad', Icon: TrendingDown, kind: 'You pay' },
+    tax: { tone: 'bad', Icon: BankIcon, kind: 'You pay' },
+    repair: { tone: 'bad', Icon: House, kind: 'You pay' },
+    back: { tone: 'move', Icon: ArrowLeft, kind: 'You move' },
+    jail: { tone: 'move', Icon: LockKeyhole, kind: 'You move' },
+    jailcard: { tone: 'keep', Icon: KeyRound, kind: 'A card to keep' },
+};
+
+/** A drawn Chance card: a playing card on the table, with its own frame instead of the usual pop-up. */
 export function CardPopup({ state, me, send, card }: Base & { card: BusinessCard }) {
     const p = state.players[state.turn];
+    const look = CARD_LOOK[card.effect.type];
     // A card names a share ("10% of your cash"): the amount it comes to is shown with it.
     const delta = cardDelta(state, state.turn, card.effect);
     return (
-        <Pop>
-            <div className="bigcard ch">
-                <CircleHelp className="lu" />
+        <Pop bare>
+            <div className={cn('chcard', look.tone)}>
+                <span className="chmark">?</span>
+                <span className="chmark br">?</span>
                 <small>Chance</small>
-                {card.text}
-                {delta !== 0 && <b className={delta > 0 ? 'cardamt good' : 'cardamt bad'}>{delta > 0 ? `+${rs(delta)}` : `−${rs(-delta)}`}</b>}
+                <span className="chemblem">
+                    <look.Icon className="lu" />
+                </span>
+                <span className="chkind">{look.kind}</span>
+                <p>{card.text}</p>
+                {delta !== 0 && <b className="chamt">{delta > 0 ? `+${rs(delta)}` : `−${rs(-delta)}`}</b>}
             </div>
             {state.turn === me ? (
                 <GButton tone="gold" size="big" onClick={() => send({ type: 'ack' })}>
@@ -144,6 +163,11 @@ export function BreakPopup({ state, me, send, startPicking = false }: Base & { s
                             </button>
                         ))}
                     </div>
+                    <GButton tone="orange" onClick={() => send({ type: 'break', rest: false, random: true })}>
+                        <Dices className="lu" />
+                        Random player
+                    </GButton>
+                    <p className="small center">Random can pick anyone who is free, even you.</p>
                     <GButton tone="red" onClick={() => setPicking(false)}>
                         Back
                     </GButton>
@@ -357,18 +381,22 @@ export function MenuPopup({
     onGuide,
     onLog,
     onLeave,
+    onEnd,
     onClose,
 }: {
     canForfeit: boolean;
-    /** The host leaving closes the room for everyone. */
+    /** The host leaving ends the match for everyone. */
     host: boolean;
     homeHref: string;
     onGuide: () => void;
     onLog: () => void;
     onLeave: () => void;
+    /** Host only: end the match now for everyone. */
+    onEnd?: () => void;
     onClose: () => void;
 }) {
     const [confirm, setConfirm] = useState(false);
+    const [ending, setEnding] = useState(false);
     return (
         <Pop onClose={onClose}>
             <Ribbon red={confirm}>{confirm ? 'Leave match' : 'Menu'}</Ribbon>
@@ -387,6 +415,13 @@ export function MenuPopup({
                     <GButton tone="green" size="big" onClick={onClose}>
                         Keep playing
                     </GButton>
+                    {onEnd && (
+                        // Two taps, so the match is never ended by a slip of the thumb.
+                        <GButton tone="orange" onClick={() => (ending ? onEnd() : setEnding(true))}>
+                            <Flag className="lu" />
+                            {ending ? 'Tap again: richest player wins now' : 'End match now'}
+                        </GButton>
+                    )}
                     {canForfeit || host ? (
                         <GButton tone="red" onClick={() => setConfirm(true)}>
                             Exit to main menu
@@ -401,14 +436,14 @@ export function MenuPopup({
                 <>
                     <p className="center" style={{ fontWeight: 800 }}>
                         {host
-                            ? 'You are the host. If you leave, the room closes for everyone and the match ends.'
+                            ? 'You are the host. If you leave, the match ends now for everyone: the richest player wins and all players see the result.'
                             : 'Leaving ends your match. It counts as bankruptcy: everything you own is sold to the bank, and players you owe are paid from it.'}
                     </p>
                     <GButton tone="green" size="big" onClick={() => setConfirm(false)}>
                         Keep playing
                     </GButton>
                     <GButton tone="red" onClick={onLeave}>
-                        {host ? 'Close the room and leave' : 'Declare bankruptcy and leave'}
+                        {host ? 'End the match and leave' : 'Declare bankruptcy and leave'}
                     </GButton>
                 </>
             )}
@@ -430,6 +465,10 @@ export function AuctionPopup({ state, me, send, pending, now }: Base & { pending
     const leading = pending.by === me;
     const passed = pending.passed.includes(me);
     const out = mePlayer.bankrupt || passed;
+    /** Highest own bid first; players who have not bid keep seat order; those who passed sink to the bottom. */
+    const standings = state.players
+        .filter((p) => !p.bankrupt)
+        .sort((a, b) => Number(pending.passed.includes(a.seat)) - Number(pending.passed.includes(b.seat)) || (pending.bids[b.seat] ?? 0) - (pending.bids[a.seat] ?? 0) || a.seat - b.seat);
 
     return (
         <Pop>
@@ -453,19 +492,25 @@ export function AuctionPopup({ state, me, send, pending, now }: Base & { pending
                 </div>
             </div>
             <div className="bigbid">
-                <span className="small">{leader ? 'Highest bid' : 'Opening bid'}</span>
+                <span className="small">{leader ? (leading ? 'You lead with' : `${leader.name} leads with`) : 'Opening bid'}</span>
                 <Cash value={leader ? pending.bid : pending.open} />
             </div>
-            <div className="aucwho">
-                {leader ? (
-                    <>
-                        <Avatar name={leader.name} color={leader.color} size="sm" />
-                        {leading ? 'You lead' : `${leader.name} leads`}
-                    </>
-                ) : (
-                    'No bids yet'
-                )}
-            </div>
+            {/* Live standings: who is ahead, who is still in, who has dropped out. */}
+            <ol className="aucboard">
+                {standings.map((p, rank) => {
+                    const bid = pending.bids[p.seat];
+                    const gone = pending.passed.includes(p.seat);
+                    return (
+                        <li key={p.seat} className={cn(p.seat === pending.by && 'lead', gone && 'gone', p.seat === me && 'me')}>
+                            <span className="rk">{p.seat === pending.by ? <Crown className="lu" /> : rank + 1}</span>
+                            <Avatar name={p.name} color={p.color} size="sm" />
+                            <b>{p.seat === me ? 'You' : p.name}</b>
+                            <span className="st">{gone ? 'Passed' : p.seat === pending.by ? 'Leading' : bid ? 'Outbid' : 'Thinking'}</span>
+                            <span className="amt">{bid ? rs(bid) : '—'}</span>
+                        </li>
+                    );
+                })}
+            </ol>
             {!out && !leading && (
                 <>
                     <div className="chips">
@@ -492,7 +537,7 @@ export function AuctionPopup({ state, me, send, pending, now }: Base & { pending
                 </>
             )}
             {passed && <p className="small center">You passed on this auction.</p>}
-            <p className="small center">Open bidding. A late bid adds a few seconds.</p>
+            <p className="small center">Open bidding. Every bid restarts the {BUSINESS_RULES.AUCTION_SECONDS} seconds.</p>
         </Pop>
     );
 }
@@ -676,9 +721,11 @@ export function describeOffer(state: BusinessPublicState, offer: BusinessOffer):
         const split = state.splits.find((s) => s.id === t.split);
         return [`end the ${split ? BUSINESS_SETS[split.set].name : ''} split. Every house there goes back to the bank.`];
     }
-    const side = (cash: number, spaces: number[]) =>
-        [cash ? rs(cash) : null, ...spaces.map((i) => BUSINESS_BOARD[i].name)].filter(Boolean).join(' + ') || 'nothing';
-    return [`you send ${side(t.give.cash, t.give.spaces)}, you ask for ${side(t.get.cash, t.get.spaces)}.`, `Sent to ${P[offer.to].name}.`];
+    const side = (s: typeof t.give) =>
+        [s.cash ? rs(s.cash) : null, ...s.spaces.map((i) => BUSINESS_BOARD[i].name), s.cards ? `${s.cards} Jail card${s.cards === 1 ? '' : 's'}` : null]
+            .filter(Boolean)
+            .join(' + ') || 'nothing';
+    return [`you send ${side(t.give)}, you ask for ${side(t.get)}.`, `Sent to ${P[offer.to].name}.`];
 }
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
@@ -771,10 +818,11 @@ export function OfferInbox({ state, me, send, offer, now }: Base & { offer: Busi
     } else {
         ask = `${from.name} offers you a trade`;
         // Seen from the receiver: what the proposer sends is what you get.
-        const side = (cash: number, spaces: number[]) =>
-            cash || spaces.length ? (
+        const side = ({ cash, spaces, cards }: typeof t.give) =>
+            cash || spaces.length || cards ? (
                 <MiniCards>
                     {cash > 0 && <CashChip value={cash} />}
+                    {cards > 0 && <JailCardChip count={cards} />}
                     {spaces.map((i) => (
                         <MiniCard key={i} state={state} space={i} />
                     ))}
@@ -789,14 +837,14 @@ export function OfferInbox({ state, me, send, offer, now }: Base & { offer: Busi
                         <ArrowDownLeft className="lu" />
                         You get
                     </small>
-                    {side(t.give.cash, t.give.spaces)}
+                    {side(t.give)}
                 </div>
                 <div className="dealside send">
                     <small>
                         <ArrowUpRight className="lu" />
                         You send
                     </small>
-                    {side(t.get.cash, t.get.spaces)}
+                    {side(t.get)}
                 </div>
             </>
         );

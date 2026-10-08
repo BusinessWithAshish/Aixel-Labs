@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Coins, Copy, Crown, Hourglass, LogOut, Share2, Swords, TimerOff, User, Users, WifiOff, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Coins, Copy, Crown, Hourglass, KeyRound, LogOut, Share2, Swords, TimerOff, User, Users, WifiOff, X } from 'lucide-react';
 import {
     BUSINESS_MATCH_MINUTES,
     BUSINESS_MISS_LIMITS,
@@ -11,6 +11,7 @@ import {
     BUSINESS_RULES,
 } from '@aixellabs/backend/business/constants';
 import type { BusinessRoomConfig, BusinessRoomView } from '@aixellabs/backend/business/types';
+import { cn } from '@/lib/utils';
 import { sfx } from '../_lib/sound';
 import { rs } from '../_lib/client';
 import { notify } from '../_lib/toast';
@@ -22,10 +23,16 @@ type LobbyProps = {
     onStart: () => void;
     onConfigure: (patch: Partial<BusinessRoomConfig>) => void;
     onKick: (seat: number) => void;
+    /** Host: move a player to another place in the turn order. */
+    onMove: (seat: number, to: number) => void;
     onTeam: (seat: number, team: number) => void;
     /** Host only: ends the room for everyone. */
     onClose: () => void;
 };
+
+/** Who may bail a player out of Jail: only players visiting it (0), or anyone (1). */
+const BAIL_FROM = [0, 1] as const;
+const bailLabel = (value: number) => (value === 1 ? 'Anyone' : 'Jail visitors');
 
 /** Team play is always two sides. */
 const SIDES = [
@@ -34,8 +41,10 @@ const SIDES = [
 ] as const;
 
 const CONFIRM_MS = 3000;
+/** Turn order, as shown on each player's card. */
+const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 
-export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, onClose }: LobbyProps) {
+export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onMove, onTeam, onClose }: LobbyProps) {
     const router = useRouter();
     const host = room.you === room.hostSeat;
     const teamPlay = room.config.teams;
@@ -77,7 +86,13 @@ export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, on
         return () => window.clearTimeout(timer);
     }, [confirm]);
     const link = typeof window === 'undefined' ? '' : window.location.href;
-    const { seats, minutes, missLimit, salaryCap } = room.config;
+    const { seats, minutes, missLimit, salaryCap, bailAnyone } = room.config;
+    /** Host: a player's card being dragged to a new place in the turn order, and the place it is over. */
+    const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
+    const seatUnder = (x: number, y: number) => {
+        const slot = document.elementFromPoint(x, y)?.closest('[data-seat]');
+        return slot ? Number(slot.getAttribute('data-seat')) : null;
+    };
     const capLabel = (cap: number) => (cap === 0 ? 'No cap' : rs(cap));
 
     const copy = async (text: string, what: string) => {
@@ -186,6 +201,11 @@ export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, on
                         label={missLabel}
                         onPick={(value) => onConfigure({ missLimit: value })}
                     />
+                    <div className="row">
+                        <span>Bail from</span>
+                        <span className="small">Who can get a player out of Jail</span>
+                    </div>
+                    <Choices options={BAIL_FROM} value={bailAnyone ? 1 : 0} label={bailLabel} onPick={(value) => onConfigure({ bailAnyone: value === 1 })} />
                 </>
             ) : (
                 /* Guests only read the host's settings, so these are plain facts, not controls. */
@@ -204,6 +224,11 @@ export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, on
                         <Coins className="lu" />
                         <dt>Salary cap</dt>
                         <dd>{capLabel(salaryCap)}</dd>
+                    </div>
+                    <div>
+                        <KeyRound className="lu" />
+                        <dt>Bail from</dt>
+                        <dd>{bailLabel(bailAnyone ? 1 : 0)}</dd>
                     </div>
                     <div>
                         <TimerOff className="lu" />
@@ -289,7 +314,28 @@ export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, on
                                 </div>
                             );
                         return (
-                            <div key={i} className={`slot${i === room.you ? ' me' : ''}`}>
+                            <div
+                                key={i}
+                                data-seat={i}
+                                className={cn('slot', i === room.you && 'me', host && 'movable', drag?.from === i && 'dragging', drag && drag.over === i && drag.from !== i && 'over')}
+                                {...(host
+                                    ? {
+                                          // Drag a player's card onto another to change who plays when. Buttons on the card keep working.
+                                          onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+                                              if ((e.target as HTMLElement).closest('button')) return;
+                                              e.currentTarget.setPointerCapture(e.pointerId);
+                                              setDrag({ from: i, over: i });
+                                          },
+                                          onPointerMove: (e: React.PointerEvent) => drag && setDrag({ from: drag.from, over: seatUnder(e.clientX, e.clientY) ?? drag.over }),
+                                          onPointerUp: () => {
+                                              if (drag && drag.over !== drag.from) onMove(drag.from, drag.over);
+                                              setDrag(null);
+                                          },
+                                          onPointerCancel: () => setDrag(null),
+                                      }
+                                    : {})}
+                            >
+                                <span className="ord">{ORDINALS[i]}</span>
                                 <Avatar name={seat.name} color={seat.color} />
                                 {who(seat, i)}
                                 {host && i !== room.hostSeat && (
@@ -314,6 +360,7 @@ export function Lobby({ room, homeHref, onStart, onConfigure, onKick, onTeam, on
                 </div>
             )}
 
+            {!teamPlay && <p className="small center">{host ? 'Players take turns in this order. Drag a card to change it.' : 'Players take turns in this order.'}</p>}
             {host ? (
                 <GButton tone="green" size="big" disabled={!!blocked} onClick={onStart}>
                     {blocked ?? (teamPlay ? 'Start Alpha vs Beta' : 'Start game')}

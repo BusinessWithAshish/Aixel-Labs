@@ -58,7 +58,19 @@ function write(key: string, value: unknown) {
 }
 
 export const loadSeat = (code: string) => read<SeatToken>(`bb:seat:${code}`);
-export const saveSeat = (code: string, seat: SeatToken | null) => write(`bb:seat:${code}`, seat);
+/** The room this browser last held a seat in, so the main screen can offer the way back. */
+export const loadLastRoom = () => read<string>('bb:last-room');
+export const forgetLastRoom = () => write('bb:last-room', null);
+/** Called whenever this browser takes its seat in a room again, so "last" means the last one played in. */
+export const rememberRoom = (code: string) => write('bb:last-room', code);
+export function saveSeat(code: string, seat: SeatToken | null) {
+    write(`bb:seat:${code}`, seat);
+    if (seat) rememberRoom(code);
+    else if (loadLastRoom() === code) forgetLastRoom();
+}
+/** The newest "What's new" entry this browser has shown (see whats-new.ts); null on a first visit. */
+export const loadSeenUpdate = () => read<number>('bb:seen-update');
+export const saveSeenUpdate = (id: number) => write('bb:seen-update', id);
 export const loadProfile = () => read<Profile>('bb:profile');
 export const saveProfile = (profile: Profile) => write('bb:profile', profile);
 export const loadMuted = () => read<boolean>('bb:mute') === true;
@@ -67,36 +79,35 @@ export const saveMuted = (muted: boolean) => write('bb:mute', muted);
 export const loadMusicOn = () => read<boolean>('bb:music') !== false;
 export const saveMusicOn = (on: boolean) => write('bb:music', on);
 
-/** Opens a short-lived socket to create a room, then hands back the seat token. */
-export function createRoomRequest(
+/** Opens a short-lived socket, sends one message, and resolves with the first answer of the kind asked for. */
+function askServer<K extends BusinessServerMessage['t']>(
     serverUrl: string | null,
-    msg: Extract<BusinessClientMessage, { t: 'create' }>,
-): Promise<{ code: string; seat: number; token: string }> {
+    msg: BusinessClientMessage,
+    answer: K,
+): Promise<Extract<BusinessServerMessage, { t: K }>> {
     return new Promise((resolve, reject) => {
         const ws = new WebSocket(businessWsUrl(serverUrl));
-        const timer = window.setTimeout(() => {
-            ws.close();
-            reject(new Error('The game server did not answer. Is the backend running?'));
-        }, 8000);
-        ws.onopen = () => ws.send(JSON.stringify(msg));
-        ws.onerror = () => {
+        const done = (settle: () => void) => {
             window.clearTimeout(timer);
-            reject(new Error('Could not reach the game server. Is the backend running?'));
+            ws.close();
+            settle();
         };
+        const timer = window.setTimeout(() => done(() => reject(new Error('The game server did not answer. Is the backend running?'))), 8000);
+        ws.onopen = () => ws.send(JSON.stringify(msg));
+        ws.onerror = () => done(() => reject(new Error('Could not reach the game server. Is the backend running?')));
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data as string) as BusinessServerMessage;
-            if (data.t === 'joined') {
-                window.clearTimeout(timer);
-                ws.close();
-                resolve({ code: data.code, seat: data.seat, token: data.token });
-            } else if (data.t === 'error') {
-                window.clearTimeout(timer);
-                ws.close();
-                reject(new Error(data.message));
-            }
+            if (data.t === answer) done(() => resolve(data as Extract<BusinessServerMessage, { t: K }>));
+            else if (data.t === 'error') done(() => reject(new Error(data.message)));
         };
     });
 }
+
+/** Creates a room and hands back the seat token. */
+export const createRoomRequest = (serverUrl: string | null, msg: Extract<BusinessClientMessage, { t: 'create' }>) => askServer(serverUrl, msg, 'joined');
+
+/** Whether a room still exists, and who is hosting it. Rejects when it is gone. */
+export const peekRoomRequest = (serverUrl: string | null, code: string) => askServer(serverUrl, { t: 'peek', code }, 'peek').then((answer) => answer.room);
 
 /** Whether `gap` works in flex layouts. It cannot be asked of CSS (`@supports` says yes for grids), so it is measured once. */
 export function supportsFlexGap(): boolean {
@@ -108,3 +119,16 @@ export function supportsFlexGap(): boolean {
     probe.remove();
     return works;
 }
+
+/** Dark ink on a light player colour (white, yellow), white ink on the rest: a letter always shows on its own colour. */
+export function inkOn(color: string): string {
+    const n = parseInt(color.slice(1), 16);
+    const light = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+    return light > 0.62 ? '#2a1b4d' : '#ffffff';
+}
+
+/** The first character of a name as a person sees it, so an emoji stays whole. */
+export const initial = (name: string) => (Array.from(name.trim())[0] ?? '?').toUpperCase();
+
+/** Cuts a name to the longest allowed, counting an emoji as one character. */
+export const clampName = (name: string, max: number) => Array.from(name).slice(0, max).join('');

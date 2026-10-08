@@ -4,6 +4,7 @@ import { Handshake } from 'lucide-react';
 import { BUSINESS_RULES, BUSINESS_SETS, type BusinessSetKey } from '@aixellabs/backend/business/constants';
 import { houseResale, setSpaces } from '@aixellabs/backend/business/compute';
 import type { BusinessPublicState } from '@aixellabs/backend/business/types';
+import { cssVars } from '../_lib/art';
 import { rs } from '../_lib/client';
 import { MiniCard, MiniCards } from './MiniCard';
 
@@ -33,7 +34,7 @@ export function SplitView({ state, set, major, minor, minorPct, ending = false }
                 ))}
             </MiniCards>
             <div className="rentsplit">
-                <div className="share" style={{ color: A.color }}>
+                <div className="share" style={cssVars({ '--pc': A.color })}>
                     {majorPct}%<small>{A.name}</small>
                 </div>
                 <div className="donut" style={{ background: `conic-gradient(${B.color} 0 ${minorPct}%, ${A.color} 0)` }}>
@@ -41,7 +42,7 @@ export function SplitView({ state, set, major, minor, minorPct, ending = false }
                         <Handshake style={{ width: 16, height: 16 }} />
                     </b>
                 </div>
-                <div className="share" style={{ color: B.color }}>
+                <div className="share" style={cssVars({ '--pc': B.color })}>
                     {minorPct}%<small>{B.name}</small>
                 </div>
             </div>

@@ -112,9 +112,9 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
 | Roll | 45 s | The turn is missed. |
 | Buy decision | 30 s | The property goes to auction |
 | Auction | 20 s after the last bid | Highest bid wins |
+| Take a Break | 90 s | Keeps playing |
 | Chance card | 12 s | The card is applied |
 | Market | 45 s | Skipped |
-| Take a Break | 15 s | Keeps playing |
 | Debt | 75 s | The player is bankrupt |
 | End of turn | 90 s | Turn passes |
 
@@ -158,7 +158,9 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
 - **Start:** when the host presses Start, everyone sees a 3, 2, 1, Go! countdown
   before the table.
 - **Pause:** the host has a pause button during the match. Everyone sees a
-  "Game paused" curtain, every clock stops, and the time is given back on resume. If the host
+  "Game paused" curtain, every clock stops, and the time is given back on resume. A pause ends by
+  itself after 5 minutes, and the curtain counts that down. From it any player
+  can look at the board or at their own properties. If the host
   drops off while it is paused, the match restarts by itself after a minute.
 - **Host leaving:** the room closes for everyone. Any other player leaving
   counts as bankruptcy.
@@ -183,20 +185,26 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   player who cannot afford it goes straight to auction.
 - **Auction:** open bidding, everyone still in the match may bid. Opens at half
   price, minimum raise ₹5, 20-second countdown shown on screen. Every bid starts
-  it again from 20. No bids: it stays unowned.
+  it again from 20. The pop-up is a live standings board: each player's own
+  latest bid, who leads, who is outbid, who has passed. No bids: it stays unowned.
 - **Owned property:** pay rent. No rent on a property mortgaged to the bank.
 - **Chance:** one deck of 12 cards, none of them a fixed sum. Four pay: a
   dividend of 5% of what your properties cost, and 5%, 8% or 10% of the cash
   you hold (each at least ₹50 and at most ₹300). Six cost: 5%, 8%, 10% or 15%
   of the cash held (at least ₹50); property tax at 2% per property owned, up to
   20%; repairs at 2% per house, a hotel counting as five, up to 25%. Two move
-  the player: "go back 3 spaces" and "go to Jail".
+  the player: "go back 3 spaces" and "go to Jail". One is a card to keep:
+  **"get out of Jail free"**. It is not on the board; it shows beside the
+  holder's properties, can be handed in to walk out of Jail, and can be given or
+  sold in a trade like cash. A drawn card is shown as a playing card in the
+  colour of what it does (green collects, red pays, blue moves, gold is kept).
 - **Market:** a player who owns a property may stake ₹10–₹1,000 (never more
   than their cash) and two dice are rolled: 2–5 loses the whole stake, 6–8
   nothing, 9–12 wins the stake again. The two outer ranges are equally likely
   (10 in 36 each), so on average the Market neither pays nor costs.
 - **Take a Break:** choose to rest (skip your next turn), keep playing, or
-  send any other player straight to Jail.
+  send a player straight to Jail: one you pick, or **Random**, which picks
+  among everyone who is free, the sender included.
 - **Go to Jail:** move to Jail, no salary. Everyone sees a Jail banner: "Sent
   to Jail", "Chance: go straight to Jail", or for three doubles in a row
   "Overspeeding!".
@@ -210,7 +218,15 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
 - **Bail:** a player standing on the Jail space as a visitor can get a player
   held there out at once, for any price the two agree (the prisoner pays the
   visitor). Either of them offers it on their own turn, like a trade. Nobody
-  else can offer bail, so with no visitor the 30% applies.
+  By default any player may bail a prisoner out ("Bail from: Anyone"); the host
+  can narrow it in the lobby to players visiting Jail only.
+  Whoever bails a player out moves to the Jail themselves, as a visitor, from
+  wherever they stand: a step back, with no Launch on the way and no salary.
+  They roll from there on their next turn.
+- **A player held in Jail** makes and receives no trades, loans or splits:
+  only bail (and the extension of a loan of theirs that has fallen due).
+- **The Jail corner** is drawn as two rooms: a barred cell for players held
+  there and a walkway for visitors, and each pawn stands in its own room.
 
 ## 6. Raising cash
 
@@ -305,6 +321,41 @@ negative the player cannot continue and has two choices:
   4. All the properties return to the bank, unowned, and can be bought again.
   A loan the bankrupt player had given to someone is cancelled: the borrower
   keeps the money.
+
+## Lobby
+
+Names are at most 12 characters; an emoji counts as one and is allowed. Each player's card shows their place in the
+turn order (1st, 2nd, …); the host drags a card onto another to change it.
+A second tap on Join never seats the same player twice.
+
+## Ending a match early, and an absent host
+
+- **End match now:** the host's menu has this button in every match, timed
+  or not (two taps). The match ends on the spot, the richest player wins as at
+  the bell, and everyone sees the result.
+- **The host leaving a running match** does the same thing: it ends with a
+  result for everyone. Leaving before the match starts, or after it is over,
+  closes the room.
+- **The host dropping off without leaving** (closed tab, dead phone, no
+  signal) is treated like any player: the stand-in bot plays their seat after
+  10 seconds and hands it back when they return. A pause they left running
+  ends after a minute. A host who is connected but not playing collects
+  missed-turn strikes like anyone else; if that puts them out, they are still
+  the host and keep the pause and end buttons.
+
+## Coming back, and what's new
+
+- **A seat belongs to the browser.** Refreshing, closing the tab and opening
+  the link again, or losing the network and getting it back all return the
+  player to the same seat. A different browser or device cannot take it.
+- **The main screen offers the way back** ("You still have a seat in room
+  …") while the room last played in is still open.
+- **Two rooms at once** is possible: in the room the player is not looking at,
+  the stand-in bot plays their seat until they return.
+- **What's new** (`_lib/whats-new.ts`): a returning player sees the changes
+  since their last visit once, on the main screen only, never during a match;
+  a first-time player sees nothing. A "What's new" link shows them all again.
+  Add an entry there with each release that changes how the game plays.
 
 ## Old phones and tablets
 
