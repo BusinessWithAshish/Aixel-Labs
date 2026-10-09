@@ -74,6 +74,26 @@ export const MEDIA_CAPTION_REQUEST_SCHEMA = z.object({
   style: CAPTION_STYLE_SCHEMA.optional().describe(MEDIA_FIELD_DESCRIPTIONS.captionStyle),
   wrap: CAPTION_WRAP_SCHEMA.optional().describe(MEDIA_FIELD_DESCRIPTIONS.captionWrap),
   burn: z.boolean().optional().default(true).describe(MEDIA_FIELD_DESCRIPTIONS.captionBurn),
+  /**
+   * `"gemini"`: a second listener (Gemini, on the clip's own audio, no language
+   * forced) decides the words and Whisper only times them — see `listen.ts`.
+   * For speech Whisper mishears: code-switched Hindi/English, Punjabi and other
+   * accents, fast talk. `"none"` (default) is Whisper alone, as before.
+   */
+  listener: z
+    .enum(["none", "gemini", "verified"])
+    .optional()
+    .default("none")
+    .describe(
+      "'gemini' has a second listener decide the caption WORDS (verbatim, Roman script, no language forced) while Whisper only supplies their timing — use it for Indian-language, mixed-language or heavily accented speech, where Whisper alone writes the wrong words or drops whole stretches. Falls back to Whisper alone if the listener is unavailable, and says so in `listener`/`listenerFallbackReason`. 'verified' is the robust one: the same listener, plus a second Whisper pass in the other language and Claude as judge whenever the listener is unavailable or disagrees with Whisper about much of the clip — so a busy listener no longer means wrong captions. 'none' (default) is Whisper alone.",
+    ),
+  maskProfanity: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      "true shows swear words as their first and last letter with stars between ('f*****g'), English and Hindi/Punjabi, same length as the word. Only what is written on screen changes; the audio is untouched.",
+    ),
 });
 
 /** Gemini `responseSchema` for `script: "roman"`: numbered words in, the same numbers back — see `transliterate.ts`. */

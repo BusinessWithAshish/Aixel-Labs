@@ -26,11 +26,37 @@ import {
 import { chunksToAss, cuesToAss } from "./ass";
 import { burnCaptions } from "./ffmpeg-caption";
 import { romanizeWords } from "./transliterate";
+import { maskProfanityInText, maskProfanityInWords } from "./profanity";
+import {
+  alignHeardToTimings,
+  judgeWithClaude,
+  listenWithGemini,
+  whisperLanguageFor,
+  type BASE_SEGMENT,
+  type HEARD,
+  type WITNESS,
+} from "./listen";
 import type {
   CAPTION_STYLE_RESOLVED,
   MEDIA_CAPTION_REQUEST_PARSED,
   MEDIA_CAPTION_RESPONSE,
 } from "./types";
+
+function chunkWords<T>(words: T[], size = 10): T[][] {
+  const parts: T[][] = [];
+  for (let i = 0; i < words.length; i += size) parts.push(words.slice(i, i + size));
+  return parts;
+}
+
+/** Whisper's words as short timed lines, so a judge can see WHEN each stretch was said. */
+function timedLines(words: Array<{ word: string; start: number; end: number }>): string {
+  return chunkWords(words)
+    .map((part) => `[${part[0].start.toFixed(1)}-${part[part.length - 1].end.toFixed(1)}] ${part.map((w) => w.word).join(" ")}`)
+    .join("\n");
+}
+
+/** `verified`: below this share of words agreeing between the listener and Whisper, the judge decides. */
+const MEDIA_CAPTION_VERIFY_MIN_AGREEMENT = 0.8;
 
 /** Looks like a filesystem path rather than subtitle content? Content always contains `-->`. */
 function looksLikePath(value: string): boolean {
@@ -128,7 +154,9 @@ export async function captionVideo(
 ): Promise<MEDIA_CAPTION_RESPONSE> {
   assertPersistentDisk(MEDIA_ERROR_MESSAGES.VERCEL);
 
-  const { videoSource, subtitles, language, model, burn, script } = request;
+  const { videoSource, subtitles, language, model, burn, script, channel, listener, maskProfanity } = request;
+  const groqApiKey = resolveGroqKeyForChannel(channel);
+  const geminiApiKey = resolveGeminiKeyForChannel(channel);
 
   const resolved = await resolveMediaSource(videoSource);
 
@@ -149,6 +177,11 @@ export async function captionVideo(
     let detectedLanguage: string | undefined;
     let romanized = false;
     let scriptFallbackReason: string | undefined;
+    let usedListener: "gemini" | "claude" | "whisper" | undefined;
+    let witnessLabels: string[] | undefined;
+    let unclearStretches: number | undefined;
+    let listenerFallbackReason: string | undefined;
+    let timingAnchoredShare: number | undefined;
 
     if (subtitles) {
       const raw = looksLikePath(subtitles)
@@ -165,17 +198,43 @@ export async function captionVideo(
       }
       const normalized = await normalizeToFlac(resolved.path);
       try {
+        // The second listener goes first: what it hears decides the language
+        // Whisper is asked for, and its text is the prompt that pulls
+        // Whisper's spelling toward what was actually said.
+        let heard: HEARD | undefined;
+        if (listener === "gemini" || listener === "verified") {
+          try {
+            // Patient in both modes. Without a listener the judge can only work
+            // from Whisper, and on a hard mixed clip that recovered barely half
+            // the words (tested): waiting a minute for a busy listener is
+            // worth far more than a fast answer with holes in it.
+            heard = await listenWithGemini(normalized.path, geminiApiKey, true);
+            usedListener = "gemini";
+          } catch (err) {
+            usedListener = "whisper";
+            listenerFallbackReason = `second listener unavailable: ${(err instanceof Error ? err.message : String(err)).slice(0, 200)}`;
+          }
+        }
         // Word timings are what let a cue appear exactly on its first word
         // instead of being apportioned by character count — see `cues.ts`.
         const groq = await transcribeWithGroq(normalized.path, {
           model,
-          language,
+          language: heard ? whisperLanguageFor(heard, language) : language,
           wordTimestamps: true,
+          // No decoder prompt. Handing Whisper the listener's text to "help" it
+          // made it skip 24 seconds of a 65-second clip outright — the words it
+          // was told to expect, it stopped listening for — and every caption in
+          // that stretch landed twenty seconds early.
+          apiKey: groqApiKey,
         });
-        detectedLanguage = groq.language;
+        detectedLanguage = heard?.language ?? groq.language;
         // Captioning what Whisper only imagined (a looped phrase, words over
-        // music) puts garbage on screen, so those spans are left out.
-        const reliable = dropUnreliableSpans(groq.segments ?? [], groq.words ?? []);
+        // music) puts garbage on screen, so those spans are left out. With a
+        // second listener they stay: Whisper's text is not shown, only its
+        // timings are used, and a dropped span is a stretch with no anchors.
+        const reliable = heard
+          ? { segments: groq.segments ?? [], words: groq.words ?? [] }
+          : dropUnreliableSpans(groq.segments ?? [], groq.words ?? []);
         let segments = reliable.segments;
         let words = reliable.words;
 
@@ -194,6 +253,100 @@ export async function captionVideo(
               return spoken.length > 0 ? { ...segment, text: spoken.map((w) => w.word).join(" ") } : segment;
             });
           }
+        }
+
+        // Whisper's own words in the script they will be compared in: the clock
+        // every other transcript is laid onto.
+        const whisperWords = words;
+        // `verified`: a second pass in the other language. On mixed speech each
+        // pass understands what the other garbles, and between them they time
+        // far more of the clip. Its text is also a witness for the judge.
+        const otherLanguage = (groq.language ?? "").toLowerCase().startsWith("en") ? "hi" : "en";
+        let other: Awaited<ReturnType<typeof transcribeWithGroq>> | undefined;
+        let otherWords: typeof words = [];
+        if (listener === "verified") {
+          try {
+            other = await transcribeWithGroq(normalized.path, {
+              model,
+              language: otherLanguage,
+              wordTimestamps: true,
+              apiKey: groqApiKey,
+            });
+            otherWords = other.words ?? [];
+            if (script === "roman" && otherWords.length > 0) {
+              otherWords = (await romanizeWords(otherWords, groqApiKey, geminiApiKey)).words;
+            }
+          } catch {
+            other = undefined;
+          }
+        }
+        const clocks = otherWords.length > 0 ? [whisperWords, otherWords] : [whisperWords];
+        if (heard) {
+          // Whisper's words (now in the same script as the listener's) are the
+          // clock; the listener's words are what goes on screen.
+          const aligned = alignHeardToTimings(heard, clocks, probe.durationSeconds ?? 0);
+          words = aligned.words;
+          timingAnchoredShare = Math.round(aligned.anchoredShare * 100) / 100;
+          segments = heard.segments.map((s, id) => ({ id, start: s.start, end: s.end, text: s.text }));
+        }
+
+        // `verified`: when there is no listener, or it and Whisper agree on too
+        // little of the clip to trust either, the transcripts go to a judge.
+        const agreed = heard ? (timingAnchoredShare ?? 0) >= MEDIA_CAPTION_VERIFY_MIN_AGREEMENT : false;
+        if (listener === "verified" && !agreed) {
+          try {
+            const witnesses: WITNESS[] = [];
+            // The timeline the judge corrects: the listener's lines when there
+            // is a listener, otherwise Whisper's own words in ten-word lines.
+            const base: BASE_SEGMENT[] = heard
+              ? heard.segments
+              : chunkWords(whisperWords).map((part) => ({
+                  start: part[0].start,
+                  end: part[part.length - 1].end,
+                  text: part.map((w) => w.word).join(" "),
+                }));
+            const baseLabel = heard
+              ? "a model that listened to the audio with no language forced; usually the most accurate, but it can soften, skip or mishear words, and its times are only good to a second or two"
+              : "speech recognition; it garbles stretches spoken in another language, but its times are exact";
+            if (heard) {
+              witnesses.push({
+                label: `WHISPER (${groq.language ?? "auto"})`,
+                note: "speech recognition; garbles stretches spoken in another language, but its times are exact",
+                text: timedLines(whisperWords),
+              });
+            }
+            witnesses.push({
+              label: `WHISPER (${otherLanguage})`,
+              note:
+                otherLanguage === "en"
+                  ? "the same audio forced to English: it TRANSLATES the Hindi parts, which you must not keep, but its English stretches are reliable"
+                  : "the same audio forced to Hindi; its English stretches are unreliable",
+              text:
+                (other?.segments ?? []).map((s) => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text.trim()}`).join("\n") ||
+                (other?.text ?? "(unavailable)"),
+            });
+            const judged = await judgeWithClaude(base, baseLabel, witnesses, probe.durationSeconds ?? 0);
+            const aligned = alignHeardToTimings(judged.heard, clocks, probe.durationSeconds ?? 0);
+            words = aligned.words;
+            timingAnchoredShare = Math.round(aligned.anchoredShare * 100) / 100;
+            segments = judged.heard.segments.map((s, id) => ({ id, start: s.start, end: s.end, text: s.text }));
+            detectedLanguage = judged.heard.language;
+            usedListener = "claude";
+            listenerFallbackReason = undefined;
+            witnessLabels = [heard ? "LISTENER" : "WHISPER timeline", ...witnesses.map((w) => w.label)];
+            unclearStretches = judged.unclearStretches;
+          } catch (err) {
+            // The judge is the safety net, not a requirement: keep what there was.
+            const why = (err instanceof Error ? err.message : String(err)).slice(0, 160);
+            listenerFallbackReason = heard
+              ? `listener and Whisper disagreed and the judge was unavailable (${why}); the listener's words were kept`
+              : `no listener and no judge (${why}); these are Whisper's words alone`;
+          }
+        }
+
+        if (maskProfanity) {
+          words = maskProfanityInWords(words);
+          segments = segments.map((s) => ({ ...s, text: maskProfanityInText(s.text) }));
         }
 
         if (style.preset === "chunks" && words.length > 0) {
@@ -243,6 +396,11 @@ export async function captionVideo(
       language: detectedLanguage,
       ...(romanized ? { script: "roman" as const } : {}),
       ...(scriptFallbackReason ? { scriptFallbackReason } : {}),
+      ...(usedListener ? { listener: usedListener } : {}),
+      ...(listenerFallbackReason ? { listenerFallbackReason } : {}),
+      ...(timingAnchoredShare !== undefined ? { timingAnchoredShare } : {}),
+      ...(witnessLabels ? { witnesses: witnessLabels } : {}),
+      ...(unclearStretches !== undefined ? { unclearStretches } : {}),
       durationSeconds: probe.durationSeconds,
     };
   } finally {

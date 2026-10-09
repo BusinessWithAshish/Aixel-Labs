@@ -40,5 +40,15 @@ export type MEDIA_CAPTION_RESPONSE = {
   script?: "roman";
   /** Why `script: "roman"` kept the native script, when it did. */
   scriptFallbackReason?: string;
+  /** Who decided the words: "gemini" when the second listener's text was used, "whisper" otherwise. */
+  listener?: "gemini" | "claude" | "whisper";
+  /** With `listener: "verified"`: which transcripts the words were decided from. */
+  witnesses?: string[];
+  /** Stretches the judge could not recover from any transcript; they carry no captions. */
+  unclearStretches?: number;
+  /** Why `listener: "gemini"` fell back to Whisper alone, when it did. */
+  listenerFallbackReason?: string;
+  /** With `listener: "gemini"`: the share of words whose timing came straight from a matching Whisper word (0–1). Low means the timing is approximate. */
+  timingAnchoredShare?: number;
   durationSeconds: number;
 };
