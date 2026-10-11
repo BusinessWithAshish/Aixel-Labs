@@ -24,6 +24,8 @@ export type NARRATE_PHRASE = {
   footageSeconds: number;
 };
 
+export type NARRATE_RESPELLING = { from: string; to: string; source: "channel" | "lexicon" | "rule" };
+
 export type MEDIA_NARRATE_RESPONSE = {
   audioPath: string;
   durationSeconds: number;
@@ -32,6 +34,8 @@ export type MEDIA_NARRATE_RESPONSE = {
   speed: number;
   /** The text actually spoken, after markup removal, respelling and punctuation clean-up. */
   spokenText: string;
+  /** Words spoken differently from how they were written, and why. The captions keep the written form. */
+  respelled: NARRATE_RESPELLING[];
   words: NARRATE_WORD[];
   phrases: NARRATE_PHRASE[];
 };

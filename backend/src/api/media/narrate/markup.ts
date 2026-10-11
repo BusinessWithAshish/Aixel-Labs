@@ -1,4 +1,5 @@
 import { MEDIA_NARRATE } from "./constants";
+import { respellToken, type RESPELLING } from "./hindi";
 import type { NARRATE_PHRASE, NARRATE_WORD } from "./types";
 
 const MARKUP = /\{\s*(pause|pace)\s+([0-9]*\.?[0-9]+)\s*s?\s*\}/gi;
@@ -6,8 +7,15 @@ const MARKUP = /\{\s*(pause|pace)\s+([0-9]*\.?[0-9]+)\s*s?\s*\}/gi;
 export type PREPARED_TEXT = {
   /** Exactly what is sent to the engine, with its inline tags. */
   engineInput: string;
-  /** The words a listener hears, tags and markup removed. */
+  /** The words a listener hears, tags and markup removed, after respelling. */
   spokenText: string;
+  /**
+   * The caller's own words, cleaned the same way and aligned one-for-one with
+   * `spokenText`'s tokens — what captions should show.
+   */
+  displayTokens: string[];
+  /** Every word that was spoken differently from how it was written. */
+  respelled: RESPELLING[];
   /** True when `engineInput` carries `[rate:...]` tags, which the engine only honours when told to. */
   usesVoiceTags: boolean;
 };
@@ -32,20 +40,48 @@ export function prepareText(
 ): PREPARED_TEXT {
   let source = text.replace(/[।॥]/g, ".").replace(/[\[\]]/g, " ");
 
+  // A key with a space cannot be matched token by token; swap it out first.
+  const own: Record<string, string> = {};
   for (const [word, respelling] of Object.entries(pronunciations ?? {})) {
     if (!word) continue;
-    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(word)}(?![\\p{L}\\p{N}])`, "gu");
-    source = source.replace(pattern, respelling);
+    if (/\s/.test(word)) {
+      const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(word)}(?![\\p{L}\\p{N}])`, "gu");
+      source = source.replace(pattern, respelling);
+    } else {
+      own[word] = respelling;
+    }
   }
 
   let usesVoiceTags = false;
   const engineParts: string[] = [];
   const spokenParts: string[] = [];
+  const displayParts: string[] = [];
+  const respelled: RESPELLING[] = [];
+  const seen = new Set<string>();
+
+  /** Respells one stretch of plain text, keeping its whitespace. */
+  const speak = (chunk: string) => {
+    const spoken: string[] = [];
+    for (const piece of chunk.split(/(\s+)/)) {
+      if (!piece || /^\s+$/.test(piece)) {
+        spoken.push(piece);
+        continue;
+      }
+      const result = respellToken(piece, own);
+      spoken.push(result.spoken);
+      if (result.respelling && !seen.has(result.respelling.from)) {
+        seen.add(result.respelling.from);
+        respelled.push(result.respelling);
+      }
+    }
+    engineParts.push(spoken.join(""));
+    spokenParts.push(spoken.join(""));
+    displayParts.push(chunk);
+  };
+
   let cursor = 0;
   for (const match of source.matchAll(MARKUP)) {
-    const before = source.slice(cursor, match.index);
-    engineParts.push(before);
-    spokenParts.push(before);
+    speak(source.slice(cursor, match.index));
     cursor = (match.index ?? 0) + match[0].length;
     const value = Number(match[2]);
     if (match[1].toLowerCase() === "pause") {
@@ -58,14 +94,14 @@ export function prepareText(
       engineParts.push(` [rate:${value.toFixed(2)}] `);
     }
   }
-  const rest = source.slice(cursor);
-  engineParts.push(rest);
-  spokenParts.push(rest);
+  speak(source.slice(cursor));
 
   const clean = (value: string) => value.replace(/\s+/g, " ").trim();
   return {
     engineInput: clean(engineParts.join("")),
-    spokenText: clean(spokenParts.join("")),
+    spokenText: clean(spokenParts.join(" ")),
+    displayTokens: clean(displayParts.join(" ")).split(" ").filter(Boolean),
+    respelled,
     usesVoiceTags,
   };
 }

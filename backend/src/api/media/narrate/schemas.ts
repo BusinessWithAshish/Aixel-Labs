@@ -32,7 +32,7 @@ export const MEDIA_NARRATE_REQUEST_SCHEMA = z.object({
     .record(z.string(), z.string())
     .optional()
     .describe(
-      "Whole-word respellings applied before synthesis, e.g. {\"Vijay\":\"विजय\"}: write a name or word the way the engine should say it. Case-sensitive; the spoken words come back in `words` as respelled.",
+      "Per-call respellings applied before synthesis, e.g. {\"Vijay\":\"विजय्\"}: write a name or word the way the engine should say it. Case-sensitive, single words; they win over the built-in corrections (final-cluster and -य endings, a list of common Indian names and words). The captions keep the written form; `respelled` lists what was changed.",
     ),
   provider: z
     .enum(MEDIA_NARRATE.PROVIDERS)

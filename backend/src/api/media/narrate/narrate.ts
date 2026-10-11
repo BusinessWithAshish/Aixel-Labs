@@ -131,6 +131,13 @@ export async function narrate(input: MEDIA_NARRATE_REQUEST): Promise<MEDIA_NARRA
   await repairWav(wav, audioPath);
   const durationSeconds = Math.round((await wavSeconds(audioPath)) * 1000) / 1000;
 
+  // Respelling swaps words one for one, so the engine's words line up with
+  // what the caller wrote: show that, speak the respelling.
+  const shown =
+    words.length === prepared.displayTokens.length
+      ? words.map((word, i) => ({ ...word, word: prepared.displayTokens[i] }))
+      : words;
+
   return {
     audioPath,
     durationSeconds,
@@ -138,7 +145,8 @@ export async function narrate(input: MEDIA_NARRATE_REQUEST): Promise<MEDIA_NARRA
     voice: input.voice,
     speed: input.speed,
     spokenText: prepared.spokenText,
-    words,
-    phrases: buildPhrases(words, prepared.spokenText, durationSeconds),
+    respelled: prepared.respelled,
+    words: shown,
+    phrases: buildPhrases(shown, prepared.spokenText, durationSeconds),
   };
 }
