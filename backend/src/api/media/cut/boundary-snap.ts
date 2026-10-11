@@ -36,6 +36,8 @@ export function snapClipBoundaries(
   requestedEnd: string,
   diarized: DIARIZED_TRANSCRIPT | undefined,
   sourceDurationSeconds?: number,
+  /** Overrides `MEDIA.CLIP_PADDING_SECONDS` — 0 puts the edges exactly on the requested times. */
+  paddingSeconds: number = MEDIA.CLIP_PADDING_SECONDS,
 ): SnappedRange {
   const rawStart = parseTimestampToSeconds(requestedStart);
   const rawEnd = parseTimestampToSeconds(requestedEnd);
@@ -69,8 +71,8 @@ export function snapClipBoundaries(
     }
   }
 
-  start = Math.max(0, start - MEDIA.CLIP_PADDING_SECONDS);
-  end = end + MEDIA.CLIP_PADDING_SECONDS;
+  start = Math.max(0, start - paddingSeconds);
+  end = end + paddingSeconds;
   if (sourceDurationSeconds !== undefined) {
     end = Math.min(end, sourceDurationSeconds);
   }

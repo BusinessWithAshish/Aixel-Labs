@@ -28,6 +28,10 @@ export const AIXEL_MEDIA = {
    * path instead of the model re-sending a ~50K-token transcript as a tool
    * argument (see api/media/diarize/transcript-store.ts). */
   MEDIA_TRANSCRIPTS: join(AIXEL_MEDIA_ROOT, "private", "transcripts"),
+  /** Where `media.narrate` writes synthesised narration (one WAV per call). Private: the file is an intermediate, `assemble` consumes it. */
+  MEDIA_NARRATION: join(AIXEL_MEDIA_ROOT, "private", "media-narration"),
+  /** Where `media.assemble` writes the finished recap and its `.srt`. */
+  MEDIA_ASSEMBLED: join(AIXEL_MEDIA_ROOT, "private", "media-assembled"),
   /** Where `media.fetch` writes a genuine remote (non-local) download — a fixed, persistent folder rather than a temp dir, so the op's response can just be `{ path }` with nothing to track or clean up. Also where a caller stages a reference image (`imageOnly: true`) for later use, e.g. by `chatgpt`/`claude` — one download op, one folder, not a second bucket per consumer. */
   MEDIA_FETCHED: join(AIXEL_MEDIA_ROOT, "private", "media-fetched"),
   /** Where `instagram` op=download writes post/reel/carousel media — `{shortcode}/{index}.{mp4|jpg}`. Private: shortcode paths are guessable. */

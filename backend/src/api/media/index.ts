@@ -12,6 +12,8 @@ import {
   mediaShareHandler,
 } from "./handler";
 import { mediaEffectsHandler } from "./effects/handler";
+import { mediaNarrateHandler } from "./narrate/handler";
+import { mediaAssembleHandler } from "./assemble/handler";
 import {
   mediaUploadChunkHandler,
   mediaUploadCompleteHandler,
@@ -29,6 +31,8 @@ mediaRoutes.post(API_ENDPOINTS.MEDIA.CONDENSE.route, mediaCondenseHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.CAPTION.route, mediaCaptionHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.EFFECTS.route, mediaEffectsHandler);
 mediaRoutes.post(API_ENDPOINTS.MEDIA.SHARE.route, mediaShareHandler);
+mediaRoutes.post(API_ENDPOINTS.MEDIA.NARRATE.route, mediaNarrateHandler);
+mediaRoutes.post(API_ENDPOINTS.MEDIA.ASSEMBLE.route, mediaAssembleHandler);
 
 mediaRoutes.post(API_ENDPOINTS.MEDIA.UPLOAD.INIT.route, mediaUploadInitHandler);
 // Route-scoped raw body parser — this is the one route that must NOT go
@@ -53,6 +57,8 @@ export { condenseVideo } from "./condense/client";
 export { captionVideo } from "./caption/caption";
 export { applyEffects } from "./effects/effects";
 export { shareMedia } from "./share/share";
+export { narrate } from "./narrate/narrate";
+export { assembleRecap } from "./assemble/assemble";
 
 /* Source resolution — shared by every op that takes a media source. */
 export {
@@ -70,6 +76,8 @@ export { MEDIA_CUT_REQUEST_SCHEMA } from "./cut/schemas";
 export { MEDIA_CONDENSE_REQUEST_SCHEMA } from "./condense/schemas";
 export { MEDIA_CAPTION_REQUEST_SCHEMA } from "./caption/schemas";
 export { MEDIA_SHARE_REQUEST_SCHEMA } from "./share/schemas";
+export { MEDIA_NARRATE_REQUEST_SCHEMA } from "./narrate/schemas";
+export { MEDIA_ASSEMBLE_REQUEST_SCHEMA } from "./assemble/schemas";
 export type { MEDIA_SHARE_REQUEST, MEDIA_SHARE_RESPONSE } from "./share/types";
 
 export type {

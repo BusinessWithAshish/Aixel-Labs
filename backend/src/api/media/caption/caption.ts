@@ -25,6 +25,7 @@ import {
 } from "./cues";
 import { chunksToAss, cuesToAss } from "./ass";
 import { burnCaptions } from "./ffmpeg-caption";
+import { romanizeSubtitles } from "./romanize-subtitles";
 import { NON_LATIN_LETTER, romanizeWords } from "./transliterate";
 import { maskProfanityInText, maskProfanityInWords } from "./profanity";
 import { alignWordsToAudio } from "./align";
@@ -248,7 +249,14 @@ export async function captionVideo(
       const raw = looksLikePath(subtitles)
         ? await readFile(subtitles.trim(), "utf8")
         : subtitles;
-      cues = parseSubtitles(raw, wrap);
+      let subtitleText = raw;
+      if (script === "roman") {
+        const result = await romanizeSubtitles(raw, groqApiKey, geminiApiKey);
+        subtitleText = result.raw;
+        romanized = result.romanized;
+        scriptFallbackReason = result.fallbackReason;
+      }
+      cues = parseSubtitles(subtitleText, wrap);
       source = "provided";
       if (cues.length === 0) {
         throw new Error(MEDIA_ERROR_MESSAGES.CAPTION_SUBTITLE_PARSE_FAILED);

@@ -65,6 +65,8 @@ export async function cutClipsFromVideo(
   logo?: CUT_LOGO_REQUEST,
   /** Ceiling for a clip's length — `boundaries: "moment"` only. */
   maxSeconds?: number,
+  /** Edge padding in seconds — see `MEDIA_FIELD_DESCRIPTIONS.cutPadding`. */
+  paddingSeconds?: number,
 ): Promise<MEDIA_CUT_RESPONSE> {
   assertPersistentDisk(MEDIA_ERROR_MESSAGES.VERCEL);
   const resolved = await resolveVideoSourceForCut(videoSource);
@@ -149,6 +151,7 @@ export async function cutClipsFromVideo(
         clip.end,
         diarized,
         durationSeconds,
+        paddingSeconds,
       );
 
       /**
@@ -197,6 +200,9 @@ export async function cutClipsFromVideo(
       const rangeStart = natural ? Math.max(0, requestedStart - windowBefore) : cutStartSeconds;
       const rangeEnd = natural ? Math.min(durationSeconds, requestedEnd + windowAfter) : cutEndSeconds;
       const unframed = followSpeaker || natural;
+      // "blur" is a framing, not a worker: it rides on the same ffmpeg pass as
+      // the centre crop, so it is applied wherever that crop would have been.
+      const fit = reframe === "blur" ? "blur" : "crop";
 
       let appliedStart = cutStartSeconds;
       let appliedEnd = cutEndSeconds;
@@ -218,6 +224,7 @@ export async function cutClipsFromVideo(
             ffmpegProxyUrl,
             logoFilter,
             logoImage,
+            fit,
           );
         } else {
           await cutClip(
@@ -230,6 +237,7 @@ export async function cutClipsFromVideo(
             undefined,
             logoFilter,
             logoImage,
+            fit,
           );
         }
 
@@ -325,6 +333,9 @@ export async function cutClipsFromVideo(
               inSeconds: MEDIA_NATURAL_BOUNDARIES.FADE_IN_SECONDS,
               outSeconds: MEDIA_NATURAL_BOUNDARIES.FADE_OUT_SECONDS,
             },
+            undefined,
+            undefined,
+            fit,
           );
           current = trimmed;
         }

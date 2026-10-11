@@ -57,9 +57,11 @@ export const MEDIA_FIELD_DESCRIPTIONS = {
   aspectRatio:
     "Output aspect ratio for cut clips: '9:16' (Shorts/Reels/TikTok, default), '16:9' (YouTube/landscape), '1:1' (square), or 'original' (no crop, keep source framing). Cropping is centered on the source frame.",
   reframe:
-    "How a cut clip is framed when aspectRatio crops the source: 'center' (default) keeps the fixed centre crop; 'speaker' follows whoever is talking — camera cuts, face tracking and LR-ASD lip-sync (each face's lip motion matched to the audio) choose the face for each stretch, and the crop cuts on speech onsets. Slower: about 50 s of CPU per clip. Needs the reframe worker installed on this host (backend/workers/reframe); when it cannot run or finds no faces the clip still gets the centre crop and `reframe.fallbackReason` says why. Ignored for audio sources and for aspectRatio 'original'.",
+    "How a cut clip is framed when aspectRatio crops the source: 'center' (default) keeps the fixed centre crop; 'blur' keeps the WHOLE frame (no crop): the picture is fitted inside the output and a blurred, zoomed copy of the same frame fills the space around it — the right call for film and series footage, where a crop throws the composition away; 'speaker' follows whoever is talking — camera cuts, face tracking and LR-ASD lip-sync (each face's lip motion matched to the audio) choose the face for each stretch, and the crop cuts on speech onsets. Slower: about 50 s of CPU per clip. Needs the reframe worker installed on this host (backend/workers/reframe); when it cannot run or finds no faces the clip still gets the centre crop and `reframe.fallbackReason` says why. Ignored for audio sources and for aspectRatio 'original'.",
   boundaries:
     "Where each clip's edges land: 'exact' (default) cuts at the requested start/end plus a little padding; 'natural' re-places them on the clip's own audio — start on the first word of the phrase instead of mid-word, end after the last word of the thought plus any laugh or applause that follows (until it quiets, never into the next sentence). Moves edges by a few seconds at most; the range you ask for still decides what the clip is. Costs one short Groq transcription per clip. cutStartSeconds/cutEndSeconds report where the clip actually starts and ends; clips[].boundaries says why.",
+  cutPadding:
+    "Seconds added before each clip's start and after its end (default 0.35, so the edge of speech is not clipped). Pass 0 for edges that land exactly on the requested times — needed when the clip is one beat of a longer edit and its length must be exact. Applied on top of any diarize snap.",
   cutLanguage:
     "Optional spoken-language hint (ISO 639-1, e.g. 'hi', 'en') for boundaries: 'natural', which transcribes the audio around each edge. Pass it for anything not plainly English — auto-detection hears short mixed Hindi-English windows as English and drops the Hindi words.",
   captionScript:
@@ -101,8 +103,8 @@ export const MEDIA_GEMINI_MODEL = {
 /** Supported output framings for `/video/cut`. */
 export const MEDIA_ASPECT_RATIOS = ["9:16", "16:9", "1:1", "original"] as const;
 
-/** How `/video/cut` frames a cropped clip: fixed centre, or follow the speaker. */
-export const MEDIA_REFRAME_MODES = ["center", "speaker"] as const;
+/** How `/video/cut` frames a clip: fixed centre crop, follow the speaker, or keep the whole frame over a blurred fill. */
+export const MEDIA_REFRAME_MODES = ["center", "speaker", "blur"] as const;
 
 /** A speaker-reframe segment either crops to one face or shows the whole frame ("wide"). */
 export const MEDIA_REFRAME_LAYOUTS = ["crop", "wide"] as const;

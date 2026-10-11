@@ -85,6 +85,12 @@ export const MEDIA_CUT_REQUEST_SCHEMA = z.object({
     .optional()
     .default(MEDIA_REFRAME.DEFAULT_MODE)
     .describe(MEDIA_FIELD_DESCRIPTIONS.reframe),
+  paddingSeconds: z
+    .number()
+    .min(0)
+    .max(5)
+    .optional()
+    .describe(MEDIA_FIELD_DESCRIPTIONS.cutPadding),
   boundaries: z
     .enum(MEDIA_BOUNDARY_MODES)
     .optional()

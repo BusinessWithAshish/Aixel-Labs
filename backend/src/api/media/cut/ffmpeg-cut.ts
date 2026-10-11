@@ -7,6 +7,7 @@ import {
   MEDIA,
   MEDIA_ASPECT_RATIO_DIMENSIONS,
   MEDIA_ERROR_MESSAGES,
+  MEDIA_REFRAME,
 } from "../constants";
 import type { MEDIA_ASPECT_RATIO_VALUE } from "../types";
 
@@ -127,11 +128,29 @@ function buildAspectRatioFilter(
    * and the speaker reframe need no knowledge of it at all.
    */
   prefix?: string,
+  /**
+   * `"blur"` keeps the whole frame: fitted inside the output over a blurred,
+   * zoomed copy of itself (the same look as a speaker reframe's wide shots,
+   * with no worker or plan). `"crop"` is the centre crop.
+   */
+  fit: "crop" | "blur" = "crop",
 ): string | undefined {
   if (aspectRatio === "original") return prefix;
 
   const { ratioW, ratioH, outputWidth, outputHeight } =
     MEDIA_ASPECT_RATIO_DIMENSIONS[aspectRatio];
+  if (fit === "blur") {
+    const even = (value: number) => Math.max(2, Math.round(value / 2) * 2);
+    const blurWidth = even(outputWidth * MEDIA_REFRAME.WIDE_BACKGROUND_SCALE);
+    const blurHeight = even(outputHeight * MEDIA_REFRAME.WIDE_BACKGROUND_SCALE);
+    const blurFill = [
+      "split=2[fgsrc][bgsrc]",
+      `[bgsrc]scale=${blurWidth}:${blurHeight}:force_original_aspect_ratio=increase,crop=${blurWidth}:${blurHeight},boxblur=${MEDIA_REFRAME.WIDE_BACKGROUND_BLUR_RADIUS}:2,scale=${outputWidth}:${outputHeight},setsar=1[bg]`,
+      `[fgsrc]scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1[fg]`,
+      "[bg][fg]overlay=(W-w)/2:(H-h)/2",
+    ].join(";");
+    return prefix ? `${prefix},${blurFill}` : blurFill;
+  }
   const wider = `gt(iw*${ratioH},ih*${ratioW})`;
   const cropW = `if(${wider},ih*${ratioW}/${ratioH},iw)`;
   const cropH = `if(${wider},ih,iw*${ratioH}/${ratioW})`;
@@ -206,12 +225,14 @@ export async function cutClip(
   videoPrefix?: string,
   /** Local image the prefix pastes from, when a cover uses `replace`. */
   overlayImage?: string,
+  /** How a cropping aspect ratio is reached — see `buildAspectRatioFilter`. */
+  fit: "crop" | "blur" = "crop",
 ): Promise<void> {
   if (!ffmpegPath) {
     throw new Error(MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED);
   }
 
-  const videoFilter = hasVideo ? buildAspectRatioFilter(aspectRatio, videoPrefix) : undefined;
+  const videoFilter = hasVideo ? buildAspectRatioFilter(aspectRatio, videoPrefix, fit) : undefined;
   // A replacement image is a second input, and a second input means
   // `-filter_complex` with explicit labels rather than `-vf`.
   const complex = Boolean(videoFilter && overlayImage);
@@ -220,16 +241,23 @@ export async function cutClip(
       `afade=t=out:st=${Math.max(startSeconds, endSeconds - fade.outSeconds).toFixed(3)}:d=${fade.outSeconds}`
     : undefined;
 
+  // Without a fade (whose times are on the input's own timeline) the seek goes
+  // BEFORE the input: ffmpeg jumps to the keyframe ahead of the start and
+  // decodes forward from there, still frame-accurate when re-encoding. Seeking
+  // after the input decodes everything from the top of the file to reach the
+  // start — minutes per clip deep into a feature film, and a recap is dozens
+  // of clips.
+  const seekFirst = !fade;
   try {
     await execFileAsync(ffmpegPath, [
       "-y",
+      ...(seekFirst ? ["-ss", startSeconds.toFixed(3)] : []),
       "-i",
       inputPath,
       ...(complex && overlayImage ? ["-i", overlayImage] : []),
-      "-ss",
-      startSeconds.toFixed(3),
-      "-to",
-      endSeconds.toFixed(3),
+      ...(seekFirst
+        ? ["-t", (endSeconds - startSeconds).toFixed(3)]
+        : ["-ss", startSeconds.toFixed(3), "-to", endSeconds.toFixed(3)]),
       ...(hasVideo
         ? [
             ...(complex
@@ -296,12 +324,14 @@ export async function cutClipFromStream(
   videoPrefix?: string,
   /** Local image the prefix pastes from, when a cover uses `replace`. */
   overlayImage?: string,
+  /** How a cropping aspect ratio is reached — see `buildAspectRatioFilter`. */
+  fit: "crop" | "blur" = "crop",
 ): Promise<void> {
   if (!ffmpegPath) {
     throw new Error(MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED);
   }
 
-  const videoFilter = buildAspectRatioFilter(aspectRatio, videoPrefix);
+  const videoFilter = buildAspectRatioFilter(aspectRatio, videoPrefix, fit);
   const fastSeek = Math.max(0, Number(startSeconds) - STREAM_DIRECT_FAST_SEEK_BACKUP_SECONDS);
   const accurateSeek = Number(startSeconds) - fastSeek;
   const duration = Number(endSeconds) - Number(startSeconds);

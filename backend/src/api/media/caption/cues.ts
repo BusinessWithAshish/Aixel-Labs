@@ -151,7 +151,9 @@ export function parseSubtitles(raw: string, options: WRAP_OPTIONS): CAPTION_CUE[
 
     const [rawStart, rawEnd] = blockLines[arrowIndex].split("-->");
     const start = parseTimestamp(rawStart ?? "");
-    const end = parseTimestamp((rawEnd ?? "").split(/\s+/)[0] ?? "");
+    // `trim` first: a standard SRT has a space after the arrow, and splitting an
+    // untrimmed " 00:00:01,550" on whitespace yields "" — zero cues, no error.
+    const end = parseTimestamp((rawEnd ?? "").trim().split(/\s+/)[0] ?? "");
     if (Number.isNaN(start) || Number.isNaN(end)) continue;
 
     const text = blockLines.slice(arrowIndex + 1).join(" ").trim();
