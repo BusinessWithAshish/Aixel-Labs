@@ -21,6 +21,7 @@ pnpm --filter frontend dev      # port 3003
 pnpm --filter frontend lint
 pnpm --filter frontend types
 pnpm --filter frontend build
+pnpm --filter frontend e2e      # Playwright browser tests — see e2e/README.md
 ```
 
 ## Code style

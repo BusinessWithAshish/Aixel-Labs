@@ -8,7 +8,12 @@
     "start": "next start",
     "lint": "next lint",
     "types": "tsc --noEmit",
-    "prod": "rm -rf .next && next build && next start --port=3003"
+    "prod": "rm -rf .next && next build && next start --port=3003",
+    "e2e:services:up": "docker compose -f e2e/docker-compose.yml up -d --wait",
+    "e2e:services:down": "docker compose -f e2e/docker-compose.yml down -v",
+    "e2e": "pnpm e2e:services:up && playwright test --project=chromium",
+    "e2e:ui": "pnpm e2e:services:up && playwright test --project=chromium --ui",
+    "e2e:walkthrough": "pnpm e2e:services:up && playwright test --project=walkthrough"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.34",
@@ -74,6 +79,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

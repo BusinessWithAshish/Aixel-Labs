@@ -1,0 +1,35 @@
+# Throwaway services for the browser test suite. Nothing here persists:
+# Mongo runs on tmpfs and the Auth emulator keeps users in memory.
+name: aixel-e2e
+
+services:
+    mongo:
+        image: mongo:7
+        ports:
+            - '127.0.0.1:27018:27017'
+        tmpfs:
+            - /data/db
+        healthcheck:
+            test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+            interval: 2s
+            timeout: 5s
+            retries: 30
+
+    firebase-auth:
+        image: node:22-alpine
+        working_dir: /srv
+        command: npx -y firebase-tools@15.32.1 emulators:start --only auth --project demo-aixel-e2e
+        ports:
+            - '127.0.0.1:9099:9099'
+        volumes:
+            - ./firebase.json:/srv/firebase.json:ro
+            - npm-cache:/root/.npm
+        healthcheck:
+            test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:9099/']
+            interval: 3s
+            timeout: 5s
+            retries: 60
+            start_period: 20s
+
+volumes:
+    npm-cache:
