@@ -32,6 +32,10 @@ for mounts/boot, **db** for anything persisted, then the folder you are editing.
   function, not the route — MCP ops call the same function.
 - APIs return `ALApiResponse<T>`; Zod validates **requests** only.
 - **No Mongo inside `src/api`.** Utils are BE-only (no FE package export).
+- Auth: with `AIXEL_API_SECRET` set, `server.ts` rejects remote callers that do not
+  present it (header `API_SECRET_HEADER`, `Authorization: Bearer`, or `/mcp?key=`).
+  Callers on this host are exempt. Routes have no auth of their own — never expose
+  the API without it.
 - MCP: one tool per domain (`op` / `layer` / `input`) calling the same
   **services** as HTTP — no loopback. Catalog: `backend/src/mcp/README.md`.
 

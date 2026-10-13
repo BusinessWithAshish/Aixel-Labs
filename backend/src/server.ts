@@ -1,5 +1,6 @@
 // Load `.env` before any local module reads `process.env` into constants (e.g. PROXY_CONFIG).
 import "dotenv/config";
+import { createHash, timingSafeEqual } from "crypto";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -13,6 +14,9 @@ import {
   ALLOWED_ORIGINS_DEV_REGEX,
   ALLOWED_ORIGINS_PROD_REGEX,
   API_ENDPOINTS,
+  API_SECRET_EXEMPT_PATHS,
+  API_SECRET_HEADER,
+  ENDPOINTS,
 } from "./config";
 
 const app: Express = express();
@@ -85,6 +89,13 @@ app.use(express.json({ limit: "5mb" }));
 // ===================
 // 4. Request Logging
 // ===================
+// `/mcp?key=…` carries the API secret for connectors that only take a URL — keep it out of the logs.
+morgan.token("url", (req) =>
+  ((req as express.Request).originalUrl ?? req.url ?? "").replace(
+    /([?&]key=)[^&]*/g,
+    "$1[redacted]",
+  ),
+);
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
 // ===================
@@ -132,6 +143,63 @@ app.get(
     res.json({ success: true, message: "Server is running" });
   },
 );
+
+// ===================
+// 6.1 API Secret
+// ===================
+// Nothing below this line has auth of its own, and it includes routes that
+// shell out (`/claude`, `/chatgpt`) and every scraper. With `AIXEL_API_SECRET`
+// set, a remote caller must present it; without it the API stays open, which is
+// only acceptable in local dev.
+//
+// Callers on this host — the Hermes gateways, cron sessions, local Claude Code —
+// dial 127.0.0.1:8002 directly and are exempt, so they need no key. A request
+// relayed by Caddy also arrives from loopback, but always carries
+// X-Forwarded-For (Caddy sets it; a client cannot remove it), so it is never
+// mistaken for a local caller, whatever `trust proxy` is set to.
+const API_SECRET = process.env.AIXEL_API_SECRET?.trim();
+if (!API_SECRET && process.env.NODE_ENV === "production") {
+  console.warn(
+    "[server] AIXEL_API_SECRET is not set — every route is callable without credentials.",
+  );
+}
+
+function isLocalCaller(req: express.Request): boolean {
+  return (
+    LOOPBACK_IPS.has(req.socket.remoteAddress ?? "") &&
+    !req.headers["x-forwarded-for"]
+  );
+}
+
+function presentedApiSecret(req: express.Request): string | undefined {
+  const header = req.get(API_SECRET_HEADER);
+  if (header) return header;
+  const bearer = req.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (bearer) return bearer;
+  // Hosted MCP connectors can be given a URL but no custom header.
+  const { key } = req.query;
+  if (req.path.startsWith(ENDPOINTS.MCP) && typeof key === "string") return key;
+  return undefined;
+}
+
+function matchesApiSecret(presented: string, secret: string): boolean {
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(digest(presented), digest(secret));
+}
+
+app.use((req, res, next) => {
+  if (
+    !API_SECRET ||
+    req.method === "OPTIONS" ||
+    isLocalCaller(req) ||
+    API_SECRET_EXEMPT_PATHS.some((pattern) => pattern.test(req.path))
+  ) {
+    return next();
+  }
+  const presented = presentedApiSecret(req);
+  if (presented && matchesApiSecret(presented, API_SECRET)) return next();
+  res.status(401).json({ success: false, error: "Unauthorized" });
+});
 
 // ===================
 // 7. Feature Routes

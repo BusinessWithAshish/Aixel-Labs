@@ -35,6 +35,20 @@ export enum ENDPOINTS {
 }
 
 /**
+ * Header a remote caller presents `AIXEL_API_SECRET` in (`Authorization: Bearer`
+ * is accepted too). Enforced in `server.ts`; callers on this host are exempt.
+ */
+export const API_SECRET_HEADER = "x-aixel-api-key";
+
+/**
+ * Reachable without the API secret: the upload steps a browser calls directly,
+ * each of which carries its own signed upload token.
+ */
+export const API_SECRET_EXEMPT_PATHS: readonly RegExp[] = [
+  /^\/media\/upload\/[^/]+\/(chunk|status|complete)\/?$/,
+];
+
+/**
  * Vercel sets `VERCEL=1` automatically on every deployment. Used in
  * `server.ts` to skip `app.listen` (export the app instead). Product HTTP
  * mounts and MCP tools always register — this backend is intended to run

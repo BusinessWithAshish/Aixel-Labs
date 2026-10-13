@@ -1,6 +1,7 @@
 'use server';
 
 import { ALApiResponse } from '@aixellabs/backend/api/types';
+import { API_SECRET_HEADER } from '@aixellabs/backend/config';
 import { assertRequiredTrimmedString, runAuthenticatedAction } from '@/helpers/server-action-helpers';
 import { assertCallerIsAdmin } from '@/server/auth';
 
@@ -24,6 +25,12 @@ function getUploadOrigin(): string {
     return origin;
 }
 
+/** `init` is not token-gated like the later upload steps, so it needs the backend API secret. */
+function apiSecretHeader(): Record<string, string> {
+    const apiSecret = process.env.AIXEL_API_SECRET?.trim();
+    return apiSecret ? { [API_SECRET_HEADER]: apiSecret } : {};
+}
+
 /**
  * Admin-only: mints an upload session against the VPS backend's public upload origin.
  * The returned token is opaque — the browser carries it on every subsequent chunk /
@@ -42,7 +49,7 @@ export const createUploadInit = async (
 
         const response = await fetch(`${getUploadOrigin()}/media/upload/init`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...apiSecretHeader() },
             body: JSON.stringify({
                 filename: input.filename,
                 size: input.size,

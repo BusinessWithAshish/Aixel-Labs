@@ -12,6 +12,11 @@ const nlQueryAPIInputSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+    // Proof of concept: it runs model-written code on the server, so it is not served in production.
+    if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     try {
         const session = await getAppSession();
 
