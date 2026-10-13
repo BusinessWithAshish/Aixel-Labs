@@ -126,6 +126,22 @@
       "types": "./src/api/segment/constants.ts",
       "default": "./src/api/segment/constants.ts"
     },
+    "./reddit": {
+      "types": "./src/api/reddit/index.ts",
+      "default": "./src/api/reddit/index.ts"
+    },
+    "./reddit/schemas": {
+      "types": "./src/api/reddit/schemas.ts",
+      "default": "./src/api/reddit/schemas.ts"
+    },
+    "./reddit/types": {
+      "types": "./src/api/reddit/types.ts",
+      "default": "./src/api/reddit/types.ts"
+    },
+    "./reddit/constants": {
+      "types": "./src/api/reddit/constants.ts",
+      "default": "./src/api/reddit/constants.ts"
+    },
     "./twitter": {
       "types": "./src/api/twitter/index.ts",
       "default": "./src/api/twitter/index.ts"

@@ -11,13 +11,14 @@ import { registerSegmentTool } from "./tools/segment";
 import { registerInstagramTool } from "./tools/instagram";
 import { registerTrendsTool } from "./tools/trends";
 import { registerTwitterTool } from "./tools/twitter";
+import { registerRedditTool } from "./tools/reddit";
 import { registerMediaTool } from "./tools/media";
 import { registerYoutubeTool } from "./tools/youtube";
 
 export const MCP_SERVER_NAME = "aixel-intelligence";
 export const MCP_SERVER_VERSION = "1.0.0";
-/** One domain tool each: youtube, trends, instagram, twitter, gsearch, media, segment, chatgpt, claude, gemini, gmaps, facebook, linkedin, crawl. */
-export const MCP_TOOL_COUNT = 14;
+/** One domain tool each: youtube, trends, instagram, twitter, reddit, gsearch, media, segment, chatgpt, claude, gemini, gmaps, facebook, linkedin, crawl. */
+export const MCP_TOOL_COUNT = 15;
 
 export function createAixelIntelligenceMcpServer(): McpServer {
   const server = new McpServer(
@@ -30,6 +31,7 @@ export function createAixelIntelligenceMcpServer(): McpServer {
   registerTrendsTool(server);
   registerInstagramTool(server);
   registerTwitterTool(server);
+  registerRedditTool(server);
   registerGsearchTool(server);
   registerMediaTool(server);
   registerSegmentTool(server);

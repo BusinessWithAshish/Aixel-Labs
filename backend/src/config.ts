@@ -9,6 +9,7 @@ import { IG_DOWNLOAD_ROUTES } from "./api/instagram/download/constants";
 import { GMAPS_DETAILS_ROUTES } from "./api/gmaps/details/constants";
 import { GMAPS_ADVANCED_ROUTES } from "./api/gmaps/advanced/constants";
 import { TWITTER_API_ROUTES } from "./api/twitter/constants";
+import { REDDIT_API_ROUTES } from "./api/reddit/constants";
 import { BLUFF_ROUTES } from "./api/bluff/constants";
 import { BUSINESS_ROUTES } from "./api/business/constants";
 
@@ -20,6 +21,7 @@ export enum ENDPOINTS {
   LINKEDIN = "/linkedin",
   YOUTUBE = "/youtube",
   TWITTER = "/twitter",
+  REDDIT = "/reddit",
   GSEARCH = "/gsearch",
   GOOGLE_TRENDS = "/google-trends",
   MEDIA = "/media",
@@ -184,6 +186,36 @@ export const API_ENDPOINTS = {
     TRENDING: {
       route: TWITTER_API_ROUTES.TRENDING,
       full: `${ENDPOINTS.TWITTER}${TWITTER_API_ROUTES.TRENDING}`,
+    },
+  },
+  REDDIT: {
+    FEED: {
+      route: REDDIT_API_ROUTES.FEED,
+      full: `${ENDPOINTS.REDDIT}${REDDIT_API_ROUTES.FEED}`,
+    },
+    POST: {
+      route: REDDIT_API_ROUTES.POST,
+      full: `${ENDPOINTS.REDDIT}${REDDIT_API_ROUTES.POST}`,
+    },
+    SUBREDDIT: {
+      route: REDDIT_API_ROUTES.SUBREDDIT,
+      full: `${ENDPOINTS.REDDIT}${REDDIT_API_ROUTES.SUBREDDIT}`,
+    },
+    USER: {
+      route: REDDIT_API_ROUTES.USER,
+      full: `${ENDPOINTS.REDDIT}${REDDIT_API_ROUTES.USER}`,
+    },
+    SEARCH: {
+      route: REDDIT_API_ROUTES.SEARCH,
+      full: `${ENDPOINTS.REDDIT}${REDDIT_API_ROUTES.SEARCH}`,
+    },
+    WIKI: {
+      route: REDDIT_API_ROUTES.WIKI,
+      full: `${ENDPOINTS.REDDIT}${REDDIT_API_ROUTES.WIKI}`,
+    },
+    ARCHIVE: {
+      route: REDDIT_API_ROUTES.ARCHIVE,
+      full: `${ENDPOINTS.REDDIT}${REDDIT_API_ROUTES.ARCHIVE}`,
     },
   },
   YOUTUBE: {
