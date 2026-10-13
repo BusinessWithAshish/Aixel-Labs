@@ -14,6 +14,19 @@ type FieldControllerProps = {
     render: (props: FieldControllerRenderProps) => ReactElement;
 };
 
+/** Zod issue codes an empty required value fails with; their default wording is developer-facing. */
+const EMPTY_VALUE_ERROR_TYPES = new Set(['too_small', 'invalid_type']);
+const REQUIRED_FIELD_MESSAGE = 'This field is required';
+
+function isEmptyValue(value: unknown): boolean {
+    return value == null || value === '' || (Array.isArray(value) && value.length === 0);
+}
+
+function toDisplayError(error: ReactHookFormFieldError | undefined, value: unknown) {
+    if (!error || !isEmptyValue(value) || !EMPTY_VALUE_ERROR_TYPES.has(String(error.type))) return error;
+    return { ...error, message: REQUIRED_FIELD_MESSAGE };
+}
+
 /**
  * HOC wrapper component that eliminates redundant Controller wrapping
  * Provides a clean interface for field components with standardized props
@@ -29,7 +42,7 @@ export const FieldController = ({ name, render }: FieldControllerProps) => {
                 const FieldComponent = render({
                     value: field.value,
                     invalid: fieldState.invalid,
-                    errors: fieldState.error,
+                    errors: toDisplayError(fieldState.error, field.value),
                     onChange: field.onChange,
                 });
                 return cloneElement(FieldComponent, { key: name });

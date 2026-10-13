@@ -170,7 +170,7 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
         return current !== baseline;
     };
 
-    const openSaveDialog = (mode: 'save-and-run' | 'save-only') => {
+    const openSaveDialog = async (mode: 'save-and-run' | 'save-only') => {
         if (busy) return;
         if (mode === 'save-and-run' && loadedPresetName) {
             const saved = presets[loadedPresetName];
@@ -187,6 +187,11 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
                 return;
             }
             runForm();
+            return;
+        }
+        // Check before asking for a name: the dialog would cover the fields that need fixing.
+        if (mode === 'save-and-run' && !(await form.trigger())) {
+            toast.error('Please fill in all required fields.');
             return;
         }
         setSaveMode(mode);
@@ -279,7 +284,7 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
                         variant="default"
                         size="sm"
                         className="rounded-r-none"
-                        onClick={() => openSaveDialog('save-and-run')}
+                        onClick={() => void openSaveDialog('save-and-run')}
                         disabled={busy}
                         title={
                             loadedPresetName
@@ -333,7 +338,7 @@ export function FormPresetScraperActions<TFieldValues extends FieldValues = Fiel
                                     icon: BookmarkPlusIcon,
                                     variant: 'primary',
                                     disabled: busy,
-                                    onSelect: () => openSaveDialog('save-only'),
+                                    onSelect: () => void openSaveDialog('save-only'),
                                 },
                                 {
                                     key: 'run-without-saving',

@@ -45,7 +45,7 @@ export function LeadFormWrapper({
 
     return (
         <Card className={classNames?.card}>
-            <CardHeader className={classNames?.header}>
+            <CardHeader className={cn('max-sm:grid-cols-1!', classNames?.header)}>
                 <CardTitle className={cn('flex items-center gap-2', classNames?.title)}>
                     <Avatar className={cn('shrink-0', classNames?.icon)} style={{ width: iconSize, height: iconSize }}>
                         <AvatarImage className={classNames?.iconImage} src={config.icon.src} alt={config.icon.alt} />
@@ -62,7 +62,14 @@ export function LeadFormWrapper({
                     <CreditCostNotice module={creditModule} className={classNames?.creditNotice} />
                 ) : null}
                 {actions ? (
-                    <CardAction className={cn('flex item-center flex-row w-full gap-2', classNames?.action)}>
+                    <CardAction
+                        className={cn(
+                            'flex items-center flex-row w-full gap-2',
+                            // Phones: one column, actions below the title block instead of squeezing it.
+                            'max-sm:col-start-1 max-sm:row-span-1 max-sm:row-start-auto max-sm:justify-end',
+                            classNames?.action,
+                        )}
+                    >
                         {actions}
                     </CardAction>
                 ) : null}

@@ -89,7 +89,7 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                                                         <Link prefetch={true} href={subItem.url}>
                                                             <LinkItem>
                                                                 {SubItemIcon && <SubItemIcon.icon className={SubItemIcon.color} />}
-                                                                <span>
+                                                                <span title={enumToTitleCase(subItem.title)}>
                                                                     {enumToTitleCase(subItem.title)}
                                                                 </span>
                                                             </LinkItem>

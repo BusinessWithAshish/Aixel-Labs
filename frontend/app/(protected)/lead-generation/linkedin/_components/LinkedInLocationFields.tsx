@@ -16,13 +16,13 @@ type LinkedInLocationFieldsProps = {
 const LOCATION_COPY: Record<LinkedInLocationFieldsProps['mode'], { country: string; state: string; city: string }> = {
     people: {
         country:
-            'Where this person is based. Country is required (ISO code). Add state and/or city to narrow results — both are sent to search as "in City, State".',
+            'Where this person is based. Country is required. Add a state and/or city to narrow results.',
         state: 'Optional. State or province name for the selected country.',
         city: 'Optional. City name. Combined with state when both are set.',
     },
     company: {
         country:
-            'Where the company is headquartered. Country is required (ISO code). Add state and/or city to narrow — both are sent as "in City, State".',
+            'Where the company is headquartered. Country is required. Add a state and/or city to narrow results.',
         state: 'Optional. State or province name for the selected country.',
         city: 'Optional. City name. Combined with state when both are set.',
     },

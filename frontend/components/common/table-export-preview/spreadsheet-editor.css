@@ -103,3 +103,8 @@
     background-color: color-mix(in oklch, var(--primary) 22%, var(--header_background)) !important;
     font-weight: 600;
 }
+
+/* jsuites.css uppercases every placeholder on the page below 800px wide — undo it app-wide. */
+::placeholder {
+    text-transform: none;
+}

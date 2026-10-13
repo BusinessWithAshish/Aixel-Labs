@@ -339,11 +339,12 @@ export const StringArrayControlledField = ({
             // Provide stable keys from useFieldArray for proper React rendering
             fieldKeys={fields.map((field) => field.id)}
             // Custom renderItem that uses StringControlledField - reusing existing component!
-            renderItem={({ itemName, disabled: itemDisabled, onRemove }) => (
+            renderItem={({ itemName, placeholder, disabled: itemDisabled, onRemove }) => (
                 <>
                     <StringControlledField
                         name={itemName}
                         label=""
+                        placeholder={placeholder}
                         disabled={itemDisabled}
                         className="flex-1"
                         classNames={{ input: classNames?.input, label: 'sr-only' }}

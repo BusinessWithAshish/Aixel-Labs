@@ -56,7 +56,7 @@ export const GoogleMapsQueryForm = () => {
             <ZodSearchableSelectField
                 name="placeTypeGroup"
                 label="Category"
-                description="Business category group (Places Table A). Choose a group, then a place type."
+                description="Business category group. Choose a group, then a place type."
                 options={placeTypeGroupOptions}
                 value={selectedPlaceTypeGroup === GMAPS_EMPTY ? undefined : selectedPlaceTypeGroup}
                 onChange={onPlaceTypeGroupChange}

@@ -97,12 +97,10 @@ export function LeadListItemCard({ list, selected, onToggleSelect }: LeadListIte
             <CardFooter className="flex w-full flex-row flex-wrap items-center justify-between gap-2">
                 <div className="text-muted-foreground flex flex-wrap gap-1 text-xs">
                     <Badge variant="secondary" className="wrap-break-word">
-                        Updated at:
-                        {new Date(list.updatedAt).toLocaleString()}
+                        Updated at: {new Date(list.updatedAt).toLocaleString()}
                     </Badge>
                     <Badge variant="secondary" className="wrap-break-word">
-                        Created at:
-                        {new Date(list.createdAt).toLocaleString()}
+                        Created at: {new Date(list.createdAt).toLocaleString()}
                     </Badge>
                 </div>
                 <Badge variant="secondary" className="w-fit shrink-0 gap-1.5 font-medium tabular-nums">
