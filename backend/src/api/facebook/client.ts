@@ -162,9 +162,15 @@ export async function fetchFromEntities(
     if (!lead) continue;
     if (!lead.id) lead.id = v.toLowerCase();
     if (!lead.facebookUrl) lead.facebookUrl = facebookPageUrl(v);
-    // Drop shells with no usable page identity
-    if (!lead.name) continue;
+    // Drop what is still sparse after every retry: a login shell, or a Page
+    // with nothing but a name. Neither is worth a credit to the caller.
+    if (isSparseFacebookLead(lead)) continue;
     out.push(lead);
+  }
+  if (out.length < vanities.length) {
+    console.log(
+      `[facebook] dropped ${vanities.length - out.length} of ${vanities.length} page(s) with no contact or category data`,
+    );
   }
   return out;
 }

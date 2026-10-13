@@ -20,6 +20,7 @@ import {
   extractUsername,
   generateInstagramSearchQuery,
   instagramProfileUrl,
+  isEmptyInstagramLead,
   mapXigUserToResponse,
   uniqueUsernames,
   type XigProfilePageUser,
@@ -171,7 +172,16 @@ export async function fetchFromQuery(
     `[instagram] SERP rows=${searchResultsData.length} → unique profile handles=${entities.length} (limit=${limit})`,
   );
 
-  return await fetchFromEntities(entities, countryCode, limit);
+  // Discovery only: a handle the caller asked for by name is returned as-is,
+  // but a search hit with no bio, link, contact or category is not a lead.
+  const profiles = await fetchFromEntities(entities, countryCode, limit);
+  const leads = profiles.filter((profile) => !isEmptyInstagramLead(profile));
+  if (leads.length < profiles.length) {
+    console.log(
+      `[instagram] dropped ${profiles.length - leads.length} of ${profiles.length} empty profile(s) from discovery`,
+    );
+  }
+  return leads;
 }
 
 /** One AYML entry as Instagram ships it to a logged-out viewer. */

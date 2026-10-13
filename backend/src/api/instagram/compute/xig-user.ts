@@ -146,6 +146,21 @@ function addressJson(page: XigProfilePageUser | null): string | null {
  * `is_business` is always false to guests. Emails and phones come from the
  * bio and bio links; the Contact-button fields stay login-only.
  */
+/**
+ * A profile that carries nothing a lead is bought for: no bio, links, email,
+ * phone or category — typically a private or abandoned account. It still has
+ * a handle and counts, so it is only "empty" as a discovery result.
+ */
+export function isEmptyInstagramLead(lead: INSTAGRAM_RESPONSE): boolean {
+  return !(
+    lead.bio?.trim() ||
+    lead.websites?.length ||
+    lead.businessEmail ||
+    lead.businessPhoneNumber?.length ||
+    lead.businessCategoryName
+  );
+}
+
 export function mapXigUserToResponse(
   user: XigUserByUsername,
   country: CountryCode,

@@ -11,7 +11,9 @@ Page data (name, followers, category, website) with zero cookies — no static
 header/cookie fix was found to reliably reproduce it, but a fresh session
 lands the real page roughly 1 in 6 tries, the rest getting a full-size page
 shell whose `<meta http-equiv="refresh">` points at `/login` (parsed as
-sparse, not returned as fake data). `mbasic.facebook.com` now unconditionally
+sparse, not returned as fake data). A Page still sparse after every retry — no
+website, phone, email, address or category — is dropped from the response,
+so callers are never charged for a name-only lead. `mbasic.facebook.com` now unconditionally
 redirects to login — dropped from the fallback chain entirely, it was pure
 wasted attempts. The fix is `FACEBOOK_SPARSE_RETRY_MAX` in `constants.ts`:
 keep retrying `/about` with fresh sessions (Evomi gives each one a different

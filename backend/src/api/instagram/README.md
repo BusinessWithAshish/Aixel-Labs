@@ -23,6 +23,10 @@ disk (Googlebot-UA SSR page, direct — no proxy). See
 
 ## How discovery works
 
+Discovery results with no bio, link, email, phone or category (private or
+abandoned accounts) are dropped — `isEmptyInstagramLead`. A handle looked up by
+name through `entities` is always returned as found.
+
 1. `generateInstagramSearchQuery` builds a profile-biased Google query:
    `site:instagram.com intitle:"Instagram photos and videos" …`
 2. `fetchGsearch` returns SERP URLs (up to ~120).

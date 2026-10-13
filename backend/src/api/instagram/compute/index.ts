@@ -12,6 +12,7 @@ export {
 } from "./username";
 export { collectBusinessPhoneNumbers } from "./phones";
 export {
+  isEmptyInstagramLead,
   mapXigUserToResponse,
   extractEmailsFromBio,
   type XigProfilePageUser,
