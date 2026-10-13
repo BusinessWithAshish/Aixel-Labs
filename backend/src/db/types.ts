@@ -5,7 +5,7 @@
 import { type GMAPS_INTERNAL_RESPONSE } from "../api/gmaps/internal/types";
 import type { GMAPS_DETAILS_RESPONSE } from "../api/gmaps/details";
 import type { GSEARCH_RESPONSE } from "../api/gsearch";
-import { INSTAGRAM_RESPONSE } from "../api/instagram";
+import type { INSTAGRAM_RESPONSE } from "../api/instagram";
 import type { FACEBOOK_RESPONSE } from "../api/facebook";
 import { ObjectId } from "mongodb";
 import {
@@ -108,7 +108,7 @@ export type TenantDoc<Id = ObjectId> = {
   app_theme_color?: string;
   app_description?: string;
   defaultModuleAccess?: ModuleAccess;
-  /** Credits a new member starts with, and what a member's balance is topped back up to each refill period. */
+  /** Credits a new member starts with (never below the daily free allowance). */
   defaultCredits?: number;
 };
 
@@ -125,7 +125,7 @@ export type UserDoc<Id = ObjectId> = {
   tenantName: string;
   moduleAccess?: ModuleAccess;
   credits?: number;
-  /** When the balance was last topped back up to the tenant's `defaultCredits`. */
+  /** When the balance was last topped back up to the daily free allowance. */
   creditsRefilledAt?: Date;
 };
 

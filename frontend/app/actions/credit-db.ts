@@ -1,41 +1,47 @@
 import 'server-only';
 
-import { getCollection, MongoCollections, MongoObjectId, type TenantDoc, type UserDoc } from '@aixellabs/backend/db';
-import { isCreditsRefillDue, normalizeCredits, type UserCreditsState } from '@/helpers/credits';
+import { getCollection, MongoCollections, MongoObjectId, type UserDoc } from '@aixellabs/backend/db';
+import {
+    DAILY_FREE_CREDITS,
+    getNextCreditsRefillAt,
+    isCreditsRefillDue,
+    normalizeCredits,
+    type UserCreditsState,
+} from '@/helpers/credits';
 
-type RefillFields = Pick<UserDoc, '_id' | 'credits' | 'isAdmin' | 'tenantId' | 'creditsRefilledAt'>;
+type RefillFields = Pick<UserDoc, '_id' | 'credits' | 'creditsRefilledAt'>;
+type RefilledBalance = { credits: number; refilledAt: Date };
 
 /**
- * Tops a member's balance back up to their tenant's `defaultCredits` once per
- * refill period, lazily — on the first balance read after it falls due, so no
- * scheduler is involved. Returns the balance after any refill.
+ * Tops a member's balance back up to `DAILY_FREE_CREDITS` once per refill
+ * period, lazily — on the first balance read after it falls due, so no
+ * scheduler is involved. Returns the balance after any refill and when that
+ * refill happened.
  *
  * The update is conditional on `creditsRefilledAt` being what was just read,
  * so two requests arriving together refill once.
  */
-async function refillCreditsIfDue(user: RefillFields): Promise<number> {
+async function refillCreditsIfDue(user: RefillFields): Promise<RefilledBalance> {
     const balance = normalizeCredits(user.credits);
-    if (user.isAdmin === true || !isCreditsRefillDue(user.creditsRefilledAt)) return balance;
+    if (user.creditsRefilledAt && !isCreditsRefillDue(user.creditsRefilledAt)) {
+        return { credits: balance, refilledAt: user.creditsRefilledAt };
+    }
 
-    const tenants = await getCollection<TenantDoc>(MongoCollections.TENANTS);
-    const tenant = await tenants.findOne({ _id: user.tenantId }, { projection: { defaultCredits: 1 } });
-    const allowance = normalizeCredits(tenant?.defaultCredits);
-    if (allowance <= 0) return balance;
-
+    const refilledAt = new Date();
     const users = await getCollection<UserDoc>(MongoCollections.USERS);
     const updated = await users.findOneAndUpdate(
         {
             _id: user._id,
             creditsRefilledAt: user.creditsRefilledAt ?? { $exists: false },
         },
-        { $set: { credits: Math.max(balance, allowance), creditsRefilledAt: new Date() } },
+        { $set: { credits: Math.max(balance, DAILY_FREE_CREDITS), creditsRefilledAt: refilledAt } },
         { returnDocument: 'after', projection: { credits: 1 } },
     );
-    if (updated) return normalizeCredits(updated.credits);
+    if (updated) return { credits: normalizeCredits(updated.credits), refilledAt };
 
     // Another request refilled first — read what it left.
-    const current = await users.findOne({ _id: user._id }, { projection: { credits: 1 } });
-    return normalizeCredits(current?.credits);
+    const current = await users.findOne({ _id: user._id }, { projection: { credits: 1, creditsRefilledAt: 1 } });
+    return { credits: normalizeCredits(current?.credits), refilledAt: current?.creditsRefilledAt ?? refilledAt };
 }
 
 export async function getUserCreditsState(userId: string | MongoObjectId): Promise<UserCreditsState> {
@@ -43,15 +49,17 @@ export async function getUserCreditsState(userId: string | MongoObjectId): Promi
     const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
     const user = await usersCollection.findOne(
         { _id: oid },
-        { projection: { credits: 1, isAdmin: 1, tenantId: 1, creditsRefilledAt: 1 } },
+        { projection: { credits: 1, isAdmin: 1, creditsRefilledAt: 1 } },
     );
     if (!user) {
         throw new Error('User not found');
     }
-    return {
-        credits: await refillCreditsIfDue(user),
-        exempt: user.isAdmin === true,
-    };
+    if (user.isAdmin === true) {
+        return { credits: normalizeCredits(user.credits), exempt: true };
+    }
+
+    const { credits, refilledAt } = await refillCreditsIfDue(user);
+    return { credits, exempt: false, refillsAt: getNextCreditsRefillAt(refilledAt) };
 }
 
 export async function getUserCredits(userId: string | MongoObjectId): Promise<number> {

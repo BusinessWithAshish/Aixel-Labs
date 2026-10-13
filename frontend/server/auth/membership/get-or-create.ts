@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getCollection, MongoCollections, type TenantDoc, type UserDoc } from '@aixellabs/backend/db';
+import { DAILY_FREE_CREDITS } from '@/helpers/credits';
 import { AUTH_ERRORS } from '@/lib/auth/constants';
 import { isDeviceFingerprintSkipped } from '@/lib/auth/device-fingerprint-config';
 import { authErrorMessage, decideCreateMembership } from '@/server/auth/policy';
@@ -89,7 +90,7 @@ export async function getOrCreateMembership(
             tenantId: tenant._id,
             tenantName,
             moduleAccess: decision.isAdmin ? {} : (tenant.defaultModuleAccess ?? {}),
-            credits: tenant.defaultCredits ?? 0,
+            credits: Math.max(tenant.defaultCredits ?? 0, DAILY_FREE_CREDITS),
             creditsRefilledAt: new Date(),
         };
         await users.insertOne(doc);

@@ -1,6 +1,6 @@
 import { type ModuleAccess, Modules } from '@aixellabs/backend/db/types';
 import { SubModuleUrls, ALWAYS_ALLOWED_PATHS, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
-import { SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS } from '@/config/sidebar.config';
+import { SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS, HIDDEN_SUB_MODULES } from '@/config/sidebar.config';
 import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 
 /**
@@ -11,7 +11,7 @@ function buildSidebarFromModuleAccess(moduleAccess: ModuleAccess): SidebarConfig
 
     // eslint-disable-next-line @next/next/no-assign-module-variable
     for (const module of Object.values(Modules)) {
-        const subModules = moduleAccess[module];
+        const subModules = moduleAccess[module]?.filter((subModule) => !HIDDEN_SUB_MODULES.has(subModule));
         if (!subModules || subModules.length === 0) {
             continue;
         }

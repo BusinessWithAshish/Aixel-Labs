@@ -18,7 +18,7 @@ import {
     toObjectId,
 } from '@/helpers/server-action-helpers';
 import { buildLeadListNameFromPreset, getLeadSoruceFromSubModule } from '@/helpers/lead-gen-api';
-import { computeLeadGenCreditCost, getCreditCostPerItem } from '@/helpers/credits';
+import { computeLeadGenCreditCost, getCreditCostPerItem, NO_CREDITS_MESSAGE } from '@/helpers/credits';
 import { assertAndDebitCredits, getUserCreditsState } from '@/app/actions/credit-db';
 import { createUserLeadList } from './user-lead-lists-actions';
 import { getAppSession } from '@/server/auth';
@@ -60,7 +60,7 @@ export async function createUserLeads(
                 throw new Error('Unauthorized: no access to this lead generation module');
             }
             if (availableCredits < 1) {
-                throw new Error('Insufficient credits');
+                throw new Error(NO_CREDITS_MESSAGE);
             }
         }
 

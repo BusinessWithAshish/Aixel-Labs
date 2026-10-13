@@ -1,7 +1,8 @@
 import { CreditsIcon } from '@/components/common/credits/CreditsBadge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getCurrentUserCredits } from '@/app/actions/user-actions';
-import { creditsToneClassName } from '@/helpers/credits';
+import { formatDistanceToNow } from 'date-fns';
+import { creditsToneClassName, DAILY_FREE_CREDITS } from '@/helpers/credits';
 import { cn } from '@/lib/utils';
 import { RedeemCouponForm } from './RedeemCouponForm';
 
@@ -13,6 +14,7 @@ export async function CreditsBalanceCard() {
         return null;
     }
     const credits = result.success && result.data ? result.data.credits : 0;
+    const refillsAt = result.success ? result.data?.refillsAt : undefined;
 
     return (
         <Card>
@@ -23,7 +25,10 @@ export async function CreditsBalanceCard() {
                     </span>
                     Credits
                 </CardTitle>
-                <CardDescription>Your remaining balance for lead generation and other actions.</CardDescription>
+                <CardDescription>
+                    Your remaining balance for lead generation and other actions. Free credits refill to{' '}
+                    {DAILY_FREE_CREDITS.toLocaleString('en-US')} every 24 hours.
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <p
@@ -36,6 +41,7 @@ export async function CreditsBalanceCard() {
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                     {credits === 1 ? '1 credit available' : `${credits} credits available`}
+                    {refillsAt ? ` · next free refill ${formatDistanceToNow(refillsAt, { addSuffix: true })}` : null}
                 </p>
                 <RedeemCouponForm />
             </CardContent>

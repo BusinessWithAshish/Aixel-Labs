@@ -11,6 +11,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { DAILY_FREE_CREDITS } from '@/helpers/credits';
 
 const LEADS_OVERVIEW_PATH = '/lead-generation/leads';
 
@@ -39,7 +40,8 @@ function CreditsExhaustedDialog({ savedCount, onClose }: CreditsExhaustedDialogP
                     <DialogTitle>Credits exhausted</DialogTitle>
                     <DialogDescription>
                         Your credit balance is now 0. We saved {savedCount}{' '}
-                        {savedCount === 1 ? 'lead' : 'leads'} from this run. Top up credits to generate more.
+                        {savedCount === 1 ? 'lead' : 'leads'} from this run. Your free credits refill to{' '}
+                        {DAILY_FREE_CREDITS.toLocaleString('en-US')} every 24 hours.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>

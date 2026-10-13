@@ -15,6 +15,8 @@ export type UserCreditsState = {
     credits: number;
     /** Admins are outside the credits system. */
     exempt: boolean;
+    /** When the balance is next topped back up to `DAILY_FREE_CREDITS`. Absent for exempt users. */
+    refillsAt?: Date;
 };
 
 /** Balance tone thresholds (inclusive upper bounds for warn/critical). */
@@ -53,17 +55,30 @@ export function creditsToneClassName(credits: number): string {
     }
 }
 
+/** Free credits every member's balance is topped back up to each refill period. */
+export const DAILY_FREE_CREDITS = 1000;
+
 /**
- * How often a member's balance is topped back up to their tenant's
- * `defaultCredits`. A refill never lowers a balance, so credits from a coupon
- * or an admin survive it.
+ * How often a member's balance is topped back up to `DAILY_FREE_CREDITS`.
+ * A refill never lowers a balance, so credits from a coupon or an admin
+ * survive it.
  */
-export const CREDITS_REFILL_PERIOD_DAYS = 30;
+export const CREDITS_REFILL_PERIOD_DAYS = 1;
+
+const CREDITS_REFILL_PERIOD_MS = CREDITS_REFILL_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+
+/** Shown when a run is refused because the balance is empty. */
+export const NO_CREDITS_MESSAGE = `No credits left. Your free credits refill to ${DAILY_FREE_CREDITS.toLocaleString('en-US')} every 24 hours.`;
+
+/** When a balance last refilled at `refilledAt` is topped up next. */
+export function getNextCreditsRefillAt(refilledAt: Date): Date {
+    return new Date(new Date(refilledAt).getTime() + CREDITS_REFILL_PERIOD_MS);
+}
 
 /** True when a balance last refilled at `refilledAt` (never, when absent) is due again at `now`. */
 export function isCreditsRefillDue(refilledAt: Date | null | undefined, now: Date = new Date()): boolean {
     if (!refilledAt) return true;
-    return now.getTime() - new Date(refilledAt).getTime() >= CREDITS_REFILL_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+    return now.getTime() >= getNextCreditsRefillAt(refilledAt).getTime();
 }
 
 /** Upper bound for manually assigned user credit balances. */

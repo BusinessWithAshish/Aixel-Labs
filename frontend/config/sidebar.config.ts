@@ -28,6 +28,11 @@ import {
     Globe,
 } from 'lucide-react';
 
+/** Granted submodules whose page is not built yet: kept out of the sidebar and the path ACL. */
+export const HIDDEN_SUB_MODULES: ReadonlySet<SubModule> = new Set([
+    LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH,
+]);
+
 export type SidebarNavItem = {
     title: string;
     items?: {
