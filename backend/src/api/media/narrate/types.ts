@@ -26,6 +26,17 @@ export type NARRATE_PHRASE = {
 
 export type NARRATE_RESPELLING = { from: string; to: string; source: "channel" | "lexicon" | "rule" };
 
+/** provider "gemini": one sentence of the whole-script narration, cut out as its own audio file. */
+export type NARRATE_SENTENCE = {
+  n: number;
+  text: string;
+  audioPath: string;
+  durationSeconds: number;
+  /** Times are relative to this sentence's own file. */
+  words: NARRATE_WORD[];
+  phrases: NARRATE_PHRASE[];
+};
+
 export type MEDIA_NARRATE_RESPONSE = {
   audioPath: string;
   durationSeconds: number;
@@ -38,4 +49,15 @@ export type MEDIA_NARRATE_RESPONSE = {
   respelled: NARRATE_RESPELLING[];
   words: NARRATE_WORD[];
   phrases: NARRATE_PHRASE[];
+  /**
+   * provider "gemini" only. How the word times were found: "aligned" = matched
+   * to Whisper's hearing of the audio (`timingMatchedShare` of the words were
+   * heard; the rest are placed between their neighbours), "estimated" =
+   * Whisper failed, words spread over the audio by length.
+   */
+  timing?: "aligned" | "estimated";
+  timingMatchedShare?: number;
+  timingFallbackReason?: string;
+  /** provider "gemini" only: the narration cut at sentence ends, ready for `assemble`. */
+  sentences?: NARRATE_SENTENCE[];
 };

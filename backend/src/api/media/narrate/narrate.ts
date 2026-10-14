@@ -10,6 +10,7 @@ import { assertPersistentDisk } from "../../../config";
 import { AIXEL_MEDIA } from "../../../media";
 import { MEDIA_ERROR_MESSAGES } from "../constants";
 import { MEDIA_NARRATE, MEDIA_NARRATE_ERRORS } from "./constants";
+import { narrateWithGemini } from "./gemini";
 import { buildPhrases, prepareText } from "./markup";
 import type { MEDIA_NARRATE_REQUEST, MEDIA_NARRATE_RESPONSE, NARRATE_WORD } from "./types";
 
@@ -119,11 +120,14 @@ async function wavSeconds(path: string): Promise<number> {
  */
 export async function narrate(input: MEDIA_NARRATE_REQUEST): Promise<MEDIA_NARRATE_RESPONSE> {
   assertPersistentDisk(MEDIA_ERROR_MESSAGES.VERCEL);
+  if (input.provider === "gemini") return narrateWithGemini(input, wavSeconds);
+
   const prepared = prepareText(input.text, input.pronunciations);
   if (!prepared.spokenText) throw new Error(MEDIA_NARRATE_ERRORS.EMPTY_TEXT);
+  const voice = input.voice ?? MEDIA_NARRATE.DEFAULT_VOICE;
 
   const { wav, words } = await serialised(() =>
-    synthesise(prepared.engineInput, input.voice, input.speed, input.language, prepared.usesVoiceTags),
+    synthesise(prepared.engineInput, voice, input.speed, input.language, prepared.usesVoiceTags),
   );
 
   await mkdir(AIXEL_MEDIA.MEDIA_NARRATION, { recursive: true });
@@ -142,7 +146,7 @@ export async function narrate(input: MEDIA_NARRATE_REQUEST): Promise<MEDIA_NARRA
     audioPath,
     durationSeconds,
     provider: input.provider,
-    voice: input.voice,
+    voice,
     speed: input.speed,
     spokenText: prepared.spokenText,
     respelled: prepared.respelled,
