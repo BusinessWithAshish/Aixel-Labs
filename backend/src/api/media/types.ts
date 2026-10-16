@@ -77,6 +77,13 @@ export type GEMINI_USAGE_METADATA = {
   cachedContentTokenCount?: number;
 };
 
+/** Groq's OpenAI-compatible usage block — see `groq-chat.ts`. */
+export type GROQ_CHAT_USAGE = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+};
+
 export type DIARIZED_SPEAKER = {
   id: string;
   guessed_identity?: string;

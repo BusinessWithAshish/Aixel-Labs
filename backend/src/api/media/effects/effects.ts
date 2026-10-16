@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import ffmpegPath from "ffmpeg-static";
+import sharp from "sharp";
 
 import { assertPersistentDisk } from "../../../config";
 import {
@@ -16,7 +17,13 @@ import {
 } from "../constants";
 import { cleanupResolvedMediaSource, resolveMediaSource } from "../source";
 import { probeMediaStreams } from "../cut/ffmpeg-cut";
-import { buildFilterGraph, HIDE_DEFAULTS, proofFilter } from "./compose";
+import {
+  buildFilterGraph,
+  buildSpeedPlan,
+  HIDE_DEFAULTS,
+  proofFilter,
+  resolveLogoInsets,
+} from "./compose";
 import { detectStaticOverlays, eraseRegion, normalizeRegion } from "./detect";
 import { cornerColour, sampleSurroundColour } from "./surround";
 import { buildGradeFilters, everyPresetChain } from "./grade";
@@ -30,6 +37,7 @@ import type {
   HIDE_REGION,
   MEDIA_EFFECTS_REQUEST_PARSED,
   MEDIA_EFFECTS_RESPONSE,
+  SPEED_PLAN,
 } from "./types";
 
 const execFileAsync = promisify(execFile);
@@ -56,12 +64,14 @@ async function runFfmpeg(args: string[], failure: string): Promise<void> {
 }
 
 /**
- * Apply a colour grade, cover regions, and composite a mark — in one pass.
+ * Apply a colour grade, cover regions, composite a mark, retime the clip — in
+ * one pass.
  *
- * Audio is stream-copied throughout: nothing here touches it, and re-encoding
- * a track we do not change would be slower and lossy for nothing. Video
- * settings match `caption`'s burn exactly, so a clip that goes through both is
- * encoded twice at one quality rather than degrading in steps.
+ * **Audio is stream-copied unless `speed` filtered it.** Re-encoding a track we
+ * do not change would be slower and lossy for nothing; a track we DID filter has
+ * to be encoded, and there is no third option. Video settings match `caption`'s
+ * burn exactly, so a clip that goes through both is encoded twice at one quality
+ * rather than degrading in steps.
  */
 async function render(
   inputPath: string,
@@ -69,14 +79,27 @@ async function render(
   outLabel: string,
   imagePaths: string[],
   outputPath: string,
+  audioOutLabel: string | undefined,
+  retimed: boolean,
 ): Promise<void> {
   const args = ["-y", "-i", inputPath];
   for (const image of imagePaths) args.push("-i", image);
   if (graph) {
-    args.push("-filter_complex", graph, "-map", outLabel, "-map", "0:a?");
+    // `outLabel` is still the raw input when the graph only touches audio — a
+    // bracketed label there refers to a filter output that does not exist, so
+    // the plain stream specifier is what -map needs.
+    const videoMap = outLabel === "[0:v]" ? "0:v" : outLabel;
+    args.push("-filter_complex", graph, "-map", videoMap, "-map", audioOutLabel ?? "0:a?");
+  }
+  if (retimed) {
+    // `setpts` leaves the filter link with no declared frame rate, and ffmpeg
+    // then falls back to 25 fps and RESAMPLES to it — silently dropping 79 of a
+    // 180-frame clip at rate 1.5, and duplicating frames on a slowdown.
+    // Passthrough keeps every source frame on the timestamps setpts gave it.
+    args.push("-fps_mode", "passthrough");
   }
   args.push(
-    "-c:a", "copy",
+    "-c:a", audioOutLabel ? MEDIA_EFFECTS.ENCODE.audioCodec : "copy",
     "-c:v", "libx264",
     "-preset", MEDIA_EFFECTS.ENCODE.preset,
     "-crf", MEDIA_EFFECTS.ENCODE.crf,
@@ -100,8 +123,23 @@ export async function applyEffects(
   input: MEDIA_EFFECTS_REQUEST_PARSED,
 ): Promise<MEDIA_EFFECTS_RESPONSE> {
   assertPersistentDisk(MEDIA_ERROR_MESSAGES.VERCEL);
-  if (!input.preview && !input.grade && !input.hide && !input.logo) {
+  if (!input.preview && !input.grade && !input.hide && !input.logo && !input.speed) {
     throw new Error(MEDIA_ERROR_MESSAGES.EFFECTS_NOTHING_TO_DO);
+  }
+  if (input.speed) {
+    // Both move the pitch, by different routes: pitchFollowsRate ties it to the
+    // rate, semitones moves it while the rate stays put. Asking for both means
+    // one of them is not what was wanted, so say so rather than compounding them.
+    if (input.speed.pitchFollowsRate && input.speed.semitones !== undefined) {
+      throw new Error(MEDIA_ERROR_MESSAGES.EFFECTS_SPEED_PITCH_CONFLICT);
+    }
+    // A `speed` block that resolves to no change is rejected rather than run: a
+    // silently inert parameter is the failure that costs a whole clip, because
+    // the output looks like a success and nothing says the treatment was dropped.
+    const rate = input.speed.rate ?? 1;
+    if (rate === 1 && (input.speed.semitones ?? 0) === 0) {
+      throw new Error(MEDIA_ERROR_MESSAGES.EFFECTS_SPEED_NOTHING);
+    }
   }
   if (input.hide?.style === "replace") {
     if (!input.hide.replaceWith) {
@@ -126,6 +164,12 @@ export async function applyEffects(
   const runId = randomUUID().slice(0, 8);
 
   try {
+    // A still has no duration, so the video probe below cannot read it. Stills
+    // take their own short path: grade and logo only, one frame out as a PNG.
+    if (isStill(input.videoSource) || isStill(resolved.path)) {
+      return await renderStill(resolved.path, runId, input);
+    }
+
     const probe = await probeMediaStreams(resolved.path);
     if (!probe.hasVideo) throw new Error(MEDIA_ERROR_MESSAGES.EFFECTS_NO_VIDEO);
     const { width, height, durationSeconds } = probe;
@@ -181,14 +225,33 @@ export async function applyEffects(
       }
     }
 
+    // --- speed --------------------------------------------------------------
+    // Planned after the probe because it needs to know whether there is an
+    // audio stream at all: asking a filtergraph for `[0:a]` on a silent source
+    // fails the entire render.
+    let speedPlan: SPEED_PLAN | undefined;
+    if (input.speed) {
+      speedPlan = buildSpeedPlan(input.speed, probe.hasAudio);
+      // Pitch was the only thing asked for and there is nothing to pitch. The
+      // render would exit 0 having changed nothing at all, so refuse instead.
+      if (!probe.hasAudio && !speedPlan.videoFilter) {
+        throw new Error(MEDIA_ERROR_MESSAGES.EFFECTS_SPEED_NO_AUDIO);
+      }
+    }
+
     // --- grade + logo -------------------------------------------------------
     const grade = input.grade ? buildGradeFilters(input.grade) : undefined;
     const logoPixelWidth = input.logo
       ? even(width * (input.logo.scale ?? MEDIA_LOGO.DEFAULT_SCALE))
       : 0;
-    const logoMargin = input.logo
-      ? Math.round(width * (input.logo.margin ?? MEDIA_LOGO.DEFAULT_MARGIN))
-      : 0;
+    // Asymmetric, per-edge, and resolved from the frame's OWN width and height.
+    // The number this replaces was one fraction of the WIDTH used on all four
+    // edges, so on 1080x1920 the vertical inset came out at 2.2% of the height
+    // while the horizontal one was 4.0% of the width — tightest exactly where a
+    // notch is. `resolveLogoInsets` still honours an explicit `margin` verbatim.
+    const logoInsets = input.logo
+      ? resolveLogoInsets(input.logo.margin, width, height)
+      : undefined;
 
     const keyedColour =
       input.logo?.keyColor === "auto"
@@ -224,20 +287,43 @@ export async function applyEffects(
     }
 
 
-    const { graph, outLabel } = buildFilterGraph({
+    const { graph, outLabel, audioOutLabel } = buildFilterGraph({
       gradeFilters: grade?.filters ?? [],
       covers,
       imageIndex,
-      logo: input.logo
-        ? { ...input.logo, keyedColour, pixelWidth: logoPixelWidth, pixelMargin: logoMargin }
+      logo: input.logo && logoInsets
+        ? { ...input.logo, keyedColour, pixelWidth: logoPixelWidth, pixelInsets: logoInsets }
         : undefined,
+      videoTimeFilter: speedPlan?.videoFilter,
+      audioFilters: speedPlan?.audioFilters,
     });
 
-    const name = [grade ? grade.preset : null, regions.length > 0 ? "hidden" : null, input.logo ? "marked" : null]
+    const name = [
+      grade ? grade.preset : null,
+      regions.length > 0 ? "hidden" : null,
+      input.logo ? "marked" : null,
+      speedPlan ? "retimed" : null,
+    ]
       .filter(Boolean)
       .join("-");
     const outputPath = join(MEDIA_EFFECTS_OUTPUT_DIR, `${name || "effects"}-${runId}.mp4`);
-    await render(resolved.path, graph, outLabel, imagePaths, outputPath);
+    await render(
+      resolved.path,
+      graph,
+      outLabel,
+      imagePaths,
+      outputPath,
+      audioOutLabel,
+      Boolean(speedPlan?.videoFilter),
+    );
+
+    // A rate change makes the output a different length from the source, so the
+    // duration is read off the file that was actually written rather than the
+    // one it came from. Derived arithmetic would be close and still wrong at the
+    // last frame, and this number is what the caller plans a Short around.
+    const outputDuration = speedPlan?.videoFilter
+      ? (await probeMediaStreams(outputPath)).durationSeconds
+      : durationSeconds;
 
     return {
       outputPath,
@@ -257,21 +343,111 @@ export async function applyEffects(
             note: hideNote,
           }
         : undefined,
-      logo: input.logo
+      logo: input.logo && logoInsets
         ? {
             file: input.logo.file,
             position: input.logo.position ?? MEDIA_LOGO.DEFAULT_POSITION,
             widthPixels: logoPixelWidth,
+            insets: logoInsets,
             ...(keyedColour ? { keyed: keyedColour } : {}),
           }
         : undefined,
-      durationSeconds,
+      speed: speedPlan
+        ? {
+            rate: speedPlan.rate,
+            pitchFollowsRate: speedPlan.pitchFollowsRate,
+            semitones: speedPlan.semitones,
+            ...(speedPlan.pitchScale !== undefined ? { pitchScale: speedPlan.pitchScale } : {}),
+            filters: { video: speedPlan.videoFilter, audio: speedPlan.audioFilters },
+            ...(speedPlan.note ? { note: speedPlan.note } : {}),
+          }
+        : undefined,
+      durationSeconds: outputDuration,
       width,
       height,
     };
   } finally {
     await cleanupResolvedMediaSource(resolved);
   }
+}
+
+function isStill(path: string): boolean {
+  return MEDIA_EFFECTS.STILL.EXTENSIONS.test(path.split(/[?#]/)[0]);
+}
+
+/**
+ * Grade and/or stamp a mark onto a still image, written out as a PNG.
+ *
+ * This exists because an image model never pastes a logo it is handed: it
+ * redraws it, and the redraw misspells and restyles the mark often enough that a
+ * brand cannot publish on it. Stamping the real file afterwards is the only way
+ * the mark is exactly the mark. Same filter graph as a clip — grade first, mark
+ * last, so the mark is never graded — so a still and a clip treated with the
+ * same settings look the same.
+ *
+ * `hide` and `speed` are refused rather than half-supported: `hide` samples the
+ * background across frames and `speed` retimes a clock, and a still has neither.
+ * The default inset is a plain margin, not the Reels safe area a clip gets: a
+ * feed image has no caption block or action rail laid over its bottom third.
+ */
+async function renderStill(
+  sourcePath: string,
+  runId: string,
+  input: MEDIA_EFFECTS_REQUEST_PARSED,
+): Promise<MEDIA_EFFECTS_RESPONSE> {
+  if (input.preview || input.hide || input.speed) {
+    throw new Error(MEDIA_ERROR_MESSAGES.EFFECTS_STILL_UNSUPPORTED);
+  }
+  const meta = await sharp(sourcePath).metadata();
+  const width = meta.width;
+  const height = meta.height;
+  if (!width || !height) {
+    throw new Error(`${MEDIA_ERROR_MESSAGES.EFFECTS_RENDER_FAILED}: could not read image size`);
+  }
+
+  const grade = input.grade ? buildGradeFilters(input.grade) : undefined;
+  const logoPixelWidth = input.logo ? even(width * (input.logo.scale ?? MEDIA_LOGO.DEFAULT_SCALE)) : 0;
+  const logoInsets = input.logo
+    ? resolveLogoInsets(input.logo.margin ?? MEDIA_EFFECTS.STILL.DEFAULT_MARGIN, width, height)
+    : undefined;
+  const keyedColour =
+    input.logo?.keyColor === "auto" ? await cornerColour(input.logo.file) : input.logo?.keyColor;
+
+  const imageIndex = new Map<string, number>();
+  if (input.logo) imageIndex.set(input.logo.file, 1);
+  const { graph, outLabel } = buildFilterGraph({
+    gradeFilters: grade?.filters ?? [],
+    covers: [],
+    imageIndex,
+    logo: input.logo && logoInsets
+      ? { ...input.logo, keyedColour, pixelWidth: logoPixelWidth, pixelInsets: logoInsets }
+      : undefined,
+  });
+
+  const name = [grade ? grade.preset : null, input.logo ? "marked" : null].filter(Boolean).join("-");
+  const outputPath = join(MEDIA_EFFECTS_OUTPUT_DIR, `${name || "effects"}-${runId}.png`);
+  const args = ["-y", "-i", sourcePath];
+  if (input.logo) args.push("-i", input.logo.file);
+  if (graph) args.push("-filter_complex", graph, "-map", outLabel === "[0:v]" ? "0:v" : outLabel);
+  args.push("-frames:v", "1", "-update", "1", outputPath);
+  await runFfmpeg(args, MEDIA_ERROR_MESSAGES.EFFECTS_RENDER_FAILED);
+
+  return {
+    outputPath,
+    applied: grade ? { preset: grade.preset, filters: grade.filters } : undefined,
+    logo: input.logo && logoInsets
+      ? {
+          file: input.logo.file,
+          position: input.logo.position ?? MEDIA_LOGO.DEFAULT_POSITION,
+          widthPixels: logoPixelWidth,
+          insets: logoInsets,
+          ...(keyedColour ? { keyed: keyedColour } : {}),
+        }
+      : undefined,
+    durationSeconds: 0,
+    width,
+    height,
+  };
 }
 
 /** `preview: true` — render no video, tile every preset onto the clip's own frames instead. */

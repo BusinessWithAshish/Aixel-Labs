@@ -555,6 +555,8 @@ export async function findNaturalRange(
    * copy. `start`/`end` are absolute times in that source.
    */
   audioWindow?: { source: string; start: number; end: number; proxyUrl?: string },
+  /** A channel's own Groq key (see `channel-keys.ts`) — falls back to `GROQ_API_KEY` when omitted. */
+  groqApiKey?: string,
 ): Promise<NATURAL_RANGE & { fallbackReason?: string }> {
   if (!ffmpegPath) {
     return { start: requestedStart, end: requestedEnd, endReason: "unchanged", fallbackReason: MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED };
@@ -581,6 +583,7 @@ export async function findNaturalRange(
         // Without this Whisper often returns no punctuation at all, and the
         // sentence-end logic has nothing to work with.
         prompt: NB.BOUNDARY_PROMPT,
+        apiKey: groqApiKey,
       }),
       loudnessFrames(flacPath),
     ]);
@@ -629,6 +632,8 @@ export async function findMomentBoundaries(
   maxSeconds?: number,
   /** One session for the whole batch — see `moment-boundaries.ts`. */
   session?: { id?: string },
+  /** A channel's own Groq key (see `channel-keys.ts`) — falls back to `GROQ_API_KEY` when omitted. */
+  groqApiKey?: string,
 ): Promise<NATURAL_RANGE & { fallbackReason?: string; why?: string }> {
   const unchanged: NATURAL_RANGE = { start: pointerStart, end: pointerEnd, endReason: "unchanged" };
   if (!ffmpegPath) return { ...unchanged, fallbackReason: MEDIA_ERROR_MESSAGES.FFMPEG_CUT_FAILED };
@@ -650,6 +655,7 @@ export async function findMomentBoundaries(
         wordTimestamps: true,
         language,
         prompt: NB.BOUNDARY_PROMPT,
+        apiKey: groqApiKey,
       }),
       loudnessFrames(flacPath),
     ]);

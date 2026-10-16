@@ -1,5 +1,6 @@
 import { MEDIA_GEMINI_MODEL } from "../../media/constants";
 import { loadDiarizedTranscript } from "../../media/diarize/transcript-store";
+import { resolveGeminiKeyForChannel } from "../../../channel-keys";
 import { scoreViralMoments } from "../moments/score";
 import { scoreViralMomentsWithClaude } from "../moments/score-claude";
 import type { BY_SPEECH_REQUEST_PARSED, BY_SPEECH_RESPONSE } from "../types";
@@ -31,6 +32,7 @@ export async function rankBySpeech(
     maxClipSeconds,
     channelContext,
     audienceSignals,
+    channel,
   } = input;
 
   const shared = {
@@ -47,6 +49,7 @@ export async function rankBySpeech(
     const result = await scoreViralMoments({
       ...shared,
       model: model || MEDIA_GEMINI_MODEL.DEFAULT,
+      apiKey: resolveGeminiKeyForChannel(channel),
     });
     return {
       candidates: result.candidates,

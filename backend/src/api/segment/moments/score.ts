@@ -47,6 +47,8 @@ export type ScoreViralMomentsOptions = {
    * MOMENTS_AUDIENCE_SIGNALS_BLOCK_TEMPLATE.
    */
   audienceSignals?: string[];
+  /** A channel's own Gemini key (see `channel-keys.ts`) — falls back to the shared free-tier pool when omitted. */
+  apiKey?: string;
 };
 
 export async function scoreViralMoments(
@@ -61,6 +63,7 @@ export async function scoreViralMoments(
     maxClipSeconds,
     channelContext,
     audienceSignals,
+    apiKey,
   } = options;
 
   const channelContextBlock = channelContext
@@ -105,6 +108,7 @@ export async function scoreViralMoments(
         zodValidator: MOMENTS_RESPONSE_VALIDATOR,
       }),
     "viral-moments scoring",
+    apiKey ? [apiKey] : undefined,
   );
 
   return {

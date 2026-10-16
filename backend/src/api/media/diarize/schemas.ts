@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { MEDIA_FIELD_DESCRIPTIONS, MEDIA_GEMINI_MODEL } from "../constants";
+import { CHANNEL_FIELD } from "../../../channel-keys";
 
 /**
  * Gemini-audio only — this op no longer takes a `videoUrl`. Reading YouTube's
@@ -22,6 +23,7 @@ export const MEDIA_DIARIZE_REQUEST_SCHEMA = z.object({
     .describe(
       "false: return transcriptPath + a summary instead of the full transcript inline. Use it whenever the transcript goes on to segment op=by_speech (pass the path as diarizedPath) — a long episode's transcript is tens of thousands of tokens. The file is written either way. Default true.",
     ),
+  channel: CHANNEL_FIELD,
 });
 
 const DIARIZED_SEGMENT_SCHEMA = z.object({

@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { assertPersistentDisk } from "../../../config";
+import { resolveGeminiKeyForChannel, resolveGroqKeyForChannel } from "../../../channel-keys";
 import {
   MEDIA_CAPTION,
   MEDIA_CAPTION_OUTPUT_DIR,

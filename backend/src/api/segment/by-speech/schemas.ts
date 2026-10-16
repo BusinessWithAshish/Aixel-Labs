@@ -8,6 +8,7 @@ import {
   requireValidClipDurationRange,
 } from "../moments/schemas";
 import { SEGMENT_FIELD_DESCRIPTIONS, SEGMENT_PROVIDERS } from "../constants";
+import { CHANNEL_FIELD } from "../../../channel-keys";
 
 export const BY_SPEECH_REQUEST_SCHEMA = z
   .object({
@@ -30,6 +31,7 @@ export const BY_SPEECH_REQUEST_SCHEMA = z
       MEDIA.DEFAULT_MAX_CANDIDATES,
     ),
     ...CLIP_DURATION_BOUNDS_FIELDS,
+    channel: CHANNEL_FIELD,
   })
   .superRefine(requireValidClipDurationRange)
   .refine((v) => (v.diarized ? 1 : 0) + (v.diarizedPath ? 1 : 0) === 1, {

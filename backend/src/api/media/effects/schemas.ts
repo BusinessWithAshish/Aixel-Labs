@@ -10,7 +10,7 @@ import {
   MEDIA_LOGO_POSITIONS,
 } from "../constants";
 
-const { GRADE_BOUNDS } = MEDIA_EFFECTS;
+const { GRADE_BOUNDS, SPEED_BOUNDS } = MEDIA_EFFECTS;
 
 /** Bounds live in `MEDIA_EFFECTS.GRADE_BOUNDS` — see there for why they exist. */
 const GRADE_SCHEMA = z
@@ -37,6 +37,34 @@ const GRADE_SCHEMA = z
       .optional(),
     /** `unsharp` luma amount. 0 disables. */
     sharpen: z.number().min(GRADE_BOUNDS.SHARPEN.MIN).max(GRADE_BOUNDS.SHARPEN.MAX).optional(),
+  })
+  .strict();
+
+/**
+ * Bounds and the reasoning live in `MEDIA_EFFECTS.SPEED_BOUNDS`.
+ *
+ * Three fields rather than one, because "play it faster" and "move the pitch"
+ * are genuinely different requests and collapsing them into a single `speed`
+ * number would silently pick one. `rate` retimes; `pitchFollowsRate` decides
+ * whether the pitch is dragged along by that retiming; `semitones` moves pitch
+ * with the tempo left alone. Every field absent = no change.
+ */
+const SPEED_SCHEMA = z
+  .object({
+    /** One factor for video (`setpts`) and audio (`atempo`) together. */
+    rate: z.number().min(SPEED_BOUNDS.RATE.MIN).max(SPEED_BOUNDS.RATE.MAX).optional(),
+    /**
+     * `rate` only. false (default) time-stretches the audio, so the pitch stays
+     * where it was. true resamples it instead, so the pitch rides the rate —
+     * the tape-played-faster sound. Cannot be combined with `semitones`.
+     */
+    pitchFollowsRate: z.boolean().optional(),
+    /** Pitch shift in semitones, tempo untouched (`rubberband`). */
+    semitones: z
+      .number()
+      .min(SPEED_BOUNDS.SEMITONES.MIN)
+      .max(SPEED_BOUNDS.SEMITONES.MAX)
+      .optional(),
   })
   .strict();
 
@@ -110,7 +138,11 @@ const LOGO_SCHEMA = z
     keyColor: z
       .union([z.literal("auto"), z.string().regex(/^0x[0-9a-fA-F]{6}$/)])
       .optional(),
-    /** Inset from the frame edges, as a fraction of frame width. */
+    /**
+     * Inset from the frame edges, as a fraction of frame WIDTH, applied to all
+     * four edges. Overrides the per-edge safe-area insets that apply by default
+     * (`MEDIA_SAFE_AREA`); `0` puts the mark hard into its corner.
+     */
     margin: z
       .number()
       .min(MEDIA_LOGO.BOUNDS.MARGIN.MIN)
@@ -125,6 +157,7 @@ export const MEDIA_EFFECTS_REQUEST_SCHEMA = z
     grade: GRADE_SCHEMA.optional().describe(MEDIA_FIELD_DESCRIPTIONS.effectsGrade),
     hide: HIDE_SCHEMA.optional().describe(MEDIA_FIELD_DESCRIPTIONS.effectsHide),
     logo: LOGO_SCHEMA.optional().describe(MEDIA_FIELD_DESCRIPTIONS.effectsLogo),
+    speed: SPEED_SCHEMA.optional().describe(MEDIA_FIELD_DESCRIPTIONS.effectsSpeed),
     preview: z.boolean().optional().default(false).describe(MEDIA_FIELD_DESCRIPTIONS.effectsPreview),
     at: z
       .array(z.number().nonnegative())

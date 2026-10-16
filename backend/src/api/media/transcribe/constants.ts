@@ -10,6 +10,10 @@ export const MEDIA_TRANSCRIBE_FIELD_DESCRIPTIONS = {
   language:
     "Optional ISO-639-1 language code to improve accuracy (e.g. 'en').",
   model: "Optional Groq Whisper model override.",
+  words:
+    "true = also return per-word start/end times (format must be json; they come back as `words[]`). For SUNG vocals use model whisper-large-v3 on a cleanly cut section — turbo returns unusable word times on music.",
+  prompt:
+    "Optional text to bias the decode toward known wording, e.g. the lyric lines of the section being transcribed.",
 } as const;
 
 export const MEDIA_TRANSCRIBE_FORMAT = {
@@ -41,6 +45,15 @@ export const MEDIA_TRANSCRIBE = {
 
 export const GROQ_TRANSCRIPTIONS_URL =
   "https://api.groq.com/openai/v1/audio/transcriptions";
+
+/**
+ * Groq's OpenAI-compatible chat endpoint. Transcription is not the only thing
+ * this project has a Groq key for — `caption/transliterate.ts` romanizes on it
+ * too, deliberately off the Gemini free-tier pool that diarization and moment
+ * scoring already spend before captions ever run.
+ */
+export const GROQ_CHAT_COMPLETIONS_URL =
+  "https://api.groq.com/openai/v1/chat/completions";
 
 /**
  * Source resolution (local path / URL, TLS-fingerprint fallback,

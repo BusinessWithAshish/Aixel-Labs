@@ -12,6 +12,7 @@ import {
   MEDIA_HIDE_STYLES,
 } from "../constants";
 import { DIARIZED_TRANSCRIPT_SCHEMA } from "../diarize/schemas";
+import { CHANNEL_FIELD } from "../../../channel-keys";
 
 const CLIP_RANGE_SCHEMA = z.object({
   // Seconds as a number or a timestamp string. Ledgers and segment output
@@ -106,4 +107,5 @@ export const MEDIA_CUT_REQUEST_SCHEMA = z.object({
   maxSeconds: z.number().positive().max(3600).optional(),
   language: z.string().trim().min(2).max(5).optional().describe(MEDIA_FIELD_DESCRIPTIONS.cutLanguage),
   logo: CUT_LOGO_SCHEMA.optional().describe(MEDIA_FIELD_DESCRIPTIONS.cutLogo),
+  channel: CHANNEL_FIELD,
 });

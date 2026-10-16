@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { YOUTUBE_TRANSCRIPT_LANGUAGE_SCHEMA } from "../transcript/schemas";
 import { YOUTUBE_DIARIZE_MAX_CAPTION_SPEAKERS } from "./constants";
+import { CHANNEL_FIELD } from "../../../channel-keys";
 
 /**
  * Captions only — no `mediaSource` fallback here. Gemini-audio diarization
@@ -9,10 +10,13 @@ import { YOUTUBE_DIARIZE_MAX_CAPTION_SPEAKERS } from "./constants";
  * captions rather than silently escalating to a paid call on your behalf.
  *
  * The model call this op makes is small — label already-split turns with
- * speaker ids, no audio, no judgment about content — so `provider` defaults
- * to `gemini` (real schema-constrained output, free-tier key pool) rather
- * than being required like `segment.by_speech`'s. `claude` is there for when
- * the free-tier pool is dry or you specifically want Claude's labeling.
+ * speaker ids, no audio, no judgment about content — so `provider` has a
+ * default rather than being required like `segment.by_speech`'s. It defaults
+ * to `groq`, off the Gemini free-tier pool: that pool is spent by the
+ * audio-shaped work first, and this call was seen failing on both 429 (daily
+ * quota) and 503 (model overloaded), only the first of which more keys fix.
+ * `gemini` and `claude` remain for when you want schema-constrained decoding
+ * or Claude's labeling specifically.
  */
 export const YOUTUBE_DIARIZE_REQUEST_SCHEMA = z.object({
   videoUrl: z
@@ -23,11 +27,11 @@ export const YOUTUBE_DIARIZE_REQUEST_SCHEMA = z.object({
     "Caption language (BCP-47). Defaults to en.",
   ),
   provider: z
-    .enum(["gemini", "claude"])
+    .enum(["groq", "gemini", "claude"])
     .optional()
-    .default("gemini")
+    .default("groq")
     .describe(
-      "Which AI backend runs the (cheap, text-only) speaker-labeling pass over already-split caption turns. 'gemini' (default) — free-tier key pool, real schema-constrained output. 'claude' — local Claude Code subscription (flat-rate, shares the org-wide 40-session/day delegation budget), validated + retried on a malformed response.",
+      "Which AI backend runs the (cheap, text-only) speaker-labeling pass over already-split caption turns. 'groq' (default) — the Groq key this project already holds for Whisper, a separate quota from Gemini's, JSON-mode output validated against the schema; its free tier caps one request at 8k tokens, so a long episode's turn list falls back to Claude automatically (then Gemini, only if Claude is unavailable) and `usage.provider` reports which one ran. 'gemini' — free-tier key pool, real schema-constrained output; shared with diarization and moment scoring, so it is the first thing to run dry. 'claude' — local Claude Code subscription (flat-rate, shares the org-wide 40-session/day delegation budget), validated + retried on a malformed response.",
     ),
   model: z
     .string()
@@ -50,6 +54,7 @@ export const YOUTUBE_DIARIZE_REQUEST_SCHEMA = z.object({
     .describe(
       "false: return transcriptPath + a summary instead of the full transcript inline. Use it whenever the transcript goes on to segment op=by_speech (pass the path as diarizedPath) — a long episode's transcript is tens of thousands of tokens. The file is written either way. Default true.",
     ),
+  channel: CHANNEL_FIELD,
 });
 
 

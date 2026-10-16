@@ -8,6 +8,7 @@ import {
   MEDIA_FIELD_DESCRIPTIONS,
 } from "../constants";
 import { MEDIA_TRANSCRIBE_MODEL } from "../transcribe/constants";
+import { CHANNEL_FIELD } from "../../../channel-keys";
 
 const HEX_COLOUR = z
   .string()

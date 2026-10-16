@@ -15,15 +15,19 @@ export const MEDIA_FIELD_DESCRIPTIONS = {
   effectsHide:
     "Cover part of every frame — a creator's bug, a sponsor ident, a broadcaster watermark. `regions: \"auto\"` finds burned-in overlays itself (static across the clip AND structured, so a plain dark background is not mistaken for one) and always writes a proof still with the boxes drawn on it, so what got covered can be checked rather than trusted. Explicit `[{x,y,width,height}]` regions in SOURCE PIXELS skip detection entirely — the right choice once a creator's mark is known, since it sits in the same place in everything they publish.",
   effectsLogo:
-    "Composite your own mark onto every frame from a local image file (PNG with alpha normally). Applied LAST, after grade and hide, so your own mark is never graded or blurred.",
+    "Composite your own mark onto every frame from a local image file (PNG with alpha normally). Applied LAST, after grade and hide, so your own mark is never graded or blurred. With no `margin`, the mark is inset by the platform/device safe areas for its corner — asymmetric per edge, since a notch takes the top and the Reels caption + action block takes 35% of the bottom. Pass `margin` (one fraction of frame WIDTH, all four edges, `0` for hard into the corner) to override. The response reports the insets actually used.",
   effectsVideoSource:
-    "Local filesystem path (normally a `cut` output) or a publicly-reachable URL of the video to treat. Grade BEFORE captioning: captions are burned white-with-outline, and grading afterwards shifts their colour.",
+    "Local filesystem path (normally a `cut` output) or a publicly-reachable URL of the video to treat. Grade BEFORE captioning: captions are burned white-with-outline, and grading afterwards shifts their colour. A still image (.png/.jpg/.jpeg/.webp) is accepted too, for `grade` and `logo` only, and comes back as a PNG — the way to put a brand's REAL logo file on a generated image, since an image model redraws any logo it is handed.",
   effectsGrade:
     "The colour treatment. `preset` names one of the built-in looks; every other field is an override applied on top of it, so `{preset: \"warm\", saturation: 1.2}` is the warm look with more saturation. Omit `grade` entirely with `preview: true` to see every preset at once.",
   effectsPreview:
     "true = render no video. Instead, grab still frames from the clip, apply EVERY preset to each one, and tile them into a labelled contact sheet per frame so the looks can be compared side by side on the same footage. This is how a look gets chosen — a grade is judged by eye on real frames, not from its numbers.",
+  effectsSpeed:
+    "Change the clip's pace or the pitch of its audio. A deliberate look-and-feel control, opt-in per clip and absent by default. `rate` retimes video and audio together (1.25 = 25% faster, 0.8 = a fifth slower) and by default the audio is time-stretched so the PITCH DOES NOT MOVE. `pitchFollowsRate: true` resamples the track instead, so the pitch rides the rate — the tape-played-faster sound — which is a different effect, not a better one. `semitones` shifts pitch on its own and leaves the tempo exactly where it was (+2 up a tone, -3 down a minor third); it cannot be combined with `pitchFollowsRate`, which is already moving the same thing. A slowdown respaces the source's OWN frames rather than generating new ones, so 0.5 on a 30 fps clip plays at an effective 15 fps. Apply BEFORE caption: captions are burned at fixed times and retiming afterwards would slide them off the words. Ignored by `preview: true`, which renders stills.",
   effectsAt:
     "Preview only: which timestamps (seconds) to grab frames at, one sheet per timestamp. Defaults to two frames, a third and two thirds of the way in, because a grade reads very differently on a bright scene and a dark one.",
+  shareFormat:
+    "OPTIONAL. \"jpeg\" re-encodes a still image (PNG/WebP) as a JPEG for the public copy — Instagram's API accepts only JPEG images. Ignored for files that are already JPEG; rejected for anything that is not an image.",
   sharePath:
     "Absolute path of a file this backend produced under the private media root (e.g. a `caption` or `cut` output).",
   mediaSource:
@@ -99,6 +103,35 @@ export const MEDIA_GEMINI_MODEL = {
     "gemini-3.1-flash-lite",
   ],
 } as const;
+
+/**
+ * Groq text model for this project's small structured-text calls — caption
+ * romanization and YouTube caption speaker-labelling. See `groq-chat.ts` for
+ * why these run off the Gemini pool at all: that pool is saturated by the
+ * audio-shaped work and fails with both 429 (daily quota) and 503 (model
+ * overloaded), and only the second of those is fixable with more keys.
+ */
+export const MEDIA_GROQ_TEXT_MODEL = {
+  DEFAULT: "openai/gpt-oss-120b",
+  /**
+   * Tokens-per-minute ceiling on the free `on_demand` tier — measured off
+   * `x-ratelimit-limit-tokens`, and the same 8k for every text model this
+   * key can reach, so there is no bigger model to escape to. A prompt over
+   * this is rejected outright with a 413, never queued, which is why callers
+   * that build one prompt from a whole episode must either batch under it or
+   * fall back to a provider without the ceiling.
+   */
+  TOKENS_PER_MINUTE: 8000,
+  /** Rough chars-per-token for sizing a prompt before spending a round-trip on a 413. */
+  CHARS_PER_TOKEN: 4,
+} as const;
+
+/** True when `prompt` is small enough to stand a chance against `TOKENS_PER_MINUTE`. */
+export function fitsGroqTokenBudget(prompt: string): boolean {
+  const estimatedTokens = prompt.length / MEDIA_GROQ_TEXT_MODEL.CHARS_PER_TOKEN;
+  // Leave headroom for the reply and for this minute's other calls.
+  return estimatedTokens < MEDIA_GROQ_TEXT_MODEL.TOKENS_PER_MINUTE * 0.7;
+}
 
 /** Supported output framings for `/video/cut`. */
 export const MEDIA_ASPECT_RATIOS = ["9:16", "16:9", "1:1", "original"] as const;
@@ -528,6 +561,7 @@ export const MEDIA_ERROR_MESSAGES = {
   SHARE_NOT_FOUND: "share: no such file",
   SHARE_OUTSIDE_ROOT: "share: path must be under the private media root (a file this backend produced)",
   SHARE_NOT_A_FILE: "share: not a file",
+  SHARE_NOT_AN_IMAGE: "share: format=jpeg only applies to a still image (.png, .webp, .jpg, .jpeg)",
   INVALID_PARAMS: "Invalid request parameters",
   MISSING_API_KEY: "GEMINI_API_KEY_FREE is not configured",
   DOWNLOAD_FAILED: "Failed to resolve source media",
@@ -561,6 +595,10 @@ export const MEDIA_ERROR_MESSAGES = {
     "The moment pass did not return a range (call failed, or its answer was out of bounds); edges were placed around the requested range instead",
   NATURAL_BOUNDARIES_FAILED: "Could not analyse the clip's audio for natural boundaries; kept the requested range",
   CAPTION_ROMANIZE_FAILED: "Could not rewrite captions in Roman script; kept the native script",
+  GROQ_CHAT_FAILED: "Groq chat request failed",
+  GROQ_CHAT_EMPTY: "Groq returned an empty response",
+  GROQ_CHAT_TRUNCATED: "Groq response was cut off before it finished — not safe to use",
+  GROQ_CHAT_MALFORMED: "Groq returned JSON that does not match the expected shape",
   GENERIC: "Media operation failed",
   VERCEL:
     "The cut op needs a persistent host with local disk output (not available on Vercel)",
@@ -580,8 +618,18 @@ export const MEDIA_ERROR_MESSAGES = {
     "The source has no video track — a colour grade can only be applied to a video",
   EFFECTS_RENDER_FAILED: "ffmpeg failed to render the graded clip",
   EFFECTS_PREVIEW_FAILED: "ffmpeg failed to build the preset preview sheet",
+  EFFECTS_STILL_UNSUPPORTED:
+    "A still image takes `grade` and `logo` only — `hide`, `speed` and `preview` need a video",
   EFFECTS_NOTHING_TO_DO:
-    "No treatment was asked for — pass at least one of `grade`, `hide` or `logo`, or `preview: true`",
+    "No treatment was asked for — pass at least one of `grade`, `hide`, `logo` or `speed`, or `preview: true`",
+  EFFECTS_SPEED_NOTHING:
+    "`speed` was passed but changes nothing — set `rate` away from 1, or `semitones` away from 0. `pitchFollowsRate` only does something alongside a `rate`",
+  EFFECTS_SPEED_PITCH_CONFLICT:
+    "`speed.pitchFollowsRate` and `speed.semitones` both move the pitch — pass one. pitchFollowsRate ties the pitch to the rate; semitones shifts it independently of the rate",
+  EFFECTS_SPEED_NO_AUDIO:
+    "The source has no audio track, so there is no pitch or tempo to change — drop `speed.semitones`, or pass a `rate` (which retimes the video too)",
+  EFFECTS_SPEED_VIDEO_ONLY:
+    "The source has no audio track, so only the video was retimed — the audio side of `speed` did nothing",
   EFFECTS_LOGO_MISSING: "The logo file does not exist or is not readable",
   EFFECTS_REPLACE_NO_IMAGE:
     "hide.style is \"replace\" but no hide.replaceWith image was given — replace pastes an image over the region, so it needs one",
@@ -615,11 +663,133 @@ export const MEDIA_CUT_OUTPUT_DIR = AIXEL_MEDIA.MEDIA_CUTS;
 
 export const MEDIA_CAPTION_OUTPUT_DIR = AIXEL_MEDIA.MEDIA_CAPTIONS;
 
-/** `share` — public copies live here; /home/ubuntu/media/prune.sh deletes them after RETENTION_DAYS. */
+/** `share` — public copies live here; the Hermes cron `prune-media` (~/.hermes/scripts/prune-media.sh) deletes them after PUBLIC_RETENTION_DAYS. */
 export const MEDIA_SHARE = {
   PUBLIC_DIR: AIXEL_MEDIA.PUBLIC,
   PUBLIC_BASE_URL: AIXEL_MEDIA.PUBLIC_BASE_URL,
   PUBLIC_RETENTION_DAYS: 7,
+} as const;
+
+/**
+ * Device safe-area insets — what the PHONE takes out of our frame, before any
+ * app draws anything. Ratios of the axis each one insets.
+ */
+const SAFE_AREA_DEVICE = {
+  /**
+   * ~135px on a 1920-tall frame. **HIGH confidence, and DERIVED rather than
+   * quoted** — this is not a published "media safe zone" number, it is
+   * arithmetic on a published safe-area inset.
+   *
+   * Worst case is a fill-mode player on an iPhone 16 Pro: a 62pt top inset on a
+   * 956pt-tall screen, mapped onto a 1920-tall frame that has been scaled to
+   * fill it, is 62 / (1920 / 956) = 133px. Rounded up to 135 and expressed as a
+   * ratio, it covers every Dynamic Island and notch iPhone and, in the worst
+   * mapping, every Android punch-hole too.
+   *
+   * **Android display cutouts have no computable number.** Cutout size is
+   * per-device and unbounded, Android's own documentation publishes none, and
+   * it tells apps to query `WindowInsets` at runtime — which a server-side
+   * render cannot do. This inset is the coverage story for them, not a
+   * measurement of any one device.
+   */
+  TOP_HEIGHT_RATIO: 0.07,
+  /**
+   * ~100px on a 1080-wide frame. HIGH confidence: measured fill-mode side loss
+   * is 96-98px across iPhone 13 through 16 Pro Max, so 100 clears all of them.
+   *
+   * **No rounded-corner radius constant, deliberately.** Apple publishes no
+   * display-corner radius, community measurements disagree with each other, and
+   * a number we cannot source would be added to a problem that is already
+   * solved: a 100px side inset and a 135px top inset put furniture well outside
+   * the corner arcs on every one of those screens.
+   */
+  SIDE_WIDTH_RATIO: 0.093,
+  /**
+   * The home indicator / gesture bar is ~80px on a 1920-tall frame (0.04) and
+   * HIGH confidence, but it gets NO constant of its own: every platform below
+   * reserves several times that much of the bottom for its own chrome, so the
+   * device figure is always dwarfed and a second number would only be one more
+   * thing to keep in sync. It is recorded here and used nowhere.
+   */
+} as const;
+
+/**
+ * Platform safe-area insets — what the HOST APP draws over our frame on top of
+ * whatever the device already took.
+ *
+ * Source for all three: Meta's Ads Guide for Reels, quoted consistently as
+ * these percentages across independent write-ups. **MEDIUM-HIGH confidence, not
+ * verified verbatim against a first-party Meta page from here.** They are the
+ * best sourced numbers available and they are treated as guidance, not as
+ * measurements we took.
+ */
+const SAFE_AREA_PLATFORM = {
+  /**
+   * ~269px on a 1920-tall frame. This SUBSUMES the 135px device inset — it is
+   * roughly twice it — so on Instagram it is the binding constraint and the
+   * device number never comes into play.
+   */
+  TOP_HEIGHT_RATIO: 0.14,
+  /**
+   * 672px on a 1920-tall frame: the handle, caption, audio row and action rail
+   * Reels draws across the bottom. This is the number `above-ui` captions are
+   * measured from.
+   */
+  BOTTOM_HEIGHT_RATIO: 0.35,
+  /**
+   * ~65px on a 1080-wide frame. WEAKER than the 100px device figure, so the
+   * device number governs the sides everywhere. Kept for the record, so the
+   * next person does not have to rediscover that it loses.
+   */
+  SIDE_WIDTH_RATIO: 0.06,
+} as const;
+
+/**
+ * Named, asymmetric safe-area insets for our own furniture — a channel mark, a
+ * caption block. Every positioning op reads these instead of inventing a margin.
+ *
+ * **Asymmetric is the entire point.** What a vertical video loses differs per
+ * edge by a factor of five: a notch eats the top, a gesture bar the bottom, a
+ * fill-mode crop both sides, and the host app's own chrome far more of the
+ * bottom than any hardware does. A single scalar margin cannot express that.
+ *
+ * The version this replaces tried, and got it backwards twice over: one margin
+ * for all four edges, derived from frame WIDTH and then applied to the VERTICAL
+ * axis too. On 1080x1920 the 0.04 default came out as 43px — 4.0% of the width
+ * but only 2.2% of the height. The SMALLEST inset landed on the one edge with a
+ * notch in it, and the default position was `top-right`: the Dynamic Island
+ * corner.
+ *
+ * Ratios rather than pixels, each measured against the axis it insets
+ * (TOP/BOTTOM against HEIGHT, SIDE against WIDTH), so they hold on 720x1280 as
+ * well as on 1080x1920.
+ *
+ * `DEFAULT` is the per-edge worst of `DEVICE` and `PLATFORM`, computed from them
+ * rather than written out, so it cannot drift. It is what an op uses when the
+ * caller expressed no preference: the default has to be the safe one, and a
+ * caller who wants the mark hard into a corner still says so with `margin: 0`.
+ *
+ * Instagram's PROFILE GRID is the one crop none of this can inset around, and it
+ * is certain and device-independent: the grid shows a Reel's thumbnail at 3:4,
+ * so on 1080x1920 it takes 240px off the top AND 240px off the bottom. Only
+ * y 240-1680 survives there. The platform top inset (269px) clears it; the 135px
+ * device inset alone does NOT, which is why `DEFAULT` takes the larger.
+ */
+export const MEDIA_SAFE_AREA = {
+  DEVICE: SAFE_AREA_DEVICE,
+  PLATFORM: SAFE_AREA_PLATFORM,
+  DEFAULT: {
+    TOP_HEIGHT_RATIO: Math.max(
+      SAFE_AREA_DEVICE.TOP_HEIGHT_RATIO,
+      SAFE_AREA_PLATFORM.TOP_HEIGHT_RATIO,
+    ),
+    /** Platform-only: the device gesture bar (0.04) is inside this several times over. */
+    BOTTOM_HEIGHT_RATIO: SAFE_AREA_PLATFORM.BOTTOM_HEIGHT_RATIO,
+    SIDE_WIDTH_RATIO: Math.max(
+      SAFE_AREA_DEVICE.SIDE_WIDTH_RATIO,
+      SAFE_AREA_PLATFORM.SIDE_WIDTH_RATIO,
+    ),
+  },
 } as const;
 
 /**
@@ -656,11 +826,27 @@ export const MEDIA_CAPTION = {
   DEFAULT_POSITION: "middle" as const,
   /**
    * `middle` is libass alignment 5 (true vertical centre), so its margin is
-   * irrelevant. The other two anchor to the bottom edge (alignment 2) with a
+   * irrelevant. The other three anchor to the bottom edge (alignment 2) with a
    * margin expressed as a FRACTION OF FRAME HEIGHT, so they hold at any
    * resolution. `style.marginV` overrides with absolute source pixels.
+   *
+   * `above-ui` is the one that has to be sourced rather than judged, and it now
+   * IS the platform bottom inset rather than a number next to it: 0.35 of the
+   * height, 672px on 1080x1920, from Meta's own Ads Guide for Reels. It was
+   * 0.3125 (600px), eyeballed from how tall the Reels chrome looks, which put
+   * ~72px of clearance short and left roughly 55% of a caption block inside the
+   * zone Meta declares unsafe. Reading `MEDIA_SAFE_AREA` keeps the two in step.
+   *
+   * `bottom` (0.04, ~77px) is deliberately NOT safe-area aware. It is the
+   * explicit opt-out — a caller asking for `bottom` is asking for the bottom
+   * edge, near where the device gesture bar sits, and gets it.
    */
-  MARGIN_V_HEIGHT_RATIO: { middle: 0, "lower-third": 0.25, bottom: 0.04, "above-ui": 0.3125 },
+  MARGIN_V_HEIGHT_RATIO: {
+    middle: 0,
+    "lower-third": 0.25,
+    bottom: 0.04,
+    "above-ui": MEDIA_SAFE_AREA.DEFAULT.BOTTOM_HEIGHT_RATIO,
+  },
   ALIGNMENT_BY_POSITION: { middle: 5, "lower-third": 2, bottom: 2, "above-ui": 2 },
   DEFAULT_PRESET: "lines" as const,
   /** Fonts shipped with the backend (OFL), handed to libass as `fontsdir`. Same depth under src/ and dist/. */
@@ -672,10 +858,13 @@ export const MEDIA_CAPTION = {
    * highlighted, each new chunk sliding up into place. Every value is a
    * default that an explicit `style` field overrides.
    *
-   * `above-ui` sits the text bottom at 31% of the frame height from the bottom
-   * (y=1320 on 1080x1920): above the handle/caption/subscribe block both Reels
-   * (~480px) and Shorts (~380px) draw, and usually on the chest or mic of a
-   * speaker-framed crop rather than the face.
+   * `above-ui` sits the text bottom on the platform bottom inset — 35% of the
+   * frame height up from the bottom, y=1248 on 1080x1920 — which is what Meta's
+   * Ads Guide for Reels asks to be left clear for the handle, caption, audio row
+   * and action rail. Not an eyeballed "the chrome looks about this tall": the
+   * number comes from `MEDIA_SAFE_AREA.PLATFORM`, where its confidence and
+   * provenance are recorded. On a speaker-framed crop it lands on the chest or
+   * mic rather than the face.
    */
   CHUNKS: {
     FONT_NAME: "Anton",
@@ -854,6 +1043,16 @@ export const MEDIA_GRADE_PRESET_NAMES = [
 ] as const;
 
 export const MEDIA_EFFECTS = {
+  /**
+   * A still image (PNG/JPEG/WebP) instead of a clip: `grade` and `logo` only,
+   * written out as a PNG. Its default inset is a plain margin, a fraction of the
+   * image WIDTH on every edge, because a feed image has none of the furniture
+   * the clip safe areas exist to dodge.
+   */
+  STILL: {
+    EXTENSIONS: /\.(png|jpe?g|webp)$/i,
+    DEFAULT_MARGIN: 0.05,
+  },
   DEFAULT_PRESET: "neutral" as const,
   /**
    * Accepted ranges for the grade overrides. Bounds exist so a typo cannot
@@ -869,8 +1068,64 @@ export const MEDIA_EFFECTS = {
     TEMPERATURE: { MIN: 1000, MAX: 40000 },
     SHARPEN: { MIN: 0, MAX: 2 },
   },
+  /**
+   * `speed` — retime the clip, or move the pitch of its audio.
+   *
+   * A look-and-feel control and nothing more. It does NOT defeat either
+   * platform's content matching: Instagram and YouTube both match audio and
+   * video through pitch and speed changes, and YouTube's reused-content policy
+   * is a separate review of whether a channel adds value at all, which no
+   * per-file treatment touches. Nothing here should be described as if it did.
+   */
+  SPEED_BOUNDS: {
+    /**
+     * One factor for video and audio together.
+     *
+     * The ceiling and the floor are `atempo`'s own legal per-instance range,
+     * which is why they are these numbers rather than round ones: the whole
+     * exposed range fits in a SINGLE atempo instance, so nothing has to be
+     * chained and the track is time-stretched once instead of twice.
+     *
+     * They also happen to be where the content stops being the thing that
+     * worked. `setpts` respaces the source's own frames rather than
+     * interpolating new ones, so 0.5 turns a 30 fps clip into an effective
+     * 15 fps one — measurably the floor of watchable motion — while 2.0 takes
+     * the same clip to 60 fps, the highest frame rate Shorts and Reels ingest.
+     * Past 2.0 speech also stops being intelligible, and a viral clip that
+     * cannot be followed is not the clip any more.
+     */
+    RATE: { MIN: 0.5, MAX: 2 },
+    /**
+     * Pitch shift in semitones, independent of tempo (`rubberband`).
+     *
+     * One octave either way. Beyond twelve semitones a voice stops reading as a
+     * voice and becomes an effect in its own right, and rubberband's artefacts
+     * on speech are plainly audible by then — so the bound is where the control
+     * stops doing the thing it is for.
+     */
+    SEMITONES: { MIN: -12, MAX: 12 },
+  },
+  SPEED: {
+    /**
+     * `pitchFollowsRate` reinterprets the samples at a different rate, so it
+     * needs to know what rate they are at. Normalising to one known value first
+     * makes the filter deterministic for any source instead of needing a probe,
+     * and the speed path re-encodes the audio anyway.
+     */
+    RESAMPLE_HZ: 48000,
+  },
   /** Encode settings, identical to `caption`'s burn — one look for every re-encode this backend does. */
-  ENCODE: { preset: "veryfast", crf: "20", pixelFormat: "yuv420p" },
+  ENCODE: {
+    preset: "veryfast",
+    crf: "20",
+    pixelFormat: "yuv420p",
+    /**
+     * Only used on the `speed` path, which has to re-encode the track it
+     * filtered. Everything else stream-copies the audio untouched. Matches
+     * `MEDIA.FFMPEG_AUDIO_CODEC`, at ffmpeg's own default bitrate, like `cut`.
+     */
+    audioCodec: "aac",
+  },
   PREVIEW: {
     /** Tiles per row. 4 keeps a 7-tile sheet (original + 6 presets) to two rows on a phone. */
     COLUMNS: 4,
@@ -1166,6 +1421,33 @@ export const MEDIA_HIDE = {
 } as const;
 
 export const MEDIA_LOGO = {
+  /**
+   * `top-right`, KEPT after re-deciding it against the safe areas rather than
+   * inherited — but at the platform top inset (~270px on 1920) instead of the
+   * 43px it used to mean, which is the whole of the old bug.
+   *
+   * The case for moving marks out of the corners entirely is real: Instagram's
+   * profile grid crops a Reel thumbnail to 3:4, taking 240px off the top and
+   * 240px off the bottom of a 1080x1920 frame, and at the old 43px inset EVERY
+   * mark we ship was cut from the grid completely. At 270px the mark's top edge
+   * clears that crop by 30px, so the grid no longer argues for a move — and
+   * three things argue against one:
+   *
+   *  - A top mark clears the HIGH-confidence device inset (135px) nearly twice
+   *    over and is protected by two independent numbers. A bottom mark rests
+   *    entirely on the single MEDIUM-HIGH 672px Reels figure; if that is an
+   *    underestimate the mark is simply covered, and we cannot see it happen.
+   *  - `above-ui` captions end exactly on that 672px line, which is precisely
+   *    where a bottom-inset mark's lower edge would sit. The default mark and
+   *    the default `chunks` captions would collide.
+   *  - Anything far enough down to survive every possible grid crop offset
+   *    (y 480-1440) is mid-frame, over the subject's face, and on top of the
+   *    default `middle` caption band.
+   *
+   * Assumes the profile-grid crop is CENTRED, which is Instagram's default. A
+   * creator who drags the cover frame down in the cover editor can still crop
+   * the mark away; our publish step never moves it.
+   */
   DEFAULT_POSITION: "top-right" as const,
   /**
    * Chroma-key tolerance when a logo file has no alpha of its own (a JPEG
@@ -1181,6 +1463,17 @@ export const MEDIA_LOGO = {
   /** Mark width as a fraction of the frame width. */
   DEFAULT_SCALE: 0.14,
   DEFAULT_OPACITY: 0.9,
-  /** Inset from the frame edges, as a fraction of frame width. */
-  DEFAULT_MARGIN: 0.04,
+  /**
+   * No `DEFAULT_MARGIN` any more, and that absence is the fix. It was a single
+   * 0.04 fraction of frame WIDTH used on all four edges — 43px on 1080x1920,
+   * which is 4.0% of the width but only 2.2% of the height, so the tightest
+   * inset fell on the top edge, where the notch is, under a `top-right`
+   * default. Omitting `margin` now reads the asymmetric per-edge insets in
+   * `MEDIA_SAFE_AREA.DEFAULT` instead (see `resolveLogoInsets`).
+   *
+   * An explicit `margin` still means exactly what it always did — one fraction
+   * of frame width on every edge, honoured verbatim — so the knob is unchanged
+   * for anyone who wants the mark somewhere specific, `margin: 0` included. The
+   * DEFAULT is what became safe.
+   */
 } as const;

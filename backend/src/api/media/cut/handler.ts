@@ -17,6 +17,7 @@ export const mediaCutHandler = createMediaHandler({
       input.language,
       input.logo,
       input.maxSeconds,
+      undefined,
       input.paddingSeconds,
     ),
 });

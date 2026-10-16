@@ -353,10 +353,14 @@ screen.
   `cues.ts`, `chunksToAss` in `ass.ts`): a chunk closes at 3 words, 14
   characters, punctuation, or a pause over 0.6 s, and each word is one ASS
   event, so libass does all the animation. It defaults to position `above-ui`
-  — text bottom at 31% of the frame height from the bottom (y=1320 on
-  1080x1920), above the handle/caption/subscribe block Reels (~480px) and
-  Shorts (~380px) draw, with 13% side margins clear of the action rail.
-  Needs word timings, so supplied `subtitles` render as `lines`.
+  — text bottom on the platform bottom safe area, 35% of the frame height up
+  from the bottom (y=1248 on 1080x1920), which is what Meta's Ads Guide for
+  Reels asks to be left clear for the handle, caption, audio row and action
+  rail. That number comes from `MEDIA_SAFE_AREA` (see **Safe areas** below);
+  it was 31% (600px), eyeballed from how tall the chrome looks, which left
+  roughly 55% of a caption block inside the zone Meta declares unsafe. 13%
+  side margins keep it clear of the action rail. Needs word timings, so
+  supplied `subtitles` render as `lines`.
 
 **Roman script (`script: "roman"`).** Whisper asked for Hindi writes
 Devanagari, and asked for English translates or drops the Hindi — neither gives
@@ -440,7 +444,39 @@ afterwards shifts their colour.
   `proofPath`, a still with every candidate outlined in red — look at it before
   trusting a run.
 - **`logo`** — `{file, position?, scale?, opacity?, margin?}`, composited from a
-  local image. Never generated: a channel mark is a real file.
+  local image. Never generated: a channel mark is a real file. Inset by the
+  **safe areas** below unless `margin` says otherwise; the response reports the
+  insets it actually used, and which of the two it took them from.
+
+### Safe areas
+
+Our own furniture — a channel mark, a caption block — has to sit inside what the
+phone and the host app leave us, and what they take is **asymmetric**. A notch
+takes the top, a gesture bar the bottom, a fill-mode crop both sides, and the
+host app's own chrome far more of the bottom than any hardware does. The named
+per-edge insets live in `MEDIA_SAFE_AREA` (`constants.ts`), with each number's
+confidence and derivation written next to it; on 1080x1920 the defaults come out
+as **270px top, 102px each side, 672px bottom**.
+
+They replaced one scalar that got it backwards twice over: a single margin for
+all four edges, taken as a fraction of frame **width** and then applied to the
+**vertical** axis too. At the old 0.04 default that was 43px on 1080x1920 — 4.0%
+of the width but only 2.2% of the height, so the tightest inset landed on the
+one edge with a notch in it, under a `top-right` default. The `margin` knob is
+unchanged for anyone who wants a specific inset; only the default moved.
+
+Two things are worth knowing beyond the constants:
+
+- **Instagram's profile grid crops a Reel thumbnail to 3:4.** On 1080x1920 that
+  takes 240px off the top *and* 240px off the bottom, so only y 240-1680
+  survives there. It is certain and device-independent, and no inset can dodge
+  it — it is the yardstick a placement is checked against. At the old 43px inset
+  every mark we ship was cut from the grid entirely; at the platform top inset
+  the mark clears it by 30px. Assumes Instagram's default centred cover crop.
+- **Nothing here changes the canvas.** The fix is where furniture sits, not
+  letterboxing or pillarboxing our own output to dodge a notch — that trades a
+  hidden mark for a permanently smaller picture on every device, including the
+  ones with no notch at all.
 
 ### `POST /media/share`
 

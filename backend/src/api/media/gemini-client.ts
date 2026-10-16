@@ -189,8 +189,15 @@ function backoffDelayMs(attempt: number): number {
 export async function withGeminiKeyPoolRetry<T>(
   operation: (apiKey: string) => Promise<T>,
   context: string,
+  /**
+   * Explicit key(s) to use instead of `GEMINI_API_KEY_FREE` — e.g. a
+   * channel's own key resolved via `resolveGeminiKeyForChannel`. Falls back
+   * to the shared env pool when omitted or empty, so every existing caller
+   * is unaffected.
+   */
+  explicitKeys?: string[],
 ): Promise<T> {
-  const keys = getApiKeyPool();
+  const keys = explicitKeys?.length ? explicitKeys : getApiKeyPool();
   let lastError: unknown;
 
   for (const apiKey of keys) {

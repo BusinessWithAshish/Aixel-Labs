@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { copyFile, realpath, stat } from "node:fs/promises";
 import { extname, join, sep } from "node:path";
 
+import sharp from "sharp";
+
 import { assertPersistentDisk } from "../../../config";
 import { AIXEL_MEDIA } from "../../../media";
 import { MEDIA_ERROR_MESSAGES, MEDIA_SHARE } from "../constants";
@@ -29,13 +31,24 @@ export async function shareMedia(input: MEDIA_SHARE_REQUEST): Promise<MEDIA_SHAR
   const info = await stat(resolved);
   if (!info.isFile()) throw new Error(`${MEDIA_ERROR_MESSAGES.SHARE_NOT_A_FILE}: ${input.path}`);
 
-  const name = `${randomUUID()}${extname(resolved).toLowerCase()}`;
+  const ext = extname(resolved).toLowerCase();
+  const toJpeg = input.format === "jpeg" && ext !== ".jpg" && ext !== ".jpeg";
+  if (toJpeg && ext !== ".png" && ext !== ".webp") {
+    throw new Error(`${MEDIA_ERROR_MESSAGES.SHARE_NOT_AN_IMAGE}: ${input.path}`);
+  }
+  const name = `${randomUUID()}${toJpeg ? ".jpg" : ext}`;
   const publicPath = join(MEDIA_SHARE.PUBLIC_DIR, name);
-  await copyFile(resolved, publicPath);
+  if (toJpeg) {
+    // Flatten first: a transparent PNG would otherwise come out with black where it was clear.
+    await sharp(resolved).flatten({ background: "#ffffff" }).jpeg({ quality: 92 }).toFile(publicPath);
+  } else {
+    await copyFile(resolved, publicPath);
+  }
+  const bytes = toJpeg ? (await stat(publicPath)).size : info.size;
   return {
     url: `${MEDIA_SHARE.PUBLIC_BASE_URL}/${name}`,
     publicPath,
-    bytes: info.size,
+    bytes,
     retentionDays: MEDIA_SHARE.PUBLIC_RETENTION_DAYS,
   };
 }

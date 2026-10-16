@@ -6,6 +6,7 @@ import {
   MEDIA_TRANSCRIBE_FORMAT,
   MEDIA_TRANSCRIBE_MODEL,
 } from "./constants";
+import { CHANNEL_FIELD } from "../../../channel-keys";
 
 export const MEDIA_TRANSCRIBE_REQUEST_SCHEMA = z.object({
   mediaSource: z
@@ -34,4 +35,7 @@ export const MEDIA_TRANSCRIBE_REQUEST_SCHEMA = z.object({
     .optional()
     .default(MEDIA_TRANSCRIBE.DEFAULT_MODEL)
     .describe(MEDIA_TRANSCRIBE_FIELD_DESCRIPTIONS.model),
+  words: z.boolean().optional().describe(MEDIA_TRANSCRIBE_FIELD_DESCRIPTIONS.words),
+  prompt: z.string().max(1500).optional().describe(MEDIA_TRANSCRIBE_FIELD_DESCRIPTIONS.prompt),
+  channel: CHANNEL_FIELD,
 });

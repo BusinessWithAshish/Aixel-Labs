@@ -4,7 +4,11 @@ import { YOUTUBE_TRANSCRIPT_DEFAULT_HL } from "../transcript/constants";
 import { fetchYoutubeVideoTranscript } from "../transcript/helpers";
 import type { YOUTUBE_TRANSCRIPT_LINE } from "../transcript/types";
 import { formatSecondsAsTimestamp } from "../../../utils/timestamp";
-import { MEDIA_GEMINI_MODEL } from "../../media/constants";
+import {
+  fitsGroqTokenBudget,
+  MEDIA_GEMINI_MODEL,
+  MEDIA_GROQ_TEXT_MODEL,
+} from "../../media/constants";
 import {
   YOUTUBE_CAPTION_SPEAKER_LABEL_PROMPT,
   YOUTUBE_DIARIZE_CLAUDE_MAX_ATTEMPTS,
@@ -16,6 +20,7 @@ import {
   generateStructuredContent,
   withGeminiKeyPoolRetry,
 } from "../../media/gemini-client";
+import { generateJsonWithGroq } from "../../media/groq-chat";
 import { askClaudeForJson } from "../../claude/structured-json";
 import {
   GEMINI_CAPTION_SPEAKER_LABEL_SCHEMA,
@@ -282,43 +287,102 @@ function buildLabelPrompt(turns: CaptionTurn[], speakerCount?: number): string {
 }
 
 /**
+ * Neither Groq nor Claude has Gemini's `responseSchema`, so both are told the
+ * shape in the prompt and validated afterwards.
+ */
+function withJsonSchemaInstruction(prompt: string): string {
+  return (
+    prompt +
+    "\n\nReturn ONLY a single JSON object matching exactly this JSON Schema — no " +
+    "markdown code fences, no commentary before or after it:\n\n" +
+    JSON.stringify(GEMINI_CAPTION_SPEAKER_LABEL_SCHEMA, null, 2)
+  );
+}
+
+/**
  * `provider` picks the transport for this one cheap text-only labeling call
- * — same rubric prompt and same output contract either way. `gemini` uses
- * real schema-constrained decoding (`responseSchema`) against the free-tier
- * key pool. `claude` delegates to the local Claude Code subscription
- * (flat-rate, shares the org-wide 40-session/day budget) via
- * `askClaudeForJson` — no native schema constraint, so it asks for JSON
- * explicitly and validates/retries on a malformed response. This is the same
- * two-provider choice `segment.by_speech` already offers, applied to a much
- * smaller task (label already-known turns, not judge which moments matter).
+ * — same rubric prompt and same output contract whichever is chosen.
+ *
+ * `groq` (default) runs on the Groq key this repo already holds for Whisper.
+ * It leads because the Gemini free-tier pool is the contended resource in a
+ * clip run — the audio-shaped work (diarization uploads, moment scoring)
+ * spends it first — and because this call was observed failing on BOTH 429
+ * (daily quota) and 503 (model overloaded); extra Gemini keys only ever fix
+ * the first. Groq has no native schema constraint, so the prompt asks for
+ * JSON and `generateJsonWithGroq` validates the shape.
+ *
+ * `groq` is a PREFERENCE, not a guarantee: its free tier rejects any single
+ * request over 8k tokens, and a feature-length episode's turn list is
+ * several times that, so long videos silently label on Gemini instead. The
+ * returned `usage.provider` says which one actually ran. Short videos — the
+ * ones that would otherwise be queueing behind diarization for the same
+ * Gemini quota — are the ones this keeps off that pool.
+ *
+ * `gemini` keeps real schema-constrained decoding (`responseSchema`) against
+ * the free-tier key pool. `claude` delegates to the local Claude Code
+ * subscription (flat-rate, shares the org-wide 40-session/day budget) via
+ * `askClaudeForJson`, validating and retrying on a malformed response.
+ *
+ * Labeling already-split turns is a much smaller task than the two-provider
+ * choice `segment.by_speech` offers, which is why this one has a default at
+ * all rather than making the caller choose.
  */
 async function labelAsrTurns(
   turns: CaptionTurn[],
   model: string | undefined,
   speakerCount: number | undefined,
-  provider: "gemini" | "claude",
+  provider: "groq" | "gemini" | "claude",
+  groqApiKey?: string,
+  geminiApiKey?: string,
 ): Promise<{ labeled: CaptionSpeakerLabel; usage: YOUTUBE_DIARIZE_USAGE }> {
   const prompt = buildLabelPrompt(turns, speakerCount);
 
-  if (provider === "claude") {
-    // `model` here is a Claude model name (or undefined -> Claude's own
-    // default) — never the Gemini default, which would be meaningless to
-    // `askClaude`.
-    const { data, usage, attempts } = await askClaudeForJson({
-      prompt:
-        prompt +
-        "\n\nReturn ONLY a single JSON object matching exactly this JSON Schema — no " +
-        "markdown code fences, no commentary before or after it:\n\n" +
-        JSON.stringify(GEMINI_CAPTION_SPEAKER_LABEL_SCHEMA, null, 2),
-      zodValidator: GEMINI_CAPTION_SPEAKER_LABEL_VALIDATOR,
-      model,
-      maxAttempts: YOUTUBE_DIARIZE_CLAUDE_MAX_ATTEMPTS,
-      exhaustedErrorPrefix: YOUTUBE_DIARIZE_ERROR_MESSAGES.CLAUDE_INVALID_JSON,
-    });
-    return { labeled: data, usage: { provider: "claude", usage, attempts } };
+  if (provider === "groq") {
+    const groqPrompt = withJsonSchemaInstruction(prompt);
+    // Groq's free tier caps a single request at MEDIA_GROQ_TEXT_MODEL
+    // .TOKENS_PER_MINUTE and rejects anything larger outright (413), and
+    // every text model on this key shares that ceiling. Turns cannot be
+    // split across calls without risking speaker ids drifting between
+    // batches, so an episode whose turn list does not fit goes to Claude
+    // (then Gemini) rather than being labelled inconsistently.
+    if (fitsGroqTokenBudget(groqPrompt)) {
+      try {
+        const { data, usage } = await generateJsonWithGroq({
+          model: model ?? MEDIA_GROQ_TEXT_MODEL.DEFAULT,
+          prompt: groqPrompt,
+          zodValidator: GEMINI_CAPTION_SPEAKER_LABEL_VALIDATOR,
+          apiKey: groqApiKey,
+        });
+        return { labeled: data, usage: { provider: "groq", usage } };
+      } catch {
+        // fall through to Claude
+      }
+    }
   }
 
-  const geminiModel = model ?? MEDIA_GEMINI_MODEL.DEFAULT;
+  if (provider === "claude" || provider === "groq") {
+    // A full-length episode never fits Groq's per-request ceiling, and on
+    // Gemini this one labelling call spent the caption listener's daily
+    // free-tier allowance before a single clip was captioned (measured
+    // 2026-10-13: three runs out of four labelled on Gemini). So a `groq`
+    // request that Groq cannot take goes to Claude next; Gemini is last.
+    // `model` is only meaningful for the provider the caller named.
+    try {
+      const { data, usage, attempts } = await askClaudeForJson({
+        prompt: withJsonSchemaInstruction(prompt),
+        zodValidator: GEMINI_CAPTION_SPEAKER_LABEL_VALIDATOR,
+        model: provider === "claude" ? model : undefined,
+        maxAttempts: YOUTUBE_DIARIZE_CLAUDE_MAX_ATTEMPTS,
+        exhaustedErrorPrefix: YOUTUBE_DIARIZE_ERROR_MESSAGES.CLAUDE_INVALID_JSON,
+      });
+      return { labeled: data, usage: { provider: "claude", usage, attempts } };
+    } catch (err) {
+      if (provider === "claude") throw err;
+      // Claude unavailable (daily session budget, outage): Gemini as the last resort.
+    }
+  }
+
+  const geminiModel = (provider === "gemini" ? model : undefined) ?? MEDIA_GEMINI_MODEL.DEFAULT;
   return withGeminiKeyPoolRetry(async (apiKey) => {
     const { data, usage } = await generateStructuredContent<CaptionSpeakerLabel>({
       model: geminiModel,
@@ -329,7 +393,7 @@ async function labelAsrTurns(
       zodValidator: GEMINI_CAPTION_SPEAKER_LABEL_VALIDATOR,
     });
     return { labeled: data, usage: { provider: "gemini" as const, usage } };
-  }, "caption speaker label");
+  }, "caption speaker label", geminiApiKey ? [geminiApiKey] : undefined);
 }
 
 function emptyUsage(): GEMINI_USAGE_METADATA {
@@ -381,7 +445,9 @@ export async function diarizeFromYoutubeCaptions(
   language: string = YOUTUBE_TRANSCRIPT_DEFAULT_HL,
   model?: string,
   speakerCount?: number,
-  provider: "gemini" | "claude" = "gemini",
+  provider: "groq" | "gemini" | "claude" = "groq",
+  groqApiKey?: string,
+  geminiApiKey?: string,
 ): Promise<YOUTUBE_DIARIZE_RESPONSE> {
   const videoId = parseYoutubeVideoId(videoUrl);
   if (!videoId) {
@@ -423,7 +489,14 @@ export async function diarizeFromYoutubeCaptions(
     };
   }
 
-  const { labeled, usage } = await labelAsrTurns(turns, model, speakerCount, provider);
+  const { labeled, usage } = await labelAsrTurns(
+    turns,
+    model,
+    speakerCount,
+    provider,
+    groqApiKey,
+    geminiApiKey,
+  );
   const utterances = mergeConsecutive(applyTurnLabels(turns, labeled));
   return {
     transcript: toDiarizedTranscript(utterances),

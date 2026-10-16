@@ -14,10 +14,35 @@ export type LOGO_POSITION = (typeof MEDIA_LOGO_POSITIONS)[number];
 export type MEDIA_EFFECTS_REQUEST_PARSED = z.infer<typeof MEDIA_EFFECTS_REQUEST_SCHEMA>;
 
 export type GRADE_OPTIONS = MEDIA_EFFECTS_REQUEST_PARSED["grade"];
+export type SPEED_OPTIONS = NonNullable<MEDIA_EFFECTS_REQUEST_PARSED["speed"]>;
+
+/** The filters one `speed` request resolves to, and what they will do to the clip. */
+export type SPEED_PLAN = {
+  /** 1 when only the pitch is moving. */
+  rate: number;
+  pitchFollowsRate: boolean;
+  semitones: number;
+  /** `setpts`, when the timeline is rescaled. Absent at rate 1. */
+  videoFilter?: string;
+  /** The audio chain. Absent when the source has no audio track. */
+  audioFilters?: string[];
+  /** Pitch scale factor handed to `rubberband`, when `semitones` was set. */
+  pitchScale?: number;
+  /** Set when the audio side was asked for and skipped — the source has no track. */
+  note?: string;
+};
 export type LOGO_OPTIONS = NonNullable<MEDIA_EFFECTS_REQUEST_PARSED["logo"]> & {
   /** Resolved `0xRRGGBB` to key out, after `keyColor: "auto"` has been sampled. */
   keyedColour?: string;
 };
+
+/**
+ * Per-edge insets in real frame pixels, already even.
+ *
+ * Four numbers and not one, because the safe areas they express are asymmetric:
+ * see `MEDIA_SAFE_AREA` for each edge and its provenance.
+ */
+export type LOGO_INSETS = { top: number; right: number; bottom: number; left: number };
 
 /** The background colour immediately around a region, and whether it is safe to paint with it. */
 export type SURROUND_COLOUR = {
@@ -99,7 +124,34 @@ export type MEDIA_EFFECTS_RESPONSE = {
     /** Set when detection ran and found nothing — the clip is rendered untouched by `hide`. */
     note?: string;
   };
-  logo?: { file: string; position: LOGO_POSITION; widthPixels: number; keyed?: string };
+  logo?: {
+    file: string;
+    position: LOGO_POSITION;
+    widthPixels: number;
+    keyed?: string;
+    /**
+     * The per-edge insets the mark was actually placed at, in real frame pixels,
+     * and where they came from. Reported for the same reason `hide` reports its
+     * covers: a placement that silently lands under a notch or inside the
+     * platform's caption block looks like a clean success from here, and the
+     * only way to catch it is to be able to read the numbers back.
+     */
+    insets: LOGO_INSETS & { source: "safe-area" | "margin" };
+  };
+  /** What `speed` actually did. Absent when it was not asked for. */
+  speed?: {
+    rate: number;
+    pitchFollowsRate: boolean;
+    semitones: number;
+    pitchScale?: number;
+    filters: { video?: string; audio?: string[] };
+    /** Set when the source has no audio track, so only the video was retimed. */
+    note?: string;
+  };
+  /**
+   * The OUTPUT's duration. A `speed.rate` changes it, so this is re-read off the
+   * rendered file rather than carried over from the source.
+   */
   durationSeconds: number;
   width?: number;
   height?: number;

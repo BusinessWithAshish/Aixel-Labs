@@ -9,6 +9,7 @@ import { cleanupResolvedMediaSource, resolveMediaSource } from "../source";
 import { normalizeToFlac } from "./ffmpeg";
 import { toJson, toSrt, toText, toVtt } from "./formatters";
 import { transcribeWithGroq } from "./groq-client";
+import { resolveGroqKeyForChannel } from "../../../channel-keys";
 import type {
   GROQ_VERBOSE_JSON_RESPONSE,
   MEDIA_TRANSCRIBE_FORMAT_VALUE,
@@ -37,7 +38,8 @@ function formatResponse(
 export async function transcribe(
   request: MEDIA_TRANSCRIBE_REQUEST_PARSED,
 ): Promise<MEDIA_TRANSCRIBE_RESPONSE> {
-  const { mediaSource, format, language, model } = request;
+  const { mediaSource, format, language, model, channel, words, prompt } = request;
+  const apiKey = resolveGroqKeyForChannel(channel);
 
   const resolved = await resolveMediaSource(mediaSource);
 
@@ -55,6 +57,9 @@ export async function transcribe(
     const groqResponse = await transcribeWithGroq(normalized.path, {
       model,
       language,
+      apiKey,
+      wordTimestamps: words === true,
+      prompt,
     });
 
     return {

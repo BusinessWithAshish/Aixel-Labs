@@ -3,6 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { assertPersistentDisk } from "../../../config";
+import { resolveGroqKeyForChannel } from "../../../channel-keys";
 import { parseTimestampToSeconds, snapClipBoundaries } from "./boundary-snap";
 import {
   MEDIA,
@@ -65,10 +66,13 @@ export async function cutClipsFromVideo(
   logo?: CUT_LOGO_REQUEST,
   /** Ceiling for a clip's length — `boundaries: "moment"` only. */
   maxSeconds?: number,
+  /** Sage channel slug — resolves that channel's own Groq key for boundary-placement transcription (see `channel-keys.ts`). */
+  channel?: string,
   /** Edge padding in seconds — see `MEDIA_FIELD_DESCRIPTIONS.cutPadding`. */
   paddingSeconds?: number,
 ): Promise<MEDIA_CUT_RESPONSE> {
   assertPersistentDisk(MEDIA_ERROR_MESSAGES.VERCEL);
+  const groqApiKey = resolveGroqKeyForChannel(channel);
   const resolved = await resolveVideoSourceForCut(videoSource);
 
   // For the youtube kind that still needs Evomi (VPS googlevideo 403),
@@ -300,6 +304,7 @@ export async function cutClipsFromVideo(
                 audioWindow,
                 maxSeconds,
                 momentSession,
+                groqApiKey,
               )
             : await findNaturalRange(
             current,
@@ -312,6 +317,7 @@ export async function cutClipsFromVideo(
             // differently — enough to move the end further than the edge is
             // allowed to travel.
             audioWindow,
+            groqApiKey,
           );
           appliedStart = rangeStart + plan.start;
           appliedEnd = rangeStart + plan.end;

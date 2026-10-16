@@ -38,6 +38,8 @@ export type GroqTranscribeOptions = {
    * this with a disfluency-heavy sample. See `MEDIA_CONDENSE.VERBATIM_PROMPT`.
    */
   prompt?: string;
+  /** A channel's own Groq key (see `channel-keys.ts`) — falls back to `GROQ_API_KEY` when omitted. */
+  apiKey?: string;
 };
 
 /**
@@ -58,9 +60,9 @@ type FetchResponseLike = {
  * (Groq has no native srt/vtt output). */
 export async function transcribeWithGroq(
   filePath: string,
-  { model, language, wordTimestamps, prompt }: GroqTranscribeOptions,
+  { model, language, wordTimestamps, prompt, apiKey: explicitApiKey }: GroqTranscribeOptions,
 ): Promise<GROQ_VERBOSE_JSON_RESPONSE> {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = explicitApiKey || process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error(MEDIA_TRANSCRIBE_ERROR_MESSAGES.MISSING_API_KEY);
   }

@@ -86,6 +86,7 @@ async function diarizeChunkFirst(
   chunkPath: string,
   model: string,
   chunkLabel: string,
+  geminiKeys?: string[],
 ): Promise<ChunkDiarizeResult> {
   return withGeminiKeyPoolRetry(async (apiKey) => {
     const active = await uploadAndWaitActive(chunkPath, apiKey);
@@ -101,7 +102,7 @@ async function diarizeChunkFirst(
       zodValidator: DIARIZED_TRANSCRIPT_SCHEMA,
     });
     return { segments: data.segments, speakers: data.speakers, usage };
-  }, chunkLabel);
+  }, chunkLabel, geminiKeys);
 }
 
 type ReferenceClip = { path: string; guessedIdentity?: string };
@@ -112,6 +113,7 @@ async function diarizeChunkContinuation(
   referenceClips: Map<string, ReferenceClip>,
   nextSpeakerIndex: number,
   chunkLabel: string,
+  geminiKeys?: string[],
 ): Promise<ChunkDiarizeResult> {
   const knownIds = [...referenceClips.keys()].slice(0, MEDIA.MAX_REFERENCE_SPEAKERS);
 
@@ -155,7 +157,7 @@ async function diarizeChunkContinuation(
       zodValidator: DIARIZED_TRANSCRIPT_SCHEMA,
     });
     return { segments: data.segments, speakers: data.speakers, usage };
-  }, chunkLabel);
+  }, chunkLabel, geminiKeys);
 }
 
 /**
@@ -213,6 +215,7 @@ async function diarizeChunked(
   tempDir: string,
   totalDurationSeconds: number,
   model: string,
+  geminiKeys?: string[],
 ): Promise<MEDIA_DIARIZE_RESPONSE> {
   const chunkStarts: number[] = [];
   for (let t = 0; t < totalDurationSeconds; t += MEDIA.CHUNK_DURATION_SECONDS) {
@@ -238,13 +241,14 @@ async function diarizeChunked(
     const chunkLabel = `chunk ${i + 1}/${chunkStarts.length} (${formatSecondsAsTimestamp(startSec)})`;
     const result =
       i === 0
-        ? await diarizeChunkFirst(chunkPath, model, chunkLabel)
+        ? await diarizeChunkFirst(chunkPath, model, chunkLabel, geminiKeys)
         : await diarizeChunkContinuation(
             chunkPath,
             model,
             referenceClips,
             nextSpeakerIndex,
             chunkLabel,
+            geminiKeys,
           );
 
     usage = addUsage(usage, result.usage);
@@ -328,6 +332,7 @@ async function diarizeChunked(
 export async function diarizeFromSource(
   mediaSource: string,
   model: string,
+  geminiKeys?: string[],
 ): Promise<MEDIA_DIARIZE_RESPONSE> {
   const resolved = await resolveMediaSource(mediaSource);
 
@@ -335,7 +340,7 @@ export async function diarizeFromSource(
     const durationSeconds = await getMediaDurationSeconds(resolved.path);
 
     if (durationSeconds <= MEDIA.CHUNK_THRESHOLD_SECONDS) {
-      const result = await diarizeChunkFirst(resolved.path, model, "single-call diarize");
+      const result = await diarizeChunkFirst(resolved.path, model, "single-call diarize", geminiKeys);
       return {
         transcript: {
           speaker_count: result.speakers.length,
@@ -346,7 +351,7 @@ export async function diarizeFromSource(
       };
     }
 
-    return await diarizeChunked(resolved.path, resolved.workDir, durationSeconds, model);
+    return await diarizeChunked(resolved.path, resolved.workDir, durationSeconds, model, geminiKeys);
   } finally {
     await cleanupResolvedMediaSource(resolved);
   }
