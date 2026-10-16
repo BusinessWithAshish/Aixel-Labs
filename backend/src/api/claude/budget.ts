@@ -38,10 +38,18 @@ function load(): CLAUDE_BUDGET_LEDGER {
   try {
     if (!existsSync(CLAUDE_BUDGET.LEDGER_FILE)) return empty();
     const s = JSON.parse(readFileSync(CLAUDE_BUDGET.LEDGER_FILE, "utf8")) as CLAUDE_BUDGET_LEDGER;
-    // Roll over at midnight. limit_hit_at clears too — a daily budget that
-    // stays tripped forever is just an outage.
-    if (s.day !== today()) return empty();
-    return { ...empty(), ...s };
+    // Roll over the daily counters (sessions/tokens) at midnight — those are
+    // genuinely calendar-day quotas.
+    const merged = s.day === today() ? { ...empty(), ...s } : empty();
+    // The breaker itself tracks Claude's 5-hour rolling usage window, not the
+    // calendar day. Clear it once that window has actually elapsed instead of
+    // leaving it open until UTC midnight, which could be ~19h past the real
+    // reset (and wouldn't clear at all for a limit hit after midnight rolled
+    // the day above, since `s.day === today()` would then keep it alive).
+    if (merged.limit_hit_at && Date.now() - Date.parse(merged.limit_hit_at) >= CLAUDE_BUDGET.BREAKER_COOLDOWN_MS) {
+      merged.limit_hit_at = null;
+    }
+    return merged;
   } catch {
     return empty();
   }
@@ -91,11 +99,12 @@ export function checkBudget({ isResume }: { isResume: boolean }): {
     };
   }
   if (s.limit_hit_at) {
+    const cooldownMin = CLAUDE_BUDGET.BREAKER_COOLDOWN_MS / 60_000;
     return {
       allowed: false,
       reason:
-        `Claude reported a usage limit at ${s.limit_hit_at} and the breaker is open for today. ` +
-        "Follow-ups on existing sessions may still work.",
+        `Claude reported a usage limit at ${s.limit_hit_at}; the breaker stays open for ` +
+        `${cooldownMin} minutes from then. Follow-ups on existing sessions may still work.`,
     };
   }
   return { allowed: true };

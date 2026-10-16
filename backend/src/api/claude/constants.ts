@@ -68,4 +68,8 @@ export const CLAUDE_BUDGET = {
   // 0 or unset = unlimited (track but never block).
   DAILY_SESSIONS: Number(process.env.CLAUDE_DAILY_SESSIONS || 0),
   DAILY_TOKENS: Number(process.env.CLAUDE_DAILY_TOKENS || 0),
+  // Claude's own usage limit resets on a 5-hour rolling window, not the
+  // calendar day — the breaker mirrors that instead of waiting for UTC
+  // midnight, which could leave it open up to ~19h past the real reset.
+  BREAKER_COOLDOWN_MS: Number(process.env.CLAUDE_BREAKER_COOLDOWN_MINUTES || 300) * 60 * 1000,
 } as const;
