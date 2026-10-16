@@ -22,6 +22,7 @@ import { GROQ_CHAT_COMPLETIONS_URL } from "../transcribe/constants";
  * word it returns in the audio afterwards.
  */
 const EDITED = z.object({ language: z.string(), text: z.string().min(1) });
+const EDITOR_TIMEOUT_MS = 120_000;
 
 function prompt(heard: string, reference: string | undefined, durationSeconds: number, json: boolean): string {
   return [
@@ -147,6 +148,8 @@ async function editWithGroq(ask: string, apiKey?: string): Promise<{ text: strin
   const res = await fetch(GROQ_CHAT_COMPLETIONS_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    // A hung connection must not hold the clip (and every clip queued behind it).
+    signal: AbortSignal.timeout(EDITOR_TIMEOUT_MS),
     // A reasoning model: with the default effort it could spend its whole
     // budget thinking and return an empty answer (seen on 2 of 10 clips).
     body: JSON.stringify({

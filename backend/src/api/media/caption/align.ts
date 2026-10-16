@@ -106,11 +106,13 @@ export async function alignWordsToAudio(
     }
     if (parsed.words.length !== words.length) return keep(MEDIA_ERROR_MESSAGES.ALIGN_RESULT_INVALID);
 
-    // In spoken order, never overlapping, never past the end of the clip.
+    // In spoken order, never overlapping, never past the end of the clip
+    // (an unknown duration, 0, clamps nothing).
+    const limit = durationSeconds > 0 ? durationSeconds : Infinity;
     let cursor = 0;
     const timed = words.map((w, i) => {
-      const start = Math.max(cursor, Math.min(parsed.words[i].start, durationSeconds));
-      const end = Math.max(start + 0.05, Math.min(parsed.words[i].end, durationSeconds + 0.05));
+      const start = Math.max(cursor, Math.min(parsed.words[i].start, limit));
+      const end = Math.max(start + 0.05, Math.min(parsed.words[i].end, limit + 0.05));
       cursor = start;
       return { ...w, start, end };
     });
