@@ -88,6 +88,8 @@ export const GEMINI = {
   STOP_SELECTOR: 'button[aria-label*="Stop" i]',
   UPLOAD_BUTTON_SELECTOR: 'button[aria-label*="Upload and tools" i], button[aria-label*="upload" i]',
   RESPONSE_SELECTOR: "model-response, message-content",
+  /** One element per assistant turn — counted to tell a new answer from one already on the page. */
+  TURN_SELECTOR: "model-response",
 
   // Timing
   COMPOSER_WAIT_SEC: 90,

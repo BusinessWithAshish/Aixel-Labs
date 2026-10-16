@@ -20,7 +20,7 @@ export type GEMINI_RESPONSE = {
   media: GEMINI_MEDIA[];
   /** The Gemini model label reported for the turn, if the UI exposed it (e.g. "3.6 Flash"). */
   model?: string;
-  /** The /app/<id> conversation id — pass back as conversation_id + mode=resume to continue. */
+  /** The /app/<id> conversation id — pass back as conversation_id (or conversation_url) with mode=resume|revise to continue. */
   conversation_id: string;
   conversation_url: string;
   /** The notebook/Gem the chat was started in, echoed back when one was given. */

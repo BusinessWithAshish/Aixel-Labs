@@ -1,7 +1,7 @@
 # Instagram download
 
 Saves public Instagram **post / reel / tv / carousel** media to local disk and
-returns file paths. No login, no browser, **no Evomi proxy**.
+returns file paths. No login, no browser.
 
 | Surface | Name |
 |---------|------|
@@ -30,7 +30,7 @@ Refused on Vercel (`assertPersistentDisk`) — it writes to disk.
     url?, mediaTypeLabel?, productType?, owner?, caption?, takenAt?,
     items: [{ index, kind: "video" | "image", filePath, bytes, width, height, cached }]
   }],
-  bytesFetched   // pulled from Instagram this call (pages + media, cache hits excluded)
+  bytesFetched   // crawler pages + media pulled this call (GraphQL metadata and cache hits not counted)
 }
 ```
 
@@ -39,17 +39,19 @@ rest of the batch still runs. Posts run sequentially.
 
 Files land at `{AIXEL_MEDIA_ROOT}/private/instagram-downloads/{shortcode}/{index}.{mp4|jpg}`
 (`AIXEL_MEDIA.INSTAGRAM_DOWNLOADS`). An existing file is returned as `cached: true`
-without re-downloading, but the post page is still fetched (~700 KB) to read metadata.
+without re-downloading; the post metadata is still looked up.
 No retention policy on this folder yet.
 
 ## How it works
 
 1. `client.ts` → `extractShortcode` (reuses `advanced/search/compute/classify-url.ts`, plus `/tv/`).
-2. `GET https://www.instagram.com/p/{shortcode}/` with a **Googlebot UA**, direct
-   `fetch`. Instagram serves crawlers server-rendered HTML whose
-   `<script type="application/json">` blobs carry the full v1 feed item.
-3. `compute/parse-ssr.ts` → `findFeedItemInSsr` finds the item whose `code`
-   matches (related-post teasers carry other codes).
+2. The logged-out GraphQL post query (`fetchLoggedOutMedia`, media id decoded
+   from the shortcode) — direct first, through Evomi only if direct is refused
+   and Evomi is configured (`graphql.ts`). Since 2026-10 this leads: the crawler
+   page below is a login wall for most posts from the VPS.
+3. Fallback: `GET https://www.instagram.com/p/{shortcode}/` with a **Googlebot
+   UA**, direct `fetch`; `compute/parse-ssr.ts` → `findFeedItemInSsr` reads the
+   feed item from its `<script type="application/json">` blobs.
 4. `advanced/compute/map-post.ts` → `mapFeedItem` — same mapper as the
    `posts` op. One asset per slide: its largest video, else its largest image.
 5. Each CDN file (`*.cdninstagram.com`) is streamed direct to a `.part` file,
@@ -65,11 +67,10 @@ No retention policy on this folder yet.
 | `i.instagram.com/api/v1/media/{pk}/info/`, `/p/{code}/?__a=1` | 404 |
 | `graphql/query` shortcode doc_id | 403 |
 
-There is deliberately **no Evomi fallback**: residential IPs do not get guest
-access anyway (see the parent README / `ssr-profile.ts` history), and a page
-plus a reel is ~10 MB of metered bandwidth per post. If the Googlebot page
-stops carrying media JSON, every post fails with `NOT_FOUND` — fix it in
-`compute/parse-ssr.ts` / `client.ts`, not with a proxy.
+The media files and the crawler page are always fetched direct — a page plus a
+reel is ~10 MB, too much for metered bandwidth. Only the small GraphQL metadata
+query may go through Evomi. If neither route returns the feed item, the post
+fails with `NOT_FOUND`.
 
 ## Smoke
 

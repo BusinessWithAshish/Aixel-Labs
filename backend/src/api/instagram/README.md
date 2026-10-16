@@ -18,7 +18,7 @@ See [`advanced/README.md`](./advanced/README.md).
 handles (+ optional profile enrich). See [`advanced/search/README.md`](./advanced/search/README.md).
 
 `POST /instagram/download` — save public post / reel / carousel media to local
-disk (Googlebot-UA SSR page, direct — no proxy). See
+disk (logged-out GraphQL post query, Googlebot-UA SSR page as fallback). See
 [`download/README.md`](./download/README.md).
 
 ## How discovery works

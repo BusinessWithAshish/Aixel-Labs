@@ -36,6 +36,6 @@ export type IG_DOWNLOAD_POST = {
 
 export type IG_DOWNLOAD_RESPONSE = {
   posts: IG_DOWNLOAD_POST[];
-  /** Bytes actually pulled from Instagram this call (SSR pages + media; cache hits excluded). */
+  /** Bytes pulled from Instagram this call: crawler pages + media (GraphQL metadata and cache hits not counted). */
   bytesFetched: number;
 };

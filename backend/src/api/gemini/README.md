@@ -85,7 +85,10 @@ UI; this module only starts chats in them.
 {
   "prompt": "Create a short video: a teal robot waves hello in a library.",
   "mode": "new",
+  "project_url": null,
   "conversation_id": null,
+  "conversation_url": null,
+  "revise_notes": null,
   "images": null,
   "videos": null,
   "expect": "auto",
@@ -93,9 +96,12 @@ UI; this module only starts chats in them.
 }
 ```
 
-- `mode: "resume"` requires `conversation_id` (the `/app/<id>` id from a prior
-  response) — continues that chat, e.g. to iterate on a generated image or
-  extend a video.
+- `project_url`: a `gemini.google.com/notebook/<id>` or `/gem/<id>` URL — the
+  new chat starts inside it (see **Notebooks are projects**).
+- `mode: "resume"` / `"revise"` require `conversation_id` (the `/app/<id>` id
+  from a prior response) or `conversation_url` — continues that chat, e.g. to
+  iterate on a generated image or extend a video. `revise_notes` is human
+  feedback appended to the prompt on a continued conversation.
 - `images` / `videos`: absolute local file paths attached as real input media,
   in order. Omit or `[]` for none. For a remote file, download it first with
   `media` op=fetch (`imageOnly: true` for images) and pass the returned path.

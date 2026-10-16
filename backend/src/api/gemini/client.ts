@@ -272,7 +272,7 @@ type TurnState = {
 const TURN_STATE_JS = `(() => {
   const resp = document.querySelectorAll(${S(GEMINI.RESPONSE_SELECTOR)});
   const last = resp.length ? resp[resp.length - 1] : null;
-  const count = document.querySelectorAll('model-response').length;
+  const count = document.querySelectorAll(${S(GEMINI.TURN_SELECTOR)}).length;
   const text = last ? (last.innerText || '').trim() : '';
   const imgs = last ? [...last.querySelectorAll('img')].filter(i => i.naturalWidth > 200 && /generat/i.test(i.alt || '')).length : 0;
   const vids = [...document.querySelectorAll('video')].filter(v => v.src || v.querySelector('source')).length;
@@ -523,7 +523,7 @@ export async function generateGemini(req: GEMINI_REQUEST_PARSED): Promise<GEMINI
     }
 
     const baseline = Number(
-      (await tab.js(`document.querySelectorAll('model-response').length`).catch(() => 0)) ?? 0,
+      (await tab.js(`document.querySelectorAll(${S(GEMINI.TURN_SELECTOR)}).length`).catch(() => 0)) ?? 0,
     );
 
     await attachFiles(tab, attachments);
