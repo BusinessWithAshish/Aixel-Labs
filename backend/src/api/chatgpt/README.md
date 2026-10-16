@@ -8,7 +8,7 @@ it's staged as a public JPEG under `{AIXEL_MEDIA_ROOT}/public` →
 `https://hermes.aixellabs.in/media/…`.
 
 Spawns a fresh headed Chrome per call against a persistent profile dir
-(`CHATGPT.PROFILE_DIR`, default `/home/ubuntu/browser-vnc/chrome-official` —
+(`CHATGPT.PROFILE_DIR`, default `/home/ubuntu/browser-vnc/BWA` —
 the same dir the old always-on VNC Chrome used) and closes it when done.
 Login state lives in the profile directory, not a running process, so it
 survives every spawn. **Headed is required, not headless** — chatgpt.com's

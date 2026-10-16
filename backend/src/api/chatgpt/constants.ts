@@ -12,7 +12,7 @@ export const CHATGPT_ROUTES = {
 
 export const CHATGPT_FIELD_DESCRIPTIONS = {
   project_url:
-    "OPTIONAL. ChatGPT Project URL (https://chatgpt.com/g/g-p-…/project) — use one when a project's saved instructions should shape the turn (house style, a brand, a persona). Omit it to run in a plain ChatGPT chat with no project context at all.",
+    "OPTIONAL. ChatGPT Project URL (https://chatgpt.com/g/g-p-…/project) — use one when a project's saved instructions should shape the turn (house style, a brand, a persona). Omit it and the chat opens in the account's \"General chats\" project when it has one (keeps tool traffic out of the owner's own sidebar), otherwise in a plain chat.",
   prompt:
     "Full prompt — a chat question, an image-generation brief, or both. Caller builds this from soul/memory/skills.",
   mode: "'new' opens the project; 'revise' continues an existing conversation_url.",
@@ -21,6 +21,8 @@ export const CHATGPT_FIELD_DESCRIPTIONS = {
   revise_notes: "Human revise feedback; appended into the prompt when mode=revise.",
   images:
     "Absolute local file paths to attach to the message, in order, as real input images (e.g. a logo, reference posts to emulate). Omit or pass [] to attach nothing. To use a remote image (e.g. a competitor's post) as a reference, first download it with `media` op=fetch (imageOnly: true) and pass the returned path here — this module has no downloader of its own.",
+  account:
+    "OPTIONAL. Which signed-in ChatGPT account to use, by name (e.g. \"literallyashish\", \"BWA\"). Omit for the server's default account. A project_url or conversation_url only opens in the account it belongs to. An unknown name is rejected with the list of known ones.",
   attach_brand_logo:
     "Also attach the server's configured brand logo (CHATGPT_LOGO_PATH) to this message. Default false. Only for callers that actually want that brand on the output — it is a specific organisation's mark, not a generic asset.",
   timeout_seconds:
@@ -37,7 +39,7 @@ export const CHATGPT = {
    * VNC (or copying a logged-in profile here) keeps working across restarts
    * because only the profile *directory* needs to persist, not the process.
    */
-  PROFILE_DIR: process.env.CHATGPT_PROFILE_DIR || "/home/ubuntu/browser-vnc/chrome-official",
+  PROFILE_DIR: process.env.CHATGPT_PROFILE_DIR || "/home/ubuntu/browser-vnc/BWA",
   /**
    * X11 display to render into. MUST be headed, not `--headless=new` —
    * verified live 2026-09-07: chatgpt.com's Cloudflare check waves through
@@ -92,6 +94,50 @@ export const CHATGPT = {
 
 export const CHATGPT_MODES = ["new", "revise"] as const;
 
+/**
+ * The same ChatGPT subscription reached through the Codex CLI instead of a
+ * browser tab — for an account that cannot be signed into the VPS Chrome.
+ *
+ * The CLI keeps its own login in `HOME` (a CODEX_HOME separate from any
+ * developer's `~/.codex`), signed in once with `codex login --device-auth`.
+ * Image generation there draws on the plan's included Codex usage, not on the
+ * in-app image cap the browser path hits and not on metered API credits.
+ */
+export const CHATGPT_CODEX = {
+  BIN: process.env.CHATGPT_CODEX_BIN || "/home/ubuntu/.local/bin/codex",
+  HOME: process.env.CHATGPT_CODEX_HOME || "/home/ubuntu/.codex-literallyashish",
+  /** An empty directory the CLI runs in, so it has no repository to wander into. */
+  WORKDIR: `${AIXEL_MEDIA.PRIVATE}/codex-work`,
+  DEFAULT_TIMEOUT_SEC: 10 * 60,
+  /**
+   * Goes in front of every prompt. Codex is a coding agent: left alone it will
+   * write an SVG or a script that draws the picture. This pins it to the one
+   * tool wanted and to a one-line answer.
+   */
+  PREAMBLE:
+    "Use your built-in image generation tool to produce exactly ONE image for the request below. " +
+    "Do not write code, do not create or edit files, do not run shell commands, and do not describe the image instead of generating it. " +
+    "When the image exists, reply with one short line saying what you made.",
+  REVISE_PREAMBLE:
+    "Revise the image you generated earlier in this session, using your built-in image generation tool, and produce exactly ONE new image. " +
+    "Change only what is asked and keep everything else as it was. Do not write code, files or shell commands. Reply with one short line.",
+} as const;
+
+export const CHATGPT_CODEX_FIELD_DESCRIPTIONS = {
+  prompt:
+    "What to generate (mode=new) or what to change (mode=revise). Describe the picture; the server already tells the CLI to use its image tool and nothing else.",
+  mode: "'new' starts a session; 'revise' continues `session_id`, where the earlier image still is, so the change keeps everything not mentioned.",
+  session_id: "Required when mode=revise. The session_id a prior call returned.",
+  revise_notes: "Human revise feedback; appended to the prompt when mode=revise.",
+  images:
+    "Absolute local file paths attached as real input images, in order — a reference to follow, or an image to edit. Omit for none. For a remote image, download it first with `media` op=fetch (imageOnly: true).",
+  account:
+    "OPTIONAL. Which ChatGPT account's Codex CLI login to use, by name — the same names op=ask takes. Omit for the server's default account. A session_id only resumes in the account that made it.",
+  instructions_file:
+    "OPTIONAL. Absolute path of a text/markdown file of standing instructions (a brand's palette, type, never-list) put in front of the prompt on mode=new — this path's stand-in for a ChatGPT Project, which the CLI cannot open. A session keeps them, so mode=revise does not need it again.",
+  timeout_seconds: "Cap on the whole turn, in seconds. Default 600.",
+} as const;
+
 export const CHATGPT_ERROR_MESSAGES = {
   INVALID_PARAMS: "Invalid request parameters",
   BUSY: "A ChatGPT call is already running — retry shortly",
@@ -100,4 +146,73 @@ export const CHATGPT_ERROR_MESSAGES = {
   NO_RESULT: "ChatGPT produced neither text nor an image — it may have refused",
   NOT_VPS:
     "ChatGPT calls need a headful Chrome with an X display (the VPS's Xvfb) — no X display is available on this host",
+  CODEX_BUSY: "A Codex image call is already running — retry shortly",
+  CODEX_NOT_INSTALLED: "The Codex CLI is not installed at the configured path",
+  CODEX_SIGNED_OUT:
+    "The Codex CLI is not signed in. On the VPS run: CODEX_HOME=<the configured home> codex login --device-auth, and approve the code with the ChatGPT account to use",
+  CODEX_NO_IMAGE: "Codex finished without generating an image",
+  CODEX_FAILED: "Codex image call failed",
 } as const;
+
+/**
+ * One signed-in ChatGPT account, reachable two ways. Every op takes `account`
+ * and looks its routes up here, so adding a login is one entry — never a new
+ * op or a new env var per route.
+ *
+ * - `profile_dir`: the Chrome profile holding the chatgpt.com login (op=ask).
+ * - `codex_home`: the Codex CLI login folder for the same account (op=image);
+ *   absent when the CLI was never signed in for it.
+ * - `general_project_url`: that account's "General chats" project. A new chat
+ *   that names no project_url opens there instead of the account's main
+ *   sidebar, so tool traffic never lands in the owner's own chat history.
+ *   Absent = no such project yet, and a project-less chat is a plain chat.
+ */
+export type CHATGPT_ACCOUNT = {
+  profile_dir: string;
+  codex_home?: string;
+  general_project_url?: string;
+};
+
+const CHATGPT_BUILTIN_ACCOUNTS: Record<string, CHATGPT_ACCOUNT> = {
+  BWA: {
+    profile_dir: CHATGPT.PROFILE_DIR,
+    codex_home: "/home/ubuntu/.codex",
+    general_project_url: "https://chatgpt.com/g/g-p-6ac6449946bc81919c3c9df3322efe59/project",
+  },
+  literallyashish: {
+    profile_dir: "/home/ubuntu/browser-vnc/literallyashish",
+    codex_home: CHATGPT_CODEX.HOME,
+    general_project_url: "https://chatgpt.com/g/g-p-6ac63b5c8d1c819190fbd1098431f0a3/project",
+  },
+};
+
+function loadChatGptAccounts(): Record<string, CHATGPT_ACCOUNT> {
+  const raw = process.env.CHATGPT_ACCOUNTS;
+  if (!raw) return CHATGPT_BUILTIN_ACCOUNTS;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, CHATGPT_ACCOUNT>;
+    if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) return parsed;
+  } catch {
+    /* fall through: a malformed override must not take the tool down */
+  }
+  return CHATGPT_BUILTIN_ACCOUNTS;
+}
+
+/** Override whole with CHATGPT_ACCOUNTS (JSON: { "<name>": { profile_dir, codex_home?, general_project_url? } }). */
+export const CHATGPT_ACCOUNTS: Record<string, CHATGPT_ACCOUNT> = loadChatGptAccounts();
+
+/** Used when a call names no account. */
+export const CHATGPT_DEFAULT_ACCOUNT = process.env.CHATGPT_DEFAULT_ACCOUNT || "BWA";
+
+export function resolveChatGptAccount(name?: string | null): { name: string; account: CHATGPT_ACCOUNT } {
+  const key = name || CHATGPT_DEFAULT_ACCOUNT;
+  const account = CHATGPT_ACCOUNTS[key];
+  if (!account) {
+    const err = new Error(
+      `Unknown ChatGPT account "${key}". Known accounts: ${Object.keys(CHATGPT_ACCOUNTS).join(", ")}`,
+    );
+    (err as Error & { statusCode?: number }).statusCode = 400;
+    throw err;
+  }
+  return { name: key, account };
+}

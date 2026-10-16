@@ -188,10 +188,10 @@ async function closeAnyExistingChrome(): Promise<void> {
  * runs only after closeAnyExistingChrome() has confirmed no CDP endpoint is
  * reachable, so any lock files that exist are provably stale.
  */
-async function clearStaleSingletonFiles(): Promise<void> {
+async function clearStaleSingletonFiles(profileDir: string): Promise<void> {
   await Promise.all(
     ["SingletonLock", "SingletonCookie", "SingletonSocket"].map((name) =>
-      unlink(join(CHATGPT.PROFILE_DIR, name)).catch(() => {
+      unlink(join(profileDir, name)).catch(() => {
         /* fine if it doesn't exist */
       }),
     ),
@@ -208,9 +208,11 @@ export type ChromeHandle = { proc: ChildProcess };
  * contention. Login state (cookies) lives in the profile dir, not the
  * process, so it survives every spawn/close cycle.
  */
-export async function launchChatGptChrome(): Promise<ChromeHandle> {
+export async function launchChatGptChrome(
+  profileDir: string = CHATGPT.PROFILE_DIR,
+): Promise<ChromeHandle> {
   await closeAnyExistingChrome();
-  await clearStaleSingletonFiles();
+  await clearStaleSingletonFiles(profileDir);
 
   const port = new URL(CHATGPT.CDP_HTTP).port || "9222";
   const proc = spawn(
@@ -221,7 +223,7 @@ export async function launchChatGptChrome(): Promise<ChromeHandle> {
       `--remote-debugging-port=${port}`,
       "--remote-debugging-address=127.0.0.1",
       "--remote-allow-origins=*",
-      `--user-data-dir=${CHATGPT.PROFILE_DIR}`,
+      `--user-data-dir=${profileDir}`,
       "--no-first-run",
       "--no-default-browser-check",
       "--disable-session-crashed-bubble",

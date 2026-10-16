@@ -17,7 +17,9 @@ import {
   type ChromeHandle,
   type CdpTab,
 } from "./cdp";
-import { CHATGPT, CHATGPT_ERROR_MESSAGES } from "./constants";
+import { CHATGPT, CHATGPT_ERROR_MESSAGES,
+  resolveChatGptAccount,
+} from "./constants";
 import type {
   CHATGPT_HEALTH_RESPONSE,
   CHATGPT_REQUEST_PARSED,
@@ -43,12 +45,17 @@ async function checkChromeBinary(): Promise<{ ok: boolean; detail: string }> {
   }
 }
 
-async function checkProfileDir(): Promise<{ ok: boolean; detail: string }> {
+/** The profile of the call in flight — `busy` guarantees there is only one. */
+let activeProfileDir: string = CHATGPT.PROFILE_DIR;
+
+async function checkProfileDir(
+  dir: string = CHATGPT.PROFILE_DIR,
+): Promise<{ ok: boolean; detail: string }> {
   try {
-    await fs.access(CHATGPT.PROFILE_DIR);
-    return { ok: true, detail: CHATGPT.PROFILE_DIR };
+    await fs.access(dir);
+    return { ok: true, detail: dir };
   } catch {
-    return { ok: false, detail: `profile directory missing: ${CHATGPT.PROFILE_DIR}` };
+    return { ok: false, detail: `profile directory missing: ${dir}` };
   }
 }
 
@@ -164,7 +171,7 @@ async function openChat(tab: CdpTab, url: string): Promise<void> {
     `composer never appeared at ${url} after ${CHATGPT.COMPOSER_WAIT_SEC}s ` +
       `(selector ${CHATGPT.COMPOSER_SELECTOR}). The page may be logged in but ` +
       `the composer selector is stale (ChatGPT changed its DOM), or the ` +
-      `${CHATGPT.PROFILE_DIR} session is logged out — check via VNC on ${CHATGPT.DISPLAY}.`,
+      `${activeProfileDir} session is logged out — check via VNC on ${CHATGPT.DISPLAY}.`,
   );
 }
 
@@ -454,21 +461,27 @@ export async function generateChatGpt(
   let chrome: ChromeHandle | undefined;
   let tab: CdpTab | undefined;
   try {
-    const staticChecks = await Promise.all([checkChromeBinary(), checkProfileDir()]);
+    const { account } = resolveChatGptAccount(req.account);
+    activeProfileDir = account.profile_dir;
+    const staticChecks = await Promise.all([
+      checkChromeBinary(),
+      checkProfileDir(activeProfileDir),
+    ]);
     const failedStatic = staticChecks.find((c) => !c.ok);
     if (failedStatic) {
       throw new Error(`${CHATGPT_ERROR_MESSAGES.PREFLIGHT}: ${failedStatic.detail}`);
     }
 
-    chrome = await launchChatGptChrome();
+    chrome = await launchChatGptChrome(activeProfileDir);
     tab = await openNewTab(CHATGPT.CDP_HTTP);
     // Where the turn happens, in priority order: the conversation being
-    // revised, else the project asked for, else a plain chat with no project
-    // context at all.
+    // revised, else the project asked for, else the account's "General chats"
+    // project (so tool traffic stays out of the owner's own sidebar), else a
+    // plain chat when the account has no such project.
     const openUrl =
       req.mode === "revise" && req.conversation_url
         ? req.conversation_url
-        : (req.project_url ?? CHATGPT.NEW_CHAT_URL);
+        : (req.project_url ?? account.general_project_url ?? CHATGPT.NEW_CHAT_URL);
     await openChat(tab, openUrl);
 
     // Nothing is attached unless the caller asked for it. The brand logo is
