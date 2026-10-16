@@ -81,11 +81,11 @@ export const MEDIA_CAPTION_REQUEST_SCHEMA = z.object({
    * accents, fast talk. `"none"` (default) is Whisper alone, as before.
    */
   listener: z
-    .enum(["none", "gemini", "verified"])
+    .enum(["none", "gemini", "verified", "apex"])
     .optional()
     .default("none")
     .describe(
-      "'gemini' has a second listener decide the caption WORDS (verbatim, Roman script, no language forced) while Whisper only supplies their timing — use it for Indian-language, mixed-language or heavily accented speech, where Whisper alone writes the wrong words or drops whole stretches. Falls back to Whisper alone if the listener is unavailable, and says so in `listener`/`listenerFallbackReason`. 'verified' is the robust one: the same listener, plus a second Whisper pass in the other language and Claude as judge whenever the listener is unavailable or disagrees with Whisper about much of the clip — so a busy listener no longer means wrong captions. 'none' (default) is Whisper alone.",
+      "'gemini' has a second listener decide the caption WORDS (verbatim, Roman script, no language forced) while Whisper only supplies their timing — use it for Indian-language, mixed-language or heavily accented speech, where Whisper alone writes the wrong words or drops whole stretches. Falls back to Whisper alone if the listener is unavailable, and says so in `listener`/`listenerFallbackReason`. 'verified' is the robust one: the same listener, plus a second Whisper pass in the other language and Claude as judge whenever the listener is unavailable or disagrees with Whisper about much of the clip — so a busy listener no longer means wrong captions. 'apex' (recommended for Indian speech) runs a Hinglish speech model on this host — no daily quota — then an editor (Groq, Claude as backup) writes the words in everyday Roman script using `reference` as a second hearing; every word is then timed against the audio. 'none' (default) is Whisper alone.",
     ),
   maskProfanity: z
     .boolean()
@@ -94,6 +94,23 @@ export const MEDIA_CAPTION_REQUEST_SCHEMA = z.object({
     .describe(
       "true shows swear words as their first and last letter with stars between ('f*****g'), English and Hindi/Punjabi, same length as the word. Only what is written on screen changes; the audio is untouched.",
     ),
+  /**
+   * `listener: "apex"` only: where this clip sits in the episode transcript
+   * research already saved (`youtube` op=diarize's `transcriptPath`). That
+   * stretch of YouTube's own captions is given to the caption editor as a
+   * second, independent hearing — see `caption/reference.ts`.
+   */
+  reference: z
+    .object({
+      transcriptPath: z.string().min(1),
+      startSeconds: z.number().nonnegative(),
+      endSeconds: z.number().positive(),
+    })
+    .optional()
+    .describe(
+      "With listener 'apex': { transcriptPath, startSeconds, endSeconds } — the episode transcript research saved (youtube op=diarize transcriptPath) and where this clip sits in the episode (the cut's cutStartSeconds/cutEndSeconds). That stretch of YouTube's own captions is used as a second hearing to correct names, numbers and misheard words. Optional; without it the ear's words are only cleaned up.",
+    ),
+  channel: CHANNEL_FIELD,
 });
 
 /** Gemini `responseSchema` for `script: "roman"`: numbered words in, the same numbers back — see `transliterate.ts`. */

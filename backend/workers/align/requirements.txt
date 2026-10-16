@@ -1,0 +1,2 @@
+# torch + torchaudio are installed first, pinned, from the CPU wheel index by setup.sh.
+soundfile>=0.12

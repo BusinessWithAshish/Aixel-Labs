@@ -11,7 +11,7 @@ import type { GROQ_TRANSCRIPTION_WORD } from "../transcribe/types";
 import { CAPTION_ROMANIZE_VALIDATOR, GEMINI_CAPTION_ROMANIZE_RESPONSE_SCHEMA } from "./schemas";
 
 /** Any letter outside the Latin blocks (Devanagari, Arabic, …) means there is something to romanize. */
-const NON_LATIN_LETTER = /(?![ -ɏḀ-ỿ])\p{L}/u;
+export const NON_LATIN_LETTER = /(?![ -ɏḀ-ỿ])\p{L}/u;
 
 async function romanizeBatch(batch: Array<{ i: number; w: string }>): Promise<Map<number, string>> {
   const prompt = MEDIA_CAPTION_ROMANIZE_PROMPT + JSON.stringify(batch);

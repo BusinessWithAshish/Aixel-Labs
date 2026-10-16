@@ -79,6 +79,23 @@ export const MEDIA_FIELD_DESCRIPTIONS = {
 export const MEDIA_GEMINI_MODEL = {
   /** Stable GA flash-tier model — used for both diarization (audio) and viral-moment scoring (text). */
   DEFAULT: "gemini-3.5-flash",
+  /**
+   * The caption listener's models, tried in this order. The free tier counts
+   * requests PER MODEL per day (20 on the flash tier), and one batch of clips
+   * can use a model's whole day: on 2026-10-13 the listener was out of quota
+   * from the second clip of the morning batch on, and those clips went out
+   * with words nobody had heard. Each model below has its own allowance, so
+   * running out on one is no longer running out of listeners. Best ear first.
+   */
+  LISTEN: [
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3-flash-preview",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+  ],
 } as const;
 
 /** Supported output framings for `/video/cut`. */
@@ -101,6 +118,45 @@ export const MEDIA_ASPECT_RATIO_DIMENSIONS = {
   "9:16": { ratioW: 9, ratioH: 16, outputWidth: 1080, outputHeight: 1920 },
   "16:9": { ratioW: 16, ratioH: 9, outputWidth: 1920, outputHeight: 1080 },
   "1:1": { ratioW: 1, ratioH: 1, outputWidth: 1080, outputHeight: 1080 },
+} as const;
+
+/**
+ * The caption ear. whisper.cpp running a Hinglish fine-tune of Whisper
+ * (`backend/workers/asr`, set up with `pnpm setup:asr`) on this host — see
+ * `caption/ear.ts`. Local, so no daily allowance can run out mid-batch.
+ */
+export const MEDIA_ASR = {
+  /** `src/api/media` and `dist/api/media` are both three levels below `backend/`. */
+  WORKER_DIR: process.env.ASR_WORKER_DIR || resolve(__dirname, "../../../workers/asr"),
+  /** Empty = `<WORKER_DIR>/whisper.cpp/build/bin/whisper-cli`. */
+  BIN: process.env.ASR_BIN || "",
+  /** Empty = `<WORKER_DIR>/models/apex-q8_0.bin`. */
+  MODEL: process.env.ASR_MODEL || "",
+  THREADS: 4,
+  /** A 60 s clip takes about 40 s on 4 ARM cores; this only guards a hung run. */
+  TIMEOUT_MS: 8 * 60 * 1000,
+  MAX_BUFFER_BYTES: 4 * 1024 * 1024,
+} as const;
+
+/**
+ * Caption timing. A Python worker (`backend/workers/align`, set up with
+ * `pnpm setup:align`) forced-aligns the caption words to the clip's audio —
+ * see `caption/align.ts`.
+ */
+export const MEDIA_ALIGN = {
+  /** `src/api/media` and `dist/api/media` are both three levels below `backend/`. */
+  WORKER_DIR: process.env.ALIGN_WORKER_DIR || resolve(__dirname, "../../../workers/align"),
+  /** Empty = `<WORKER_DIR>/.venv/bin/python`. */
+  PYTHON_BIN: process.env.ALIGN_PYTHON || "",
+  /** Empty = the worker's own `models/` folder. */
+  MODELS_DIR: process.env.ALIGN_MODELS_DIR || "",
+  /** Per clip. A 60 s clip aligns in under a minute; this only guards a hung worker. */
+  WORKER_TIMEOUT_MS: 10 * 60 * 1000,
+  WORKER_MAX_BUFFER_BYTES: 8 * 1024 * 1024,
+  /** The model holds the whole clip in memory; longer audio keeps its previous timings. */
+  MAX_AUDIO_SECONDS: 10 * 60,
+  /** Below this share of words written in Latin letters there is too little the model can search for. */
+  MIN_LATIN_SHARE: 0.8,
 } as const;
 
 /**
@@ -481,6 +537,16 @@ export const MEDIA_ERROR_MESSAGES = {
   GEMINI_MALFORMED_RESPONSE: "Gemini response did not match the expected shape",
   GEMINI_KEY_POOL_EXHAUSTED: "All Gemini API keys failed or are exhausted",
   FFMPEG_CUT_FAILED: "ffmpeg failed to cut clip",
+  ASR_WORKER_MISSING:
+    "Caption ear (whisper.cpp + Hinglish model) is not installed on this host (run `pnpm setup:asr` in backend)",
+  ASR_FAILED: "Caption ear failed",
+  ASR_EMPTY: "Caption ear heard no words",
+  ALIGN_WORKER_MISSING:
+    "Caption alignment worker is not installed on this host (run `pnpm setup:align` in backend)",
+  ALIGN_WORKER_FAILED: "Caption alignment worker failed",
+  ALIGN_RESULT_INVALID: "Caption alignment worker returned unreadable timings",
+  ALIGN_TOO_LONG: "Audio is too long to align in one pass",
+  ALIGN_NOT_LATIN: "Too few caption words are in Latin letters to align them to the audio",
   REFRAME_WORKER_MISSING:
     "Speaker reframe worker is not installed on this host (run `pnpm setup:reframe` in backend)",
   REFRAME_WORKER_FAILED: "Speaker reframe worker failed",

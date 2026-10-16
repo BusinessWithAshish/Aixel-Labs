@@ -68,6 +68,22 @@ const LISTEN_VALIDATOR = z.object({
 
 export type HEARD = z.infer<typeof LISTEN_VALIDATOR>;
 
+/**
+ * The listener is told to write Roman script and now and then answers a whole
+ * clip in Devanagari, English words included ("आई थिंक सो"). Romanizing that
+ * word by word gives "aayi think so": readable, but not what a person types.
+ * Asking once more, saying what went wrong, usually gets the real thing.
+ */
+const LISTEN_ROMAN_REMINDER =
+  "\n\nIMPORTANT: a previous answer for this audio was written in Devanagari. That is wrong. Use ONLY Latin letters (a-z) for every word, Hindi included, and normal English spelling for English words.";
+const NON_LATIN_LETTER = /(?![\u0020-\u024F\u1E00-\u1EFF])\p{L}/u;
+const LISTEN_MAX_NON_LATIN_SHARE = 0.1;
+
+function nonLatinShare(heard: HEARD): number {
+  const words = heard.segments.flatMap((s) => s.text.split(/\s+/).filter(Boolean));
+  return words.length === 0 ? 0 : words.filter((w) => NON_LATIN_LETTER.test(w)).length / words.length;
+}
+
 /** Whisper only accepts languages it knows; anything else falls back to the caller's hint. */
 const WHISPER_LANGUAGES = new Set(["en", "hi", "pa", "ur", "bn", "mr", "gu", "ta", "te", "kn", "ml"]);
 
@@ -85,26 +101,39 @@ export async function listenWithGemini(
   for (const waitMs of patient ? [0, 20_000, 45_000] : [0]) {
     if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
     for (const key of geminiApiKey ? [geminiApiKey, undefined] : [undefined]) {
-      try {
-        return await listenOnce(audioPath, key);
-      } catch (err) {
-        last = err;
+      // A model that is out of its daily allowance, or busy, is not the end:
+      // the next one has its own allowance (see `MEDIA_GEMINI_MODEL.LISTEN`).
+      for (const model of MEDIA_GEMINI_MODEL.LISTEN) {
+        try {
+          const heard = await listenOnce(audioPath, key, "", model);
+          if (nonLatinShare(heard) <= LISTEN_MAX_NON_LATIN_SHARE) return heard;
+          // One more ask of the same model; if that is no better, the caller romanizes the first answer.
+          const again = await listenOnce(audioPath, key, LISTEN_ROMAN_REMINDER, model).catch(() => undefined);
+          return again && nonLatinShare(again) <= LISTEN_MAX_NON_LATIN_SHARE ? again : heard;
+        } catch (err) {
+          last = err;
+        }
       }
     }
   }
   throw last;
 }
 
-async function listenOnce(audioPath: string, geminiApiKey?: string): Promise<HEARD> {
+export async function listenOnce(
+  audioPath: string,
+  geminiApiKey?: string,
+  promptSuffix = "",
+  model: string = MEDIA_GEMINI_MODEL.DEFAULT,
+): Promise<HEARD> {
   const { data } = await withGeminiKeyPoolRetry(
     async (apiKey) => {
       const uploaded = await uploadFileToGemini(audioPath, "audio/flac", apiKey);
       const active = await waitForGeminiFileActive(uploaded.name, apiKey);
       return generateStructuredContent<HEARD>({
-        model: MEDIA_GEMINI_MODEL.DEFAULT,
+        model,
         parts: [
           { file_data: { mime_type: active.mimeType, file_uri: active.uri } },
-          { text: LISTEN_PROMPT },
+          { text: LISTEN_PROMPT + promptSuffix },
         ],
         responseSchema: LISTEN_RESPONSE_SCHEMA,
         thinkingLevel: "low",
@@ -337,7 +366,12 @@ export async function judgeWithClaude(
     "every line starts with the time it was said, [start-end] in seconds. " +
     "Work out what was actually said, verbatim, in Roman (Latin) script: Hindi and Punjabi words the way people type them " +
     '("kya kiya inhone"), English words in English. Do not translate anything, do not summarise, do not tidy the grammar, ' +
-    "and do not add words that no transcript supports. Where the transcripts disagree, choose the reading that makes sense " +
+    "and do not add words that no transcript supports. A transcript may spell English words by ear, as if they were Hindi " +
+    '("aayi think so", "dis is", "10 fit", "vaaz hardli"): write those as the English they are ("I think so", "this is", ' +
+    '"10 feet", "was hardly"), keeping the same words. That is a spelling fix for words that ARE English and nothing ' +
+    'more: a Hindi word stays the Hindi word it is ("hamare upar teen shadow aayi" stays exactly that; it never becomes ' +
+    '"three shadows came over us"), even when another transcript shows its English translation. ' +
+    "Where the transcripts disagree, choose the reading that makes sense " +
     "for a real speaker and is supported by at least one of them; prefer a transcript that HEARD the audio in the right " +
     "language over one that translated it. Where no transcript is usable for a stretch, write [unclear] rather than " +
     "inventing words.\n\n" +

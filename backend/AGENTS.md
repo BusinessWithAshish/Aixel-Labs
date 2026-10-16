@@ -43,5 +43,12 @@ for mounts/boot, **db** for anything persisted, then the folder you are editing.
   op=`cut` (`reframe: "speaker"`). Own venv + models via `pnpm setup:reframe`,
   spawned per clip from `src/api/media/cut/reframe.ts`; analysis only, the
   render stays in ffmpeg. Outside `tsc` (`include: ["src"]`).
+- Caption ear: `workers/asr/` — whisper.cpp + a Hinglish Whisper model, run
+  by `src/api/media/caption/ear.ts` for `media` op=`caption` `listener: "apex"`
+  (sharing the align worker's one-at-a-time queue). Set up with `pnpm setup:asr`.
+- Python worker: `workers/align/` — forced alignment of caption words to the
+  clip's audio for `media` op=`caption` (the `timing: "aligned"` in its
+  response). Own venv + model via `pnpm setup:align`, spawned per clip, one at a
+  time, from `src/api/media/caption/align.ts`. Outside `tsc`.
 
 Mirror `src/api/crawl/` for a new single-endpoint module.
