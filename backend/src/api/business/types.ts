@@ -267,4 +267,6 @@ export type BusinessRoomSummary = {
   seats: number;
   /** Name of the player who created the room, shown on the invite screen. */
   host: string;
+  /** The match has ended: the room only shows its result now, and nobody can join or come back to play. */
+  over: boolean;
 };

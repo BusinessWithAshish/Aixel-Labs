@@ -114,7 +114,7 @@ function describeTerms(state: BusinessGameState, from: number, to: number, terms
     case "split":
       return `split the ${BUSINESS_SETS[terms.set].name} set, ${terms.minorPct}% to the partner with one city`;
     case "bail":
-      return `bail ${P[terms.prisoner].name} out of Jail for ${rs(terms.amount)}`;
+      return `bail ${P[terms.prisoner].name} out of Jail for ${rs(terms.amount)}${terms.bringHelper ? ", and the helper comes to the Jail" : ""}`;
     case "unsplit": {
       const split = state.splits.find((s) => s.id === terms.split);
       return `end the split of the ${split ? BUSINESS_SETS[split.set].name : ""} set`;
@@ -814,9 +814,9 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
     prisoner.cash -= terms.amount;
     helper.cash += terms.amount;
     prisoner.jail = 0;
-    // The price of a rescue: the helper comes to the Jail in person, from wherever they stand, as a
+    // If the deal says so, the helper comes to the Jail in person, from wherever they stand, as a
     // visitor. It is a step back, not a lap: no Launch on the way and no salary.
-    helper.pos = BUSINESS_JAIL_INDEX;
+    if (terms.bringHelper) helper.pos = BUSINESS_JAIL_INDEX;
     log(state, `${helper.name} bailed ${prisoner.name} out of Jail.`, helper.seat, othersThan(state, from, to), { kind: "bail", from: prisoner.seat, to: helper.seat, amount: 0 });
     log(state, `${helper.name} bailed ${prisoner.name} out of Jail for ${rs(terms.amount)}.`, helper.seat, [from, to], { kind: "bail", from: prisoner.seat, to: helper.seat, amount: terms.amount });
     return;

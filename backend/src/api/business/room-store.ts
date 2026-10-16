@@ -18,6 +18,8 @@ import type {
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 6;
 const IDLE_TTL_MS = 30 * 60_000;
+/** A finished match stays readable this long (the result screen), then its room is gone for good. */
+const OVER_KEEP_MS = 10 * 60_000;
 const MAX_ROOMS = 500;
 /**
  * A dropped connection gets this long to come back before the bot steps in. If
@@ -53,6 +55,8 @@ export type BusinessRoom = {
   botAt: number;
   /** Epoch ms of the last time anyone was connected or acted. */
   touchedAt: number;
+  /** When the match ended; the room is removed a while after (see OVER_KEEP_MS). */
+  overAt?: number;
 };
 
 export class BusinessRoomError extends Error {}
@@ -229,7 +233,9 @@ export function tickRooms(now: number): BusinessRoom[] {
   const changed: BusinessRoom[] = [];
   for (const room of rooms.values()) {
     if (room.seats.some((s) => s.connections > 0)) room.touchedAt = now;
-    if (now - room.touchedAt > IDLE_TTL_MS) {
+    // A match that has ended keeps its room only while players read the result.
+    if (room.state?.phase === "over") room.overAt ??= now;
+    if (now - room.touchedAt > IDLE_TTL_MS || (room.overAt !== undefined && now - room.overAt > OVER_KEEP_MS)) {
       rooms.delete(room.code);
       continue;
     }
@@ -299,5 +305,6 @@ export function summarizeRoom(code: string): BusinessRoomSummary {
     seatsTaken: room.seats.length,
     seats: room.config.seats,
     host: room.seats[room.hostSeat]?.name ?? "",
+    over: room.state?.phase === "over",
   };
 }

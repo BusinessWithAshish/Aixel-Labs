@@ -46,6 +46,8 @@ export const BUSINESS_OFFER_TERMS_SCHEMA = z.discriminatedUnion("kind", [
     kind: z.literal("bail"),
     prisoner: SEAT,
     amount: CASH,
+    /** Part of the deal: the helper comes to the Jail themselves. A helper will usually ask more for that. */
+    bringHelper: z.boolean().default(true),
   }),
   z.object({
     /** End a split: every house in the set goes back to the bank. */

@@ -80,7 +80,8 @@ export const BUSINESS_PHASE_SECONDS = {
   roll: 45,
   buy: 30,
   card: 12,
-  result: 12,
+  /** A result pop-up (the Market's dice, a closed Market): time to read it. */
+  result: 20,
   market: 45,
   /** Rest, keep playing, or pick someone to send to Jail: a real decision, so it gets real time. */
   break: 90,
