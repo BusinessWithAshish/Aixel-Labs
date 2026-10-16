@@ -94,7 +94,9 @@ through the account limit many times over. Resumes are always allowed even
 when the breaker has tripped — they cost a fraction of a cold start.
 
 Env: `CLAUDE_DAILY_SESSIONS` / `CLAUDE_DAILY_TOKENS` (0/unset = unlimited,
-tracked but never blocks), `CLAUDE_BUDGET_FILE` (ledger path override).
+tracked but never blocks), `CLAUDE_BUDGET_FILE` (ledger path override),
+`CLAUDE_BREAKER_COOLDOWN_MINUTES` (default 300 — how long the breaker stays open
+after a limit hit, matching Claude's 5-hour usage window).
 
 ## Smoke
 

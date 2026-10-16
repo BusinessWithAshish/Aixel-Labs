@@ -38,14 +38,10 @@ function load(): CLAUDE_BUDGET_LEDGER {
   try {
     if (!existsSync(CLAUDE_BUDGET.LEDGER_FILE)) return empty();
     const s = JSON.parse(readFileSync(CLAUDE_BUDGET.LEDGER_FILE, "utf8")) as CLAUDE_BUDGET_LEDGER;
-    // Roll over the daily counters (sessions/tokens) at midnight — those are
-    // genuinely calendar-day quotas.
-    const merged = s.day === today() ? { ...empty(), ...s } : empty();
-    // The breaker itself tracks Claude's 5-hour rolling usage window, not the
-    // calendar day. Clear it once that window has actually elapsed instead of
-    // leaving it open until UTC midnight, which could be ~19h past the real
-    // reset (and wouldn't clear at all for a limit hit after midnight rolled
-    // the day above, since `s.day === today()` would then keep it alive).
+    // Daily counters roll at midnight; the breaker survives the rollover and
+    // clears only once its cooldown has elapsed (see BREAKER_COOLDOWN_MS).
+    const merged =
+      s.day === today() ? { ...empty(), ...s } : { ...empty(), limit_hit_at: s.limit_hit_at ?? null };
     if (merged.limit_hit_at && Date.now() - Date.parse(merged.limit_hit_at) >= CLAUDE_BUDGET.BREAKER_COOLDOWN_MS) {
       merged.limit_hit_at = null;
     }
