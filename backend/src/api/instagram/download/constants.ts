@@ -3,7 +3,11 @@ import { AIXEL_MEDIA } from "../../../media";
 /**
  * Instagram download — post / reel / carousel media to local disk.
  *
- * Resolution: `GET https://www.instagram.com/p/{shortcode}/` with a Googlebot
+ * Resolution: the logged-out GraphQL post query (`fetchLoggedOutMedia`, media
+ * id decoded from the shortcode) first. Since 2026-10 the crawler page below
+ * is a login wall for most posts from the VPS, so it is only the fallback.
+ *
+ * Fallback: `GET https://www.instagram.com/p/{shortcode}/` with a Googlebot
  * UA. Instagram serves crawlers server-rendered HTML whose
  * `<script type="application/json">` blobs carry the full v1 feed item
  * (`code`, `media_type`, `video_versions`, `image_versions2`,

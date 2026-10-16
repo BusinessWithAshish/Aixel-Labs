@@ -12,7 +12,11 @@ import { fetch } from "undici";
 import { assertPersistentDisk } from "../../../config";
 import { mapFeedItem } from "../advanced/compute";
 import type { IG_ADVANCED_POST, IgFeedItem } from "../advanced/types";
-import { classifyInstagramContentUrl } from "../advanced/search/compute/classify-url";
+import {
+  classifyInstagramContentUrl,
+  mediaIdFromShortcode,
+} from "../advanced/search/compute/classify-url";
+import { fetchLoggedOutMedia } from "../graphql";
 import { findFeedItemInSsr } from "./compute/parse-ssr";
 import {
   IG_CDN_HEADERS,
@@ -116,6 +120,23 @@ async function fetchPostPage(shortcode: string): Promise<string> {
   return html;
 }
 
+/**
+ * The post's feed item: the logged-out GraphQL post query first, then the
+ * crawler page. Since 2026-10 the crawler page is a login wall for most posts
+ * from the VPS, while the GraphQL query still answers guests.
+ */
+async function resolveFeedItem(
+  shortcode: string,
+): Promise<{ raw: IgFeedItem | null; bytes: number }> {
+  const mediaId = mediaIdFromShortcode(shortcode);
+  if (mediaId) {
+    const raw = await fetchLoggedOutMedia(mediaId).catch(() => null);
+    if (raw) return { raw, bytes: 0 };
+  }
+  const html = await fetchPostPage(shortcode);
+  return { raw: findFeedItemInSsr(html, shortcode), bytes: Buffer.byteLength(html) };
+}
+
 async function existingSize(path: string): Promise<number | null> {
   try {
     return (await stat(path)).size;
@@ -190,9 +211,8 @@ async function downloadPost(
   const items: IG_DOWNLOAD_ITEM[] = [];
   let meta: Omit<IG_DOWNLOAD_POST, "input" | "shortcode" | "ok" | "items"> = {};
   try {
-    const html = await fetchPostPage(shortcode);
-    bytesFetched += Buffer.byteLength(html);
-    const raw = findFeedItemInSsr(html, shortcode);
+    const { raw, bytes } = await resolveFeedItem(shortcode);
+    bytesFetched += bytes;
     if (!raw) throw new Error(IG_DOWNLOAD_ERROR_MESSAGES.NOT_FOUND);
 
     const post = mapFeedItem(raw);
