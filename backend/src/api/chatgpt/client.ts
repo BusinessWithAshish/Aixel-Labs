@@ -9,7 +9,7 @@ import { basename } from "node:path";
 import sharp from "sharp";
 import { fetch } from "undici";
 
-import { assertBrowserRuntime } from "../../config";
+import { assertBrowserRuntime, withStatusCode } from "../../config";
 import {
   closeChatGptChrome,
   launchChatGptChrome,
@@ -17,9 +17,7 @@ import {
   type ChromeHandle,
   type CdpTab,
 } from "./cdp";
-import { CHATGPT, CHATGPT_ERROR_MESSAGES,
-  resolveChatGptAccount,
-} from "./constants";
+import { CHATGPT, CHATGPT_ERROR_MESSAGES, resolveChatGptAccount } from "./constants";
 import type {
   CHATGPT_HEALTH_RESPONSE,
   CHATGPT_REQUEST_PARSED,
@@ -44,9 +42,6 @@ async function checkChromeBinary(): Promise<{ ok: boolean; detail: string }> {
     return { ok: false, detail: `not found or not executable: ${CHATGPT.CHROME_BIN}` };
   }
 }
-
-/** The profile of the call in flight — `busy` guarantees there is only one. */
-let activeProfileDir: string = CHATGPT.PROFILE_DIR;
 
 async function checkProfileDir(
   dir: string = CHATGPT.PROFILE_DIR,
@@ -155,7 +150,7 @@ async function chatgptApiGet(
   return JSON.parse(body);
 }
 
-async function openChat(tab: CdpTab, url: string): Promise<void> {
+async function openChat(tab: CdpTab, url: string, profileDir: string): Promise<void> {
   await tab.send("Page.navigate", { url });
   for (let i = 0; i < CHATGPT.COMPOSER_WAIT_SEC; i++) {
     await sleep(1000);
@@ -171,7 +166,7 @@ async function openChat(tab: CdpTab, url: string): Promise<void> {
     `composer never appeared at ${url} after ${CHATGPT.COMPOSER_WAIT_SEC}s ` +
       `(selector ${CHATGPT.COMPOSER_SELECTOR}). The page may be logged in but ` +
       `the composer selector is stale (ChatGPT changed its DOM), or the ` +
-      `${activeProfileDir} session is logged out — check via VNC on ${CHATGPT.DISPLAY}.`,
+      `${profileDir} session is logged out — check via VNC on ${CHATGPT.DISPLAY}.`,
   );
 }
 
@@ -432,11 +427,12 @@ async function downloadImage(
   return { mime, bytes: Buffer.from(b64, "base64") };
 }
 
-async function stagePublicJpeg(pngBytes: Buffer): Promise<string> {
+/** Re-encodes an image (bytes or a file path) as a public JPEG; shared with codex.ts. */
+export async function stagePublicJpeg(image: Buffer | string): Promise<string> {
   await fs.mkdir(CHATGPT.MEDIA_ROOT, { recursive: true });
   const name = `${randomBytes(24).toString("base64url")}.jpg`;
   const dest = `${CHATGPT.MEDIA_ROOT}/${name}`;
-  await sharp(pngBytes).jpeg({ quality: 95 }).toFile(dest);
+  await sharp(image).jpeg({ quality: 95 }).toFile(dest);
   return `${CHATGPT.MEDIA_PUBLIC_BASE}/${name}`;
 }
 
@@ -451,28 +447,23 @@ export async function generateChatGpt(
   req: CHATGPT_REQUEST_PARSED,
 ): Promise<CHATGPT_RESPONSE> {
   assertBrowserRuntime(CHATGPT_ERROR_MESSAGES.NOT_VPS, CHATGPT.DISPLAY);
-  if (busy) {
-    const err = new Error(CHATGPT_ERROR_MESSAGES.BUSY);
-    (err as Error & { statusCode?: number }).statusCode = 409;
-    throw err;
-  }
+  if (busy) throw withStatusCode(CHATGPT_ERROR_MESSAGES.BUSY, 409);
 
   busy = true;
   let chrome: ChromeHandle | undefined;
   let tab: CdpTab | undefined;
   try {
     const { account } = resolveChatGptAccount(req.account);
-    activeProfileDir = account.profile_dir;
     const staticChecks = await Promise.all([
       checkChromeBinary(),
-      checkProfileDir(activeProfileDir),
+      checkProfileDir(account.profile_dir),
     ]);
     const failedStatic = staticChecks.find((c) => !c.ok);
     if (failedStatic) {
       throw new Error(`${CHATGPT_ERROR_MESSAGES.PREFLIGHT}: ${failedStatic.detail}`);
     }
 
-    chrome = await launchChatGptChrome(activeProfileDir);
+    chrome = await launchChatGptChrome(account.profile_dir);
     tab = await openNewTab(CHATGPT.CDP_HTTP);
     // Where the turn happens, in priority order: the conversation being
     // revised, else the project asked for, else the account's "General chats"
@@ -482,7 +473,7 @@ export async function generateChatGpt(
       req.mode === "revise" && req.conversation_url
         ? req.conversation_url
         : (req.project_url ?? account.general_project_url ?? CHATGPT.NEW_CHAT_URL);
-    await openChat(tab, openUrl);
+    await openChat(tab, openUrl, account.profile_dir);
 
     // Nothing is attached unless the caller asked for it. The brand logo is
     // one organisation's mark and is opt-in for that reason.

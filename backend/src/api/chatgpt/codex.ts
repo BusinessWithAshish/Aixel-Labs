@@ -13,28 +13,15 @@
  * `generateChatGpt`; `busy` serialises this path's own calls.
  */
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
 import { constants as fsConstants, promises as fs } from "node:fs";
 import { join } from "node:path";
 
-import sharp from "sharp";
-
-import { assertPersistentDisk } from "../../config";
-import {
-  CHATGPT,
-  CHATGPT_CODEX,
-  CHATGPT_ERROR_MESSAGES,
-  resolveChatGptAccount,
-} from "./constants";
+import { assertPersistentDisk, withStatusCode } from "../../config";
+import { stagePublicJpeg } from "./client";
+import { CHATGPT_CODEX, CHATGPT_ERROR_MESSAGES, resolveChatGptAccount } from "./constants";
 import type { CHATGPT_CODEX_IMAGE_REQUEST_PARSED, CHATGPT_CODEX_IMAGE_RESPONSE } from "./types";
 
 let busy = false;
-
-function fail(message: string, statusCode: number): Error {
-  const err = new Error(message);
-  (err as Error & { statusCode?: number }).statusCode = statusCode;
-  return err;
-}
 
 async function exists(path: string, mode = fsConstants.R_OK): Promise<boolean> {
   return fs.access(path, mode).then(() => true).catch(() => false);
@@ -114,13 +101,6 @@ async function newestImage(
   return best?.path ?? null;
 }
 
-async function stagePublicJpeg(imagePath: string): Promise<string> {
-  await fs.mkdir(CHATGPT.MEDIA_ROOT, { recursive: true });
-  const name = `${randomBytes(24).toString("base64url")}.jpg`;
-  await sharp(imagePath).jpeg({ quality: 95 }).toFile(`${CHATGPT.MEDIA_ROOT}/${name}`);
-  return `${CHATGPT.MEDIA_PUBLIC_BASE}/${name}`;
-}
-
 async function buildPrompt(req: CHATGPT_CODEX_IMAGE_REQUEST_PARSED): Promise<string> {
   if (req.mode === "revise") {
     const notes = req.revise_notes?.trim();
@@ -147,29 +127,30 @@ async function buildPrompt(req: CHATGPT_CODEX_IMAGE_REQUEST_PARSED): Promise<str
 export async function generateCodexImage(
   req: CHATGPT_CODEX_IMAGE_REQUEST_PARSED,
 ): Promise<CHATGPT_CODEX_IMAGE_RESPONSE> {
-  assertPersistentDisk(CHATGPT_ERROR_MESSAGES.CODEX_FAILED);
-  if (busy) throw fail(CHATGPT_ERROR_MESSAGES.CODEX_BUSY, 409);
+  assertPersistentDisk(CHATGPT_ERROR_MESSAGES.CODEX_NOT_VPS);
+  if (busy) throw withStatusCode(CHATGPT_ERROR_MESSAGES.CODEX_BUSY, 409);
   if (!(await exists(CHATGPT_CODEX.BIN, fsConstants.X_OK))) {
-    throw fail(`${CHATGPT_ERROR_MESSAGES.CODEX_NOT_INSTALLED}: ${CHATGPT_CODEX.BIN}`, 503);
+    throw withStatusCode(`${CHATGPT_ERROR_MESSAGES.CODEX_NOT_INSTALLED}: ${CHATGPT_CODEX.BIN}`, 503);
   }
   const { name: accountName, account } = resolveChatGptAccount(req.account);
   const codexHome = account.codex_home;
   if (!codexHome) {
-    throw fail(`${CHATGPT_ERROR_MESSAGES.CODEX_SIGNED_OUT} (account "${accountName}" has no Codex CLI login configured)`, 503);
+    throw withStatusCode(`${CHATGPT_ERROR_MESSAGES.CODEX_SIGNED_OUT} (account "${accountName}" has no Codex CLI login configured)`, 503);
   }
   if (!(await exists(join(codexHome, "auth.json")))) {
-    throw fail(`${CHATGPT_ERROR_MESSAGES.CODEX_SIGNED_OUT} (account "${accountName}", home: ${codexHome})`, 503);
+    throw withStatusCode(`${CHATGPT_ERROR_MESSAGES.CODEX_SIGNED_OUT} (account "${accountName}", home: ${codexHome})`, 503);
   }
   for (const path of [...(req.images ?? []), ...(req.instructions_file ? [req.instructions_file] : [])]) {
-    if (!(await exists(path))) throw fail(`An attached file path does not exist: ${path}`, 400);
+    if (!(await exists(path))) throw withStatusCode(`An attached file path does not exist: ${path}`, 400);
   }
 
   busy = true;
   try {
     await fs.mkdir(CHATGPT_CODEX.WORKDIR, { recursive: true });
     const prompt = await buildPrompt(req);
-    // read-only sandbox: the image tool is not a shell command, and nothing
-    // this call wants needs the CLI to write anywhere.
+    // read-only sandbox on a new session: the image tool is not a shell command,
+    // and nothing this call wants needs the CLI to write anywhere. `exec resume`
+    // has no `-s` flag, so a revise runs under the CLI's default sandbox.
     const common = ["--skip-git-repo-check", "--json"];
     const images = (req.images ?? []).flatMap((path) => ["-i", path]);
     // `--` ends the options: `-i` takes a list, and without it the prompt is read as one more image.
@@ -183,14 +164,14 @@ export async function generateCodexImage(
     const sessionId = run.sessionId || (req.mode === "revise" ? (req.session_id ?? "") : "");
 
     if (/could not be refreshed|sign in again|not logged in|401 Unauthorized/i.test(`${run.error} ${run.stderr}`)) {
-      throw fail(`${CHATGPT_ERROR_MESSAGES.CODEX_SIGNED_OUT} (account "${accountName}", home: ${codexHome})`, 503);
+      throw withStatusCode(`${CHATGPT_ERROR_MESSAGES.CODEX_SIGNED_OUT} (account "${accountName}", home: ${codexHome})`, 503);
     }
     const imagePath = sessionId ? await newestImage(sessionId, startedAt, codexHome) : null;
     if (!imagePath) {
       // Say what the CLI said: a usage limit, a refusal and a crash all end here,
       // and they need different responses from the caller.
       const detail = run.error || run.text || run.stderr.trim().split("\n").pop() || `exit ${run.exitCode}`;
-      throw fail(`${CHATGPT_ERROR_MESSAGES.CODEX_NO_IMAGE}: ${detail.slice(0, 400)}`, 502);
+      throw withStatusCode(`${CHATGPT_ERROR_MESSAGES.CODEX_NO_IMAGE}: ${detail.slice(0, 400)}`, 502);
     }
     return {
       text: run.text || undefined,

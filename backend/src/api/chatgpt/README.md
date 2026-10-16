@@ -8,8 +8,8 @@ it's staged as a public JPEG under `{AIXEL_MEDIA_ROOT}/public` →
 `https://hermes.aixellabs.in/media/…`.
 
 Spawns a fresh headed Chrome per call against a persistent profile dir
-(`CHATGPT.PROFILE_DIR`, default `/home/ubuntu/browser-vnc/BWA` —
-the same dir the old always-on VNC Chrome used) and closes it when done.
+(the `account`'s `profile_dir`, see [Accounts](#accounts)) and closes it
+when done.
 Login state lives in the profile directory, not a running process, so it
 survives every spawn. **Headed is required, not headless** — chatgpt.com's
 Cloudflare check walls a headless launch behind a "Just a moment…"
@@ -34,9 +34,37 @@ resume spawning against it.
 |--------|------|------|
 | `GET` | `/chatgpt/health` | Static checks (binary, profile dir) + one real spawn+login check |
 | `POST` | `/chatgpt` | One ChatGPT turn (sync; may take many minutes for an image) |
+| `POST` | `/chatgpt/image` | One image through the Codex CLI, no browser ([below](#image-via-the-codex-cli-post-chatgptimage)) |
 
-Also exposed as the `chatgpt` MCP tool (op `ask`) — same request/response
-shape, same underlying service.
+Also exposed as the `chatgpt` MCP tool — op `ask` (`POST /chatgpt`) and op
+`image` (`POST /chatgpt/image`), same request/response shapes, same services.
+
+## Accounts
+
+Every request takes an optional `account` name (letters, digits, `_`, `-`);
+omitted = `CHATGPT_DEFAULT_ACCOUNT`. An unknown name is a `400` listing the
+known ones. The map comes from `CHATGPT_ACCOUNTS` (JSON, Zod-validated at
+boot; set in the VPS `.env`, never in this public repo):
+
+```json
+{
+  "work": {
+    "profile_dir": "/home/ubuntu/browser-vnc/work",
+    "codex_home": "/home/ubuntu/.codex-work",
+    "general_project_url": "https://chatgpt.com/g/g-p-…/project"
+  },
+  "personal": { "profile_dir": "/home/ubuntu/browser-vnc/personal" }
+}
+```
+
+- `profile_dir` — Chrome profile holding that account's chatgpt.com login (op `ask`).
+- `codex_home` — that account's Codex CLI login (op `image`); absent = no CLI login.
+- `general_project_url` — where a new `ask` with no `project_url` opens, so
+  tool traffic stays out of the owner's own sidebar; absent = plain chat.
+
+Unset (or invalid, with a boot warning) = one built-in account `default` on
+`CHATGPT_PROFILE_DIR` / `CHATGPT_CODEX_HOME`, no project. A `project_url` or
+`conversation_url` only opens in the account it belongs to.
 
 ## Staging a reference image
 
@@ -60,6 +88,7 @@ Downloaded images land in `{AIXEL_MEDIA_ROOT}/private/media-fetched` — see
   "conversation_url": null,
   "revise_notes": null,
   "images": null,
+  "account": null,
   "attach_brand_logo": false,
   "timeout_seconds": null
 }
@@ -68,8 +97,8 @@ Downloaded images land in `{AIXEL_MEDIA_ROOT}/private/media-fetched` — see
 - `prompt` and `mode` are the only required fields.
 - `project_url` is **optional**. Give one when a project's saved instructions
   should shape the turn (house style, a brand, a persona); **omit it to run in
-  a plain ChatGPT chat with no project context at all**. There is no implicit
-  project — a caller that does not name one gets none.
+  the account's `general_project_url`, or a plain chat when it has none** (see
+  [Accounts](#accounts)).
 - `mode: "revise"` requires `conversation_url` from a prior success and
   continues that conversation, **with or without a project**. The response's
   `conversation_url` is what you pass back, so a plain-chat thread is reusable
@@ -105,6 +134,39 @@ Downloaded images land in `{AIXEL_MEDIA_ROOT}/private/media-fetched` — see
 caption). Failure: `{ "success": false, "error": "…" }`. Neither `text` nor
 `media_url` present is itself a failure (`NO_RESULT`) — the model likely
 refused or the turn produced nothing usable.
+
+## Image via the Codex CLI (`POST /chatgpt/image`)
+
+The same subscription's image model, reached through `codex exec` with the
+account's `codex_home` (signed in once: `CODEX_HOME=<home> codex login
+--device-auth`) — for an account that is not signed into the VPS Chrome. It
+draws on the plan's small monthly Codex allowance, not the browser's in-app
+image cap, so prefer `POST /chatgpt` where the account has a browser login.
+Refused on Vercel (`assertPersistentDisk`); no X display needed.
+
+```json
+{
+  "prompt": "…",
+  "mode": "new",
+  "session_id": null,
+  "revise_notes": null,
+  "images": ["/abs/path/reference.png"],
+  "account": "work",
+  "instructions_file": "/abs/path/brand.md",
+  "timeout_seconds": 600
+}
+```
+
+- `prompt` is the only required field; `mode` defaults to `new`. Unknown keys
+  are rejected.
+- `mode: "revise"` requires `session_id` from a prior success and resumes that
+  CLI session, so only what is asked changes.
+- `instructions_file`: standing instructions put in front of the prompt on
+  `new` — the stand-in for a ChatGPT Project, which the CLI cannot open.
+- Response `data`: `{ media_url, session_id, text? }` — always an image; a turn
+  that made none fails (`502`) with what the CLI said (usage limit, refusal).
+  Signed out / CLI missing → `503`; a concurrent call → `409`. Does not block
+  or wait for `POST /chatgpt`.
 
 ## Smoke
 
@@ -147,4 +209,9 @@ curl -sS -X POST http://127.0.0.1:8002/chatgpt \
     "mode":"new",
     "images":["/home/ubuntu/AIXEL-LABS-ORG/brand/assets/aixellabs-lockup.png","/home/ubuntu/media/private/media-fetched/example-viral-post.jpg"]
   }' | jq .
+
+# Image through the Codex CLI
+curl -sS -X POST http://127.0.0.1:8002/chatgpt/image \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Flat-vector illustration of an empty inbox, square.","mode":"new"}' | jq .
 ```

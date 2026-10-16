@@ -3,9 +3,14 @@ import type { Request, Response } from "express";
 import { statusCodeFromError } from "../../config";
 import { ALApiResponse } from "../types";
 import { generateChatGpt, isChatGptBusy, runChatGptHealth } from "./client";
+import { generateCodexImage } from "./codex";
 import { CHATGPT_ERROR_MESSAGES } from "./constants";
-import { CHATGPT_REQUEST_SCHEMA } from "./schemas";
-import type { CHATGPT_HEALTH_RESPONSE, CHATGPT_RESPONSE } from "./types";
+import { CHATGPT_CODEX_IMAGE_REQUEST_SCHEMA, CHATGPT_REQUEST_SCHEMA } from "./schemas";
+import type {
+  CHATGPT_CODEX_IMAGE_RESPONSE,
+  CHATGPT_HEALTH_RESPONSE,
+  CHATGPT_RESPONSE,
+} from "./types";
 
 function errorMessage(err: unknown): string {
   return err instanceof Error
@@ -54,6 +59,31 @@ export async function chatgptGenerateHandler(req: Request, res: Response) {
       success: true,
       data,
     } satisfies ALApiResponse<CHATGPT_RESPONSE>);
+  } catch (err) {
+    res.status(statusCodeFromError(err)).json({
+      success: false,
+      error: errorMessage(err),
+    } satisfies ALApiResponse<never>);
+  }
+}
+
+/** POST /chatgpt/image — one image through the Codex CLI; sync, may run minutes. */
+export async function chatgptImageHandler(req: Request, res: Response) {
+  const parsed = CHATGPT_CODEX_IMAGE_REQUEST_SCHEMA.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: CHATGPT_ERROR_MESSAGES.INVALID_PARAMS,
+    } satisfies ALApiResponse<never>);
+    return;
+  }
+
+  try {
+    const data = await generateCodexImage(parsed.data);
+    res.status(200).json({
+      success: true,
+      data,
+    } satisfies ALApiResponse<CHATGPT_CODEX_IMAGE_RESPONSE>);
   } catch (err) {
     res.status(statusCodeFromError(err)).json({
       success: false,

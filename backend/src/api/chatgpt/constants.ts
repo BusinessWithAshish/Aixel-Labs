@@ -1,3 +1,6 @@
+import { z } from "zod";
+
+import { withStatusCode } from "../../config";
 import { AIXEL_MEDIA } from "../../media";
 
 /**
@@ -8,6 +11,7 @@ import { AIXEL_MEDIA } from "../../media";
 export const CHATGPT_ROUTES = {
   GENERATE: "/",
   HEALTH: "/health",
+  IMAGE: "/image",
 } as const;
 
 export const CHATGPT_FIELD_DESCRIPTIONS = {
@@ -22,7 +26,7 @@ export const CHATGPT_FIELD_DESCRIPTIONS = {
   images:
     "Absolute local file paths to attach to the message, in order, as real input images (e.g. a logo, reference posts to emulate). Omit or pass [] to attach nothing. To use a remote image (e.g. a competitor's post) as a reference, first download it with `media` op=fetch (imageOnly: true) and pass the returned path here — this module has no downloader of its own.",
   account:
-    "OPTIONAL. Which signed-in ChatGPT account to use, by name (e.g. \"literallyashish\", \"BWA\"). Omit for the server's default account. A project_url or conversation_url only opens in the account it belongs to. An unknown name is rejected with the list of known ones.",
+    "OPTIONAL. Which signed-in ChatGPT account to use, by name (e.g. \"work\", \"personal\"). Omit for the server's default account. A project_url or conversation_url only opens in the account it belongs to. An unknown name is rejected with the list of known ones.",
   attach_brand_logo:
     "Also attach the server's configured brand logo (CHATGPT_LOGO_PATH) to this message. Default false. Only for callers that actually want that brand on the output — it is a specific organisation's mark, not a generic asset.",
   timeout_seconds:
@@ -39,7 +43,7 @@ export const CHATGPT = {
    * VNC (or copying a logged-in profile here) keeps working across restarts
    * because only the profile *directory* needs to persist, not the process.
    */
-  PROFILE_DIR: process.env.CHATGPT_PROFILE_DIR || "/home/ubuntu/browser-vnc/BWA",
+  PROFILE_DIR: process.env.CHATGPT_PROFILE_DIR || "/home/ubuntu/browser-vnc/chatgpt",
   /**
    * X11 display to render into. MUST be headed, not `--headless=new` —
    * verified live 2026-09-07: chatgpt.com's Cloudflare check waves through
@@ -105,7 +109,7 @@ export const CHATGPT_MODES = ["new", "revise"] as const;
  */
 export const CHATGPT_CODEX = {
   BIN: process.env.CHATGPT_CODEX_BIN || "/home/ubuntu/.local/bin/codex",
-  HOME: process.env.CHATGPT_CODEX_HOME || "/home/ubuntu/.codex-literallyashish",
+  HOME: process.env.CHATGPT_CODEX_HOME || "/home/ubuntu/.codex-chatgpt",
   /** An empty directory the CLI runs in, so it has no repository to wander into. */
   WORKDIR: `${AIXEL_MEDIA.PRIVATE}/codex-work`,
   DEFAULT_TIMEOUT_SEC: 10 * 60,
@@ -151,8 +155,12 @@ export const CHATGPT_ERROR_MESSAGES = {
   CODEX_SIGNED_OUT:
     "The Codex CLI is not signed in. On the VPS run: CODEX_HOME=<the configured home> codex login --device-auth, and approve the code with the ChatGPT account to use",
   CODEX_NO_IMAGE: "Codex finished without generating an image",
-  CODEX_FAILED: "Codex image call failed",
+  CODEX_NOT_VPS:
+    "Codex image calls need the VPS's persistent disk (CLI login + generated images) — refused on Vercel",
 } as const;
+
+/** Account names as callers pass them in `account`, and the keys of CHATGPT_ACCOUNTS. */
+export const CHATGPT_ACCOUNT_NAME_REGEX = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 /**
  * One signed-in ChatGPT account, reachable two ways. Every op takes `account`
@@ -167,34 +175,36 @@ export const CHATGPT_ERROR_MESSAGES = {
  *   sidebar, so tool traffic never lands in the owner's own chat history.
  *   Absent = no such project yet, and a project-less chat is a plain chat.
  */
-export type CHATGPT_ACCOUNT = {
-  profile_dir: string;
-  codex_home?: string;
-  general_project_url?: string;
-};
+const CHATGPT_ACCOUNT_SCHEMA = z.object({
+  profile_dir: z.string().min(1),
+  codex_home: z.string().min(1).optional(),
+  general_project_url: z.string().url().optional(),
+});
 
+export type CHATGPT_ACCOUNT = z.infer<typeof CHATGPT_ACCOUNT_SCHEMA>;
+
+const CHATGPT_ACCOUNTS_SCHEMA = z
+  .record(z.string().regex(CHATGPT_ACCOUNT_NAME_REGEX), CHATGPT_ACCOUNT_SCHEMA)
+  .refine((accounts) => Object.keys(accounts).length > 0, "at least one account");
+
+/** Used when CHATGPT_ACCOUNTS is unset: the configured profile + Codex home, no project. */
 const CHATGPT_BUILTIN_ACCOUNTS: Record<string, CHATGPT_ACCOUNT> = {
-  BWA: {
-    profile_dir: CHATGPT.PROFILE_DIR,
-    codex_home: "/home/ubuntu/.codex",
-    general_project_url: "https://chatgpt.com/g/g-p-6ac6449946bc81919c3c9df3322efe59/project",
-  },
-  literallyashish: {
-    profile_dir: "/home/ubuntu/browser-vnc/literallyashish",
-    codex_home: CHATGPT_CODEX.HOME,
-    general_project_url: "https://chatgpt.com/g/g-p-6ac63b5c8d1c819190fbd1098431f0a3/project",
-  },
+  default: { profile_dir: CHATGPT.PROFILE_DIR, codex_home: CHATGPT_CODEX.HOME },
 };
 
 function loadChatGptAccounts(): Record<string, CHATGPT_ACCOUNT> {
   const raw = process.env.CHATGPT_ACCOUNTS;
   if (!raw) return CHATGPT_BUILTIN_ACCOUNTS;
+  let json: unknown;
   try {
-    const parsed = JSON.parse(raw) as Record<string, CHATGPT_ACCOUNT>;
-    if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) return parsed;
+    json = JSON.parse(raw);
   } catch {
-    /* fall through: a malformed override must not take the tool down */
+    /* not JSON: reported below as an invalid map */
   }
+  const result = CHATGPT_ACCOUNTS_SCHEMA.safeParse(json);
+  if (result.success) return result.data;
+  // A malformed override must not take the tool down, but must not pass silently either.
+  console.warn(`CHATGPT_ACCOUNTS is not a valid account map, using the built-in "default": ${result.error.message}`);
   return CHATGPT_BUILTIN_ACCOUNTS;
 }
 
@@ -202,17 +212,16 @@ function loadChatGptAccounts(): Record<string, CHATGPT_ACCOUNT> {
 export const CHATGPT_ACCOUNTS: Record<string, CHATGPT_ACCOUNT> = loadChatGptAccounts();
 
 /** Used when a call names no account. */
-export const CHATGPT_DEFAULT_ACCOUNT = process.env.CHATGPT_DEFAULT_ACCOUNT || "BWA";
+export const CHATGPT_DEFAULT_ACCOUNT = process.env.CHATGPT_DEFAULT_ACCOUNT || "default";
 
 export function resolveChatGptAccount(name?: string | null): { name: string; account: CHATGPT_ACCOUNT } {
   const key = name || CHATGPT_DEFAULT_ACCOUNT;
   const account = CHATGPT_ACCOUNTS[key];
   if (!account) {
-    const err = new Error(
+    throw withStatusCode(
       `Unknown ChatGPT account "${key}". Known accounts: ${Object.keys(CHATGPT_ACCOUNTS).join(", ")}`,
+      400,
     );
-    (err as Error & { statusCode?: number }).statusCode = 400;
-    throw err;
   }
   return { name: key, account };
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  CHATGPT_ACCOUNT_NAME_REGEX,
   CHATGPT_CODEX_FIELD_DESCRIPTIONS,
   CHATGPT_FIELD_DESCRIPTIONS,
   CHATGPT_MODES,
@@ -38,7 +39,7 @@ export const CHATGPT_REQUEST_SCHEMA = z
       .describe(CHATGPT_FIELD_DESCRIPTIONS.images),
     account: z
       .string()
-      .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/)
+      .regex(CHATGPT_ACCOUNT_NAME_REGEX)
       .optional()
       .describe(CHATGPT_FIELD_DESCRIPTIONS.account),
     attach_brand_logo: z
@@ -62,7 +63,7 @@ export const CHATGPT_REQUEST_SCHEMA = z
     }
   });
 
-export const CHATGPT_CODEX_IMAGE_SCHEMA = z
+export const CHATGPT_CODEX_IMAGE_REQUEST_SCHEMA = z
   .object({
     prompt: z.string().min(1).describe(CHATGPT_CODEX_FIELD_DESCRIPTIONS.prompt),
     mode: z.enum(CHATGPT_MODES).default("new").describe(CHATGPT_CODEX_FIELD_DESCRIPTIONS.mode),
@@ -80,7 +81,7 @@ export const CHATGPT_CODEX_IMAGE_SCHEMA = z
     images: z.array(z.string()).optional().describe(CHATGPT_CODEX_FIELD_DESCRIPTIONS.images),
     account: z
       .string()
-      .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/)
+      .regex(CHATGPT_ACCOUNT_NAME_REGEX)
       .optional()
       .describe(CHATGPT_CODEX_FIELD_DESCRIPTIONS.account),
     instructions_file: z

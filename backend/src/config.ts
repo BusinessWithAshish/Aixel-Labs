@@ -87,7 +87,8 @@ export function isBrowserRuntime(display?: string): boolean {
   return !!n && existsSync(`/tmp/.X11-unix/X${n}`);
 }
 
-function withStatusCode(message: string, statusCode: number): Error {
+/** An `Error` carrying the HTTP status {@link statusCodeFromError} reads back. */
+export function withStatusCode(message: string, statusCode: number): Error {
   const err = new Error(message);
   (err as Error & { statusCode?: number }).statusCode = statusCode;
   return err;
@@ -383,6 +384,10 @@ export const API_ENDPOINTS = {
     HEALTH: {
       route: "/health",
       full: `${ENDPOINTS.CHATGPT}/health`,
+    },
+    IMAGE: {
+      route: "/image",
+      full: `${ENDPOINTS.CHATGPT}/image`,
     },
   },
   CLAUDE: {
