@@ -104,6 +104,8 @@ rather than silently writing to a `/tmp` that won't survive the invocation;
   overridable.
 - `GROQ_API_KEY` — **required by `/transcribe`** (Groq Whisper). Unrelated to
   the Gemini keys above; `/diarize` and `/transcribe` are separate providers.
+- `KOKORO_URL` — Kokoro-FastAPI base URL for `/narrate` `provider: "kokoro"`
+  (default `http://127.0.0.1:8880`, a container on this host).
 - **ffmpeg** — required by `/cut` (clip re-encode), `/condense` (full
   re-encode) and the YouTube download path when a YouTube URL is passed as
   the source. Comes from the `ffmpeg-static` npm dependency, so no
@@ -167,8 +169,10 @@ side needing to know about the other's domain.
 
 ### `POST /media/transcribe`
 
-`{ mediaSource, format?, language?, model? }` -> text in `txt` | `json` | `srt`
-| `vtt`. Groq Whisper. Speech to words, no speaker attribution — use `/diarize`
+`{ mediaSource, format?, language?, model?, words?, prompt?, channel? }` -> text
+in `txt` | `json` | `srt` | `vtt`. Groq Whisper. `words: true` (json only) adds
+per-word times; `prompt` biases the decode toward known wording (e.g. lyrics);
+`channel` uses that channel's own Groq key when one is on file. Speech to words, no speaker attribution — use `/diarize`
 when you need to know *who* spoke. Shares `fetch`'s source resolution (same
 local-path-or-URL rules, same content-type guard, same TLS-fingerprint
 fallback for sources that block a plain fetch) — it used to have its own
@@ -190,7 +194,7 @@ tool entirely; `youtube`'s diarize response carries no such field either).
 
 ### `POST /media/cut`
 
-`{ videoSource, clips[{start,end,label?}], diarized?, aspectRatio?, reframe?, boundaries?, language?, logo? }` ->
+`{ videoSource, clips[{start,end,label?,moment?}], diarized?, aspectRatio?, reframe?, paddingSeconds?, boundaries?, maxSeconds?, language?, logo?, channel? }` ->
 `{ clips: CUT_CLIP_RESULT[], logo? }`, one entry per requested range with the actual
 boundaries used, the resolved `aspectRatio`, and the finished clip's local
 `clipPath` (under `MEDIA_CUT_OUTPUT_DIR`).
@@ -203,6 +207,12 @@ range falling outside the source's real duration yields an `error` on that
 entry rather than failing the whole call. Still the one op in this module
 that keeps its own YouTube-specific handling (the stream-direct path below)
 — not yet generalized, a deliberately parked follow-up.
+
+`paddingSeconds` (0-5, default 0.35) is the edge padding; `0` puts the edges
+exactly on the requested times, for a clip that is one beat of a longer edit.
+`reframe` is `center` (default, fixed centre crop), `speaker` (below) or `blur`:
+the whole frame fitted inside the output over a blurred, zoomed copy of itself,
+for film and series footage where a crop throws the composition away.
 
 #### Removing a burned-in logo (`logo`)
 
@@ -406,7 +416,7 @@ or editing the text before committing to a render. Video is re-encoded
 
 ### `POST /media/effects`
 
-`{ videoSource, grade?, hide?, logo?, preview?, at? }` ->
+`{ videoSource, grade?, hide?, logo?, speed?, preview?, at? }` ->
 `{ outputPath?, previews?, tileOrder?, applied?, hide?, logo?, durationSeconds, width, height }`.
 
 Also the `media` MCP tool's `effects` op. Colour-grades a clip, covers a region,
@@ -414,6 +424,10 @@ and composites your own mark — as **one filtergraph**, so however many of the
 three are asked for it stays one decode and one encode. Audio is stream-copied
 untouched; video settings match `caption`'s burn, so a clip through both is
 encoded twice at one quality rather than degrading in steps.
+
+`videoSource` may also be a still image (`.png`/`.jpg`/`.jpeg`/`.webp`), for
+`grade` and `logo` only; it comes back as a PNG. This is how a brand's real logo
+file goes onto a generated image.
 
 Order inside the op is fixed and deliberate: **grade → hide → logo**. Grading
 applies to the footage as shot; blurring after the grade means the patch is made
@@ -447,6 +461,11 @@ afterwards shifts their colour.
   local image. Never generated: a channel mark is a real file. Inset by the
   **safe areas** below unless `margin` says otherwise; the response reports the
   insets it actually used, and which of the two it took them from.
+- **`speed`** — `{rate?, pitchFollowsRate?, semitones?}`. `rate` retimes video
+  and audio together, time-stretching the audio so the pitch stays put;
+  `pitchFollowsRate: true` resamples instead, so the pitch rides the rate.
+  `semitones` shifts pitch with the tempo untouched and cannot be combined with
+  `pitchFollowsRate`. Apply before `caption`. Ignored by `preview`.
 
 ### Safe areas
 
@@ -481,11 +500,57 @@ Two things are worth knowing beyond the constants:
 ### `POST /media/share`
 
 Also the `media` MCP tool's `share` op. Copies a file from under the private media root into `{root}/public` with a
-random UUID name and returns `{ url, publicPath, bytes, retentionDays }`. For
+random UUID name and returns `{ url, publicPath, bytes, retentionDays }`.
+`format: "jpeg"` re-encodes a PNG/WebP still as a JPEG (flattened onto white,
+so transparency does not turn black) — Instagram's API takes only JPEG. For
 services that can only fetch by URL — the YouTube publish step stages a clip
 into Composio's sandbox from this URL. Paths outside the private root are
-refused, so it cannot expose arbitrary host files. `/home/ubuntu/media/prune.sh`
+refused, so it cannot expose arbitrary host files. An external prune job
 deletes public files after 7 days.
+
+### `POST /media/narrate`
+
+`{ text, provider?, language?, voice?, speed?, direction?, pronunciations? }` ->
+`{ audioPath, durationSeconds, provider, voice, speed, spokenText, respelled[], words[], phrases[], timing?, timingMatchedShare?, timingFallbackReason?, sentences? }`.
+
+Also the `media` MCP tool's `narrate` op. Text to a narration WAV (under
+`private/media-narration`) plus where every word lands. `phrases[]` group the
+words into 2-4-word footage units whose `footageSeconds` tile the whole audio:
+one clip of exactly that length per phrase, back to back, covers the narration
+with no gap.
+
+- **`provider: "kokoro"`** (default) — self-hosted Kokoro-FastAPI at
+  `KOKORO_URL`, one synthesis at a time. One sentence or short beat per call;
+  word times come from the engine. Built-in Hindi respellings (`hindi.ts`) fix
+  its phonemiser; the captions keep the written form and `respelled` lists
+  every swap.
+- **`provider: "gemini"`** — Gemini TTS on the free key pool (10 calls a day per
+  project), so it takes the WHOLE script in one call. Word times come from Groq
+  Whisper on the audio, matched back to the script (`timing: "aligned"`, or
+  `"estimated"` with `timingFallbackReason`), and the audio is cut at sentence
+  ends into `sentences[]`, each with its own file, words and phrases.
+  `direction` is a delivery brief, never read aloud.
+
+`text` markup: `{pause 0.6}` is a silence (gemini: a short or long pause tag),
+`{pace 0.85}` the speed from there on (kokoro only); `।` reads as a sentence end.
+`pronunciations` are per-call single-word respellings and win over the built-ins.
+
+### `POST /media/assemble`
+
+`{ sentences[{audioPath, phrases[{text, startSeconds, endSeconds, videoPath, videoStartSeconds?}]}], sentencePauseSeconds?, aspectRatio? }` ->
+`{ outputPath, durationSeconds, videoSeconds, audioSeconds, width, height, sentences[], subtitlesPath, cueCount }`.
+
+Also the `media` MCP tool's `assemble` op. Narrated sentences (from `narrate`)
+and one clip per phrase (from `cut`, cut to its `footageSeconds`) in, one recap
+mp4 (`private/media-assembled/recap-*.mp4`) out, in a single ffmpeg run. Picture
+and sound are built from the same numbers, so they cannot drift: each sentence
+is its audio's length plus `sentencePauseSeconds` (0-3, default 0.22, none after
+the last) — silence on the audio, a held last frame on the picture — and a clip
+shorter than its slot holds its last frame (`sentences[].heldSeconds`). The
+footage's own sound is dropped. `aspectRatio` is `9:16` (default), `16:9` or
+`1:1`; clips are fitted inside it. Every path must be under the media root.
+`subtitlesPath` is an SRT with one cue per phrase at its time in the finished
+video — pass it to `caption` as `subtitles`.
 
 ## Stream-direct clip extraction (YouTube sources)
 
@@ -787,6 +852,7 @@ video/
   handler.ts                # re-exports the six per-op handlers
   create-handler.ts         # thin handler factory (zod validate -> service -> ALApiResponse)
   gemini-client.ts          # generic Gemini File API + generateContent(responseSchema) helpers
+  groq-chat.ts              # Groq chat completions for small structured-text calls (sibling of gemini-client.ts)
   source.ts                 # resolveMediaSource (download to local) + resolveVideoSourceForCut (YouTube stream-direct URLs, no full download)
   fetch/                    # POST /media/fetch — source -> local path
     fetch.ts / handler.ts / schemas.ts
@@ -813,6 +879,14 @@ video/
     ass.ts                     # ASS document with PlayResX/Y = real frame size (why font size is meaningful)
     ffmpeg-caption.ts          # the `ass` filter burn-in
     handler.ts / schemas.ts / types.ts
+  narrate/                  # POST /media/narrate — text to narration WAV + word timings
+    narrate.ts                 # orchestration + provider "kokoro" (Kokoro-FastAPI, one call at a time)
+    gemini.ts                  # provider "gemini": whole script in one call, Whisper word times, sentence split
+    markup.ts                  # {pause}/{pace} markup -> engine input, footage phrases
+    hindi.ts / timing.ts / audio.ts
+    handler.ts / schemas.ts / constants.ts / types.ts
+  assemble/                 # POST /media/assemble — narrated sentences + phrase clips -> one recap mp4 + SRT
+    assemble.ts / handler.ts / schemas.ts / constants.ts / types.ts
   types.ts / constants.ts   # DIARIZED_TRANSCRIPT SSOT, shared limits/errors/prompts
   README.md
 

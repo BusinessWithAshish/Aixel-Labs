@@ -11,6 +11,8 @@
  * (`/dev/phonemize`), not guessed.
  */
 
+import type { NARRATE_RESPELLING } from "./types";
+
 const CONSONANT = "\\u0915-\\u0939\\u0958-\\u095F";
 const NUKTA = "\\u093C";
 const VIRAMA = "\\u094D";
@@ -73,8 +75,6 @@ const LEXICON: Record<string, string> = {
   delhi: "दिल्ली",
 };
 
-export type RESPELLING = { from: string; to: string; source: "channel" | "lexicon" | "rule" };
-
 /** Splits a token into leading punctuation, the word, trailing punctuation. */
 const TOKEN = /^([^\p{L}\p{N}\p{M}]*)(.*?)([^\p{L}\p{N}\p{M}]*)$/su;
 
@@ -85,7 +85,7 @@ const TOKEN = /^([^\p{L}\p{N}\p{M}]*)(.*?)([^\p{L}\p{N}\p{M}]*)$/su;
 export function respellToken(
   token: string,
   own: Record<string, string> | undefined,
-): { spoken: string; respelling?: RESPELLING } {
+): { spoken: string; respelling?: NARRATE_RESPELLING } {
   const match = TOKEN.exec(token);
   if (!match || !match[2]) return { spoken: token };
   const [, lead, core, tail] = match;

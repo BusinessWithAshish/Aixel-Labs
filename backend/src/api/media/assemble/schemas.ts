@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MEDIA, MEDIA_ASPECT_RATIOS } from "../constants";
+import { MEDIA_ASSEMBLE } from "./constants";
 
 const PHRASE_SCHEMA = z.object({
   text: z.string().min(1).describe("The words shown as a caption while this phrase is spoken, as `narrate` returned them."),
@@ -41,15 +43,17 @@ export const MEDIA_ASSEMBLE_REQUEST_SCHEMA = z.object({
   sentencePauseSeconds: z
     .number()
     .min(0)
-    .max(3)
+    .max(MEDIA_ASSEMBLE.MAX_SENTENCE_PAUSE_SECONDS)
     .optional()
-    .default(0.22)
+    .default(MEDIA_ASSEMBLE.DEFAULT_SENTENCE_PAUSE_SECONDS)
     .describe(
       "Silence added after every sentence but the last, on BOTH tracks: the audio gets silence and the picture holds its last frame, so the two stay exactly the same length. Added on top of the quiet tail the engine leaves after each sentence.",
     ),
   aspectRatio: z
-    .enum(["9:16", "16:9", "1:1"])
+    .enum(MEDIA_ASPECT_RATIOS)
+    // A recap needs one fixed frame size, so the source's own ("original") is not offered.
+    .exclude(["original"])
     .optional()
-    .default("9:16")
+    .default(MEDIA.DEFAULT_ASPECT_RATIO)
     .describe("Output frame. Clips already cut to this ratio pass through untouched; others are fitted inside it."),
 });

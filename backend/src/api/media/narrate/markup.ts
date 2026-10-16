@@ -1,8 +1,10 @@
+import { round3 } from "./audio";
 import { MEDIA_NARRATE } from "./constants";
-import { respellToken, type RESPELLING } from "./hindi";
-import type { NARRATE_PHRASE, NARRATE_WORD } from "./types";
+import { respellToken } from "./hindi";
+import type { NARRATE_PHRASE, NARRATE_RESPELLING, NARRATE_WORD } from "./types";
 
-const MARKUP = /\{\s*(pause|pace)\s+([0-9]*\.?[0-9]+)\s*s?\s*\}/gi;
+/** The caller's `{pause s}` / `{pace f}` markup. */
+export const MARKUP = /\{\s*(pause|pace)\s+([0-9]*\.?[0-9]+)\s*s?\s*\}/gi;
 
 export type PREPARED_TEXT = {
   /** Exactly what is sent to the engine, with its inline tags. */
@@ -15,12 +17,17 @@ export type PREPARED_TEXT = {
    */
   displayTokens: string[];
   /** Every word that was spoken differently from how it was written. */
-  respelled: RESPELLING[];
+  respelled: NARRATE_RESPELLING[];
   /** True when `engineInput` carries `[rate:...]` tags, which the engine only honours when told to. */
   usesVoiceTags: boolean;
 };
 
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+export const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const collapseSpaces = (value: string) => value.replace(/\s+/g, " ").trim();
+
+/** Danda to full stop, square brackets out — see `prepareText` for why. */
+export const normaliseSource = (text: string) => text.replace(/[।॥]/g, ".").replace(/[\[\]]/g, " ");
 
 /**
  * Turns the caller's text into engine input.
@@ -38,7 +45,7 @@ export function prepareText(
   text: string,
   pronunciations: Record<string, string> | undefined,
 ): PREPARED_TEXT {
-  let source = text.replace(/[।॥]/g, ".").replace(/[\[\]]/g, " ");
+  let source = normaliseSource(text);
 
   // A key with a space cannot be matched token by token; swap it out first.
   const own: Record<string, string> = {};
@@ -56,7 +63,7 @@ export function prepareText(
   const engineParts: string[] = [];
   const spokenParts: string[] = [];
   const displayParts: string[] = [];
-  const respelled: RESPELLING[] = [];
+  const respelled: NARRATE_RESPELLING[] = [];
   const seen = new Set<string>();
 
   /** Respells one stretch of plain text, keeping its whitespace. */
@@ -96,11 +103,10 @@ export function prepareText(
   }
   speak(source.slice(cursor));
 
-  const clean = (value: string) => value.replace(/\s+/g, " ").trim();
   return {
-    engineInput: clean(engineParts.join("")),
-    spokenText: clean(spokenParts.join(" ")),
-    displayTokens: clean(displayParts.join(" ")).split(" ").filter(Boolean),
+    engineInput: collapseSpaces(engineParts.join("")),
+    spokenText: collapseSpaces(spokenParts.join(" ")),
+    displayTokens: collapseSpaces(displayParts.join(" ")).split(" ").filter(Boolean),
     respelled,
     usesVoiceTags,
   };
@@ -166,11 +172,9 @@ export function buildPhrases(
     return {
       n: index + 1,
       text: group.map((i) => words[i].word).join(" "),
-      startSeconds: round(first.start),
-      endSeconds: round(last.end),
-      footageSeconds: round(tileEnd - starts[index]),
+      startSeconds: round3(first.start),
+      endSeconds: round3(last.end),
+      footageSeconds: round3(tileEnd - starts[index]),
     };
   });
 }
-
-const round = (value: number) => Math.round(value * 1000) / 1000;

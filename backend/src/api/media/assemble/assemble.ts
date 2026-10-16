@@ -9,23 +9,13 @@ import ffmpegPath from "ffmpeg-static";
 import { assertPersistentDisk } from "../../../config";
 import { AIXEL_MEDIA } from "../../../media";
 import { MEDIA, MEDIA_ASPECT_RATIO_DIMENSIONS, MEDIA_ERROR_MESSAGES } from "../constants";
+import { cuesToSrt, type CAPTION_CUE } from "../caption/cues";
 import { probeAudioSeconds, probeMediaStreams } from "../cut/ffmpeg-cut";
+import { round3 } from "../narrate/audio";
+import { MEDIA_ASSEMBLE, MEDIA_ASSEMBLE_ERRORS } from "./constants";
 import type { ASSEMBLED_SENTENCE, MEDIA_ASSEMBLE_REQUEST, MEDIA_ASSEMBLE_RESPONSE } from "./types";
 
 const execFileAsync = promisify(execFile);
-
-const FPS = 30;
-const AUDIO_RATE = 48000;
-/** A slot shorter than a frame cannot be shown; its time goes to a neighbour. */
-const MIN_SLOT_SECONDS = 0.04;
-const TIMEOUT_MS = 20 * 60 * 1000;
-
-const ERRORS = {
-  FFMPEG_FAILED: "ffmpeg failed to assemble the recap",
-  OUTSIDE_ROOT: "Assemble only takes files under the media root",
-  NOT_FOUND: "File not found",
-  NO_AUDIO: "Could not read the narration audio's length",
-} as const;
 
 type SLOT = {
   sentence: number;
@@ -43,17 +33,11 @@ async function checkedPath(path: string, root: string): Promise<string> {
   try {
     resolved = await realpath(path);
   } catch {
-    throw new Error(`${ERRORS.NOT_FOUND}: ${path}`);
+    throw new Error(`${MEDIA_ASSEMBLE_ERRORS.NOT_FOUND}: ${path}`);
   }
-  if (!resolved.startsWith(root + sep)) throw new Error(`${ERRORS.OUTSIDE_ROOT} (${root}/): ${path}`);
-  if (!(await stat(resolved)).isFile()) throw new Error(`${ERRORS.NOT_FOUND}: ${path}`);
+  if (!resolved.startsWith(root + sep)) throw new Error(`${MEDIA_ASSEMBLE_ERRORS.OUTSIDE_ROOT} (${root}/): ${path}`);
+  if (!(await stat(resolved)).isFile()) throw new Error(`${MEDIA_ASSEMBLE_ERRORS.NOT_FOUND}: ${path}`);
   return resolved;
-}
-
-function srtTime(seconds: number): string {
-  const ms = Math.max(0, Math.round(seconds * 1000));
-  const pad = (n: number, w = 2) => String(n).padStart(w, "0");
-  return `${pad(Math.floor(ms / 3600000))}:${pad(Math.floor(ms / 60000) % 60)}:${pad(Math.floor(ms / 1000) % 60)},${pad(ms % 1000, 3)}`;
 }
 
 /**
@@ -68,7 +52,7 @@ function srtTime(seconds: number): string {
  */
 export async function assembleRecap(input: MEDIA_ASSEMBLE_REQUEST): Promise<MEDIA_ASSEMBLE_RESPONSE> {
   assertPersistentDisk(MEDIA_ERROR_MESSAGES.VERCEL);
-  if (!ffmpegPath) throw new Error(ERRORS.FFMPEG_FAILED);
+  if (!ffmpegPath) throw new Error(MEDIA_ASSEMBLE_ERRORS.FFMPEG_FAILED);
 
   const root = await realpath(AIXEL_MEDIA.ROOT);
   const { outputWidth: width, outputHeight: height } = MEDIA_ASPECT_RATIO_DIMENSIONS[input.aspectRatio];
@@ -82,7 +66,7 @@ export async function assembleRecap(input: MEDIA_ASSEMBLE_REQUEST): Promise<MEDI
     const sentence = input.sentences[s];
     const audioPath = await checkedPath(sentence.audioPath, root);
     const seconds = await probeAudioSeconds(audioPath);
-    if (!seconds || seconds <= 0) throw new Error(`${ERRORS.NO_AUDIO}: ${sentence.audioPath}`);
+    if (!seconds || seconds <= 0) throw new Error(`${MEDIA_ASSEMBLE_ERRORS.NO_AUDIO}: ${sentence.audioPath}`);
     audioPaths.push(audioPath);
     audioSeconds.push(seconds);
 
@@ -112,7 +96,7 @@ export async function assembleRecap(input: MEDIA_ASSEMBLE_REQUEST): Promise<MEDI
     }
     // Fold slots too short to show into the previous (or, first, the next) one.
     for (let k = 0; k < sentenceSlots.length && sentenceSlots.length > 1; k++) {
-      if (sentenceSlots[k].seconds >= MIN_SLOT_SECONDS) continue;
+      if (sentenceSlots[k].seconds >= MEDIA_ASSEMBLE.MIN_SLOT_SECONDS) continue;
       const target = k > 0 ? sentenceSlots[k - 1] : sentenceSlots[k + 1];
       target.seconds += sentenceSlots[k].seconds;
       target.shortBy += sentenceSlots[k].shortBy;
@@ -145,7 +129,7 @@ export async function assembleRecap(input: MEDIA_ASSEMBLE_REQUEST): Promise<MEDI
       const label = `p${s}_${k}`;
       const hold = slot.shortBy > 0.02 ? `,tpad=stop_mode=clone:stop_duration=${f3(slot.shortBy + 0.1)}` : "";
       lines.push(
-        `[${videoIndex.get(slot.videoPath)}:v]trim=start=${f3(slot.videoStart)}:duration=${f3(slot.seconds + slot.shortBy)},setpts=PTS-STARTPTS,fps=${FPS}${hold},` +
+        `[${videoIndex.get(slot.videoPath)}:v]trim=start=${f3(slot.videoStart)}:duration=${f3(slot.seconds + slot.shortBy)},setpts=PTS-STARTPTS,fps=${MEDIA_ASSEMBLE.FPS}${hold},` +
           `trim=duration=${f3(slot.seconds)},setpts=PTS-STARTPTS,` +
           `scale=${width}:${height}:force_original_aspect_ratio=decrease:force_divisible_by=2,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,format=yuv420p[${label}]`,
       );
@@ -160,17 +144,17 @@ export async function assembleRecap(input: MEDIA_ASSEMBLE_REQUEST): Promise<MEDI
 
     const audioLabel = `sa${s}`;
     lines.push(
-      `[${audioBase + s}:a]aresample=${AUDIO_RATE},aformat=sample_fmts=fltp:channel_layouts=stereo,` +
+      `[${audioBase + s}:a]aresample=${MEDIA_ASSEMBLE.AUDIO_RATE},aformat=sample_fmts=fltp:channel_layouts=stereo,` +
         `apad=whole_dur=${f3(total)},atrim=duration=${f3(total)},asetpts=PTS-STARTPTS[${audioLabel}]`,
     );
     sentenceAudioLabels.push(`[${audioLabel}]`);
 
     sentences.push({
       n: s + 1,
-      startSeconds: Math.round(cursor * 1000) / 1000,
-      endSeconds: Math.round((cursor + audioSeconds[s]) * 1000) / 1000,
-      audioSeconds: Math.round(audioSeconds[s] * 1000) / 1000,
-      heldSeconds: Math.round(own.reduce((sum, slot) => sum + slot.shortBy, 0) * 1000) / 1000,
+      startSeconds: round3(cursor),
+      endSeconds: round3(cursor + audioSeconds[s]),
+      audioSeconds: round3(audioSeconds[s]),
+      heldSeconds: round3(own.reduce((sum, slot) => sum + slot.shortBy, 0)),
     });
     for (const phrase of input.sentences[s].phrases) {
       cues.push({
@@ -208,33 +192,33 @@ export async function assembleRecap(input: MEDIA_ASSEMBLE_REQUEST): Promise<MEDI
     "-crf",
     MEDIA.FFMPEG_CRF,
     "-r",
-    String(FPS),
+    String(MEDIA_ASSEMBLE.FPS),
     "-c:a",
     MEDIA.FFMPEG_AUDIO_CODEC,
     "-b:a",
-    "160k",
+    MEDIA_ASSEMBLE.AUDIO_BITRATE,
     "-movflags",
     "+faststart",
     outputPath,
   );
   try {
-    await execFileAsync(ffmpegPath, args, { maxBuffer: 64 * 1024 * 1024, timeout: TIMEOUT_MS });
+    await execFileAsync(ffmpegPath, args, { maxBuffer: 64 * 1024 * 1024, timeout: MEDIA_ASSEMBLE.TIMEOUT_MS });
   } catch (err) {
     const { stderr, message } = err as { stderr?: string; message?: string };
     const detail = stderr?.trim().split("\n").slice(-4).join(" | ") ?? message ?? "unknown error";
-    throw new Error(`${ERRORS.FFMPEG_FAILED}: ${detail}`);
+    throw new Error(`${MEDIA_ASSEMBLE_ERRORS.FFMPEG_FAILED}: ${detail}`);
   } finally {
     await rm(scriptPath, { force: true });
   }
 
   // One cue per phrase, never overlapping the next.
-  const srt = cues
-    .map((cue, i) => {
+  const srt = cuesToSrt(
+    cues.map((cue, i): CAPTION_CUE => {
       const next = cues[i + 1];
       const end = Math.max(cue.start + 0.05, next ? Math.min(cue.end, next.start) : cue.end);
-      return `${i + 1}\n${srtTime(cue.start)} --> ${srtTime(end)}\n${cue.text}\n`;
-    })
-    .join("\n");
+      return { start: cue.start, end, lines: [cue.text] };
+    }),
+  );
   const subtitlesPath = join(AIXEL_MEDIA.MEDIA_ASSEMBLED, `recap-${id}.srt`);
   await writeFile(subtitlesPath, srt, "utf8");
 

@@ -1,3 +1,4 @@
+import { round3 } from "./audio";
 import { MEDIA_NARRATE_GEMINI } from "./constants";
 import type { NARRATE_WORD } from "./types";
 
@@ -126,13 +127,12 @@ export function timeScriptWords(
     i = j;
   }
 
-  const round = (value: number) => Math.round(value * 1000) / 1000;
   return {
     words: tokens.map((word, k) => ({
       word,
-      start: round(starts[k] as number),
-      end: round(Math.max(starts[k] as number, ends[k] as number)),
+      start: round3(starts[k] as number),
+      end: round3(Math.max(starts[k] as number, ends[k] as number)),
     })),
-    matchedShare: tokens.length ? round(pairs.size / tokens.length) : 0,
+    matchedShare: tokens.length ? round3(pairs.size / tokens.length) : 0,
   };
 }

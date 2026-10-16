@@ -1,5 +1,6 @@
 import type { z } from "zod";
 
+import type { MEDIA_NARRATE } from "./constants";
 import type { MEDIA_NARRATE_REQUEST_SCHEMA } from "./schemas";
 
 export type MEDIA_NARRATE_REQUEST = z.infer<typeof MEDIA_NARRATE_REQUEST_SCHEMA>;
@@ -40,7 +41,7 @@ export type NARRATE_SENTENCE = {
 export type MEDIA_NARRATE_RESPONSE = {
   audioPath: string;
   durationSeconds: number;
-  provider: string;
+  provider: (typeof MEDIA_NARRATE.PROVIDERS)[number];
   voice: string;
   speed: number;
   /** The text actually spoken, after markup removal, respelling and punctuation clean-up. */

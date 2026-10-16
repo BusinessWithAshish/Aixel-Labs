@@ -25,7 +25,7 @@ export const MEDIA_NARRATE_REQUEST_SCHEMA = z.object({
   direction: z
     .string()
     .trim()
-    .max(300)
+    .max(MEDIA_NARRATE.MAX_DIRECTION_CHARS)
     .optional()
     .describe(
       "gemini only: how the whole script should be delivered, in plain English, e.g. 'energetic YouTube movie-recap narrator, conversational, a little dramatic'. Shapes the delivery and is never read aloud. Ignored by kokoro.",

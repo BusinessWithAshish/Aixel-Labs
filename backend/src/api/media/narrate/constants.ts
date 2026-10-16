@@ -1,9 +1,10 @@
 /**
  * `media` op=narrate — text to narration audio plus word timings.
  *
- * The engine is a self-hosted Kokoro-FastAPI container (see
- * `MEDIA_NARRATE.KOKORO_URL`). Every number below was measured against it, not
- * taken from its docs; the comments say where each one comes from.
+ * Two providers: "kokoro", a self-hosted Kokoro-FastAPI container (see
+ * `MEDIA_NARRATE.KOKORO_URL`), and "gemini" (`MEDIA_NARRATE_GEMINI` below).
+ * The Kokoro numbers were measured against the container, not taken from its
+ * docs; the comments say where each one comes from.
  */
 export const MEDIA_NARRATE = {
   /** Kokoro-FastAPI base URL. One container, one box: loopback by default. */
@@ -23,6 +24,8 @@ export const MEDIA_NARRATE = {
   MAX_CONCURRENT: 1,
   /** A whole 90 s Hindi script is ~1,500 characters; `gemini` takes the whole script in one call. */
   MAX_TEXT_CHARS: 4000,
+  /** gemini `direction`: a one-line delivery brief, not a second script. */
+  MAX_DIRECTION_CHARS: 300,
   /**
    * Kokoro adds ~0.38 s of its own silence to every `[pause:Ns]` tag (a chunk
    * boundary: ~0.05 s lead + ~0.3 s trail). A caller asking for a 0.6 s pause
@@ -32,7 +35,7 @@ export const MEDIA_NARRATE = {
   /** Below this the tag would be pointless; the surrounding punctuation already gives ~0.4 s. */
   PAUSE_TAG_MIN_SECONDS: 0.05,
   PAUSE_MAX_SECONDS: 10,
-  /** Phrase size for footage matching — see `phrases.ts`. */
+  /** Phrase size for footage matching — see `buildPhrases` in `markup.ts`. */
   PHRASE_MIN_WORDS: 2,
   PHRASE_MAX_WORDS: 4,
 } as const;
@@ -69,7 +72,7 @@ export const MEDIA_NARRATE_GEMINI = {
 
 export const MEDIA_NARRATE_ERRORS = {
   ENGINE_UNREACHABLE:
-    "The narration engine (Kokoro) is not reachable. Start the kokoro container (docker start kokoro-test) or set KOKORO_URL",
+    "The narration engine (Kokoro) is not reachable. Start the Kokoro container or set KOKORO_URL",
   ENGINE_FAILED: "The narration engine failed to synthesise the text",
   ENGINE_EMPTY: "The narration engine returned no audio",
   EMPTY_TEXT: "Nothing to narrate: the text is empty after cleaning",

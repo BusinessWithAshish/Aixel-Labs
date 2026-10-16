@@ -106,7 +106,7 @@ export class GeminiApiError extends Error {
  *     { "@type": ".../RetryInfo", retryDelay: "36s" } ] }`
  * — the exact shape observed hitting the free tier's daily quota.
  */
-function parseGeminiErrorBody(errorBody: unknown): {
+export function parseGeminiErrorBody(errorBody: unknown): {
   code?: number;
   status?: string;
   quotaId?: string;
