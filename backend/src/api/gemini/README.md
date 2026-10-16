@@ -13,7 +13,7 @@ produced. Generated images and video are staged under
 
 Unlike `chatgpt` (which shares the VPS's original profile on port 9222), this
 module spawns its **own** Chrome: a separate profile dir
-(`GEMINI_PROFILE_DIR`, default `/home/ubuntu/browser-vnc/chrome-gemini`) on a
+(`GEMINI_PROFILE_DIR`, default `/home/ubuntu/browser-vnc/gemini`) on a
 separate CDP port (`GEMINI_CDP_HTTP`, default `http://127.0.0.1:9333`), against
 the same Xvfb display. So a Gemini call and a ChatGPT call can run at the same
 time without contending for one profile/lock. `busy` (module-level) still
@@ -49,6 +49,35 @@ request or its token — forging it was blocked in testing and is the risky path
 | `POST` | `/gemini` | One Gemini turn (sync; a video turn can take minutes) |
 
 Also the `gemini` MCP tool (op `ask`) — same service.
+
+## Notebooks are projects
+
+A Gemini **notebook** (`https://gemini.google.com/notebook/<id>`) is the
+equivalent of a ChatGPT Project: saved instructions, source files and memory
+across its chats. Pass it as `project_url` with `mode: "new"` and the chat is
+started inside the notebook, so a brand's palette, rules and logo files shape
+the turn without being attached or restated. Omit `project_url` for a plain
+chat. A chat started in a notebook still lives at `/app/<id>` afterwards, so
+continuing it needs only the conversation, never the notebook.
+
+`mode: "resume"` (or `"revise"`, the name `chatgpt` uses — identical) continues
+a conversation with its whole context: "make the table rows blank, change
+nothing else" edits the image it already made. It takes `conversation_id` or
+`conversation_url`, plus optional `revise_notes`. Three things make it honest:
+
+- **A conversation the account does not hold is an error**, not a new chat.
+  Gemini redirects an unknown `/app/<id>` to a blank `/app`; typing into that
+  returned an unrelated image as the "revision".
+- **Only a NEW assistant turn counts as the answer.** A resumed conversation
+  opens with its previous answer already on the page; the turn is finished when
+  the number of `model-response` elements has grown, not when the last one has
+  content.
+- **The browser is held a few seconds after the turn** (`PERSIST_SETTLE_MS`).
+  Closed the instant the image appeared, the conversation never reached the
+  account's history and could not be resumed at all.
+
+Notebooks themselves (instructions, sources) are created by hand in the Gemini
+UI; this module only starts chats in them.
 
 ## Request (`POST /gemini`)
 
@@ -118,8 +147,8 @@ Video → video (extend/edit an uploaded clip) uses the same plumbing
 |-----|---------|
 | `GEMINI_CDP_HTTP` | `http://127.0.0.1:9333` |
 | `GEMINI_CHROME_BIN` | `/usr/bin/google-chrome-stable` |
-| `GEMINI_PROFILE_DIR` | `/home/ubuntu/browser-vnc/chrome-gemini` |
-| `GEMINI_SEED_PROFILE_DIR` | `$CHATGPT_PROFILE_DIR` or `/home/ubuntu/browser-vnc/chrome-official` |
+| `GEMINI_PROFILE_DIR` | `/home/ubuntu/browser-vnc/gemini` |
+| `GEMINI_SEED_PROFILE_DIR` | `$CHATGPT_PROFILE_DIR` or `/home/ubuntu/browser-vnc/BWA` |
 | `GEMINI_DISPLAY` | `$CHATGPT_DISPLAY` or `:99` |
 
 ## Smoke

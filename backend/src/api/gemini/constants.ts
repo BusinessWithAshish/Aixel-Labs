@@ -27,14 +27,21 @@ export const GEMINI_ROUTES = {
 } as const;
 
 export const GEMINI_EXPECT = ["auto", "text", "image", "video"] as const;
-export const GEMINI_MODES = ["new", "resume"] as const;
+/** `revise` is `resume` under the name the `chatgpt` module uses, so a caller written for one works on the other. */
+export const GEMINI_MODES = ["new", "resume", "revise"] as const;
 
 export const GEMINI_FIELD_DESCRIPTIONS = {
   prompt:
     "Full prompt — a chat question, an image-generation brief, a video brief, or an instruction over attached media. For a video ask, phrase it as a video (e.g. 'Create a short video: …') so Gemini routes it to Veo.",
-  mode: "'new' opens a fresh Gemini chat; 'resume' continues an existing conversation_id.",
+  project_url:
+    "OPTIONAL. A Gemini notebook URL (https://gemini.google.com/notebook/<id>) — Gemini's equivalent of a ChatGPT Project: saved instructions, source files (logos, brand docs) and memory across its chats. With mode=new the chat is started INSIDE that notebook, so its instructions and sources shape the turn without being attached or restated. A Gem URL (https://gemini.google.com/gem/<id>) works the same way. Omit it for a plain Gemini chat with no project context. Ignored when continuing a conversation — a chat keeps the notebook it was started in.",
+  mode: "'new' starts a chat (in project_url when given, else a plain chat). 'resume' or 'revise' (same thing) continues an existing conversation with its full context — the way to iterate on an image it already made. Works the same for a notebook chat and a plain one.",
   conversation_id:
-    "Required when mode=resume. The id from a prior response (the /app/<id> segment) — used to continue that conversation (e.g. iterate on a generated image or extend a video).",
+    "The id from a prior response (the /app/<id> segment). mode=resume|revise needs this or conversation_url.",
+  conversation_url:
+    "The conversation_url from a prior response (https://gemini.google.com/app/<id>). Alternative to conversation_id for mode=resume|revise.",
+  revise_notes:
+    "Human revise feedback; appended to the prompt when continuing a conversation.",
   images:
     "Absolute local file paths attached as real input images, in order (e.g. a reference photo, a frame to edit). Omit or pass [] for none. To use a remote image, download it first with `media` op=fetch (imageOnly: true) and pass the returned path here.",
   videos:
@@ -56,7 +63,7 @@ export const GEMINI = {
    * seed copy carry an existing Google login over) and it survives restarts.
    */
   PROFILE_DIR:
-    process.env.GEMINI_PROFILE_DIR || "/home/ubuntu/browser-vnc/chrome-gemini",
+    process.env.GEMINI_PROFILE_DIR || "/home/ubuntu/browser-vnc/gemini",
   /**
    * Source profile to seed PROFILE_DIR from on first run — the same
    * already-logged-in Chrome profile chatgpt uses. Only `Default` + `Local
@@ -66,10 +73,14 @@ export const GEMINI = {
   SEED_PROFILE_DIR:
     process.env.GEMINI_SEED_PROFILE_DIR ||
     process.env.CHATGPT_PROFILE_DIR ||
-    "/home/ubuntu/browser-vnc/chrome-official",
+    "/home/ubuntu/browser-vnc/BWA",
   /** Same Xvfb display chatgpt uses — headful is required (Cloudflare walls headless). */
   DISPLAY: process.env.GEMINI_DISPLAY || process.env.CHATGPT_DISPLAY || ":99",
   APP_URL: "https://gemini.google.com/app",
+  /** A notebook (project) or a Gem — the only pages besides APP_URL a new chat may start from. */
+  PROJECT_URL_RE: /^https:\/\/gemini\.google\.com\/(notebook|gem)\/[A-Za-z0-9_-]+\/?$/,
+  /** A conversation, whether it was started in a notebook or not. */
+  CONVERSATION_URL_RE: /^https:\/\/gemini\.google\.com\/app\/([0-9a-fA-F]+)/,
 
   // Selectors — verified live 2026-09-12 against gemini.google.com.
   EDITOR_SELECTOR: 'rich-textarea .ql-editor, div[contenteditable="true"][role="textbox"]',
@@ -85,6 +96,16 @@ export const GEMINI = {
   TURN_POLL_MS: 1500,
   VIDEO_POLL_MS: 15_000,
   UPLOAD_SETTLE_MS: 10_000,
+  /**
+   * Held after a finished turn, before the browser is torn down. Chrome was
+   * being closed the instant the image appeared, and those conversations never
+   * reached the account's history — every later resume opened a blank chat.
+   */
+  PERSIST_SETTLE_MS: 6000,
+  /** Consecutive signed-out reads (TURN_POLL_MS apart) before a turn is declared logged out. */
+  LOGGED_OUT_POLLS: 8,
+  /** How long a new chat gets to move from its start page to its own /app/<id> URL. */
+  CONVERSATION_ID_WAIT_MS: 20_000,
   MENU_SETTLE_MS: 1800,
 
   // CDP
@@ -108,6 +129,8 @@ export const GEMINI_ERROR_MESSAGES = {
     "Gemini session is logged out — sign in via VNC into the Gemini profile dir, or re-seed it from a logged-in profile",
   NO_RESULT: "Gemini produced neither text nor media — it may have refused",
   MISSING_FILE: "An attached file path does not exist",
+  CONVERSATION_NOT_FOUND:
+    "That Gemini conversation does not exist on this account (it opened a blank chat instead) — it was never saved or has been deleted. Start again with mode=new",
   NOT_VPS:
     "Gemini calls need a headful Chrome with an X display (the VPS's Xvfb) — no X display is available on this host",
 } as const;

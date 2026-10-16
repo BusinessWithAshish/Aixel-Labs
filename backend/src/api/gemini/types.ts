@@ -23,6 +23,8 @@ export type GEMINI_RESPONSE = {
   /** The /app/<id> conversation id — pass back as conversation_id + mode=resume to continue. */
   conversation_id: string;
   conversation_url: string;
+  /** The notebook/Gem the chat was started in, echoed back when one was given. */
+  project_url?: string;
 };
 
 export type GEMINI_HEALTH_RESPONSE = {

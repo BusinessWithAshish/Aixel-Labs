@@ -258,6 +258,8 @@ async function sendPrompt(tab: CdpTab, prompt: string): Promise<void> {
 }
 
 type TurnState = {
+  /** How many assistant turns the conversation holds — what tells a new answer from an old one. */
+  count: number;
   text: string;
   imgs: number;
   vids: number;
@@ -270,6 +272,7 @@ type TurnState = {
 const TURN_STATE_JS = `(() => {
   const resp = document.querySelectorAll(${S(GEMINI.RESPONSE_SELECTOR)});
   const last = resp.length ? resp[resp.length - 1] : null;
+  const count = document.querySelectorAll('model-response').length;
   const text = last ? (last.innerText || '').trim() : '';
   const imgs = last ? [...last.querySelectorAll('img')].filter(i => i.naturalWidth > 200 && /generat/i.test(i.alt || '')).length : 0;
   const vids = [...document.querySelectorAll('video')].filter(v => v.src || v.querySelector('source')).length;
@@ -278,16 +281,26 @@ const TURN_STATE_JS = `(() => {
   const videoGen = /Generating your video|creating your video|could take a few minutes/i.test(body);
   const blocked = /unusual traffic|verify you|something went wrong|try again later/i.test(body);
   const loggedOut = !(window.WIZ_global_data && window.WIZ_global_data.SNlM0e);
-  return { text, imgs, vids, stop, videoGen, blocked, loggedOut };
+  return { count, text, imgs, vids, stop, videoGen, blocked, loggedOut };
 })()`;
 
-/** Wait for a text/image turn to finish, or detect that Gemini has started an async video. */
+/**
+ * Wait for a text/image turn to finish, or detect that Gemini has started an async video.
+ *
+ * `baseline` is the number of assistant turns already in the conversation
+ * before this prompt was sent. A resumed conversation opens with its previous
+ * answer — text and image — already on the page, so "the last response has
+ * content" is true before Gemini has replied at all; without the baseline a
+ * revise returned the PREVIOUS image as if it were the new one.
+ */
 async function waitForTurn(
   tab: CdpTab,
   timeoutSec: number,
+  baseline: number,
 ): Promise<TurnState> {
   const started = Date.now();
   let last: TurnState = {
+    count: 0,
     text: "",
     imgs: 0,
     vids: 0,
@@ -297,15 +310,52 @@ async function waitForTurn(
     loggedOut: false,
   };
   const deadline = started + timeoutSec * 1000;
+  // A chat started in a notebook leaves the notebook page for its own /app/<id>
+  // with a real document load. For a moment the page has no globals at all,
+  // which reads exactly like a signed-out session — so only a signed-out state
+  // that HOLDS is believed, and a read that dies mid-navigation is skipped.
+  let loggedOutPolls = 0;
   while (Date.now() < deadline) {
     await sleep(GEMINI.TURN_POLL_MS);
-    last = (await tab.js(TURN_STATE_JS)) as TurnState;
-    if (last.loggedOut) throw new Error(GEMINI_ERROR_MESSAGES.LOGGED_OUT);
-    if (last.videoGen || last.vids > 0) return last; // hand off to video polling
+    const state = (await tab.js(TURN_STATE_JS).catch(() => null)) as TurnState | null;
+    if (!state) continue;
+    last = state;
+    loggedOutPolls = last.loggedOut ? loggedOutPolls + 1 : 0;
+    if (loggedOutPolls >= GEMINI.LOGGED_OUT_POLLS) throw new Error(GEMINI_ERROR_MESSAGES.LOGGED_OUT);
+    if (last.loggedOut) continue;
+    const fresh = last.count > baseline;
+    if (fresh && (last.videoGen || last.vids > 0)) return last; // hand off to video polling
     const elapsed = Date.now() - started;
-    if (!last.stop && elapsed > 4000 && (last.text || last.imgs > 0)) return last;
+    if (fresh && !last.stop && elapsed > 4000 && (last.text || last.imgs > 0)) return last;
   }
-  return last;
+  // Timed out with no new turn: report nothing rather than the old answer.
+  return last.count > baseline ? last : { ...last, text: "", imgs: 0, vids: 0 };
+}
+
+/** A new chat starts on /app or a notebook page and only gets its own /app/<id> once the turn is accepted. */
+async function waitForConversationId(tab: CdpTab): Promise<string> {
+  const deadline = Date.now() + GEMINI.CONVERSATION_ID_WAIT_MS;
+  for (;;) {
+    const cid = await conversationId(tab);
+    if (cid || Date.now() >= deadline) return cid;
+    await sleep(1000);
+  }
+}
+
+/** The prompt as sent: revise feedback rides along when continuing a conversation, as in `chatgpt`. */
+function buildPrompt(req: GEMINI_REQUEST_PARSED): string {
+  if (req.mode !== "new" && req.revise_notes?.trim()) {
+    return `${req.prompt.trim()}\n\nREVISION NOTES FROM HUMAN:\n${req.revise_notes.trim()}`;
+  }
+  return req.prompt;
+}
+
+/** The conversation a resume/revise names, from either field. */
+function requestedConversationId(req: GEMINI_REQUEST_PARSED): string {
+  if (req.mode === "new") return "";
+  if (req.conversation_id) return req.conversation_id;
+  const m = req.conversation_url?.match(GEMINI.CONVERSATION_URL_RE);
+  return m ? m[1] : "";
 }
 
 /**
@@ -455,19 +505,34 @@ export async function generateGemini(req: GEMINI_REQUEST_PARSED): Promise<GEMINI
     chrome = await launchGeminiChrome();
     tab = await openNewTab(GEMINI.CDP_HTTP);
 
-    const openUrl =
-      req.mode === "resume" && req.conversation_id
-        ? `${GEMINI.APP_URL}/${req.conversation_id}`
-        : GEMINI.APP_URL;
+    // The conversation being continued, else the notebook asked for, else a
+    // plain chat with no project context.
+    const resumeId = requestedConversationId(req);
+    const openUrl = resumeId
+      ? `${GEMINI.APP_URL}/${resumeId}`
+      : (req.project_url ?? GEMINI.APP_URL);
     await openChat(tab, openUrl);
 
-    await attachFiles(tab, attachments);
-    await sendPrompt(tab, req.prompt);
+    // A conversation the account does not hold redirects to a blank /app. Typing
+    // into that would start an unrelated chat and hand back an unrelated image
+    // under the caller's "revision" — refuse instead.
+    if (resumeId && (await conversationId(tab)) !== resumeId) {
+      const err = new Error(GEMINI_ERROR_MESSAGES.CONVERSATION_NOT_FOUND);
+      (err as Error & { statusCode?: number }).statusCode = 404;
+      throw err;
+    }
 
-    const turn = await waitForTurn(tab, req.timeout_seconds);
+    const baseline = Number(
+      (await tab.js(`document.querySelectorAll('model-response').length`).catch(() => 0)) ?? 0,
+    );
+
+    await attachFiles(tab, attachments);
+    await sendPrompt(tab, buildPrompt(req));
+
+    const turn = await waitForTurn(tab, req.timeout_seconds, baseline);
     if (turn.blocked) throw new Error("Gemini showed a block/verification screen — session may be flagged");
 
-    const cid = await conversationId(tab);
+    const cid = resumeId || (await waitForConversationId(tab));
     const convoUrl = cid ? `${GEMINI.APP_URL}/${cid}` : openUrl;
 
     // Video is async: the first turn only says "Generating…". Poll for it when
@@ -475,6 +540,12 @@ export async function generateGemini(req: GEMINI_REQUEST_PARSED): Promise<GEMINI
     const wantVideo = req.expect === "video" || turn.videoGen;
     if (wantVideo && turn.vids === 0) {
       await pollForVideo(tab, convoUrl, GEMINI.VIDEO_TIMEOUT_SEC);
+    }
+
+    // No new assistant turn means nothing was produced; the last response on the
+    // page is then the PREVIOUS answer and must not be read back as this one.
+    if (turn.count <= baseline && !(req.expect === "video" || turn.videoGen)) {
+      throw new Error(GEMINI_ERROR_MESSAGES.NO_RESULT);
     }
 
     const media: GEMINI_MEDIA[] = [];
@@ -495,12 +566,16 @@ export async function generateGemini(req: GEMINI_REQUEST_PARSED): Promise<GEMINI
 
     if (!finalText && media.length === 0) throw new Error(GEMINI_ERROR_MESSAGES.NO_RESULT);
 
+    // Let Gemini finish saving the conversation before the browser goes away.
+    await sleep(GEMINI.PERSIST_SETTLE_MS);
+
     return {
       text: finalText || undefined,
       media,
       model: await modelLabel(tab),
       conversation_id: cid,
       conversation_url: convoUrl,
+      ...(req.project_url && !resumeId ? { project_url: req.project_url } : {}),
     };
   } finally {
     tab?.close();
