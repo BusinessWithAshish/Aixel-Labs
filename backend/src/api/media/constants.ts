@@ -111,6 +111,9 @@ export const MEDIA_GEMINI_MODEL = {
  * audio-shaped work and fails with both 429 (daily quota) and 503 (model
  * overloaded), and only the second of those is fixable with more keys.
  */
+/** Groq's OpenAI-compatible chat endpoint — used by `groq-chat.ts` and the caption editor. */
+export const GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions";
+
 export const MEDIA_GROQ_TEXT_MODEL = {
   DEFAULT: "openai/gpt-oss-120b",
   /**
@@ -124,14 +127,9 @@ export const MEDIA_GROQ_TEXT_MODEL = {
   TOKENS_PER_MINUTE: 8000,
   /** Rough chars-per-token for sizing a prompt before spending a round-trip on a 413. */
   CHARS_PER_TOKEN: 4,
+  /** Share of `TOKENS_PER_MINUTE` one prompt may take — the rest is the reply and this minute's other calls. */
+  BUDGET_HEADROOM: 0.7,
 } as const;
-
-/** True when `prompt` is small enough to stand a chance against `TOKENS_PER_MINUTE`. */
-export function fitsGroqTokenBudget(prompt: string): boolean {
-  const estimatedTokens = prompt.length / MEDIA_GROQ_TEXT_MODEL.CHARS_PER_TOKEN;
-  // Leave headroom for the reply and for this minute's other calls.
-  return estimatedTokens < MEDIA_GROQ_TEXT_MODEL.TOKENS_PER_MINUTE * 0.7;
-}
 
 /** Supported output framings for `/video/cut`. */
 export const MEDIA_ASPECT_RATIOS = ["9:16", "16:9", "1:1", "original"] as const;
@@ -519,6 +517,8 @@ export const MEDIA = {
   BOUNDARY_SNAP_MAX_DISTANCE_SECONDS: 3,
   /** Extra padding applied at the (possibly snapped) start/end so the very edge of speech isn't clipped. */
   CLIP_PADDING_SECONDS: 0.35,
+  /** Upper bound on a caller-supplied `paddingSeconds`. */
+  CLIP_PADDING_MAX_SECONDS: 5,
   /** ffmpeg re-encode settings — clips are short (<=120s), so re-encoding is cheap and eliminates keyframe-boundary glitches entirely. */
   FFMPEG_VIDEO_CODEC: "libx264",
   FFMPEG_AUDIO_CODEC: "aac",
@@ -663,7 +663,7 @@ export const MEDIA_CUT_OUTPUT_DIR = AIXEL_MEDIA.MEDIA_CUTS;
 
 export const MEDIA_CAPTION_OUTPUT_DIR = AIXEL_MEDIA.MEDIA_CAPTIONS;
 
-/** `share` — public copies live here; the Hermes cron `prune-media` (~/.hermes/scripts/prune-media.sh) deletes them after PUBLIC_RETENTION_DAYS. */
+/** `share` — public copies live here; an external prune job deletes them after PUBLIC_RETENTION_DAYS. */
 export const MEDIA_SHARE = {
   PUBLIC_DIR: AIXEL_MEDIA.PUBLIC,
   PUBLIC_BASE_URL: AIXEL_MEDIA.PUBLIC_BASE_URL,
@@ -704,13 +704,7 @@ const SAFE_AREA_DEVICE = {
    * the corner arcs on every one of those screens.
    */
   SIDE_WIDTH_RATIO: 0.093,
-  /**
-   * The home indicator / gesture bar is ~80px on a 1920-tall frame (0.04) and
-   * HIGH confidence, but it gets NO constant of its own: every platform below
-   * reserves several times that much of the bottom for its own chrome, so the
-   * device figure is always dwarfed and a second number would only be one more
-   * thing to keep in sync. It is recorded here and used nowhere.
-   */
+  /** The ~0.04 home-indicator bar has no constant: every platform reserves far more of the bottom for its own chrome. */
 } as const;
 
 /**
@@ -1463,17 +1457,5 @@ export const MEDIA_LOGO = {
   /** Mark width as a fraction of the frame width. */
   DEFAULT_SCALE: 0.14,
   DEFAULT_OPACITY: 0.9,
-  /**
-   * No `DEFAULT_MARGIN` any more, and that absence is the fix. It was a single
-   * 0.04 fraction of frame WIDTH used on all four edges — 43px on 1080x1920,
-   * which is 4.0% of the width but only 2.2% of the height, so the tightest
-   * inset fell on the top edge, where the notch is, under a `top-right`
-   * default. Omitting `margin` now reads the asymmetric per-edge insets in
-   * `MEDIA_SAFE_AREA.DEFAULT` instead (see `resolveLogoInsets`).
-   *
-   * An explicit `margin` still means exactly what it always did — one fraction
-   * of frame width on every edge, honoured verbatim — so the knob is unchanged
-   * for anyone who wants the mark somewhere specific, `margin: 0` included. The
-   * DEFAULT is what became safe.
-   */
+  /** No default margin: an omitted `margin` uses the per-edge `MEDIA_SAFE_AREA.DEFAULT` insets (`resolveLogoInsets`). */
 } as const;

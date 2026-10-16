@@ -9,6 +9,6 @@ export type MEDIA_SHARE_RESPONSE = {
   url: string;
   publicPath: string;
   bytes: number;
-  /** Days until prune.sh deletes the public copy. */
+  /** Days until the external prune job deletes the public copy. */
   retentionDays: number;
 };

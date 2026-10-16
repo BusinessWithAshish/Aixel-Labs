@@ -4,8 +4,8 @@ import { z } from "zod";
 
 /**
  * Per-channel Gemini/Groq API keys, kept OUTSIDE this repo and outside
- * `AIXEL_MEDIA_ROOT` — one small JSON file per Sage channel, next to that
- * channel's other Hermes-side state, never committed anywhere. A cron run
+ * `AIXEL_MEDIA_ROOT` — one small JSON file per channel in
+ * `CHANNEL_API_KEYS_DIR`, never committed anywhere. Unset = feature off. A cron run
  * that shares one org-wide `GEMINI_API_KEY_FREE`/`GROQ_API_KEY` pool across
  * every channel means one channel's heavy day (or one bad key) exhausts the
  * quota every OTHER channel also needs the same afternoon — this lets a
@@ -19,8 +19,7 @@ import { z } from "zod";
  * the model's own context — all of which are plaintext and persisted.
  */
 
-const CHANNEL_KEYS_DIR =
-  process.env.CHANNEL_API_KEYS_DIR || "/home/ubuntu/.hermes/profiles/sage/channel-keys";
+const CHANNEL_KEYS_DIR = process.env.CHANNEL_API_KEYS_DIR;
 
 /** Slug shape only — this arrives from MCP tool input, so it must never reach a filesystem path unescaped. */
 const CHANNEL_SLUG = /^[a-z0-9][a-z0-9-]*$/;
@@ -36,11 +35,11 @@ export const CHANNEL_FIELD = z
   .regex(CHANNEL_SLUG)
   .optional()
   .describe(
-    "Sage channel slug (e.g. 'podcast-scissors'). When given and that channel has its own Gemini/Groq key on file, this call uses it instead of the shared org-wide pool — keeps one channel's usage from exhausting another's quota. Optional; omit for the shared default. Never pass an actual API key here.",
+    "Channel slug (e.g. 'my-channel'). When given and that channel has its own Gemini/Groq key on file, this call uses it instead of the shared org-wide pool — keeps one channel's usage from exhausting another's quota. Optional; omit for the shared default. Never pass an actual API key here.",
   );
 
 function readChannelKeyFile(channel: string): z.infer<typeof CHANNEL_KEY_FILE_SCHEMA> | undefined {
-  if (!CHANNEL_SLUG.test(channel)) return undefined;
+  if (!CHANNEL_KEYS_DIR || !CHANNEL_SLUG.test(channel)) return undefined;
   try {
     const raw = readFileSync(`${CHANNEL_KEYS_DIR}/${channel}.json`, "utf8");
     const result = CHANNEL_KEY_FILE_SCHEMA.safeParse(JSON.parse(raw));

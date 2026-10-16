@@ -1,14 +1,11 @@
+import { resolveGeminiKeyForChannel, resolveGroqKeyForChannel } from "../../../channel-keys";
 import { YOUTUBE_DEFAULT_COUNTRY } from "../constants";
 import { parseYoutubeVideoId } from "../helpers";
 import { YOUTUBE_TRANSCRIPT_DEFAULT_HL } from "../transcript/constants";
 import { fetchYoutubeVideoTranscript } from "../transcript/helpers";
 import type { YOUTUBE_TRANSCRIPT_LINE } from "../transcript/types";
 import { formatSecondsAsTimestamp } from "../../../utils/timestamp";
-import {
-  fitsGroqTokenBudget,
-  MEDIA_GEMINI_MODEL,
-  MEDIA_GROQ_TEXT_MODEL,
-} from "../../media/constants";
+import { MEDIA_GEMINI_MODEL, MEDIA_GROQ_TEXT_MODEL } from "../../media/constants";
 import {
   YOUTUBE_CAPTION_SPEAKER_LABEL_PROMPT,
   YOUTUBE_DIARIZE_CLAUDE_MAX_ATTEMPTS,
@@ -20,7 +17,7 @@ import {
   generateStructuredContent,
   withGeminiKeyPoolRetry,
 } from "../../media/gemini-client";
-import { generateJsonWithGroq } from "../../media/groq-chat";
+import { fitsGroqTokenBudget, generateJsonWithGroq } from "../../media/groq-chat";
 import { askClaudeForJson } from "../../claude/structured-json";
 import {
   GEMINI_CAPTION_SPEAKER_LABEL_SCHEMA,
@@ -446,9 +443,10 @@ export async function diarizeFromYoutubeCaptions(
   model?: string,
   speakerCount?: number,
   provider: "groq" | "gemini" | "claude" = "groq",
-  groqApiKey?: string,
-  geminiApiKey?: string,
+  channel?: string,
 ): Promise<YOUTUBE_DIARIZE_RESPONSE> {
+  const groqApiKey = resolveGroqKeyForChannel(channel);
+  const geminiApiKey = resolveGeminiKeyForChannel(channel);
   const videoId = parseYoutubeVideoId(videoUrl);
   if (!videoId) {
     throw new Error(

@@ -66,7 +66,7 @@ export async function cutClipsFromVideo(
   logo?: CUT_LOGO_REQUEST,
   /** Ceiling for a clip's length — `boundaries: "moment"` only. */
   maxSeconds?: number,
-  /** Sage channel slug — resolves that channel's own Groq key for boundary-placement transcription (see `channel-keys.ts`). */
+  /** Channel slug — resolves that channel's own Groq key for boundary-placement transcription (see `channel-keys.ts`). */
   channel?: string,
   /** Edge padding in seconds — see `MEDIA_FIELD_DESCRIPTIONS.cutPadding`. */
   paddingSeconds?: number,

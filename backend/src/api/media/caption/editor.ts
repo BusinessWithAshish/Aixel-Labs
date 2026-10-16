@@ -1,8 +1,7 @@
 import { z } from "zod";
 
 import { askClaudeForJson } from "../../claude/structured-json";
-import { MEDIA_GROQ_TEXT_MODEL } from "../constants";
-import { GROQ_CHAT_COMPLETIONS_URL } from "../transcribe/constants";
+import { GROQ_CHAT_COMPLETIONS_URL, MEDIA_GROQ_TEXT_MODEL } from "../constants";
 
 /**
  * The caption editor: one text pass that turns what the ear heard into the

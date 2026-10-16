@@ -47,15 +47,6 @@ export const GROQ_TRANSCRIPTIONS_URL =
   "https://api.groq.com/openai/v1/audio/transcriptions";
 
 /**
- * Groq's OpenAI-compatible chat endpoint. Transcription is not the only thing
- * this project has a Groq key for — `caption/transliterate.ts` romanizes on it
- * too, deliberately off the Gemini free-tier pool that diarization and moment
- * scoring already spend before captions ever run.
- */
-export const GROQ_CHAT_COMPLETIONS_URL =
-  "https://api.groq.com/openai/v1/chat/completions";
-
-/**
  * Source resolution (local path / URL, TLS-fingerprint fallback,
  * Vercel guard) is shared — see `../source.ts` and its own
  * `MEDIA_ERROR_MESSAGES`/`MEDIA_GATED_STATUS_CODES`. This file only owns

@@ -13,5 +13,7 @@ export const youtubeDiarizeHandler = createYoutubeHandler({
       input.language,
       input.model,
       input.speakerCount,
+      input.provider,
+      input.channel,
     ),
 });

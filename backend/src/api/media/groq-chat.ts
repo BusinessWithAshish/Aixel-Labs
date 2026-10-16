@@ -1,8 +1,8 @@
 import { Agent } from "undici";
 import type { z } from "zod";
 
-import { MEDIA, MEDIA_ERROR_MESSAGES } from "./constants";
-import { GROQ_CHAT_COMPLETIONS_URL, MEDIA_TRANSCRIBE_ERROR_MESSAGES } from "./transcribe/constants";
+import { GROQ_CHAT_COMPLETIONS_URL, MEDIA, MEDIA_ERROR_MESSAGES, MEDIA_GROQ_TEXT_MODEL } from "./constants";
+import { MEDIA_TRANSCRIBE_ERROR_MESSAGES } from "./transcribe/constants";
 import type { GROQ_CHAT_USAGE } from "./types";
 
 /**
@@ -95,4 +95,10 @@ export async function generateJsonWithGroq<T>(options: {
     throw new Error(`${MEDIA_ERROR_MESSAGES.GROQ_CHAT_MALFORMED}: ${result.error.message}`);
   }
   return { data: result.data, usage: completion.usage ?? {} };
+}
+
+/** True when `prompt` is small enough to stand a chance against `MEDIA_GROQ_TEXT_MODEL.TOKENS_PER_MINUTE`. */
+export function fitsGroqTokenBudget(prompt: string): boolean {
+  const estimatedTokens = prompt.length / MEDIA_GROQ_TEXT_MODEL.CHARS_PER_TOKEN;
+  return estimatedTokens < MEDIA_GROQ_TEXT_MODEL.TOKENS_PER_MINUTE * MEDIA_GROQ_TEXT_MODEL.BUDGET_HEADROOM;
 }

@@ -32,7 +32,6 @@ import { downloadYoutubeMedia } from "../../api/youtube/download/helpers";
 import { YOUTUBE_DIARIZE_REQUEST_SCHEMA } from "../../api/youtube/diarize/schemas";
 import { diarizeFromYoutubeCaptions } from "../../api/youtube/diarize/captions";
 import { withTranscriptFile } from "../../api/media/diarize/transcript-store";
-import { resolveGeminiKeyForChannel, resolveGroqKeyForChannel } from "../../channel-keys";
 import { YOUTUBE_VIDEO_META_REQUEST_SCHEMA } from "../../api/youtube/video-meta/schemas";
 import { fetchYoutubeVideoMeta } from "../../api/youtube/video-meta/helpers";
 import {
@@ -206,8 +205,7 @@ const YOUTUBE_OPS: Record<string, DomainOp> = {
             input.model,
             input.speakerCount,
             input.provider,
-            resolveGroqKeyForChannel(input.channel),
-            resolveGeminiKeyForChannel(input.channel),
+            input.channel,
           ),
           `yt-${input.videoUrl}`,
           input.includeTranscript,
@@ -259,7 +257,7 @@ Ops:
 - handle_check (raw only) — auth-free validity + availability for CANDIDATE handles (channel-name idea checks). Batch: input handles[] (with or without @). Each result: { input, handle, valid, reason?, available (true=free, false=taken, null=not checked because invalid), channelId (set when taken), url }. Uses the public InnerTube resolve_url — no login. input: handles[], country?, region?
 - video_meta (raw|intel, default intel) — batch watch-page metadata. input: videoIds[], country?, region?
 - video_download (raw only) — download a whole video (mp4, up to 1080p) or its audio (m4a) to local disk, via a third-party downloader site in the VPS's headed Chrome — no proxy bytes. About a minute for a 20-min video, several for a multi-hour one. Cached — re-downloading the same videoId+media returns the cached file. 404 if the video does not exist. Refused on Vercel and on hosts without an X display. input: videoId, media? ('video'|'audio', default video), country?, region? (both ignored)
-- diarize (raw only) — speaker-labelled transcript from the video's own captions. Always free/cheap regardless of provider (at most one small text-only labeling call, no audio uploaded ever). Hard-fails if there are no usable captions — no fallback to Gemini-audio diarization here; that's 'media' op=diarize, called explicitly if you want it. input: videoUrl, language?, provider? ('groq'|'gemini'|'claude', default 'groq' — Groq is a separate quota from the Gemini free-tier pool that diarization and moment scoring drain first), model?, speakerCount?, includeTranscript? (false = return transcriptPath + summary instead of the inline transcript — use it whenever the transcript goes to segment), channel? (Sage channel slug — uses that channel's own Groq/Gemini key on file instead of the shared pool when one exists; never pass an actual key, only the slug). Always returns transcriptPath.
+- diarize (raw only) — speaker-labelled transcript from the video's own captions. Always free/cheap regardless of provider (at most one small text-only labeling call, no audio uploaded ever). Hard-fails if there are no usable captions — no fallback to Gemini-audio diarization here; that's 'media' op=diarize, called explicitly if you want it. input: videoUrl, language?, provider? ('groq'|'gemini'|'claude', default 'groq' — Groq is a separate quota from the Gemini free-tier pool that diarization and moment scoring drain first), model?, speakerCount?, includeTranscript? (false = return transcriptPath + summary instead of the inline transcript — use it whenever the transcript goes to segment), channel? (Channel slug — uses that channel's own Groq/Gemini key on file instead of the shared pool when one exists; never pass an actual key, only the slug). Always returns transcriptPath.
 - aggregate_niche (raw only) — compute-only niche signals from harvested videos
 - aggregate_keyword (raw only) — compute-only keyword signals
 - compare_channels (raw only) — compute-only channel comparison

@@ -25,6 +25,9 @@ for mounts/boot, **db** for anything persisted, then the folder you are editing.
 - `server.ts`: `dotenv` first → middleware → `registerRoutes` → Vercel `export = app`.
 - **`src/db` is schema SSOT.** New persisted features start in `types.ts`.
 - Disk: `src/media.ts` (`AIXEL_MEDIA_ROOT`) — `{root}/public` vs `{root}/private/…`.
+- Per-channel keys: `src/channel-keys.ts` (`CHANNEL_API_KEYS_DIR`) — ops that take
+  `channel` resolve that channel's own Gemini/Groq key inside the service; callers
+  pass only the slug, never a key.
 - Runtime guards in `config.ts`: `IS_VERCEL_RUNTIME` (auto) blocks disk-output
   ops on Vercel; `IS_VPS_RUNTIME` (`AIXEL_VPS=1`, explicit) gates the
   `chatgpt`/`claude` modules to the VPS only, local dev included. Use

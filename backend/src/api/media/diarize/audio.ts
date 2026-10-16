@@ -1,5 +1,7 @@
 import { extname, join } from "node:path";
 
+import { resolveGeminiKeyForChannel } from "../../../channel-keys";
+
 import { parseTimestampToSeconds } from "../../../utils/timestamp";
 import {
   MEDIA,
@@ -332,8 +334,10 @@ async function diarizeChunked(
 export async function diarizeFromSource(
   mediaSource: string,
   model: string,
-  geminiKeys?: string[],
+  channel?: string,
 ): Promise<MEDIA_DIARIZE_RESPONSE> {
+  const channelKey = resolveGeminiKeyForChannel(channel);
+  const geminiKeys = channelKey ? [channelKey] : undefined;
   const resolved = await resolveMediaSource(mediaSource);
 
   try {

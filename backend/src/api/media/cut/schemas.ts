@@ -89,7 +89,7 @@ export const MEDIA_CUT_REQUEST_SCHEMA = z.object({
   paddingSeconds: z
     .number()
     .min(0)
-    .max(5)
+    .max(MEDIA.CLIP_PADDING_MAX_SECONDS)
     .optional()
     .describe(MEDIA_FIELD_DESCRIPTIONS.cutPadding),
   boundaries: z
