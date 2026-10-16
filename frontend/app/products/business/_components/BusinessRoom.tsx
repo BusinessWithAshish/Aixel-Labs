@@ -6,10 +6,11 @@ import { usePathname } from 'next/navigation';
 import { House, Users } from 'lucide-react';
 import { BUSINESS_LOBBY_COLOR, BUSINESS_RULES } from '@aixellabs/backend/business/constants';
 import { useBusinessRoom } from '../_hooks/use-business-room';
-import { clampName, gameBasePath, loadProfile, saveProfile } from '../_lib/client';
+import { clampName, gameBasePath, loadProfile, saveProfile, loadSeat } from '../_lib/client';
 import { sfx } from '../_lib/sound';
 import { GameToasts } from '../_lib/toast';
 import { AudioToggles, Avatar, GButton, Logo, Ribbon, Tips } from './bits';
+import { ScreenLoader, Spinner } from './Loading';
 import { Lobby } from './Lobby';
 import { Table } from './Table';
 
@@ -92,7 +93,13 @@ export function BusinessRoom({ code }: { code: string }) {
             </main>
         );
     } else if (status === 'need-join') {
-        const closed = invite?.started ? 'This match has already started.' : invite && invite.seatsTaken >= invite.seats ? 'This room is full.' : null;
+        const closed = invite?.over
+            ? 'This match has ended.'
+            : invite?.started
+              ? 'This match has already started.'
+              : invite && invite.seatsTaken >= invite.seats
+                ? 'This room is full.'
+                : null;
         body = (
             <main className="screen form">
                 <div className="hud">
@@ -137,7 +144,8 @@ export function BusinessRoom({ code }: { code: string }) {
                                 join(name.trim());
                             }}
                         >
-                            Join {invite ? `${invite.host}'s room` : 'room'}
+                            {joining && <Spinner className="sm" />}
+                            {joining ? 'Joining…' : `Join ${invite ? `${invite.host}'s room` : 'room'}`}
                         </GButton>
                     </>
                 )}
@@ -146,13 +154,7 @@ export function BusinessRoom({ code }: { code: string }) {
             </main>
         );
     } else if (status === 'connecting' || !room) {
-        body = (
-            <main className="screen form">
-                <p className="center" style={{ fontWeight: 800 }}>
-                    Connecting to room {code}…
-                </p>
-            </main>
-        );
+        body = <ScreenLoader text={loadSeat(code) ? `Taking your seat back in room ${code}…` : `Finding room ${code}…`} />;
     } else if (!room.started || !room.state) {
         body = <Lobby room={room} homeHref={homeHref} onStart={start} onConfigure={configure} onKick={kick} onMove={move} onTeam={setTeam} onClose={close} />;
     } else {

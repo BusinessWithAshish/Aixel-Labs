@@ -9,6 +9,18 @@ export type BusinessUpdate = { id: number; title: string; points: string[] };
 
 export const BUSINESS_UPDATES: readonly BusinessUpdate[] = [
     {
+        id: 3,
+        title: 'Smoother comebacks',
+        points: [
+            'Bail now says whether the helper has to come to the Jail, so a helper can ask more for the trip.',
+            'Banners stay up longer, and the Market result waits 20 seconds for you to read it.',
+            'Your own moves stand out in gold in the activity.',
+            'Back from another app? The game reconnects the moment you return.',
+            'The main screen offers a way back into a match that is still on, and forgets one that has ended.',
+            'Joining and rejoining show what is happening while you wait.',
+        ],
+    },
+    {
         id: 2,
         title: 'Jail gets dangerous',
         points: [

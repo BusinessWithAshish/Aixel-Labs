@@ -220,9 +220,10 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   visitor). Either of them offers it on their own turn, like a trade. Nobody
   By default any player may bail a prisoner out ("Bail from: Anyone"); the host
   can narrow it in the lobby to players visiting Jail only.
-  Whoever bails a player out moves to the Jail themselves, as a visitor, from
-  wherever they stand: a step back, with no Launch on the way and no salary.
-  They roll from there on their next turn.
+  The offer says whether the helper comes to the Jail themselves (on by default):
+  if so they move there as a visitor from wherever they stand, a step back with
+  no Launch on the way and no salary, and roll from there next turn. A helper who
+  must make the trip will usually ask more.
 - **A player held in Jail** makes and receives no trades, loans or splits:
   only bail (and the extension of a loan of theirs that has fallen due).
 - **The Jail corner** is drawn as two rooms: a barred cell for players held
@@ -350,6 +351,9 @@ A second tap on Join never seats the same player twice.
   player to the same seat. A different browser or device cannot take it.
 - **The main screen offers the way back** ("You still have a seat in room
   …") while the room last played in is still open.
+- **A finished match** keeps its room for 10 minutes so players can read the
+  result, then the room is gone. The main screen stops offering it the moment
+  it ends, and the invite screen says the match has ended.
 - **Two rooms at once** is possible: in the room the player is not looking at,
   the stand-in bot plays their seat until they return.
 - **What's new** (`_lib/whats-new.ts`): a returning player sees the changes

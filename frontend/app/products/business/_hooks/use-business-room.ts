@@ -11,7 +11,7 @@ import type {
     BusinessServerMessage,
 } from '@aixellabs/backend/business/types';
 import { useBusinessServerWsUrl } from '../_components/BusinessConfig';
-import { businessWsUrl, loadSeat, rememberRoom, saveSeat } from '../_lib/client';
+import { businessWsUrl, forgetRoom, loadSeat, rememberRoom, saveSeat } from '../_lib/client';
 import { notify } from '../_lib/toast';
 
 export type BusinessRoomStatus = 'connecting' | 'need-join' | 'ready' | 'missing' | 'kicked' | 'closed';
@@ -92,7 +92,9 @@ export function useBusinessRoom(code: string) {
                     saveSeat(code, { token: msg.token, seat: msg.seat });
                 } else if (msg.t === 'room') {
                     setRoom(msg.room);
-                    rememberRoom(code);
+                    // A finished match is not one to come back to: the main screen stops offering it.
+                    if (msg.room.state?.phase === 'over') forgetRoom(code);
+                    else rememberRoom(code);
                     setClockOffset(msg.room.now - Date.now());
                     setStatus('ready');
                 } else if (msg.t === 'error') {
@@ -117,11 +119,26 @@ export function useBusinessRoom(code: string) {
             };
         };
 
+        // Phones drop the connection while the game is in the background. The moment it is back in
+        // front, or the network returns, reconnect at once instead of waiting for the next retry.
+        const wake = () => {
+            if (closed || document.visibilityState === 'hidden') return;
+            const ws = wsRef.current;
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+            window.clearTimeout(retry);
+            connect();
+        };
         connect();
+        document.addEventListener('visibilitychange', wake);
+        window.addEventListener('online', wake);
+        window.addEventListener('pageshow', wake);
         return () => {
             closed = true;
             window.clearTimeout(retry);
             window.clearInterval(ping);
+            document.removeEventListener('visibilitychange', wake);
+            window.removeEventListener('online', wake);
+            window.removeEventListener('pageshow', wake);
             wsRef.current?.close();
         };
     }, [code, serverUrl]);

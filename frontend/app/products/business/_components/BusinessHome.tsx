@@ -21,11 +21,13 @@ import {
     saveSeat,
     saveSeenUpdate,
 } from '../_lib/client';
+import type { BusinessRoomSummary } from '@aixellabs/backend/business/types';
 import { BUSINESS_UPDATES, LATEST_UPDATE, type BusinessUpdate } from '../_lib/whats-new';
 import { GameToasts, notify } from '../_lib/toast';
 import { AudioToggles, Choices, GButton, Logo, minutesLabel, missLabel, Stepper, Tips } from './bits';
 import { useBusinessServerWsUrl } from './BusinessConfig';
 import { InstallApp } from './InstallApp';
+import { PendingLink, Spinner } from './Loading';
 import { WhatsNew } from './WhatsNew';
 
 /** First screen: your name, then either host a room or join one. Fits one phone screen. */
@@ -43,8 +45,8 @@ export function BusinessHome() {
 
     /** News to show: what a returning player has not seen yet, or everything when they ask for it. */
     const [news, setNews] = useState<readonly BusinessUpdate[] | null>(null);
-    /** A room this browser still holds a seat in, if that room is still open. */
-    const [lastRoom, setLastRoom] = useState<string | null>(null);
+    /** A room this browser still holds a seat in, while its match is still on. */
+    const [lastRoom, setLastRoom] = useState<BusinessRoomSummary | null>(null);
 
     useEffect(() => {
         const profile = loadProfile();
@@ -59,8 +61,8 @@ export function BusinessHome() {
     useEffect(() => {
         const code = loadLastRoom();
         if (!code) return;
-        // Offer the way back only while the room is really there.
-        peekRoomRequest(serverUrl, code).then(() => setLastRoom(code), forgetLastRoom);
+        // Offer the way back only while the room is really there and its match has not ended.
+        peekRoomRequest(serverUrl, code).then((summary) => (summary.over ? forgetLastRoom() : setLastRoom(summary)), forgetLastRoom);
     }, [serverUrl]);
 
     const ready = name.trim().length > 0;
@@ -78,10 +80,7 @@ export function BusinessHome() {
         }
     };
 
-    const join = () => {
-        saveProfile({ name: name.trim() });
-        router.push(`${base}/${code.trim().toUpperCase()}`);
-    };
+
 
     return (
         <main className="screen form">
@@ -93,10 +92,12 @@ export function BusinessHome() {
             <Logo />
             {lastRoom && (
                 <div className="banner info">
-                    <span>You still have a seat in room {lastRoom}.</span>
-                    <GButton size="sm" tone="gold" onClick={() => router.push(`${base}/${lastRoom}`)}>
-                        Back to it
-                    </GButton>
+                    <span>
+                        {lastRoom.started ? `Your match in ${lastRoom.host}'s room is still on.` : `You have a seat in ${lastRoom.host}'s room.`} Room {lastRoom.code}.
+                    </span>
+                    <PendingLink href={`${base}/${lastRoom.code}`} className="sm gold">
+                        {lastRoom.started ? 'Rejoin' : 'Back to it'}
+                    </PendingLink>
                 </div>
             )}
             <label className="field">
@@ -129,6 +130,7 @@ export function BusinessHome() {
                     </div>
                     <Choices options={BUSINESS_MISS_LIMITS} value={missLimit as (typeof BUSINESS_MISS_LIMITS)[number]} label={missLabel} onPick={setMissLimit} />
                     <GButton tone="green" size="big" disabled={!ready || busy || mode !== 'create'} onClick={create}>
+                        {busy && <Spinner className="sm" />}
                         {busy ? 'Creating…' : 'Create'}
                     </GButton>
                 </section>
@@ -148,9 +150,15 @@ export function BusinessHome() {
                     </label>
                     <p className="small">Ask your host for the 6-character code, or open the invite link they sent.</p>
                     <span style={{ flex: 1 }} />
-                    <GButton tone="green" size="big" disabled={!ready || code.length !== 6 || mode !== 'join'} onClick={join}>
-                        Join
-                    </GButton>
+                    {ready && code.length === 6 && mode === 'join' ? (
+                        <PendingLink href={`${base}/${code}`} className="big green" onClick={() => saveProfile({ name: name.trim() })}>
+                            Join
+                        </PendingLink>
+                    ) : (
+                        <GButton tone="green" size="big" disabled>
+                            Join
+                        </GButton>
+                    )}
                 </section>
             </div>
             <InstallApp />

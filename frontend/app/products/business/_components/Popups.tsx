@@ -308,13 +308,16 @@ export function ChanceBook({ onClose }: { onClose: () => void }) {
 }
 
 /** Everything that has happened, newest first. */
-export function LogPopup({ log, onClose }: { log: BusinessLogEntry[]; onClose: () => void }) {
+/** The activity, newest first. Lines about you (`me`) stand out so you can find your own moves. */
+export function LogPopup({ log, me, onClose }: { log: BusinessLogEntry[]; me: number; onClose: () => void }) {
     return (
         <Pop onClose={onClose}>
             <Ribbon>Activity</Ribbon>
             <ul className="log" style={{ maxHeight: '60dvh' }}>
                 {log.map((entry) => (
-                    <li key={entry.n}>{entry.text}</li>
+                    <li key={entry.n} className={entry.seat === me || entry.fx?.from === me || entry.fx?.to === me ? 'mine' : undefined}>
+                        {entry.text}
+                    </li>
                 ))}
             </ul>
             <GButton tone="gold" onClick={onClose}>
@@ -715,7 +718,7 @@ export function describeOffer(state: BusinessPublicState, offer: BusinessOffer):
     if (t.kind === 'renew') {
         return [`extend the loan: pay ${rs(t.pay)} now${t.extra ? `, borrow ${rs(t.extra)} more` : ''}.`, interestLine(0, t.interestPct, t.interestMode, t.laps)];
     }
-    if (t.kind === 'bail') return [`bail ${P[t.prisoner].name} out of Jail for ${rs(t.amount)}.`];
+    if (t.kind === 'bail') return [`bail ${P[t.prisoner].name} out of Jail for ${rs(t.amount)}${t.bringHelper ? ', and the helper comes to the Jail' : ''}.`];
     if (t.kind === 'split') return [`split the ${BUSINESS_SETS[t.set].name} set, ${t.minorPct}% to the player with one city.`];
     if (t.kind === 'unsplit') {
         const split = state.splits.find((s) => s.id === t.split);
@@ -802,6 +805,7 @@ export function OfferInbox({ state, me, send, offer, now }: Base & { offer: Busi
                     {mine
                         ? `You pay ${from.name} ${rs(t.amount)} and walk free. Otherwise leaving Jail costs you ${rs(shareOfCash(you.cash, BUSINESS_RULES.JAIL_PCT))}.`
                         : `${from.name} pays you ${rs(t.amount)} and walks free.`}
+                    {t.bringHelper ? ` ${mine ? from.name : 'You'} must come to the Jail as part of the deal.` : ` ${mine ? from.name : 'You'} stay${mine ? 's' : ''} where ${mine ? 'they are' : 'you are'}.`}
                 </p>
             </>
         );

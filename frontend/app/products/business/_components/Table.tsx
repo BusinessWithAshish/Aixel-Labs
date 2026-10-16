@@ -49,9 +49,12 @@ const JAIL_TRIP_MS = 1500;
 /** A beat after the pawn lands before pop-ups and landing sounds, so they do not pile onto the last step. */
 const SETTLE_MS = 280;
 
-/** How long each money banner stays up; shorter when several are waiting. */
-const DEAL_MS = 2000;
-const DEAL_FAST_MS = 1100;
+/** How long each banner stays up; shorter when several are waiting. */
+const DEAL_MS = 3000;
+const DEAL_FAST_MS = 1700;
+/** Banners that tell a story (someone jailed, bailed, out, a split or a trade) stay up longer to be read. */
+const DEAL_NEWS_MS = 4500;
+const NEWS_KINDS: readonly string[] = ['jail', 'bail', 'out', 'split', 'trade'];
 const FLOAT_MS = 1500;
 
 /**
@@ -290,7 +293,7 @@ function useDeals(state: BusinessPublicState, busy: boolean, hold: boolean, laun
         if (amount > 0 && to !== null) added.push({ id: next.id * 2 + 1, seat: to, amount });
         setFloats((list) => [...list, ...added]);
         window.setTimeout(() => setFloats((list) => list.filter((f) => !added.includes(f))), FLOAT_MS);
-        timer.current = window.setTimeout(showNext, queue.current.length > 1 ? DEAL_FAST_MS : DEAL_MS);
+        timer.current = window.setTimeout(showNext, queue.current.length > 1 ? DEAL_FAST_MS : NEWS_KINDS.includes(next.fx.kind) ? DEAL_NEWS_MS : DEAL_MS);
     };
 
     const showNext = () => {
@@ -699,7 +702,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
             />
         );
     else if (view?.t === 'guide') pop = <GuidePopup onClose={() => setView(null)} />;
-    else if (view?.t === 'log') pop = <LogPopup log={state.log} onClose={() => setView(null)} />;
+    else if (view?.t === 'log') pop = <LogPopup log={state.log} me={me} onClose={() => setView(null)} />;
     else if (view?.t === 'market') pop = <MarketBook onClose={() => setView(null)} />;
     else if (view?.t === 'chance') pop = <ChanceBook onClose={() => setView(null)} />;
     else if (view?.t === 'player')

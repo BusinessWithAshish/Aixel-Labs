@@ -111,6 +111,8 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
     const [giveCash, setGiveCash] = useState(0);
     const [getCash, setGetCash] = useState(0);
     const [giveCards, setGiveCards] = useState(0);
+    /** Bail: whether the helper comes to the Jail as part of the deal. */
+    const [bringHelper, setBringHelper] = useState(true);
     const [getCards, setGetCards] = useState(0);
 
     const mePlayer = state.players[me];
@@ -210,10 +212,19 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
         const helper = state.players[draft.prisoner === me ? draft.with : me];
         const cap = round10(prisoner.cash);
         const value = Math.min(amount, cap);
-        terms = { kind: 'bail', prisoner: prisoner.seat, amount: value };
+        terms = { kind: 'bail', prisoner: prisoner.seat, amount: value, bringHelper };
         body = (
             <>
                 <Slider label={`${prisoner.name} pays ${helper.name}`} value={value} display={rs(value)} min={0} max={cap} step={10} onChange={setAmount} />
+                {/* Part of the price: whether the helper has to come to the Jail too. A helper who must will usually ask more. */}
+                <div className="seg two">
+                    <GButton size="sm" tone="gold" className={bringHelper ? undefined : 'off'} onClick={() => setBringHelper(true)}>
+                        {helper.name} comes to Jail
+                    </GButton>
+                    <GButton size="sm" tone="gold" className={bringHelper ? 'off' : undefined} onClick={() => setBringHelper(false)}>
+                        {helper.name} stays put
+                    </GButton>
+                </div>
                 <p className="small center">
                     {helper.name} gets {prisoner.name} out of Jail at once. Without bail, leaving Jail costs {prisoner.name}{' '}
                     {rs(shareOfCash(prisoner.cash, BUSINESS_RULES.JAIL_PCT))} ({BUSINESS_RULES.JAIL_PCT}% of their cash), shared among everyone else.

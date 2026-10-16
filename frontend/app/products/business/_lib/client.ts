@@ -63,10 +63,14 @@ export const loadLastRoom = () => read<string>('bb:last-room');
 export const forgetLastRoom = () => write('bb:last-room', null);
 /** Called whenever this browser takes its seat in a room again, so "last" means the last one played in. */
 export const rememberRoom = (code: string) => write('bb:last-room', code);
+/** Stops offering this room on the main screen (it ended, or the seat is gone). */
+export function forgetRoom(code: string) {
+    if (loadLastRoom() === code) forgetLastRoom();
+}
 export function saveSeat(code: string, seat: SeatToken | null) {
     write(`bb:seat:${code}`, seat);
     if (seat) rememberRoom(code);
-    else if (loadLastRoom() === code) forgetLastRoom();
+    else forgetRoom(code);
 }
 /** The newest "What's new" entry this browser has shown (see whats-new.ts); null on a first visit. */
 export const loadSeenUpdate = () => read<number>('bb:seen-update');
