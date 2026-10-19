@@ -20,7 +20,8 @@
 # 3. Point Caddy at the new slot (the one `to` line in
 #    /etc/caddy/aixel-labs-<service>.upstream) and reload it gracefully.
 # 4. SIGTERM the old slot and move on. It drains on its own (server.ts: in-flight
-#    requests; the games: running matches) and, once it exits, its ExecStopPost
+#    requests; the games: running matches; the voice engine, phone.py: running
+#    calls) and, once it exits, its ExecStopPost
 #    prunes old releases. Only the newest $KEEP releases and whatever a slot still
 #    runs survive.
 # Then deploy/Caddyfile is installed if it differs from the live one.
@@ -38,13 +39,19 @@ NODE=/home/ubuntu/.local/bin/node # the units' node (ExecStart)
 # --- services -----------------------------------------------------------------
 # A service is a systemd template, deploy/aixel-labs-<service>@.service, whose
 # instance is a port; it has two slots, one live behind Caddy and one idle.
-SERVICES=(api games)
-declare -A SLOTS=([api]="8101 8102" [games]="8111 8112")
-declare -A HEALTH=([api]=/v1/ping [games]=/v1/ping)
+SERVICES=(api games voice)
+declare -A SLOTS=([api]="8101 8102" [games]="8111 8112" [voice]="8121 8122")
+declare -A HEALTH=([api]=/v1/ping [games]=/v1/ping [voice]=/health)
 # Paths a service owns besides the api, which owns everything else under backend/.
-declare -A OWNS=([games]="backend/src/api/business backend/src/api/bluff backend/src/api/game-sockets.ts")
-# Boot code every Node service runs: a change here redeploys all of them.
+declare -A OWNS=([games]="backend/src/api/business backend/src/api/bluff backend/src/api/game-sockets.ts" [voice]="backend/voice")
+# Boot code every Node service runs: a change here redeploys all of them (not voice, which is Python).
 SHARED="backend/src/server.ts backend/src/routes.ts backend/src/config.ts backend/package.json backend/tsconfig.json pnpm-lock.yaml"
+NODE_SERVICES="api games"
+# The voice engine's runtime state: kept in the checkout's backend/voice (untracked) and linked into
+# every release with the rest of its untracked files. Made before linking, so a release never starts
+# a copy of its own that the next deploy would lose.
+VOICE_STATE_DIRS="calls cache"
+VOICE_STATE_FILES="suppressed.jsonl turns.jsonl"
 
 log() { printf '[deploy %s IST] %s\n' "$(TZ=Asia/Kolkata date +%H:%M:%S)" "$*"; }
 die() { log "ERROR: $*"; exit 1; }
@@ -60,7 +67,9 @@ affects() {
   [[ "$file" == *.md ]] && return 1
   [[ "$file" == "backend/deploy/aixel-labs-$svc@.service" ]] && return 0
   [[ "$file" == backend/deploy/* ]] && return 1
-  for path in $SHARED; do [[ "$file" == "$path" ]] && return 0; done
+  if [[ " $NODE_SERVICES " == *" $svc "* ]]; then
+    for path in $SHARED; do [[ "$file" == "$path" ]] && return 0; done
+  fi
   for other in "${!OWNS[@]}"; do
     for path in ${OWNS[$other]}; do [[ "$file" == "$path" || "$file" == "$path"/* ]] && owner=$other; done
   done
@@ -143,13 +152,15 @@ else
   mkdir -p "$release"
   git -C "$REPO" archive "$sha" | tar -x -C "$release"
   # Untracked runtime files live once, in the checkout, and every release links
-  # to them: the env file and each Python worker's venv / models / binaries.
+  # to them: the env file, each Python worker's venv / models / binaries, and the
+  # voice engine's venv, keys (.env, service.env), prompt and runtime state.
   ln -s "$BACKEND/.env" "$release/backend/.env"
+  (cd "$BACKEND/voice" && mkdir -p $VOICE_STATE_DIRS && touch $VOICE_STATE_FILES)
   while IFS= read -r path; do
     path="${path%/}"
-    [[ "$path" =~ ^backend/workers/[^/]+/[^/]+$ && "$path" != */__pycache__ ]] || continue
+    [[ "$path" =~ ^backend/(workers/[^/]+|voice)/[^/]+$ && "$path" != */__pycache__ ]] || continue
     [[ -e "$release/$path" ]] || ln -s "$REPO/$path" "$release/$path"
-  done < <(git -C "$REPO" ls-files --others --ignored --exclude-standard --directory backend/workers)
+  done < <(git -C "$REPO" ls-files --others --ignored --exclude-standard --directory backend/workers backend/voice)
   log "installing dependencies"
   # The standalone pnpm binary bundles its own old Node and checks `engines`
   # against it, silently skipping optional native packages that need a newer

@@ -42,8 +42,34 @@
 	}
 }
 
-# Paths the games service owns: room routes and WebSockets (/business/ws, /bluff/ws).
+(aixel_labs_voice) {
+	reverse_proxy {
+		import /etc/caddy/aixel-labs-voice.upstream
+		lb_try_duration 15s
+		lb_try_interval 250ms
+		# Calls are WebSockets: a reload (any service's deploy, a cert renewal) must not cut one
+		# short. A slot being replaced keeps its calls until they end, up to its TimeoutStopSec (1 h).
+		stream_close_delay 1h
+		{block}
+	}
+}
+
+# Which service serves which path:
+#   /voice/*               voice: carrier webhooks, call media WebSockets, the app's /calls and /play;
+#                          the prefix is stripped (the engine's own routes are /texml, /telnyx, /calls, ...)
+#   /business/*, /bluff/*  games: room routes and WebSockets (/business/ws, /bluff/ws)
+#   everything else        api
 (aixel_labs_routes) {
+	@voice path /voice/*
+	handle @voice {
+		uri strip_prefix /voice
+		# FastAPI's generated docs are not for the public.
+		@docs path /docs /docs/* /redoc /openapi.json
+		respond @docs 404
+		import aixel_labs_voice {
+			{block}
+		}
+	}
 	@games path /business/* /bluff/*
 	handle @games {
 		import aixel_labs_games {

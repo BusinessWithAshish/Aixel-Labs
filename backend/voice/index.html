@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maya — voice test page</title>
+<style>
+  :root {
+    --ground: #10161c; --surface: #18212a; --ink: #e6ecf2; --muted: #93a3b1;
+    --line: #2a3742; --accent: #74a7e8; --agent: #e98b4e; --ok: #7dc08f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--ground); color: var(--ink);
+    font: 16px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+    display: grid; place-items: start center; padding: 32px 16px;
+  }
+  .card {
+    width: min(560px, 100%); background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; padding: 24px; display: grid; gap: 20px;
+  }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+  .badge {
+    font: 600 0.75rem/1 ui-monospace, monospace; letter-spacing: .08em;
+    padding: 6px 10px; border-radius: 999px; background: #1f2d3a; color: var(--accent);
+  }
+  button {
+    font: 600 1rem/1 inherit; padding: 14px 20px; border-radius: 8px; border: 0;
+    background: var(--accent); color: #0b1218; cursor: pointer;
+  }
+  button.live { background: var(--agent); }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { color: var(--muted); font-size: .92rem; min-height: 1.5em; }
+  .meter { height: 8px; border-radius: 4px; background: #101820; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .08s linear; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th { font: 600 .7rem/1 inherit; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  td.ms { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .summary { display: flex; gap: 24px; font-family: ui-monospace, monospace; }
+  .summary div { display: grid; gap: 2px; }
+  .summary span { font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-family: inherit; }
+  .summary b { font-size: 1.4rem; font-weight: 600; }
+  p.hint { margin: 0; color: var(--muted); font-size: .88rem; }
+</style>
+</head>
+<body>
+<div class="card">
+  <header>
+    <h1>Voice latency trial</h1>
+    <span class="badge">TEST PAGE</span>
+  </header>
+
+  <p class="hint">Talk to the agent like a business owner who just picked up a cold call. Interrupt it, pause mid-sentence, object. The timer below measures from the moment you stop talking to the first sound of its reply, as heard here in your browser.</p>
+
+  <button id="go">Start call</button>
+  <div class="meter"><i id="level"></i></div>
+  <div id="status">Not connected.</div>
+
+  <div class="summary">
+    <div><span>Turns</span><b id="count">0</b></div>
+    <div><span>Median</span><b id="median">—</b></div>
+    <div><span>Last</span><b id="last">—</b></div>
+  </div>
+
+  <table>
+    <thead><tr><th>#</th><th>Gap</th><th>Note</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<script>
+const IN_RATE = 16000, OUT_RATE = 24000;
+const goBtn = document.getElementById("go"), statusEl = document.getElementById("status");
+const levelEl = document.getElementById("level"), rowsEl = document.getElementById("rows");
+const countEl = document.getElementById("count"), medianEl = document.getElementById("median"), lastEl = document.getElementById("last");
+
+let ws, micCtx, playCtx, micStream, worklet, playHead = 0, sources = [];
+let speaking = false, silenceSince = 0, stoppedAt = 0, waiting = false, gaps = [];
+
+const WORKLET = `
+class Mic extends AudioWorkletProcessor {
+  process(inputs) {
+    const ch = inputs[0][0];
+    if (!ch) return true;
+    let sum = 0;
+    const pcm = new Int16Array(ch.length);
+    for (let i = 0; i < ch.length; i++) {
+      const s = Math.max(-1, Math.min(1, ch[i]));
+      pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      sum += s * s;
+    }
+    this.port.postMessage({ pcm, rms: Math.sqrt(sum / ch.length) }, [pcm.buffer]);
+    return true;
+  }
+}
+registerProcessor("mic", Mic);`;
+
+function addRow(gapMs, note) {
+  gaps.push(gapMs);
+  const sorted = [...gaps].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  countEl.textContent = gaps.length;
+  medianEl.textContent = median + " ms";
+  lastEl.textContent = gapMs + " ms";
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${gaps.length}</td><td class="ms">${gapMs} ms</td><td>${note}</td>`;
+  rowsEl.prepend(tr);
+}
+
+function playChunk(buf) {
+  const pcm = new Int16Array(buf);
+  const audio = playCtx.createBuffer(1, pcm.length, OUT_RATE);
+  const ch = audio.getChannelData(0);
+  for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 0x8000;
+  const src = playCtx.createBufferSource();
+  src.buffer = audio;
+  src.connect(playCtx.destination);
+  const now = playCtx.currentTime;
+  if (playHead < now) playHead = now + 0.02;
+  src.start(playHead);
+  playHead += audio.duration;
+  sources.push(src);
+  src.onended = () => { sources = sources.filter((s) => s !== src); };
+}
+
+function clearAudio() {
+  sources.forEach((s) => { try { s.stop(); } catch (e) {} });
+  sources = [];
+  playHead = 0;
+}
+
+async function start() {
+  goBtn.disabled = true;
+  statusEl.textContent = "Asking for the microphone…";
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  });
+
+  micCtx = new AudioContext({ sampleRate: IN_RATE });
+  playCtx = new AudioContext({ sampleRate: OUT_RATE });
+  await micCtx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" })));
+
+  // Relative to this page, so it works at /a and behind a path prefix (/voice/a -> /voice/ws).
+  ws = new WebSocket(new URL("ws?t=__TOKEN__", location.href.replace(/^http/, "ws")));
+  ws.binaryType = "arraybuffer";
+
+  ws.onopen = () => {
+    statusEl.textContent = "Connected. The agent speaks first — say hello back.";
+    goBtn.textContent = "Hang up";
+    goBtn.classList.add("live");
+    goBtn.disabled = false;
+    goBtn.onclick = stop;
+
+    const src = micCtx.createMediaStreamSource(micStream);
+    worklet = new AudioWorkletNode(micCtx, "mic");
+    worklet.port.onmessage = ({ data }) => {
+      if (ws.readyState === 1) ws.send(data.pcm.buffer);
+
+      levelEl.style.width = Math.min(100, data.rms * 400) + "%";
+      const now = performance.now();
+      if (data.rms > 0.02) {
+        if (!speaking) { speaking = true; clearAudio(); }
+        silenceSince = 0;
+      } else if (speaking) {
+        if (!silenceSince) silenceSince = now;
+        else if (now - silenceSince > 400) {
+          speaking = false; stoppedAt = silenceSince; waiting = true; silenceSince = 0;
+        }
+      }
+    };
+    src.connect(worklet).connect(micCtx.destination);
+  };
+
+  ws.onmessage = (ev) => {
+    if (typeof ev.data === "string") {
+      if (JSON.parse(ev.data).type === "clear") clearAudio();
+      return;
+    }
+    if (waiting) {
+      waiting = false;
+      addRow(Math.round(performance.now() - stoppedAt), "browser to browser");
+    }
+    playChunk(ev.data);
+  };
+
+  ws.onclose = () => { statusEl.textContent = "Call ended."; cleanup(); };
+  ws.onerror = () => { statusEl.textContent = "Connection problem. Check the server."; };
+}
+
+function cleanup() {
+  clearAudio();
+  micStream?.getTracks().forEach((t) => t.stop());
+  micCtx?.close(); playCtx?.close();
+  goBtn.textContent = "Start call";
+  goBtn.classList.remove("live");
+  goBtn.disabled = false;
+  goBtn.onclick = start;
+}
+
+function stop() { ws?.close(); cleanup(); }
+
+goBtn.onclick = start;
+</script>
+</body>
+</html>

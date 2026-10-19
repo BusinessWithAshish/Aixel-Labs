@@ -24,8 +24,12 @@ for mounts/boot, **db** for anything persisted, then the folder you are editing.
   FE calls `API_ENDPOINTS.*.full` via `@aixellabs/backend/config`.
 - `server.ts`: `dotenv` first → middleware → `registerRoutes` → Vercel `export = app`.
 - On the VPS the backend runs as services, one process each (`AIXEL_LABS_SERVICE`:
-  `api`, `games`), deployed one at a time with zero downtime by `deploy/deploy.sh`.
-  Never restart a unit by hand. See the `backend-platform` skill (Services, Deploy).
+  `api`, `games`; plus `voice`, the Python voice engine in `voice/`), deployed one at a
+  time with zero downtime by `deploy/deploy.sh`. Never restart a unit by hand. See the
+  `backend-platform` skill (Services, Deploy).
+- Voice engine: `voice/` (Python, Pipecat + Gemini Live), served at `/voice/*`; its own
+  venv, tests and README; keys and runtime state untracked (allowlist `.gitignore`).
+  Persisted `voice_*` shapes still start in `src/db/types.ts`.
 - **`src/db` is schema SSOT.** New persisted features start in `types.ts`.
 - Disk: `src/media.ts` (`AIXEL_MEDIA_ROOT`) — `{root}/public` vs `{root}/private/…`.
 - Per-channel keys: `src/channel-keys.ts` (`CHANNEL_API_KEYS_DIR`) — ops that take

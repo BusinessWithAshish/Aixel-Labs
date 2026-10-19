@@ -1,0 +1,23 @@
+# The repo is PUBLIC. This folder is an allowlist: the engine's code, its tests and the shipped voice
+# clips go in; everything a call, a customer, a key or the sales work produces stays on the server.
+# Kept out on purpose (untracked, in the checkout's backend/voice; deploy.sh links each one into every
+# release, so it survives deploys):
+#   .env (every key), service.env (the database the service uses), .venv/
+#   calls/ turns.jsonl (real calls and transcripts), suppressed.jsonl (people who asked not to be called),
+#   cache/ (voice clips made at runtime), prompt.md (the sales prompt of Aixel Labs' own line)
+#   and local notes: HANDOFF.md (account ids), research/, demo/, one-off scripts.
+#   tests/sim/ tests/linecache/: generated test transcripts and audio.
+/*
+!/.gitignore
+!/README.md
+!/*.py
+!/requirements.txt
+!/index.html
+!/fillers/
+!/tests/
+/tests/*
+!/tests/*.py
+__pycache__/
+*.pyc
+# one-off for the move off the voicelab tunnel; delete it once the old host is gone
+/repoint_numbers.py

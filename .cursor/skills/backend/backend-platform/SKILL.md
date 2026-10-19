@@ -6,7 +6,8 @@ description: >-
   Use whenever adding or changing a product mount, MCP base path, ping/CORS/rate
   limit, how the Express app boots locally vs on Vercel, or how the VPS backend
   is split into services and deployed (backend/deploy/: AIXEL_LABS_SERVICE,
-  releases, slots, Caddy switch, rollback, adding a service).
+  releases, slots, Caddy switch, rollback, adding a service, the Python voice
+  service in backend/voice).
   Required context for any backend route or server change.
 ---
 
@@ -92,13 +93,15 @@ Proxy scrape env (`EVOMI_*`) is documented under `backend-utils`.
 ## Services (VPS)
 
 The backend runs as separate processes, one per service, so a deploy of one never
-restarts another. Same code, same folders: `AIXEL_LABS_SERVICE` picks what a process
-mounts. Caddy routes `api.aixellabs.in` (and the local `127.0.0.1:8002`) by path.
+restarts another. Same code, same folders: `AIXEL_LABS_SERVICE` picks what a Node process
+mounts; `voice` is the Python voice engine in `backend/voice/` (its own README). Caddy
+routes `api.aixellabs.in` (and the local `127.0.0.1:8002`) by path.
 
 | Service | Serves | Caddy paths | Slots (`aixel-labs-<service>@<port>`) | Drains on SIGTERM until |
 |---|---|---|---|---|
 | `api` | every REST module, `/mcp`, media | everything else | `8101` / `8102` | in-flight requests answer (`TimeoutStopSec=65min`, media jobs) |
 | `games` | `/business/*`, `/bluff/*` (rooms + `/…/ws`) | `/business/*`, `/bluff/*` | `8111` / `8112` | its running matches end (`TimeoutStopSec=2h`) |
+| `voice` | `backend/voice/phone.py` (Python): carrier webhooks, call media WebSockets, the app's `/calls` + `/play`, campaigns | `/voice/*`, prefix stripped (`/docs`, `/redoc`, `/openapi.json` 404) | `8121` / `8122` | its running calls end and its campaign calls are settled (`TimeoutStopSec=1h`) |
 
 **Games rooms are in memory only, by decision (no database, no snapshot).** A
 games deploy therefore never moves a match: the old slot refuses new sockets,
@@ -107,6 +110,18 @@ running match until it ends, then exits. A player whose own connection drops
 during that window reconnects to the new slot and finds the room gone. An api
 deploy does not touch the games at all; Caddy's `stream_close_delay 2h` keeps
 match sockets open through every reload.
+
+**Voice.** The engine checks every request itself (signed URLs, stream tokens, its key), so
+Caddy sends `/voice/*` straight to it, not through Node. Its unit sets
+`PUBLIC_HOST=api.aixellabs.in/voice` (every URL it hands to a carrier) and reads the database
+from the untracked `backend/voice/service.env`; keys are in the untracked `backend/voice/.env`.
+On SIGTERM `phone.py` drains instead of uvicorn's stop (which would close every call's socket):
+no new calls (`/texml` / `/twiml` answer with a short apology, `/play` and a VoiceLink call coming
+in are refused, `POST /calls` is 503 `code: "draining"`, the campaign loop dials nobody and lets
+go of its campaign leases), `/health` turns 503, running calls go on, and it exits when nothing
+is left. While both slots run, contacts are claimed atomically (never dialled twice), and a
+Telnyx event for a call the other slot holds is handed to it (`SLOT_PORTS`). Caddy's
+`stream_close_delay 1h` matches its `TimeoutStopSec`.
 
 ## Deploy (VPS)
 
@@ -120,17 +135,17 @@ deploy/deploy.sh --plan [sha|ref]   # print which services would deploy, change 
 ```
 
 **Which services a commit redeploys** (`affects` in `deploy.sh`): `games` owns
-`src/api/business/`, `src/api/bluff/` and `src/api/game-sockets.ts`; `api` owns
-everything else under `backend/`; the boot code every service runs (`server.ts`,
-`routes.ts`, `config.ts`, `package.json`, `tsconfig.json`, `pnpm-lock.yaml`)
-redeploys all of them; a service's own unit file redeploys it. `*.md` and the rest
+`src/api/business/`, `src/api/bluff/` and `src/api/game-sockets.ts`; `voice` owns
+`backend/voice/`; `api` owns everything else under `backend/`; the Node boot code
+(`server.ts`, `routes.ts`, `config.ts`, `package.json`, `tsconfig.json`,
+`pnpm-lock.yaml`) redeploys `api` and `games`; a service's own unit file redeploys it. `*.md` and the rest
 of `deploy/` redeploy nothing (`deploy/Caddyfile` is installed on its own, below).
 
 For each service, `deploy.sh` does, in order:
 
-1. **Build** the commit once into `backend/releases/<sha>/` (`git archive` + `pnpm install --frozen-lockfile` + `tsc`), shared by every service. The checkout's own `dist/` is never touched, and only committed code deploys. Untracked runtime files stay in the checkout and are symlinked into every release: `backend/.env` and each `workers/<name>/` venv, `models/` and binaries.
+1. **Build** the commit once into `backend/releases/<sha>/` (`git archive` + `pnpm install --frozen-lockfile` + `tsc`), shared by every service. The checkout's own `dist/` is never touched, and only committed code deploys. Untracked runtime files stay in the checkout and are symlinked into every release: `backend/.env`, each `workers/<name>/` venv, `models/` and binaries, and everything untracked in `backend/voice/` (`.venv`, `.env`, `service.env`, `prompt.md` and its runtime state: `calls/`, `cache/`, `suppressed.jsonl`, `turns.jsonl`, created first if missing so a release never keeps its own copy).
 2. **Start** the idle slot (template `backend/deploy/aixel-labs-<service>@.service`, installed by the script). `releases/slot-<service>-<port>` points at the release it runs.
-3. **Health check**: `/v1/ping` must return 200 within 120 s. Otherwise the new slot is stopped and the live one is untouched.
+3. **Health check**: the service's health path (`/v1/ping`; voice: `/health`) must return 200 within 120 s. Otherwise the new slot is stopped and the live one is untouched.
 4. **Switch**: rewrite the one line in `/etc/caddy/aixel-labs-<service>.upstream` (`to 127.0.0.1:<port>`) and `systemctl reload caddy` (graceful).
 5. **Drain**: SIGTERM to the old slot, then move on without waiting. `server.ts` stops accepting, keeps sweeping idle keep-alive connections (Caddy pools them) and connections that never sent a request (closed 5 s after opening); without the sweep either would make the slot sit out `TimeoutStopSec`, and exits once in-flight requests answer and, in `games`, running matches end. `KillMode=mixed` keeps a media job's ffmpeg / Python children alive meanwhile.
 6. **Clean up**: when a slot exits, its `ExecStopPost` runs `deploy.sh --prune`, which removes stopped slots' links and every release outside the 3 most recently deployed, never one a slot still runs.
@@ -140,7 +155,7 @@ from `/etc/caddy/Caddyfile`. Change Caddy only through that file.
 
 **Port 8002 is Caddy, not Node.** Hermes MCP configs, cron scripts and Claude Code dial `127.0.0.1:8002`; Caddy serves that address (loopback only) and strips `X-Forwarded-For`, so those callers are still local callers (no API key, outside the public rate limit). Never run a backend on 8002.
 
-Don't `systemctl restart` a slot by hand while it is live, and don't bring back the old single `aixel-backend.service` or the `aixel-backend@` slots. Logs: `journalctl -u aixel-labs-<service>@<port>`.
+Don't `systemctl restart` a slot by hand while it is live, and don't bring back the old single `aixel-backend.service` or the `aixel-backend@` slots (nor the voice engine's old `voicelab.service` and its tunnel). Logs: `journalctl -u aixel-labs-<service>@<port>`.
 
 ### Adding a service
 
@@ -160,6 +175,7 @@ Don't `systemctl restart` a slot by hand while it is live, and don't bring back 
 - DON’T move `dotenv` below modules that read `process.env` at import time.
 - DO deploy with `backend/deploy/deploy.sh` (VPS); DON’T build into the live `dist/` and restart a unit.
 - DO keep the games rooms in memory; a games deploy waits for matches instead of moving them.
+- DO keep the voice engine's keys and runtime state untracked in the checkout's `backend/voice/` (linked into releases); never in a release, never committed (the repo is public).
 
 ## Related
 

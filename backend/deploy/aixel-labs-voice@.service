@@ -1,0 +1,37 @@
+# The voice service (the Python voice engine, backend/voice/phone.py: carrier webhooks, call media
+# WebSockets, the app's /calls and /play, outbound campaigns) of one release on one port:
+# aixel-labs-voice@8121 and aixel-labs-voice@8122 are its two slots. Same deploy flow as
+# aixel-labs-api@.service; never start or restart a slot by hand while it is live — run deploy.sh.
+[Unit]
+Description=Aixel Labs voice service (slot %i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/AIXEL-LABS-ORG/Aixel-Labs/backend/releases/slot-voice-%i/backend/voice
+# Carriers reach the engine at https://api.aixellabs.in/voice/* (Caddy strips /voice); every URL it
+# hands out, and Twilio's signature check, use this.
+Environment=PUBLIC_HOST=api.aixellabs.in/voice
+Environment=LOG_LEVEL=INFO
+Environment=CAMPAIGNS=on
+# Both slots: an event about a call the other slot holds is handed to it (phone.py, SLOT_PORTS).
+Environment="SLOT_PORTS=8121 8122"
+# The database (MONGODB_URI, MONGODB_DB_NAME), untracked, in the checkout: edit it, then redeploy.
+# Keys come from .env next to the code (every release links the checkout's backend/voice/.env).
+EnvironmentFile=/home/ubuntu/AIXEL-LABS-ORG/Aixel-Labs/backend/voice/service.env
+# .venv is the checkout's, linked into the release like the workers' venvs.
+ExecStart=/home/ubuntu/AIXEL-LABS-ORG/Aixel-Labs/backend/releases/slot-voice-%i/backend/voice/.venv/bin/python phone.py --port %i
+ExecStopPost=-/home/ubuntu/AIXEL-LABS-ORG/Aixel-Labs/backend/deploy/deploy.sh --prune %n
+Restart=on-failure
+RestartSec=5
+# SIGTERM drains (phone.py): no new calls, running calls go on to their end, then it exits. A Gemini
+# Live session lasts 15 min at most but the engine rotates it, so a call can run longer: an hour
+# covers any real call. Caddy's stream_close_delay for /voice matches this.
+KillMode=mixed
+TimeoutStopSec=1h
+
+[Install]
+WantedBy=multi-user.target
