@@ -28,6 +28,8 @@ const MAX_ROOMS = 500;
 const BOT_GRACE_MS = 10_000;
 /** A paused match restarts by itself once the host has been gone this long. */
 const PAUSE_HOST_AWAY_MS = 60_000;
+/** The match goes on while the host is away (the bot plays for them), but it ends once they have been gone this long. */
+const HOST_AWAY_MS = 10 * 60_000;
 /** Gap between two bot moves; longer after a roll, while everyone watches the pawn walk. */
 const BOT_PACE_MS = 1600;
 const BOT_AFTER_ROLL_MS = 4200;
@@ -246,6 +248,12 @@ export function tickRooms(now: number): BusinessRoom[] {
       setPaused(room, room.hostSeat, false, now);
       changed.push(room);
     }
+    if (room.state && room.state.phase !== "over" && host.offlineAt !== null && now - host.offlineAt > HOST_AWAY_MS) {
+      room.state = endMatch(room.state, "The host has been away for 10 minutes, so the match ends.");
+      room.pausedAt = null;
+      changed.push(room);
+      continue;
+    }
     if (!room.state || room.pausedAt !== null) continue;
     if (playForAbsent(room, now)) changed.push(room);
     const next = tick(room.state, now);
@@ -291,6 +299,7 @@ export function viewRoom(room: BusinessRoom, you: number, now: number): Business
     seats: room.seats.map((s, seat) => ({ seat, name: s.name, color: s.color, connected: s.connections > 0, team: s.team })),
     started: !!room.state,
     pausedAt: room.pausedAt,
+    hostAwayEndsAt: room.state && room.state.phase !== "over" && room.seats[room.hostSeat].offlineAt !== null ? room.seats[room.hostSeat].offlineAt! + HOST_AWAY_MS : null,
     state: room.state ? publicView(room.state, you) : null,
     you,
     now,

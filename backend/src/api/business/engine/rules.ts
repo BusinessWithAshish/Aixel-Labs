@@ -349,6 +349,7 @@ function payJailFine(state: BusinessGameState, p: BusinessPlayer): number {
 function sendToJail(state: BusinessGameState, p: BusinessPlayer, why: "speeding" | "gojail" | "card", text: string) {
   p.pos = BUSINESS_JAIL_INDEX;
   p.jail = 1;
+  p.freed = false;
   state.again = false;
   state.doubles = 0;
   log(state, text, p.seat, undefined, { kind: "jail", from: p.seat, to: null, amount: 0, why });
@@ -572,6 +573,7 @@ function moveBy(state: BusinessGameState, steps: number, now: number) {
   const p = active(state);
   const from = p.pos;
   p.pos = (from + steps) % N;
+  p.freed = false;
   log(state, `${p.name} rolled ${state.dice[0]} + ${state.dice[1]} and landed on ${BUSINESS_BOARD[p.pos].name}.`, p.seat);
   if (p.pos < from) passLaunch(state, p);
   land(state, now);
@@ -814,6 +816,7 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
     prisoner.cash -= terms.amount;
     helper.cash += terms.amount;
     prisoner.jail = 0;
+    prisoner.freed = true;
     // If the deal says so, the helper comes to the Jail in person, from wherever they stand, as a
     // visitor. It is a step back, not a lap: no Launch on the way and no salary.
     if (terms.bringHelper) helper.pos = BUSINESS_JAIL_INDEX;
@@ -880,6 +883,7 @@ export function createGame(
       pos: 0,
       jail: 0,
       skip: false,
+      freed: false,
       bankrupt: false,
       missed: 0,
       jailCards: 0,
@@ -941,11 +945,11 @@ const MANAGE_PHASES: BusinessPhase[] = ["roll", "end"];
 const RAISE_PHASES: BusinessPhase[] = ["roll", "end", "debt", "loandue"];
 
 /** The host ends the match on the spot: whoever is richest wins, exactly as at the bell. */
-export function endMatch(prev: BusinessGameState): BusinessGameState {
+export function endMatch(prev: BusinessGameState, why = "The host ended the match."): BusinessGameState {
   if (prev.phase === "over") return prev;
   const state = structuredClone(prev);
   state.rev++;
-  log(state, "The host ended the match. The richest player wins.");
+  log(state, `${why} The richest player wins.`);
   finish(state, null);
   return state;
 }
@@ -982,6 +986,7 @@ export function applyCommand(
       if (!me.jail) fail("You are not in Jail.");
       if (me.cash < BUSINESS_RULES.PCT_MIN) fail("Not enough cash.");
       me.jail = 0;
+      me.freed = true;
       {
         const fine = payJailFine(state, me);
         log(state, `${me.name} paid to leave Jail: ${BUSINESS_RULES.JAIL_PCT}% of their cash, ${rs(fine)}, shared among the other players.`, seat, undefined, { kind: "tax", from: seat, to: null, amount: fine });
@@ -994,7 +999,8 @@ export function applyCommand(
       if (me.jailCards < 1) fail("You have no Jail card.");
       me.jailCards--;
       me.jail = 0;
-      log(state, `${me.name} used a "get out of Jail free" card.`, seat);
+      me.freed = true;
+      log(state, `${me.name} used a "get out of Jail free" card.`, seat, undefined, { kind: "bail", from: seat, to: null, amount: 0 });
       break;
 
     case "buy": {
@@ -1066,6 +1072,7 @@ export function applyCommand(
         const own = target.seat === seat;
         target.pos = BUSINESS_JAIL_INDEX;
         target.jail = 1;
+        target.freed = false;
         if (own) {
           // Caught by their own trap: no extra roll either.
           state.again = false;
@@ -1081,6 +1088,7 @@ export function applyCommand(
         if (target.jail) fail(`${target.name} is already in Jail.`);
         target.pos = BUSINESS_JAIL_INDEX;
         target.jail = 1;
+        target.freed = false;
         log(state, `${me.name} used the break to send ${target.name} to Jail.`, target.seat, undefined, { kind: "jail", from: target.seat, to: seat, amount: 0, why: "sent" });
       } else {
         me.skip = cmd.rest;
@@ -1324,6 +1332,8 @@ export function tick(prev: BusinessGameState, now: number): BusinessGameState {
           doBankrupt(state, p.seat, `missed ${p.missed} turns in a row and is out`);
         } else {
           log(state, `${p.name} missed the turn (${p.missed} of ${state.missLimit}).`, p.seat);
+          // A turn in Jail counts as a try even when it is missed, so nobody stays in for ever.
+          if (p.jail > 0 && p.jail < BUSINESS_RULES.JAIL_TRIES) p.jail++;
         }
         advance(state, now);
         break;

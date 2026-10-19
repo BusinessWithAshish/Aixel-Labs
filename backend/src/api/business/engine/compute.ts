@@ -139,10 +139,17 @@ export function utilityMultiplier(state: State, count: number): number {
   return (count === 2 ? BUSINESS_UTILITY_MULTIPLIER.BOTH : BUSINESS_UTILITY_MULTIPLIER.ONE) + housesOnBoard(state);
 }
 
-/** True for a player standing on the Jail space without being held there. */
-export function visitingJail(state: State, seat: number): boolean {
+const BREAK_INDEX = BUSINESS_BOARD.findIndex((s) => s.kind === "break");
+
+/**
+ * Whether this player may bail someone out. Never from Jail itself, and not straight after
+ * leaving it without a roll (two prisoners could otherwise free each other). Then anyone if the
+ * host allowed it; otherwise only a player visiting Jail or standing on Take a Break.
+ */
+export function canBail(state: State, seat: number): boolean {
   const p = state.players[seat];
-  return !!p && !p.bankrupt && p.jail === 0 && p.pos === BUSINESS_JAIL_INDEX;
+  if (!p || p.bankrupt || p.jail > 0 || p.freed) return false;
+  return state.bailAnyone || p.pos === BUSINESS_JAIL_INDEX || p.pos === BREAK_INDEX;
 }
 
 /** Salary for a player's `lap`-th lap: it grows by one step every lap, up to the host's cap (0 = none). */
@@ -158,29 +165,35 @@ export function shareOfCash(cash: number, pct: number): number {
 }
 
 /**
+ * How a Chance card's amount is worked out: `pct` percent of `of` (the cash in hand, or what the
+ * properties cost for a dividend), with no minimum and no cap. Null for the cards that move the player.
+ */
+export type CardMath = { pct: number; of: number; amount: number; gain: boolean };
+
+export function cardMath(state: State, seat: number, effect: BusinessCardEffect): CardMath | null {
+  const cash = Math.max(0, state.players[seat].cash);
+  const owned = ownedBy(state, seat);
+  const houses = owned.reduce((sum, i) => sum + state.props[i].houses, 0);
+  // Property tax and repairs grow with what is owned; they can never take more than all the cash.
+  const [pct, of, gain] =
+    effect.type === "gain" ? [effect.pct, cash, true]
+    : effect.type === "dividend" ? [effect.pct, owned.reduce((sum, i) => sum + (BUSINESS_BOARD[i].price ?? 0), 0), true]
+    : effect.type === "pct" ? [effect.pct, cash, false]
+    : effect.type === "tax" ? [Math.min(100, owned.length * BUSINESS_RULES.TAX_PCT_PER_PROPERTY), cash, false]
+    : effect.type === "repair" ? [Math.min(100, houses * BUSINESS_RULES.REPAIR_PCT_PER_HOUSE), cash, false]
+    : [0, 0, false];
+  if (pct <= 0 && effect.type !== "tax" && effect.type !== "repair") return null;
+  return { pct, of, amount: Math.round((of * pct) / 100), gain };
+}
+
+/**
  * What a Chance card does to the cash of the player who drew it: positive is collected, negative
  * is paid. Zero for the cards that move the player instead.
  */
 export function cardDelta(state: State, seat: number, effect: BusinessCardEffect): number {
-  const cash = state.players[seat].cash;
-  const owned = ownedBy(state, seat);
-  const gain = (base: number, pct: number) => Math.min(BUSINESS_RULES.CARD_GAIN_MAX, shareOfCash(base, pct));
-  switch (effect.type) {
-    case "gain":
-      return gain(cash, effect.pct);
-    case "dividend":
-      return gain(owned.reduce((sum, i) => sum + (BUSINESS_BOARD[i].price ?? 0), 0), effect.pct);
-    case "pct":
-      return -shareOfCash(cash, effect.pct);
-    case "tax":
-      return -shareOfCash(cash, Math.min(BUSINESS_RULES.TAX_PCT_MAX, owned.length * BUSINESS_RULES.TAX_PCT_PER_PROPERTY));
-    case "repair": {
-      const houses = owned.reduce((sum, i) => sum + state.props[i].houses, 0);
-      return -shareOfCash(cash, Math.min(BUSINESS_RULES.REPAIR_PCT_MAX, houses * BUSINESS_RULES.REPAIR_PCT_PER_HOUSE));
-    }
-    default:
-      return 0;
-  }
+  const math = cardMath(state, seat, effect);
+  if (!math) return 0;
+  return math.gain ? math.amount : -math.amount;
 }
 
 export function rentFor(state: State, space: number, diceSum: number): number {
@@ -349,7 +362,10 @@ export function validateOffer(
     const helper = terms.prisoner === from ? to : from;
     if (!pair(terms.prisoner, helper)) return "Bail is between the two of you.";
     if (!prisoner.jail) return `${prisoner.name} is not in Jail.`;
-    if (!state.bailAnyone && !visitingJail(state, helper)) return `Only a player visiting Jail can bail ${prisoner.name} out.`;
+    const h = state.players[helper];
+    if (h.jail > 0) return `${h.name} is in Jail too.`;
+    if (h.freed) return `${h.name} has only just left Jail and cannot bail anyone out until they move on.`;
+    if (!canBail(state, helper)) return `Only a player visiting Jail or on Take a Break can bail ${prisoner.name} out.`;
     if (terms.amount > Math.max(0, prisoner.cash)) return `${prisoner.name} does not have ₹${terms.amount}.`;
     return null;
   }

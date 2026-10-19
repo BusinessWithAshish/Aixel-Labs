@@ -33,6 +33,8 @@ export type BusinessPlayer = {
   jail: number;
   /** Resting: the next turn is skipped. */
   skip: boolean;
+  /** Let out of Jail without a roll (fee, card or bail) and still on the Jail space: not a visitor until they move on. */
+  freed: boolean;
   bankrupt: boolean;
   /** Turns in a row this player let the roll timer run out. */
   missed: number;
@@ -141,7 +143,7 @@ export type BusinessFxKind =
   | "out"
   /** `from` and `to` split a colour set, or ended a split (`amount` 0 = started). */
   | "split"
-  /** `to` got `from` out of Jail; `from` paid them `amount` (0 for players outside the deal). */
+  /** `to` got `from` out of Jail; `from` paid them `amount` (0 for players outside the deal). `to` null: a Jail card. */
   | "bail";
 
 /** Money moving with a log line. `from`/`to` are seats; null is the bank. */
@@ -240,6 +242,8 @@ export type BusinessRoomView = {
   started: boolean;
   /** Server time (epoch ms) at which the host paused the match, or null while it runs. */
   pausedAt: number | null;
+  /** While the host is away from a running match: server time at which it ends unless they are back. */
+  hostAwayEndsAt: number | null;
   state: BusinessPublicState | null;
   /** The seat this socket controls. */
   you: number;

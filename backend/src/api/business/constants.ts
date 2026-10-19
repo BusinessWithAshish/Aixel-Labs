@@ -17,8 +17,6 @@ export const BUSINESS_RULES = {
   RAIL_RENT_PER_HOUSE: 5,
   /** A levy or a percentage card never takes or pays less than this. */
   PCT_MIN: 50,
-  /** A Chance card that pays never pays more than this, so the richest player is not the one it helps most. */
-  CARD_GAIN_MAX: 300,
   /** Leaving Jail without doubles costs this share of the cash held, shared out among the other players. */
   JAIL_PCT: 30,
   /** Missed doubles allowed before the fee is forced on the third turn. */
@@ -53,12 +51,10 @@ export const BUSINESS_RULES = {
   MARKET_LOSE_MAX: 5,
   MARKET_FLAT_MAX: 8,
   DEFAULT_MISS_LIMIT: 3,
-  /** Chance "Property tax": this share of the cash held for every property owned, up to the cap. */
+  /** Chance "Property tax": this share of the cash held for every property owned (all of it at most). */
   TAX_PCT_PER_PROPERTY: 2,
-  TAX_PCT_MAX: 20,
-  /** Chance "Repairs": this share of the cash held for every house (a hotel counts as five), up to the cap. */
+  /** Chance "Repairs": this share of the cash held for every house (a hotel counts as five), all of it at most. */
   REPAIR_PCT_PER_HOUSE: 2,
-  REPAIR_PCT_MAX: 25,
   /** Longest name a player may take: it has to fit on a player plate. */
   NAME_MAX: 12,
   /** A pause ends by itself after this long, so one tap cannot stop a match for good. */
@@ -79,7 +75,8 @@ export const BUSINESS_RULES = {
 export const BUSINESS_PHASE_SECONDS = {
   roll: 45,
   buy: 30,
-  card: 12,
+  /** A Chance card: time to read it, and for the table to see it. */
+  card: 30,
   /** A result pop-up (the Market's dice, a closed Market): time to read it. */
   result: 20,
   market: 45,
@@ -264,16 +261,15 @@ export type BusinessCard = { text: string; effect: BusinessCardEffect };
  * One Chance deck: four cards pay, six cost, two move the player, and one is a card to keep
  * ("get out of Jail free"). It takes more than it gives.
  * Nothing is a fixed sum: every card is a share of the player's cash or property, so it matters
- * as much late in a match as early. What a card pays or takes is at least `PCT_MIN`, and a
- * paying card gives at most `CARD_GAIN_MAX`.
+ * as much late in a match as early. There is no minimum and no cap: the card is exactly its share.
  */
 export const BUSINESS_CHANCE_CARDS: readonly BusinessCard[] = [
   { text: "The bank pays a dividend on your properties. Collect 5% of what they cost.", effect: { type: "dividend", pct: 5 } },
   { text: "Your annuity matures. Collect 5% of your cash.", effect: { type: "gain", pct: 5 } },
   { text: "Festival bonus. Collect 8% of your cash.", effect: { type: "gain", pct: 8 } },
   { text: "The bank made a mistake in your favour. Collect 10% of your cash.", effect: { type: "gain", pct: 10 } },
-  { text: "Property tax. Pay 2% of your cash for every property you own (20% at most).", effect: { type: "tax" } },
-  { text: "Repairs. Pay 2% of your cash for every house, a hotel counting as 5 (25% at most).", effect: { type: "repair" } },
+  { text: "Property tax. Pay 2% of your cash for every property you own.", effect: { type: "tax" } },
+  { text: "Repairs. Pay 2% of your cash for every house, a hotel counting as 5.", effect: { type: "repair" } },
   { text: "Doctor's fees. Pay 5% of your cash.", effect: { type: "pct", pct: 5 } },
   { text: "School fees. Pay 8% of your cash.", effect: { type: "pct", pct: 8 } },
   { text: "Car breakdown. Pay 10% of your cash.", effect: { type: "pct", pct: 10 } },
