@@ -11,7 +11,7 @@ import { cssVars, Die } from '../_lib/art';
 import { fmt, rs } from '../_lib/client';
 import { buzz } from '../_lib/haptic';
 import { sfx, sfxQueued, sfxShared } from '../_lib/sound';
-import { canBuild, canMortgage, canSellHouse, houseCost, ownedBy, setSpaces, shareOfCash, visitingJail } from '@aixellabs/backend/business/compute';
+import { canBuild, canMortgage, canSellHouse, canBail, houseCost, ownedBy, setSpaces, shareOfCash } from '@aixellabs/backend/business/compute';
 import { DealBanner, dealFromLog, dealSound, quietSound, type Deal } from './DealBanner';
 import { notify } from '../_lib/toast';
 import { AudioToggles, Avatar, Cash, GButton, Pop } from './bits';
@@ -52,9 +52,9 @@ const SETTLE_MS = 280;
 /** How long each banner stays up; shorter when several are waiting. */
 const DEAL_MS = 3000;
 const DEAL_FAST_MS = 1700;
-/** Banners that tell a story (someone jailed, bailed, out, a split or a trade) stay up longer to be read. */
+/** Banners that tell a story (someone jailed, bailed, out, a split, a trade, a Chance card) stay up longer to be read. */
 const DEAL_NEWS_MS = 4500;
-const NEWS_KINDS: readonly string[] = ['jail', 'bail', 'out', 'split', 'trade'];
+const NEWS_KINDS: readonly string[] = ['jail', 'bail', 'out', 'split', 'trade', 'card'];
 const FLOAT_MS = 1500;
 
 /**
@@ -423,8 +423,8 @@ type TableProps = {
     homeHref: string;
     /** Host only: freeze or restart every clock. */
     onPause: (on: boolean) => void;
-    /** Host only: end the room for everyone. */
-    onClose: () => void;
+    /** Opens a fresh connection: the whole room is sent again. */
+    onRefresh: () => void;
     /** Host only: end the match now; the richest player wins. */
     onEnd?: () => void;
     /** Open already in the "raising cash on the board" view (used by the design preview). */
@@ -433,7 +433,7 @@ type TableProps = {
     curtain?: boolean;
 };
 
-export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause, onClose, onEnd, startRaising = false, curtain = false }: TableProps) {
+export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause, onRefresh, onEnd, startRaising = false, curtain = false }: TableProps) {
     const router = useRouter();
     const state = room.state as BusinessPublicState;
     const me = room.you;
@@ -561,9 +561,24 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                         : mine,
               );
     const others = state.players.filter((p) => p.seat !== me && !p.bankrupt);
-    /** Who could bail this player out: players visiting Jail, or everyone if the host allowed that. */
-    const bailers = others.filter((p) => state.bailAnyone || visitingJail(state, p.seat));
+    /** Who could bail this player out (see canBail). */
+    const bailers = others.filter((p) => canBail(state, p.seat));
     const tapSent = useRef({ rev: -1, at: 0 });
+
+    // Phones go back with an edge swipe (iPhone) or the back gesture (Android), easy to make by
+    // accident mid-match. One extra history entry catches it: the menu opens instead, and leaving
+    // stays a deliberate tap.
+    useEffect(() => {
+        if (over) return;
+        const guard = () => window.history.pushState({ bbGuard: true }, '', window.location.href);
+        guard();
+        const onBack = () => {
+            guard();
+            setView({ t: 'menu' });
+        };
+        window.addEventListener('popstate', onBack);
+        return () => window.removeEventListener('popstate', onBack);
+    }, [over]);
 
     // The turn clock stands still while its player is making a deal.
     const dealing = myTurn && !over && (view?.t === 'deal' || view?.t === 'offer' || (view?.t === 'player' && view.seat !== me));
@@ -693,10 +708,14 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                           }
                         : undefined
                 }
+                onRefresh={() => {
+                    onRefresh();
+                    router.refresh();
+                    setView(null);
+                }}
                 onLeave={() => {
-                    // The host leaving ends the match for everyone: they all get the result.
-                    if (host) onClose();
-                    else send({ type: 'leave' });
+                    // The host only steps away: their seat is kept, and the server ends the match if they stay gone.
+                    if (!host) send({ type: 'leave' });
                     router.push(homeHref);
                 }}
             />
@@ -857,6 +876,13 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                     <GButton size="sm" tone="gold" disabled={mePlayer.cash < BUSINESS_RULES.PCT_MIN} onClick={() => send({ type: 'payJail' })}>
                         Pay {rs(shareOfCash(mePlayer.cash, BUSINESS_RULES.JAIL_PCT))}
                     </GButton>
+                </div>
+            )}
+            {room.hostAwayEndsAt !== null && !host && (
+                <div className="banner info">
+                    <span>
+                        {state.players[room.hostSeat].name} (the host) is away. If they are not back in {Math.max(1, Math.ceil((room.hostAwayEndsAt - liveNow) / 60_000))} min, the match ends and the richest player wins.
+                    </span>
                 </div>
             )}
             {outgoing && (

@@ -113,7 +113,7 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
 | Buy decision | 30 s | The property goes to auction |
 | Auction | 20 s after the last bid | Highest bid wins |
 | Take a Break | 90 s | Keeps playing |
-| Chance card | 12 s | The card is applied |
+| Chance card | 30 s | The card is applied |
 | Market | 45 s | Skipped |
 | Debt | 75 s | The player is bankrupt |
 | End of turn | 90 s | Turn passes |
@@ -190,14 +190,16 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
 - **Owned property:** pay rent. No rent on a property mortgaged to the bank.
 - **Chance:** one deck of 12 cards, none of them a fixed sum. Four pay: a
   dividend of 5% of what your properties cost, and 5%, 8% or 10% of the cash
-  you hold (each at least ₹50 and at most ₹300). Six cost: 5%, 8%, 10% or 15%
-  of the cash held (at least ₹50); property tax at 2% per property owned, up to
-  20%; repairs at 2% per house, a hotel counting as five, up to 25%. Two move
+  you hold. Six cost: 5%, 8%, 10% or 15% of the cash held; property tax at 2%
+  per property owned; repairs at 2% per house, a hotel counting as five. No card
+  has a minimum or a cap: it is exactly its share (tax and repairs can never
+  take more than all the cash). Two move
   the player: "go back 3 spaces" and "go to Jail". One is a card to keep:
   **"get out of Jail free"**. It is not on the board; it shows beside the
   holder's properties, can be handed in to walk out of Jail, and can be given or
   sold in a trade like cash. A drawn card is shown as a playing card in the
   colour of what it does (green collects, red pays, blue moves, gold is kept).
+  Under the amount it shows the sum, such as "10% of ₹4,200".
 - **Market:** a player who owns a property may stake ₹10–₹1,000 (never more
   than their cash) and two dice are rolled: 2–5 loses the whole stake, 6–8
   nothing, 9–12 wins the stake again. The two outer ranges are equally likely
@@ -214,12 +216,19 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   the pawn reaches Launch, before whatever it lands on.
 - **Jail:** roll doubles to leave free. After two misses, on the third turn you
   leave anyway and 30% of the cash you hold (at least ₹50) is shared equally
-  among the other players. You may also pay that before rolling.
+  among the other players. You may also pay that before rolling. A turn in Jail
+  that runs out unplayed still counts as one of the three tries, so a player who
+  is away cannot sit in Jail for ever.
 - **Bail:** a player standing on the Jail space as a visitor can get a player
   held there out at once, for any price the two agree (the prisoner pays the
   visitor). Either of them offers it on their own turn, like a trade. Nobody
   By default any player may bail a prisoner out ("Bail from: Anyone"); the host
-  can narrow it in the lobby to players visiting Jail only.
+  can narrow it in the lobby to "Jail & Break": players visiting Jail or standing
+  on Take a Break. In either mode the helper can be neither in Jail nor fresh out
+  of it: a player let out without a roll (by paying, a Jail card or bail) still
+  stands on the Jail space but is no visitor until they have moved on. Otherwise
+  two prisoners could free each other cheaply, the poorer one paying the fee and
+  then bailing out the richer.
   The offer says whether the helper comes to the Jail themselves (on by default):
   if so they move there as a visitor from wherever they stand, a step back with
   no Launch on the way and no salary, and roll from there next turn. A helper who
@@ -334,13 +343,14 @@ A second tap on Join never seats the same player twice.
 - **End match now:** the host's menu has this button in every match, timed
   or not (two taps). The match ends on the spot, the richest player wins as at
   the bell, and everyone sees the result.
-- **The host leaving a running match** does the same thing: it ends with a
-  result for everyone. Leaving before the match starts, or after it is over,
-  closes the room.
-- **The host dropping off without leaving** (closed tab, dead phone, no
-  signal) is treated like any player: the stand-in bot plays their seat after
-  10 seconds and hands it back when they return. A pause they left running
-  ends after a minute. A host who is connected but not playing collects
+- **The host leaving a running match** only steps away: their seat is kept and
+  the main screen offers it back ("Rejoin"). Leaving before the match starts, or
+  after it is over, closes the room.
+- **The host away** (left, closed tab, dead phone, no signal): the stand-in bot
+  plays their seat after 10 seconds and hands it back when they return. The
+  others see a notice with the minutes left: after 10 minutes away the match
+  ends with a result, and the room is removed 10 minutes after that. A pause
+  they left running ends after a minute. A host who is connected but not playing collects
   missed-turn strikes like anyone else; if that puts them out, they are still
   the host and keep the pause and end buttons.
 

@@ -90,7 +90,7 @@ function caption(state: BusinessPublicState, deal: Deal): string {
         case 'out':
             return `${name(fx.from)} is out of the match`;
         case 'bail':
-            return `${name(fx.to)} bailed ${name(fx.from)} out of Jail`;
+            return fx.to === null ? 'Out free with a Jail card' : `${name(fx.to)} bailed ${name(fx.from)} out of Jail`;
         case 'split':
             return fx.amount === 0 && !deal.text.includes('no longer') ? `${name(fx.from)} and ${name(fx.to)} split a colour set` : 'Split ended: the houses went back to the bank';
     }
@@ -198,6 +198,20 @@ export function DealBanner({ state, deal }: { state: BusinessPublicState; deal: 
                 <Icon className="dl-siren" />
                 <div className="dl-cap">{caption(state, deal)}</div>
                 <div className="dl-sub">{p.name} goes to Jail</div>
+            </div>
+        );
+    }
+    if (fx.kind === 'bail' && fx.to === null) {
+        // A Jail card: the player and the key that freed them.
+        return (
+            <div key={deal.id} className="deal green">
+                <div className="dl-row">
+                    <Party state={state} seat={fx.from} />
+                    <span className="dl-arrow" aria-hidden="true">
+                        <KeyRound className="dl-chev swap" />
+                    </span>
+                </div>
+                <div className="dl-cap">{caption(state, deal)}</div>
             </div>
         );
     }

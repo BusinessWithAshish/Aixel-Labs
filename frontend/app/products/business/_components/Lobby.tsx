@@ -32,7 +32,7 @@ type LobbyProps = {
 
 /** Who may bail a player out of Jail: only players visiting it (0), or anyone (1). */
 const BAIL_FROM = [0, 1] as const;
-const bailLabel = (value: number) => (value === 1 ? 'Anyone' : 'Jail visitors');
+const bailLabel = (value: number) => (value === 1 ? 'Anyone' : 'Jail & Break');
 
 /** Team play is always two sides. */
 const SIDES = [

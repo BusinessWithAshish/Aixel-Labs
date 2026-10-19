@@ -34,6 +34,8 @@ export function useBusinessRoom(code: string) {
     const serverUrl = useBusinessServerWsUrl();
     const wsRef = useRef<WebSocket | null>(null);
     const idRef = useRef(0);
+    /** Drops the socket and opens a fresh one at once: the whole room is sent again. */
+    const resyncRef = useRef<() => void>(() => {});
 
     const post = useCallback((msg: BusinessClientMessage) => {
         const ws = wsRef.current;
@@ -112,6 +114,8 @@ export function useBusinessRoom(code: string) {
             };
 
             ws.onclose = () => {
+                // A socket replaced by a refresh closes quietly: the new one is already on its way.
+                if (wsRef.current !== ws) return;
                 setOnline(false);
                 setRtt(null);
                 window.clearInterval(ping);
@@ -127,6 +131,14 @@ export function useBusinessRoom(code: string) {
             if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
             window.clearTimeout(retry);
             connect();
+        };
+        resyncRef.current = () => {
+            if (closed) return;
+            window.clearTimeout(retry);
+            window.clearInterval(ping);
+            const old = wsRef.current;
+            connect();
+            old?.close();
         };
         connect();
         document.addEventListener('visibilitychange', wake);
@@ -153,8 +165,9 @@ export function useBusinessRoom(code: string) {
     const pause = useCallback((on: boolean) => post({ t: 'pause', on }), [post]);
     const close = useCallback(() => post({ t: 'close' }), [post]);
     const end = useCallback(() => post({ t: 'end' }), [post]);
+    const resync = useCallback(() => resyncRef.current(), []);
 
-    return { room, status, invite, online, rtt, clockOffset, send, join, start, configure, kick, move, setTeam, pause, close, end };
+    return { room, status, invite, online, rtt, clockOffset, send, join, start, configure, kick, move, setTeam, pause, close, end, resync };
 }
 
 export type BusinessSend = (cmd: BusinessCommand) => void;

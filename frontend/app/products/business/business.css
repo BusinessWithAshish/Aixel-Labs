@@ -2431,6 +2431,9 @@
     grid-template-columns: 1fr 1fr;
     gap: 10px;
 }
+.bb .opts.three {
+    grid-template-columns: 1fr 1fr 1fr;
+}
 .bb .opt {
     flex-direction: column;
     gap: 2px;
@@ -4426,6 +4429,13 @@
     line-height: 1;
     color: #fff;
     background: var(--cc);
+}
+.bb .chcard .chmath {
+    margin-top: -2px;
+    font-size: 12px;
+    font-weight: 800;
+    opacity: 0.75;
+    text-align: center;
 }
 .bb .minicard.jailchip {
     color: #5e3408;

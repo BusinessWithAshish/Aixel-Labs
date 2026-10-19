@@ -20,7 +20,7 @@ const JOIN_RETRY_MS = 4000;
 
 /** One room URL: join form, lobby, then the table, depending on what the server says. */
 export function BusinessRoom({ code }: { code: string }) {
-    const { room, status, invite, online, rtt, clockOffset, send, join, start, configure, kick, move, setTeam, pause, close, end } = useBusinessRoom(code);
+    const { room, status, invite, online, rtt, clockOffset, send, join, start, configure, kick, move, setTeam, pause, close, end, resync } = useBusinessRoom(code);
     const homeHref = gameBasePath(usePathname()) || '/';
     const [name, setName] = useState('');
     const [joining, setJoining] = useState(false);
@@ -158,7 +158,7 @@ export function BusinessRoom({ code }: { code: string }) {
     } else if (!room.started || !room.state) {
         body = <Lobby room={room} homeHref={homeHref} onStart={start} onConfigure={configure} onKick={kick} onMove={move} onTeam={setTeam} onClose={close} />;
     } else {
-        body = <Table room={room} send={send} clockOffset={clockOffset} online={online} rtt={rtt} homeHref={homeHref} onPause={pause} onClose={close} onEnd={end} curtain={count !== null || wasStarted.current === false} />;
+        body = <Table room={room} send={send} clockOffset={clockOffset} online={online} rtt={rtt} homeHref={homeHref} onPause={pause} onRefresh={resync} onEnd={end} curtain={count !== null || wasStarted.current === false} />;
     }
 
     return (

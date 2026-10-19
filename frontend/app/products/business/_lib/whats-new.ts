@@ -9,6 +9,20 @@ export type BusinessUpdate = { id: number; title: string; points: string[] };
 
 export const BUSINESS_UPDATES: readonly BusinessUpdate[] = [
     {
+        id: 4,
+        title: 'Fairer Jail, safer exits',
+        points: [
+            'Just out of Jail? You cannot bail anyone out until you have moved on, and nobody in Jail can bail another.',
+            'With "Bail from: Jail & Break", a player resting on Take a Break can bail too.',
+            'A Jail turn you miss still counts as one of your three tries.',
+            'Chance cards stay up for 30 seconds and show the sum, such as "10% of ₹2,140".',
+            'No more limits on Chance: a card pays or takes exactly its share, however rich you are.',
+            'A swipe back on your phone opens the menu instead of throwing you out of the match.',
+            'Refresh in the menu fetches the table again without reloading the page.',
+            'The host can step away and rejoin: the match only ends if they are gone for 10 minutes.',
+        ],
+    },
+    {
         id: 3,
         title: 'Smoother comebacks',
         points: [

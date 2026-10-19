@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowLeftRight, HandCoins, Handshake, KeyRound } from 'lucide-react';
-import { netWorth, ownedBy, splitPair, visitingJail } from '@aixellabs/backend/business/compute';
+import { netWorth, ownedBy, splitPair, canBail } from '@aixellabs/backend/business/compute';
 import type { BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { rs } from '../_lib/client';
@@ -28,9 +28,8 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer }
     const canDeal = myTurn && ['roll', 'end', 'debt'].includes(state.phase) && !state.players[me].bankrupt;
     const canRepay = myTurn && (state.phase === 'roll' || state.phase === 'end');
     const loans = state.loans.filter((l) => l.lender === seat || l.borrower === seat);
-    /** Bail is between a player held in Jail and one visiting it (or anyone, if the host allowed that): the seat that would be freed, or null. */
-    const canBail = (helper: number) => state.bailAnyone || visitingJail(state, helper);
-    const bailFor = p.jail > 0 && canBail(me) ? seat : state.players[me].jail > 0 && canBail(seat) ? me : null;
+    /** Bail is between a player held in Jail and one who may get them out (see canBail): the seat that would be freed, or null. */
+    const bailFor = p.jail > 0 && canBail(state, me) ? seat : state.players[me].jail > 0 && canBail(state, seat) ? me : null;
     /** A player held in Jail deals in nothing but their bail. */
     const jailed = p.jail > 0 ? p : state.players[me].jail > 0 ? state.players[me] : null;
     /** Colour sets this player shares with someone. */

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, CircleHelp, Coffee, Crown, Flag, Dices, HandCoins, Handshake, House, IndianRupee, KeyRound, LockKeyhole, Landmark as BankIcon, Map, Minus, ScrollText, Siren, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, CircleHelp, Coffee, Crown, Flag, Dices, HandCoins, Handshake, House, IndianRupee, KeyRound, LockKeyhole, Landmark as BankIcon, Map, Minus, RefreshCw, ScrollText, Siren, TrendingDown, TrendingUp } from 'lucide-react';
 import { BUSINESS_BOARD, BUSINESS_RULES, BUSINESS_SETS, type BusinessCard } from '@aixellabs/backend/business/constants';
-import { canMortgage, canSellHouse, cardDelta, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
+import { canMortgage, canSellHouse, cardMath, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
 import type { BusinessInterestMode, BusinessLoan, BusinessLogEntry, BusinessOffer, BusinessPending, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { cn } from '@/lib/utils';
@@ -59,8 +59,8 @@ const CARD_LOOK: Record<BusinessCard['effect']['type'], { tone: string; Icon: ty
 export function CardPopup({ state, me, send, card }: Base & { card: BusinessCard }) {
     const p = state.players[state.turn];
     const look = CARD_LOOK[card.effect.type];
-    // A card names a share ("10% of your cash"): the amount it comes to is shown with it.
-    const delta = cardDelta(state, state.turn, card.effect);
+    // A card names a share ("10% of your cash"): the amount it comes to is shown with it, and how.
+    const math = cardMath(state, state.turn, card.effect);
     return (
         <Pop bare>
             <div className={cn('chcard', look.tone)}>
@@ -72,7 +72,14 @@ export function CardPopup({ state, me, send, card }: Base & { card: BusinessCard
                 </span>
                 <span className="chkind">{look.kind}</span>
                 <p>{card.text}</p>
-                {delta !== 0 && <b className="chamt">{delta > 0 ? `+${rs(delta)}` : `−${rs(-delta)}`}</b>}
+                {math && math.amount > 0 && (
+                    <>
+                        <b className="chamt">{math.gain ? `+${rs(math.amount)}` : `−${rs(math.amount)}`}</b>
+                        <span className="chmath">
+                            {math.pct}% of {rs(math.of)}
+                        </span>
+                    </>
+                )}
             </div>
             {state.turn === me ? (
                 <GButton tone="gold" size="big" onClick={() => send({ type: 'ack' })}>
@@ -383,16 +390,19 @@ export function MenuPopup({
     homeHref,
     onGuide,
     onLog,
+    onRefresh,
     onLeave,
     onEnd,
     onClose,
 }: {
     canForfeit: boolean;
-    /** The host leaving ends the match for everyone. */
+    /** The host can step away: the match waits up to 10 minutes for them. */
     host: boolean;
     homeHref: string;
     onGuide: () => void;
     onLog: () => void;
+    /** Fetches the whole table again from the server, without reloading the page. */
+    onRefresh: () => void;
     onLeave: () => void;
     /** Host only: end the match now for everyone. */
     onEnd?: () => void;
@@ -405,14 +415,18 @@ export function MenuPopup({
             <Ribbon red={confirm}>{confirm ? 'Leave match' : 'Menu'}</Ribbon>
             {!confirm ? (
                 <>
-                    <div className="opts">
+                    <div className="opts three">
                         <GButton tone="blue" className="opt" onClick={onGuide}>
                             <Map className="lu" />
-                            Board guide
+                            Guide
                         </GButton>
                         <GButton tone="gold" className="opt" onClick={onLog}>
                             <ScrollText className="lu" />
                             Activity
+                        </GButton>
+                        <GButton tone="violet" className="opt" onClick={onRefresh}>
+                            <RefreshCw className="lu" />
+                            Refresh
                         </GButton>
                     </div>
                     <GButton tone="green" size="big" onClick={onClose}>
@@ -439,14 +453,14 @@ export function MenuPopup({
                 <>
                     <p className="center" style={{ fontWeight: 800 }}>
                         {host
-                            ? 'You are the host. If you leave, the match ends now for everyone: the richest player wins and all players see the result.'
+                            ? 'You are the host. The match goes on while you are away, with a stand-in playing your turns. Rejoin from the main screen within 10 minutes, or the match ends and the richest player wins.'
                             : 'Leaving ends your match. It counts as bankruptcy: everything you own is sold to the bank, and players you owe are paid from it.'}
                     </p>
                     <GButton tone="green" size="big" onClick={() => setConfirm(false)}>
                         Keep playing
                     </GButton>
                     <GButton tone="red" onClick={onLeave}>
-                        {host ? 'End the match and leave' : 'Declare bankruptcy and leave'}
+                        {host ? 'Leave for now' : 'Declare bankruptcy and leave'}
                     </GButton>
                 </>
             )}

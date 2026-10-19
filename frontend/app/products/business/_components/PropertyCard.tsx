@@ -38,7 +38,7 @@ import { Cash, GButton } from './bits';
 const DESCRIPTIONS: Record<string, string> = {
     launch: `Collect your salary every time you pass or land here: ${rs(BUSINESS_RULES.SALARY_STEP)} for your first lap, ${rs(BUSINESS_RULES.SALARY_STEP * 2)} for the second, and ${rs(BUSINESS_RULES.SALARY_STEP)} more with every lap after that.`,
     chance: 'Draw a Chance card. Four pay you and six cost you, each a share of your cash or property; two move you.',
-    jail: `Just visiting, unless you were sent here. Roll doubles to leave free. Leave without doubles and ${BUSINESS_RULES.JAIL_PCT}% of your cash is shared among the other players, unless a player visiting Jail bails you out.`,
+    jail: `Just visiting, unless you were sent here. Roll doubles to leave free. Leave without doubles and ${BUSINESS_RULES.JAIL_PCT}% of your cash is shared among the other players, unless another player bails you out.`,
     break: 'Your choice: rest and skip your next turn, keep playing, or send another player to Jail.',
     gojail: 'Go straight to Jail. No salary on the way.',
 };
