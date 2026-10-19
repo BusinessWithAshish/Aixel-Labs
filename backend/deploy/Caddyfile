@@ -1,0 +1,77 @@
+# /etc/caddy/Caddyfile, kept here so it changes by commit. deploy.sh installs it
+# (validated first) whenever it differs from the live one. Each service's live
+# slot is the one `to` line in /etc/caddy/aixel-labs-<service>.upstream, which
+# deploy.sh rewrites on a switch; this file never changes on a deploy.
+{
+	auto_https disable_redirects
+	servers {
+		timeouts {
+			read_body 1h
+			read_header 1m
+			write 1h
+			idle 1h
+		}
+	}
+}
+
+(aixel_labs_api) {
+	reverse_proxy {
+		import /etc/caddy/aixel-labs-api.upstream
+		transport http {
+			dial_timeout 10s
+			read_timeout 1h
+			write_timeout 1h
+		}
+		# A slot that briefly refuses a connection gets the request retried, not failed.
+		lb_try_duration 15s
+		lb_try_interval 250ms
+		{block}
+	}
+}
+
+(aixel_labs_games) {
+	reverse_proxy {
+		import /etc/caddy/aixel-labs-games.upstream
+		lb_try_duration 15s
+		lb_try_interval 250ms
+		# Every reload (any service's deploy) would otherwise cut the open match
+		# sockets at once. A slot being replaced keeps its matches until they end,
+		# up to its TimeoutStopSec (2 h), so the sockets get as long.
+		stream_close_delay 2h
+		{block}
+	}
+}
+
+# Paths the games service owns: room routes and WebSockets (/business/ws, /bluff/ws).
+(aixel_labs_routes) {
+	@games path /business/* /bluff/*
+	handle @games {
+		import aixel_labs_games {
+			{block}
+		}
+	}
+	handle {
+		import aixel_labs_api {
+			{block}
+		}
+	}
+}
+
+http://api.aixellabs.in {
+	redir https://api.aixellabs.in{uri} 308
+}
+
+api.aixellabs.in {
+	tls /etc/caddy/certs/api.aixellabs.in.crt /etc/caddy/certs/api.aixellabs.in.key
+	import aixel_labs_routes
+}
+
+# The fixed local address this host's own callers dial (Hermes MCP configs, cron
+# scripts, Claude Code): 127.0.0.1:8002. Without X-Forwarded-For the backend
+# still sees them as local callers (no API key, outside the public rate limit).
+http://:8002 {
+	bind 127.0.0.1
+	import aixel_labs_routes {
+		header_up -X-Forwarded-For
+	}
+}

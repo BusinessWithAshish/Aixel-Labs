@@ -7,7 +7,9 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import morgan from "morgan";
 import path from "path";
-import { registerRoutes } from "./routes";
+import type { IncomingMessage } from "http";
+import type { Socket } from "net";
+import { AIXEL_LABS_SERVICE, registerRoutes, servesGames } from "./routes";
 import { attachGameSockets } from "./api/game-sockets";
 import type { Express } from "express";
 import {
@@ -255,8 +257,38 @@ if (!process.env.VERCEL) {
    */
   // The games (Big Business, Bluff) each play over a WebSocket on this same HTTP
   // server. They need a long-lived process, so they are attached here and never on Vercel.
-  attachGameSockets(server);
+  const drainGames = servesGames ? attachGameSockets(server) : undefined;
 
   server.requestTimeout = 60 * 60 * 1000;
   server.headersTimeout = 60 * 60 * 1000 - 1000;
+
+  // Connections that have not sent a request (or upgrade) yet, with when they opened.
+  // To Node these are neither idle nor busy, so a drain has to close them itself.
+  const silent = new Map<Socket, number>();
+  server.on("connection", (socket: Socket) => {
+    silent.set(socket, Date.now());
+    socket.once("close", () => silent.delete(socket));
+  });
+  server.on("request", (req: IncomingMessage) => silent.delete(req.socket));
+  server.on("upgrade", (req: IncomingMessage) => silent.delete(req.socket));
+
+  // A deploy (`backend/deploy/deploy.sh`) moves traffic to the new slot first,
+  // then stops this one with SIGTERM. Stop accepting and exit once every
+  // in-flight request has answered (a media job may need most of an hour, which
+  // is why the unit's TimeoutStopSec is longer than `requestTimeout`) and, in the
+  // games process, every running match has ended.
+  process.once("SIGTERM", () => {
+    console.log(`[server] SIGTERM: draining before exit (${AIXEL_LABS_SERVICE ?? "all services"})`);
+    server.close(() => process.exit(0));
+    // close() shuts only the connections idle at that moment. One whose request
+    // finishes later would stay open on keep-alive (Caddy pools them), and one
+    // that never sends a request is not idle at all; either would hold the
+    // process until TimeoutStopSec, so keep sweeping both.
+    setInterval(() => {
+      server.closeIdleConnections();
+      const cutoff = Date.now() - 5000;
+      for (const [socket, openedAt] of silent) if (openedAt < cutoff) socket.destroy();
+    }, 1000).unref();
+    drainGames?.(() => console.log("[games] last match finished"));
+  });
 }

@@ -4,8 +4,10 @@ description: >-
   Backend process wiring: config.ts (ENDPOINTS / API_ENDPOINTS / CORS), routes.ts
   (app.use mounts), server.ts (middleware, dotenv, rate limit, Vercel export).
   Use whenever adding or changing a product mount, MCP base path, ping/CORS/rate
-  limit, or how the Express app boots locally vs on Vercel. Required context for
-  any backend route or server change.
+  limit, how the Express app boots locally vs on Vercel, or how the VPS backend
+  is split into services and deployed (backend/deploy/: AIXEL_LABS_SERVICE,
+  releases, slots, Caddy switch, rollback, adding a service).
+  Required context for any backend route or server change.
 ---
 
 # Backend platform (`config` / `routes` / `server`)
@@ -49,8 +51,8 @@ API_ENDPOINTS.FACEBOOK.API.full = "/facebook"  // FE / apiClient path
 7. Global `rateLimit` (`RATE_LIMIT_MAX` or 100 / 15m) — loopback callers (127.0.0.1 / ::1: local agents, cron, MCP on this host) are exempt via `skip`; public traffic arrives through Caddy with `TRUST_PROXY=1`, so `req.ip` is the real client and cannot be spoofed to loopback
 8. `GET API_ENDPOINTS.PING` (`/v1/ping`) — extra-tight limit
 9. API secret gate — with `AIXEL_API_SECRET` set, remote callers must send it (`API_SECRET_HEADER`, `Authorization: Bearer`, or `/mcp?key=`); callers on this host and `API_SECRET_EXEMPT_PATHS` (token-gated upload steps) pass. Unset = open (local dev only)
-10. `registerRoutes(app)`
-11. `export = app`; if not `VERCEL`, `listen(PORT || 8002)`
+10. `registerRoutes(app)` — mounts only what this process serves (`AIXEL_LABS_SERVICE`, see Services)
+11. `export = app`; if not `VERCEL`, `listen(PORT || 8002)` and a SIGTERM handler that drains (see Deploy)
 
 **`import "dotenv/config"` must be first** so `PROXY_CONFIG` and other env-baked
 constants see variables.
@@ -74,7 +76,8 @@ Default stays `/mcp`. Extra servers: path-split under the MCP router **or** new
 | Var | Effect |
 |-----|--------|
 | `NODE_ENV` | CORS set, morgan format |
-| `PORT` | Local listen (default 8002) |
+| `PORT` | Local listen (default 8002). On the VPS each slot's unit sets its own (see Services). |
+| `AIXEL_LABS_SERVICE` | Which part of the backend this process serves: `api` (every module and MCP), `games` (Big Business + Bluff room routes and WebSockets). Unset (local dev, Vercel) = everything. Read in `routes.ts` (`servesApi` / `servesGames`); each VPS unit sets it. |
 | `HOST` | Local listen bind address (default `127.0.0.1` — loopback only; the VPS's Caddy reverse-proxies from there). Set `0.0.0.0` to expose on the LAN. |
 | `VERCEL` | Auto-set by Vercel. Skip `listen`; trust proxy default. Also refuses (501) any op that writes local disk expecting it to persist — `media` `fetch`/`cut`/`condense`, `youtube` `video_download` (`IS_VERCEL_RUNTIME` in `config.ts`). Does **not** skip product mounts or MCP tools. |
 | _(browser host)_ | **No env var.** The `chatgpt`/`gemini` modules (headful Chrome/CDP) are gated by `assertBrowserRuntime` in `config.ts`, which auto-detects a usable host: an X display must be present (Xvfb socket at `/tmp/.X11-unix/X<n>` for the module's `DISPLAY`, default `:99`) and it must not be Vercel. The VPS's `aixel-xvfb` unit provides that display, so nothing is configured; Vercel and any host without an X server refuse browser ops on their own. Replaced the old hand-set `AIXEL_VPS=1` flag. **Not** used by `claude` — that module shells to the `claude` CLI, which runs on any machine it's installed and authenticated on and fails with a plain error otherwise. |
@@ -86,6 +89,67 @@ Default stays `/mcp`. Extra servers: path-split under the MCP router **or** new
 
 Proxy scrape env (`EVOMI_*`) is documented under `backend-utils`.
 
+## Services (VPS)
+
+The backend runs as separate processes, one per service, so a deploy of one never
+restarts another. Same code, same folders: `AIXEL_LABS_SERVICE` picks what a process
+mounts. Caddy routes `api.aixellabs.in` (and the local `127.0.0.1:8002`) by path.
+
+| Service | Serves | Caddy paths | Slots (`aixel-labs-<service>@<port>`) | Drains on SIGTERM until |
+|---|---|---|---|---|
+| `api` | every REST module, `/mcp`, media | everything else | `8101` / `8102` | in-flight requests answer (`TimeoutStopSec=65min`, media jobs) |
+| `games` | `/business/*`, `/bluff/*` (rooms + `/…/ws`) | `/business/*`, `/bluff/*` | `8111` / `8112` | its running matches end (`TimeoutStopSec=2h`) |
+
+**Games rooms are in memory only, by decision (no database, no snapshot).** A
+games deploy therefore never moves a match: the old slot refuses new sockets,
+drops lobby sockets (those players reconnect to the new slot) and keeps every
+running match until it ends, then exits. A player whose own connection drops
+during that window reconnects to the new slot and finds the room gone. An api
+deploy does not touch the games at all; Caddy's `stream_close_delay 2h` keeps
+match sockets open through every reload.
+
+## Deploy (VPS)
+
+Zero downtime, one command, from `backend/`:
+
+```bash
+deploy/deploy.sh                    # origin/main (fetched first): only the services whose files changed
+deploy/deploy.sh <sha|ref>          # any commit, same rule
+deploy/deploy.sh <sha|ref> games    # exactly these services; an older built sha is a rollback
+deploy/deploy.sh --plan [sha|ref]   # print which services would deploy, change nothing
+```
+
+**Which services a commit redeploys** (`affects` in `deploy.sh`): `games` owns
+`src/api/business/`, `src/api/bluff/` and `src/api/game-sockets.ts`; `api` owns
+everything else under `backend/`; the boot code every service runs (`server.ts`,
+`routes.ts`, `config.ts`, `package.json`, `tsconfig.json`, `pnpm-lock.yaml`)
+redeploys all of them; a service's own unit file redeploys it. `*.md` and the rest
+of `deploy/` redeploy nothing (`deploy/Caddyfile` is installed on its own, below).
+
+For each service, `deploy.sh` does, in order:
+
+1. **Build** the commit once into `backend/releases/<sha>/` (`git archive` + `pnpm install --frozen-lockfile` + `tsc`), shared by every service. The checkout's own `dist/` is never touched, and only committed code deploys. Untracked runtime files stay in the checkout and are symlinked into every release: `backend/.env` and each `workers/<name>/` venv, `models/` and binaries.
+2. **Start** the idle slot (template `backend/deploy/aixel-labs-<service>@.service`, installed by the script). `releases/slot-<service>-<port>` points at the release it runs.
+3. **Health check**: `/v1/ping` must return 200 within 120 s. Otherwise the new slot is stopped and the live one is untouched.
+4. **Switch**: rewrite the one line in `/etc/caddy/aixel-labs-<service>.upstream` (`to 127.0.0.1:<port>`) and `systemctl reload caddy` (graceful).
+5. **Drain**: SIGTERM to the old slot, then move on without waiting. `server.ts` stops accepting, keeps sweeping idle keep-alive connections (Caddy pools them) and connections that never sent a request (closed 5 s after opening); without the sweep either would make the slot sit out `TimeoutStopSec`, and exits once in-flight requests answer and, in `games`, running matches end. `KillMode=mixed` keeps a media job's ffmpeg / Python children alive meanwhile.
+6. **Clean up**: when a slot exits, its `ExecStopPost` runs `deploy.sh --prune`, which removes stopped slots' links and every release outside the 3 most recently deployed, never one a slot still runs.
+
+Then `deploy/Caddyfile` **at that commit** is validated and installed if it differs
+from `/etc/caddy/Caddyfile`. Change Caddy only through that file.
+
+**Port 8002 is Caddy, not Node.** Hermes MCP configs, cron scripts and Claude Code dial `127.0.0.1:8002`; Caddy serves that address (loopback only) and strips `X-Forwarded-For`, so those callers are still local callers (no API key, outside the public rate limit). Never run a backend on 8002.
+
+Don't `systemctl restart` a slot by hand while it is live, and don't bring back the old single `aixel-backend.service` or the `aixel-backend@` slots. Logs: `journalctl -u aixel-labs-<service>@<port>`.
+
+### Adding a service
+
+1. Give it an owned path and, for a Node service, a value of `AIXEL_LABS_SERVICE` read in `routes.ts` / `server.ts`.
+2. Add `deploy/aixel-labs-<service>@.service`: instance = port, `WorkingDirectory=…/releases/slot-<service>-%i/…`, the `ExecStopPost` prune line, a `TimeoutStopSec` above its longest in-flight work. SIGTERM must mean: stop taking new work, finish what is running, exit.
+3. In `deploy.sh`: add it to `SERVICES`, `SLOTS` (two free ports), `HEALTH` (a path that answers 200 from loopback) and `OWNS`. A Python service links its untracked venv into each release the way `workers/` does.
+4. In `deploy/Caddyfile`: a snippet importing `/etc/caddy/aixel-labs-<service>.upstream` and a path matcher. WebSockets that must outlive a reload need `stream_close_delay`.
+5. Commit, then `deploy.sh <sha> <service>` first: the Caddyfile is only installed once every upstream it imports exists.
+
 ## Do / don’t
 
 - DO change mounts only via `config.ts` + `routes.ts`.
@@ -94,6 +158,8 @@ Proxy scrape env (`EVOMI_*`) is documented under `backend-utils`.
 - DON’T call `listen` on Vercel — keep `export = app`.
 - DON’T skip product mounts or MCP tools when `VERCEL` is set.
 - DON’T move `dotenv` below modules that read `process.env` at import time.
+- DO deploy with `backend/deploy/deploy.sh` (VPS); DON’T build into the live `dist/` and restart a unit.
+- DO keep the games rooms in memory; a games deploy waits for matches instead of moving them.
 
 ## Related
 

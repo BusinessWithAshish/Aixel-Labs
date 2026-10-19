@@ -1,0 +1,32 @@
+# The games service (Big Business and Bluff: room routes and WebSockets) of one
+# release on one port: aixel-labs-games@8111 and aixel-labs-games@8112 are its two
+# slots. Same deploy flow as aixel-labs-api@.service; never start or restart a
+# slot by hand while it is live — run deploy.sh instead.
+[Unit]
+Description=Aixel Labs games service (slot %i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/AIXEL-LABS-ORG/Aixel-Labs/backend/releases/slot-games-%i/backend
+Environment=PATH=/home/ubuntu/.local/bin:/home/ubuntu/.hermes/node/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=AIXEL_LABS_SERVICE=games
+Environment=NODE_ENV=production
+Environment=PORT=%i
+Environment=HOST=127.0.0.1
+Environment=TRUST_PROXY=1
+ExecStart=/home/ubuntu/.local/bin/node dist/server.js
+ExecStopPost=-/home/ubuntu/AIXEL-LABS-ORG/Aixel-Labs/backend/deploy/deploy.sh --prune %n
+Restart=on-failure
+RestartSec=5
+# Rooms live only in this process's memory, so a slot being replaced keeps
+# serving its running matches until they end (src/api/game-sockets.ts). A
+# 60-minute match plus pauses fits in 2 h; an untimed match still going then is
+# cut off. Caddy's stream_close_delay for the games route matches this.
+TimeoutStopSec=2h
+
+[Install]
+WantedBy=multi-user.target

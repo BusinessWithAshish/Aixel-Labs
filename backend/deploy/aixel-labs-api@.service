@@ -1,0 +1,46 @@
+# The api service (every REST module, MCP, media) of one release on one port:
+# aixel-labs-api@8101 and aixel-labs-api@8102 are its two slots. deploy.sh installs
+# this file into /etc/systemd/system, points releases/slot-api-<port> at a built
+# release, starts the idle slot, moves Caddy to it and stops the other one. Never
+# start or restart a slot by hand while it is live — run deploy.sh instead (see
+# .cursor/skills/backend/backend-platform/SKILL.md).
+[Unit]
+Description=Aixel Labs api service (slot %i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+# slot-api-<port> is a symlink to releases/<sha>; systemd resolves it once, at
+# start, so re-pointing it later never moves a running process.
+WorkingDirectory=/home/ubuntu/AIXEL-LABS-ORG/Aixel-Labs/backend/releases/slot-api-%i/backend
+Environment=PATH=/home/ubuntu/.local/bin:/home/ubuntu/.hermes/node/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=AIXEL_LABS_SERVICE=api
+Environment=NODE_ENV=production
+Environment=PORT=%i
+Environment=HOST=127.0.0.1
+Environment=TRUST_PROXY=1
+# Single root for every on-disk media path (media cut/condense/fetch output,
+# youtube video_download, chatgpt's staged refs) — see AIXEL_MEDIA in
+# src/media.ts. Repoint the whole tree by changing this one var; none of the
+# per-op subdirs has its own override env var.
+Environment=AIXEL_MEDIA_ROOT=/home/ubuntu/media
+Environment=CHANNEL_API_KEYS_DIR=/home/ubuntu/.hermes/profiles/sage/channel-keys
+Environment=CLAUDE_DAILY_SESSIONS=40
+# dotenv loads .env from WorkingDirectory; every release links it to the one
+# backend/.env in the checkout. Edit that file, then redeploy.
+ExecStart=/home/ubuntu/.local/bin/node dist/server.js
+# Once this slot has drained and exited, delete the releases nothing uses any more.
+ExecStopPost=-/home/ubuntu/AIXEL-LABS-ORG/Aixel-Labs/backend/deploy/deploy.sh --prune %n
+Restart=on-failure
+RestartSec=5
+# SIGTERM goes to node alone, so the ffmpeg / Python worker children of an
+# in-flight job keep running while server.ts drains. Whatever is still alive
+# at the timeout gets SIGKILL. The timeout sits above the 1 h requestTimeout.
+KillMode=mixed
+TimeoutStopSec=65min
+
+[Install]
+WantedBy=multi-user.target

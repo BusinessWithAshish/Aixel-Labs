@@ -1,6 +1,6 @@
 ---
-description: Backend platform — config ENDPOINTS, routes mounts, server middleware/boot
-globs: backend/src/config.ts,backend/src/routes.ts,backend/src/server.ts
+description: Backend platform — config ENDPOINTS, routes mounts, server middleware/boot, VPS deploy
+globs: backend/src/config.ts,backend/src/routes.ts,backend/src/server.ts,backend/deploy/**
 alwaysApply: false
 ---
 
@@ -20,3 +20,7 @@ behavior must follow this file.
 - CORS / MCP headers stay in `server.ts`; origin allowlists stay in `config.ts`.
 - Do not skip product `app.use` mounts or MCP tools based on `VERCEL`. `VERCEL` only skips `listen`.
 - Do not invent parallel backend path constants on the frontend — import `@aixellabs/backend/config`.
+- Deploy the VPS backend only with `backend/deploy/deploy.sh`: per service (`api`, `games`), a release per commit, two slots each (`aixel-labs-<service>@<port>`), Caddy switches, the old slot drains and prunes itself. Never build into the live `dist/` and restart a unit, and never run Node on `127.0.0.1:8002` — that port is Caddy's fixed local address for this host's callers.
+- A process mounts only what `AIXEL_LABS_SERVICE` (`routes.ts`) gives it. A new mount belongs to exactly one service; one that must share in-memory state with the game sockets goes in `games`, and its path in the `@games` matcher of `backend/deploy/Caddyfile`.
+- Keep the SIGTERM drain in `server.ts` (`server.close` + idle-connection sweep → exit; games wait for running matches). Anything new that holds a connection open past its request must be closed there too, or the old slot waits out `TimeoutStopSec`.
+- Caddy changes go through `backend/deploy/Caddyfile` (installed by `deploy.sh`), never by editing `/etc/caddy/Caddyfile`.

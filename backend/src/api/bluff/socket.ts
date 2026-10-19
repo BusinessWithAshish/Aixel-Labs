@@ -206,6 +206,19 @@ export function createBluffGateway() {
       }
       wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws));
     },
+    /**
+     * A deploy has sent new players to the next games process. Drops every socket whose room
+     * has no match yet (its player reconnects there) and returns how many running matches still
+     * have a player here. Rooms are in memory only, so the process waits for those to finish.
+     */
+    drain(): number {
+      const live = new Set<BluffRoom>();
+      for (const [ws, { room }] of sessions) {
+        if (!room.state) ws.terminate();
+        else if (room.state.phase !== "over") live.add(room);
+      }
+      return live.size;
+    },
   };
 }
 

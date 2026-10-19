@@ -121,6 +121,7 @@ Thumbs.db
 /backend/experiments/
 /backend/_temp/
 /backend/storage/
+/backend/releases/
 /scraper/venv
 /scraper/output/
 

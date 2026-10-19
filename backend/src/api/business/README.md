@@ -41,7 +41,10 @@ server → client   joined (seat + reconnect token) | room (full view) | peek | 
 
 ## Limits to know
 
-- Rooms live in memory. A backend restart ends every match.
+- Rooms live in memory, in the `games` service (its own process on the VPS: see the
+  `backend-platform` skill). An api deploy never touches it. A games deploy keeps
+  every running match on the old process until it ends (`drain` in `socket.ts`);
+  a crash or reboot still ends every match.
 - Needs a long-lived process, so it is not available on Vercel.
 - In production the browser needs the public `wss://` address:
   set `NEXT_PUBLIC_BUSINESS_WS_URL` on the frontend. The reverse proxy must

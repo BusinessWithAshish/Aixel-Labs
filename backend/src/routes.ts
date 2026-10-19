@@ -21,7 +21,23 @@ import claudeRoutes from "./api/claude/index";
 import geminiRoutes from "./api/gemini/index";
 import mcpRoutes from "./mcp/router";
 
+/**
+ * Which part of the backend this process serves. On the VPS each service runs as its
+ * own process (`backend/deploy/aixel-labs-<service>@.service` sets it), so a deploy of
+ * one never restarts the other. Unset (local dev, Vercel): everything.
+ */
+export type AixelLabsService = "api" | "games";
+export const AIXEL_LABS_SERVICE = process.env.AIXEL_LABS_SERVICE as AixelLabsService | undefined;
+export const servesApi = AIXEL_LABS_SERVICE !== "games";
+export const servesGames = AIXEL_LABS_SERVICE !== "api";
+
 export function registerRoutes(app: Express) {
+  // The games' room routes read the same in-memory rooms as their sockets, so they live in the games process.
+  if (servesGames) {
+    app.use(ENDPOINTS.BUSINESS, businessRoutes);
+    app.use(ENDPOINTS.BLUFF, bluffRoutes);
+  }
+  if (!servesApi) return;
   app.use(ENDPOINTS.HOME, homeRoutes);
   app.use(ENDPOINTS.GMAPS, gmapsRoutes);
   app.use(ENDPOINTS.INSTAGRAM, instagramRoutes);
@@ -35,8 +51,6 @@ export function registerRoutes(app: Express) {
   app.use(ENDPOINTS.MEDIA, mediaRoutes);
   app.use(ENDPOINTS.SEGMENT, segmentRoutes);
   app.use(ENDPOINTS.CRAWL, crawlRoutes);
-  app.use(ENDPOINTS.BUSINESS, businessRoutes);
-  app.use(ENDPOINTS.BLUFF, bluffRoutes);
   app.use(ENDPOINTS.CHATGPT, chatgptRoutes);
   app.use(ENDPOINTS.CLAUDE, claudeRoutes);
   app.use(ENDPOINTS.GEMINI, geminiRoutes);
