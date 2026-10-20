@@ -32,7 +32,7 @@ export function getSubModulesForModule(module: Modules): SubModule[] {
 
 /**
  * Full module/submodule grant map — SSOT for:
- * - admin sidebar + path ACL (`generateSidebarConfig(isAdmin: true)`)
+ * - admin sidebar + path ACL (`generateSidebarConfig` for an admin)
  * - ModuleAccessCard “select all” / promote templates
  * - demotion fallback when tenant has no defaultModuleAccess
  *

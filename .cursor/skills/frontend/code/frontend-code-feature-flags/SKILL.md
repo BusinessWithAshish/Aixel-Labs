@@ -36,7 +36,9 @@ Today flags use `decide() { return false }` / `defaultValue: false` (off until f
 
 1. Add the key, a one-line `pageFlag(key, description, false)` and its `FLAG_BY_KEY` entry in `flags.ts`.
 2. Map the submodule (or every submodule of an unbuilt module via `wholeModule`) in `SUB_MODULE_FLAG_KEY`.
-3. Nothing else: `getHiddenSubModules()` drops it from the sidebar (`generateSidebarConfig`) and the path ACL (`withRouteGuard` → 404), admins included. Ship it by flipping `false` → `true`.
+3. Nothing else: `getHiddenSubModules(user)` drops it from the sidebar (`generateSidebarConfig`) and the path ACL (`withRouteGuard` → 404), admins included. Ship it by flipping `false` → `true`.
+
+Admins on `PREVIEW_TENANT` (`test`) see every flagged page; every other tenant (`app` is production) shows only shipped pages, to admins too. Normal users on any tenant still need the submodule in their `moduleAccess`.
 
 Dev override without a deploy: `vercel-flag-overrides` cookie = `encryptOverrides({ key: true })` (needs `FLAGS_SECRET`); `e2e/navigation/hidden-pages.spec.ts` shows it.
 

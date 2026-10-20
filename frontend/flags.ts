@@ -5,6 +5,7 @@ import {
     LEAD_GENERATION_SUB_MODULES,
     MESSAGING_SUB_MODULES,
     type SubModule,
+    type User,
     VOICE_AGENT_SUB_MODULES,
 } from '@aixellabs/backend/db/types';
 
@@ -72,7 +73,8 @@ function pageFlag(key: FeatureFlagKey, description: string, enabled: boolean) {
 
 /**
  * Unfinished pages. While off, the page is left out of the sidebar (a module with nothing left
- * disappears) and its URL 404s for every user, admins included. The page code stays in place.
+ * disappears) and its URL 404s for every user, admins included, except admins on {@link PREVIEW_TENANT}.
+ * The page code stays in place.
  */
 export const instagramAdvancedFlag = pageFlag(FeatureFlagKey.INSTAGRAM_ADVANCED_SEARCH, 'Instagram advanced search', false);
 export const voiceWebDialerFlag = pageFlag(FeatureFlagKey.VOICE_WEB_DIALER, 'Voice agent web dialer', false);
@@ -111,8 +113,15 @@ export const SUB_MODULE_FLAG_KEY: Partial<Record<SubModule, FeatureFlagKey>> = {
     ...wholeModule(LEAD_ENRICHMENT_SUB_MODULES, FeatureFlagKey.LEAD_ENRICHMENT),
 };
 
-/** Submodules hidden for this request because their flag is off (sidebar + path ACL). */
-export async function getHiddenSubModules(): Promise<ReadonlySet<SubModule>> {
+/** Tenant where admins see every page, flagged or not, to try unfinished work before it ships. */
+export const PREVIEW_TENANT = 'test';
+
+/** Submodules hidden for this user because their flag is off (sidebar + path ACL). */
+export async function getHiddenSubModules({
+    isAdmin,
+    tenantName,
+}: Pick<User, 'isAdmin' | 'tenantName'>): Promise<ReadonlySet<SubModule>> {
+    if (isAdmin && tenantName === PREVIEW_TENANT) return new Set();
     const gated = Object.entries(SUB_MODULE_FLAG_KEY) as [SubModule, FeatureFlagKey][];
     const enabled = await Promise.all(gated.map(([, key]) => evaluateFlag(key)));
     return new Set(gated.filter((_, i) => !enabled[i]).map(([subModule]) => subModule));

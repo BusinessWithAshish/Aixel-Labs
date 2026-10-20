@@ -3,6 +3,10 @@ import { SubModuleUrls, ALWAYS_ALLOWED_PATHS, DEFAULT_HOME_PAGE_ROUTE } from '@/
 import { SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS } from '@/config/sidebar.config';
 import { getHiddenSubModules } from '@/flags';
 import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
+import type { AppSessionUser } from '@/lib/auth/types';
+
+/** What the sidebar and path ACL need to know about the signed-in user. */
+type AccessUser = Pick<AppSessionUser, 'isAdmin' | 'moduleAccess' | 'tenantName'>;
 
 /**
  * Build sidebar nav from a ModuleAccess map (shared by admin full-access and non-admin grants).
@@ -35,21 +39,21 @@ function buildSidebarFromModuleAccess(moduleAccess: ModuleAccess, hidden: Readon
  * Admins ignore stored `moduleAccess` and use {@link getDefaultModuleAccess} (SSOT for “all modules”).
  * Non-admins with missing/empty map get no module nav.
  */
-export async function generateSidebarConfig(isAdmin: boolean, moduleAccess?: ModuleAccess): Promise<SidebarConfig> {
-    const access = isAdmin ? getDefaultModuleAccess() : moduleAccess;
+export async function generateSidebarConfig(user: AccessUser): Promise<SidebarConfig> {
+    const access = user.isAdmin ? getDefaultModuleAccess() : user.moduleAccess;
     if (!access) {
         return { navMain: [] };
     }
 
-    return buildSidebarFromModuleAccess(access, await getHiddenSubModules());
+    return buildSidebarFromModuleAccess(access, await getHiddenSubModules(user));
 }
 
 /**
  * Extract all accessible paths from sidebar config (same logic as nav items).
  * Reuses generateSidebarConfig for single source of truth.
  */
-export async function getAccessiblePaths(isAdmin: boolean, moduleAccess?: ModuleAccess): Promise<Set<string>> {
-    const config = await generateSidebarConfig(isAdmin, moduleAccess);
+export async function getAccessiblePaths(user: AccessUser): Promise<Set<string>> {
+    const config = await generateSidebarConfig(user);
     const paths = new Set<string>();
 
     for (const item of config.navMain) {
@@ -73,16 +77,16 @@ function isAdminOnlyPathAccessible(normalized: string, isAdmin: boolean): boolea
     return false;
 }
 
-export async function isPathAccessible(pathname: string, isAdmin: boolean, moduleAccess?: ModuleAccess): Promise<boolean> {
+export async function isPathAccessible(pathname: string, user: AccessUser): Promise<boolean> {
     const normalized = pathname.replace(/\/$/, '') || DEFAULT_HOME_PAGE_ROUTE;
 
     if (ALWAYS_ALLOWED_PATHS.includes(normalized as (typeof ALWAYS_ALLOWED_PATHS)[number])) {
         return true;
     }
 
-    if (isAdminOnlyPathAccessible(normalized, isAdmin)) return true;
+    if (isAdminOnlyPathAccessible(normalized, user.isAdmin ?? false)) return true;
 
-    const allowedPaths = await getAccessiblePaths(isAdmin, moduleAccess);
+    const allowedPaths = await getAccessiblePaths(user);
     if (allowedPaths.has(normalized)) return true;
 
     for (const allowed of allowedPaths) {

@@ -30,10 +30,7 @@ export function withRouteGuard<P extends object>(Component: React.ComponentType<
         }
 
         const pathname = (await headers()).get(PATHNAME_HEADER_KEY) ?? DEFAULT_HOME_PAGE_ROUTE;
-        const isAdmin = session.user.isAdmin ?? false;
-        const moduleAccess = session.user.moduleAccess;
-
-        if (!(await isPathAccessible(pathname, isAdmin, moduleAccess))) {
+        if (!(await isPathAccessible(pathname, session.user))) {
             return notFound();
         }
 
