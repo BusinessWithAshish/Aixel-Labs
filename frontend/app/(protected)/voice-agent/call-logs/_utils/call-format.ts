@@ -1,33 +1,34 @@
 import {
     VoiceCallChannel,
     VoiceCallDirection,
+    VoiceCallEndReason,
     type VoiceCallSentiment,
     type VoiceCallTurn,
 } from '@aixellabs/backend/db/types';
 
-const ENDED_BY_LABELS: Record<string, string> = {
-    caller_hung_up: 'Caller hung up',
-    agent_hung_up: 'Agent hung up',
-    goodbye: 'Said goodbye',
-    dnc: 'Asked not to be called',
-    abuse: 'Abusive caller',
-    voicemail: 'Voicemail',
-    voicemail_message: 'Left a voicemail',
-    ivr: 'Phone menu',
-    no_answer: 'No answer',
-    not_connected: 'Audio never connected',
-    recording_objection: 'Objected to recording',
-    wrong_number: 'Wrong number',
-    busy: 'Busy',
-    failed: 'Failed',
-    timeout: 'Time limit',
-    error: 'Error',
-    gemini_key_error: 'Gemini key problem',
+const ENDED_BY_LABELS: Record<VoiceCallEndReason, string> = {
+    [VoiceCallEndReason.CALLER_HUNG_UP]: 'Caller hung up',
+    [VoiceCallEndReason.AGENT_HUNG_UP]: 'Agent hung up',
+    [VoiceCallEndReason.GOODBYE]: 'Said goodbye',
+    [VoiceCallEndReason.DNC]: 'Asked not to be called',
+    [VoiceCallEndReason.ABUSE]: 'Abusive caller',
+    [VoiceCallEndReason.VOICEMAIL]: 'Voicemail',
+    [VoiceCallEndReason.VOICEMAIL_MESSAGE]: 'Left a voicemail',
+    [VoiceCallEndReason.IVR]: 'Phone menu',
+    [VoiceCallEndReason.NO_ANSWER]: 'No answer',
+    [VoiceCallEndReason.NOT_CONNECTED]: 'Audio never connected',
+    [VoiceCallEndReason.RECORDING_OBJECTION]: 'Objected to recording',
+    [VoiceCallEndReason.WRONG_NUMBER]: 'Wrong number',
+    [VoiceCallEndReason.BUSY]: 'Busy',
+    [VoiceCallEndReason.FAILED]: 'Failed',
+    [VoiceCallEndReason.TIMEOUT]: 'Time limit',
+    [VoiceCallEndReason.ERROR]: 'Error',
+    [VoiceCallEndReason.GEMINI_KEY_ERROR]: 'Gemini key problem',
 };
 
 /** Known reasons in words; anything new from the engine is shown as it was written. */
 export function endedByLabel(endedBy: string): string {
-    return ENDED_BY_LABELS[endedBy] ?? (endedBy || 'Unknown');
+    return (ENDED_BY_LABELS as Record<string, string>)[endedBy] ?? (endedBy || 'Unknown');
 }
 
 export function callTypeLabel(channel: VoiceCallChannel, direction: VoiceCallDirection): string {
@@ -59,15 +60,6 @@ export function median(values: number[]): number | null {
 export function formatGap(ms: number | null): string {
     if (ms === null) return '—';
     return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
-}
-
-export function formatWhen(iso: string): string {
-    return new Date(iso).toLocaleString(undefined, {
-        day: 'numeric',
-        month: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
 }
 
 export function formatParty(value: string | undefined, fallback: string): string {

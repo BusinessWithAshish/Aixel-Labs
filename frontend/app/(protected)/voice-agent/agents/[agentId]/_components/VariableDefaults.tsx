@@ -1,11 +1,11 @@
 'use client';
 
 import { TriangleAlert } from 'lucide-react';
-import { VOICE_BUILTIN_VARIABLES } from '@aixellabs/backend/db/types';
+import { VOICE_AGENT_FEATURE_LIMITS, VOICE_BUILTIN_VARIABLES } from '@aixellabs/backend/db/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePage } from '@/contexts/PageStore';
-import { VOICE_AGENT_FEATURE_LIMITS, VOICE_BUILTIN_VARIABLE_INFO } from '@/helpers/voice-agent-features';
+import { VOICE_BUILTIN_VARIABLE_INFO } from '@/helpers/voice-agent-features';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 
 /**

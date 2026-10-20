@@ -1,17 +1,11 @@
 'use client';
 
-import { VoiceProvider } from '@aixellabs/backend/db/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePage } from '@/contexts/PageStore';
+import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UseNewCampaignPageReturn } from '../_hooks/use-new-campaign-page';
-
-const PROVIDER_LABEL: Record<VoiceProvider, string> = {
-    [VoiceProvider.TELNYX]: 'Telnyx',
-    [VoiceProvider.TWILIO]: 'Twilio',
-    [VoiceProvider.VOICELINK]: 'VoiceLink',
-};
 
 export function StepDetails() {
     const { name, setName, agents, agentId, setAgentId, numbers, numberId, setNumberId } =
@@ -55,7 +49,7 @@ export function StepDetails() {
                         {numbers.map((number) => (
                             <SelectItem key={number.id} value={number.id}>
                                 <span className="tabular-nums">{number.phoneNumber}</span>
-                                <span className="text-muted-foreground">· {PROVIDER_LABEL[number.provider]}</span>
+                                <span className="text-muted-foreground">· {numberProviderInfo(number.provider).label}</span>
                             </SelectItem>
                         ))}
                     </SelectContent>

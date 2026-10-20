@@ -1,14 +1,18 @@
+import type { VariantProps } from 'class-variance-authority';
 import {
     VoiceCampaignContactStatus,
+    VoiceCampaignOutcome,
     VoiceCampaignRetryOutcome,
     VoiceCampaignStatus,
     type VoiceCampaignDay,
     type VoiceCampaignWindow,
 } from '@aixellabs/backend/db/types';
 import type { VoiceCampaignStats } from '@/app/actions/voice-campaign-actions';
+import type { badgeVariants } from '@/components/ui/badge';
+import { minutesOf, VOICE_WEEKDAY_OPTIONS } from '@/helpers/voice-time';
 import { endedByLabel } from '../../call-logs/_utils/call-format';
 
-type BadgeVariant = 'secondary' | 'green' | 'yellow' | 'red' | 'blue' | 'orange' | 'purple' | 'outline';
+type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
 
 export const CAMPAIGN_STATUS: Record<VoiceCampaignStatus, { label: string; variant: BadgeVariant }> = {
     [VoiceCampaignStatus.DRAFT]: { label: 'Draft', variant: 'secondary' },
@@ -28,45 +32,24 @@ export const CONTACT_STATUS: Record<VoiceCampaignContactStatus, { label: string;
     [VoiceCampaignContactStatus.CANCELLED]: { label: 'Cancelled', variant: 'outline' },
 };
 
-export const DAYS: { key: VoiceCampaignDay; short: string }[] = [
-    { key: 'mon', short: 'Mon' },
-    { key: 'tue', short: 'Tue' },
-    { key: 'wed', short: 'Wed' },
-    { key: 'thu', short: 'Thu' },
-    { key: 'fri', short: 'Fri' },
-    { key: 'sat', short: 'Sat' },
-    { key: 'sun', short: 'Sun' },
-];
-
 export const RETRY_OUTCOMES: { value: VoiceCampaignRetryOutcome; label: string }[] = [
     { value: VoiceCampaignRetryOutcome.NO_ANSWER, label: 'No answer' },
     { value: VoiceCampaignRetryOutcome.BUSY, label: 'Busy' },
     { value: VoiceCampaignRetryOutcome.VOICEMAIL, label: 'Voicemail' },
 ];
 
-export const RETRY_DELAYS: { minutes: number; label: string }[] = [
-    { minutes: 15, label: '15 minutes' },
-    { minutes: 30, label: '30 minutes' },
-    { minutes: 60, label: '1 hour' },
-    { minutes: 120, label: '2 hours' },
-    { minutes: 240, label: '4 hours' },
-    { minutes: 1440, label: '1 day' },
-];
-
-export function delayLabel(minutes: number): string {
-    const known = RETRY_DELAYS.find((d) => d.minutes === minutes);
-    if (known) return known.label;
-    return minutes % 60 === 0 ? `${minutes / 60} hours` : `${minutes} minutes`;
-}
+/** The waits between retries the wizard offers. */
+export const RETRY_DELAY_MINUTES = [15, 30, 60, 120, 240, 1440] as const;
 
 /** "Mon–Fri" for a run of days, else "Mon, Wed, Sat"; "Every day" for all seven. */
 export function daysLabel(days: VoiceCampaignDay[]): string {
-    const idx = DAYS.map((d, i) => (days.includes(d.key) ? i : -1)).filter((i) => i >= 0);
+    const week = VOICE_WEEKDAY_OPTIONS;
+    const idx = week.map((d, i) => (days.includes(d.key) ? i : -1)).filter((i) => i >= 0);
     if (idx.length === 7) return 'Every day';
     if (idx.length === 0) return 'No days';
     const contiguous = idx.length > 2 && idx.every((v, i) => i === 0 || v === idx[i - 1] + 1);
-    if (contiguous) return `${DAYS[idx[0]].short}–${DAYS[idx[idx.length - 1]].short}`;
-    return idx.map((i) => DAYS[i].short).join(', ');
+    if (contiguous) return `${week[idx[0]].short}–${week[idx[idx.length - 1]].short}`;
+    return idx.map((i) => week[i].short).join(', ');
 }
 
 export function windowLabel(window: VoiceCampaignWindow): string {
@@ -86,8 +69,7 @@ export function isWindowOpen(window: VoiceCampaignWindow, at = new Date()): bool
         const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
         const day = get('weekday').toLowerCase().slice(0, 3) as VoiceCampaignDay;
         const minutes = Number(get('hour')) * 60 + Number(get('minute'));
-        const toMin = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
-        return window.days.includes(day) && minutes >= toMin(window.start) && minutes < toMin(window.end);
+        return window.days.includes(day) && minutes >= minutesOf(window.start) && minutes < minutesOf(window.end);
     } catch {
         return false;
     }
@@ -100,17 +82,14 @@ export function progressPercent(stats: VoiceCampaignStats): number {
     return Math.round((done / stats.total) * 100);
 }
 
-const OUTCOME_LABELS: Record<string, string> = {
-    dnc_list: 'On the do-not-call list',
-    invalid_number: 'Not a valid number',
-    interrupted: 'Interrupted',
+const OUTCOME_LABELS: Record<VoiceCampaignOutcome, string> = {
+    [VoiceCampaignOutcome.DNC_LIST]: 'On the do-not-call list',
+    [VoiceCampaignOutcome.INVALID_NUMBER]: 'Not a valid number',
+    [VoiceCampaignOutcome.INTERRUPTED]: 'Interrupted',
 };
 
+/** A contact's last outcome in words: a campaign outcome, else how its last call ended. */
 export function outcomeLabel(outcome: string | null): string | null {
     if (!outcome) return null;
-    return OUTCOME_LABELS[outcome] ?? endedByLabel(outcome);
-}
-
-export function formatDateTime(iso: string): string {
-    return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+    return (OUTCOME_LABELS as Record<string, string>)[outcome] ?? endedByLabel(outcome);
 }

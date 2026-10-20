@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { getCollection, MongoCollections, type VoiceNumberDoc } from '@aixellabs/backend/db';
+import { getCollection, MongoCollections, type VoiceNumberDoc, VoiceProvider } from '@aixellabs/backend/db';
+import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { numberWebhookUrl, openSecret } from '@/server/voice-agent/engine';
 import type { NumberProvider, OwnedNumberDoc, ProviderAccountNumber } from '@/server/voice-agent/number-provider';
 import {
@@ -159,7 +160,7 @@ async function restorePreviousConnection(doc: OwnedNumberDoc, key: string): Prom
  * and back); calls out go through a Call Control app, which leaves the number's routing alone.
  */
 export const telnyxNumbers: NumberProvider = {
-    label: 'Telnyx',
+    label: numberProviderInfo(VoiceProvider.TELNYX).label,
 
     async startAnswering(doc) {
         await routeCallsToAi(doc, openSecret(doc.apiKeySealed));

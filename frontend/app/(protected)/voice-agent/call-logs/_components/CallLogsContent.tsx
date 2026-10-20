@@ -16,6 +16,7 @@ import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import type { UseCallLogsPageReturn } from '../_hooks/use-call-logs-page';
+import { formatShortDateTime } from '@/helpers/voice-time';
 import {
     callTypeLabel,
     callTypeVariant,
@@ -23,7 +24,6 @@ import {
     formatDuration,
     formatGap,
     formatParty,
-    formatWhen,
     median,
 } from '../_utils/call-format';
 import { callBookedSomething } from '../_utils/tool-calls';
@@ -210,7 +210,7 @@ export function CallLogsContent() {
                                                     onClick={(event) => event.stopPropagation()}
                                                 >
                                                     <time dateTime={call.startedAt} suppressHydrationWarning>
-                                                        {formatWhen(call.startedAt)}
+                                                        {formatShortDateTime(call.startedAt)}
                                                     </time>
                                                 </Link>
                                             </TableCell>
@@ -259,7 +259,7 @@ export function CallLogsContent() {
                                     <CallSummaryLine call={call} className="line-clamp-2" />
                                     <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-xs">
                                         <time dateTime={call.startedAt} suppressHydrationWarning>
-                                            {formatWhen(call.startedAt)}
+                                            {formatShortDateTime(call.startedAt)}
                                         </time>
                                         <span className="tabular-nums">{formatDuration(call.durationSec)}</span>
                                         <span>{endedByLabel(call.endedBy)}</span>

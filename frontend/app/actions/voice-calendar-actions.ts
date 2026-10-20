@@ -16,6 +16,7 @@ import {
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { defaultBookingTarget, voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
+import { CONNECTED_APP_CALLBACK_URL } from '@/helpers/voice-routes';
 import {
     assertUsableDestination,
     calendarConnectionsCollection,
@@ -44,8 +45,6 @@ import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
  */
 
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.AGENTS;
-/** Where Composio sends the browser back to (agent editor route group, so the same access applies). */
-const CALLBACK_PATH = '/voice-agent/agents/connected-apps/callback';
 /** How long the callback waits for Composio to finish activating the account. */
 const CONFIRM_TRIES = 8;
 const CONFIRM_WAIT_MS = 750;
@@ -174,7 +173,7 @@ export const startVoiceAppConnection = async (
     return runAuthenticatedAction(async function startVoiceAppConnection(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         if (!isComposioConfigured()) throw new Error('Connected apps are not set up on this server yet');
-        const callback = new URL(CALLBACK_PATH, await requestOrigin());
+        const callback = new URL(CONNECTED_APP_CALLBACK_URL, await requestOrigin());
         if (agentId) callback.searchParams.set('agent', agentId);
         callback.searchParams.set('app', provider);
         const authConfigId = await ensureManagedAuthConfig(provider);

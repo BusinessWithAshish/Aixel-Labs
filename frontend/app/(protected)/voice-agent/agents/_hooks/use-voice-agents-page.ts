@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import type { VoiceAgent, VoiceAgentCallType, VoiceAgentVoice } from '@aixellabs/backend/db/types';
 import { createVoiceAgent } from '@/app/actions/voice-agent-actions';
 import { DEFAULT_VOICE_AGENT_NAME, DEFAULT_VOICE_AGENT_VOICE } from '@/helpers/voice-agent-defaults';
-import { voiceAgentUrl } from '../_utils/voice-agent-routes';
+import { voiceAgentUrl } from '@/helpers/voice-routes';
 
 export function useVoiceAgentsPage(initialAgents: VoiceAgent[]) {
     const router = useRouter();

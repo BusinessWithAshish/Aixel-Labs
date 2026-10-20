@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { KeyRound, Loader2, Send } from 'lucide-react';
-import type { VoiceAgent, VoiceAgentWebhookToolView } from '@aixellabs/backend/db/types';
+import { VOICE_WEBHOOK_LIMITS, type VoiceAgent, type VoiceAgentWebhookToolView } from '@aixellabs/backend/db/types';
 import {
     createVoiceAgentWebhookTool,
     sendVoiceAgentWebhookTest,
@@ -15,7 +15,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { VOICE_WEBHOOK_LIMITS } from '@/helpers/voice-agent-defaults';
 import { cn } from '@/lib/utils';
 import { WebhookParamRows } from './WebhookParamRows';
 import { draftToInput, sameDraft, toolToDraft, webhookDraftError, type WebhookToolDraft } from './webhook-tool-form';

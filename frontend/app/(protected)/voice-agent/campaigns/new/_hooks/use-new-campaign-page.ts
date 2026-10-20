@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
     VOICE_CAMPAIGN_LIMITS,
+    VOICE_WEEKDAYS,
     VoiceCampaignRetryOutcome,
     type VoiceCampaignDay,
     type VoiceCampaignRetry,
@@ -26,7 +27,8 @@ import {
     rowsToContactInputs,
     variableKeys,
 } from '@/helpers/voice-campaign-contacts';
-import { campaignUrl } from '../../_utils/campaign-routes';
+import { browserTimezone } from '@/helpers/voice-time';
+import { campaignUrl } from '@/helpers/voice-routes';
 
 export type NewCampaignPageData = {
     setup: VoiceCampaignSetup;
@@ -40,14 +42,6 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const CONTACTS_PER_REQUEST = 500;
 
 export type CsvFile = { fileName: string; headers: string[]; rows: string[][] };
-
-function browserTimeZone(): string {
-    try {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-    } catch {
-        return 'UTC';
-    }
-}
 
 /** The country of the number calls go out from: numbers without a "+" are most likely local to it. */
 function countryForNumber(phoneNumber: string | undefined): string {
@@ -77,10 +71,10 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
     const [mapping, setMapping] = useState<{ phone: number | null; name: number | null }>({ phone: null, name: null });
 
     const [callWindow, setCallWindow] = useState<VoiceCampaignWindow>({
-        days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+        days: VOICE_WEEKDAYS.slice(0, 5),
         start: '09:00',
         end: '18:00',
-        timezone: browserTimeZone(),
+        timezone: browserTimezone(),
     });
     const [maxConcurrent, setMaxConcurrent] = useState(2);
     const [retry, setRetry] = useState<VoiceCampaignRetry>({

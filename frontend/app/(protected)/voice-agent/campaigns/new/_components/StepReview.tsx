@@ -4,7 +4,8 @@ import { ShieldBan } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { usePage } from '@/contexts/PageStore';
-import { delayLabel, RETRY_OUTCOMES, windowLabel } from '../../_utils/campaign-format';
+import { minutesLabel } from '@/helpers/voice-time';
+import { RETRY_OUTCOMES, windowLabel } from '../../_utils/campaign-format';
 import type { UseNewCampaignPageReturn } from '../_hooks/use-new-campaign-page';
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -44,7 +45,7 @@ export function StepReview() {
                 <Row label="Retries">
                     {retry.maxRetries === 0
                         ? 'None: each contact is called once'
-                        : `Up to ${retry.maxRetries} more ${retry.maxRetries === 1 ? 'call' : 'calls'} on ${retryOn}, ${delayLabel(retry.delayMinutes)} apart`}
+                        : `Up to ${retry.maxRetries} more ${retry.maxRetries === 1 ? 'call' : 'calls'} on ${retryOn}, ${minutesLabel(retry.delayMinutes)} apart`}
                 </Row>
             </dl>
             <p className="text-muted-foreground flex items-start gap-2 text-sm">

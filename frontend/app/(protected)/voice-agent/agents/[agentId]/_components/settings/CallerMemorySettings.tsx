@@ -2,18 +2,14 @@
 
 import { useState } from 'react';
 import { BrainCircuit, Loader2 } from 'lucide-react';
-import type { VoiceCallerMemory } from '@aixellabs/backend/db/types';
+import { VOICE_AGENT_FEATURE_LIMITS, type VoiceCallerMemory } from '@aixellabs/backend/db/types';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { usePage } from '@/contexts/PageStore';
-import { VOICE_AGENT_FEATURE_LIMITS } from '@/helpers/voice-agent-features';
+import { formatDay } from '@/helpers/voice-time';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
-
-function formatDay(iso: string): string {
-    return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-}
 
 /** Caller memory: on/off, and the callers it remembers, each of whom can be forgotten. */
 export function CallerMemorySettings() {

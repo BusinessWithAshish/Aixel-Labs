@@ -1,4 +1,4 @@
-import { VOICE_CAMPAIGN_LIMITS } from '@aixellabs/backend/db/types';
+import { VOICE_CAMPAIGN_LIMITS, VOICE_VARIABLE_NAME_PATTERN } from '@aixellabs/backend/db/types';
 
 /**
  * Campaign contacts from a CSV: parsing, phone numbers to E.164, column mapping, variables.
@@ -152,8 +152,6 @@ export function variableKey(header: string): string {
     return /^[0-9]/.test(slug) ? `col_${slug}` : slug;
 }
 
-export const VARIABLE_KEY_PATTERN = /^[a-z][a-z0-9_]{0,43}$/;
-
 /** Variable names for the extra columns, unique (a repeated header gets _2, _3...). */
 export function variableKeys(headers: string[], skip: (number | null)[]): { index: number; key: string; header: string }[] {
     const used = new Set<string>(['name', 'phone']);
@@ -207,7 +205,7 @@ export function checkContacts(
         seen.set(parsed.e164, input.row);
         const variables: Record<string, string> = {};
         for (const [key, value] of Object.entries(input.variables ?? {})) {
-            if (!VARIABLE_KEY_PATTERN.test(key)) continue;
+            if (!VOICE_VARIABLE_NAME_PATTERN.test(key)) continue;
             const text = String(value ?? '').trim().slice(0, VOICE_CAMPAIGN_LIMITS.maxVariableLength);
             if (text) variables[key] = text;
         }

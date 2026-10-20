@@ -7,7 +7,7 @@ import type { VoiceAgent } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { voiceAgentVoiceCharacter, voiceAgentVoiceName } from '@/helpers/voice-agent-defaults';
-import { voiceAgentUrl } from '../_utils/voice-agent-routes';
+import { voiceAgentUrl } from '@/helpers/voice-routes';
 import { VoiceAgentCallTypeBadge } from './VoiceAgentCallTypeBadge';
 
 type VoiceAgentCardProps = {

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { usePage } from '@/contexts/PageStore';
 import type { UseCampaignsPageReturn } from '../_hooks/use-campaigns-page';
-import { NEW_CAMPAIGN_URL } from '../_utils/campaign-routes';
+import { NEW_CAMPAIGN_URL } from '@/helpers/voice-routes';
 import { CampaignCard } from './CampaignCard';
 
 function NewCampaignButton() {

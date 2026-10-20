@@ -12,9 +12,10 @@ import {
     type VoiceNumberDoc,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
+import { VOICE_AGENT_FEATURE_LIMITS, VOICE_VARIABLE_NAME_PATTERN } from '@aixellabs/backend/db/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key';
-import { isBuiltinVariable, VOICE_AGENT_FEATURE_LIMITS, VOICE_VARIABLE_NAME_PATTERN } from '@/helpers/voice-agent-features';
+import { isBuiltinVariable } from '@/helpers/voice-agent-features';
 import { engineFetch, sealSecret } from '@/server/voice-agent/engine';
 import { assertGeminiKeySet, GEMINI_KEY_MISSING_MESSAGE } from '@/server/voice-agent/gemini-key';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
@@ -366,7 +367,7 @@ export const importTelnyxNumbers = async (
             accountNumbers: await listTelnyxAccountNumbers(key),
             wantedIds: providerNumberIds,
             apiKeySealed: sealSecret(key),
-            providerName: 'Telnyx',
+            providerName: telnyxNumbers.label,
         });
     });
 
@@ -395,7 +396,7 @@ export const importVoiceLinkNumbers = async (
             accountNumbers: await listVoiceLinkAccountNumbers(auth),
             wantedIds: providerNumberIds,
             apiKeySealed: sealSecret(auth.token),
-            providerName: 'VoiceLink',
+            providerName: voicelinkNumbers.label,
             extra: { voicelink: { clientId: auth.clientId, botId: null, routingId: null } },
         });
     });
@@ -427,7 +428,7 @@ export const importTwilioNumbers = async (
             accountNumbers: await listTwilioAccountNumbers(auth),
             wantedIds: providerNumberIds,
             apiKeySealed: sealSecret(auth.secret),
-            providerName: 'Twilio',
+            providerName: twilioNumbers.label,
             extra: { twilio: { accountSid: auth.accountSid, apiKeySid: auth.apiKeySid } },
             problemWith: twilioNumberProblem,
         });

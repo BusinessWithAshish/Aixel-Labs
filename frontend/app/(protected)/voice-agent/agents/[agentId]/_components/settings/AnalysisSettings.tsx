@@ -1,7 +1,11 @@
 'use client';
 
 import { ClipboardList, Plus, Trash2 } from 'lucide-react';
-import type { VoiceAnalysisFieldType } from '@aixellabs/backend/db/types';
+import {
+    VOICE_AGENT_FEATURE_LIMITS,
+    VOICE_ANALYSIS_FIELD_TYPES,
+    type VoiceAnalysisFieldType,
+} from '@aixellabs/backend/db/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { usePage } from '@/contexts/PageStore';
-import { VOICE_AGENT_FEATURE_LIMITS, VOICE_ANALYSIS_FIELD_TYPES } from '@/helpers/voice-agent-features';
+import { VOICE_ANALYSIS_FIELD_TYPE_LABELS } from '@/helpers/voice-agent-features';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 import type { AnalysisFieldDraft } from '../../_utils/call-settings-draft';
 
@@ -66,9 +70,9 @@ function FieldRow({ field, index }: { field: AnalysisFieldDraft; index: number }
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        {VOICE_ANALYSIS_FIELD_TYPES.map((t) => (
-                            <SelectItem key={t.value} value={t.value}>
-                                {t.label}
+                        {VOICE_ANALYSIS_FIELD_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>
+                                {VOICE_ANALYSIS_FIELD_TYPE_LABELS[type]}
                             </SelectItem>
                         ))}
                     </SelectContent>

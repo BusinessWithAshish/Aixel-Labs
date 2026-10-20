@@ -6,7 +6,9 @@ import {
     type VoiceLinkNumberState,
     type VoiceLinkRouting,
     type VoiceNumberDoc,
+    VoiceProvider,
 } from '@aixellabs/backend/db';
+import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { numberWebhookUrl, openSecret, voicelinkSocketUrl } from '@/server/voice-agent/engine';
 import type { NumberProvider, OwnedNumberDoc, ProviderAccountNumber } from '@/server/voice-agent/number-provider';
 import {
@@ -260,7 +262,7 @@ function isTokenRejected(error: unknown): boolean {
 }
 
 export const voicelinkNumbers: NumberProvider = {
-    label: 'VoiceLink',
+    label: numberProviderInfo(VoiceProvider.VOICELINK).label,
 
     startAnswering(doc) {
         return syncRouting(doc, { inbound: true, outbound: !!doc.outboundAgentId });

@@ -1,5 +1,6 @@
 import { VoiceProvider } from '@aixellabs/backend/db/types';
 
+/** What the UI and errors call each number provider (client-safe). */
 export type NumberProviderInfo = {
     label: string;
     /** Which numbers it is for, shown in the Connect dialog. */

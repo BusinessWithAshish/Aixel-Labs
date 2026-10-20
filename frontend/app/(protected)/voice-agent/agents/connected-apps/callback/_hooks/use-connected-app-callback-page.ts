@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import type { VoiceCalendarProvider } from '@aixellabs/backend/db/types';
 import { confirmVoiceAppConnection } from '@/app/actions/voice-calendar-actions';
 import { voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
-import { VOICE_AGENTS_URL, voiceAgentUrl } from '../../../_utils/voice-agent-routes';
+import { VOICE_AGENTS_URL, voiceAgentUrl } from '@/helpers/voice-routes';
 
 export type ConnectedAppCallbackData = {
     /** Composio's `connected_account_id`; null when it sent none. */

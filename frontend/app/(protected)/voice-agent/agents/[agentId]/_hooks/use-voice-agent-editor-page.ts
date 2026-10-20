@@ -5,20 +5,20 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
     VOICE_BUILTIN_VARIABLES,
-    VoiceCalendarConnectionStatus,
     type VoiceAgent,
     type VoiceAgentCallType,
     type VoiceAgentVoice,
     type VoiceBookingDestination,
     type VoiceCalendarConnection,
+    VoiceCalendarConnectionStatus,
     type VoiceCallerMemory,
+    type VoiceWeekday,
 } from '@aixellabs/backend/db/types';
 import {
     deleteVoiceAgent,
     saveVoiceAgentBooking,
     saveVoiceAgentCallSettings,
     updateVoiceAgent,
-    type VoiceAgentInput,
     type VoiceAgentUsage,
 } from '@/app/actions/voice-agent-actions';
 import {
@@ -34,16 +34,17 @@ import {
 } from '@/app/actions/voice-caller-memory-actions';
 import { customVariableNames, VOICE_BUILTIN_VARIABLE_INFO } from '@/helpers/voice-agent-features';
 import { defaultBookingTarget, voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
-import { voiceAgentDefaults, type VoiceBookingDay } from '@/helpers/voice-agent-defaults';
-import { VOICE_AGENTS_URL } from '../../_utils/voice-agent-routes';
+import { voiceAgentDefaults } from '@/helpers/voice-agent-defaults';
+import type { VoiceAgentInput } from '@/helpers/voice-schemas';
+import { browserTimezone } from '@/helpers/voice-time';
+import { VOICE_AGENTS_URL } from '@/helpers/voice-routes';
 import {
-    bookingDraftError,
-    bookingToDraft,
-    browserTimezone,
-    draftToBooking,
-    sameBooking,
     type BookingDayDraft,
     type BookingDraft,
+    bookingDraftError,
+    bookingToDraft,
+    draftToBooking,
+    sameBooking,
 } from '../_utils/booking-draft';
 import {
     draftToSettings,
@@ -223,7 +224,7 @@ export function useVoiceAgentEditorPage({
         [],
     );
     const setBookingDay = useCallback(
-        (day: VoiceBookingDay, patch: Partial<BookingDayDraft>) =>
+        (day: VoiceWeekday, patch: Partial<BookingDayDraft>) =>
             setBookingDraft((d) => ({ ...d, days: { ...d.days, [day]: { ...d.days[day], ...patch } } })),
         [],
     );

@@ -1,18 +1,9 @@
 import { VoiceCallChannel } from '@aixellabs/backend/db/types';
-
-/** A zone the browser knows, else UTC (an agent could have been saved with a zone this browser lacks). */
-function safeZone(timeZone: string): string {
-    try {
-        new Intl.DateTimeFormat('en-US', { timeZone });
-        return timeZone;
-    } catch {
-        return 'UTC';
-    }
-}
+import { safeTimezone } from '@/helpers/voice-time';
 
 /** "Sat 18 Oct" (plus the year when it is not this year) in `timeZone`. */
 export function formatDayIn(iso: string, timeZone: string): string {
-    const zone = safeZone(timeZone);
+    const zone = safeTimezone(timeZone);
     const date = new Date(iso);
     const sameYear =
         new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: zone }).format(date) ===
@@ -29,7 +20,7 @@ export function formatDayIn(iso: string, timeZone: string): string {
 /** "2:00 PM" in `timeZone` (ICU's narrow no-break space becomes a plain one, so server and browser agree). */
 export function formatTimeIn(iso: string, timeZone: string): string {
     return new Date(iso)
-        .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: safeZone(timeZone) })
+        .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: safeTimezone(timeZone) })
         .replace(/\s/g, ' ');
 }
 

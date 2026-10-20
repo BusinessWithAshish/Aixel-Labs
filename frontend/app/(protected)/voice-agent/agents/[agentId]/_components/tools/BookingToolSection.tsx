@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { CalendarCheck, Loader2, Save } from 'lucide-react';
-import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
+import { VOICE_AGENT_SUB_MODULES, VOICE_BOOKING_LIMITS } from '@aixellabs/backend/db/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,10 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
-import { VOICE_BOOKING_DAYS, VOICE_BOOKING_LIMITS, VOICE_BOOKING_SLOT_OPTIONS } from '@/helpers/voice-agent-defaults';
+import { VOICE_BOOKING_SLOT_OPTIONS } from '@/helpers/voice-agent-defaults';
 import { cn } from '@/lib/utils';
+import { minutesLabel, VOICE_WEEKDAY_OPTIONS } from '@/helpers/voice-time';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
-import { slotLengthLabel } from '../../_utils/booking-draft';
 import { BookingDestinationField } from './BookingDestinationField';
 import { TimezoneSelect } from './TimezoneSelect';
 
@@ -23,7 +23,7 @@ function BookingHoursGrid() {
 
     return (
         <ul className="divide-y rounded-md border" aria-labelledby="booking-hours-label" data-testid="booking-hours">
-            {VOICE_BOOKING_DAYS.map(({ key, label }) => {
+            {VOICE_WEEKDAY_OPTIONS.map(({ key, label }) => {
                 const day = bookingDraft.days[key];
                 const switchId = `booking-${key}-open`;
                 return (
@@ -155,7 +155,7 @@ export function BookingToolSection() {
                                 <SelectContent>
                                     {slotOptions.map((minutes) => (
                                         <SelectItem key={minutes} value={String(minutes)}>
-                                            {slotLengthLabel(minutes)}
+                                            {minutesLabel(minutes)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -186,7 +186,7 @@ export function BookingToolSection() {
                         </p>
                         <BookingHoursGrid />
                         <p className="text-muted-foreground text-xs">
-                            Callers are offered start times every {slotLengthLabel(bookingDraft.slotMinutes)} within these
+                            Callers are offered start times every {minutesLabel(bookingDraft.slotMinutes)} within these
                             hours, never one that is already booked.
                         </p>
                     </div>

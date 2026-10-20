@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { usePage } from '@/contexts/PageStore';
 // Shared with the booking tool's settings (same searchable list of IANA zones).
 import { TimezoneSelect } from '../../../agents/[agentId]/_components/tools/TimezoneSelect';
-import { DAYS, RETRY_DELAYS, RETRY_OUTCOMES } from '../../_utils/campaign-format';
+import { minutesLabel, VOICE_WEEKDAY_OPTIONS } from '@/helpers/voice-time';
+import { RETRY_DELAY_MINUTES, RETRY_OUTCOMES } from '../../_utils/campaign-format';
 import type { UseNewCampaignPageReturn } from '../_hooks/use-new-campaign-page';
 
 const CONCURRENCY = Array.from({ length: VOICE_CAMPAIGN_LIMITS.maxConcurrent }, (_, i) => i + 1);
@@ -35,7 +36,7 @@ export function StepSchedule() {
         <div className="flex flex-col gap-6">
             <Section title="Calling days" hint="Calls only start inside these hours, on the campaign’s clock.">
                 <div className="flex flex-wrap gap-1.5" role="group" aria-label="Calling days">
-                    {DAYS.map((day) => {
+                    {VOICE_WEEKDAY_OPTIONS.map((day) => {
                         const on = callWindow.days.includes(day.key);
                         return (
                             <Button
@@ -133,9 +134,9 @@ export function StepSchedule() {
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                {RETRY_DELAYS.map((d) => (
-                                    <SelectItem key={d.minutes} value={String(d.minutes)}>
-                                        {d.label}
+                                {RETRY_DELAY_MINUTES.map((minutes) => (
+                                    <SelectItem key={minutes} value={String(minutes)}>
+                                        {minutesLabel(minutes)}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

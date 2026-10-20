@@ -255,6 +255,13 @@ export enum VoiceAgentCallType {
   OUTBOUND = "OUTBOUND",
 }
 
+/** Limits on an agent's own fields, enforced by the app. */
+export const VOICE_AGENT_LIMITS = {
+  nameMax: 80,
+  promptMax: 50_000,
+  callNotesMax: 4_000,
+} as const;
+
 export type VoiceAgentDoc<Id = ObjectId> = {
   _id?: Id;
   tenantId: Id;
@@ -285,8 +292,25 @@ export type VoiceAgentDoc<Id = ObjectId> = {
   updatedAt: Date;
 };
 
+/** Days of the week as stored, Monday first (booking hours, campaign calling days). */
+export const VOICE_WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+
+export type VoiceWeekday = (typeof VOICE_WEEKDAYS)[number];
+
+/** A clock time, "HH:MM" (24 h). */
+export const VOICE_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 /** "Mon".."Sun" -> opening hours that day; a missing day is closed. Times are "HH:MM" (24 h) in the booking timezone. */
-export type VoiceBookingHours = Partial<Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", { open: string; close: string }>>;
+export type VoiceBookingHours = Partial<Record<VoiceWeekday, { open: string; close: string }>>;
+
+export const VOICE_BOOKING_LIMITS = {
+  slotMinutesMin: 15,
+  slotMinutesMax: 240,
+  /** Appointment lengths are whole multiples of this. */
+  slotMinutesStep: 5,
+  maxDaysAheadMin: 1,
+  maxDaysAheadMax: 90,
+} as const;
 
 /**
  * Built-in appointment booking. The engine gives the model two functions,
@@ -383,7 +407,29 @@ export type VoiceBookingExternal = {
   meetingUrl?: string | null;
 };
 
-export type VoiceWebhookParamType = "string" | "number" | "boolean";
+export const VOICE_WEBHOOK_PARAM_TYPES = ["string", "number", "boolean"] as const;
+
+export type VoiceWebhookParamType = (typeof VOICE_WEBHOOK_PARAM_TYPES)[number];
+
+/** A custom tool's name, as the model sees it. */
+export const VOICE_TOOL_NAME_PATTERN = /^[a-z][a-z0-9_]{1,39}$/;
+
+/** A custom tool parameter's name. */
+export const VOICE_TOOL_PARAM_NAME_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
+
+/** Names the engine already uses for its own functions. */
+export const VOICE_RESERVED_TOOL_NAMES = ["check_availability", "book_appointment", "end_call"] as const;
+
+export const VOICE_WEBHOOK_LIMITS = {
+  maxTools: 10,
+  maxParams: 10,
+  descriptionMax: 1000,
+  paramDescriptionMax: 300,
+  urlMax: 2048,
+  secretMax: 256,
+  /** The engine (and the test request) waits this long for an answer. */
+  timeoutMs: 8000,
+} as const;
 
 export type VoiceWebhookParam = {
   /** ^[a-z][a-z0-9_]{0,39}$ */
@@ -587,6 +633,29 @@ export enum VoiceCallDirection {
   PLAYGROUND = "PLAYGROUND",
 }
 
+/** How a call ended, as the engine writes `endedBy`. */
+export enum VoiceCallEndReason {
+  CALLER_HUNG_UP = "caller_hung_up",
+  AGENT_HUNG_UP = "agent_hung_up",
+  GOODBYE = "goodbye",
+  DNC = "dnc",
+  ABUSE = "abuse",
+  VOICEMAIL = "voicemail",
+  /** A message was left after the beep (`voicemailMessage`). */
+  VOICEMAIL_MESSAGE = "voicemail_message",
+  IVR = "ivr",
+  NO_ANSWER = "no_answer",
+  NOT_CONNECTED = "not_connected",
+  RECORDING_OBJECTION = "recording_objection",
+  WRONG_NUMBER = "wrong_number",
+  BUSY = "busy",
+  FAILED = "failed",
+  TIMEOUT = "timeout",
+  ERROR = "error",
+  /** Gemini refused the owner's key; the reason is in `flags` and on their VoiceSettingsDoc. */
+  GEMINI_KEY_ERROR = "gemini_key_error",
+}
+
 export type VoiceCallTurn = {
   role: "agent" | "caller";
   text: string;
@@ -608,10 +677,7 @@ export type VoiceCallDoc<Id = ObjectId> = {
   startedAt: Date;
   endedAt: Date;
   durationSec: number;
-  /**
-   * caller_hung_up | goodbye | dnc | abuse | voicemail | voicemail_message | ivr | no_answer | ...
-   * | gemini_key_error (Gemini refused the owner's key; the reason is in `flags` and on their VoiceSettingsDoc).
-   */
+  /** A {@link VoiceCallEndReason}, or a newer reason the engine writes as it is. */
   endedBy: string;
   flags: { flag: string; quote: string }[];
   turns: VoiceCallTurn[];
@@ -674,6 +740,9 @@ export const VOICE_BUILTIN_VARIABLES = [
 
 export type VoiceBuiltinVariable = (typeof VOICE_BUILTIN_VARIABLES)[number];
 
+/** A variable, analysis field or campaign CSV column name as saved. */
+export const VOICE_VARIABLE_NAME_PATTERN = /^[a-z][a-z0-9_]{0,43}$/;
+
 export const VOICE_AGENT_FEATURE_LIMITS = {
   /** Default values kept per agent, and each one's length. */
   maxVariables: 30,
@@ -701,7 +770,9 @@ export type VoiceAgentVoicemail = {
   message: string;
 };
 
-export type VoiceAnalysisFieldType = "boolean" | "text" | "number" | "choice";
+export const VOICE_ANALYSIS_FIELD_TYPES = ["text", "number", "boolean", "choice"] as const;
+
+export type VoiceAnalysisFieldType = (typeof VOICE_ANALYSIS_FIELD_TYPES)[number];
 
 /** One custom value the analysis pulls out of each call. */
 export type VoiceAnalysisField = {
@@ -827,7 +898,7 @@ export type VoiceGeminiKeyView = {
 // ---------------------------------------------------------------------------
 // Outbound campaigns: an outbound agent calls a list of contacts from one of the owner's
 // numbers, inside a calling window. The app writes both collections; the voice engine
-// (~/voice-latency-trial/campaigns.py) runs RUNNING campaigns: it claims due contacts, dials
+// (backend/voice/campaigns.py) runs RUNNING campaigns: it claims due contacts, dials
 // them through its own POST /calls, and settles each contact from the call's voice_calls doc.
 // ---------------------------------------------------------------------------
 
@@ -852,7 +923,10 @@ export enum VoiceCampaignRetryOutcome {
   VOICEMAIL = "voicemail",
 }
 
-export type VoiceCampaignDay = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+export type VoiceCampaignDay = VoiceWeekday;
+
+/** A calling window's end may also be midnight. */
+export const VOICE_CAMPAIGN_END_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$|^24:00$/;
 
 /** Calls start only on `days`, from `start` (included) to `end` (excluded), "HH:MM" on the clock of `timezone`. */
 export type VoiceCampaignWindow = {
@@ -873,6 +947,7 @@ export type VoiceCampaignRetry = {
 
 /** Limits the app enforces and the engine relies on. */
 export const VOICE_CAMPAIGN_LIMITS = {
+  nameMax: 80,
   /** Calls at once per campaign, and per number across campaigns (the engine's MAX_CALLS 8, minus 2 kept for calls coming in). */
   maxConcurrent: 6,
   maxRetries: 5,
@@ -927,6 +1002,13 @@ export enum VoiceCampaignContactStatus {
   CANCELLED = "CANCELLED",
 }
 
+/** A contact's `lastOutcome` when no call settled it. */
+export enum VoiceCampaignOutcome {
+  DNC_LIST = "dnc_list",
+  INVALID_NUMBER = "invalid_number",
+  INTERRUPTED = "interrupted",
+}
+
 export type VoiceCampaignContactDoc<Id = ObjectId> = {
   _id?: Id;
   tenantId: Id;
@@ -944,7 +1026,7 @@ export type VoiceCampaignContactDoc<Id = ObjectId> = {
   attempts: number;
   /** When it may be called (again); null = now. */
   nextAttemptAt: Date | null;
-  /** The last call's `endedBy` (no_answer, goodbye, ...), `dnc_list`, `invalid_number` or `interrupted`. */
+  /** The last call's `endedBy` ({@link VoiceCallEndReason}) or a {@link VoiceCampaignOutcome}. */
   lastOutcome?: string | null;
   /** The engine's or provider's words when a call could not be placed. */
   lastError?: string | null;

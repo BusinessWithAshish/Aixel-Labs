@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useGeminiKeyCard, type UseGeminiKeyCardReturn } from '../_hooks/use-gemini-key-card';
-import { GEMINI_KEY_ANCHOR } from '../_utils/voice-agent-routes';
+import { GEMINI_KEY_ANCHOR } from '@/helpers/voice-routes';
 
 const AI_STUDIO_KEYS_URL = 'https://aistudio.google.com/apikey';
 

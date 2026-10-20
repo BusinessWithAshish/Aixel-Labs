@@ -3,7 +3,7 @@ import { KeyRound } from 'lucide-react';
 import { VoiceGeminiKeyStatus, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { GEMINI_KEY_URL } from '../_utils/voice-agent-routes';
+import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 
 type GeminiKeyNoticeProps = {
     view: VoiceGeminiKeyView;

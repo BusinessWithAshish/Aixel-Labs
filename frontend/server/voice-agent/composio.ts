@@ -5,6 +5,7 @@ import {
     VoiceCalendarProvider,
     type VoiceBookingExternal,
 } from '@aixellabs/backend/db/types';
+import { voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
 
 /**
  * Customers' own booking apps, through Composio (REST v3.1, project API key).
@@ -90,13 +91,6 @@ export const CALENDAR_TOOLS: Record<VoiceCalendarProvider, string[]> = {
         'CALENDLY_GET_USER',
         'CALENDLY_LIST_EVENT_TYPES',
     ],
-};
-
-const PROVIDER_LABELS: Record<VoiceCalendarProvider, string> = {
-    [VoiceCalendarProvider.GOOGLE_CALENDAR]: 'Google Calendar',
-    [VoiceCalendarProvider.OUTLOOK]: 'Outlook',
-    [VoiceCalendarProvider.CAL_COM]: 'Cal.com',
-    [VoiceCalendarProvider.CALENDLY]: 'Calendly',
 };
 
 export class ComposioError extends Error {
@@ -201,7 +195,10 @@ export async function ensureManagedAuthConfig(provider: VoiceCalendarProvider): 
         const created = await composio('POST', '/auth_configs', {
             body: {
                 toolkit: { slug: toolkit },
-                auth_config: { type: 'use_composio_managed_auth', name: `Aixel voice agents: ${PROVIDER_LABELS[provider]}` },
+                auth_config: {
+                    type: 'use_composio_managed_auth',
+                    name: `Aixel voice agents: ${voiceCalendarProviderLabel(provider)}`,
+                },
             },
         });
         const config = isRecord(created.auth_config) ? created.auth_config : null;

@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { Info } from 'lucide-react';
-import { VOICE_AGENT_SUB_MODULES, VoiceProvider } from '@aixellabs/backend/db/types';
+import { VOICE_AGENT_FEATURE_LIMITS, VOICE_AGENT_SUB_MODULES, VoiceProvider } from '@aixellabs/backend/db/types';
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
 import { placeTestCall, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
-import { VOICE_AGENT_FEATURE_LIMITS } from '@/helpers/voice-agent-features';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -15,8 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
+import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
-import { numberProviderInfo } from '../_utils/number-providers';
 import { GeminiKeyNotice } from '../../agents/_components/GeminiKeyNotice';
 
 /** What to know before placing a call through each provider. */

@@ -8,12 +8,10 @@ import {
     VOICE_CAMPAIGN_LIMITS,
     VoiceAgentCallType,
     VoiceCampaignContactStatus,
-    VoiceCampaignRetryOutcome,
     VoiceCampaignStatus,
     VoiceProvider,
     type VoiceAgentDoc,
     type VoiceCampaignContactDoc,
-    type VoiceCampaignDay,
     type VoiceCampaignDoc,
     type VoiceCampaignRetry,
     type VoiceCampaignWindow,
@@ -21,12 +19,8 @@ import {
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
-import {
-    campaignCountry,
-    checkContacts,
-    VARIABLE_KEY_PATTERN,
-    type CampaignContactInput,
-} from '@/helpers/voice-campaign-contacts';
+import { type CampaignContactInput, campaignCountry, checkContacts } from '@/helpers/voice-campaign-contacts';
+import { campaignSettingsSchema, parseOrThrow, type VoiceCampaignSettingsInput } from '@/helpers/voice-schemas';
 import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key';
 import { assertGeminiKeySet } from '@/server/voice-agent/gemini-key';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
@@ -37,8 +31,6 @@ import { twilioNumbers } from '@/server/voice-agent/twilio-numbers';
 import { voicelinkNumbers } from '@/server/voice-agent/voicelink-numbers';
 
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.CAMPAIGNS;
-const DAYS: VoiceCampaignDay[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$|^24:00$/;
 /** Contacts per addVoiceCampaignContacts call: keeps each request well under the 1 MB action body limit. */
 const CONTACTS_PER_REQUEST = 500;
 const CONTACTS_SHOWN = 500;
@@ -114,17 +106,6 @@ export type VoiceCampaignDetail = {
 export type VoiceCampaignSetup = {
     agents: { id: string; name: string }[];
     numbers: { id: string; phoneNumber: string; provider: VoiceProvider }[];
-};
-
-export type VoiceCampaignSettingsInput = {
-    name: string;
-    agentId: string;
-    numberId: string;
-    window: VoiceCampaignWindow;
-    maxConcurrent: number;
-    retry: VoiceCampaignRetry;
-    defaultCountry: string;
-    variableKeys: string[];
 };
 
 export type AddCampaignContactsResult = {
@@ -270,65 +251,6 @@ async function loadCampaignItem(owner: VoiceOwnerScope, doc: VoiceCampaignDoc & 
     return mapCampaign(doc, stats.get(doc._id.toString()), names);
 }
 
-function validTimezone(zone: string): boolean {
-    try {
-        new Intl.DateTimeFormat('en-US', { timeZone: zone });
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
-
-function parseSettings(input: VoiceCampaignSettingsInput) {
-    const name = typeof input?.name === 'string' ? input.name.trim() : '';
-    if (!name) throw new Error('Give the campaign a name');
-    if (name.length > 80) throw new Error('Keep the name under 80 characters');
-    assertValidObjectId(input.agentId, 'Agent ID');
-    assertValidObjectId(input.numberId, 'Number ID');
-
-    const w = input.window ?? ({} as VoiceCampaignWindow);
-    const days = DAYS.filter((d) => Array.isArray(w.days) && w.days.includes(d));
-    if (days.length === 0) throw new Error('Pick at least one calling day');
-    if (!HHMM.test(w.start ?? '') || !HHMM.test(w.end ?? '') || w.start === '24:00')
-        throw new Error('Calling hours must be times like 09:00');
-    if (minutesOf(w.start) >= minutesOf(w.end)) throw new Error('Calling hours must end after they start');
-    if (typeof w.timezone !== 'string' || !validTimezone(w.timezone)) throw new Error('Pick a valid timezone');
-
-    const maxConcurrent = Math.trunc(Number(input.maxConcurrent));
-    if (!(maxConcurrent >= 1 && maxConcurrent <= VOICE_CAMPAIGN_LIMITS.maxConcurrent))
-        throw new Error(`Calls at once must be 1 to ${VOICE_CAMPAIGN_LIMITS.maxConcurrent}`);
-
-    const r = input.retry ?? ({} as VoiceCampaignRetry);
-    const maxRetries = Math.trunc(Number(r.maxRetries));
-    if (!(maxRetries >= 0 && maxRetries <= VOICE_CAMPAIGN_LIMITS.maxRetries))
-        throw new Error(`Retries must be 0 to ${VOICE_CAMPAIGN_LIMITS.maxRetries}`);
-    const delayMinutes = Math.trunc(Number(r.delayMinutes));
-    if (!(delayMinutes >= VOICE_CAMPAIGN_LIMITS.minRetryDelayMinutes && delayMinutes <= VOICE_CAMPAIGN_LIMITS.maxRetryDelayMinutes))
-        throw new Error('Pick a delay between retries');
-    const outcomes = Object.values(VoiceCampaignRetryOutcome);
-    const on = outcomes.filter((o) => Array.isArray(r.on) && r.on.includes(o));
-    if (maxRetries > 0 && on.length === 0) throw new Error('Pick what to retry: no answer, busy or voicemail');
-
-    if (!campaignCountry(input.defaultCountry)) throw new Error('Pick the country for numbers without a +');
-    const variableKeys = Array.isArray(input.variableKeys)
-        ? [...new Set(input.variableKeys.filter((k) => typeof k === 'string' && VARIABLE_KEY_PATTERN.test(k)))].slice(
-              0,
-              VOICE_CAMPAIGN_LIMITS.maxVariables,
-          )
-        : [];
-
-    return {
-        name,
-        window: { days, start: w.start, end: w.end, timezone: w.timezone },
-        maxConcurrent,
-        retry: { maxRetries, delayMinutes, on },
-        defaultCountry: input.defaultCountry,
-        variableKeys,
-    };
-}
-
 async function findOutboundAgent(owner: VoiceOwnerScope, agentId: string) {
     const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
     const agent = await agents.findOne(
@@ -424,7 +346,7 @@ export const getVoiceCampaign = async (
 export const createVoiceCampaign = async (input: VoiceCampaignSettingsInput): Promise<ALApiResponse<{ id: string }>> =>
     runAuthenticatedAction(async function createVoiceCampaign(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
-        const settings = parseSettings(input);
+        const settings = parseOrThrow(campaignSettingsSchema, input, 'Check the campaign settings');
         const agent = await findOutboundAgent(owner, input.agentId);
         const number = await findOwnedNumber(owner, input.numberId);
         await ensureVoiceAgentIndexes();

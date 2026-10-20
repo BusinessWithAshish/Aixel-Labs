@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { voiceCallRecordingApiRoute } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
+import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UseCallDetailPageReturn } from '../_hooks/use-call-detail-page';
 
 export function RecordingPlayer() {
@@ -49,7 +50,7 @@ export function RecordingPlayer() {
                             Download {recording.format.toUpperCase()}
                         </a>
                         <p className="text-muted-foreground text-xs">
-                            Stored in your {recording.storedBy} account. Aixel Labs keeps no copy.
+                            Stored in your {numberProviderInfo(recording.storedBy).label} account. Aixel Labs keeps no copy.
                         </p>
                     </>
                 ) : (

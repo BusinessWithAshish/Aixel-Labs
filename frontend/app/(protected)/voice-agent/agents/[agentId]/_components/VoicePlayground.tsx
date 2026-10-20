@@ -11,7 +11,7 @@ import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import { ToolCallRow } from '../../../call-logs/_components/ToolCallRow';
 import { GeminiKeyNotice } from '../../_components/GeminiKeyNotice';
-import { GEMINI_KEY_URL } from '../../_utils/voice-agent-routes';
+import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import {
     median,

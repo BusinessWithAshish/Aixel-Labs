@@ -1,11 +1,12 @@
 import {
     VOICE_AGENT_FEATURE_LIMITS,
-    VoiceVoicemailAction,
+    VOICE_VARIABLE_NAME_PATTERN,
     type VoiceAgent,
     type VoiceAnalysisFieldType,
+    VoiceVoicemailAction,
 } from '@aixellabs/backend/db/types';
-import type { VoiceAgentCallSettingsInput } from '@/app/actions/voice-agent-actions';
-import { callSettingsOf, VOICE_VARIABLE_NAME_PATTERN } from '@/helpers/voice-agent-features';
+import { callSettingsOf } from '@/helpers/voice-agent-features';
+import type { VoiceAgentCallSettingsInput } from '@/helpers/voice-schemas';
 
 /** One custom analysis field as edited: a choice's answers are typed as one comma-separated line. */
 export type AnalysisFieldDraft = {

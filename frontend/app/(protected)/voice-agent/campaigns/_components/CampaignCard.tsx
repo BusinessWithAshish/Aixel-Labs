@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Bot, Clock, Phone } from 'lucide-react';
 import type { VoiceCampaignListItem } from '@/app/actions/voice-campaign-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { campaignUrl } from '../_utils/campaign-routes';
+import { campaignUrl } from '@/helpers/voice-routes';
 import { windowLabel } from '../_utils/campaign-format';
 import { CampaignProgress } from './CampaignProgress';
 import { CampaignStatusBadge } from './CampaignStatusBadge';

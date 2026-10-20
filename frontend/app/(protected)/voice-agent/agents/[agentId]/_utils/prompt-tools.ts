@@ -1,5 +1,9 @@
-import type { VoiceAgentWebhookToolView, VoiceBookingDestination } from '@aixellabs/backend/db/types';
-import { VOICE_RESERVED_TOOL_NAMES, VOICE_TOOL_NAME_PATTERN } from '@/helpers/voice-agent-defaults';
+import {
+    VOICE_RESERVED_TOOL_NAMES,
+    VOICE_TOOL_NAME_PATTERN,
+    type VoiceAgentWebhookToolView,
+    type VoiceBookingDestination,
+} from '@aixellabs/backend/db/types';
 import { findVariables, type VariableMention } from '@/helpers/voice-agent-features';
 import { voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
 

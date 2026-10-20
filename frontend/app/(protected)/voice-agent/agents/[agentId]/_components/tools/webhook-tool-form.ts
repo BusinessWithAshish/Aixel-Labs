@@ -1,11 +1,12 @@
-import type { VoiceAgentWebhookToolView, VoiceWebhookParamType } from '@aixellabs/backend/db/types';
-import type { VoiceWebhookToolInput } from '@/app/actions/voice-agent-actions';
 import {
     VOICE_RESERVED_TOOL_NAMES,
     VOICE_TOOL_NAME_PATTERN,
     VOICE_TOOL_PARAM_NAME_PATTERN,
     VOICE_WEBHOOK_LIMITS,
-} from '@/helpers/voice-agent-defaults';
+    type VoiceAgentWebhookToolView,
+    type VoiceWebhookParamType,
+} from '@aixellabs/backend/db/types';
+import type { VoiceWebhookToolInput } from '@/helpers/voice-schemas';
 
 export type ParamDraft = {
     /** Row key for React only. */

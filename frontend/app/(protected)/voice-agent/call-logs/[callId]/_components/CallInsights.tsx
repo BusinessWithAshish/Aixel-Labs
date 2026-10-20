@@ -6,13 +6,10 @@ import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePage } from '@/contexts/PageStore';
+import { formatDay } from '@/helpers/voice-time';
 import type { UseCallDetailPageReturn } from '../_hooks/use-call-detail-page';
 import { formatFieldValue } from '../../_utils/call-format';
 import { CallOutcomeBadges } from '../../_components/CallOutcomeBadges';
-
-function formatDay(iso: string): string {
-    return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-}
 
 /** What the post-call analysis worked out: summary, verdicts, custom fields (or why it failed). */
 export function CallAnalysisCard() {

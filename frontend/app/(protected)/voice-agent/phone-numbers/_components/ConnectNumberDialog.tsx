@@ -23,8 +23,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
+import { NUMBER_PROVIDER_ORDER, numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
-import { NUMBER_PROVIDER_ORDER, numberProviderInfo } from '../_utils/number-providers';
 import { setupGuideFor, TELNYX_GUIDE_STEP, TWILIO_GUIDE_STEP } from '../_utils/setup-guides';
 
 const FORM_ID = 'connect-number-form';

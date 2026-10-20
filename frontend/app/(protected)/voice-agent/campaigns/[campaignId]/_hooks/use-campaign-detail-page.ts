@@ -12,7 +12,7 @@ import {
     type VoiceCampaignContactFilter,
     type VoiceCampaignDetail,
 } from '@/app/actions/voice-campaign-actions';
-import { CAMPAIGNS_URL } from '../../_utils/campaign-routes';
+import { CAMPAIGNS_URL } from '@/helpers/voice-routes';
 
 /** While it runs, the page follows the engine's progress on its own. */
 const REFRESH_MS = 4000;

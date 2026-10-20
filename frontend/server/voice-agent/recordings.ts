@@ -21,8 +21,8 @@ export type CallRecordingResult =
           url: string;
           format: 'mp3' | 'wav';
           durationSec: number | null;
-          /** Who keeps the recording, e.g. "Telnyx". */
-          storedBy: string;
+          /** Whose account keeps the recording. */
+          storedBy: VoiceProvider;
       }
     | { available: false; reason: string };
 
@@ -66,7 +66,7 @@ async function twilioRecording(number: VoiceNumberDoc, callSid: string): Promise
         url: recordingMediaUrl(auth, recording.sid, 'mp3'),
         format: 'mp3',
         durationSec: Number.isFinite(seconds) && seconds >= 0 ? seconds : null,
-        storedBy: 'Twilio',
+        storedBy: VoiceProvider.TWILIO,
         authorization: twilioAuthorization(auth),
     };
 }
@@ -84,7 +84,7 @@ export async function findCallRecording(owner: VoiceOwnerScope, call: VoiceCallD
             url: call.recordingUrl,
             format: recordingFormat(call.recordingUrl),
             durationSec: call.durationSec || null,
-            storedBy: 'VoiceLink',
+            storedBy: VoiceProvider.VOICELINK,
         };
     }
     if (!call.numberId) {
@@ -118,9 +118,21 @@ export async function findCallRecording(owner: VoiceOwnerScope, call: VoiceCallD
     }
     const durationSec = recording.duration_millis ? Math.round(recording.duration_millis / 1000) : null;
     if (recording.download_urls.mp3) {
-        return { available: true, url: recording.download_urls.mp3, format: 'mp3', durationSec, storedBy: 'Telnyx' };
+        return {
+            available: true,
+            url: recording.download_urls.mp3,
+            format: 'mp3',
+            durationSec,
+            storedBy: VoiceProvider.TELNYX,
+        };
     }
-    return { available: true, url: recording.download_urls.wav ?? '', format: 'wav', durationSec, storedBy: 'Telnyx' };
+    return {
+        available: true,
+        url: recording.download_urls.wav ?? '',
+        format: 'wav',
+        durationSec,
+        storedBy: VoiceProvider.TELNYX,
+    };
 }
 
 /** The signed-in user's call, or null when it is not theirs. */

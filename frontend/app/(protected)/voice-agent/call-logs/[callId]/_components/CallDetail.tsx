@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
 import { Flag, Timer } from 'lucide-react';
+import { VoiceCallEndReason } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePage } from '@/contexts/PageStore';
@@ -17,7 +18,7 @@ import {
     formatParty,
 } from '../../_utils/call-format';
 import { ToolCallRow } from '../../_components/ToolCallRow';
-import { GEMINI_KEY_URL } from '../../../agents/_utils/voice-agent-routes';
+import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { CallAnalysisCard, CallerMemoryCard, CallVariablesCard } from './CallInsights';
 import { RecordingPlayer } from './RecordingPlayer';
 
@@ -68,7 +69,7 @@ function CallSummary() {
                     </SummaryRow>
                     <SummaryRow label="Ended by">
                         {endedByLabel(call.endedBy)}
-                        {call.endedBy === 'gemini_key_error' ? (
+                        {call.endedBy === VoiceCallEndReason.GEMINI_KEY_ERROR ? (
                             <>
                                 {' · '}
                                 <Link className="text-primary underline-offset-4 hover:underline" href={GEMINI_KEY_URL}>

@@ -1,13 +1,13 @@
 'use client';
 
 import { Plus, X } from 'lucide-react';
-import type { VoiceWebhookParamType } from '@aixellabs/backend/db/types';
+import { VOICE_WEBHOOK_LIMITS, VOICE_WEBHOOK_PARAM_TYPES, type VoiceWebhookParamType } from '@aixellabs/backend/db/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { VOICE_WEBHOOK_LIMITS, VOICE_WEBHOOK_PARAM_TYPES } from '@/helpers/voice-agent-defaults';
+import { VOICE_WEBHOOK_PARAM_TYPE_LABELS } from '@/helpers/voice-agent-defaults';
 import { newParamRow, type ParamDraft } from './webhook-tool-form';
 
 type WebhookParamRowsProps = {
@@ -60,9 +60,9 @@ export function WebhookParamRows({ params, onChange, disabled }: WebhookParamRow
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {VOICE_WEBHOOK_PARAM_TYPES.map((t) => (
-                                                <SelectItem key={t.value} value={t.value}>
-                                                    {t.label}
+                                            {VOICE_WEBHOOK_PARAM_TYPES.map((type) => (
+                                                <SelectItem key={type} value={type}>
+                                                    {VOICE_WEBHOOK_PARAM_TYPE_LABELS[type]}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

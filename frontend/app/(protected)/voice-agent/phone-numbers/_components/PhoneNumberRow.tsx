@@ -12,9 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
+import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { numberBadges, type UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
-import { numberProviderInfo } from '../_utils/number-providers';
-import { GEMINI_KEY_URL } from '../../agents/_utils/voice-agent-routes';
+import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 
 const NO_AGENT = 'none';
 const AGENTS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.AGENTS];

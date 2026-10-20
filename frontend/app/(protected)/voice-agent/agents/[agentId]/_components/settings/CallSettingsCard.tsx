@@ -1,14 +1,14 @@
 'use client';
 
 import { Loader2, Save, Voicemail } from 'lucide-react';
-import { VoiceAgentCallType, VoiceVoicemailAction } from '@aixellabs/backend/db/types';
+import { VOICE_AGENT_FEATURE_LIMITS, VoiceAgentCallType, VoiceVoicemailAction } from '@aixellabs/backend/db/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { usePage } from '@/contexts/PageStore';
-import { SUGGESTED_VOICEMAIL_MESSAGE, VOICE_AGENT_FEATURE_LIMITS } from '@/helpers/voice-agent-features';
+import { SUGGESTED_VOICEMAIL_MESSAGE } from '@/helpers/voice-agent-features';
 import { cn } from '@/lib/utils';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 import { AnalysisSettings } from './AnalysisSettings';

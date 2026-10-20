@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { canonicalTimezone } from '../../_utils/booking-draft';
+import { canonicalTimezone } from '@/helpers/voice-time';
 
 type TimezoneOption = { value: string; label: string };
 

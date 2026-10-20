@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { VoiceProvider } from '@aixellabs/backend/db/types';
 import { getCall } from '@/app/actions/voice-call-actions';
 import { getActionErrorMessage } from '@/helpers/server-action-helpers';
 import { isValidObjectId } from '@/helpers/object-id';
@@ -96,7 +97,7 @@ async function resolveSource(userId: string, callId: string): Promise<RecordingS
         url: recording.url,
         format: recording.format,
         filename: `call-${date}-${slug(callRes.data.agentName ?? 'deleted agent')}.${recording.format}`,
-        redirectOnFailure: recording.storedBy === 'VoiceLink',
+        redirectOnFailure: recording.storedBy === VoiceProvider.VOICELINK,
         authorization: recording.authorization,
         expiresAt: Date.now() + SOURCE_TTL_MS,
     };

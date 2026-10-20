@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { usePage } from '@/contexts/PageStore';
-import { voiceAgentUrl } from '../../../agents/_utils/voice-agent-routes';
+import { voiceAgentUrl } from '@/helpers/voice-routes';
 import type { UseCampaignDetailPageReturn } from '../_hooks/use-campaign-detail-page';
 import { CampaignProgress } from '../../_components/CampaignProgress';
 import { CampaignStatusBadge } from '../../_components/CampaignStatusBadge';
-import { delayLabel, formatDateTime, isWindowOpen, RETRY_OUTCOMES, windowLabel } from '../../_utils/campaign-format';
+import { formatShortDateTime, minutesLabel } from '@/helpers/voice-time';
+import { isWindowOpen, RETRY_OUTCOMES, windowLabel } from '../../_utils/campaign-format';
 import { CampaignContacts } from './CampaignContacts';
 
 function Actions() {
@@ -74,7 +75,7 @@ function StateLine() {
             text = 'Paused: no new calls until you resume.';
             break;
         case VoiceCampaignStatus.COMPLETED:
-            text = campaign.completedAt ? `Finished ${formatDateTime(campaign.completedAt)}.` : 'Finished.';
+            text = campaign.completedAt ? `Finished ${formatShortDateTime(campaign.completedAt)}.` : 'Finished.';
             break;
         default:
             text = 'Cancelled: contacts not called yet were dropped.';
@@ -112,7 +113,7 @@ function Settings() {
                 {campaign.maxConcurrent} at once ·{' '}
                 {campaign.retry.maxRetries === 0 || !retryOn
                     ? 'no retries'
-                    : `${campaign.retry.maxRetries} ${campaign.retry.maxRetries === 1 ? 'retry' : 'retries'} on ${retryOn}, ${delayLabel(campaign.retry.delayMinutes)} apart`}
+                    : `${campaign.retry.maxRetries} ${campaign.retry.maxRetries === 1 ? 'retry' : 'retries'} on ${retryOn}, ${minutesLabel(campaign.retry.delayMinutes)} apart`}
             </span>
         </div>
     );

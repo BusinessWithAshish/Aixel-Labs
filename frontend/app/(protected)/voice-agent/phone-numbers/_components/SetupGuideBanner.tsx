@@ -5,8 +5,8 @@ import { BookOpen, X } from 'lucide-react';
 import { VoiceProvider } from '@aixellabs/backend/db/types';
 import { Button } from '@/components/ui/button';
 import { usePage } from '@/contexts/PageStore';
+import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
-import { numberProviderInfo } from '../_utils/number-providers';
 import { SETUP_GUIDE_PROVIDERS, setupGuideFor } from '../_utils/setup-guides';
 
 const DISMISSED_KEY = 'aixellabs:voice-agent:setup-guide-banner-dismissed';

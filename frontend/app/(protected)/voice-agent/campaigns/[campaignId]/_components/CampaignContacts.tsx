@@ -11,7 +11,8 @@ import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import type { UseCampaignDetailPageReturn } from '../_hooks/use-campaign-detail-page';
-import { CONTACT_STATUS, formatDateTime, outcomeLabel } from '../../_utils/campaign-format';
+import { formatShortDateTime } from '@/helpers/voice-time';
+import { CONTACT_STATUS, outcomeLabel } from '../../_utils/campaign-format';
 
 const CALL_LOGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.CALL_LOGS];
 
@@ -59,7 +60,7 @@ function ContactRow({ contact }: { contact: VoiceCampaignContactItem }) {
                         : [
                               contact.attempts ? `${contact.attempts} ${contact.attempts === 1 ? 'call' : 'calls'}` : null,
                               outcome ? `last: ${outcome}` : null,
-                              waitingRetry ? `next try ${formatDateTime(contact.nextAttemptAt!)}` : null,
+                              waitingRetry ? `next try ${formatShortDateTime(contact.nextAttemptAt!)}` : null,
                           ]
                               .filter(Boolean)
                               .join(' · ') || 'Not called yet'}

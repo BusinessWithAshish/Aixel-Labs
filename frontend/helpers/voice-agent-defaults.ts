@@ -8,12 +8,12 @@ import {
 } from '@aixellabs/backend/db/types';
 
 /**
- * Starting values for a new voice agent.
+ * Starting values for a new voice agent: the single source for the prompts new agents get.
  *
- * The outbound prompt is the live, call-tested one from the voice engine (`backend/voice/prompt.md`)
- * without its final `# This call` section: the engine appends that per call from the agent's
- * `callNotes` (and, on the phone, from the lead being dialled). The inbound prompt follows the same
- * honesty, limits and tone rules for a receptionist answering the business's own number.
+ * The outbound prompt is the call-tested cold-call prompt without a `# This call` section: the
+ * engine appends that per call from the agent's `callNotes` (and, on the phone, from the lead being
+ * dialled). The inbound prompt follows the same honesty, limits and tone rules for a receptionist
+ * answering the business's own number.
  */
 export const DEFAULT_VOICE_AGENT_NAME = 'Maya';
 
@@ -250,44 +250,21 @@ export const VOICE_AGENT_VOICE_OPTIONS = (Object.keys(VOICE_AGENT_VOICES) as Voi
 }));
 
 // ---------------------------------------------------------------------------
-// Tools (appointment booking + custom webhook tools). Shared by the editor and the server actions,
-// so the limits the form shows are the ones the server enforces.
+// Tools (appointment booking + custom webhook tools): what the editor offers. Limits and name
+// rules are in `@aixellabs/backend/db/types`, validation in `helpers/voice-schemas.ts`.
 // ---------------------------------------------------------------------------
-
-export type VoiceBookingDay = keyof VoiceBookingHours;
-
-/** Monday first, the way a week reads on a business's door. */
-export const VOICE_BOOKING_DAYS: readonly { key: VoiceBookingDay; label: string; short: string }[] = [
-    { key: 'mon', label: 'Monday', short: 'Mon' },
-    { key: 'tue', label: 'Tuesday', short: 'Tue' },
-    { key: 'wed', label: 'Wednesday', short: 'Wed' },
-    { key: 'thu', label: 'Thursday', short: 'Thu' },
-    { key: 'fri', label: 'Friday', short: 'Fri' },
-    { key: 'sat', label: 'Saturday', short: 'Sat' },
-    { key: 'sun', label: 'Sunday', short: 'Sun' },
-];
-
-/** "HH:MM", 24 h. */
-export const VOICE_BOOKING_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-export const VOICE_BOOKING_LIMITS = {
-    slotMinutesMin: 15,
-    slotMinutesMax: 240,
-    /** Appointment lengths are whole multiples of this. */
-    slotMinutesStep: 5,
-    maxDaysAheadMin: 1,
-    maxDaysAheadMax: 90,
-} as const;
 
 /** The appointment lengths the editor offers. */
 export const VOICE_BOOKING_SLOT_OPTIONS = [15, 20, 30, 45, 60, 90, 120, 180, 240] as const;
 
+const WEEKDAY_HOURS = { open: '09:00', close: '17:00' };
+
 export const DEFAULT_VOICE_BOOKING_HOURS: VoiceBookingHours = {
-    mon: { open: '09:00', close: '17:00' },
-    tue: { open: '09:00', close: '17:00' },
-    wed: { open: '09:00', close: '17:00' },
-    thu: { open: '09:00', close: '17:00' },
-    fri: { open: '09:00', close: '17:00' },
+    mon: WEEKDAY_HOURS,
+    tue: WEEKDAY_HOURS,
+    wed: WEEKDAY_HOURS,
+    thu: WEEKDAY_HOURS,
+    fri: WEEKDAY_HOURS,
 };
 
 /** Booking settings for an agent that has none yet: off, weekdays 9 to 5, 30 minutes, a month ahead. */
@@ -295,34 +272,8 @@ export function defaultVoiceBookingTool(timezone: string): VoiceAgentBookingTool
     return { enabled: false, timezone, slotMinutes: 30, maxDaysAhead: 30, hours: { ...DEFAULT_VOICE_BOOKING_HOURS } };
 }
 
-/** "HH:MM" -> minutes after midnight. */
-export function voiceBookingMinutes(time: string): number {
-    const [h, m] = time.split(':').map(Number);
-    return h * 60 + m;
-}
-
-/** A custom tool's name, as the model sees it. */
-export const VOICE_TOOL_NAME_PATTERN = /^[a-z][a-z0-9_]{1,39}$/;
-
-/** A custom tool parameter's name. */
-export const VOICE_TOOL_PARAM_NAME_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
-
-/** Names the engine already uses for its own functions. */
-export const VOICE_RESERVED_TOOL_NAMES = ['check_availability', 'book_appointment', 'end_call'] as const;
-
-export const VOICE_WEBHOOK_LIMITS = {
-    maxTools: 10,
-    maxParams: 10,
-    descriptionMax: 1000,
-    paramDescriptionMax: 300,
-    urlMax: 2048,
-    secretMax: 256,
-    /** The engine (and the test request) waits this long for an answer. */
-    timeoutMs: 8000,
-} as const;
-
-export const VOICE_WEBHOOK_PARAM_TYPES: readonly { value: VoiceWebhookParamType; label: string }[] = [
-    { value: 'string', label: 'Text' },
-    { value: 'number', label: 'Number' },
-    { value: 'boolean', label: 'Yes / no' },
-];
+export const VOICE_WEBHOOK_PARAM_TYPE_LABELS: Record<VoiceWebhookParamType, string> = {
+    string: 'Text',
+    number: 'Number',
+    boolean: 'Yes / no',
+};

@@ -1,12 +1,12 @@
 import {
-    VOICE_AGENT_FEATURE_LIMITS,
     VOICE_BUILTIN_VARIABLES,
-    VoiceVoicemailAction,
     type VoiceAgent,
     type VoiceAgentAnalysis,
     type VoiceAgentVoicemail,
     type VoiceAnalysisFieldType,
     type VoiceBuiltinVariable,
+    VoiceCallDirection,
+    VoiceVoicemailAction,
 } from '@aixellabs/backend/db/types';
 
 /**
@@ -18,9 +18,6 @@ import {
 
 /** `{{ name }}`: the engine's own pattern (spaces inside the braces allowed, names case-insensitive). */
 const VARIABLE = /\{\{\s*([A-Za-z][A-Za-z0-9_]{0,43})\s*\}\}/g;
-
-/** A variable or analysis field name as the editor saves it. */
-export const VOICE_VARIABLE_NAME_PATTERN = /^[a-z][a-z0-9_]{0,43}$/;
 
 /** What each built-in holds, for the editor's lists. Values are worked out per call. */
 export const VOICE_BUILTIN_VARIABLE_INFO: Record<VoiceBuiltinVariable, string> = {
@@ -72,12 +69,12 @@ export const DEFAULT_VOICE_AGENT_ANALYSIS: VoiceAgentAnalysis = {
     fields: [],
 };
 
-export const VOICE_ANALYSIS_FIELD_TYPES: readonly { value: VoiceAnalysisFieldType; label: string }[] = [
-    { value: 'text', label: 'Text' },
-    { value: 'number', label: 'Number' },
-    { value: 'boolean', label: 'Yes / no' },
-    { value: 'choice', label: 'Choice' },
-];
+export const VOICE_ANALYSIS_FIELD_TYPE_LABELS: Record<VoiceAnalysisFieldType, string> = {
+    text: 'Text',
+    number: 'Number',
+    boolean: 'Yes / no',
+    choice: 'Choice',
+};
 
 /** An agent's call settings as the editor shows them (never set up: hang up on voicemail, summary only, no memory). */
 export function callSettingsOf(agent: Pick<VoiceAgent, 'voicemail' | 'analysis' | 'memory'>): {
@@ -93,11 +90,14 @@ export function callSettingsOf(agent: Pick<VoiceAgent, 'voicemail' | 'analysis' 
 }
 
 /** The number a call's caller memory is kept under (the engine's `normalize_number`): the other person, as +digits. */
-export function memoryPhoneOf(call: { direction: string; from?: string; to?: string }): string | null {
-    const other = call.direction === 'INBOUND' ? call.from : call.direction === 'OUTBOUND' ? call.to : undefined;
+export function memoryPhoneOf(call: { direction: VoiceCallDirection; from?: string; to?: string }): string | null {
+    const other =
+        call.direction === VoiceCallDirection.INBOUND
+            ? call.from
+            : call.direction === VoiceCallDirection.OUTBOUND
+              ? call.to
+              : undefined;
     if (!other || other.trim().toLowerCase().startsWith('sip:')) return null;
     const digits = other.replace(/\D/g, '');
     return digits.length >= 7 ? `+${digits}` : null;
 }
-
-export { VOICE_AGENT_FEATURE_LIMITS };

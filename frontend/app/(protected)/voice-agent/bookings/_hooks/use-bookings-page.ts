@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
 import { cancelBooking, type MyBookings, type VoiceBookingListItem } from '@/app/actions/voice-booking-actions';
+import { browserTimezone } from '@/helpers/voice-time';
 import { formatSlotIn } from '../_utils/booking-format';
 
 export type BookingsPageData = {
@@ -25,13 +26,7 @@ export function useBookingsPage(data: BookingsPageData) {
     const [viewerTimeZone, setViewerTimeZone] = useState<string | null>(null);
 
     useEffect(() => setBookings(data.bookings), [data.bookings]);
-    useEffect(() => {
-        try {
-            setViewerTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || null);
-        } catch {
-            setViewerTimeZone(null);
-        }
-    }, []);
+    useEffect(() => setViewerTimeZone(browserTimezone()), []);
 
     /** The filter lives in the URL (`?agent=`), like Call logs. */
     const setAgentFilter = (agentId: string | null) => {

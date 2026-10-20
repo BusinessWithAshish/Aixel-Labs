@@ -3,14 +3,13 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { KeyRound, Pencil, Plus, Trash2, Webhook } from 'lucide-react';
-import type { VoiceAgentWebhookToolView } from '@aixellabs/backend/db/types';
+import { VOICE_WEBHOOK_LIMITS, type VoiceAgentWebhookToolView } from '@aixellabs/backend/db/types';
 import { deleteVoiceAgentWebhookTool, setVoiceAgentWebhookToolEnabled } from '@/app/actions/voice-agent-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { usePage } from '@/contexts/PageStore';
-import { VOICE_WEBHOOK_LIMITS } from '@/helpers/voice-agent-defaults';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 import { WebhookToolDialog } from './WebhookToolDialog';
 import { urlHost } from './webhook-tool-form';

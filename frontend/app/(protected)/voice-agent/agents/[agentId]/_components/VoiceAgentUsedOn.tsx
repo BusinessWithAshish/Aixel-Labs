@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
-import { VOICE_PHONE_NUMBERS_URL } from '../../_utils/voice-agent-routes';
+import { VOICE_PHONE_NUMBERS_URL } from '@/helpers/voice-routes';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 
 /** "1 number still places" / "2 numbers still place". */
