@@ -44,7 +44,8 @@ async function archiveGet(path: string, query: ArchiveQuery): Promise<Record<str
   const url = `${REDDIT_ARCHIVE_ORIGIN}${path}?${params.toString()}`;
 
   for (let limited = 0; ; ) {
-    let response: Response;
+    // Not the global `Response` name: in Vercel's function build it resolves to an empty interface.
+    let response: Awaited<ReturnType<typeof fetch>>;
     try {
       response = await fetch(url, {
         headers: { "user-agent": REDDIT_ARCHIVE_USER_AGENT, accept: "application/json" },
