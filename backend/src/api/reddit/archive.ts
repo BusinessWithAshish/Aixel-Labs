@@ -44,17 +44,15 @@ async function archiveGet(path: string, query: ArchiveQuery): Promise<Record<str
   const url = `${REDDIT_ARCHIVE_ORIGIN}${path}?${params.toString()}`;
 
   for (let limited = 0; ; ) {
-    // Not the global `Response` name: in Vercel's function build it resolves to an empty interface.
-    let response: Awaited<ReturnType<typeof fetch>>;
-    try {
-      response = await fetch(url, {
-        headers: { "user-agent": REDDIT_ARCHIVE_USER_AGENT, accept: "application/json" },
-        signal: AbortSignal.timeout(REDDIT_ARCHIVE_TIMEOUT_MS),
-      });
-    } catch (err) {
+    // Typed by the call itself: naming `Response` (or `ReturnType<typeof fetch>`) gets an
+    // empty interface in Vercel's function build, where fetch has two declarations.
+    const response = await fetch(url, {
+      headers: { "user-agent": REDDIT_ARCHIVE_USER_AGENT, accept: "application/json" },
+      signal: AbortSignal.timeout(REDDIT_ARCHIVE_TIMEOUT_MS),
+    }).catch((err: unknown) => {
       const reason = err instanceof Error ? err.message : String(err);
       throw new RedditApiError(`${REDDIT_ERROR_MESSAGES.ARCHIVE_FAILED}: ${reason}`);
-    }
+    });
 
     const parsed: unknown = await response.json().catch(() => null);
     const error = isRecord(parsed) && typeof parsed.error === "string" ? parsed.error : null;
