@@ -7,6 +7,7 @@ import { VoiceCalendarConnectionStatus, type VoiceCalendarConnection } from '@ai
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
+import { SettingsSection } from '@/components/common/SettingsSection';
 import { usePage } from '@/contexts/PageStore';
 import { VOICE_CALENDAR_PROVIDERS, voiceCalendarProviderInfo } from '@/helpers/voice-calendar-providers';
 import { CalendarProviderLogo } from '../../../_components/CalendarProviderLogo';
@@ -35,18 +36,13 @@ export function ConnectedAppsSection() {
     const attempt = !!toRemove && !isActive(toRemove);
 
     return (
-        <section className="grid gap-3" aria-labelledby="connected-apps-title" data-testid="connected-apps">
-            <div className="grid gap-1">
-                <h3 id="connected-apps-title" className="flex items-center gap-2 font-medium">
-                    <Link2 className="text-muted-foreground size-4" />
-                    Connected apps
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                    Your own calendars and booking apps, for the agent to book into. Shared by all your agents. You sign in
-                    on a secure page from Composio, our connection partner.
-                </p>
-            </div>
-
+        <SettingsSection
+            titleId="connected-apps-title"
+            icon={Link2}
+            title="Connected apps"
+            description="Your own calendars and booking apps, for the agent to book into. Shared by all your agents. You sign in on a secure page from Composio, our connection partner."
+            data-testid="connected-apps"
+        >
             {connections.length > 0 ? (
                 <ul className="divide-y rounded-md border" data-testid="connected-apps-list">
                     {connections.map((c) => {
@@ -182,6 +178,6 @@ export function ConnectedAppsSection() {
                 isLoading={!!disconnecting}
                 confirmText={attempt ? 'Remove' : 'Disconnect'}
             />
-        </section>
+        </SettingsSection>
     );
 }

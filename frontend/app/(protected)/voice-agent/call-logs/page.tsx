@@ -25,7 +25,7 @@ async function CallLogsPage({
     ]);
 
     return (
-        <PageLayout title={PAGE_TITLE}>
+        <PageLayout title={PAGE_TITLE} className="flex flex-col gap-4 p-1">
             <PageProvider
                 data={{
                     calls: callsRes.success && callsRes.data ? callsRes.data : [],

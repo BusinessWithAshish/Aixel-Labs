@@ -6,7 +6,7 @@ import { VOICE_AGENT_SUB_MODULES, VoiceBookingStatus } from '@aixellabs/backend/
 import type { VoiceBookingListItem } from '@/app/actions/voice-booking-actions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { EmptyState } from '@/components/common/EmptyState';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
@@ -77,7 +77,7 @@ export function BookingsContent() {
     const scheduled = upcoming.filter((b) => b.status === VoiceBookingStatus.BOOKED).length;
 
     return (
-        <div className="flex flex-col gap-4 p-1">
+        <>
             <div className="flex flex-wrap items-end justify-between gap-3">
                 <p className="text-muted-foreground max-w-prose text-sm">
                     {total === 0
@@ -116,26 +116,22 @@ export function BookingsContent() {
             ) : null}
 
             {total === 0 && !loadError ? (
-                <Empty className="border" data-testid="bookings-empty">
-                    <EmptyHeader>
-                        <EmptyMedia variant="icon">
-                            <CalendarCheck />
-                        </EmptyMedia>
-                        <EmptyTitle>No bookings yet</EmptyTitle>
-                        <EmptyDescription>
-                            {agentFilter
-                                ? 'This agent has not booked anything yet. Turn on Appointment booking in its Tools, and every time a caller books a slot it shows up here.'
-                                : 'Turn on Appointment booking in an agent’s Tools and set your opening hours. When a caller picks a time, the agent books it and it shows up here.'}
-                        </EmptyDescription>
-                    </EmptyHeader>
-                    <EmptyContent>
-                        <Button asChild variant="outline" size="sm">
-                            <Link href={agentFilter ? `${AGENTS_URL}/${agentFilter}` : AGENTS_URL}>
-                                {agentFilter ? 'Open this agent' : 'Open agents'}
-                            </Link>
-                        </Button>
-                    </EmptyContent>
-                </Empty>
+                <EmptyState
+                    icon={<CalendarCheck />}
+                    title="No bookings yet"
+                    description={
+                        agentFilter
+                            ? 'This agent has not booked anything yet. Turn on Appointment booking in its Tools, and every time a caller books a slot it shows up here.'
+                            : 'Turn on Appointment booking in an agent’s Tools and set your opening hours. When a caller picks a time, the agent books it and it shows up here.'
+                    }
+                    data-testid="bookings-empty"
+                >
+                    <Button asChild variant="outline" size="sm">
+                        <Link href={agentFilter ? `${AGENTS_URL}/${agentFilter}` : AGENTS_URL}>
+                            {agentFilter ? 'Open this agent' : 'Open agents'}
+                        </Link>
+                    </Button>
+                </EmptyState>
             ) : null}
 
             {total > 0 ? (
@@ -167,6 +163,6 @@ export function BookingsContent() {
                 confirmText="Cancel booking"
                 cancelText="Keep it"
             />
-        </div>
+        </>
     );
 }

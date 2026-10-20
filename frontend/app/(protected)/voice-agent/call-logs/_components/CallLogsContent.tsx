@@ -8,7 +8,7 @@ import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import type { CallSuccessFilter, VoiceCallListItem } from '@/app/actions/voice-call-actions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { EmptyState } from '@/components/common/EmptyState';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,18 +16,12 @@ import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import type { UseCallLogsPageReturn } from '../_hooks/use-call-logs-page';
+import { endedByLabel } from '@/helpers/voice-call-outcomes';
 import { formatShortDateTime } from '@/helpers/voice-time';
-import {
-    callTypeLabel,
-    callTypeVariant,
-    endedByLabel,
-    formatDuration,
-    formatGap,
-    formatParty,
-    median,
-} from '../_utils/call-format';
-import { callBookedSomething } from '../_utils/tool-calls';
+import { formatDuration, formatGap, formatParty, median } from '../_utils/call-format';
+import { callBookedSomething } from '@/helpers/voice-tool-calls';
 import { CallOutcomeBadges } from './CallOutcomeBadges';
+import { CallTypeBadge } from './CallTypeBadge';
 
 const ALL_AGENTS = 'all';
 const ALL_OUTCOMES = 'all';
@@ -55,9 +49,7 @@ function Parties({ call }: { call: VoiceCallListItem }) {
 function CallType({ call }: { call: VoiceCallListItem }) {
     return (
         <span className="inline-flex flex-wrap items-center gap-1">
-            <Badge variant={callTypeVariant(call.channel, call.direction)}>
-                {callTypeLabel(call.channel, call.direction)}
-            </Badge>
+            <CallTypeBadge channel={call.channel} direction={call.direction} />
             {callBookedSomething(call.toolCalls) ? (
                 <Badge variant="outline" className="gap-1 text-teal-700 dark:text-teal-300" data-testid="call-booked">
                     <CalendarCheck aria-hidden />
@@ -97,7 +89,7 @@ export function CallLogsContent() {
     const outcomeLabel = OUTCOME_OPTIONS.find((o) => o.value === successFilter)?.label.toLowerCase();
 
     return (
-        <div className="flex flex-col gap-4 p-1">
+        <>
             <div className="flex flex-wrap items-end justify-between gap-3">
                 <p className="text-muted-foreground text-sm">
                     {calls.length === limit
@@ -162,21 +154,17 @@ export function CallLogsContent() {
             ) : null}
 
             {calls.length === 0 && !loadError ? (
-                <Empty className="border">
-                    <EmptyHeader>
-                        <EmptyMedia variant="icon">
-                            <History />
-                        </EmptyMedia>
-                        <EmptyTitle>{successFilter ? 'No matching calls' : 'No calls yet'}</EmptyTitle>
-                        <EmptyDescription>
-                            {successFilter
-                                ? 'No analysed calls match this outcome. Calls are judged when “Call successful” is on in the agent’s Call settings.'
-                                : agentFilter
-                                  ? 'This agent has no calls yet.'
-                                  : 'Calls show up here when they end: playground sessions, test calls and calls to your numbers.'}
-                        </EmptyDescription>
-                    </EmptyHeader>
-                </Empty>
+                <EmptyState
+                    icon={<History />}
+                    title={successFilter ? 'No matching calls' : 'No calls yet'}
+                    description={
+                        successFilter
+                            ? 'No analysed calls match this outcome. Calls are judged when “Call successful” is on in the agent’s Call settings.'
+                            : agentFilter
+                              ? 'This agent has no calls yet.'
+                              : 'Calls show up here when they end: playground sessions, test calls and calls to your numbers.'
+                    }
+                />
             ) : null}
 
             {calls.length > 0 ? (
@@ -271,6 +259,6 @@ export function CallLogsContent() {
                     </ul>
                 </div>
             ) : null}
-        </div>
+        </>
     );
 }

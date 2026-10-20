@@ -2,7 +2,7 @@
 
 import { Bot, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { EmptyState } from '@/components/common/EmptyState';
 import { usePage } from '@/contexts/PageStore';
 import type { UseVoiceAgentsPageReturn } from '../_hooks/use-voice-agents-page';
 import { CreateVoiceAgentDialog } from './CreateVoiceAgentDialog';
@@ -10,28 +10,23 @@ import { VoiceAgentCard } from './VoiceAgentCard';
 
 export function VoiceAgentsList() {
     const { agents, openCreate } = usePage<UseVoiceAgentsPageReturn>();
+    const newAgentButton = (
+        <Button onClick={openCreate} data-testid="new-voice-agent">
+            <Plus className="size-4" />
+            New agent
+        </Button>
+    );
 
     return (
-        <div className="flex flex-col gap-4 p-1">
+        <>
             {agents.length === 0 ? (
-                <Empty className="border">
-                    <EmptyHeader>
-                        <EmptyMedia variant="icon">
-                            <Bot />
-                        </EmptyMedia>
-                        <EmptyTitle>No voice agents yet</EmptyTitle>
-                        <EmptyDescription>
-                            An agent is a voice, a prompt and a few notes. Inbound agents answer your number&rsquo;s calls;
-                            outbound agents make calls. Make one, talk to it in your browser, then put it on a phone number.
-                        </EmptyDescription>
-                    </EmptyHeader>
-                    <EmptyContent>
-                        <Button onClick={openCreate} data-testid="new-voice-agent">
-                            <Plus className="size-4" />
-                            New agent
-                        </Button>
-                    </EmptyContent>
-                </Empty>
+                <EmptyState
+                    icon={<Bot />}
+                    title="No voice agents yet"
+                    description="An agent is a voice, a prompt and a few notes. Inbound agents answer your number’s calls; outbound agents make calls. Make one, talk to it in your browser, then put it on a phone number."
+                >
+                    {newAgentButton}
+                </EmptyState>
             ) : (
                 <>
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -39,10 +34,7 @@ export function VoiceAgentsList() {
                             {agents.length} {agents.length === 1 ? 'agent' : 'agents'}. Open one to edit it or try it in the
                             playground.
                         </p>
-                        <Button onClick={openCreate} data-testid="new-voice-agent">
-                            <Plus className="size-4" />
-                            New agent
-                        </Button>
+                        {newAgentButton}
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         {agents.map((agent) => (
@@ -52,6 +44,6 @@ export function VoiceAgentsList() {
                 </>
             )}
             <CreateVoiceAgentDialog />
-        </div>
+        </>
     );
 }

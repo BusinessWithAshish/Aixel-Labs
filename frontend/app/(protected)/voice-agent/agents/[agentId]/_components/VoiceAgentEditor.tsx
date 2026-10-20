@@ -19,13 +19,14 @@ import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-ed
 import type { PromptTool } from '../_utils/prompt-tools';
 import { PromptField } from './PromptField';
 import { CallSettingsCard } from './settings/CallSettingsCard';
-import { VoiceAgentToolsCard } from './tools/VoiceAgentToolsCard';
+import { VOICE_AGENT_TOOLS_ID, VoiceAgentToolsCard } from './tools/VoiceAgentToolsCard';
 import { VariableDefaults } from './VariableDefaults';
 
 /** Scrolls to the Tools card: the booking switch (focused) or the custom tools. */
 function openTools(kind?: PromptTool['kind']) {
     const target =
-        (kind === 'custom' && document.getElementById('custom-tools-title')) || document.getElementById('agent-tools');
+        (kind === 'custom' && document.getElementById('custom-tools-title')) ||
+        document.getElementById(VOICE_AGENT_TOOLS_ID);
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (kind === 'booking') document.getElementById('booking-enabled')?.focus({ preventScroll: true });
 }
@@ -226,9 +227,7 @@ export function VoiceAgentEditor() {
                     isLoading={deleting}
                 />
             </Card>
-            <div id="agent-tools" className="min-w-0 scroll-mt-4">
-                <VoiceAgentToolsCard />
-            </div>
+            <VoiceAgentToolsCard />
             <CallSettingsCard />
         </div>
     );

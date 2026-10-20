@@ -55,6 +55,7 @@ import {
     type AnalysisFieldDraft,
     type CallSettingsDraft,
 } from '../_utils/call-settings-draft';
+import { VOICE_AGENT_TOOLS_ID } from '../_components/tools/VoiceAgentToolsCard';
 import { toolsForPrompt, type PromptVariable } from '../_utils/prompt-tools';
 
 function toInput(agent: VoiceAgent): VoiceAgentInput {
@@ -484,7 +485,7 @@ export function useVoiceAgentEditorPage({
             `${voiceCalendarProviderLabel(connection.provider)} connected${connection.label ? ` as ${connection.label}` : ''}`,
             into ? { description: `Bookings now go to ${bookingDraft.destination?.calendarName}.` } : undefined,
         );
-        document.getElementById('voice-agent-tools')?.scrollIntoView({ block: 'start' });
+        document.getElementById(VOICE_AGENT_TOOLS_ID)?.scrollIntoView({ block: 'start' });
         const forget = () => window.history.replaceState(window.history.state, '', window.location.pathname);
         if (bookingDraft.enabled && !bookingDraft.destination) void chooseBookingTarget(justConnected).finally(forget);
         else forget();

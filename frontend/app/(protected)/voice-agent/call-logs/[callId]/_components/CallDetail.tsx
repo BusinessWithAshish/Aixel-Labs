@@ -7,20 +7,15 @@ import { VoiceCallEndReason } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePage } from '@/contexts/PageStore';
+import { endedByLabel } from '@/helpers/voice-call-outcomes';
 import { cn } from '@/lib/utils';
 import type { UseCallDetailPageReturn } from '../_hooks/use-call-detail-page';
-import {
-    callTypeLabel,
-    callTypeVariant,
-    endedByLabel,
-    formatDuration,
-    formatGap,
-    formatParty,
-} from '../../_utils/call-format';
-import { ToolCallRow } from '../../_components/ToolCallRow';
+import { formatDuration, formatGap, formatParty } from '../../_utils/call-format';
+import { ToolCallRow } from '@/components/common/voice-agent/ToolCallRow';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { CallAnalysisCard, CallerMemoryCard, CallVariablesCard } from './CallInsights';
 import { RecordingPlayer } from './RecordingPlayer';
+import { CallTypeBadge } from '../../_components/CallTypeBadge';
 
 function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
     return (
@@ -40,9 +35,7 @@ function CallSummary() {
             <CardHeader className="pb-2">
                 <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-base">Summary</CardTitle>
-                    <Badge variant={callTypeVariant(call.channel, call.direction)}>
-                        {callTypeLabel(call.channel, call.direction)}
-                    </Badge>
+                    <CallTypeBadge channel={call.channel} direction={call.direction} />
                 </div>
                 <CardDescription>
                     <time dateTime={call.startedAt} suppressHydrationWarning>

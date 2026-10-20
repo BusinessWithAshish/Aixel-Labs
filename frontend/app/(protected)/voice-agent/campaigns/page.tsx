@@ -11,7 +11,7 @@ async function CampaignsPage() {
     const res = await listMyCampaigns();
 
     return (
-        <PageLayout title={PAGE_TITLE}>
+        <PageLayout title={PAGE_TITLE} className="flex flex-col gap-4 p-1">
             <PageProvider
                 data={{
                     campaigns: res.success && res.data ? res.data : [],

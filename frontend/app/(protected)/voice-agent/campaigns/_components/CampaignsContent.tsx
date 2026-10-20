@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Megaphone, Plus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { EmptyState } from '@/components/common/EmptyState';
 import { usePage } from '@/contexts/PageStore';
 import type { UseCampaignsPageReturn } from '../_hooks/use-campaigns-page';
 import { NEW_CAMPAIGN_URL } from '@/helpers/voice-routes';
@@ -25,7 +25,7 @@ export function CampaignsContent() {
     const { campaigns, loadError } = usePage<UseCampaignsPageReturn>();
 
     return (
-        <div className="flex flex-col gap-4 p-1">
+        <>
             {loadError ? (
                 <Alert variant="destructive">
                     <AlertDescription>{loadError}</AlertDescription>
@@ -33,21 +33,14 @@ export function CampaignsContent() {
             ) : null}
 
             {campaigns.length === 0 && !loadError ? (
-                <Empty className="border" data-testid="campaigns-empty">
-                    <EmptyHeader>
-                        <EmptyMedia variant="icon">
-                            <Megaphone />
-                        </EmptyMedia>
-                        <EmptyTitle>No campaigns yet</EmptyTitle>
-                        <EmptyDescription>
-                            Upload a list of contacts and an outbound agent calls them from one of your numbers, inside the
-                            hours you choose. Calls nobody answers are tried again later.
-                        </EmptyDescription>
-                    </EmptyHeader>
-                    <EmptyContent>
-                        <NewCampaignButton />
-                    </EmptyContent>
-                </Empty>
+                <EmptyState
+                    icon={<Megaphone />}
+                    title="No campaigns yet"
+                    description="Upload a list of contacts and an outbound agent calls them from one of your numbers, inside the hours you choose. Calls nobody answers are tried again later."
+                    data-testid="campaigns-empty"
+                >
+                    <NewCampaignButton />
+                </EmptyState>
             ) : null}
 
             {campaigns.length > 0 ? (
@@ -66,6 +59,6 @@ export function CampaignsContent() {
                     </div>
                 </>
             ) : null}
-        </div>
+        </>
     );
 }

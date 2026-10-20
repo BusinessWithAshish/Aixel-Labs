@@ -9,7 +9,9 @@ import { getGeminiKeyStatus } from '@/app/actions/voice-settings-actions';
 import { isValidObjectId } from '@/helpers/object-id';
 import { NO_GEMINI_KEY } from '@/server/voice-agent/gemini-key';
 import { useVoiceAgentEditorPage } from './_hooks/use-voice-agent-editor-page';
-import { VoiceAgentWorkspace } from './_components/VoiceAgentWorkspace';
+import { VoiceAgentEditor } from './_components/VoiceAgentEditor';
+import { VoiceAgentUsedOn } from './_components/VoiceAgentUsedOn';
+import { VoicePlayground } from './_components/VoicePlayground';
 
 const NO_USAGE: VoiceAgentUsage = { inbound: [], outbound: [] };
 const NO_APPS: VoiceConnectedApps = { configured: false, connections: [] };
@@ -38,13 +40,21 @@ async function VoiceAgentPage({
     const justConnected = typeof connected === 'string' && isValidObjectId(connected) ? connected : null;
     const memories = memoriesResponse.success && memoriesResponse.data ? memoriesResponse.data : NO_MEMORIES;
 
+    // Editor beside the numbers it is on and the playground on wide screens, stacked on narrow ones.
     return (
-        <PageLayout title={response.data.name}>
+        <PageLayout
+            title={response.data.name}
+            className="grid items-start gap-4 p-1 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]"
+        >
             <PageProvider
                 data={{ agent: response.data, usage, connectedApps, justConnected, memories }}
                 usePageHook={useVoiceAgentEditorPage}
             >
-                <VoiceAgentWorkspace geminiKey={keyResponse.data ?? NO_GEMINI_KEY} />
+                <VoiceAgentEditor />
+                <div className="grid min-w-0 gap-4 lg:sticky lg:top-0">
+                    <VoiceAgentUsedOn />
+                    <VoicePlayground geminiKey={keyResponse.data ?? NO_GEMINI_KEY} />
+                </div>
             </PageProvider>
         </PageLayout>
     );

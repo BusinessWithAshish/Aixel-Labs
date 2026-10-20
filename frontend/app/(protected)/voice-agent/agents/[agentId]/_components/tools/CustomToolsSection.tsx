@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
+import { SettingsSection } from '@/components/common/SettingsSection';
 import { usePage } from '@/contexts/PageStore';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 import { WebhookToolDialog } from './WebhookToolDialog';
@@ -58,23 +59,19 @@ export function CustomToolsSection() {
     };
 
     return (
-        <section className="grid gap-3" aria-labelledby="custom-tools-title" data-testid="custom-tools">
-            <div className="grid gap-1">
-                <div className="flex items-center justify-between gap-4">
-                    <h3 id="custom-tools-title" className="flex items-center gap-2 font-medium">
-                        <Webhook className="text-muted-foreground size-4" />
-                        Custom tools
-                    </h3>
-                    <Button type="button" variant="outline" size="sm" onClick={() => openDialog(null)} disabled={atLimit}>
-                        <Plus className="size-4" />
-                        Add tool
-                    </Button>
-                </div>
-                <p className="text-muted-foreground text-sm">
-                    Let the agent use your own systems mid-call, like looking up an order or checking stock. It sends
-                    what it collected to your URL and reads the answer.
-                </p>
-            </div>
+        <SettingsSection
+            titleId="custom-tools-title"
+            icon={Webhook}
+            title="Custom tools"
+            description="Let the agent use your own systems mid-call, like looking up an order or checking stock. It sends what it collected to your URL and reads the answer."
+            action={
+                <Button type="button" variant="outline" size="sm" onClick={() => openDialog(null)} disabled={atLimit}>
+                    <Plus className="size-4" />
+                    Add tool
+                </Button>
+            }
+            data-testid="custom-tools"
+        >
 
             {tools.length === 0 ? (
                 <p className="text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center text-sm">
@@ -159,6 +156,6 @@ export function CustomToolsSection() {
                 onConfirm={() => void confirmDelete()}
                 isLoading={deleting}
             />
-        </section>
+        </SettingsSection>
     );
 }

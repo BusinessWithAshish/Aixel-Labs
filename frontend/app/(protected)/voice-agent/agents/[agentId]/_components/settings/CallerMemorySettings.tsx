@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { SettingsSection } from '@/components/common/SettingsSection';
 import { usePage } from '@/contexts/PageStore';
 import { formatDay } from '@/helpers/voice-time';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
@@ -23,21 +24,16 @@ export function CallerMemorySettings() {
     };
 
     return (
-        <section className="grid gap-3" aria-labelledby="memory-title" data-testid="memory-settings">
-            <div className="flex items-start justify-between gap-4">
-                <div className="grid gap-1">
-                    <h3 id="memory-title" className="flex items-center gap-2 font-medium">
-                        <BrainCircuit className="text-muted-foreground size-4" />
-                        <Label htmlFor="memory-enabled" className="text-base font-medium">
-                            Remember callers
-                        </Label>
-                    </h3>
-                    <p className="text-muted-foreground text-sm">
-                        After each phone call, a short note on the person (up to {VOICE_AGENT_FEATURE_LIMITS.memoryBriefMax}{' '}
-                        characters) is kept under their number. The next time this agent talks with that number, it starts
-                        with the note and the date of the last call. Only this agent sees it.
-                    </p>
-                </div>
+        <SettingsSection
+            titleId="memory-title"
+            icon={BrainCircuit}
+            title={
+                <Label htmlFor="memory-enabled" className="text-base font-medium">
+                    Remember callers
+                </Label>
+            }
+            description={`After each phone call, a short note on the person (up to ${VOICE_AGENT_FEATURE_LIMITS.memoryBriefMax} characters) is kept under their number. The next time this agent talks with that number, it starts with the note and the date of the last call. Only this agent sees it.`}
+            action={
                 <Switch
                     id="memory-enabled"
                     checked={settingsDraft.memory}
@@ -45,8 +41,9 @@ export function CallerMemorySettings() {
                     disabled={savingSettings}
                     className="mt-1"
                 />
-            </div>
-
+            }
+            data-testid="memory-settings"
+        >
             {memories.total > 0 ? (
                 <div className="grid gap-2" data-testid="memory-list">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -111,6 +108,6 @@ export function CallerMemorySettings() {
                 onConfirm={() => void onConfirm()}
                 isLoading={forgetting !== null}
             />
-        </section>
+        </SettingsSection>
     );
 }

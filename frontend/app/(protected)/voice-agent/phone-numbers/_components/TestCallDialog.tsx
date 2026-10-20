@@ -16,7 +16,7 @@ import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
-import { GeminiKeyNotice } from '../../agents/_components/GeminiKeyNotice';
+import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
 
 /** What to know before placing a call through each provider. */
 const PROVIDER_NOTE: Record<VoiceProvider, string> = {

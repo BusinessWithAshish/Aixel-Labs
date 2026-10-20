@@ -123,7 +123,7 @@ export function CampaignDetail() {
     const { campaign, confirm, setConfirm, busy, runAction, remove } = usePage<UseCampaignDetailPageReturn>();
 
     return (
-        <div className="flex flex-col gap-4 p-1">
+        <>
             <Card className="gap-4">
                 <CardContent className="flex flex-col gap-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -173,6 +173,6 @@ export function CampaignDetail() {
                 confirmText="Delete"
                 cancelText="Keep it"
             />
-        </div>
+        </>
     );
 }

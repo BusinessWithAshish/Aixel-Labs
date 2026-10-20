@@ -14,7 +14,7 @@ async function CampaignDetailPage({ params }: { params: Promise<{ campaignId: st
     if (!res.success || !res.data) notFound();
 
     return (
-        <PageLayout title={res.data.campaign.name}>
+        <PageLayout title={res.data.campaign.name} className="flex flex-col gap-4 p-1">
             <PageProvider data={res.data} usePageHook={useCampaignDetailPage}>
                 <CampaignDetail />
             </PageProvider>

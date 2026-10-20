@@ -3,12 +3,12 @@
 import { BookOpen, Info, PhoneIcon, Plus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { EmptyState } from '@/components/common/EmptyState';
 import { usePage } from '@/contexts/PageStore';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
 import { ConnectNumberDialog } from './ConnectNumberDialog';
-import { GeminiKeyNotice } from '../../agents/_components/GeminiKeyNotice';
+import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
 import { SETUP_GUIDE_PROVIDERS, setupGuideFor } from '../_utils/setup-guides';
 import { PhoneNumberRow } from './PhoneNumberRow';
 import { ProviderSetupGuide } from './ProviderSetupGuide';
@@ -74,7 +74,7 @@ export function PhoneNumbersContent() {
     const { numbers, loadError, setConnectOpen, geminiKey } = usePage<UsePhoneNumbersPageReturn>();
 
     return (
-        <div className="flex flex-col gap-4 p-1">
+        <>
             {loadError ? (
                 <Alert variant="destructive">
                     <AlertDescription>{loadError}</AlertDescription>
@@ -86,26 +86,18 @@ export function PhoneNumbersContent() {
             {numbers.length === 0 ? <SetupGuideBanner /> : null}
 
             {numbers.length === 0 ? (
-                <Empty className="border">
-                    <EmptyHeader>
-                        <EmptyMedia variant="icon">
-                            <PhoneIcon />
-                        </EmptyMedia>
-                        <EmptyTitle>No phone numbers yet</EmptyTitle>
-                        <EmptyDescription>
-                            Bring a number you own: Telnyx or Twilio for US and international numbers, VoiceLink for Indian
-                            numbers. Importing changes nothing in your account: each number keeps ringing where it does until
-                            you turn on AI answering.
-                        </EmptyDescription>
-                    </EmptyHeader>
-                    <EmptyContent className="flex-row flex-wrap justify-center gap-2">
-                        <Button onClick={() => setConnectOpen(true)}>
-                            <Plus className="size-4" />
-                            Connect a number
-                        </Button>
-                        <SetupGuideButton />
-                    </EmptyContent>
-                </Empty>
+                <EmptyState
+                    icon={<PhoneIcon />}
+                    title="No phone numbers yet"
+                    description="Bring a number you own: Telnyx or Twilio for US and international numbers, VoiceLink for Indian numbers. Importing changes nothing in your account: each number keeps ringing where it does until you turn on AI answering."
+                    classNames={{ content: 'flex-row flex-wrap justify-center gap-2' }}
+                >
+                    <Button onClick={() => setConnectOpen(true)}>
+                        <Plus className="size-4" />
+                        Connect a number
+                    </Button>
+                    <SetupGuideButton />
+                </EmptyState>
             ) : (
                 <>
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -138,6 +130,6 @@ export function PhoneNumbersContent() {
             <TestCallDialog />
             <RemoveNumberDialog />
             <SetupGuideDialog />
-        </div>
+        </>
     );
 }

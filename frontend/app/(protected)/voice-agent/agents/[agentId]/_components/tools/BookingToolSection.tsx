@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { minutesLabel, VOICE_WEEKDAY_OPTIONS } from '@/helpers/voice-time';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 import { BookingDestinationField } from './BookingDestinationField';
-import { TimezoneSelect } from './TimezoneSelect';
+import { TimezoneSelect } from '@/components/common/voice-agent/TimezoneSelect';
 
 /** Mon..Sun: open or closed, and from / to when open. */
 function BookingHoursGrid() {

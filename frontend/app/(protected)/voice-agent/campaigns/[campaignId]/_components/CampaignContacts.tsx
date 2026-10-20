@@ -11,8 +11,9 @@ import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import type { UseCampaignDetailPageReturn } from '../_hooks/use-campaign-detail-page';
+import { outcomeLabel } from '@/helpers/voice-call-outcomes';
 import { formatShortDateTime } from '@/helpers/voice-time';
-import { CONTACT_STATUS, outcomeLabel } from '../../_utils/campaign-format';
+import { CONTACT_STATUS } from '../../_utils/campaign-format';
 
 const CALL_LOGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.CALL_LOGS];
 

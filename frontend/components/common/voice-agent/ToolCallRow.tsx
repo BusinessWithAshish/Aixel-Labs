@@ -6,7 +6,7 @@ import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { SubModuleUrls } from '@/config/app-config';
 import { cn } from '@/lib/utils';
-import { formatToolArguments, summarizeToolRun, type ToolRun, type ToolRunKind } from '../_utils/tool-calls';
+import { formatToolArguments, summarizeToolRun, type ToolRun, type ToolRunKind } from '@/helpers/voice-tool-calls';
 
 const BOOKINGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS];
 

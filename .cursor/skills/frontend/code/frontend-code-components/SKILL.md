@@ -37,6 +37,7 @@ shared UI is structured**.
 | `zod-form-builder/` | RHF + Zod field primitives / schema builder |
 | `ai-chat-interface/` | NL scraper chat shell |
 | `table-export-preview/` | Spreadsheet export preview/edit dialogs |
+| `voice-agent/` | Voice UI shared by several voice routes (timezone picker, tool-call row, Gemini key notice) |
 
 Single-file utilities stay flat in `common/` (`ComingSoon`, `FeatureFlagGate`, `CommonLoader`, …).
 

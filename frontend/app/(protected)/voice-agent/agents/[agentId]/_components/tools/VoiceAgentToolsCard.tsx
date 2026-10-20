@@ -6,10 +6,13 @@ import { BookingToolSection } from './BookingToolSection';
 import { ConnectedAppsSection } from './ConnectedAppsSection';
 import { CustomToolsSection } from './CustomToolsSection';
 
+/** The Tools card's id, for scrolling to it. */
+export const VOICE_AGENT_TOOLS_ID = 'voice-agent-tools';
+
 /** What the agent can do during a call, beyond talking. Read by the engine at the start of every call. */
 export function VoiceAgentToolsCard() {
     return (
-        <Card id="voice-agent-tools" className="h-auto min-w-0 scroll-mt-4" data-testid="voice-agent-tools">
+        <Card id={VOICE_AGENT_TOOLS_ID} className="h-auto min-w-0 scroll-mt-4" data-testid="voice-agent-tools">
             <CardHeader>
                 <CardTitle>Tools</CardTitle>
                 <CardDescription>Things the agent can do during a call. Changes apply from the next call.</CardDescription>

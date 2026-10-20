@@ -1,7 +1,6 @@
 import type { VariantProps } from 'class-variance-authority';
 import {
     VoiceCampaignContactStatus,
-    VoiceCampaignOutcome,
     VoiceCampaignRetryOutcome,
     VoiceCampaignStatus,
     type VoiceCampaignDay,
@@ -10,7 +9,6 @@ import {
 import type { VoiceCampaignStats } from '@/app/actions/voice-campaign-actions';
 import type { badgeVariants } from '@/components/ui/badge';
 import { minutesOf, VOICE_WEEKDAY_OPTIONS } from '@/helpers/voice-time';
-import { endedByLabel } from '../../call-logs/_utils/call-format';
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
 
@@ -80,16 +78,4 @@ export function progressPercent(stats: VoiceCampaignStats): number {
     if (!stats.total) return 0;
     const done = stats.total - stats.pending - stats.calling;
     return Math.round((done / stats.total) * 100);
-}
-
-const OUTCOME_LABELS: Record<VoiceCampaignOutcome, string> = {
-    [VoiceCampaignOutcome.DNC_LIST]: 'On the do-not-call list',
-    [VoiceCampaignOutcome.INVALID_NUMBER]: 'Not a valid number',
-    [VoiceCampaignOutcome.INTERRUPTED]: 'Interrupted',
-};
-
-/** A contact's last outcome in words: a campaign outcome, else how its last call ended. */
-export function outcomeLabel(outcome: string | null): string | null {
-    if (!outcome) return null;
-    return (OUTCOME_LABELS as Record<string, string>)[outcome] ?? endedByLabel(outcome);
 }

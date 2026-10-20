@@ -10,7 +10,6 @@ import { voiceAgentUrl } from '@/helpers/voice-routes';
 
 export function useVoiceAgentsPage(initialAgents: VoiceAgent[]) {
     const router = useRouter();
-    const [agents] = useState<VoiceAgent[]>(initialAgents);
     const [createOpen, setCreateOpen] = useState(false);
     /** null = the dialog's first step: pick inbound or outbound. */
     const [newCallType, setNewCallType] = useState<VoiceAgentCallType | null>(null);
@@ -47,7 +46,7 @@ export function useVoiceAgentsPage(initialAgents: VoiceAgent[]) {
     }, [creating, newCallType, newName, newVoice, router]);
 
     return {
-        agents,
+        agents: initialAgents,
         createOpen,
         openCreate,
         onCreateOpenChange,

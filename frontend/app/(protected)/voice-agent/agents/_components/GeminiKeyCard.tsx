@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ExternalLink, KeyRound, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { VoiceGeminiKeyStatus, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -105,7 +106,15 @@ export function GeminiKeyCard({ initialKey, className }: GeminiKeyCardProps) {
                 </div>
             </CardContent>
             <GeminiKeyDialog card={card} />
-            <RemoveGeminiKeyDialog card={card} />
+            <ConfirmDialog
+                open={card.removeOpen}
+                onOpenChange={(open) => !open && !card.removing && card.setRemoveOpen(false)}
+                title="Remove your Gemini API key?"
+                alertMessage="Your agents stop answering calls, placing calls and talking in the playground until you add a key again. Your numbers and agents stay set up."
+                confirmText="Remove key"
+                onConfirm={() => void card.remove()}
+                isLoading={card.removing}
+            />
         </Card>
     );
 }
@@ -187,35 +196,6 @@ function GeminiKeyDialog({ card }: { card: UseGeminiKeyCardReturn }) {
                         </Button>
                     </DialogFooter>
                 </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function RemoveGeminiKeyDialog({ card }: { card: UseGeminiKeyCardReturn }) {
-    return (
-        <Dialog open={card.removeOpen} onOpenChange={(open) => !open && !card.removing && card.setRemoveOpen(false)}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Remove your Gemini API key?</DialogTitle>
-                    <DialogDescription>
-                        Your agents stop answering calls, placing calls and talking in the playground until you add a key
-                        again. Your numbers and agents stay set up.
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={card.removing}
-                        onClick={() => card.setRemoveOpen(false)}
-                    >
-                        Cancel
-                    </Button>
-                    <Button type="button" variant="destructive" disabled={card.removing} onClick={() => void card.remove()}>
-                        {card.removing ? 'Removing…' : 'Remove key'}
-                    </Button>
-                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

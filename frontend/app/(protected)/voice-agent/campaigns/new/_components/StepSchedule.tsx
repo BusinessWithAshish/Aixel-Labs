@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePage } from '@/contexts/PageStore';
 // Shared with the booking tool's settings (same searchable list of IANA zones).
-import { TimezoneSelect } from '../../../agents/[agentId]/_components/tools/TimezoneSelect';
+import { TimezoneSelect } from '@/components/common/voice-agent/TimezoneSelect';
 import { minutesLabel, VOICE_WEEKDAY_OPTIONS } from '@/helpers/voice-time';
 import { RETRY_DELAY_MINUTES, RETRY_OUTCOMES } from '../../_utils/campaign-format';
 import type { UseNewCampaignPageReturn } from '../_hooks/use-new-campaign-page';

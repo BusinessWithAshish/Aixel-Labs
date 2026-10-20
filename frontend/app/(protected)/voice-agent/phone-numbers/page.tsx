@@ -18,7 +18,7 @@ async function PhoneNumbersPage() {
     ]);
 
     return (
-        <PageLayout title={PAGE_TITLE}>
+        <PageLayout title={PAGE_TITLE} className="flex flex-col gap-4 p-1">
             <PageProvider
                 data={{
                     numbers: numbersRes.success && numbersRes.data ? numbersRes.data : [],

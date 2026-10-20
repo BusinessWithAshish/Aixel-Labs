@@ -16,10 +16,8 @@ async function VoiceAgentsPage() {
     const agents: VoiceAgent[] = response.success && response.data ? response.data : [];
 
     return (
-        <PageLayout title={PAGE_TITLE}>
-            <div className="p-1 pb-3">
-                <GeminiKeyCard initialKey={keyResponse.data ?? NO_GEMINI_KEY} />
-            </div>
+        <PageLayout title={PAGE_TITLE} className="flex flex-col gap-4 p-1">
+            <GeminiKeyCard initialKey={keyResponse.data ?? NO_GEMINI_KEY} />
             <PageProvider data={agents} usePageHook={useVoiceAgentsPage}>
                 <VoiceAgentsList />
             </PageProvider>

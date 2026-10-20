@@ -16,7 +16,7 @@ async function BookingsPage({ searchParams }: { searchParams: Promise<{ agent?: 
     const [bookingsRes, agentsRes] = await Promise.all([listMyBookings({ agentId: agentFilter }), getVoiceAgentOptions()]);
 
     return (
-        <PageLayout title={PAGE_TITLE}>
+        <PageLayout title={PAGE_TITLE} className="flex flex-col gap-4 p-1">
             <PageProvider
                 data={{
                     bookings: bookingsRes.success && bookingsRes.data ? bookingsRes.data : { upcoming: [], past: [] },
