@@ -11,6 +11,7 @@ import type { IncomingMessage } from "http";
 import type { Socket } from "net";
 import { AIXEL_LABS_SERVICE, registerRoutes, servesGames } from "./routes";
 import { attachGameSockets } from "./api/game-sockets";
+import { closeMcpStreams } from "./mcp/router";
 import type { Express } from "express";
 import {
   ALLOWED_ORIGINS_DEV_REGEX,
@@ -282,10 +283,12 @@ if (!process.env.VERCEL) {
     server.close(() => process.exit(0));
     // close() shuts only the connections idle at that moment. One whose request
     // finishes later would stay open on keep-alive (Caddy pools them), and one
-    // that never sends a request is not idle at all; either would hold the
-    // process until TimeoutStopSec, so keep sweeping both.
+    // that never sends a request is not idle at all, and an MCP client's
+    // notification stream never ends by itself; any of them would hold the
+    // process until TimeoutStopSec, so keep sweeping all three.
     setInterval(() => {
       server.closeIdleConnections();
+      closeMcpStreams();
       const cutoff = Date.now() - 5000;
       for (const [socket, openedAt] of silent) if (openedAt < cutoff) socket.destroy();
     }, 1000).unref();

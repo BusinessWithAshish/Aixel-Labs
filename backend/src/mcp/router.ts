@@ -43,7 +43,27 @@ async function handleMcpRequest(req: Request, res: Response) {
   }
 }
 
+/**
+ * Open `GET /mcp` streams: the channel a client keeps open for server-sent
+ * notifications. This server is stateless and never sends any, so such a stream
+ * ends only when its client drops it.
+ */
+const notificationStreams = new Set<Response>();
+
+/**
+ * For a draining process (`server.ts`, on SIGTERM): end every open notification
+ * stream so its client reopens it on the slot that now takes the traffic.
+ * Otherwise these streams would hold the old slot open until its TimeoutStopSec.
+ */
+export function closeMcpStreams() {
+  for (const res of notificationStreams) res.end();
+}
+
 mcpRouter.all("/", (req, res) => {
+  if (req.method === "GET") {
+    notificationStreams.add(res);
+    res.once("close", () => notificationStreams.delete(res));
+  }
   void handleMcpRequest(req, res);
 });
 
