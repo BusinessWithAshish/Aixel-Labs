@@ -1,3 +1,4 @@
+import { fetch } from "undici";
 import {
   REDDIT_ARCHIVE_BUSY_WAIT_MS,
   REDDIT_ARCHIVE_KIND,
@@ -44,8 +45,8 @@ async function archiveGet(path: string, query: ArchiveQuery): Promise<Record<str
   const url = `${REDDIT_ARCHIVE_ORIGIN}${path}?${params.toString()}`;
 
   for (let limited = 0; ; ) {
-    // Typed by the call itself: naming `Response` (or `ReturnType<typeof fetch>`) gets an
-    // empty interface in Vercel's function build, where fetch has two declarations.
+    // undici's fetch, like the other callers that pass a timeout signal: Vercel's function
+    // build types the global fetch's Response as an empty interface here.
     const response = await fetch(url, {
       headers: { "user-agent": REDDIT_ARCHIVE_USER_AGENT, accept: "application/json" },
       signal: AbortSignal.timeout(REDDIT_ARCHIVE_TIMEOUT_MS),
