@@ -8,7 +8,10 @@
 #
 # With no services named, only the ones whose files changed since the commit each
 # one runs now are deployed (all of them, the first time). Naming services
-# deploys exactly those: `deploy.sh <older-sha> api` is a rollback of the api.
+# deploys exactly those: `deploy.sh <older-sha> api` is a rollback of the api, and
+# naming the sha a service already runs starts a fresh slot of it, which is how a
+# changed .env (or any untracked runtime file) goes live. Never `systemctl
+# restart` a live slot for that: it is down until it comes back.
 #
 # For each service:
 # 1. Build the commit into releases/<sha>/ once (git archive + pnpm install
@@ -100,10 +103,15 @@ prune() {
     [[ -L "$link" ]] || continue
     name="${link##*/slot-}"
     # slot-<service>-<port> is aixel-labs-<service>@<port>; any other slot link
-    # (an older layout) is taken as in use until it is removed by hand.
+    # (an older layout) is taken as in use until it is removed by hand. The live
+    # slot is the enabled one (a deploy disables the old slot before stopping it),
+    # and it keeps its link even while stopped: a `systemctl restart` or a crash
+    # runs this same ExecStopPost and then starts that slot again from the link.
     if [[ "$name" =~ ^([a-z]+)-([0-9]+)$ ]]; then
       unit="aixel-labs-${BASH_REMATCH[1]}@${BASH_REMATCH[2]}.service"
-      if [[ "$unit" == "$exiting" ]] || stopped "$unit"; then rm -f "$link"; continue; fi
+      if ! systemctl is-enabled -q "$unit" 2>/dev/null && { [[ "$unit" == "$exiting" ]] || stopped "$unit"; }; then
+        rm -f "$link"; continue
+      fi
     fi
     in_use+=("$(readlink "$link")")
   done
@@ -136,7 +144,8 @@ if [[ $# -gt 0 ]] && ! is_service "$1"; then ref=$1; shift; fi
 for svc in "$@"; do is_service "$svc" || die "unknown service: $svc (known: ${SERVICES[*]})"; done
 [[ "$ref" == origin/* ]] && git -C "$REPO" fetch -q origin "${ref#origin/}"
 sha="$(git -C "$REPO" rev-parse --verify "$ref^{commit}")" || die "unknown ref: $ref"
-if [[ $# -gt 0 ]]; then targets=("$@"); else mapfile -t targets < <(changed_services "$sha"); fi
+named=false
+if [[ $# -gt 0 ]]; then targets=("$@"); named=true; else mapfile -t targets < <(changed_services "$sha"); fi
 log "$ref = ${sha:0:7} ($(git -C "$REPO" log -1 --format=%s "$sha"))"
 log "services to deploy: ${targets[*]:-none}"
 $plan && exit 0
@@ -182,8 +191,11 @@ deploy_service() {
   live="$(live_port "$svc")"
   idle="${slots[0]}"; [[ "$live" == "$idle" ]] && idle="${slots[1]}"
   if [[ -n "$live" && "$(readlink "$RELEASES/slot-$svc-$live" 2>/dev/null)" == "$sha" ]]; then
-    log "$svc: ${sha:0:7} is already live on :$live"
-    return
+    if ! $named; then
+      log "$svc: ${sha:0:7} is already live on :$live"
+      return
+    fi
+    log "$svc: ${sha:0:7} is already live on :$live; starting a fresh slot of it, as asked"
   fi
   log "$svc: live slot :${live:-none}, deploying to :$idle"
 

@@ -148,12 +148,14 @@ For each service, `deploy.sh` does, in order:
 3. **Health check**: the service's health path (`/v1/ping`; voice: `/health`) must return 200 within 120 s. Otherwise the new slot is stopped and the live one is untouched.
 4. **Switch**: rewrite the one line in `/etc/caddy/aixel-labs-<service>.upstream` (`to 127.0.0.1:<port>`) and `systemctl reload caddy` (graceful).
 5. **Drain**: SIGTERM to the old slot, then move on without waiting. `server.ts` stops accepting, keeps sweeping idle keep-alive connections (Caddy pools them) and connections that never sent a request (closed 5 s after opening); without the sweep either would make the slot sit out `TimeoutStopSec`, and exits once in-flight requests answer and, in `games`, running matches end. `KillMode=mixed` keeps a media job's ffmpeg / Python children alive meanwhile.
-6. **Clean up**: when a slot exits, its `ExecStopPost` runs `deploy.sh --prune`, which removes stopped slots' links and every release outside the 3 most recently deployed, never one a slot still runs.
+6. **Clean up**: when a slot exits, its `ExecStopPost` runs `deploy.sh --prune`, which removes the links of stopped slots that are no longer live (the live slot is the enabled one, and keeps its link through a restart or crash) and every release outside the 3 most recently deployed, never one a slot still runs.
 
 Then `deploy/Caddyfile` **at that commit** is validated and installed if it differs
 from `/etc/caddy/Caddyfile`. Change Caddy only through that file.
 
 **Port 8002 is Caddy, not Node.** Hermes MCP configs, cron scripts and Claude Code dial `127.0.0.1:8002`; Caddy serves that address (loopback only) and strips `X-Forwarded-For`, so those callers are still local callers (no API key, outside the public rate limit). Never run a backend on 8002.
+
+**Changed `.env` or another untracked runtime file?** Run `deploy.sh <sha it runs> <service>`: naming a service always starts a fresh slot, even of the sha already live. Never `systemctl restart` a live slot for it: the service is down until it is back up (it does come back, since the live, enabled slot keeps its release link).
 
 Don't `systemctl restart` a slot by hand while it is live, and don't bring back the old single `aixel-backend.service` or the `aixel-backend@` slots (nor the voice engine's old `voicelab.service` and its tunnel). Logs: `journalctl -u aixel-labs-<service>@<port>`.
 
