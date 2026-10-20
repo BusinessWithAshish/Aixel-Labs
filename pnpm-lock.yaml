@@ -326,6 +326,9 @@ importers:
       twilio:
         specifier: ^5.8.2
         version: 5.13.1
+      undici:
+        specifier: ^7.24.6
+        version: 7.24.6
       use-local-storage-state:
         specifier: ^19.5.0
         version: 19.5.0(react-dom@19.2.4)(react@19.2.4)

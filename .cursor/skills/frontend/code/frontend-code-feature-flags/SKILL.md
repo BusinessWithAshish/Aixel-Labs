@@ -32,6 +32,14 @@ Today flags use `decide() { return false }` / `defaultValue: false` (off until f
 4. Gate UI: `<FeatureFlagGate flagKey={FeatureFlagKey.MY_FLAG}>…</FeatureFlagGate>` (Server Component).
 5. If NL chat module: extend `NlChatModule` + `NL_CHAT_MODULE_TO_FLAG_KEY` + `hooks/use-nl-chat` module set + `app/api/nl-chat` registry (api-routes / hooks skills).
 
+## Hide an unfinished page
+
+1. Add the key, a one-line `pageFlag(key, description, false)` and its `FLAG_BY_KEY` entry in `flags.ts`.
+2. Map the submodule (or every submodule of an unbuilt module via `wholeModule`) in `SUB_MODULE_FLAG_KEY`.
+3. Nothing else: `getHiddenSubModules()` drops it from the sidebar (`generateSidebarConfig`) and the path ACL (`withRouteGuard` → 404), admins included. Ship it by flipping `false` → `true`.
+
+Dev override without a deploy: `vercel-flag-overrides` cookie = `encryptOverrides({ key: true })` (needs `FLAGS_SECRET`); `e2e/navigation/hidden-pages.spec.ts` shows it.
+
 ## Patterns
 
 - Prefer `evaluateFlag(key)` / `FeatureFlagGate` over calling individual flag functions from random call sites.

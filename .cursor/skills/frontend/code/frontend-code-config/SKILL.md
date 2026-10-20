@@ -18,10 +18,10 @@ Governor: `.cursor/rules/frontend/code/surfaces.mdc`.
 | File | Role |
 |------|------|
 | `config/app-config.ts` | App name, `SubModuleUrls`, route constants, `LEAD_GEN_SCRAPE_API_ROUTE`, tenant prefixes, `ALWAYS_ALLOWED_PATHS` |
-| `config/sidebar.config.ts` | `ADMIN_ONLY_PATHS`, `HIDDEN_SUB_MODULES` (unbuilt pages: no nav entry, 404), module/submodule Lucide icon maps, sidebar types |
+| `config/sidebar.config.ts` | `ADMIN_ONLY_PATHS`, module/submodule Lucide icon maps, sidebar types (unbuilt pages are hidden by page flags in `flags.ts`, not here) |
 | `middleware.ts` | Subdomain → tenant fetch → rewrite/redirect by `TenantType`; skips `/api` |
 
-Path ACL for modules is built in `helpers/sidebar-config-helpers.ts` from `SubModuleUrls` + `getDefaultModuleAccess()` — do not fork a second URL map.
+Path ACL for modules is built in `helpers/sidebar-config-helpers.ts` from `SubModuleUrls` + `getDefaultModuleAccess()` minus `getHiddenSubModules()` (`flags.ts`) — do not fork a second URL map.
 
 ## New submodule route checklist
 

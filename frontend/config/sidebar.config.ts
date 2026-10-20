@@ -26,12 +26,16 @@ import {
     PhoneIcon,
     ListIcon,
     Globe,
+    Bot,
+    History,
+    CalendarCheck,
+    Megaphone,
 } from 'lucide-react';
 
-/** Granted submodules whose page is not built yet: kept out of the sidebar and the path ACL. */
-export const HIDDEN_SUB_MODULES: ReadonlySet<SubModule> = new Set([
-    LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH,
-]);
+/** Sidebar labels that differ from the enum's title case. */
+export const subModuleLabelMap: Partial<Record<SubModule, string>> = {
+    [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: 'Bookings',
+};
 
 export type SidebarNavItem = {
     title: string;
@@ -106,13 +110,29 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
         icon: PhoneIcon,
         color: '!text-green-500',
     },
+    [VOICE_AGENT_SUB_MODULES.AGENTS]: {
+        icon: Bot,
+        color: '!text-violet-500',
+    },
+    [VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]: {
+        icon: PhoneIcon,
+        color: '!text-green-500',
+    },
+    [VOICE_AGENT_SUB_MODULES.CALL_LOGS]: {
+        icon: History,
+        color: '!text-blue-500',
+    },
     [VOICE_AGENT_SUB_MODULES.WEB_DIALER]: {
         icon: Phone,
         color: '!text-green-500',
     },
+    [VOICE_AGENT_SUB_MODULES.CAMPAIGNS]: {
+        icon: Megaphone,
+        color: '!text-orange-500',
+    },
     [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: {
-        icon: Phone,
-        color: '!text-green-500',
+        icon: CalendarCheck,
+        color: '!text-teal-600',
     },
     [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: {
         icon: Phone,

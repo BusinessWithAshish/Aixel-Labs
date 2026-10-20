@@ -33,7 +33,7 @@ export function withRouteGuard<P extends object>(Component: React.ComponentType<
         const isAdmin = session.user.isAdmin ?? false;
         const moduleAccess = session.user.moduleAccess;
 
-        if (!isPathAccessible(pathname, isAdmin, moduleAccess)) {
+        if (!(await isPathAccessible(pathname, isAdmin, moduleAccess))) {
             return notFound();
         }
 

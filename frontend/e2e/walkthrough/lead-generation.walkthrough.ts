@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { ACCOUNT_SETTINGS_ROUTE, SubModuleUrls, TENANT_HOME_PAGE_ROUTE } from '@/config/app-config';
-import { HIDDEN_SUB_MODULES } from '@/config/sidebar.config';
+import { SUB_MODULE_FLAG_KEY } from '@/flags';
 import { expect, test } from '../support/fixtures';
 import { E2E_ARTIFACTS_DIR, USER_STORAGE_STATE } from '../support/env';
 import {
@@ -33,7 +33,7 @@ type Finding = { screen: string; kind: 'console' | 'pageerror' | 'request' | 'ov
 const SCREENS: { name: string; url: string }[] = [
     { name: 'home', url: TENANT_HOME_PAGE_ROUTE },
     ...Object.values(LEAD_GENERATION_SUB_MODULES)
-        .filter((subModule) => !HIDDEN_SUB_MODULES.has(subModule))
+        .filter((subModule) => !(subModule in SUB_MODULE_FLAG_KEY))
         .map((subModule) => ({
             name: subModule.toLowerCase().replace(/_/g, '-'),
             url: SubModuleUrls[subModule],

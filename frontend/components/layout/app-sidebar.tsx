@@ -25,7 +25,7 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
     const moduleAccess = session?.user?.moduleAccess;
 
     // Generate sidebar config based on user's access
-    const sidebarConfig = generateSidebarConfig(isAdmin, moduleAccess);
+    const sidebarConfig = await generateSidebarConfig(isAdmin, moduleAccess);
 
     const tenantsRes = isAdmin ? await getAllTenants() : { success: true, data: [] };
     const tenants = tenantsRes.success ? tenantsRes.data ?? [] : [];

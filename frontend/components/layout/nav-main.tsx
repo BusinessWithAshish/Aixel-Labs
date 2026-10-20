@@ -17,7 +17,7 @@ import {
 import type { SidebarNavItem } from '@/config/sidebar.config';
 import { ReactNode, useCallback, useEffect } from 'react';
 import { Modules, SubModule } from '@aixellabs/backend/db/types';
-import { modulesIconMap, subModuleIconMap } from '@/config/sidebar.config';
+import { modulesIconMap, subModuleIconMap, subModuleLabelMap } from '@/config/sidebar.config';
 import { enumToTitleCase } from '@/helpers/string-helpers';
 import { DEFAULT_HOME_PAGE_ROUTE, TENANT_HOME_PAGE_ROUTE } from '@/config/app-config';
 import { eventBus } from '@/lib/event-bus';
@@ -89,8 +89,8 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                                                         <Link prefetch={true} href={subItem.url}>
                                                             <LinkItem>
                                                                 {SubItemIcon && <SubItemIcon.icon className={SubItemIcon.color} />}
-                                                                <span title={enumToTitleCase(subItem.title)}>
-                                                                    {enumToTitleCase(subItem.title)}
+                                                                <span title={subModuleLabelMap[subItem.title as SubModule] ?? enumToTitleCase(subItem.title)}>
+                                                                    {subModuleLabelMap[subItem.title as SubModule] ?? enumToTitleCase(subItem.title)}
                                                                 </span>
                                                             </LinkItem>
                                                         </Link>

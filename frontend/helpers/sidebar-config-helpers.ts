@@ -1,17 +1,19 @@
-import { type ModuleAccess, Modules } from '@aixellabs/backend/db/types';
+import { type ModuleAccess, Modules, type SubModule } from '@aixellabs/backend/db/types';
 import { SubModuleUrls, ALWAYS_ALLOWED_PATHS, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
-import { SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS, HIDDEN_SUB_MODULES } from '@/config/sidebar.config';
+import { SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS } from '@/config/sidebar.config';
+import { getHiddenSubModules } from '@/flags';
 import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 
 /**
  * Build sidebar nav from a ModuleAccess map (shared by admin full-access and non-admin grants).
+ * Submodules whose feature flag is off are left out; a module left with none is dropped.
  */
-function buildSidebarFromModuleAccess(moduleAccess: ModuleAccess): SidebarConfig {
+function buildSidebarFromModuleAccess(moduleAccess: ModuleAccess, hidden: ReadonlySet<SubModule>): SidebarConfig {
     const navMain: SidebarNavItem[] = [];
 
     // eslint-disable-next-line @next/next/no-assign-module-variable
     for (const module of Object.values(Modules)) {
-        const subModules = moduleAccess[module]?.filter((subModule) => !HIDDEN_SUB_MODULES.has(subModule));
+        const subModules = moduleAccess[module]?.filter((subModule) => !hidden.has(subModule));
         if (!subModules || subModules.length === 0) {
             continue;
         }
@@ -29,28 +31,25 @@ function buildSidebarFromModuleAccess(moduleAccess: ModuleAccess): SidebarConfig
 }
 
 /**
- * Sidebar + path ACL from module access.
+ * Sidebar + path ACL from module access and the page feature flags (`flags.ts`, server only).
  * Admins ignore stored `moduleAccess` and use {@link getDefaultModuleAccess} (SSOT for “all modules”).
  * Non-admins with missing/empty map get no module nav.
  */
-export function generateSidebarConfig(isAdmin: boolean, moduleAccess?: ModuleAccess): SidebarConfig {
-    if (isAdmin) {
-        return buildSidebarFromModuleAccess(getDefaultModuleAccess());
-    }
-
-    if (!moduleAccess) {
+export async function generateSidebarConfig(isAdmin: boolean, moduleAccess?: ModuleAccess): Promise<SidebarConfig> {
+    const access = isAdmin ? getDefaultModuleAccess() : moduleAccess;
+    if (!access) {
         return { navMain: [] };
     }
 
-    return buildSidebarFromModuleAccess(moduleAccess);
+    return buildSidebarFromModuleAccess(access, await getHiddenSubModules());
 }
 
 /**
  * Extract all accessible paths from sidebar config (same logic as nav items).
  * Reuses generateSidebarConfig for single source of truth.
  */
-export function getAccessiblePaths(isAdmin: boolean, moduleAccess?: ModuleAccess): Set<string> {
-    const config = generateSidebarConfig(isAdmin, moduleAccess);
+export async function getAccessiblePaths(isAdmin: boolean, moduleAccess?: ModuleAccess): Promise<Set<string>> {
+    const config = await generateSidebarConfig(isAdmin, moduleAccess);
     const paths = new Set<string>();
 
     for (const item of config.navMain) {
@@ -74,7 +73,7 @@ function isAdminOnlyPathAccessible(normalized: string, isAdmin: boolean): boolea
     return false;
 }
 
-export function isPathAccessible(pathname: string, isAdmin: boolean, moduleAccess?: ModuleAccess): boolean {
+export async function isPathAccessible(pathname: string, isAdmin: boolean, moduleAccess?: ModuleAccess): Promise<boolean> {
     const normalized = pathname.replace(/\/$/, '') || DEFAULT_HOME_PAGE_ROUTE;
 
     if (ALWAYS_ALLOWED_PATHS.includes(normalized as (typeof ALWAYS_ALLOWED_PATHS)[number])) {
@@ -83,7 +82,7 @@ export function isPathAccessible(pathname: string, isAdmin: boolean, moduleAcces
 
     if (isAdminOnlyPathAccessible(normalized, isAdmin)) return true;
 
-    const allowedPaths = getAccessiblePaths(isAdmin, moduleAccess);
+    const allowedPaths = await getAccessiblePaths(isAdmin, moduleAccess);
     if (allowedPaths.has(normalized)) return true;
 
     for (const allowed of allowedPaths) {

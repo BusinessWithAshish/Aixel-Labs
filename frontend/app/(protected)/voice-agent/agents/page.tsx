@@ -1,0 +1,30 @@
+import PageLayout from '@/components/common/PageLayout';
+import { withPageHandler } from '@/components/hocs/with-page-handler';
+import { PageProvider } from '@/contexts/PageStore';
+import type { VoiceAgent } from '@aixellabs/backend/db/types';
+import { listVoiceAgents } from '@/app/actions/voice-agent-actions';
+import { getGeminiKeyStatus } from '@/app/actions/voice-settings-actions';
+import { NO_GEMINI_KEY } from '@/server/voice-agent/gemini-key';
+import { useVoiceAgentsPage } from './_hooks/use-voice-agents-page';
+import { GeminiKeyCard } from './_components/GeminiKeyCard';
+import { VoiceAgentsList } from './_components/VoiceAgentsList';
+
+const PAGE_TITLE = 'Voice agents';
+
+async function VoiceAgentsPage() {
+    const [response, keyResponse] = await Promise.all([listVoiceAgents(), getGeminiKeyStatus()]);
+    const agents: VoiceAgent[] = response.success && response.data ? response.data : [];
+
+    return (
+        <PageLayout title={PAGE_TITLE}>
+            <div className="p-1 pb-3">
+                <GeminiKeyCard initialKey={keyResponse.data ?? NO_GEMINI_KEY} />
+            </div>
+            <PageProvider data={agents} usePageHook={useVoiceAgentsPage}>
+                <VoiceAgentsList />
+            </PageProvider>
+        </PageLayout>
+    );
+}
+
+export default withPageHandler(VoiceAgentsPage);

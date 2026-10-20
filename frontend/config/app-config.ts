@@ -26,8 +26,12 @@ export const SubModuleUrls: Record<SubModule, string> = {
     [LEAD_GENERATION_SUB_MODULES.CRAWL]: '/lead-generation/crawl',
     [LEAD_ENRICHMENT_SUB_MODULES.EMAIL_VERIFICATION]: '/lead-enrichment/email-verification',
     [LEAD_ENRICHMENT_SUB_MODULES.PHONE_VERIFICATION]: '/lead-enrichment/phone-verification',
+    [VOICE_AGENT_SUB_MODULES.AGENTS]: '/voice-agent/agents',
+    [VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]: '/voice-agent/phone-numbers',
+    [VOICE_AGENT_SUB_MODULES.CALL_LOGS]: '/voice-agent/call-logs',
     [VOICE_AGENT_SUB_MODULES.WEB_DIALER]: '/voice-agent/web-dialer',
-    [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: '/voice-agent',
+    [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: '/voice-agent/bookings',
+    [VOICE_AGENT_SUB_MODULES.CAMPAIGNS]: '/voice-agent/campaigns',
     [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: '/voice-agent',
     [MESSAGING_SUB_MODULES.WHATSAPP]: '/messaging/whatsapp',
     [MESSAGING_SUB_MODULES.SMS]: '/messaging/sms',
@@ -52,6 +56,9 @@ export const TENANT_HOME_PAGE_ROUTE = '/home';
 export const PATHNAME_HEADER_KEY = 'x-pathname';
 export const API_ROUTE_PREFIX = '/api';
 export const LEAD_GEN_SCRAPE_API_ROUTE = `${API_ROUTE_PREFIX}/lead-gen/scrape`;
+/** A call's recording, streamed through the app (fresh provider link, seekable). `download` asks for an attachment. */
+export const voiceCallRecordingApiRoute = (callId: string, download = false) =>
+    `${API_ROUTE_PREFIX}/voice-agent/calls/${callId}/recording${download ? '?download=1' : ''}`;
 export const TENANT_API_ROUTE_PREFIX = '/tenant';
 export const SUBDOMAIN_PARAM_NAME = 'name';
 export const IFRAME_TENANTS_ROUTE_PREFIX = '/iframe';
