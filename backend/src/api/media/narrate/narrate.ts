@@ -1,3 +1,4 @@
+import { fetch } from "undici";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -31,27 +32,24 @@ async function synthesise(
   language: string,
   usesVoiceTags: boolean,
 ): Promise<{ wav: Buffer; words: NARRATE_WORD[] }> {
-  let response: Response;
-  try {
-    response = await fetch(`${MEDIA_NARRATE.KOKORO_URL}/dev/captioned_speech`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "kokoro",
-        input: engineInput,
-        voice,
-        speed,
-        response_format: "wav",
-        lang_code: MEDIA_NARRATE.LANG_CODE[language] ?? MEDIA_NARRATE.LANG_CODE[MEDIA_NARRATE.DEFAULT_LANGUAGE],
-        stream: false,
-        allow_voice_tags: usesVoiceTags,
-      }),
-      signal: AbortSignal.timeout(MEDIA_NARRATE.REQUEST_TIMEOUT_MS),
-    });
-  } catch (err) {
+  const response = await fetch(`${MEDIA_NARRATE.KOKORO_URL}/dev/captioned_speech`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "kokoro",
+      input: engineInput,
+      voice,
+      speed,
+      response_format: "wav",
+      lang_code: MEDIA_NARRATE.LANG_CODE[language] ?? MEDIA_NARRATE.LANG_CODE[MEDIA_NARRATE.DEFAULT_LANGUAGE],
+      stream: false,
+      allow_voice_tags: usesVoiceTags,
+    }),
+    signal: AbortSignal.timeout(MEDIA_NARRATE.REQUEST_TIMEOUT_MS),
+  }).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`${MEDIA_NARRATE_ERRORS.ENGINE_UNREACHABLE} (${message})`);
-  }
+  });
   if (!response.ok) {
     const detail = (await response.text().catch(() => "")).slice(0, 300);
     throw new Error(`${MEDIA_NARRATE_ERRORS.ENGINE_FAILED}: HTTP ${response.status} ${detail}`);

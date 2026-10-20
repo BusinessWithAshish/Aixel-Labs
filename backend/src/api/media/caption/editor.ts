@@ -1,3 +1,4 @@
+import { fetch } from "undici";
 import { z } from "zod";
 
 import { askClaudeForJson } from "../../claude/structured-json";
