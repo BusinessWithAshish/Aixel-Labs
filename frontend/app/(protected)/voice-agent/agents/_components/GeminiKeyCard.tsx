@@ -42,7 +42,7 @@ export function GeminiKeyCard({ initialKey, className }: GeminiKeyCardProps) {
     const problem = view.set && view.status !== VoiceGeminiKeyStatus.OK;
 
     return (
-        <Card id={GEMINI_KEY_ANCHOR} className={cn('scroll-mt-4 gap-4', className)} data-testid="gemini-key-card">
+        <Card id={GEMINI_KEY_ANCHOR} className={cn('h-auto scroll-mt-4 gap-4', className)} data-testid="gemini-key-card">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <KeyRound className="text-primary size-4" aria-hidden />

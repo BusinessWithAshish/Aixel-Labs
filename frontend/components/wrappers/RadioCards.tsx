@@ -46,7 +46,10 @@ export function RadioCards<T extends string>({
                     <Field orientation="horizontal" className={classNames?.card}>
                         {option.media}
                         <FieldContent className="gap-0.5">
-                            <FieldTitle>{option.title}</FieldTitle>
+                            {/* One inline run of text: FieldTitle is a flex row, which would split a title made of several parts. */}
+                            <FieldTitle>
+                                <span>{option.title}</span>
+                            </FieldTitle>
                             {option.description ? (
                                 <FieldDescription className={cn('text-xs', classNames?.description)}>
                                     {option.description}
