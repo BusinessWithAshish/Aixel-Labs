@@ -161,8 +161,31 @@ KEY_OK_SECS = 600  # a key Google accepted is not asked about again for this lon
 _KEY_OK: dict[str, float] = {}
 
 
-class GeminiKeyMissing(Exception):
-    """The owner has no usable Gemini API key: the call is refused before anything runs."""
+# The app's VOICE_AGENT_NO_PROMPT_MESSAGE (helpers/voice-agent-defaults.ts), word for word.
+AGENT_NO_PROMPT = ("This agent has no prompt yet, so it would not know what to say. "
+                   "Pick a template or write a prompt first.")
+
+
+class CallRefused(Exception):
+    """A customer call that cannot run, refused before anything runs: `words` for the owner,
+    `code` for the app, `ended_by` and `flag` for its voice_calls record (save_refused)."""
+    words, code, ended_by, flag = "", "", "error", ""
+
+
+class GeminiKeyMissing(CallRefused):
+    """The owner has no usable Gemini API key."""
+    words, code, ended_by, flag = GEMINI_KEY_MISSING, "gemini_key_missing", "gemini_key_error", "gemini_key_error"
+
+
+class AgentNoPrompt(CallRefused):
+    """The agent has no prompt (a new agent before a template is picked): she would not know what to say."""
+    words, code, ended_by, flag = AGENT_NO_PROMPT, "agent_no_prompt", "error", "agent_no_prompt"
+
+
+def require_prompt(agent: dict):
+    """Raises AgentNoPrompt when the agent's prompt is empty."""
+    if not (agent.get("prompt") or "").strip():
+        raise AgentNoPrompt("the agent has no prompt")
 
 
 def gemini_key_for(user_id) -> tuple[str, str]:
@@ -217,16 +240,16 @@ async def check_gemini_key(key: str) -> tuple[str, str, str] | None:
     return (*problem, text[:300]) if problem else None
 
 
-def save_refused(number: dict, agent: dict, direction: str, other: str | None, why: str):
-    """A call on a customer's number that could not run on the owner's key: a record with no
-    audio (endedBy gemini_key_error), so the owner sees who called and why nobody answered."""
+def save_refused(number: dict, agent: dict, direction: str, other: str | None, refused: CallRefused):
+    """A call on a customer's number that was refused (CallRefused): a record with no audio
+    (endedBy gemini_key_error, or error for no prompt), so the owner sees who called and why nobody answered."""
     at, ours = now(), number.get("phoneNumber")
     _insert({
         "tenantId": number["tenantId"], "userId": number["userId"], "agentId": agent["_id"], "numberId": number["_id"],
         "channel": "PHONE", "direction": direction,
         "from": other if direction == "INBOUND" else ours, "to": ours if direction == "INBOUND" else other,
         "voice": (agent.get("voice") or "").lower(), "startedAt": at, "endedAt": at, "durationSec": 0,
-        "endedBy": "gemini_key_error", "flags": [{"flag": "gemini_key_error", "quote": why}], "turns": [], "gapsMs": [],
+        "endedBy": refused.ended_by, "flags": [{"flag": refused.flag, "quote": refused.words}], "turns": [], "gapsMs": [],
     })
 
 
@@ -354,7 +377,8 @@ def _finish_ctx(ctx: dict, agent: dict) -> dict:
     then `# Right now` and `# Your tools`, tools.prompt_sections)."""
     import analysis, campaigns, tools  # import this module: loaded on first use
 
-    # The owner's own Gemini key, or no call (GeminiKeyMissing).
+    # The agent's prompt and the owner's own Gemini key, or no call (AgentNoPrompt, GeminiKeyMissing).
+    require_prompt(agent)
     ctx["gemini_key"], ctx["gemini_sealed"] = gemini_key_for(ctx["doc"]["userId"])
     campaigns.tag(ctx)  # a campaign's call: its contact's variables (ctx["variables"]) and links
     if "variables" not in ctx and (held := _take_call_variables(ctx["doc"])) is not None:
@@ -390,7 +414,7 @@ def _finish_ctx(ctx: dict, agent: dict) -> dict:
 
 def phone_call(number: dict, agent: dict, direction: str, other: str | None) -> dict:
     """A call on a customer's number. `other` is the person: who called in, or who we dial.
-    Reads the owner's Gemini key (GeminiKeyMissing without one): call it off the event loop.
+    Refused (CallRefused) without a prompt or the owner's Gemini key: call it off the event loop.
 
     `api_key` is the customer's Telnyx key (hang-up, recording). A VoiceLink call needs none
     while it runs: it is hung up by closing its socket, and VoiceLink records it. A Twilio
@@ -427,8 +451,8 @@ def phone_call(number: dict, agent: dict, direction: str, other: str | None) -> 
 
 
 def play_call(agent: dict) -> dict:
-    """A playground session in the browser: no number, no provider key. Reads the owner's Gemini
-    key (GeminiKeyMissing without one): call it off the event loop."""
+    """A playground session in the browser: no number, no provider key. Refused (CallRefused)
+    without a prompt or the owner's Gemini key: call it off the event loop."""
     return _finish_ctx({
         "customer_phone": None,
         "voice": (agent.get("voice") or "").lower(),

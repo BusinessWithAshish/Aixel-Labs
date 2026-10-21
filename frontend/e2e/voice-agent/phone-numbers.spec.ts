@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { ObjectId } from 'mongodb';
 import type { Page } from '@playwright/test';
 import { Modules, VOICE_AGENT_SUB_MODULES, VoiceAgentCallType } from '@aixellabs/backend/db/types';
+import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
 import type { E2eDb } from '../support/db';
 import { expect, test } from '../support/fixtures';
 import { E2E_VOICE_ENGINE_SECRET, E2E_VOICE_ENGINE_URL, USER_STORAGE_STATE } from '../support/env';
@@ -257,6 +258,36 @@ test("one Call Control app serves every number, and at the trial limit the custo
     await expect(page.getByText('No phone numbers yet')).toBeVisible();
     expect(telnyx.callControlApps.has(theirs)).toBe(true);
     expect(telnyx.find('DELETE', /call_control_applications/)).toHaveLength(0);
+});
+
+test('an agent with no prompt yet cannot answer or place calls from a number', async ({ page, db }) => {
+    await db.insertVoiceAgent(E2E_USER, { name: 'Draft caller', callType: VoiceAgentCallType.OUTBOUND, prompt: '' });
+    await db.insertVoiceAgent(E2E_USER, { name: 'Draft desk', callType: VoiceAgentCallType.INBOUND, prompt: '  ' });
+    await seedNumber(db);
+    await openPhoneNumbers(page);
+    const noPrompt = page.getByText(VOICE_AGENT_NO_PROMPT_MESSAGE);
+
+    await jobRadio(page, FIRST_NUMBER, 'Answer calls').click();
+    await expect(noPrompt).toBeVisible();
+    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Not used yet');
+
+    await jobRadio(page, FIRST_NUMBER, 'Make calls').click();
+    await expect(noPrompt.first()).toBeVisible();
+    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Not used yet');
+
+    expect(telnyxWrites()).toHaveLength(0);
+    const [stored] = await db.getVoiceNumbers(E2E_USER);
+    expect(stored.inboundAgentId).toBeNull();
+    expect(stored.outboundAgentId).toBeNull();
+
+    // A test call with it is refused before the engine is asked.
+    await numberRow(page, FIRST_NUMBER).getByRole('button', { name: 'Test call' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Test call' });
+    await chooseOption(page, 'Agent that calls', 'Draft caller (makes calls)');
+    await dialog.getByLabel('Your phone number').fill('+14155550123');
+    await dialog.getByRole('button', { name: 'Call me now' }).click();
+    await expect(dialog.getByRole('alert').last()).toHaveText(VOICE_AGENT_NO_PROMPT_MESSAGE);
+    expect(engine.requests).toHaveLength(0);
 });
 
 test('an account without an outbound voice profile gets a clear error and no apps', async ({ page, db }) => {

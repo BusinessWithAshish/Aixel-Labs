@@ -150,6 +150,13 @@ def product_tests():
     except product.GeminiKeyMissing:
         refused = True
     ok("an owner with no Gemini key gets no call (GeminiKeyMissing, never our key)", refused)
+    for blank in ("", "  \n", None):
+        try:
+            product.phone_call(number, {**agent, "prompt": blank}, "INBOUND", "+15557770000")
+            refused = False
+        except product.AgentNoPrompt as e:
+            refused = e.code == "agent_no_prompt" and e.words == product.AGENT_NO_PROMPT
+        ok(f"an agent with no prompt ({blank!r}) gets no call (AgentNoPrompt), call notes or not", refused)
     product.db().voice_settings.delete_many({"userId": user})
     rec = {"turns": [{"who": "agent", "text": "Hi"}], "voice": "kore", "tool_calls": [{"name": "check_availability"}]}
     inbound["live_at"] = product.now()

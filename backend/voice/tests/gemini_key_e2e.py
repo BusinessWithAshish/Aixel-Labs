@@ -162,6 +162,14 @@ async def test_calls(port, a, b, c):
     st, body = await pe.ahttp("POST", url, {"numberId": str(a["numbers"]["telnyx"]["_id"]), "to": "+15559990002"}, auth)
     dialled = [x for x in pe.SEEN if x["path"] == "/v2/calls"]
     ok("A, own key: the call is placed", st == 200 and dialled, f"HTTP {st} {body[:200]}")
+    db.voice_agents.update_one({"_id": a["outbound"]["_id"]}, {"$set": {"prompt": " "}})
+    pe.SEEN.clear()
+    st, body = await pe.ahttp("POST", url, {"numberId": str(a["numbers"]["telnyx"]["_id"]), "to": "+15559990003"}, auth)
+    db.voice_agents.update_one({"_id": a["outbound"]["_id"]}, {"$set": {"prompt": a["outbound"]["prompt"]}})
+    data = json.loads(body) if body.startswith("{") else {}
+    ok("A, agent with no prompt: 409 agent_no_prompt, nothing dialled",
+       st == 409 and data.get("code") == "agent_no_prompt" and data.get("error") == product.AGENT_NO_PROMPT and not pe.SEEN,
+       f"HTTP {st} {body[:200]}")
 
 
 # --- calls coming in -------------------------------------------------------------------------------------
@@ -180,6 +188,17 @@ async def test_texml(port, a, b, c):
         doc = await wait_doc({"numberId": n["_id"], "direction": "INBOUND"})
         ok(f"{name}: the call is logged for the owner (gemini_key_error, no audio)", doc and doc["endedBy"] == "gemini_key_error"
            and doc["durationSec"] == 0 and doc["turns"] == [] and doc["from"] == caller and doc["to"] == n["phoneNumber"], str(doc and {k: doc.get(k) for k in ("endedBy", "flags", "from", "to")}))
+    n, caller = a["numbers"]["telnyx"], "+15557771004"
+    nid = str(n["_id"])
+    db.voice_agents.update_one({"_id": a["inbound"]["_id"]}, {"$set": {"prompt": ""}})
+    st, body = await pe.ahttp("GET", f"http://127.0.0.1:{port}/texml?n={nid}&sig={scripted.number_sig(nid)}"
+                                     f"&Direction=inbound&From={urllib.parse.quote(caller)}&To={urllib.parse.quote(n['phoneNumber'])}")
+    db.voice_agents.update_one({"_id": a["inbound"]["_id"]}, {"$set": {"prompt": a["inbound"]["prompt"]}})
+    doc = await wait_doc({"numberId": n["_id"], "direction": "INBOUND", "from": caller})
+    ok("A, agent with no prompt: an apology and a hang-up, no stream, logged as agent_no_prompt",
+       st == 200 and "<Hangup/>" in body and "<Stream" not in body and doc and doc["endedBy"] == "error"
+       and doc["flags"] == [{"flag": "agent_no_prompt", "quote": product.AGENT_NO_PROMPT}],
+       f"HTTP {st} {body[:120]} {doc and (doc['endedBy'], doc['flags'])}")
     r = await scripted.run(str(port), "busy", texml=True, number=str(a["numbers"]["telnyx"]["_id"]), caller="+15557771003")
     ok("A, own key: she answers the call", r["first_sound"] is not None, f"first sound {r['first_sound']}")
 

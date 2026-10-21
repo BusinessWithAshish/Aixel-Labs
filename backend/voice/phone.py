@@ -693,9 +693,9 @@ def make_app() -> FastAPI:
         unavailable = Response(content=UNAVAILABLE_XML, media_type="application/xml")
         try:
             ctx = await asyncio.to_thread(product.phone_call, number, agent, "INBOUND", caller)
-        except product.GeminiKeyMissing as e:
+        except product.CallRefused as e:
             logger.warning(f"texml: number {number_id}: {e}, the caller hears nobody can take the call")
-            await asyncio.to_thread(product.save_refused, number, agent, "INBOUND", caller, product.GEMINI_KEY_MISSING)
+            await asyncio.to_thread(product.save_refused, number, agent, "INBOUND", caller, e)
             return unavailable
         except Exception as e:
             logger.error(f"texml: number {number_id}: its Telnyx key cannot be opened ({e}), hanging up")
@@ -850,10 +850,10 @@ def make_app() -> FastAPI:
             number, agent = await asyncio.to_thread(product.load_number, number_id, direction, agent_id or None)
             if number and agent and number.get("provider") == "VOICELINK":
                 ctx = await asyncio.to_thread(product.phone_call, number, agent, direction, other)
-        except product.GeminiKeyMissing as e:
+        except product.CallRefused as e:
             logger.warning(f"voicelink: number {number_id}: {e}")
             if not out:  # someone called the business: the owner sees who
-                await asyncio.to_thread(product.save_refused, number, agent, direction, other, product.GEMINI_KEY_MISSING)
+                await asyncio.to_thread(product.save_refused, number, agent, direction, other, e)
         except Exception as e:
             logger.error(f"voicelink: number {number_id}: {e}")
         if not ctx:
@@ -936,10 +936,9 @@ def make_app() -> FastAPI:
         unavailable = Response(content=UNAVAILABLE_XML, media_type="application/xml")
         try:
             ctx = await asyncio.to_thread(product.phone_call, number, agent, "INBOUND", normalize_number(caller) or caller)
-        except product.GeminiKeyMissing as e:
+        except product.CallRefused as e:
             logger.warning(f"twiml: number {number_id}: {e}, the caller hears nobody can take the call")
-            await asyncio.to_thread(product.save_refused, number, agent, "INBOUND", normalize_number(caller) or caller,
-                                    product.GEMINI_KEY_MISSING)
+            await asyncio.to_thread(product.save_refused, number, agent, "INBOUND", normalize_number(caller) or caller, e)
             return unavailable
         voice = ctx["voice"] if ctx["voice"] in VOICES else DEFAULT_VOICE
         callee = normalize_number(caller) or ""
@@ -1071,12 +1070,14 @@ def make_app() -> FastAPI:
         if not agent:
             return JSONResponse({"error": "pick an agent to make the call (this number has no outbound agent)"
                                  if not agent_id else "that agent was not found"}, status_code=409)
-        # The call runs on the owner's own Gemini key: none, or one Google refuses, rings nobody.
+        # The call needs the agent's prompt and runs on the owner's own Gemini key: no prompt, no key,
+        # or one Google refuses, rings nobody.
         try:
+            product.require_prompt(agent)
             gemini_key, sealed = await asyncio.to_thread(product.gemini_key_for, number["userId"])
-        except product.GeminiKeyMissing as e:
+        except product.CallRefused as e:
             logger.warning(f"/calls: number {number_id}: {e}")
-            return JSONResponse({"error": product.GEMINI_KEY_MISSING, "code": "gemini_key_missing"}, status_code=409)
+            return JSONResponse({"error": e.words, "code": e.code}, status_code=409)
         except Exception as e:
             logger.error(f"/calls: could not read the Gemini key of number {number_id}'s owner: {e}")
             return JSONResponse({"error": "the database is unavailable"}, status_code=503)
@@ -1222,10 +1223,10 @@ def make_app() -> FastAPI:
             return
         try:
             ctx = await asyncio.to_thread(product.play_call, doc)
-        except product.GeminiKeyMissing as e:
+        except product.CallRefused as e:
             logger.warning(f"play: agent {agent}: {e}")
-            await websocket.send_text(json.dumps({"type": "error", "code": "gemini_key_missing", "message": product.GEMINI_KEY_MISSING}))
-            await websocket.close(code=1008, reason="gemini_key_missing")
+            await websocket.send_text(json.dumps({"type": "error", "code": e.code, "message": e.words}))
+            await websocket.close(code=1008, reason=e.code)
             return
         if len(ACTIVE) >= MAX_CALLS:
             await websocket.close(code=1013, reason="busy, try again shortly")

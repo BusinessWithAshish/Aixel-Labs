@@ -15,6 +15,7 @@ import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { VOICE_AGENT_FEATURE_LIMITS, VOICE_VARIABLE_NAME_PATTERN } from '@aixellabs/backend/db/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key';
+import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
 import { isBuiltinVariable } from '@/helpers/voice-agent-features';
 import { engineFetch, sealSecret } from '@/server/voice-agent/engine';
 import { assertGeminiKeySet, GEMINI_KEY_MISSING_MESSAGE } from '@/server/voice-agent/gemini-key';
@@ -224,7 +225,7 @@ const CALL_TYPE_WORD: Record<VoiceAgentCallType, string> = {
     [VoiceAgentCallType.OUTBOUND]: 'an outbound',
 };
 
-/** The caller's agent, refused when it was made for the other kind of call (any kind when `callType` is absent). */
+/** The caller's agent, refused when it was made for the other kind of call (any kind when `callType` is absent) or has no prompt yet. */
 async function findOwnedAgent(
     owner: VoiceOwnerScope,
     agentId: string,
@@ -233,12 +234,13 @@ async function findOwnedAgent(
     const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
     const agent = await agents.findOne(
         { _id: toObjectId(agentId, 'Agent ID'), userId: owner.userId },
-        { projection: { name: 1, callType: 1 } },
+        { projection: { name: 1, callType: 1, prompt: 1 } },
     );
     if (!agent?._id) throw new Error('Agent not found');
     if (callType && agent.callType && agent.callType !== callType) {
         throw new Error(`${agent.name} is ${CALL_TYPE_WORD[agent.callType]} agent. Pick ${CALL_TYPE_WORD[callType]} agent.`);
     }
+    if (!agent.prompt?.trim()) throw new Error(VOICE_AGENT_NO_PROMPT_MESSAGE);
     return { _id: agent._id, name: agent.name };
 }
 
