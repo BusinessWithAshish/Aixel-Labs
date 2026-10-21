@@ -227,7 +227,7 @@ test('"Used on" lists the numbers that use the agent for incoming and outgoing c
 
     const unusedId = await db.insertVoiceAgent(E2E_USER, { name: 'Unused' });
     await openVoiceAgent(page, unusedId);
-    await expect(page.getByTestId('voice-agent-used-on')).toContainText('Not on any number yet');
+    await expect(page.getByTestId('voice-agent-used-on')).toContainText('No number uses it yet');
 });
 
 test('edits and saves every field', async ({ page, db }) => {

@@ -280,11 +280,11 @@ export const voicelinkNumbers: NumberProvider = {
         return syncRouting(doc, { inbound: !!doc.inboundAgentId, outbound: false });
     },
 
-    /** VoiceLink refuses to dial unless the outbound half is our bot, which the outbound agent sets up. */
+    /** VoiceLink refuses to dial unless the outbound half is our bot, which "Make calls" sets up. */
     async prepareCall(doc) {
         if (!doc.outboundAgentId) {
             throw new Error(
-                'Pick an agent under "Places calls as" for this number first. VoiceLink only dials from a number whose outgoing calls go to the AI.',
+                `VoiceLink only places AI calls from a number set to "Make calls". Set ${doc.phoneNumber} to "Make calls" on the Phone numbers page, or call from another number.`,
             );
         }
     },

@@ -216,7 +216,7 @@ export function ConnectNumberDialog() {
         }
         addImported(res.data);
         toast.success(
-            `Imported ${res.data.length} ${res.data.length === 1 ? 'number' : 'numbers'}. Nothing changed in ${label}: calls ring where they did.`,
+            `Imported ${res.data.length} ${res.data.length === 1 ? 'number' : 'numbers'}. Nothing changed in ${label}: calls keep ringing the way they do now.`,
         );
         onOpenChange(false);
     };
@@ -237,7 +237,7 @@ export function ConnectNumberDialog() {
                     <DialogTitle>Connect a number</DialogTitle>
                     <DialogDescription>
                         {accountNumbers
-                            ? `Choose the numbers to add from ${label}. Nothing changes in ${label} until you turn on AI answering or an outbound agent for a number.`
+                            ? `Choose the numbers to add from ${label}. Nothing changes in ${label} until you choose what the AI does with a number.`
                             : `We use your own ${label} account for calls. Your ${words.secret} ${isTwilio ? 'are' : 'is'} encrypted before ${isTwilio ? 'they are' : 'it is'} stored and never shown again.`}
                     </DialogDescription>
                 </DialogHeader>
@@ -341,10 +341,9 @@ export function ConnectNumberDialog() {
                                         <Info className="size-4" />
                                         <AlertDescription>
                                             We add a WebSocket bot named &ldquo;Aixel Labs&nbsp;+91&hellip;&rdquo; to your
-                                            account when you turn on AI answering or an outbound agent. Keep its
-                                            &ldquo;WebSocket API&rdquo; switch off in the VoiceLink panel (WebSocket Bots):
-                                            with it on, calls are answered and dropped at once, and the API cannot set it for
-                                            us.
+                                            account when a number is set to answer or make calls. Keep its &ldquo;WebSocket
+                                            API&rdquo; switch off in the VoiceLink panel (WebSocket Bots): with it on, calls
+                                            are answered and dropped at once, and the API cannot set it for us.
                                         </AlertDescription>
                                     </Alert>
                                 </>

@@ -9,12 +9,12 @@ import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
 import { ConnectNumberDialog } from './ConnectNumberDialog';
 import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
+import { TestCallDialog } from '@/components/common/voice-agent/TestCallDialog';
 import { SETUP_GUIDE_PROVIDERS, setupGuideFor } from '../_utils/setup-guides';
 import { PhoneNumberRow } from './PhoneNumberRow';
 import { ProviderSetupGuide } from './ProviderSetupGuide';
 import { RemoveNumberDialog } from './RemoveNumberDialog';
 import { SetupGuideBanner } from './SetupGuideBanner';
-import { TestCallDialog } from './TestCallDialog';
 
 function SetupGuideButton() {
     const { openSetupGuide } = usePage<UsePhoneNumbersPageReturn>();
@@ -53,6 +53,20 @@ function GuideProviderSwitch() {
     );
 }
 
+/** The row's test call: from that number, with any agent (its own picked first). */
+function NumberTestCallDialog() {
+    const { testCallNumber, setTestCallNumber, agents, geminiKey } = usePage<UsePhoneNumbersPageReturn>();
+    return (
+        <TestCallDialog
+            open={testCallNumber !== null}
+            onOpenChange={(open) => !open && setTestCallNumber(null)}
+            numbers={testCallNumber ? [testCallNumber] : []}
+            agents={agents}
+            geminiKey={geminiKey}
+        />
+    );
+}
+
 function SetupGuideDialog() {
     const { setupGuide, closeSetupGuide } = usePage<UsePhoneNumbersPageReturn>();
     const guide = setupGuideFor(setupGuide.provider);
@@ -81,7 +95,7 @@ export function PhoneNumbersContent() {
                 </Alert>
             ) : null}
 
-            <GeminiKeyNotice view={geminiKey} action="answer or place calls" />
+            <GeminiKeyNotice view={geminiKey} action="answer or make calls" />
 
             {numbers.length === 0 ? <SetupGuideBanner /> : null}
 
@@ -89,7 +103,7 @@ export function PhoneNumbersContent() {
                 <EmptyState
                     icon={<PhoneIcon />}
                     title="No phone numbers yet"
-                    description="Bring a number you own: Telnyx or Twilio for US and international numbers, VoiceLink for Indian numbers. Importing changes nothing in your account: each number keeps ringing where it does until you turn on AI answering."
+                    description="Bring a phone number you already have with Telnyx or Twilio (US and international) or VoiceLink (India). Connecting it changes nothing: calls keep ringing the way they do now until you choose what the AI does with the number."
                     classNames={{ content: 'flex-row flex-wrap justify-center gap-2' }}
                 >
                     <Button onClick={() => setConnectOpen(true)}>
@@ -102,8 +116,8 @@ export function PhoneNumbersContent() {
                 <>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="text-muted-foreground max-w-3xl text-sm">
-                            {numbers.length} {numbers.length === 1 ? 'number' : 'numbers'} from your own Telnyx, Twilio or
-                            VoiceLink account. Each keeps ringing where it does until you turn on AI answering for it.
+                            Each number does one job: the AI answers its calls, or the AI makes calls from it. Until you pick
+                            one, calls ring the way they always have.
                         </p>
                         <div className="flex flex-wrap gap-2">
                             <SetupGuideButton />
@@ -120,14 +134,14 @@ export function PhoneNumbersContent() {
                     </ul>
                     <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
                         <Info className="mt-px size-3.5 shrink-0" aria-hidden />
-                        Call recordings stay in your Telnyx, Twilio or VoiceLink account. We keep at most a link to each one
-                        and store no audio.
+                        Call recordings stay in your Telnyx, Twilio or VoiceLink account. We only keep a link to each one,
+                        never the audio.
                     </p>
                 </>
             )}
 
             <ConnectNumberDialog />
-            <TestCallDialog />
+            <NumberTestCallDialog />
             <RemoveNumberDialog />
             <SetupGuideDialog />
         </>

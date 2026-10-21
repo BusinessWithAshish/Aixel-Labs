@@ -132,7 +132,7 @@ async function seedAgentsAndNumber(db: E2eDb) {
 const card = (page: Page) => page.getByTestId('gemini-key-card');
 const numberRow = (page: Page) => page.getByTestId('voice-number-row').filter({ hasText: NUMBER });
 
-test('without a key: the card says so, and the playground, AI answering, placing calls and test calls explain it', async ({
+test('without a key: the card says so, and the playground, answering, making calls and test calls explain it', async ({
     page,
     db,
 }) => {
@@ -155,14 +155,14 @@ test('without a key: the card says so, and the playground, AI answering, placing
     );
 
     await openPhoneNumbers(page);
-    await expect(page.getByTestId('gemini-key-notice')).toContainText('Add your Gemini API key to answer or place calls.');
-    await expect(numberRow(page).getByRole('switch', { name: 'AI answers incoming calls' })).toBeDisabled();
-    await expect(numberRow(page).getByRole('combobox', { name: `Outbound agent for ${NUMBER}` })).toBeDisabled();
-    await expect(numberRow(page).getByTestId('gemini-key-hint')).toHaveCount(2);
+    await expect(page.getByTestId('gemini-key-notice')).toContainText('Add your Gemini API key to answer or make calls.');
+    await expect(numberRow(page).getByRole('radio', { name: 'Answer calls' })).toBeDisabled();
+    await expect(numberRow(page).getByRole('radio', { name: 'Make calls' })).toBeDisabled();
+    await expect(numberRow(page).getByTestId('gemini-key-hint')).toHaveCount(1);
     await numberRow(page).getByRole('button', { name: 'Test call' }).click();
     const dialog = page.getByRole('dialog', { name: 'Test call' });
     await expect(dialog.getByTestId('gemini-key-notice')).toContainText('Add your Gemini API key to place calls.');
-    await expect(dialog.getByRole('button', { name: 'Call now' })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Call me now' })).toHaveCount(0);
 
     // The link takes them to the card.
     await page.keyboard.press('Escape');
@@ -171,7 +171,7 @@ test('without a key: the card says so, and the playground, AI answering, placing
     await expect(card(page)).toBeInViewport();
 });
 
-test('the server refuses too: a key removed after the page loaded blocks AI answering and the playground', async ({
+test('the server refuses too: a key removed after the page loaded blocks answering calls and the playground', async ({
     page,
     db,
 }) => {
@@ -181,9 +181,9 @@ test('the server refuses too: a key removed after the page loaded blocks AI answ
     await openPhoneNumbers(page);
     await expect(page.getByTestId('gemini-key-notice')).toHaveCount(0);
     await db.setVoiceGeminiKey(E2E_USER, null);
-    await numberRow(page).getByRole('switch', { name: 'AI answers incoming calls' }).click();
+    await numberRow(page).getByRole('radio', { name: 'Answer calls' }).click();
     await expect(page.getByText('Add your Gemini API key first (Voice agents page, Gemini API key).')).toBeVisible();
-    await expect(numberRow(page)).toContainText('Not set up');
+    await expect(numberRow(page).getByTestId('number-job')).toHaveText('Not used yet');
     expect((await db.getVoiceNumbers(E2E_USER))[0].inboundAgentId).toBeNull();
 
     await db.setVoiceGeminiKey(E2E_USER, GOOD_KEY);
@@ -270,7 +270,7 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     await expect(page.getByTestId('gemini-key-line')).toHaveCount(2); // the editor and the playground
     await expect(page.getByTestId('gemini-key-line').first()).toHaveText(line.replace('free', 'paid'));
     await openPhoneNumbers(page);
-    await expect(numberRow(page).getByRole('switch', { name: 'AI answers incoming calls' })).toBeEnabled();
+    await expect(numberRow(page).getByRole('radio', { name: 'Answer calls' })).toBeEnabled();
     await expect(page.getByTestId('gemini-key-notice')).toHaveCount(0);
 
     // Neither the key nor its sealed form is in any page or action payload.

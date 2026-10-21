@@ -11,6 +11,7 @@ export type RadioCardOption<T extends string> = {
     description?: ReactNode;
     /** Before the text, e.g. an icon tile. */
     media?: ReactNode;
+    disabled?: boolean;
 };
 
 type RadioCardsProps<T extends string> = Omit<
@@ -43,7 +44,7 @@ export function RadioCards<T extends string>({
         >
             {options.map((option) => (
                 <FieldLabel key={option.value} htmlFor={`${id}-${option.value}`}>
-                    <Field orientation="horizontal" className={classNames?.card}>
+                    <Field orientation="horizontal" data-disabled={option.disabled} className={classNames?.card}>
                         {option.media}
                         <FieldContent className="gap-0.5">
                             {/* One inline run of text: FieldTitle is a flex row, which would split a title made of several parts. */}
@@ -56,7 +57,7 @@ export function RadioCards<T extends string>({
                                 </FieldDescription>
                             ) : null}
                         </FieldContent>
-                        <RadioGroupItem value={option.value} id={`${id}-${option.value}`} />
+                        <RadioGroupItem value={option.value} id={`${id}-${option.value}`} disabled={option.disabled} />
                     </Field>
                 </FieldLabel>
             ))}

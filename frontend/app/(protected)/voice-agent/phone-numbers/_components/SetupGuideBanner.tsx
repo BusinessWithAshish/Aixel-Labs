@@ -54,8 +54,8 @@ export function SetupGuideBanner({ provider = VoiceProvider.TELNYX }: { provider
         >
             <BookOpen className="text-primary size-5 shrink-0" aria-hidden />
             <p className="min-w-0 flex-1 text-sm">
-                <span className="font-medium">New to this?</span> See how to set up {label} in {guide.steps.length} steps
-                {withScreenshots ? `, with screenshots of the ${label} portal` : ''}.
+                <span className="font-medium">New to this?</span> Get a {label} number ready for your AI agents in{' '}
+                {guide.steps.length} steps{withScreenshots ? `, with a picture for each` : ''}.
                 {others.map((other) => {
                     const otherLabel = numberProviderInfo(other).label;
                     return (

@@ -55,6 +55,9 @@ FIRST_LINE = {
     "OUTBOUND": "Start the call with your opening line.",
     "INBOUND": "Someone has just called your number and you have picked up. Greet them with your opening line.",
     "PLAYGROUND": "Start the call with your opening line.",
+    # An inbound agent on a call we place: only a test call from the app does that (campaigns refuse inbound agents).
+    "TEST_INBOUND": "This is a test call: you rang this person so they can try you out. Talk to them exactly as if "
+                    "they had called your number. Greet them with your opening line.",
 }
 
 
@@ -409,7 +412,7 @@ def phone_call(number: dict, agent: dict, direction: str, other: str | None) -> 
         "voice": (agent.get("voice") or "").lower(),
         "provider": provider,
         "api_key": api_key,
-        "first": FIRST_LINE[direction],
+        "first": FIRST_LINE["TEST_INBOUND" if direction == "OUTBOUND" and agent.get("callType") == "INBOUND" else direction],
         "doc": {
             "tenantId": number["tenantId"],
             "userId": number["userId"],

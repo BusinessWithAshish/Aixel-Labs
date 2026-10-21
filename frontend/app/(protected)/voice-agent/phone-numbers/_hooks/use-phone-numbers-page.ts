@@ -4,12 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { VoiceAgentCallType, VoiceProvider, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
-import {
-    removeNumber,
-    setInboundAgent,
-    setOutboundAgent,
-    type VoiceNumberListItem,
-} from '@/app/actions/voice-number-actions';
+import { removeNumber, setNumberAgent, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 
 export type PhoneNumbersPageData = {
     numbers: VoiceNumberListItem[];
@@ -19,29 +14,43 @@ export type PhoneNumbersPageData = {
     geminiKey: VoiceGeminiKeyView;
 };
 
-export type NumberBadge = { label: string; variant: 'green' | 'blue' | 'secondary' };
+/**
+ * What a number does: answers calls, makes calls, or nothing yet. `null` = numbers set up before a
+ * number did one job only, with both an answering and a calling agent, until the owner picks one.
+ */
+export type NumberJob = VoiceAgentCallType | 'NONE';
+
+export function numberJob(number: VoiceNumberListItem): NumberJob | null {
+    if (number.inboundAgentId && number.outboundAgentId) return null;
+    if (number.inboundAgentId) return VoiceAgentCallType.INBOUND;
+    if (number.outboundAgentId) return VoiceAgentCallType.OUTBOUND;
+    return 'NONE';
+}
+
+export type NumberBadge = { label: string; variant: 'green' | 'blue' | 'secondary' | 'yellow' };
 
 /** What the number does today, in the words the row shows. */
-export function numberBadges(number: VoiceNumberListItem): NumberBadge[] {
-    const badges: NumberBadge[] = [];
-    if (number.inboundAgentId) badges.push({ label: 'AI answers calls', variant: 'green' });
-    if (number.outboundAgentId) {
-        badges.push({ label: number.inboundAgentId ? 'Places calls' : 'Outbound only', variant: 'blue' });
+export function numberBadge(number: VoiceNumberListItem): NumberBadge {
+    switch (numberJob(number)) {
+        case VoiceAgentCallType.INBOUND:
+            return { label: 'Answers calls', variant: 'green' };
+        case VoiceAgentCallType.OUTBOUND:
+            return { label: 'Makes calls', variant: 'blue' };
+        case 'NONE':
+            return { label: 'Not used yet', variant: 'secondary' };
+        default:
+            return { label: 'Pick one job', variant: 'yellow' };
     }
-    if (badges.length === 0) badges.push({ label: 'Not set up', variant: 'secondary' });
-    return badges;
 }
 
 /** The provider setup guide dialog: which guide, the step it opened at, and whether it is showing. */
 export type SetupGuideState = { provider: VoiceProvider; stepId: string | null; open: boolean };
 
-/** Which save is running for a number, so only that control shows it. */
-export type NumberSaving = { numberId: string; part: 'inbound' | 'outbound' };
-
 export function usePhoneNumbersPage(data: PhoneNumbersPageData) {
     const [numbers, setNumbers] = useState<VoiceNumberListItem[]>(data.numbers);
     const [connectOpen, setConnectOpen] = useState(false);
-    const [saving, setSaving] = useState<NumberSaving | null>(null);
+    /** The number whose job or agent is being saved. */
+    const [saving, setSaving] = useState<string | null>(null);
     const [testCallNumber, setTestCallNumber] = useState<VoiceNumberListItem | null>(null);
     const [removeTarget, setRemoveTarget] = useState<VoiceNumberListItem | null>(null);
     const [removing, setRemoving] = useState(false);
@@ -67,43 +76,40 @@ export function usePhoneNumbersPage(data: PhoneNumbersPageData) {
         setNumbers((prev) => prev.map((n) => (n._id === updated._id ? updated : n)));
     };
 
-    /** `null` turns AI answering off; an agent turns it on, or swaps the agent while on. */
-    const changeInboundAgent = async (number: VoiceNumberListItem, agentId: string | null) => {
-        if (!number._id || (number.inboundAgentId ?? null) === agentId) return;
-        const wasOn = !!number.inboundAgentId;
-        setSaving({ numberId: number._id, part: 'inbound' });
-        const res = await setInboundAgent(number._id, agentId);
+    /** Gives the number one job (`callType`) with `agentId`, or none (`null`): the server undoes the old job. */
+    const changeNumberAgent = async (
+        number: VoiceNumberListItem,
+        callType: VoiceAgentCallType | null,
+        agentId: string | null,
+    ) => {
+        if (!number._id) return;
+        const current = callType === VoiceAgentCallType.INBOUND ? number.inboundAgentId : number.outboundAgentId;
+        if (numberJob(number) === (callType ?? 'NONE') && (callType === null || current === agentId)) return;
+        setSaving(number._id);
+        const res = await setNumberAgent(number._id, callType, agentId);
         setSaving(null);
         if (!res.success || !res.data) {
-            toast.error(res.error ?? 'Could not change who answers this number');
+            toast.error(res.error ?? `Could not change what ${number.phoneNumber} does`);
             return;
         }
         const updated = res.data;
         replaceNumber(updated);
-        if (agentId === null) toast.success(`AI answering is off. ${number.phoneNumber} rings wherever it did before.`);
-        else if (wasOn) toast.success(`${updated.inboundAgentName} now answers ${number.phoneNumber}`);
-        else toast.success(`The AI now answers every call to ${number.phoneNumber}, as ${updated.inboundAgentName}`);
-    };
-
-    const toggleAiAnswering = (number: VoiceNumberListItem, on: boolean) => {
-        if (!on) return changeInboundAgent(number, null);
-        const first = inboundAgents[0];
-        if (first) return changeInboundAgent(number, first.id);
-    };
-
-    const changeOutboundAgent = async (number: VoiceNumberListItem, agentId: string | null) => {
-        if (!number._id || (number.outboundAgentId ?? null) === agentId) return;
-        setSaving({ numberId: number._id, part: 'outbound' });
-        const res = await setOutboundAgent(number._id, agentId);
-        setSaving(null);
-        if (!res.success || !res.data) {
-            toast.error(res.error ?? 'Could not change the outbound agent');
-            return;
+        if (callType === VoiceAgentCallType.INBOUND) {
+            toast.success(`${updated.inboundAgentName} now answers every call to ${number.phoneNumber}`);
+        } else if (callType === VoiceAgentCallType.OUTBOUND) {
+            toast.success(`${updated.outboundAgentName} now makes the calls from ${number.phoneNumber}`);
+        } else {
+            toast.success(`The AI is off for ${number.phoneNumber}. Calls to it ring the way they did before.`);
         }
-        const updated = res.data;
-        replaceNumber(updated);
-        if (agentId === null) toast.success(`${number.phoneNumber} has no outbound agent`);
-        else toast.success(`${updated.outboundAgentName} now places calls from ${number.phoneNumber}`);
+    };
+
+    /** Picks the number's job, keeping its agent for that job when it has one, else the first agent made for it. */
+    const chooseJob = (number: VoiceNumberListItem, job: NumberJob) => {
+        if (job === 'NONE') return changeNumberAgent(number, null, null);
+        const inbound = job === VoiceAgentCallType.INBOUND;
+        const agentId =
+            (inbound ? number.inboundAgentId : number.outboundAgentId) ?? (inbound ? inboundAgents : outboundAgents)[0]?.id;
+        if (agentId) return changeNumberAgent(number, job, agentId);
     };
 
     const confirmRemove = async () => {
@@ -123,6 +129,7 @@ export function usePhoneNumbersPage(data: PhoneNumbersPageData) {
 
     return {
         numbers,
+        agents: data.agents,
         inboundAgents,
         outboundAgents,
         loadError: data.loadError,
@@ -132,9 +139,8 @@ export function usePhoneNumbersPage(data: PhoneNumbersPageData) {
         setConnectOpen,
         addImported,
         saving,
-        toggleAiAnswering,
-        changeInboundAgent,
-        changeOutboundAgent,
+        chooseJob,
+        changeNumberAgent,
         testCallNumber,
         setTestCallNumber,
         removeTarget,

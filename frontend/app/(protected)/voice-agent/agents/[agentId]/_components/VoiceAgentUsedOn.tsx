@@ -1,9 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, PhoneIncoming, PhoneOutgoing, type LucideIcon } from 'lucide-react';
-import { VoiceAgentCallType } from '@aixellabs/backend/db/types';
-import type { VoiceAgentNumberUse } from '@/app/actions/voice-agent-actions';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { ArrowRight, PhoneCall, PhoneIncoming, PhoneOutgoing, type LucideIcon } from 'lucide-react';
+import { VoiceAgentCallType, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
+import { getVoiceAgentOptions, type VoiceAgentNumberUse, type VoiceAgentOption } from '@/app/actions/voice-agent-actions';
+import { listMyNumbers, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
+import { getGeminiKeyStatus } from '@/app/actions/voice-settings-actions';
+import { TestCallDialog } from '@/components/common/voice-agent/TestCallDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePage } from '@/contexts/PageStore';
@@ -45,10 +50,39 @@ function UsageGroup({ title, icon: Icon, numbers, testId }: UsageGroupProps) {
     );
 }
 
-/** The user's numbers that send incoming calls to this agent, and those that place calls with it. */
+/** What the test call dialog needs, loaded when it is opened. */
+type TestCallData = { numbers: VoiceNumberListItem[]; agents: VoiceAgentOption[]; geminiKey: VoiceGeminiKeyView };
+
+/**
+ * The user's numbers that send incoming calls to this agent, and those that place calls with it, and a
+ * test call: the saved agent rings the owner's phone from one of their numbers.
+ */
 export function VoiceAgentUsedOn({ className }: { className?: string }) {
     const { saved, usage } = usePage<UseVoiceAgentEditorPageReturn>();
     const used = usage.inbound.length + usage.outbound.length > 0;
+    const [testCall, setTestCall] = useState<TestCallData | null>(null);
+    const [testCallOpen, setTestCallOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const openTestCall = async () => {
+        setLoading(true);
+        const [numbersRes, agentsRes, keyRes] = await Promise.all([
+            listMyNumbers(),
+            getVoiceAgentOptions(),
+            getGeminiKeyStatus(),
+        ]);
+        setLoading(false);
+        if (!numbersRes.data || !agentsRes.data || !keyRes.data) {
+            toast.error(numbersRes.error ?? agentsRes.error ?? keyRes.error ?? 'Could not open the test call');
+            return;
+        }
+        setTestCall({
+            numbers: numbersRes.data,
+            agents: agentsRes.data.filter((a) => a.id === saved._id),
+            geminiKey: keyRes.data,
+        });
+        setTestCallOpen(true);
+    };
 
     // The type is what the agent is meant for; a number can still use it the other way round.
     const mismatch =
@@ -63,7 +97,11 @@ export function VoiceAgentUsedOn({ className }: { className?: string }) {
             <CardHeader>
                 <CardTitle>Used on</CardTitle>
                 <CardDescription>Numbers using this agent.</CardDescription>
-                <CardAction>
+                <CardAction className="flex flex-wrap justify-end gap-2">
+                    <Button variant="outline" size="sm" disabled={loading} onClick={openTestCall}>
+                        <PhoneCall className="size-3.5" />
+                        {loading ? 'Opening…' : 'Test call'}
+                    </Button>
                     <Button variant="outline" size="sm" asChild>
                         <Link href={VOICE_PHONE_NUMBERS_URL}>
                             Phone numbers
@@ -90,12 +128,22 @@ export function VoiceAgentUsedOn({ className }: { className?: string }) {
                     </div>
                 ) : (
                     <p className="text-muted-foreground text-sm">
-                        Not on any number yet. Pick it for a number&rsquo;s incoming or outgoing calls on the Phone Numbers
-                        page.
+                        No number uses it yet. On the Phone numbers page, pick it for a number that answers or makes calls.
+                        You can still try it now with a test call to your phone.
                     </p>
                 )}
                 {mismatch ? <p className="text-xs text-amber-600 dark:text-amber-400">{mismatch}</p> : null}
             </CardContent>
+            {testCall ? (
+                <TestCallDialog
+                    open={testCallOpen}
+                    onOpenChange={setTestCallOpen}
+                    numbers={testCall.numbers}
+                    agents={testCall.agents}
+                    geminiKey={testCall.geminiKey}
+                    numberId={usage.outbound[0]?.id ?? usage.inbound[0]?.id}
+                />
+            ) : null}
         </Card>
     );
 }

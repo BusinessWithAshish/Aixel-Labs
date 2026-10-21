@@ -129,6 +129,10 @@ def product_tests():
     inbound = product.phone_call(number, agent, "INBOUND", "+15557770000")
     outbound = product.phone_call(number, agent, "OUTBOUND", "+15559990000")
     play = product.play_call(agent)
+    test_in = product.phone_call(number, {**agent, "callType": "INBOUND"}, "OUTBOUND", "+15559990000")
+    ok("an inbound agent on a call we place (a test call) is told to answer as if called; others get their line",
+       test_in["first"] == product.FIRST_LINE["TEST_INBOUND"] and outbound["first"] == product.FIRST_LINE["OUTBOUND"]
+       and inbound["first"] == product.FIRST_LINE["INBOUND"])
     ok("customer phone: the caller on a call in, the callee on one we place, none in the playground",
        inbound["customer_phone"] == "+15557770000" and outbound["customer_phone"] == "+15559990000" and play["customer_phone"] is None)
     ok("each call gets its own voice_calls _id at the start", all(isinstance(c["doc"]["_id"], ObjectId) for c in (inbound, outbound, play))

@@ -58,7 +58,7 @@ export type TwilioCredentials = {
 export type VoiceNumberListItem = VoiceNumber & {
     /** Name of the agent that answers calls in; null when the AI does not answer this number. */
     inboundAgentName: string | null;
-    /** Name of the agent that places calls from this number by default. */
+    /** Name of the agent that places calls from this number. */
     outboundAgentName: string | null;
 };
 
@@ -224,11 +224,11 @@ const CALL_TYPE_WORD: Record<VoiceAgentCallType, string> = {
     [VoiceAgentCallType.OUTBOUND]: 'an outbound',
 };
 
-/** The caller's agent, refused when it was made for the other kind of call. */
+/** The caller's agent, refused when it was made for the other kind of call (any kind when `callType` is absent). */
 async function findOwnedAgent(
     owner: VoiceOwnerScope,
     agentId: string,
-    callType: VoiceAgentCallType,
+    callType?: VoiceAgentCallType,
 ): Promise<{ _id: MongoObjectId; name: string }> {
     const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
     const agent = await agents.findOne(
@@ -236,7 +236,7 @@ async function findOwnedAgent(
         { projection: { name: 1, callType: 1 } },
     );
     if (!agent?._id) throw new Error('Agent not found');
-    if (agent.callType && agent.callType !== callType) {
+    if (callType && agent.callType && agent.callType !== callType) {
         throw new Error(`${agent.name} is ${CALL_TYPE_WORD[agent.callType]} agent. Pick ${CALL_TYPE_WORD[callType]} agent.`);
     }
     return { _id: agent._id, name: agent.name };
@@ -449,78 +449,54 @@ export const listMyNumbers = async (): Promise<ALApiResponse<VoiceNumberListItem
     });
 
 /**
- * Turns AI answering on with `agentId`, changes the agent while it is on, or turns it off with
- * `null`. On/off goes through the number's provider: Telnyx switches the number to our TeXML app
- * and back; VoiceLink points the inbound half of the DID's routing at our bot and back; Twilio
- * points the number's Voice URL at the engine and puts its saved voice settings back. Setting an
- * agent needs the owner's Gemini API key (the calls run on it); turning off never does.
+ * What the number does: answers calls with an inbound agent (`callType` INBOUND), places calls with
+ * an outbound agent (OUTBOUND), or nothing yet (null; `agentId` is ignored). A number does one job
+ * at a time, so the job it stops doing is undone in the provider account first and saved at once
+ * (Telnyx: back on its own connection; Twilio: its voice settings put back exactly; VoiceLink: that
+ * half of the DID's routing put back), then the new one is set up (Telnyx: our TeXML app, or the
+ * Call Control app; Twilio: its Voice URL; VoiceLink: that half on our bot). Changing the agent
+ * within a job changes no routing. Choosing an agent needs the owner's Gemini API key; nothing never does.
  */
-export const setInboundAgent = async (
+export const setNumberAgent = async (
     numberId: string,
+    callType: VoiceAgentCallType | null,
     agentId: string | null,
 ): Promise<ALApiResponse<VoiceNumberListItem>> => {
     assertValidObjectId(numberId, 'Number ID');
-    if (agentId !== null) assertValidObjectId(agentId, 'Agent ID');
+    if (callType !== null) {
+        if (!Object.values(VoiceAgentCallType).includes(callType)) throw new Error('Choose what this number does');
+        assertValidObjectId(agentId ?? '', 'Agent ID');
+    }
 
-    return runAuthenticatedAction(async function setInboundAgent(userId) {
-        const owner = await requireVoiceOwner(userId, SUB_MODULE);
-        const doc = await findOwnedNumber(owner, numberId);
-        const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-
-        if (agentId === null) {
-            await providerOf(doc).stopAnswering(doc);
-            await numbers.updateOne(
-                { _id: doc._id, userId: owner.userId },
-                { $set: { inboundAgentId: null, updatedAt: new Date() } },
-            );
-            return listItemFor(owner, doc._id);
-        }
-
-        const agent = await findOwnedAgent(owner, agentId, VoiceAgentCallType.INBOUND);
-        await assertGeminiKeySet(owner.userId);
-        if (!doc.inboundAgentId) await providerOf(doc).startAnswering(doc);
-        await numbers.updateOne(
-            { _id: doc._id, userId: owner.userId },
-            { $set: { inboundAgentId: agent._id, updatedAt: new Date() } },
-        );
-        return listItemFor(owner, doc._id);
-    });
-};
-
-/**
- * Sets (or clears, with `null`) the agent that places calls from this number. Telnyx: the first
- * one creates the Call Control app and the routing is not touched. VoiceLink: the outbound half of
- * the DID's routing goes to our bot (VoiceLink only dials from such a number) and back when cleared.
- * Twilio: nothing changes in the account (the engine dials with the Calls API). Setting an agent
- * needs the owner's Gemini API key; clearing never does.
- */
-export const setOutboundAgent = async (
-    numberId: string,
-    agentId: string | null,
-): Promise<ALApiResponse<VoiceNumberListItem>> => {
-    assertValidObjectId(numberId, 'Number ID');
-    if (agentId !== null) assertValidObjectId(agentId, 'Agent ID');
-
-    return runAuthenticatedAction(async function setOutboundAgent(userId) {
+    return runAuthenticatedAction(async function setNumberAgent(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const doc = await findOwnedNumber(owner, numberId);
         const provider = providerOf(doc);
-
-        let outboundAgentId: MongoObjectId | null = null;
-        if (agentId !== null) {
-            const agent = await findOwnedAgent(owner, agentId, VoiceAgentCallType.OUTBOUND);
-            await assertGeminiKeySet(owner.userId);
-            await provider.startPlacingCalls(doc);
-            outboundAgentId = agent._id;
-        } else if (doc.outboundAgentId) {
-            await provider.stopPlacingCalls(doc);
-        }
-
         const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-        await numbers.updateOne(
-            { _id: doc._id, userId: owner.userId },
-            { $set: { outboundAgentId, updatedAt: new Date() } },
-        );
+        const save = (fields: Pick<VoiceNumberDoc, 'inboundAgentId' | 'outboundAgentId'>) => {
+            Object.assign(doc, fields);
+            return numbers.updateOne({ _id: doc._id, userId: owner.userId }, { $set: { ...fields, updatedAt: new Date() } });
+        };
+
+        const agent = callType && agentId ? await findOwnedAgent(owner, agentId, callType) : null;
+        if (agent) await assertGeminiKeySet(owner.userId);
+
+        if (doc.inboundAgentId && callType !== VoiceAgentCallType.INBOUND) {
+            await provider.stopAnswering(doc);
+            await save({ inboundAgentId: null });
+        }
+        if (doc.outboundAgentId && callType !== VoiceAgentCallType.OUTBOUND) {
+            await provider.stopPlacingCalls(doc);
+            await save({ outboundAgentId: null });
+        }
+        if (agent && callType === VoiceAgentCallType.INBOUND) {
+            if (!doc.inboundAgentId) await provider.startAnswering(doc);
+            await save({ inboundAgentId: agent._id });
+        }
+        if (agent && callType === VoiceAgentCallType.OUTBOUND) {
+            if (!doc.outboundAgentId) await provider.startPlacingCalls(doc);
+            await save({ outboundAgentId: agent._id });
+        }
         return listItemFor(owner, doc._id);
     });
 };
@@ -562,11 +538,12 @@ function testCallVariables(input: unknown): Record<string, string> {
 }
 
 /**
- * Asks the voice engine to call `to` from this number with `agentId` (an outbound agent), or the
- * number's outbound agent when none is given. The provider gets ready first (Telnyx: the Call
- * Control app; VoiceLink: the number must already have an outbound agent). Needs the owner's
- * Gemini API key; the engine refuses too when it is missing or Google refuses it. `variables`
- * fill the agent's `{{variables}}` on this call (empty ones fall back to the agent's defaults).
+ * Asks the voice engine to call `to` from this number with `agentId` (either kind: an inbound agent
+ * rings the owner and talks as if they had called in, booking tool and all), or with the number's
+ * own agent when none is given. The provider gets ready first (Telnyx: the Call Control app;
+ * VoiceLink: the number must be set to make calls). Needs the owner's Gemini API key; the engine
+ * refuses too when it is missing or Google refuses it. `variables` fill the agent's `{{variables}}`
+ * on this call (empty ones fall back to the agent's defaults).
  */
 export const placeTestCall = async (
     numberId: string,
@@ -590,11 +567,11 @@ export const placeTestCall = async (
 
         let callerAgentId: string;
         if (agentId !== null) {
-            callerAgentId = (await findOwnedAgent(owner, agentId, VoiceAgentCallType.OUTBOUND))._id.toString();
-        } else if (doc.outboundAgentId) {
-            callerAgentId = doc.outboundAgentId.toString();
+            callerAgentId = (await findOwnedAgent(owner, agentId))._id.toString();
+        } else if (doc.outboundAgentId ?? doc.inboundAgentId) {
+            callerAgentId = String(doc.outboundAgentId ?? doc.inboundAgentId);
         } else {
-            throw new Error('Pick the agent that places the call');
+            throw new Error('Choose the agent that calls');
         }
         await assertGeminiKeySet(owner.userId);
         const provider = providerOf(doc);

@@ -18,7 +18,7 @@ export function RemoveNumberDialog() {
                         {removeTarget?.provider === VoiceProvider.VOICELINK ? (
                             <>
                                 {removeTarget.inboundAgentId || removeTarget.outboundAgentId
-                                    ? 'The AI stops handling its calls and the number’s call routing in VoiceLink goes back to how it was before. '
+                                    ? 'The AI stops handling its calls, and calls ring the way they did before you connected it. '
                                     : ''}
                                 The WebSocket bot we made for it is switched off. The number itself stays in your VoiceLink
                                 account. Past call logs are kept.
@@ -26,7 +26,7 @@ export function RemoveNumberDialog() {
                         ) : removeTarget?.provider === VoiceProvider.TWILIO ? (
                             <>
                                 {removeTarget.inboundAgentId
-                                    ? 'The AI stops answering and the number’s voice settings in Twilio go back to how they were before. '
+                                    ? 'The AI stops answering, and calls ring the way they did before you connected it (its Twilio voice settings are put back exactly). '
                                     : ''}
                                 Nothing else of ours is in your Twilio account. The number itself stays there. Past call logs
                                 are kept.
@@ -34,7 +34,7 @@ export function RemoveNumberDialog() {
                         ) : (
                             <>
                                 {removeTarget?.inboundAgentId
-                                    ? 'The AI stops answering and the number goes back to the connection it had before in Telnyx. '
+                                    ? 'The AI stops answering, and calls ring the way they did before you connected it. '
                                     : ''}
                                 The apps we made for it in your Telnyx account are deleted. The number itself stays in your
                                 Telnyx account. Past call logs are kept.

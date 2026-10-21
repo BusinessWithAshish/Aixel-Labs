@@ -115,8 +115,8 @@ const TELNYX_GUIDE: SetupGuide = {
             id: TELNYX_GUIDE_STEP.CHANGES,
             title: 'What Aixel Labs changes in your Telnyx account',
             body: [
-                'When you pick an agent that places calls from a number, we add a Voice API app named “Aixel Labs voice agents” (Voice Suite, Programmable Voice). A trial account can hold only one, so if you already have one we use it as it is.',
-                'When you turn on “AI answers incoming calls”, we add a TeXML app for that number and point the number at it. Turn it off, or remove the number, and the number goes back to the connection it had before; removing it also deletes the apps we added.',
+                'When a number is set to “Make calls” (or places a test call), we add a Voice API app named “Aixel Labs voice agents” (Voice Suite, Programmable Voice). A trial account can hold only one, so if you already have one we use it as it is.',
+                'When a number is set to “Answer calls”, we add a TeXML app for that number and point the number at it. Pick another job for it, or remove it, and the number goes back to the connection it had before; removing it also deletes the apps we added.',
             ],
             image: telnyxImage(
                 '6-what-we-change.webp',
@@ -225,7 +225,7 @@ const TWILIO_GUIDE: SetupGuide = {
             id: TWILIO_GUIDE_STEP.CHANGES,
             title: 'What Aixel Labs changes in your Twilio account',
             body: [
-                'When you turn on “AI answers incoming calls”, we set that number’s Voice URL (A call comes in, Webhook) to our agent. If the number was on a TwiML app or a SIP trunk, we take it off. We save its settings first: turn AI answering off, or remove the number, and they go back exactly as they were.',
+                'When a number is set to “Answer calls”, we set its Voice URL (A call comes in, Webhook) to our agent. If the number was on a TwiML app or a SIP trunk, we take it off. We save its settings first: pick another job for it, or remove it, and they go back exactly as they were.',
                 'Calls your agents place need no change in your account. They connect when the person answers, and are recorded in your Twilio account (Monitor, Call recordings).',
             ],
             image: TWILIO_SCREENSHOTS[TWILIO_GUIDE_STEP.CHANGES],

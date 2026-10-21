@@ -14,18 +14,19 @@ export type ProviderAccountNumber = {
 /**
  * What changes in the customer's provider account when a number's setup changes. The server
  * actions own auth, agents and our own fields; each provider owns its side and the fields that
- * only it uses. `doc` is the number as it is before the change.
+ * only it uses. `doc` is the number as it is before the change; when a number switches jobs, the
+ * old job is stopped (and its agent cleared on `doc`) before the new one starts.
  */
 export type NumberProvider = {
     /** Shown in messages, e.g. "Telnyx". */
     label: string;
-    /** AI answering goes on: send the number's incoming calls to the engine. */
+    /** The number starts answering calls: send its incoming calls to the engine. */
     startAnswering(doc: OwnedNumberDoc): Promise<void>;
-    /** AI answering goes off: incoming calls ring wherever they did before. */
+    /** The number stops answering calls: incoming calls ring wherever they did before. */
     stopAnswering(doc: OwnedNumberDoc): Promise<void>;
-    /** An outbound agent is set or changed. */
+    /** The number starts placing calls (an outbound agent is set). */
     startPlacingCalls(doc: OwnedNumberDoc): Promise<void>;
-    /** The outbound agent is cleared. */
+    /** The number stops placing calls (its outbound agent is cleared). */
     stopPlacingCalls(doc: OwnedNumberDoc): Promise<void>;
     /** Right before the engine places a call from the number. */
     prepareCall(doc: OwnedNumberDoc): Promise<void>;

@@ -600,11 +600,15 @@ export type VoiceNumberDoc<Id = ObjectId> = {
   /** Telnyx Call Control application we created in their account for calls we place. */
   callControlAppId?: string;
   /**
-   * Agent that answers calls coming in to this number. null = the AI does not answer:
-   * the number stays on the customer's own routing and only places calls.
+   * A number does one job: it answers calls (`inboundAgentId`), places calls (`outboundAgentId`), or
+   * nothing yet (both null). The app sets at most one (setNumberAgent); numbers saved before that
+   * rule may still carry both until the owner picks one.
+   *
+   * Agent that answers calls coming in to this number. null = the AI does not answer: calls ring on
+   * the customer's own routing.
    */
   inboundAgentId?: Id | null;
-  /** Agent that places calls from this number unless a call names another one. */
+  /** Agent that places calls from this number unless a call names another one (a campaign, a test call). */
   outboundAgentId?: Id | null;
   /** The Telnyx connection the number was on before AI answering; restored when it is turned off or removed. */
   previousConnectionId?: string | null;
