@@ -1,4 +1,12 @@
-import { Modules, VOICE_AGENT_SUB_MODULES, VoiceAgentCallType } from '@aixellabs/backend/db/types';
+import { ObjectId } from 'mongodb';
+import {
+    Modules,
+    VOICE_AGENT_SUB_MODULES,
+    VoiceAgentCallType,
+    VoiceCallChannel,
+    VoiceCallDirection,
+    VoiceProvider,
+} from '@aixellabs/backend/db/types';
 import {
     DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES,
     DEFAULT_INBOUND_VOICE_AGENT_PROMPT,
@@ -8,7 +16,7 @@ import {
 } from '@/helpers/voice-agent-defaults';
 import type { Page } from '@playwright/test';
 import { expect, test } from '../support/fixtures';
-import { USER_STORAGE_STATE } from '../support/env';
+import { E2E_GEMINI_API_KEY, USER_STORAGE_STATE } from '../support/env';
 import type { E2eDb } from '../support/db';
 import { E2E_ADMIN, E2E_USER } from '../support/users';
 import { openVoiceAgent, VOICE_AGENTS_URL, voiceAgentUrl, waitForHydration } from '../support/voice-agents';
@@ -228,6 +236,69 @@ test('"Used on" lists the numbers that use the agent for incoming and outgoing c
     const unusedId = await db.insertVoiceAgent(E2E_USER, { name: 'Unused' });
     await openVoiceAgent(page, unusedId);
     await expect(page.getByTestId('voice-agent-used-on')).toContainText('No number uses it yet');
+});
+
+test('the cost card estimates a minute from the prompt, the key’s tier and the number, then shows the real average', async ({
+    page,
+    db,
+}) => {
+    await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
+    // 2,400 characters = 600 tokens, plus the engine's own 600: Gemini $0.0224 + 1,200 × $0.0000103 = $0.035 a minute.
+    const agentId = await db.insertVoiceAgent(E2E_USER, {
+        name: 'Maya',
+        callType: VoiceAgentCallType.INBOUND,
+        prompt: 'x'.repeat(2400),
+        callNotes: '',
+    });
+    await db.setVoiceNumberAgents(await seedNumber(db, '+15550100001'), { inboundAgentId: agentId });
+
+    await openVoiceAgent(page, agentId);
+    const card = page.getByTestId('agent-cost-estimate');
+    // Plus Telnyx's $0.0107 a minute in: $0.045 a minute, $0.136 for 3 minutes.
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('About $0.045');
+    await expect(card).toContainText('a 3-minute call is about $0.136');
+    await expect(card.getByTestId('agent-cost-parts')).toContainText('Gemini: $0.035 (a prompt of about 1,200 tokens');
+    await expect(card.getByTestId('agent-cost-parts')).toContainText('Telnyx: $0.011');
+    await expect(card.getByTestId('agent-cost-real')).toHaveText('No calls yet to compare with.');
+
+    // A longer prompt, before saving: 6,000 characters = 2,100 tokens a turn, $0.055 a minute.
+    await page.locator('#agent-prompt').fill('y'.repeat(6000));
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('About $0.055');
+    await page.locator('#agent-prompt').fill('x'.repeat(2400)); // back as saved, so leaving asks nothing
+
+    // A free-tier key pays nothing for Gemini; a priced call gives the real average.
+    await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY, { tier: 'free' });
+    await db.insertVoiceCalls(E2E_USER, [
+        {
+            agentId: new ObjectId(agentId),
+            channel: VoiceCallChannel.PHONE,
+            direction: VoiceCallDirection.INBOUND,
+            voice: 'sulafat',
+            startedAt: new Date(Date.now() - 5 * 60_000),
+            endedAt: new Date(Date.now() - 3 * 60_000),
+            durationSec: 120,
+            endedBy: 'goodbye',
+            flags: [],
+            turns: [],
+            gapsMs: [],
+            cost: {
+                totalUsd: 0.06,
+                geminiUsd: 0.04,
+                geminiFreeTier: false,
+                geminiTokens: { textIn: 1, audioIn: 1, textOut: 1, audioOut: 1 },
+                provider: VoiceProvider.TELNYX,
+                providerUsd: 0.02,
+                providerExact: false,
+            },
+        },
+    ]);
+    await openVoiceAgent(page, agentId);
+    await expect(card.getByTestId('agent-cost-parts')).toContainText('Gemini: free');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('About $0.011');
+    await expect(card.getByTestId('agent-cost-real')).toHaveText(
+        'Real so far: $0.030 a minute over 1 call (phone part partly estimated).',
+    );
+    await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY); // the seeded paid key, for the specs after this one
 });
 
 test('edits and saves every field', async ({ page, db }) => {

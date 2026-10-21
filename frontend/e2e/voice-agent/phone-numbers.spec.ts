@@ -5,7 +5,7 @@ import { Modules, VOICE_AGENT_SUB_MODULES, VoiceAgentCallType } from '@aixellabs
 import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
 import type { E2eDb } from '../support/db';
 import { expect, test } from '../support/fixtures';
-import { E2E_VOICE_ENGINE_SECRET, E2E_VOICE_ENGINE_URL, USER_STORAGE_STATE } from '../support/env';
+import { E2E_GEMINI_API_KEY, E2E_VOICE_ENGINE_SECRET, E2E_VOICE_ENGINE_URL, USER_STORAGE_STATE } from '../support/env';
 import { openVoiceAgent, waitForHydration } from '../support/voice-agents';
 import { E2E_USER } from '../support/users';
 import {
@@ -401,11 +401,17 @@ test('a number that had no connection goes back to none, and a Telnyx refusal is
 test('a test call names the chosen agent and the trial limit is spelled out', async ({ page, db }) => {
     const { sales, followUps } = await seedAgents(db);
     const numberId = await seedNumber(db, FIRST_NUMBER, { outboundAgentId: new ObjectId(sales) });
+    await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY); // paid: Gemini is priced
     await openPhoneNumbers(page);
+    // A 41-character prompt: Gemini $0.0287 a minute (paid key), plus Telnyx's $0.0125 out.
+    await expect(numberRow(page, FIRST_NUMBER).getByTestId('number-cost-estimate')).toHaveText(
+        'About $0.041 a minute with Sales outreach, an estimate.',
+    );
 
     await numberRow(page, FIRST_NUMBER).getByRole('button', { name: 'Test call' }).click();
     const dialog = page.getByRole('dialog', { name: 'Test call' });
     await expect(dialog).toContainText('On a Telnyx trial account, calls only go to numbers you have verified');
+    await expect(dialog.getByTestId('test-call-cost')).toHaveText('It should cost about $0.041 a minute (an estimate).');
     await expect(dialog.getByRole('combobox', { name: 'Agent that calls' })).toHaveText('Sales outreach (makes calls)');
 
     await dialog.getByLabel('Your phone number').fill('4155550123');

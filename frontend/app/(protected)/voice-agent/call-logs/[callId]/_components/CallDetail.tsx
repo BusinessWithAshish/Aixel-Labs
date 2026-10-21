@@ -16,7 +16,7 @@ import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { CallAnalysisCard, CallerMemoryCard, CallVariablesCard } from './CallInsights';
 import { RecordingPlayer } from './RecordingPlayer';
 import { CallTypeBadge } from '../../_components/CallTypeBadge';
-import { CallCostAmount, CallCostBreakdown, formatCostPerMinute } from '../../_components/CallCost';
+import { CallCostAmount, CallCostBreakdown, CallCostPerMinute } from '../../_components/CallCost';
 
 function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
     return (
@@ -82,7 +82,7 @@ function CallSummary() {
                         <CallCostAmount cost={call.cost} />
                     </SummaryRow>
                     <SummaryRow label="Cost per minute">
-                        <span className="tabular-nums">{formatCostPerMinute(call.cost, call.durationSec)}</span>
+                        <CallCostPerMinute cost={call.cost} durationSec={call.durationSec} />
                     </SummaryRow>
                     {call.cost ? (
                         <div className="col-span-2">

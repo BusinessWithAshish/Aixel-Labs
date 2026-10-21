@@ -19,9 +19,9 @@ import type { UseCallLogsPageReturn } from '../_hooks/use-call-logs-page';
 import { endedByLabel } from '@/helpers/voice-call-outcomes';
 import { formatShortDateTime } from '@/helpers/voice-time';
 import { formatDuration, formatGap, formatParty, median } from '../_utils/call-format';
-import { costPerMinute, formatUsd } from '@/helpers/voice-call-cost';
 import { callBookedSomething } from '@/helpers/voice-tool-calls';
-import { CallCostAmount, CallCostSummary } from './CallCost';
+import { CallCostAmount, CallCostPerMinute, CallCostSummary } from './CallCost';
+import { CurrencySelect } from '@/components/common/voice-agent/CurrencySelect';
 import { CallOutcomeBadges } from './CallOutcomeBadges';
 import { CallTypeBadge } from './CallTypeBadge';
 
@@ -63,13 +63,6 @@ function CallType({ call }: { call: VoiceCallListItem }) {
     );
 }
 
-/** "$0.031/min" under a call's cost; nothing for a call nobody heard. */
-function PerMinute({ call, className }: { call: VoiceCallListItem; className?: string }) {
-    const perMinute = call.cost ? costPerMinute(call.cost.totalUsd, call.durationSec) : null;
-    if (perMinute === null) return null;
-    return <span className={cn('text-muted-foreground text-xs tabular-nums', className)}>{formatUsd(perMinute)}/min</span>;
-}
-
 /** The analysis' summary, one line on a desktop row, two on a phone card. */
 function CallSummaryLine({ call, className }: { call: VoiceCallListItem; className?: string }) {
     const summary = call.analysis?.summary;
@@ -108,6 +101,7 @@ export function CallLogsContent() {
                     {outcomeLabel ? `, ${outcomeLabel}` : ''}. Open a call for its transcript and recording.
                 </p>
                 <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                    <CurrencySelect className="w-full sm:w-28" />
                     <div className="flex w-full flex-col gap-1.5 sm:w-48">
                         <Label htmlFor="call-logs-outcome-filter">Outcome</Label>
                         <Select
@@ -230,7 +224,11 @@ export function CallLogsContent() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <CallCostAmount cost={call.cost} />
-                                                <PerMinute call={call} className="block" />
+                                                <CallCostPerMinute
+                                                    cost={call.cost}
+                                                    durationSec={call.durationSec}
+                                                    className="text-muted-foreground block text-xs tabular-nums"
+                                                />
                                             </TableCell>
                                         </TableRow>
                                         {call.analysis?.summary ? (
@@ -270,7 +268,8 @@ export function CallLogsContent() {
                                         <span className="tabular-nums">gap {formatGap(median(call.gapsMs))}</span>
                                         {call.cost ? (
                                             <span>
-                                                <CallCostAmount cost={call.cost} /> <PerMinute call={call} />
+                                                <CallCostAmount cost={call.cost} />{' '}
+                                                <CallCostPerMinute cost={call.cost} durationSec={call.durationSec} />
                                             </span>
                                         ) : null}
                                     </div>

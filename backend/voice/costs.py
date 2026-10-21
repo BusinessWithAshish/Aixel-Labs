@@ -7,41 +7,36 @@
               in (fill_provider_charge, after the call, in the same background task as the analysis:
               never in the call's path). Telnyx can send its charge too (`call.cost` webhooks), but only
               once the customer's apps turn `call_cost_in_webhooks` on; until then Telnyx is the estimate.
-              VoiceLink publishes no rates: its part is left out (no `provider`).
+              VoiceLink publishes no rates (each account has its own): no estimate, its part is left out
+              until its call-log API gives the call's own charge, which then fills it in like Twilio's.
 
-Prices excl. tax, read 2026-10-21:
-    Gemini  ai.google.dev/gemini-api/docs/pricing, gemini-3.8-live (page updated 2026-10-19); free tier free
-    Telnyx  telnyx.com/pricing/call-control (Voice API $0.002, media streaming $0.0035, recording $0.002 a
-            minute) + telnyx.com/pricing/elastic-sip (US local in from $0.0032, out from $0.005)
-    Twilio  twilio.com/en-us/voice/pricing/us ("current as of August 2026": local in $0.0085, out $0.014,
-            Media Streams $0.0044) + /pricing/in (to Indian mobiles $0.0496); recording $0.0025
+Prices excl. tax, with their sources and dates: backend/src/db/voice-call-rates.json, shared with the app
+(`VOICE_CALL_RATES` in types.ts, which also estimates an agent's cost before any call).
 """
 
 import asyncio
+import json
 import math
+import time
+from pathlib import Path
 
 import aiohttp
 from loguru import logger
 
 import product
 
-# USD per 1M tokens, gemini-3.8-live paid tier. Thinking bills as text out; Live has no cache price.
-GEMINI_USD_PER_M = {"textIn": 0.75, "audioIn": 3.00, "textOut": 4.50, "audioOut": 12.00}
-
+RATES = json.loads((Path(__file__).resolve().parents[1] / "src/db/voice-call-rates.json").read_text())
+# USD per 1M tokens, paid tier. Thinking bills as text out; Live has no cache price.
+GEMINI_USD_PER_M = RATES["gemini"]["usdPerMillionTokens"]
 # USD a minute, every part the engine uses (voice, media stream, recording), by provider and direction.
 # shortcut: US rates for every destination but India (Twilio); Telnyx's India rates are not public.
-PROVIDER_USD_PER_MIN = {
-    ("TELNYX", "INBOUND"): 0.002 + 0.0035 + 0.002 + 0.0032,
-    ("TELNYX", "OUTBOUND"): 0.002 + 0.0035 + 0.002 + 0.005,
-    ("TWILIO", "INBOUND"): 0.0085,
-    ("TWILIO", "OUTBOUND"): 0.014,
-    ("TWILIO", "OUTBOUND_IN"): 0.0496,
-}
-# Twilio's Call `price` is the connection only: the stream and the recording are billed beside it.
-TWILIO_EXTRAS_USD_PER_MIN = 0.0044 + 0.0025
-# After the call: when to ask Twilio for its charge (seconds after the previous look). A deploy's drain
+PROVIDER_USD_PER_MIN = {(name, direction): rate for name, p in RATES["providers"].items()
+                        for direction, rate in p["usdPerMinute"].items()}
+# Billed beside the call's own charge (Twilio's `price` is the connection only: stream and recording).
+EXTRAS_USD_PER_MIN = {name: p["extrasUsdPerMinute"] for name, p in RATES["providers"].items()}
+# After the call: when to ask the provider for its charge (seconds after the previous look). A deploy's drain
 # waits for these, so they stay short; a charge that comes later leaves the estimate.
-TWILIO_LOOKS = (20, 60, 120)
+PRICE_LOOKS = (20, 60, 120)
 
 
 def gemini_tokens(usage: dict) -> dict:
@@ -63,10 +58,9 @@ def minutes(duration_sec: int) -> int:
 
 def provider_estimate(provider: str, direction: str, to: str | None, duration_sec: int) -> float:
     key = (provider, direction)
-    if provider == "TWILIO" and direction == "OUTBOUND" and (to or "").startswith("+91"):
-        key = ("TWILIO", "OUTBOUND_IN")
-    per_min = PROVIDER_USD_PER_MIN[key] + (TWILIO_EXTRAS_USD_PER_MIN if provider == "TWILIO" else 0)
-    return minutes(duration_sec) * per_min
+    if direction == "OUTBOUND" and (to or "").startswith("+91") and (provider, "OUTBOUND_IN") in PROVIDER_USD_PER_MIN:
+        key = (provider, "OUTBOUND_IN")
+    return minutes(duration_sec) * (PROVIDER_USD_PER_MIN[key] + EXTRAS_USD_PER_MIN[provider])
 
 
 def free_tier(user_id) -> bool:
@@ -103,23 +97,60 @@ async def twilio_price(creds: dict, call_sid: str) -> float | None:
     return abs(float(price))
 
 
+async def voicelink_price(number_id, call_id: str) -> float | None:
+    """VoiceLink's charge for the call in USD (`total_cost`, rupees, from call-log/details on the number's
+    own token, at today's rate), or None while unset. The account's own rate: VoiceLink publishes none."""
+    import voicelink  # imports product: loaded on first use
+
+    number = await asyncio.to_thread(product.db().voice_numbers.find_one, {"_id": number_id}, {"apiKeySealed": 1})
+    if not number:
+        return None
+    data = await voicelink.api_get("/v1/call-log/details", product.open_secret(number["apiKeySealed"]), {"call_id": call_id})
+    inr = data.get("total_cost")
+    if inr in (None, ""):
+        return None
+    if (data.get("currency_symbol") or "₹") != "₹":  # shortcut: VoiceLink bills in rupees only, as far as its docs say
+        return None
+    return float(inr) / await usd_rate("inr")
+
+
+_USD_RATES: dict = {"at": 0.0, "rates": {}}
+
+
+async def usd_rate(code: str) -> float:
+    """Units of `code` a dollar buys today (the app's rate source), kept a day. Raises when unknown."""
+    if time.time() - _USD_RATES["at"] > 86400 or code not in _USD_RATES["rates"]:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(RATES["currency"]["usdRatesUrls"][0], timeout=aiohttp.ClientTimeout(total=10)) as r:
+                body = await r.json(content_type=None)
+        _USD_RATES.update(at=time.time(), rates=body["usd"])
+    return float(_USD_RATES["rates"][code])
+
+
 async def fill_provider_charge(ctx: dict, doc: dict):
-    """Swap the estimate for Twilio's own charge once it is there. Never raises."""
-    cost = doc.get("cost") or {}
-    if cost.get("provider") != "TWILIO" or not doc.get("providerCallId") or not ctx.get("twilio") or not doc["durationSec"]:
+    """Swap the estimate for the provider's own charge once it is there (Twilio, VoiceLink). Never raises."""
+    cost, provider = doc.get("cost") or {}, ctx.get("provider")
+    if not doc.get("providerCallId") or not doc["durationSec"] or not cost:
+        return
+    if provider == "TWILIO" and ctx.get("twilio"):
+        price = lambda: twilio_price(ctx["twilio"], doc["providerCallId"])  # noqa: E731
+    elif provider == "VOICELINK":
+        price = lambda: voicelink_price(doc["numberId"], doc["providerCallId"])  # noqa: E731
+    else:
         return
     try:
-        for wait in TWILIO_LOOKS:
+        for wait in PRICE_LOOKS:
             await asyncio.sleep(wait)
-            price = await twilio_price(ctx["twilio"], doc["providerCallId"])
-            if price is not None:
+            charged = await price()
+            if charged is not None:
                 break
         else:
-            logger.info(f"cost of call {doc['_id']}: Twilio has no price yet, the estimate stays")
+            logger.info(f"cost of call {doc['_id']}: {provider} has no charge yet, the estimate stays")
             return
-        usd = round(price + minutes(doc["durationSec"]) * TWILIO_EXTRAS_USD_PER_MIN, 6)
+        usd = round(charged + minutes(doc["durationSec"]) * EXTRAS_USD_PER_MIN.get(provider, 0), 6)
         await asyncio.to_thread(product.db().voice_calls.update_one, {"_id": doc["_id"]}, {"$set": {
-            "cost.providerUsd": usd, "cost.providerExact": True, "cost.totalUsd": round(cost["geminiUsd"] + usd, 6)}})
-        logger.info(f"cost of call {doc['_id']}: Twilio charged ${price}, phone part ${usd}")
+            "cost.provider": provider, "cost.providerUsd": usd, "cost.providerExact": True,
+            "cost.totalUsd": round(cost["geminiUsd"] + usd, 6)}})
+        logger.info(f"cost of call {doc['_id']}: {provider} charged ${charged:.4f}, phone part ${usd}")
     except Exception as e:
-        logger.warning(f"cost of call {doc.get('_id')}: could not get Twilio's charge: {e!r}")
+        logger.warning(f"cost of call {doc.get('_id')}: could not get {provider}'s charge: {e!r}")

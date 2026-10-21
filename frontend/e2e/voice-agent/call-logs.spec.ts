@@ -199,7 +199,7 @@ test.describe('with seeded calls', () => {
 
         // Every agent added up: 3 priced calls, 2:29 of talk.
         const summary = page.getByTestId('call-cost-summary');
-        await expect(summary).toContainText('Your calls cost$0.066 (about ₹6.27)');
+        await expect(summary).toContainText('Your calls cost$0.066');
         await expect(summary).toContainText('Average per minute$0.027');
         await expect(summary).toContainText('3 · 2:29 talking');
         await expect(summary).toContainText('$0.039 · $0.027 est.');
@@ -211,12 +211,24 @@ test.describe('with seeded calls', () => {
 
         await page.goto(`${CALL_LOGS_URL}/${outboundId}`);
         await expect(page.getByTestId('call-cost')).toHaveText('$0.045 est.');
-        await expect(page.getByText('$0.028 a minute')).toBeVisible();
-        await expect(page.getByTestId('call-cost-breakdown')).toHaveText(
-            'Gemini $0.025 · Telnyx $0.020 (estimate) · about ₹4.27 in all',
-        );
+        await expect(page.getByTestId('call-cost-per-minute')).toHaveText('$0.028/min');
+        await expect(page.getByTestId('call-cost-breakdown')).toHaveText('Gemini $0.025 · Telnyx $0.020 (estimate)');
         await page.goto(`${CALL_LOGS_URL}/${playgroundId}`);
-        await expect(page.getByTestId('call-cost-breakdown')).toHaveText('Gemini free (free-tier key) · about ₹0 in all');
+        await expect(page.getByTestId('call-cost-breakdown')).toHaveText('Gemini free (free-tier key)');
+    });
+
+    test('costs show in the currency the owner picks, at today’s rate', async ({ page, context }) => {
+        await openCallLogs(page);
+        const firstCost = page.getByTestId('call-row').first().getByTestId('call-cost');
+        await expect(firstCost).toHaveText('$0.045 est.');
+        await page.getByRole('combobox', { name: 'Currency' }).click();
+        await page.getByRole('option', { name: 'INR', exact: true }).click();
+        await expect(firstCost).toHaveText(/^₹\d\.\d{1,3} est\.$/);
+        // Kept for this browser; the call detail says what it is in dollars.
+        expect((await context.cookies()).find((c) => c.name === 'voice-currency')?.value).toBe('INR');
+        await page.goto(`${CALL_LOGS_URL}/${outboundId}`);
+        await expect(page.getByTestId('call-cost-breakdown')).toContainText('$0.045 in all');
+        await context.clearCookies({ name: 'voice-currency' });
     });
 
     test('filters by agent through the URL', async ({ page }) => {

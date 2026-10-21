@@ -226,15 +226,25 @@ async def api_post(path: str, token: str, body: dict) -> dict:
 
     Raises VoiceLinkError when VoiceLink refuses, aiohttp/asyncio errors when it cannot be reached.
     """
+    return await _request("POST", path, token, json=body)
+
+
+async def api_get(path: str, token: str, params: dict) -> dict:
+    """GET from VoiceLink as the customer, like api_post."""
+    return await _request("GET", path, token, params=params)
+
+
+async def _request(method: str, path: str, token: str, **kwargs) -> dict:
     proxy, proxy_auth = _proxy()
     async with aiohttp.ClientSession() as session:
-        async with session.post(
+        async with session.request(
+            method,
             api_base() + path,
-            json=body,
             headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
             proxy=proxy,
             proxy_auth=proxy_auth,
             timeout=aiohttp.ClientTimeout(total=20),
+            **kwargs,
         ) as r:
             status, text = r.status, await r.text()
     try:

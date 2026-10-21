@@ -20,6 +20,7 @@ import {
     type VoiceAgentWebhookTool,
     VoiceCallChannel,
     VoiceCallDirection,
+    type VoiceProvider,
 } from '@aixellabs/backend/db/types';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { requireUserObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
@@ -63,10 +64,12 @@ export type VoiceAgentOption = {
     callType: VoiceAgentCallType;
     /** Its custom variables, for a test call to fill in. */
     variables: VoiceAgentVariableOption[];
+    /** Length of its prompt and call notes, for the cost estimate (`estimateAgentCost`). */
+    promptChars: number;
 };
 
 /** A number that uses the agent, for the editor's "Used on" list. */
-export type VoiceAgentNumberUse = { id: string; phoneNumber: string };
+export type VoiceAgentNumberUse = { id: string; phoneNumber: string; provider: VoiceProvider };
 
 /** The user's numbers that send incoming calls to the agent, and those that place calls with it. */
 export type VoiceAgentUsage = { inbound: VoiceAgentNumberUse[]; outbound: VoiceAgentNumberUse[] };
@@ -173,6 +176,7 @@ export const getVoiceAgentOptions = async (): Promise<ALApiResponse<VoiceAgentOp
             variables: customVariableNames(doc.prompt ?? '', doc.callNotes ?? '', doc.voicemail?.message ?? '').map(
                 (name) => ({ name, value: doc.variables?.[name] ?? '' }),
             ),
+            promptChars: (doc.prompt ?? '').length + (doc.callNotes ?? '').length,
         }));
     });
 
@@ -241,13 +245,14 @@ export const getVoiceAgentUsage = async (agentId: string): Promise<ALApiResponse
         const docs = await numbers
             .find(
                 { userId: uid, $or: [{ inboundAgentId: id }, { outboundAgentId: id }] },
-                { projection: { phoneNumber: 1, inboundAgentId: 1, outboundAgentId: 1 } },
+                { projection: { phoneNumber: 1, provider: 1, inboundAgentId: 1, outboundAgentId: 1 } },
             )
             .sort({ phoneNumber: 1 })
             .toArray();
         const use = (doc: (typeof docs)[number]): VoiceAgentNumberUse => ({
             id: doc._id.toString(),
             phoneNumber: doc.phoneNumber,
+            provider: doc.provider,
         });
         return {
             inbound: docs.filter((doc) => doc.inboundAgentId?.equals(id)).map(use),

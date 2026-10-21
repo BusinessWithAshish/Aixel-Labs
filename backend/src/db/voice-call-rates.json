@@ -1,0 +1,38 @@
+{
+  "readAt": "2026-10-21",
+  "currency": {
+    "source": "@fawazahmed0/currency-api: CC0, republished daily on npm, no key. US dollar to every currency; jsDelivr first, its Cloudflare mirror second.",
+    "usdRatesUrls": [
+      "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json",
+      "https://latest.currency-api.pages.dev/v1/currencies/usd.min.json"
+    ]
+  },
+  "gemini": {
+    "model": "gemini-3.8-live",
+    "source": "ai.google.dev/gemini-api/docs/pricing (paid tier; page updated 2026-10-19). The free tier is free of charge.",
+    "usdPerMillionTokens": { "textIn": 0.75, "audioIn": 3.0, "textOut": 4.5, "audioOut": 12.0 }
+  },
+  "providers": {
+    "TELNYX": {
+      "source": "telnyx.com/pricing/call-control (Voice API 0.002, media streaming 0.0035, recording 0.002) + telnyx.com/pricing/elastic-sip (US local in from 0.0032, out from 0.005). Telnyx publishes no India rates.",
+      "usdPerMinute": { "INBOUND": 0.0107, "OUTBOUND": 0.0125 },
+      "extrasUsdPerMinute": 0
+    },
+    "TWILIO": {
+      "source": "twilio.com/en-us/voice/pricing/us ('current as of August 2026': local in 0.0085, out 0.014, Media Streams 0.0044) + /pricing/in (to Indian mobiles 0.0496); recording 0.0025.",
+      "usdPerMinute": { "INBOUND": 0.0085, "OUTBOUND": 0.014, "OUTBOUND_IN": 0.0496 },
+      "extrasUsdPerMinute": 0.0069
+    }
+  },
+  "providersWithoutRates": {
+    "VOICELINK": "No published rate: each account's plan sets its own inbound_rate, outbound_rate and pulse_seconds (app.voicelink.co.in/documentation/plans and the API context file, read 2026-10-21). The engine takes each call's own charge from GET /api/v1/call-log/details (total_cost, rupees) instead."
+  },
+  "estimate": {
+    "source": "backend/voice/research/gemini-cost-2026-10-17.md: with session rotation, a booking agent (about 1,200 prompt tokens a turn, engine sections included) costs $0.0348 a talk-minute and a 5,479-token prompt $0.079.",
+    "geminiUsdPerMinute": 0.0224,
+    "geminiUsdPerPromptTokenMinute": 0.0000103,
+    "engineTokens": 600,
+    "charsPerToken": 4,
+    "typicalCallMinutes": 3
+  }
+}

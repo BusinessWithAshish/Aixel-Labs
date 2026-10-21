@@ -13,6 +13,7 @@ import {
   LINKEDIN_BY_PEOPLE_RESPONSE,
 } from "../api/linkedin/types";
 import type { CRAWL_RESPONSE } from "../api/crawl";
+import voiceCallRates from "./voice-call-rates.json";
 
 export enum TenantType {
   IFRAME = "IFRAME",
@@ -727,6 +728,12 @@ export type VoiceCallCost = {
   /** True: the provider's own charge for the call. False: minutes × its list rate, until that charge arrives. */
   providerExact: boolean;
 };
+
+/**
+ * List prices behind `VoiceCallCost` and the cost estimate shown before any call, with sources and
+ * dates. The engine reads the same file (`backend/voice/costs.py`): change a rate there, once.
+ */
+export const VOICE_CALL_RATES = voiceCallRates;
 
 export type VoiceCallToolCall = {
   /** check_availability | book_appointment | end_call | a webhook tool's name */

@@ -24,6 +24,8 @@ import { Label } from '@/components/ui/label';
 import { SubModuleUrls } from '@/config/app-config';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
+import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
+import { estimateAgentCost, formatMoney } from '@/helpers/voice-call-cost';
 
 /** What to know before calling through each provider. */
 const PROVIDER_NOTE: Record<VoiceProvider, string> = {
@@ -94,6 +96,22 @@ export function TestCallDialog({ open, onOpenChange, numbers, agents, geminiKey,
     const number = numbers.find((n) => n._id === form.watch('numberId')) ?? (numbers.length === 1 ? numbers[0] : null);
     const agent = agents.find((a) => a.id === form.watch('agentId')) ?? null;
     const agentName = agent?.name ?? 'The agent';
+    const currency = useDisplayCurrency();
+    // The engine dials out for every test call; VoiceLink publishes no rate, so only Gemini is counted there.
+    const costLine = (() => {
+        if (!agent || !number) return null;
+        const estimate = estimateAgentCost({
+            promptChars: agent.promptChars,
+            freeTier: geminiKey.tier === 'free',
+            callType: VoiceAgentCallType.OUTBOUND,
+            providers: [number.provider],
+        });
+        const without =
+            estimate.providers[0].usdPerMinute === null
+                ? `, without ${numberProviderInfo(number.provider).label}’s charge`
+                : '';
+        return `It should cost about ${formatMoney(estimate.usdPerMinute, currency)} a minute (an estimate${without}).`;
+    })();
     const from = number ? <span className="font-medium tabular-nums">{number.phoneNumber}</span> : 'your number';
     // Calling the number itself is the real test of an agent that answers it.
     const answeredBy = number?.inboundAgentId ? (number.inboundAgentName ?? 'the AI') : null;
@@ -179,6 +197,11 @@ export function TestCallDialog({ open, onOpenChange, numbers, agents, geminiKey,
                             {answeredBy
                                 ? ` You can also call ${number.phoneNumber} from any phone: ${answeredBy} answers.`
                                 : ''}
+                            {costLine ? (
+                                <span className="mt-1 block" data-testid="test-call-cost">
+                                    {costLine}
+                                </span>
+                            ) : null}
                         </AlertDescription>
                     </Alert>
                 ) : null}

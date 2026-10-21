@@ -22,6 +22,8 @@ import {
     updateVoiceAgent,
     type VoiceAgentUsage,
 } from '@/app/actions/voice-agent-actions';
+import type { VoiceAgentCostTotals } from '@/app/actions/voice-call-actions';
+import { estimateAgentCost } from '@/helpers/voice-call-cost';
 import {
     disconnectVoiceApp,
     listVoiceAppCalendars,
@@ -66,6 +68,8 @@ export type VoiceAgentEditorData = {
     memories: VoiceCallerMemoryList;
     /** The owner's Gemini key, which this agent (like all of theirs) runs on. */
     geminiKey: VoiceGeminiKeyView;
+    /** What its calls have really cost so far (null: none priced yet). */
+    costTotals: VoiceAgentCostTotals | null;
 };
 
 /** A calendar (or event type) on a connected app, as the destination picker lists it. */
@@ -81,6 +85,7 @@ export function useVoiceAgentEditorPage({
     justConnected,
     memories: initialMemories,
     geminiKey,
+    costTotals,
 }: VoiceAgentEditorData) {
     const router = useRouter();
     const agentId = initialAgent._id ?? '';
@@ -469,9 +474,19 @@ export function useVoiceAgentEditorPage({
         router.refresh();
     }, [agentId, router]);
 
+    // What a minute should cost, as the prompt on screen stands, on the numbers it is on.
+    const costEstimate = estimateAgentCost({
+        promptChars: form.prompt.length + form.callNotes.length,
+        freeTier: geminiKey.tier === 'free',
+        callType: form.callType,
+        providers: [...usage.inbound, ...usage.outbound].map((n) => n.provider),
+    });
+
     return {
         agentId,
         geminiKey,
+        costEstimate,
+        costTotals,
         saved,
         usage,
         agentForm,

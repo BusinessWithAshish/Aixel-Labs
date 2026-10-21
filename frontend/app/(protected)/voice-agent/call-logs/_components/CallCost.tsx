@@ -1,47 +1,61 @@
 'use client';
 
-import { VoiceProvider, type VoiceCallCost } from '@aixellabs/backend/db/types';
+import type { VoiceCallCost } from '@aixellabs/backend/db/types';
+import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { usePage } from '@/contexts/PageStore';
-import { costPerMinute, formatInr, formatUsd, isCostEstimated } from '@/helpers/voice-call-cost';
+import { costPerMinute, formatMoney, isCostEstimated } from '@/helpers/voice-call-cost';
+import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UseCallLogsPageReturn } from '../_hooks/use-call-logs-page';
 import { formatDuration } from '../_utils/call-format';
 
-const PROVIDER_NAMES: Record<VoiceProvider, string> = {
-    [VoiceProvider.TELNYX]: 'Telnyx',
-    [VoiceProvider.TWILIO]: 'Twilio',
-    [VoiceProvider.VOICELINK]: 'VoiceLink',
-};
-
 const ESTIMATE_NOTE = 'The phone part is worked out from the minutes until the provider reports its own charge.';
 
-/** "$0.024", "$0.024 est." while the phone part is an estimate; "—" for calls from before costs were kept. */
+/** "₹4.27", "₹4.27 est." while the phone part is an estimate; "—" for calls from before costs were kept. */
 export function CallCostAmount({ cost }: { cost: VoiceCallCost | null | undefined }) {
+    const currency = useDisplayCurrency();
     if (!cost) return <span className="text-muted-foreground">—</span>;
     const estimated = isCostEstimated(cost);
     return (
         <span className="tabular-nums" title={estimated ? ESTIMATE_NOTE : undefined} data-testid="call-cost">
-            {formatUsd(cost.totalUsd)}
+            {formatMoney(cost.totalUsd, currency)}
             {estimated ? <span className="text-muted-foreground text-xs"> est.</span> : null}
         </span>
     );
 }
 
-/** "$0.031 a minute", or "—" when nobody was heard. */
-export function formatCostPerMinute(cost: VoiceCallCost | null | undefined, durationSec: number): string {
+/** "₹2.70/min" under a call's cost; nothing for a call nobody heard. */
+export function CallCostPerMinute({
+    cost,
+    durationSec,
+    className,
+}: {
+    cost: VoiceCallCost | null | undefined;
+    durationSec: number;
+    className?: string;
+}) {
+    const currency = useDisplayCurrency();
     const perMinute = cost ? costPerMinute(cost.totalUsd, durationSec) : null;
-    return perMinute === null ? '—' : `${formatUsd(perMinute)} a minute`;
+    if (perMinute === null) return null;
+    return (
+        <span className={className ?? 'tabular-nums'} data-testid="call-cost-per-minute">
+            {formatMoney(perMinute, currency)}/min
+        </span>
+    );
 }
 
-/** Where a call's money went: Gemini (free on a free-tier key) and the phone provider. */
+/** Where a call's money went: Gemini (free on a free-tier key) and the phone provider, with dollars as kept. */
 export function CallCostBreakdown({ cost, isPhone }: { cost: VoiceCallCost; isPhone: boolean }) {
-    const parts = [cost.geminiFreeTier ? 'Gemini free (free-tier key)' : `Gemini ${formatUsd(cost.geminiUsd)}`];
+    const currency = useDisplayCurrency();
+    const money = (usd: number) => formatMoney(usd, currency);
+    const parts = [cost.geminiFreeTier ? 'Gemini free (free-tier key)' : `Gemini ${money(cost.geminiUsd)}`];
     if (cost.provider) {
-        const estimate = cost.providerExact ? '' : ' (estimate)';
-        parts.push(`${PROVIDER_NAMES[cost.provider]} ${formatUsd(cost.providerUsd)}${estimate}`);
+        parts.push(
+            `${numberProviderInfo(cost.provider).label} ${money(cost.providerUsd)}${cost.providerExact ? '' : ' (estimate)'}`,
+        );
     } else if (isPhone) {
-        parts.push('phone charge not included (no published rate)');
+        parts.push('phone charge not included (not known yet)');
     }
-    parts.push(`about ${formatInr(cost.totalUsd)} in all`);
+    if (currency.code !== 'USD') parts.push(`${formatMoney(cost.totalUsd)} in all`);
     return (
         <span className="font-normal" data-testid="call-cost-breakdown">
             {parts.join(' · ')}
@@ -52,7 +66,9 @@ export function CallCostBreakdown({ cost, isPhone }: { cost: VoiceCallCost; isPh
 /** Above the list: what the shown agent's calls (or every agent's) have cost so far. */
 export function CallCostSummary() {
     const { costTotal, agentFilterName } = usePage<UseCallLogsPageReturn>();
+    const currency = useDisplayCurrency();
     if (costTotal.calls === 0) return null;
+    const money = (usd: number) => formatMoney(usd, currency);
     const perMinute = costPerMinute(costTotal.totalUsd, costTotal.durationSec);
 
     return (
@@ -62,15 +78,12 @@ export function CallCostSummary() {
             data-testid="call-cost-summary"
         >
             {[
-                [
-                    agentFilterName ? `${agentFilterName}’s calls cost` : 'Your calls cost',
-                    `${formatUsd(costTotal.totalUsd)} (about ${formatInr(costTotal.totalUsd)})`,
-                ],
-                ['Average per minute', perMinute === null ? '—' : formatUsd(perMinute)],
+                [agentFilterName ? `${agentFilterName}’s calls cost` : 'Your calls cost', money(costTotal.totalUsd)],
+                ['Average per minute', perMinute === null ? '—' : money(perMinute)],
                 ['Calls', `${costTotal.calls} · ${formatDuration(costTotal.durationSec)} talking`],
                 [
                     'Gemini · phone',
-                    `${formatUsd(costTotal.geminiUsd)} · ${formatUsd(costTotal.providerUsd)}${costTotal.estimated ? ' est.' : ''}`,
+                    `${money(costTotal.geminiUsd)} · ${money(costTotal.providerUsd)}${costTotal.estimated ? ' est.' : ''}`,
                 ],
             ].map(([label, value]) => (
                 <div key={label} className="flex flex-col gap-0.5">

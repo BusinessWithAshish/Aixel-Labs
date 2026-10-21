@@ -3,7 +3,8 @@
     .venv/bin/python tests/costs_unit.py
 
 Uses a local throwaway database (AixelLabsVoiceEngineDev on 127.0.0.1:27018) and deletes what it wrote.
-Twilio's REST API is a fake on 127.0.0.1:7886 (TWILIO_API_BASE), so nothing leaves this machine.
+Twilio's and VoiceLink's REST APIs are a fake on 127.0.0.1:7886 (TWILIO_API_BASE, VOICELINK_API_BASE), so nothing
+leaves this machine.
 """
 import asyncio, os, sys
 
@@ -11,6 +12,8 @@ import testdb
 MONGO, DBNAME = testdb.throwaway()
 FAKE_TWILIO = 7886
 os.environ["TWILIO_API_BASE"] = f"http://127.0.0.1:{FAKE_TWILIO}"
+os.environ["VOICELINK_API_BASE"] = f"http://127.0.0.1:{FAKE_TWILIO}/vl"
+os.environ.pop("VOICELINK_PROXY_URL", None)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import product  # first: keeps the settings above over .env
@@ -67,12 +70,20 @@ async def twilio_tests(user):
         seen.append(request.path)
         return web.json_response({"sid": request.match_info["sid"], "price": next(prices), "price_unit": "USD"})
 
+    async def voicelink_details(request):
+        seen.append(request.path_qs)
+        ok_token = request.headers.get("Authorization") == "Bearer vl-token"
+        return web.json_response({"status": True, "message": "Success",
+                                  "data": {"call_id": request.query["call_id"], "total_cost": "1.9000" if ok_token else "",
+                                           "currency_symbol": "₹"}})
+
     app = web.Application()
     app.router.add_get("/2010-04-01/Accounts/{ac}/Calls/{sid}.json", call)
+    app.router.add_get("/vl/v1/call-log/details", voicelink_details)
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "127.0.0.1", FAKE_TWILIO).start()
-    costs.TWILIO_LOOKS = (0, 0, 0)
+    costs.PRICE_LOOKS = (0, 0, 0)
     try:
         ctx = {"provider": "TWILIO", "twilio": {"account_sid": "AC" + "1" * 32, "user": "SKx", "secret": "s"}}
         doc = doc_of(user, direction="OUTBOUND", duration=95, to="+14155550123")
@@ -83,6 +94,21 @@ async def twilio_tests(user):
         want = round(0.017 + 2 * 0.0069, 6)
         ok("Twilio's charge (plus stream and recording) replaces the estimate", saved["providerExact"] is True
            and abs(saved["providerUsd"] - want) < 1e-9 and abs(saved["totalUsd"] - (saved["geminiUsd"] + want)) < 1e-6, str(saved))
+
+        # VoiceLink: no estimate; its call-log charge in rupees, on the number's own token, at today's rate.
+        number = {"_id": ObjectId(), "userId": user, "provider": "VOICELINK", "apiKeySealed": product.seal_secret("vl-token")}
+        product.db().voice_numbers.insert_one(number)
+        costs._USD_RATES.update(at=__import__("time").time(), rates={"inr": 95.0})
+        vctx = {"provider": "VOICELINK"}
+        vdoc = {**doc_of(user, direction="INBOUND", duration=100), "_id": ObjectId(), "numberId": number["_id"],
+                "providerCallId": "1764828073.53871"}
+        product._insert(vdoc, vctx, USAGE)
+        ok("VoiceLink: written without a phone part", "provider" not in vdoc["cost"])
+        await costs.fill_provider_charge(vctx, vdoc)
+        vsaved = product.db().voice_calls.find_one({"_id": vdoc["_id"]})["cost"]
+        ok("VoiceLink: its ₹1.90 (1.9 / 95 = $0.02) fills the phone part, exact", vsaved.get("provider") == "VOICELINK"
+           and vsaved["providerExact"] is True and abs(vsaved["providerUsd"] - 0.02) < 1e-9
+           and seen[-1] == "/vl/v1/call-log/details?call_id=1764828073.53871", f"{vsaved} {seen[-1]}")
     finally:
         await runner.cleanup()
 
@@ -94,7 +120,7 @@ async def main():
         pricing_tests(user)
         await twilio_tests(user)
     finally:
-        for name in ("voice_settings", "voice_calls"):
+        for name in ("voice_settings", "voice_calls", "voice_numbers"):
             product.db()[name].delete_many({"userId": user})
     passed = sum(1 for _, p in RESULTS if p)
     print(f"\n{passed}/{len(RESULTS)} passed")

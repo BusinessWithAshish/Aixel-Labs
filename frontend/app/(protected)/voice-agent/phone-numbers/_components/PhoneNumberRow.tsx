@@ -11,7 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioCards, type RadioCardOption } from '@/components/wrappers/RadioCards';
 import { SubModuleUrls } from '@/config/app-config';
+import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { usePage } from '@/contexts/PageStore';
+import { estimateAgentCost, formatMoney } from '@/helpers/voice-call-cost';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { numberBadge, numberJob, type NumberJob, type UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
@@ -89,6 +91,7 @@ function JobHints({
 
 export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
     const {
+        agents,
         inboundAgents,
         outboundAgents,
         saving,
@@ -97,7 +100,9 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
         setTestCallNumber,
         setRemoveTarget,
         hasGeminiKey,
+        geminiKey,
     } = usePage<UsePhoneNumbersPageReturn>();
+    const currency = useDisplayCurrency();
     const id = number._id ?? number.phoneNumber;
     const job = numberJob(number);
     const badge = numberBadge(number);
@@ -121,6 +126,24 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
         },
         { value: 'NONE', title: 'Not used yet', media: <PhoneOff className="size-4" /> },
     ];
+
+    // Roughly what a minute of this number's job costs with its agent (a VoiceLink plan's rate is not published).
+    const jobAgentId =
+        job === VoiceAgentCallType.INBOUND
+            ? number.inboundAgentId
+            : job === VoiceAgentCallType.OUTBOUND
+              ? number.outboundAgentId
+              : null;
+    const jobAgent = agents.find((a) => a.id === jobAgentId);
+    const estimate =
+        jobAgent && (job === VoiceAgentCallType.INBOUND || job === VoiceAgentCallType.OUTBOUND)
+            ? estimateAgentCost({
+                  promptChars: jobAgent.promptChars,
+                  freeTier: geminiKey.tier === 'free',
+                  callType: job,
+                  providers: [number.provider],
+              })
+            : null;
 
     let explain: string;
     if (busy) explain = `Updating ${number.phoneNumber} in ${providerLabel}…`;
@@ -192,6 +215,12 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
                 >
                     {explain}
                 </p>
+                {estimate ? (
+                    <p className="text-muted-foreground text-xs" data-testid="number-cost-estimate">
+                        About {formatMoney(estimate.usdPerMinute, currency)} a minute with {jobAgent?.name}, an estimate
+                        {estimate.providers[0].usdPerMinute === null ? ` without ${providerLabel}’s own charge` : ''}.
+                    </p>
+                ) : null}
                 <JobHints
                     needsKey={!hasGeminiKey && (!canAnswer || !canCall)}
                     missingInbound={!canAnswer && inboundAgents.length === 0}

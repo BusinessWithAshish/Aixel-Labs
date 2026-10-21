@@ -6,11 +6,13 @@ import { getVoiceAgent, getVoiceAgentUsage, type VoiceAgentUsage } from '@/app/a
 import { listVoiceConnectedApps, type VoiceConnectedApps } from '@/app/actions/voice-calendar-actions';
 import { listVoiceCallerMemories, type VoiceCallerMemoryList } from '@/app/actions/voice-caller-memory-actions';
 import { getGeminiKeyStatus } from '@/app/actions/voice-settings-actions';
+import { getAgentCostTotals } from '@/app/actions/voice-call-actions';
 import { isValidObjectId } from '@/helpers/object-id';
 import { NO_GEMINI_KEY } from '@/server/voice-agent/gemini-key';
 import { useVoiceAgentEditorPage } from './_hooks/use-voice-agent-editor-page';
 import { VoiceAgentEditor } from './_components/VoiceAgentEditor';
 import { VoiceAgentUsedOn } from './_components/VoiceAgentUsedOn';
+import { VoiceAgentCostEstimate } from './_components/VoiceAgentCostEstimate';
 import { VoicePlayground } from './_components/VoicePlayground';
 
 const NO_USAGE: VoiceAgentUsage = { inbound: [], outbound: [] };
@@ -25,12 +27,13 @@ async function VoiceAgentPage({
     searchParams: Promise<{ connected?: string | string[] }>;
 }) {
     const [{ agentId }, { connected }] = await Promise.all([params, searchParams]);
-    const [response, usageResponse, appsResponse, keyResponse, memoriesResponse] = await Promise.all([
+    const [response, usageResponse, appsResponse, keyResponse, memoriesResponse, costsResponse] = await Promise.all([
         getVoiceAgent(agentId),
         getVoiceAgentUsage(agentId),
         listVoiceConnectedApps(),
         getGeminiKeyStatus(),
         listVoiceCallerMemories(agentId),
+        getAgentCostTotals(agentId),
     ]);
     if (!response.success || !response.data) {
         return notFound();
@@ -54,12 +57,14 @@ async function VoiceAgentPage({
                     justConnected,
                     memories,
                     geminiKey: keyResponse.data ?? NO_GEMINI_KEY,
+                    costTotals: costsResponse.data?.[0] ?? null,
                 }}
                 usePageHook={useVoiceAgentEditorPage}
             >
                 <VoiceAgentEditor />
                 <div className="grid min-w-0 gap-4 lg:sticky lg:top-0">
                     <VoiceAgentUsedOn />
+                    <VoiceAgentCostEstimate />
                     <VoicePlayground />
                 </div>
             </PageProvider>
