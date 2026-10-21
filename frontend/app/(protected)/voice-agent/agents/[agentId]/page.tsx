@@ -47,13 +47,20 @@ async function VoiceAgentPage({
             className="grid items-start gap-4 p-1 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]"
         >
             <PageProvider
-                data={{ agent: response.data, usage, connectedApps, justConnected, memories }}
+                data={{
+                    agent: response.data,
+                    usage,
+                    connectedApps,
+                    justConnected,
+                    memories,
+                    geminiKey: keyResponse.data ?? NO_GEMINI_KEY,
+                }}
                 usePageHook={useVoiceAgentEditorPage}
             >
                 <VoiceAgentEditor />
                 <div className="grid min-w-0 gap-4 lg:sticky lg:top-0">
                     <VoiceAgentUsedOn />
-                    <VoicePlayground geminiKey={keyResponse.data ?? NO_GEMINI_KEY} />
+                    <VoicePlayground />
                 </div>
             </PageProvider>
         </PageLayout>

@@ -48,7 +48,7 @@ test('a playground call reaches the engine, she talks, the caller is heard, and 
     await expect(page.getByText(/sunrise dental/i).first()).toBeVisible({ timeout: 20_000 });
     // The fake microphone's caller line, heard and transcribed by the engine, then a reply.
     await expect(page.getByText(/go ahead|minute/i).first()).toBeVisible({ timeout: 40_000 });
-    await expect(page.getByText(/replied after [\d,]+ ms/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/answered in [\d.]+ s/i).first()).toBeVisible({ timeout: 20_000 });
 
     await page.getByRole('button', { name: /end call/i }).click();
     await expect

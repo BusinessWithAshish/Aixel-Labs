@@ -1,9 +1,9 @@
 'use client';
 
-import type { FormEvent, ReactNode } from 'react';
+import type { FormEvent } from 'react';
 import { format } from 'date-fns';
 import { Controller, FormProvider } from 'react-hook-form';
-import { Loader2, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { Loader2, Save, Trash2 } from 'lucide-react';
 import { VOICE_AGENT_LIMITS, VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
@@ -12,13 +12,14 @@ import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader,
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import { usePage } from '@/contexts/PageStore';
-import { VOICE_AGENT_CALL_TYPES } from '@/helpers/voice-agent-defaults';
+import { GeminiKeyLine } from '../../_components/GeminiKeyLine';
 import { VoiceAgentCallTypeBadge } from '../../_components/VoiceAgentCallTypeBadge';
 import { VoiceAgentCallTypePicker } from '../../_components/VoiceAgentCallTypePicker';
 import { VoiceSelect } from '../../_components/VoiceSelect';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import type { PromptTool } from '../_utils/prompt-tools';
 import { PromptField } from './PromptField';
+import { PromptTemplateList, PromptTemplateMenu } from './PromptTemplates';
 import { CallSettingsCard } from './settings/CallSettingsCard';
 import { VOICE_AGENT_TOOLS_ID, VoiceAgentToolsCard } from './tools/VoiceAgentToolsCard';
 import { VariableDefaults } from './VariableDefaults';
@@ -39,27 +40,15 @@ function openVariables() {
     target?.querySelector<HTMLInputElement>('input[value=""]')?.focus({ preventScroll: true });
 }
 
-/** "Use the inbound default prompt", shown beside a label once the text differs from the default. */
-function UseDefaultButton({ show, onClick, children }: { show: boolean; onClick: () => void; children: ReactNode }) {
-    if (!show) return null;
-    return (
-        <Button type="button" variant="ghost" size="sm" className="h-7" onClick={onClick}>
-            <RotateCcw className="size-3.5" />
-            {children}
-        </Button>
-    );
-}
-
 /** The agent's settings, with its tools and call settings in cards underneath. */
 export function VoiceAgentEditor() {
     const {
         saved,
         usage,
         agentForm,
+        geminiKey,
         form,
-        defaults,
-        resetPrompt,
-        resetCallNotes,
+        applyTemplate,
         promptTools,
         promptVariables,
         agentDirty,
@@ -72,7 +61,6 @@ export function VoiceAgentEditor() {
         confirmDelete,
     } = usePage<UseVoiceAgentEditorPageReturn>();
 
-    const typeLabel = VOICE_AGENT_CALL_TYPES[form.callType].label.toLowerCase();
     const onNumbers = usage.inbound.length + usage.outbound.length > 0;
 
     const onSubmit = (event: FormEvent) => {
@@ -90,7 +78,7 @@ export function VoiceAgentEditor() {
                                 Agent
                                 <VoiceAgentCallTypeBadge callType={form.callType} />
                             </CardTitle>
-                            <CardDescription>
+                            <CardDescription className="grid gap-1">
                                 {agentDirty ? (
                                     <span className="text-amber-600 dark:text-amber-400">Unsaved changes</span>
                                 ) : (
@@ -98,6 +86,7 @@ export function VoiceAgentEditor() {
                                         Saved {format(new Date(saved.updatedAt), 'd MMM yyyy, HH:mm')}
                                     </span>
                                 )}
+                                <GeminiKeyLine view={geminiKey} link />
                             </CardDescription>
                             <CardAction className="flex flex-wrap justify-end gap-2">
                                 {agentDirty ? (
@@ -153,7 +142,7 @@ export function VoiceAgentEditor() {
                                         />
                                         <FieldDescription className="text-xs" data-testid="call-type-note">
                                             Changing the type does not rewrite the prompt or call notes. Edit them yourself,
-                                            or use the {typeLabel} defaults below.
+                                            or start from a template below.
                                         </FieldDescription>
                                     </Field>
                                 )}
@@ -162,54 +151,72 @@ export function VoiceAgentEditor() {
                             <Controller
                                 control={agentForm.control}
                                 name="prompt"
-                                render={({ field, fieldState }) => (
-                                    <Field>
-                                        <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
-                                            <FieldLabel htmlFor="agent-prompt">Prompt</FieldLabel>
-                                            <UseDefaultButton show={field.value !== defaults.prompt} onClick={resetPrompt}>
-                                                Use the {typeLabel} default prompt
-                                            </UseDefaultButton>
-                                        </div>
-                                        <PromptField
-                                            id="agent-prompt"
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                            tools={promptTools}
-                                            onOpenTools={openTools}
-                                            variables={promptVariables}
-                                            onOpenVariables={openVariables}
-                                            invalid={fieldState.invalid}
-                                            describedBy="agent-prompt-help"
-                                            className="h-80 lg:h-[26rem]"
-                                        />
-                                        <FieldDescription id="agent-prompt-help" className="text-xs">
-                                            Everything the agent knows and how it talks. Type / to add a tool, {'{{'} to add
-                                            a variable. {field.value.length.toLocaleString('en-US')} characters.
-                                        </FieldDescription>
-                                    </Field>
-                                )}
+                                render={({ field, fieldState }) => {
+                                    const empty = !field.value.trim();
+                                    return (
+                                        <Field>
+                                            <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
+                                                <FieldLabel htmlFor="agent-prompt">Prompt</FieldLabel>
+                                                {empty ? null : (
+                                                    <PromptTemplateMenu callType={form.callType} onPick={applyTemplate} />
+                                                )}
+                                            </div>
+                                            <FieldDescription id="agent-prompt-help" className="text-xs">
+                                                <strong className="text-foreground font-medium">
+                                                    How the agent behaves
+                                                </strong>
+                                                , the same on every call: who it is, how it talks, what it may and may not
+                                                do. The facts it works from go in the call notes below.
+                                            </FieldDescription>
+                                            {empty ? (
+                                                <PromptTemplateList callType={form.callType} onPick={applyTemplate} />
+                                            ) : null}
+                                            <PromptField
+                                                id="agent-prompt"
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                tools={promptTools}
+                                                onOpenTools={openTools}
+                                                variables={promptVariables}
+                                                onOpenVariables={openVariables}
+                                                invalid={fieldState.invalid}
+                                                describedBy="agent-prompt-help"
+                                                placeholder="Or write your own: who the agent is, what it is for, and how it should talk on the phone."
+                                                className="h-80 lg:h-[26rem]"
+                                            />
+                                            {empty ? (
+                                                <p
+                                                    className="text-xs text-amber-700 dark:text-amber-400"
+                                                    data-testid="prompt-empty"
+                                                >
+                                                    No prompt yet. The agent cannot be saved or talked to until it has one.
+                                                </p>
+                                            ) : (
+                                                <p className="text-muted-foreground text-xs">
+                                                    {field.value.length.toLocaleString('en-US')} characters
+                                                </p>
+                                            )}
+                                        </Field>
+                                    );
+                                }}
                             />
 
                             <Field>
-                                <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
-                                    <FieldLabel htmlFor="agent-call-notes">Call notes</FieldLabel>
-                                    <UseDefaultButton show={form.callNotes !== defaults.callNotes} onClick={resetCallNotes}>
-                                        Use the {typeLabel} default notes
-                                    </UseDefaultButton>
-                                </div>
+                                <FieldLabel htmlFor="agent-call-notes">Call notes</FieldLabel>
+                                <FieldDescription className="text-xs">
+                                    <strong className="text-foreground font-medium">The facts it works from</strong>
+                                    {form.callType === VoiceAgentCallType.INBOUND
+                                        ? ': your hours, services, prices, whether you take bookings. It answers callers only from these.'
+                                        : ': about the business being called. On phone calls, details of the person being called are added too.'}{' '}
+                                    Added at the end of the prompt on every call, under &ldquo;This call&rdquo;. When a fact
+                                    changes, change it here, not in the prompt.
+                                </FieldDescription>
                                 <Textarea
                                     id="agent-call-notes"
                                     maxLength={VOICE_AGENT_LIMITS.callNotesMax}
                                     className="min-h-20"
                                     {...agentForm.register('callNotes')}
                                 />
-                                <FieldDescription className="text-xs">
-                                    {form.callType === VoiceAgentCallType.INBOUND
-                                        ? 'Facts about your business (hours, services, prices, whether it takes bookings). The agent answers callers only from these.'
-                                        : 'Facts about the business being called.'}{' '}
-                                    Added under &ldquo;This call&rdquo; at the end of the prompt. Playground calls use these
-                                    as written.
-                                </FieldDescription>
                             </Field>
 
                             <VariableDefaults />

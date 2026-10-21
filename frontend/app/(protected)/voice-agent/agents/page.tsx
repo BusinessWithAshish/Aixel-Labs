@@ -17,8 +17,8 @@ async function VoiceAgentsPage() {
 
     return (
         <PageLayout title={PAGE_TITLE} className="flex flex-col gap-4 p-1">
-            <GeminiKeyCard initialKey={keyResponse.data ?? NO_GEMINI_KEY} />
-            <PageProvider data={agents} usePageHook={useVoiceAgentsPage}>
+            <PageProvider data={{ agents, geminiKey: keyResponse.data ?? NO_GEMINI_KEY }} usePageHook={useVoiceAgentsPage}>
+                <GeminiKeyCard />
                 <VoiceAgentsList />
             </PageProvider>
         </PageLayout>

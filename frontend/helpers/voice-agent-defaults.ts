@@ -8,11 +8,12 @@ import {
 } from '@aixellabs/backend/db/types';
 
 /**
- * Starting values for a new voice agent: the single source for the prompts new agents get.
+ * Starting values for a new voice agent, and the prompt templates an owner can start from. A new
+ * agent's prompt starts empty: the owner picks a template or writes their own.
  *
- * The outbound prompt is the call-tested cold-call prompt without a `# This call` section: the
+ * The outbound template is the call-tested cold-call prompt without a `# This call` section: the
  * engine appends that per call from the agent's `callNotes` (and, on the phone, from the lead being
- * dialled). The inbound prompt follows the same honesty, limits and tone rules for a receptionist
+ * dialled). The inbound template follows the same honesty, limits and tone rules for a receptionist
  * answering the business's own number.
  */
 export const DEFAULT_VOICE_AGENT_NAME = 'Maya';
@@ -209,11 +210,47 @@ One sentence. Two at most; three only when they asked several things at once. Us
 
 The first word carries meaning, not a reaction. Answer from the notes or say you don't know. One question at most, and not one you've asked before. Words you haven't used on this call, matched to the person: calm for angry, gentle for sad, plain for confused, short for busy.`;
 
-/** The prompt and call notes a new agent of this type starts from. */
-export function voiceAgentDefaults(callType: VoiceAgentCallType): { prompt: string; callNotes: string } {
-    return callType === VoiceAgentCallType.INBOUND
-        ? { prompt: DEFAULT_INBOUND_VOICE_AGENT_PROMPT, callNotes: DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES }
-        : { prompt: DEFAULT_VOICE_AGENT_PROMPT, callNotes: DEFAULT_VOICE_AGENT_CALL_NOTES };
+/** A prompt an owner can start from, with the call notes it expects. */
+export type VoiceAgentPromptTemplate = {
+    id: string;
+    title: string;
+    /** One or two plain sentences, for the picker. */
+    description: string;
+    /** The kind of agent it is written for (any agent can use it). */
+    callType: VoiceAgentCallType;
+    prompt: string;
+    callNotes: string;
+};
+
+/** The editor's template picker, in this order. Add new templates here. */
+export const VOICE_AGENT_PROMPT_TEMPLATES: readonly VoiceAgentPromptTemplate[] = [
+    {
+        id: 'receptionist',
+        title: 'Receptionist',
+        description:
+            'Answers your number: questions about your business, messages and bookings. Fill in your hours and services in the call notes.',
+        callType: VoiceAgentCallType.INBOUND,
+        prompt: DEFAULT_INBOUND_VOICE_AGENT_PROMPT,
+        callNotes: DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES,
+    },
+    {
+        id: 'cold-call',
+        title: 'Cold call for a demo',
+        description:
+            'Phones local businesses to get them to watch a ten-minute demo of a booking website and an AI receptionist. Tested on real calls.',
+        callType: VoiceAgentCallType.OUTBOUND,
+        prompt: DEFAULT_VOICE_AGENT_PROMPT,
+        callNotes: DEFAULT_VOICE_AGENT_CALL_NOTES,
+    },
+];
+
+/** Why an agent without a prompt cannot be talked to, in the playground's words. */
+export const VOICE_AGENT_NO_PROMPT_MESSAGE =
+    'This agent has no prompt yet, so it would not know what to say. Pick a template or write a prompt first.';
+
+/** The call notes a new agent of this type starts with: a form for the business's facts when it answers calls. */
+export function newVoiceAgentCallNotes(callType: VoiceAgentCallType): string {
+    return callType === VoiceAgentCallType.INBOUND ? DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES : '';
 }
 
 /** How each call type is named in the UI. */

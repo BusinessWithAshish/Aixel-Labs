@@ -15,9 +15,8 @@ import { VoiceSelect } from './VoiceSelect';
 
 const STARTS_FROM: Record<VoiceAgentCallType, string> = {
     [VoiceAgentCallType.INBOUND]:
-        'It starts with a receptionist prompt and a call-notes template for your business’s hours and services. You can change all of it next.',
-    [VoiceAgentCallType.OUTBOUND]:
-        'It starts with the call-tested cold-call prompt. You can change the prompt, voice and notes next.',
+        'Next you give it a prompt: start from the receptionist template or write your own. Its call notes start as a form for your hours and services.',
+    [VoiceAgentCallType.OUTBOUND]: 'Next you give it a prompt: start from the tested cold-call template or write your own.',
 };
 
 /** Two steps: inbound or outbound, then name and voice. */

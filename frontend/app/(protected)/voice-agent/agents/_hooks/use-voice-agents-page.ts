@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import type { VoiceAgent, VoiceAgentCallType } from '@aixellabs/backend/db/types';
+import type { VoiceAgent, VoiceAgentCallType, VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import { createVoiceAgent } from '@/app/actions/voice-agent-actions';
 import { DEFAULT_VOICE_AGENT_NAME, DEFAULT_VOICE_AGENT_VOICE } from '@/helpers/voice-agent-defaults';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
@@ -15,8 +15,15 @@ import { voiceAgentSchema } from '@/helpers/voice-schemas';
 const newAgentSchema = voiceAgentSchema.pick({ name: true, voice: true });
 const NEW_AGENT = { name: DEFAULT_VOICE_AGENT_NAME, voice: DEFAULT_VOICE_AGENT_VOICE };
 
-export function useVoiceAgentsPage(agents: VoiceAgent[]) {
+export type VoiceAgentsPageData = {
+    agents: VoiceAgent[];
+    /** The owner's key, which every agent runs on: the key card changes it, the agent cards show it. */
+    geminiKey: VoiceGeminiKeyView;
+};
+
+export function useVoiceAgentsPage({ agents, geminiKey: initialKey }: VoiceAgentsPageData) {
     const router = useRouter();
+    const [geminiKey, setGeminiKey] = useState(initialKey);
     const [createOpen, setCreateOpen] = useState(false);
     /** null = the dialog's first step: pick inbound or outbound. */
     const [newCallType, setNewCallType] = useState<VoiceAgentCallType | null>(null);
@@ -53,6 +60,8 @@ export function useVoiceAgentsPage(agents: VoiceAgent[]) {
 
     return {
         agents,
+        geminiKey,
+        setGeminiKey,
         createOpen,
         openCreate,
         onCreateOpenChange,

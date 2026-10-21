@@ -23,7 +23,12 @@ import {
 } from '@aixellabs/backend/db/types';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { requireUserObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
-import { DEFAULT_VOICE_AGENT_NAME, DEFAULT_VOICE_AGENT_VOICE, voiceAgentDefaults } from '@/helpers/voice-agent-defaults';
+import {
+    DEFAULT_VOICE_AGENT_NAME,
+    DEFAULT_VOICE_AGENT_VOICE,
+    newVoiceAgentCallNotes,
+    VOICE_AGENT_NO_PROMPT_MESSAGE,
+} from '@/helpers/voice-agent-defaults';
 import { customVariableNames } from '@/helpers/voice-agent-features';
 import {
     bookingToolSchema,
@@ -180,31 +185,29 @@ export const getVoiceAgent = async (agentId: string): Promise<ALApiResponse<Voic
         return mapVoiceAgentDocToVoiceAgent(doc);
     });
 
-export type CreateVoiceAgentInput = Partial<Omit<VoiceAgentInput, 'callType'>> & { callType: VoiceAgentCallType };
+export type CreateVoiceAgentInput = Partial<Pick<VoiceAgentInput, 'name' | 'voice'>> & { callType: VoiceAgentCallType };
 
 /**
- * Creates an agent of the given call type; anything not given starts from that type's defaults
- * (inbound: the receptionist prompt; outbound: the call-tested cold-call prompt).
+ * Creates an agent of the given call type with an empty prompt: the editor offers templates, and
+ * neither a save nor the playground goes ahead without a prompt. Call notes start from that type's.
  */
 export const createVoiceAgent = async (input: CreateVoiceAgentInput): Promise<ALApiResponse<VoiceAgent>> =>
     runAuthenticatedAction(async function createVoiceAgent(userId) {
         const { userId: uid, tenantId } = await agentOwner(userId);
-        const defaults = voiceAgentDefaults(input.callType);
         const fields = parseOrThrow(
-            voiceAgentSchema,
+            voiceAgentSchema.omit({ prompt: true }),
             {
                 name: input.name ?? DEFAULT_VOICE_AGENT_NAME,
                 callType: input.callType,
                 voice: input.voice ?? DEFAULT_VOICE_AGENT_VOICE,
-                prompt: input.prompt ?? defaults.prompt,
-                callNotes: input.callNotes ?? defaults.callNotes,
-                variables: input.variables ?? {},
+                callNotes: newVoiceAgentCallNotes(input.callType),
+                variables: {},
             },
             'Invalid agent',
         );
 
         const now = new Date();
-        const doc: VoiceAgentDoc = { tenantId, userId: uid, ...fields, createdAt: now, updatedAt: now };
+        const doc: VoiceAgentDoc = { tenantId, userId: uid, ...fields, prompt: '', createdAt: now, updatedAt: now };
         const agents = await agentsCollection();
         const { insertedId } = await agents.insertOne(doc);
         return mapVoiceAgentDocToVoiceAgent({ ...doc, _id: insertedId });
@@ -290,15 +293,16 @@ export const deleteVoiceAgent = async (agentId: string): Promise<ALApiResponse<{
 /**
  * A signed `wss://…/play` URL for talking to the agent's saved version in the browser.
  * The token lives 120 s, so fetch it right before opening the socket. The call runs on the
- * owner's own Gemini key, so there is no URL without one.
+ * owner's own Gemini key, so there is no URL without one, nor for an agent with no saved prompt.
  */
 export const getPlaygroundSocketUrl = async (agentId: string): Promise<ALApiResponse<{ url: string }>> =>
     runAuthenticatedAction(async function getPlaygroundSocketUrl(userId) {
         const { userId: uid } = await agentOwner(userId);
         const id = toObjectId(agentId, 'Agent ID');
         const agents = await agentsCollection();
-        const owned = await agents.countDocuments({ _id: id, userId: uid }, { limit: 1 });
-        if (!owned) throw new Error('Agent not found');
+        const agent = await agents.findOne({ _id: id, userId: uid }, { projection: { prompt: 1 } });
+        if (!agent) throw new Error('Agent not found');
+        if (!agent.prompt?.trim()) throw new Error(VOICE_AGENT_NO_PROMPT_MESSAGE);
         await assertGeminiKeySet(uid);
         return { url: playgroundSocketUrl(id.toString(), uid.toString()) };
     });

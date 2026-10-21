@@ -51,7 +51,10 @@ async function createThroughDialog(page: Page, type: RegExp, name: string, voice
     await expect(page.locator('#agent-name')).toHaveValue(name);
 }
 
-test('creates an outbound agent from the cold-call defaults', async ({ page, db }) => {
+test('a new outbound agent starts with an empty prompt: nothing runs until a template or own text fills it', async ({
+    page,
+    db,
+}) => {
     await page.goto(VOICE_AGENTS_URL);
     await expect(page.getByText('No voice agents yet')).toBeVisible();
     await createThroughDialog(page, /^Outbound/, 'Sales caller', /Kore/);
@@ -63,36 +66,71 @@ test('creates an outbound agent from the cold-call defaults', async ({ page, db 
         name: 'Sales caller',
         callType: VoiceAgentCallType.OUTBOUND,
         voice: 'kore',
-        prompt: DEFAULT_VOICE_AGENT_PROMPT,
-        callNotes: DEFAULT_VOICE_AGENT_CALL_NOTES,
+        prompt: '',
+        callNotes: '',
     });
     expect(agent.userId.equals(user._id)).toBe(true);
     expect(agent.tenantId.equals(user.tenantId)).toBe(true);
     expect(page.url()).toContain(agent._id.toString());
-    // The default prompt is the tested one minus its per-call section.
-    expect(DEFAULT_VOICE_AGENT_PROMPT).not.toContain('# This call');
     expect(DEFAULT_VOICE_AGENT_VOICE).toBe('sulafat');
+
+    // Empty: the templates are offered, and the playground says plainly why it will not start.
+    await expect(page.locator('#agent-prompt')).toHaveValue('');
+    await expect(page.getByTestId('prompt-empty')).toContainText('cannot be saved or talked to');
+    const playground = page.getByTestId('voice-playground');
+    await expect(playground.getByTestId('playground-no-prompt')).toContainText('This agent has no prompt yet');
+    await expect(playground.getByRole('button', { name: 'Start call' })).toBeDisabled();
+
+    // Outbound templates first; picking one fills the empty prompt and notes at once.
+    const templates = page.getByTestId('prompt-templates').getByRole('button');
+    await expect(templates.first()).toContainText('Cold call for a demo');
+    await templates.first().click();
+    await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_VOICE_AGENT_PROMPT);
+    await expect(page.locator('#agent-call-notes')).toHaveValue(DEFAULT_VOICE_AGENT_CALL_NOTES);
+    await expect(page.getByTestId('prompt-templates')).toHaveCount(0);
+    await expect(playground.getByTestId('playground-no-prompt')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Agent saved')).toBeVisible();
+    expect((await db.getVoiceAgents(E2E_USER))[0]).toMatchObject({
+        prompt: DEFAULT_VOICE_AGENT_PROMPT,
+        callNotes: DEFAULT_VOICE_AGENT_CALL_NOTES,
+    });
+    // The template is the tested prompt minus its per-call section.
+    expect(DEFAULT_VOICE_AGENT_PROMPT).not.toContain('# This call');
 });
 
-test('creates an inbound agent from the receptionist defaults', async ({ page, db }) => {
+test('a new inbound agent starts with the business-facts notes; a template keeps notes the owner wrote', async ({
+    page,
+    db,
+}) => {
     await createThroughDialog(page, /^Inbound/, 'Front desk', /Puck/);
 
     await expect(page.getByTestId('voice-agent-call-type').first()).toHaveText('Inbound · answers calls');
-    await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_INBOUND_VOICE_AGENT_PROMPT);
+    await expect(page.locator('#agent-prompt')).toHaveValue('');
     const [agent] = await db.getVoiceAgents(E2E_USER);
     expect(agent).toMatchObject({
         name: 'Front desk',
         callType: VoiceAgentCallType.INBOUND,
         voice: 'puck',
-        prompt: DEFAULT_INBOUND_VOICE_AGENT_PROMPT,
+        prompt: '',
         callNotes: DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES,
     });
     expect(DEFAULT_INBOUND_VOICE_AGENT_PROMPT).not.toContain('# This call');
     expect(DEFAULT_INBOUND_VOICE_AGENT_PROMPT.length).toBeLessThan(6_000);
 
+    await page.locator('#agent-call-notes').fill('Business: Sunrise Dental');
+    const templates = page.getByTestId('prompt-templates').getByRole('button');
+    await expect(templates.first()).toContainText('Receptionist');
+    await templates.first().click();
+    await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_INBOUND_VOICE_AGENT_PROMPT);
+    await expect(page.locator('#agent-call-notes')).toHaveValue('Business: Sunrise Dental');
+
+    // The list says plainly when an agent has no prompt yet.
+    await db.insertVoiceAgent(E2E_USER, { name: 'Blank', prompt: '' });
     await page.goto(VOICE_AGENTS_URL);
-    const card = page.getByTestId('voice-agent-card');
-    await expect(card.getByTestId('voice-agent-call-type')).toHaveText('Inbound · answers calls');
+    const card = (name: string) => page.getByTestId('voice-agent-card').filter({ hasText: name });
+    await expect(card('Front desk').getByTestId('voice-agent-call-type')).toHaveText('Inbound · answers calls');
+    await expect(card('Blank')).toContainText('No prompt yet. Open it to pick a template or write one.');
 });
 
 test('the type can be changed back in the create dialog', async ({ page, db }) => {
@@ -120,7 +158,7 @@ test("list cards show each agent's type; agents saved before types read as outbo
     await expect(card('Old one').getByTestId('voice-agent-call-type')).toHaveText('Outbound · makes calls');
 });
 
-test('changing the type keeps the prompt, and the default for the new type is one click away', async ({ page, db }) => {
+test('changing the type keeps the prompt; a template replaces it only after asking', async ({ page, db }) => {
     const agentId = await db.insertVoiceAgent(E2E_USER, {
         name: 'Maya',
         callType: VoiceAgentCallType.OUTBOUND,
@@ -128,7 +166,7 @@ test('changing the type keeps the prompt, and the default for the new type is on
         callNotes: DEFAULT_VOICE_AGENT_CALL_NOTES,
     });
     await openVoiceAgent(page, agentId);
-    await expect(page.getByRole('button', { name: /default prompt/ })).toHaveCount(0);
+    await expect(page.getByTestId('prompt-templates')).toHaveCount(0);
 
     await page.getByRole('radio', { name: /^Inbound/ }).click();
     await expect(page.getByRole('radio', { name: /^Inbound/ })).toHaveAttribute('aria-checked', 'true');
@@ -143,14 +181,28 @@ test('changing the type keeps the prompt, and the default for the new type is on
     expect(agent.prompt).toBe(DEFAULT_VOICE_AGENT_PROMPT);
     expect(agent.callNotes).toBe(DEFAULT_VOICE_AGENT_CALL_NOTES);
 
-    await page.getByRole('button', { name: 'Use the inbound default prompt' }).click();
-    await page.getByRole('button', { name: 'Use the inbound default notes' }).click();
+    // Cancelling the question changes nothing.
+    await page.getByRole('button', { name: 'Templates' }).click();
+    await page.getByRole('menuitem', { name: /^Receptionist/ }).click();
+    const confirm = page.getByRole('dialog', { name: 'Replace your prompt with “Receptionist”?' });
+    await confirm.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_VOICE_AGENT_PROMPT);
+
+    // The notes were the other template's, so they are replaced too.
+    await page.getByRole('button', { name: 'Templates' }).click();
+    await page.getByRole('menuitem', { name: /^Receptionist/ }).click();
+    await confirm.getByRole('button', { name: 'Replace prompt' }).click();
     await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_INBOUND_VOICE_AGENT_PROMPT);
+    await expect(page.locator('#agent-call-notes')).toHaveValue(DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect.poll(async () => (await db.getVoiceAgents(E2E_USER))[0].prompt).toBe(DEFAULT_INBOUND_VOICE_AGENT_PROMPT);
     [agent] = await db.getVoiceAgents(E2E_USER);
     expect(agent.callNotes).toBe(DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES);
-    await expect(page.getByRole('button', { name: /default (prompt|notes)/ })).toHaveCount(0);
+
+    // Emptying the prompt blocks saving, in plain words.
+    await page.locator('#agent-prompt').fill('');
+    await expect(page.getByTestId('prompt-empty')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });
 
 test('"Used on" lists the numbers that use the agent for incoming and outgoing calls', async ({ page, db }) => {

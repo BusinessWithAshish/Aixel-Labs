@@ -75,7 +75,8 @@ function refusal(httpStatus: number, body: GoogleError): GeminiKeyError {
 }
 
 /**
- * Checks a key with one free call (list models). Resolves when Google accepts it; throws a
+ * Checks a key with one free metadata call (list models): no tokens, so it never uses the owner's
+ * Gemini quota or bill, which is why the key card can repeat it every few minutes. Resolves when Google accepts it; throws a
  * `GeminiKeyError` with plain words otherwise. A network failure has no key status (`null`).
  */
 export async function checkGeminiKey(key: string): Promise<void> {
@@ -105,6 +106,7 @@ export const NO_GEMINI_KEY: VoiceGeminiKeyView = {
     status: null,
     statusMessage: null,
     checkedAt: null,
+    tier: null,
 };
 
 export function toGeminiKeyView(doc: Pick<VoiceSettingsDoc, 'gemini'> | null): VoiceGeminiKeyView {
@@ -116,6 +118,7 @@ export function toGeminiKeyView(doc: Pick<VoiceSettingsDoc, 'gemini'> | null): V
         status: gemini.status,
         statusMessage: gemini.statusMessage ?? null,
         checkedAt: gemini.checkedAt.toISOString(),
+        tier: gemini.tier ?? 'paid',
     };
 }
 

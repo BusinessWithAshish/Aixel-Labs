@@ -62,9 +62,10 @@ test('streams the mic up and renders transcript, gaps, clear and the end', async
     // Caller fragments in quick succession share one bubble too.
     await expect(transcript.getByTestId('transcript-caller')).toHaveCount(1);
     await expect(transcript.getByTestId('transcript-caller')).toContainText("No, we just take calls. I've got a minute.");
-    await expect(transcript.getByTestId('transcript-gap')).toHaveText('replied after 642 ms');
-    await expect(page.getByTestId('playground-last-gap')).toHaveText('642 ms');
+    await expect(transcript.getByTestId('transcript-gap')).toHaveText('answered in 0.6 s');
+    await expect(page.getByTestId('playground-last-gap')).toHaveText('0.6 s');
     await expect(page.getByTestId('playground-replies')).toHaveText('1');
+    await expect(page.getByTestId('playground-speed')).toContainText('Usually 0.6 s (feels natural) · last answer 0.6 s');
 
     // Her audio plays until the engine says clear, then stops at once. A clear with nothing queued is harmless.
     const speaking = page.getByTestId('agent-speaking');
@@ -112,6 +113,24 @@ test('saves unsaved edits before the call starts', async ({ page, db }) => {
     await expect(page.getByTestId('playground-status')).toHaveText('Live');
     expect(engine.urls).toHaveLength(1);
     expect((await db.getVoiceAgents(E2E_USER))[0].prompt).toBe('New prompt, tested live.');
+});
+
+test('will not start without a prompt, on the page or on the server', async ({ page, db }) => {
+    const engine = await FakePlaygroundEngine.install(page);
+    const blank = await db.insertVoiceAgent(E2E_USER, { name: 'Blank', prompt: '' });
+    await openVoiceAgent(page, blank);
+    await expect(page.getByTestId('playground-no-prompt')).toHaveText(
+        'This agent has no prompt yet, so it would not know what to say. Pick a template or write a prompt first.',
+    );
+    await expect(page.getByRole('button', { name: 'Start call' })).toBeDisabled();
+
+    // Emptied after the page loaded: the server refuses before any socket opens.
+    const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Maya' });
+    await openVoiceAgent(page, agentId);
+    await db.setVoiceAgentFields(agentId, { prompt: '' });
+    await page.getByRole('button', { name: 'Start call' }).click();
+    await expect(page.getByTestId('voice-playground').getByRole('alert')).toContainText('This agent has no prompt yet');
+    expect(engine.connected).toBe(false);
 });
 
 test('says so when the engine cannot be reached', async ({ page, db }) => {

@@ -12,6 +12,7 @@ import {
     type VoiceCalendarConnection,
     VoiceCalendarConnectionStatus,
     type VoiceCallerMemory,
+    type VoiceGeminiKeyView,
 } from '@aixellabs/backend/db/types';
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
 import {
@@ -32,7 +33,7 @@ import {
     forgetVoiceCallerMemory,
     type VoiceCallerMemoryList,
 } from '@/app/actions/voice-caller-memory-actions';
-import { voiceAgentDefaults } from '@/helpers/voice-agent-defaults';
+import { VOICE_AGENT_PROMPT_TEMPLATES, type VoiceAgentPromptTemplate } from '@/helpers/voice-agent-defaults';
 import { customVariableNames, VOICE_BUILTIN_VARIABLE_INFO } from '@/helpers/voice-agent-features';
 import { defaultBookingTarget, voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
 import { VOICE_AGENTS_URL } from '@/helpers/voice-routes';
@@ -63,6 +64,8 @@ export type VoiceAgentEditorData = {
     justConnected: string | null;
     /** The callers the agent remembers (caller memory), latest first. */
     memories: VoiceCallerMemoryList;
+    /** The owner's Gemini key, which this agent (like all of theirs) runs on. */
+    geminiKey: VoiceGeminiKeyView;
 };
 
 /** A calendar (or event type) on a connected app, as the destination picker lists it. */
@@ -77,6 +80,7 @@ export function useVoiceAgentEditorPage({
     connectedApps,
     justConnected,
     memories: initialMemories,
+    geminiKey,
 }: VoiceAgentEditorData) {
     const router = useRouter();
     const agentId = initialAgent._id ?? '';
@@ -121,15 +125,18 @@ export function useVoiceAgentEditorPage({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    /** The defaults for the type picked on screen (which may not be saved yet). */
-    const defaults = useMemo(() => voiceAgentDefaults(form.callType), [form.callType]);
-    const setAgentField = useCallback(
-        (name: 'prompt' | 'callNotes', value: string) =>
-            agentForm.setValue(name, value, { shouldDirty: true, shouldValidate: true }),
+    /** Fills the prompt from a template, and the call notes too unless the owner wrote their own. */
+    const applyTemplate = useCallback(
+        (template: VoiceAgentPromptTemplate) => {
+            const set = { shouldDirty: true, shouldValidate: true };
+            agentForm.setValue('prompt', template.prompt, set);
+            const notes = agentForm.getValues('callNotes').trim();
+            if (!notes || VOICE_AGENT_PROMPT_TEMPLATES.some((t) => t.callNotes.trim() === notes)) {
+                agentForm.setValue('callNotes', template.callNotes, set);
+            }
+        },
         [agentForm],
     );
-    const resetPrompt = useCallback(() => setAgentField('prompt', defaults.prompt), [defaults, setAgentField]);
-    const resetCallNotes = useCallback(() => setAgentField('callNotes', defaults.callNotes), [defaults, setAgentField]);
 
     /** Custom variables the prompt, the call notes and the voicemail message use, in order. */
     const usedVariables = useMemo(
@@ -464,13 +471,12 @@ export function useVoiceAgentEditorPage({
 
     return {
         agentId,
+        geminiKey,
         saved,
         usage,
         agentForm,
         form,
-        defaults,
-        resetPrompt,
-        resetCallNotes,
+        applyTemplate,
         usedVariables,
         promptVariables,
         promptTools,

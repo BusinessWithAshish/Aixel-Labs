@@ -4,6 +4,7 @@ import {
     VOICE_AGENT_SUB_MODULES,
     VoiceGeminiKeyStatus,
     type VoiceGeminiKey,
+    type VoiceGeminiKeyTier,
     type VoiceGeminiKeyView,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
@@ -32,6 +33,11 @@ function assertKeyShape(apiKey: string): string {
     return key;
 }
 
+function assertTier(tier: VoiceGeminiKeyTier): VoiceGeminiKeyTier {
+    if (tier !== 'free' && tier !== 'paid') throw new Error('Pick the free tier or the paid tier');
+    return tier;
+}
+
 /** The signed-in user's key, as the card shows it (never the key itself). */
 export const getGeminiKeyStatus = async (): Promise<ALApiResponse<VoiceGeminiKeyView>> =>
     runAuthenticatedAction(async function getGeminiKeyStatus(userId) {
@@ -39,13 +45,14 @@ export const getGeminiKeyStatus = async (): Promise<ALApiResponse<VoiceGeminiKey
     });
 
 /**
- * Checks the key with Google (one free call), then stores it sealed, replacing any key before it.
- * A key Google refuses is not stored.
+ * Checks the key with Google (one free call), then stores it sealed with the tier the owner says it
+ * is on, replacing any key before it. A key Google refuses is not stored.
  */
-export const saveGeminiKey = async (apiKey: string): Promise<ALApiResponse<VoiceGeminiKeyView>> =>
+export const saveGeminiKey = async (apiKey: string, tier: VoiceGeminiKeyTier): Promise<ALApiResponse<VoiceGeminiKeyView>> =>
     runAuthenticatedAction(async function saveGeminiKey(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const key = assertKeyShape(apiKey);
+        assertTier(tier);
         await checkGeminiKey(key);
 
         const now = new Date();
@@ -56,6 +63,7 @@ export const saveGeminiKey = async (apiKey: string): Promise<ALApiResponse<Voice
             statusMessage: null,
             checkedAt: now,
             savedAt: now,
+            tier,
         };
         await ensureVoiceAgentIndexes();
         const settings = await voiceSettingsCollection();
@@ -68,8 +76,9 @@ export const saveGeminiKey = async (apiKey: string): Promise<ALApiResponse<Voice
     });
 
 /**
- * Asks Google about the stored key again, e.g. after turning the API on or adding billing, and
- * keeps what it says. Only a network failure is an error.
+ * Asks Google about the stored key again (the free list-models call), e.g. after turning the API on
+ * or adding billing, and keeps what it says. The key card also runs it every 10 minutes while the
+ * agents page is open. Only a network failure is an error.
  */
 export const recheckGeminiKey = async (): Promise<ALApiResponse<VoiceGeminiKeyView>> =>
     runAuthenticatedAction(async function recheckGeminiKey(userId) {
@@ -93,6 +102,21 @@ export const recheckGeminiKey = async (): Promise<ALApiResponse<VoiceGeminiKeyVi
             { $set: { 'gemini.status': status, 'gemini.statusMessage': statusMessage, 'gemini.checkedAt': checkedAt } },
         );
         return toGeminiKeyView({ gemini: { ...doc.gemini, status, statusMessage, checkedAt } });
+    });
+
+/** Records which Google tier the saved key is on (Google does not tell us; the owner does). */
+export const setGeminiKeyTier = async (tier: VoiceGeminiKeyTier): Promise<ALApiResponse<VoiceGeminiKeyView>> =>
+    runAuthenticatedAction(async function setGeminiKeyTier(userId) {
+        const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        assertTier(tier);
+        const settings = await voiceSettingsCollection();
+        const doc = await settings.findOneAndUpdate(
+            { userId: owner.userId, gemini: { $type: 'object' } },
+            { $set: { 'gemini.tier': tier, updatedAt: new Date() } },
+            { returnDocument: 'after', projection: { 'gemini.keySealed': 0 } },
+        );
+        if (!doc) throw new Error('No Gemini API key is saved');
+        return toGeminiKeyView(doc);
     });
 
 /** Forgets the key. The owner's agents stop taking and placing calls until a key is added again. */

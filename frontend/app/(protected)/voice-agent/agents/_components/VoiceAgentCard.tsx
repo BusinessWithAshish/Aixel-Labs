@@ -3,15 +3,17 @@
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { Bot } from 'lucide-react';
-import type { VoiceAgent } from '@aixellabs/backend/db/types';
+import type { VoiceAgent, VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { voiceAgentVoiceCharacter, voiceAgentVoiceName } from '@/helpers/voice-agent-defaults';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
+import { GeminiKeyLine } from './GeminiKeyLine';
 import { VoiceAgentCallTypeBadge } from './VoiceAgentCallTypeBadge';
 
 type VoiceAgentCardProps = {
     agent: VoiceAgent;
+    geminiKey: VoiceGeminiKeyView;
 };
 
 /** First non-heading line of the prompt, as a one-glance summary. */
@@ -19,8 +21,9 @@ function promptPreview(prompt: string): string {
     return prompt.split('\n').find((line) => line.trim() && !line.trimStart().startsWith('#')) ?? '';
 }
 
-export function VoiceAgentCard({ agent }: VoiceAgentCardProps) {
+export function VoiceAgentCard({ agent, geminiKey }: VoiceAgentCardProps) {
     const character = voiceAgentVoiceCharacter(agent.voice);
+    const preview = promptPreview(agent.prompt);
 
     return (
         <Link
@@ -45,9 +48,12 @@ export function VoiceAgentCard({ agent }: VoiceAgentCardProps) {
                     </div>
                 </CardHeader>
                 <CardContent className="flex-1">
-                    <CardDescription className="line-clamp-2">{promptPreview(agent.prompt)}</CardDescription>
+                    <CardDescription className="line-clamp-2">
+                        {preview || <span className="italic">No prompt yet. Open it to pick a template or write one.</span>}
+                    </CardDescription>
                 </CardContent>
-                <CardFooter className="text-muted-foreground text-xs">
+                <CardFooter className="text-muted-foreground flex-col items-start gap-1 text-xs">
+                    <GeminiKeyLine view={geminiKey} />
                     <span suppressHydrationWarning>
                         Updated {formatDistanceToNow(new Date(agent.updatedAt), { addSuffix: true })}
                     </span>

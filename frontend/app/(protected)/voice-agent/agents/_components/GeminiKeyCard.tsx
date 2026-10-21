@@ -1,21 +1,42 @@
 'use client';
 
-import { FormProvider } from 'react-hook-form';
+import { Controller, FormProvider } from 'react-hook-form';
 import { formatDistanceToNow } from 'date-fns';
 import { ExternalLink, KeyRound, Loader2, RefreshCw, Trash2 } from 'lucide-react';
-import { VoiceGeminiKeyStatus, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
+import { VoiceGeminiKeyStatus, type VoiceGeminiKeyTier, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
+import { RadioCards, type RadioCardOption } from '@/components/wrappers/RadioCards';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import { GEMINI_KEY_ANCHOR } from '@/helpers/voice-routes';
 import { useGeminiKeyCard, type UseGeminiKeyCardReturn } from '../_hooks/use-gemini-key-card';
+import type { UseVoiceAgentsPageReturn } from '../_hooks/use-voice-agents-page';
 
 const AI_STUDIO_KEYS_URL = 'https://aistudio.google.com/apikey';
+
+/** Google does not say which tier a key is on, so the owner tells us. */
+const TIER_OPTIONS: RadioCardOption<VoiceGeminiKeyTier>[] = [
+    {
+        value: 'paid',
+        title: 'Paid tier',
+        description:
+            'Billing is on for the key’s project. Google charges you per call, its limits are high, and it does not use your calls to improve its products.',
+    },
+    {
+        value: 'free',
+        title: 'Free tier',
+        description:
+            'No billing. Calls cost you nothing, but Google may use what is said on your calls to improve its products, and its low limits can cut calls short.',
+    },
+];
 
 const STATUS_BADGE: Record<VoiceGeminiKeyStatus, { label: string; variant: 'green' | 'red' | 'yellow' }> = {
     [VoiceGeminiKeyStatus.OK]: { label: 'Working', variant: 'green' },
@@ -29,14 +50,10 @@ function statusBadge(view: VoiceGeminiKeyView) {
     return STATUS_BADGE[view.status];
 }
 
-type GeminiKeyCardProps = {
-    initialKey: VoiceGeminiKeyView;
-    className?: string;
-};
-
 /** The owner's own Gemini API key, which every call of their agents runs on. */
-export function GeminiKeyCard({ initialKey, className }: GeminiKeyCardProps) {
-    const card = useGeminiKeyCard(initialKey);
+export function GeminiKeyCard({ className }: { className?: string }) {
+    const { geminiKey, setGeminiKey } = usePage<UseVoiceAgentsPageReturn>();
+    const card = useGeminiKeyCard(geminiKey, setGeminiKey);
     const { view } = card;
     const badge = statusBadge(view);
     const problem = view.set && view.status !== VoiceGeminiKeyStatus.OK;
@@ -61,16 +78,23 @@ export function GeminiKeyCard({ initialKey, className }: GeminiKeyCardProps) {
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
                 {view.set ? (
-                    <p className="text-sm" data-testid="gemini-key-summary">
-                        Key ending in <span className="font-mono font-medium">{view.last4}</span>
-                        {view.checkedAt ? (
-                            <span className="text-muted-foreground" suppressHydrationWarning>
-                                {' '}
-                                · checked {formatDistanceToNow(new Date(view.checkedAt), { addSuffix: true })}
-                            </span>
-                        ) : null}
-                    </p>
+                    <div className="grid gap-1">
+                        <p className="text-sm" data-testid="gemini-key-summary">
+                            Key ending in <span className="font-mono font-medium">{view.last4}</span>
+                            {view.checkedAt ? (
+                                <span className="text-muted-foreground" suppressHydrationWarning>
+                                    {' '}
+                                    · checked {formatDistanceToNow(new Date(view.checkedAt), { addSuffix: true })}
+                                </span>
+                            ) : null}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                            We ask Google about it again every 10 minutes while this page is open. Asking is free: it does
+                            not use your Gemini quota.
+                        </p>
+                    </div>
                 ) : null}
+                {view.set ? <TierField card={card} /> : null}
                 {problem && view.statusMessage ? (
                     <Alert variant="destructive">
                         <AlertDescription>Google refused this key: {view.statusMessage}</AlertDescription>
@@ -81,14 +105,14 @@ export function GeminiKeyCard({ initialKey, className }: GeminiKeyCardProps) {
                         <KeyRound className="size-4" aria-hidden />
                         {view.set ? 'Replace key' : 'Add key'}
                     </Button>
-                    {problem ? (
-                        <Button type="button" variant="outline" onClick={() => void card.recheck()} disabled={card.checking}>
+                    {view.set ? (
+                        <Button type="button" variant="outline" onClick={card.checkNow} disabled={card.checking}>
                             {card.checking ? (
                                 <Loader2 className="size-4 animate-spin" aria-hidden />
                             ) : (
                                 <RefreshCw className="size-4" aria-hidden />
                             )}
-                            Check again
+                            Check now
                         </Button>
                     ) : null}
                     {view.set ? (
@@ -115,6 +139,39 @@ export function GeminiKeyCard({ initialKey, className }: GeminiKeyCardProps) {
                 isLoading={card.removing}
             />
         </Card>
+    );
+}
+
+/** Which Google tier the saved key is on, changed in place. */
+function TierField({ card }: { card: UseGeminiKeyCardReturn }) {
+    const tier = card.view.tier ?? 'paid';
+    return (
+        <Field className="gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+                <FieldLabel htmlFor="gemini-key-tier">Google tier</FieldLabel>
+                <Select
+                    value={tier}
+                    onValueChange={(value) => void card.changeTier(value as VoiceGeminiKeyTier)}
+                    disabled={card.savingTier}
+                >
+                    <SelectTrigger id="gemini-key-tier" size="sm" className="w-32" data-testid="gemini-key-tier">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {TIER_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {option.title}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                {card.savingTier ? <Loader2 className="text-muted-foreground size-4 animate-spin" aria-hidden /> : null}
+            </div>
+            <p className="text-muted-foreground text-xs">
+                {TIER_OPTIONS.find((option) => option.value === tier)?.description} Google AI Studio shows the tier next to
+                the key.
+            </p>
+        </Field>
     );
 }
 
@@ -149,11 +206,6 @@ function GeminiKeyDialog({ card }: { card: UseGeminiKeyCardReturn }) {
                             <li>Click &ldquo;Create API key&rdquo; and copy the key.</li>
                             <li>Paste it below. We check it with Google before saving it.</li>
                         </ol>
-                        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
-                            Use a key on Google&rsquo;s paid tier (turn on billing for its project in AI Studio). On the free
-                            tier, Google may use what is said on your calls to improve its products, and its low limits can
-                            cut calls short.
-                        </p>
                         <StringControlledField
                             name="apiKey"
                             id="gemini-api-key"
@@ -163,6 +215,22 @@ function GeminiKeyDialog({ card }: { card: UseGeminiKeyCardReturn }) {
                             description="Stored encrypted and never shown again. Only its last 4 characters are."
                             classNames={{ description: 'text-xs' }}
                             inputProps={{ autoComplete: 'off', spellCheck: false, autoFocus: true }}
+                        />
+                        <Controller
+                            control={card.keyForm.control}
+                            name="tier"
+                            render={({ field }) => (
+                                <Field>
+                                    <FieldLabel id="gemini-key-tier-label">Which Google tier is this key on?</FieldLabel>
+                                    <RadioCards
+                                        value={field.value}
+                                        onValueChange={field.onChange}
+                                        options={TIER_OPTIONS}
+                                        aria-labelledby="gemini-key-tier-label"
+                                        disabled={card.saving}
+                                    />
+                                </Field>
+                            )}
                         />
                         <DialogFooter>
                             <Button

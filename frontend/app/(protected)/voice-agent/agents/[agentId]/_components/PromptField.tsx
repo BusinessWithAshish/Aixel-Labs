@@ -33,6 +33,7 @@ type PromptFieldProps = {
     onOpenVariables?: () => void;
     invalid?: boolean;
     describedBy?: string;
+    placeholder?: string;
     className?: string;
 };
 
@@ -50,6 +51,13 @@ const NO_VARIABLES: PromptVariable[] = [];
 const TEXT_BOX =
     'border px-3 py-2 font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-words [scrollbar-gutter:stable]';
 const MENU_WIDTH = 288;
+
+// Mark colours, shared by the text, the menus and the legend so each kind reads the same everywhere.
+const TOOL_MARK = 'bg-primary/15 ring-primary/15 dark:bg-primary/25 dark:ring-primary/25';
+const VARIABLE_MARK = 'bg-sky-500/15 ring-sky-500/15 dark:bg-sky-400/20 dark:ring-sky-400/20';
+const PROBLEM_MARK =
+    'bg-amber-400/20 ring-amber-400/20 underline decoration-amber-600 decoration-wavy underline-offset-[3px] dark:bg-amber-400/15 dark:ring-amber-400/15 dark:decoration-amber-400';
+const MENU_HEADING = 'text-muted-foreground border-b px-2 pt-1 pb-1.5 text-xs';
 
 /** Where character `offset` of the text is drawn, read from the mirror. */
 function rectAt(mirror: HTMLElement, offset: number): DOMRect | null {
@@ -83,6 +91,7 @@ export function PromptField({
     onOpenVariables,
     invalid,
     describedBy,
+    placeholder,
     className,
 }: PromptFieldProps) {
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -268,11 +277,7 @@ export function PromptField({
                 data-problem={problem ?? undefined}
                 className={cn(
                     'rounded-[3px] text-transparent ring-2',
-                    problem
-                        ? 'bg-amber-400/20 ring-amber-400/20 underline decoration-amber-600 decoration-wavy underline-offset-[3px] dark:bg-amber-400/15 dark:ring-amber-400/15 dark:decoration-amber-400'
-                        : mark.kind === 'variable'
-                          ? 'bg-sky-500/15 ring-sky-500/15 dark:bg-sky-400/20 dark:ring-sky-400/20'
-                          : 'bg-primary/15 ring-primary/15 dark:bg-primary/25 dark:ring-primary/25',
+                    problem ? PROBLEM_MARK : mark.kind === 'variable' ? VARIABLE_MARK : TOOL_MARK,
                 )}
             >
                 {value.slice(mark.start, mark.end)}
@@ -323,6 +328,7 @@ export function PromptField({
                     aria-controls={open ? listboxId : undefined}
                     aria-activedescendant={open ? optionId(active) : undefined}
                     spellCheck={false}
+                    placeholder={placeholder}
                     className={cn(
                         TEXT_BOX,
                         'relative resize-y bg-transparent field-sizing-fixed md:text-[13px] dark:bg-transparent',
@@ -348,6 +354,9 @@ export function PromptField({
                         className="bg-popover text-popover-foreground absolute z-20 max-h-60 max-w-full overflow-y-auto rounded-md border p-1 shadow-md"
                         style={{ top: menuAt.top, left: menuAt.left, width: MENU_WIDTH }}
                     >
+                        <p className={MENU_HEADING} aria-hidden>
+                            Variables: blanks filled in on each call
+                        </p>
                         {variableOptions.map((variable, index) => (
                             <div
                                 key={variable.name}
@@ -359,7 +368,9 @@ export function PromptField({
                                 onClick={() => choose(index)}
                                 className="aria-selected:bg-accent aria-selected:text-accent-foreground grid cursor-pointer gap-0.5 rounded-sm px-2 py-1.5"
                             >
-                                <span className="font-mono text-[13px]">{`{{${variable.name}}}`}</span>
+                                <span className={cn('w-fit rounded-[3px] font-mono text-[13px] ring-2', VARIABLE_MARK)}>
+                                    {`{{${variable.name}}}`}
+                                </span>
                                 <span className="text-muted-foreground truncate text-xs">
                                     {variable.builtin ? 'Built-in · ' : ''}
                                     {variable.description}
@@ -376,6 +387,9 @@ export function PromptField({
                         className="bg-popover text-popover-foreground absolute z-20 max-h-60 max-w-full overflow-y-auto rounded-md border p-1 shadow-md"
                         style={{ top: menuAt.top, left: menuAt.left, width: MENU_WIDTH }}
                     >
+                        <p className={MENU_HEADING} aria-hidden>
+                            Tools: things the agent can do on a call
+                        </p>
                         {options.length > 0 ? (
                             options.map((tool, index) => (
                                 <div
@@ -388,7 +402,9 @@ export function PromptField({
                                     onClick={() => choose(index)}
                                     className="aria-selected:bg-accent aria-selected:text-accent-foreground grid cursor-pointer gap-0.5 rounded-sm px-2 py-1.5"
                                 >
-                                    <span className="font-mono text-[13px]">{tool.name}</span>
+                                    <span className={cn('w-fit rounded-[3px] font-mono text-[13px] ring-2', TOOL_MARK)}>
+                                        {tool.name}
+                                    </span>
                                     {tool.description ? (
                                         <span className="text-muted-foreground truncate text-xs">{tool.description}</span>
                                     ) : null}
@@ -427,6 +443,23 @@ export function PromptField({
                           : 'No tools to insert. Enter opens Tools.'
                       : ''}
             </p>
+
+            <ul className="text-muted-foreground grid gap-1 text-xs" data-testid="prompt-legend">
+                <li>
+                    Type <kbd className="bg-muted text-foreground rounded px-1 font-mono">/</kbd> to add a{' '}
+                    <span className={cn('rounded-[3px] font-mono ring-2', TOOL_MARK)}>tool</span>: something the agent can do
+                    on a call, like booking an appointment.
+                </li>
+                <li>
+                    Type <kbd className="bg-muted text-foreground rounded px-1 font-mono">{'{{'}</kbd> to add a{' '}
+                    <span className={cn('rounded-[3px] font-mono ring-2', VARIABLE_MARK)}>{'{{variable}}'}</span>: a blank
+                    filled in on each call, like today&rsquo;s date or a contact&rsquo;s name.
+                </li>
+                <li>
+                    <span className={cn('rounded-[3px] ring-2', PROBLEM_MARK)}>Underlined</span> words will not work as
+                    written: point at them to see why.
+                </li>
+            </ul>
 
             {problems.length > 0 ? (
                 <ul id={problemsId} className="grid gap-1" data-testid="prompt-tool-problems">

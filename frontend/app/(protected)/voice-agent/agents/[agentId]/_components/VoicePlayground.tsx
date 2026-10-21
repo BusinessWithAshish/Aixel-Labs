@@ -2,16 +2,19 @@
 
 import Link from 'next/link';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowDown, AudioLines, Loader2, Mic, Phone, PhoneOff, Timer } from 'lucide-react';
-import type { VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
+import { ArrowDown, AudioLines, Info, Loader2, Mic, Phone, PhoneOff, Timer } from 'lucide-react';
+import { VoiceGeminiKeyStatus } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import { ToolCallRow } from '@/components/common/voice-agent/ToolCallRow';
 import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
+import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
+import { GeminiKeyLine } from '../../_components/GeminiKeyLine';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import {
     median,
@@ -43,18 +46,22 @@ function describeEndedReason(reason: string): string {
     return ENDED_REASONS[reason] ?? `Call ended: ${reason.replace(/_/g, ' ')}.`;
 }
 
-function formatMs(ms: number | null | undefined): string {
-    return ms == null ? '—' : `${ms.toLocaleString('en-US')} ms`;
+/** 642 -> "0.6 s": how long she took to start answering. */
+function formatSeconds(ms: number | null | undefined): string {
+    return ms == null ? '—' : `${(ms / 1000).toFixed(1)} s`;
 }
 
-type VoicePlaygroundProps = {
-    /** The owner's Gemini API key: calls run on it, so there is no call without one. */
-    geminiKey: VoiceGeminiKeyView;
-    className?: string;
-};
+/** How a usual answer time feels on the phone. */
+function speedWord(ms: number): string {
+    if (ms <= 1000) return 'feels natural';
+    if (ms <= 2000) return 'a little slow';
+    return 'slow';
+}
 
-export function VoicePlayground({ geminiKey, className }: VoicePlaygroundProps) {
-    const { agentId, saved, isDirty, isValid, saving, save } = usePage<UseVoiceAgentEditorPageReturn>();
+/** Calls run on the owner's Gemini key (no call without one) and the agent's saved prompt (none without one). */
+export function VoicePlayground({ className }: { className?: string }) {
+    const { agentId, geminiKey, saved, form, isDirty, isValid, saving, save } = usePage<UseVoiceAgentEditorPageReturn>();
+    const noPrompt = !form.prompt.trim();
     const { status, error, keyError, endedReason, timeline, gaps, level, agentSpeaking, start, end } = useVoicePlayground({
         agentId,
         beforeStart: save,
@@ -62,14 +69,20 @@ export function VoicePlayground({ geminiKey, className }: VoicePlaygroundProps) 
 
     const busy = status === 'connecting' || status === 'live';
     const badge = STATUS_BADGE[status];
+    const usualGap = median(gaps);
 
     return (
         <Card className={cn('h-auto min-w-0 gap-4', className)} data-testid="voice-playground">
             <CardHeader>
                 <CardTitle>Playground</CardTitle>
-                <CardDescription className="font-normal">
-                    Talk to {saved.name} through your microphone, the way a business owner would hear the call. Calls use the
-                    saved version of the agent.
+                <CardDescription className="grid gap-1 font-normal">
+                    <span>
+                        Talk to {saved.name} through your microphone, as if you were on the phone together. It uses the saved
+                        version of the agent.
+                    </span>
+                    {geminiKey.set && geminiKey.status === VoiceGeminiKeyStatus.OK ? (
+                        <GeminiKeyLine view={geminiKey} link />
+                    ) : null}
                 </CardDescription>
                 <CardAction>
                     <Badge variant={badge.variant} data-testid="playground-status">
@@ -80,7 +93,15 @@ export function VoicePlayground({ geminiKey, className }: VoicePlaygroundProps) 
 
             <CardContent className="grid gap-4">
                 <GeminiKeyNotice view={geminiKey} action="talk to your agents" />
-                {isDirty && !busy ? (
+                {noPrompt && !busy ? (
+                    <p
+                        className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                        data-testid="playground-no-prompt"
+                    >
+                        {VOICE_AGENT_NO_PROMPT_MESSAGE}
+                    </p>
+                ) : null}
+                {isDirty && !busy && !noPrompt ? (
                     <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
                         You have unsaved changes. Starting a call saves them first.
                     </p>
@@ -93,7 +114,10 @@ export function VoicePlayground({ geminiKey, className }: VoicePlaygroundProps) 
                             End call
                         </Button>
                     ) : (
-                        <Button onClick={() => void start()} disabled={!geminiKey.set || saving || (isDirty && !isValid)}>
+                        <Button
+                            onClick={() => void start()}
+                            disabled={!geminiKey.set || noPrompt || saving || (isDirty && !isValid)}
+                        >
                             <Phone className="size-4" />
                             {isDirty ? 'Save and start call' : 'Start call'}
                         </Button>
@@ -120,7 +144,8 @@ export function VoicePlayground({ geminiKey, className }: VoicePlaygroundProps) 
                 </div>
 
                 <div className="flex items-center gap-2" aria-label="Microphone level">
-                    <Mic className="text-muted-foreground size-4 shrink-0" />
+                    <Mic className="text-muted-foreground size-4 shrink-0" aria-hidden />
+                    <span className="text-muted-foreground text-xs">Your mic</span>
                     <div className="bg-muted h-2 flex-1 overflow-hidden rounded-full">
                         <div
                             className="h-full rounded-full bg-emerald-500 transition-[width] duration-75 ease-linear"
@@ -129,24 +154,40 @@ export function VoicePlayground({ geminiKey, className }: VoicePlaygroundProps) 
                     </div>
                 </div>
 
-                <dl className="grid grid-cols-3 gap-2 rounded-lg border p-3 text-center">
-                    <div>
-                        <dt className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">Replies</dt>
-                        <dd className="text-lg font-semibold tabular-nums" data-testid="playground-replies">
-                            {gaps.length}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">Median gap</dt>
-                        <dd className="text-lg font-semibold tabular-nums">{formatMs(median(gaps))}</dd>
-                    </div>
-                    <div>
-                        <dt className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">Last gap</dt>
-                        <dd className="text-lg font-semibold tabular-nums" data-testid="playground-last-gap">
-                            {formatMs(gaps[gaps.length - 1])}
-                        </dd>
-                    </div>
-                </dl>
+                <div className="grid gap-0.5 rounded-lg border px-3 py-2 text-sm" data-testid="playground-speed">
+                    <p className="flex items-center gap-1.5 font-medium">
+                        <Timer className="text-muted-foreground size-4" aria-hidden />
+                        How fast {saved.name} answers
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="text-muted-foreground hover:text-foreground"
+                                    aria-label="What this means"
+                                >
+                                    <Info className="size-3.5" />
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-64">
+                                The time from when you stop talking to when {saved.name} starts answering. Up to about a
+                                second feels natural on the phone.
+                            </TooltipContent>
+                        </Tooltip>
+                    </p>
+                    {gaps.length === 0 || usualGap === null ? (
+                        <p className="text-muted-foreground text-xs">Shows up once {saved.name} has answered you.</p>
+                    ) : (
+                        <p className="text-muted-foreground text-xs">
+                            Usually <strong className="text-foreground tabular-nums">{formatSeconds(usualGap)}</strong> (
+                            {speedWord(usualGap)}) · last answer{' '}
+                            <strong className="text-foreground tabular-nums" data-testid="playground-last-gap">
+                                {formatSeconds(gaps[gaps.length - 1])}
+                            </strong>{' '}
+                            · <span data-testid="playground-replies">{gaps.length}</span>{' '}
+                            {gaps.length === 1 ? 'answer' : 'answers'} so far
+                        </p>
+                    )}
+                </div>
 
                 <Transcript agentName={saved.name} items={timeline} live={status === 'live'} />
 
@@ -228,7 +269,7 @@ function Transcript({ agentName, items, live }: TranscriptProps) {
                     <p className="text-muted-foreground flex h-full items-center justify-center px-6 text-center text-sm">
                         {live
                             ? `${agentName} speaks first. Answer like the business owner would.`
-                            : 'The transcript shows up here.'}
+                            : `Press Start call and ${agentName} says hello. What you both say shows up here.`}
                     </p>
                 ) : (
                     <ol className="flex flex-col gap-2">
@@ -241,7 +282,7 @@ function Transcript({ agentName, items, live }: TranscriptProps) {
                                         data-testid="transcript-gap"
                                     >
                                         <Timer className="size-3" />
-                                        replied after {formatMs(item.gapMs)}
+                                        answered in {formatSeconds(item.gapMs)}
                                     </li>
                                 );
                             }

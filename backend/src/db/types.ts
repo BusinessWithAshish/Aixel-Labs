@@ -895,7 +895,11 @@ export type VoiceGeminiKey = {
   /** When the status was learned: the save's check, or the call that was refused. */
   checkedAt: Date;
   savedAt: Date;
+  /** Google's tier for the key's project, as the owner says. Missing = "paid". Calls on a free-tier key cost the owner nothing. */
+  tier?: VoiceGeminiKeyTier;
 };
+
+export type VoiceGeminiKeyTier = "free" | "paid";
 
 export type VoiceSettingsDoc<Id = ObjectId> = {
   _id?: Id;
@@ -915,6 +919,8 @@ export type VoiceGeminiKeyView = {
   status: VoiceGeminiKeyStatus | null;
   statusMessage: string | null;
   checkedAt: string | null;
+  /** null when no key is set. */
+  tier: VoiceGeminiKeyTier | null;
 };
 
 // ---------------------------------------------------------------------------
