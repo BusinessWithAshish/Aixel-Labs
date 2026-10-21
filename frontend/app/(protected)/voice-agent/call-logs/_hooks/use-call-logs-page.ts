@@ -3,11 +3,13 @@
 import { useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
-import type { CallSuccessFilter, VoiceCallListItem } from '@/app/actions/voice-call-actions';
+import type { CallSuccessFilter, VoiceAgentCostTotals, VoiceCallListItem } from '@/app/actions/voice-call-actions';
 
 export type CallLogsPageData = {
     calls: VoiceCallListItem[];
     agents: VoiceAgentOption[];
+    /** Per agent, over all their priced calls (just the filtered agent's when filtered). */
+    costTotals: VoiceAgentCostTotals[];
     agentFilter: string | null;
     /** Calls the analysis judged successful or not (`?success=yes|no`). */
     successFilter: CallSuccessFilter | null;
@@ -37,8 +39,22 @@ export function useCallLogsPage(data: CallLogsPageData) {
         ? (data.agents.find((a) => a.id === data.agentFilter)?.name ?? 'Deleted agent')
         : null;
 
+    // The summary above the list: the filtered agent, or every agent added up.
+    const costTotal = data.costTotals.reduce(
+        (sum, row) => ({
+            calls: sum.calls + row.calls,
+            durationSec: sum.durationSec + row.durationSec,
+            totalUsd: sum.totalUsd + row.totalUsd,
+            geminiUsd: sum.geminiUsd + row.geminiUsd,
+            providerUsd: sum.providerUsd + row.providerUsd,
+            estimated: sum.estimated || row.estimated,
+        }),
+        { calls: 0, durationSec: 0, totalUsd: 0, geminiUsd: 0, providerUsd: 0, estimated: false },
+    );
+
     return {
         calls: data.calls,
+        costTotal,
         agents: data.agents,
         agentFilter: data.agentFilter,
         agentFilterName,

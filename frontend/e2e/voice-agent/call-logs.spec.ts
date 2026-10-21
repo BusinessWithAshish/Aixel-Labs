@@ -7,6 +7,7 @@ import {
     VoiceCallChannel,
     VoiceCallDirection,
     VoiceProvider,
+    type VoiceCallCost,
     type VoiceCallDoc,
 } from '@aixellabs/backend/db/types';
 import { expect, test } from '../support/fixtures';
@@ -42,6 +43,22 @@ function call(fields: Partial<SeedCall> & Pick<SeedCall, 'agentId' | 'startedAt'
         gapsMs: [],
         ...fields,
     };
+}
+
+/** `provider: undefined` seeds a call with no phone provider (playground). */
+function cost(geminiUsd: number, providerUsd: number, fields: Partial<VoiceCallCost> = {}): VoiceCallCost {
+    const seeded: VoiceCallCost = {
+        totalUsd: geminiUsd + providerUsd,
+        geminiUsd,
+        geminiFreeTier: false,
+        geminiTokens: { textIn: 13432, audioIn: 1745, textOut: 546, audioOut: 467 },
+        provider: VoiceProvider.TELNYX,
+        providerUsd,
+        providerExact: false,
+        ...fields,
+    };
+    if (!seeded.provider) delete seeded.provider;
+    return seeded;
 }
 
 async function openCallLogs(page: Page, query = ''): Promise<void> {
@@ -105,6 +122,7 @@ test.describe('with seeded calls', () => {
                     { role: 'agent', text: 'Of course. Tomorrow after ten it is. Goodbye!' },
                 ],
                 gapsMs: [600, 800],
+                cost: cost(0.025, 0.02),
             }),
             call({
                 agentId: new ObjectId(frontDeskId),
@@ -120,6 +138,7 @@ test.describe('with seeded calls', () => {
                     { role: 'agent', text: 'We are open nine to six.' },
                 ],
                 gapsMs: [1200, 2400],
+                cost: cost(0.014, 0.007, { provider: VoiceProvider.TWILIO, providerExact: true }),
             }),
             call({
                 agentId: new ObjectId(salesId),
@@ -136,6 +155,7 @@ test.describe('with seeded calls', () => {
                 direction: VoiceCallDirection.PLAYGROUND,
                 startedAt: new Date(now - 120 * MINUTE),
                 durationSec: 12,
+                cost: cost(0, 0, { geminiFreeTier: true, provider: undefined }),
             }),
         ]);
     });
@@ -164,6 +184,39 @@ test.describe('with seeded calls', () => {
 
         await expect(rows.nth(3)).toContainText('Playground');
         await expect(rows.nth(3)).toContainText('Browser');
+    });
+
+    test('shows what each call and each agent cost', async ({ page }) => {
+        await openCallLogs(page);
+        const rows = page.getByTestId('call-row');
+        // Total, " est." while the phone part is the list-rate estimate, and per minute of talk.
+        await expect(rows.nth(0).getByTestId('call-cost')).toHaveText('$0.045 est.');
+        await expect(rows.nth(0)).toContainText('$0.028/min');
+        await expect(rows.nth(1).getByTestId('call-cost')).toHaveText('$0.021');
+        await expect(rows.nth(1)).toContainText('$0.030/min');
+        await expect(rows.nth(2)).not.toContainText('$');
+        await expect(rows.nth(3).getByTestId('call-cost')).toHaveText('$0.000');
+
+        // Every agent added up: 3 priced calls, 2:29 of talk.
+        const summary = page.getByTestId('call-cost-summary');
+        await expect(summary).toContainText('Your calls cost$0.066 (about ₹6.27)');
+        await expect(summary).toContainText('Average per minute$0.027');
+        await expect(summary).toContainText('3 · 2:29 talking');
+        await expect(summary).toContainText('$0.039 · $0.027 est.');
+
+        await openCallLogs(page, `?agent=${salesId}`);
+        await expect(summary).toContainText('Sales’s calls cost$0.045');
+        await expect(summary).toContainText('Average per minute$0.028');
+        await expect(summary).toContainText('1 · 1:35 talking');
+
+        await page.goto(`${CALL_LOGS_URL}/${outboundId}`);
+        await expect(page.getByTestId('call-cost')).toHaveText('$0.045 est.');
+        await expect(page.getByText('$0.028 a minute')).toBeVisible();
+        await expect(page.getByTestId('call-cost-breakdown')).toHaveText(
+            'Gemini $0.025 · Telnyx $0.020 (estimate) · about ₹4.27 in all',
+        );
+        await page.goto(`${CALL_LOGS_URL}/${playgroundId}`);
+        await expect(page.getByTestId('call-cost-breakdown')).toHaveText('Gemini free (free-tier key) · about ₹0 in all');
     });
 
     test('filters by agent through the URL', async ({ page }) => {

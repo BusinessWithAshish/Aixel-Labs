@@ -28,6 +28,18 @@ export type ListMyCallsInput = {
     limit?: number;
 };
 
+/** What one agent's calls cost, over every call with a cost (the engine has priced calls since 2026-10-21). */
+export type VoiceAgentCostTotals = {
+    agentId: string;
+    calls: number;
+    durationSec: number;
+    totalUsd: number;
+    geminiUsd: number;
+    providerUsd: number;
+    /** Some calls' phone part is still minutes × the provider's list rate. */
+    estimated: boolean;
+};
+
 export type { CallRecordingResult } from '@/server/voice-agent/recordings';
 
 const DEFAULT_LIMIT = 50;
@@ -79,6 +91,7 @@ function mapVoiceCallDoc(doc: VoiceCallDoc, agentName: string | null): VoiceCall
         memoryUsed: doc.memoryUsed
             ? { brief: doc.memoryUsed.brief, lastCallAt: new Date(doc.memoryUsed.lastCallAt).toISOString() }
             : null,
+        cost: doc.cost ?? null,
         agentName,
     };
 }
@@ -120,6 +133,46 @@ export const listMyCalls = async (input: ListMyCallsInput = {}): Promise<ALApiRe
         const docs = await calls.find(filter).sort({ startedAt: -1 }).limit(limit).toArray();
         const names = await agentNamesById(docs.map((doc) => doc.agentId));
         return docs.map((doc) => mapVoiceCallDoc(doc, names.get(doc.agentId.toString()) ?? null));
+    });
+};
+
+/** Each agent's call costs (or one agent's), most expensive first. */
+export const getAgentCostTotals = async (agentId: string | null = null): Promise<ALApiResponse<VoiceAgentCostTotals[]>> => {
+    if (agentId) assertValidObjectId(agentId, 'Agent ID');
+
+    return runAuthenticatedAction(async function getAgentCostTotals(userId) {
+        const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        const calls = await getCollection<VoiceCallDoc>(MongoCollections.VOICE_CALLS);
+        const rows = await calls
+            .aggregate<Omit<VoiceAgentCostTotals, 'agentId' | 'estimated'> & { _id: MongoObjectId; estimated: number }>([
+                {
+                    $match: {
+                        userId: owner.userId,
+                        ...(agentId ? { agentId: new MongoObjectId(agentId) } : {}),
+                        cost: { $type: 'object' },
+                    },
+                },
+                {
+                    $group: {
+                        _id: '$agentId',
+                        calls: { $sum: 1 },
+                        durationSec: { $sum: '$durationSec' },
+                        totalUsd: { $sum: '$cost.totalUsd' },
+                        geminiUsd: { $sum: '$cost.geminiUsd' },
+                        providerUsd: { $sum: '$cost.providerUsd' },
+                        estimated: {
+                            $max: { $cond: [{ $and: ['$cost.provider', { $not: ['$cost.providerExact'] }] }, 1, 0] },
+                        },
+                    },
+                },
+                { $sort: { totalUsd: -1 } },
+            ])
+            .toArray();
+        return rows.map(({ _id, estimated, ...totals }) => ({
+            agentId: _id.toString(),
+            ...totals,
+            estimated: estimated === 1,
+        }));
     });
 };
 

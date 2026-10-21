@@ -19,6 +19,7 @@ URLs, short-lived stream tokens, `VOICELAB_KEY`, Twilio's signature).
 | `tools.py`, `calendars.py` | Agent tools: booking (own calendar through Composio) and the owner's webhooks |
 | `campaigns.py` | Outbound campaigns: the dialling loop, leases, retries, calling windows |
 | `analysis.py` | Post-call analysis and caller memory |
+| `costs.py` | Each call's cost (`voice_calls.cost`): Gemini tokens at list price (0 on a free-tier key), the phone minutes at the provider's list rate, then Twilio's own charge once it is filled in |
 | `twilio.py`, `voicelink.py` | Twilio and VoiceLink numbers (Telnyx is built into `phone.py`) |
 | `fillers.py`, `fillers/` | The short "mm" and voicemail clips in each voice (shipped ones; others are made once and kept in `cache/`) |
 | `prospect.py` | A fake prospect for test calls on the Telnyx path |
@@ -87,7 +88,7 @@ exact command (engine settings, fake ports). Most use real Gemini Live sessions,
 
 ```bash
 export MONGODB_URI=mongodb://127.0.0.1:27018 MONGODB_DB_NAME=AixelLabsVoiceEngineDev
-.venv/bin/python tests/tools_unit.py          # also: calendars_unit, agent_features_unit, campaigns_unit, guard_unit
+.venv/bin/python tests/tools_unit.py          # also: calendars_unit, agent_features_unit, campaigns_unit, guard_unit, costs_unit
 .venv/bin/python tests/drain_e2e.py 8131      # starts its own two slots: SIGTERM drain + event handover
 ```
 

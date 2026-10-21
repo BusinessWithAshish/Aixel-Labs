@@ -60,6 +60,10 @@ test('a playground call reaches the engine, she talks, the caller is heard, and 
     expect(call.voice).toBe('kore');
     expect(call.turns.some((t) => t.role === 'agent')).toBe(true);
     expect(call.turns.some((t) => t.role === 'caller')).toBe(true);
+    // Priced from Gemini's own token counts; a playground call has no phone part.
+    expect(call.cost?.geminiTokens.audioOut).toBeGreaterThan(0);
+    expect(call.cost?.provider).toBeUndefined();
+    expect(call.cost?.totalUsd).toBe(call.cost?.geminiUsd);
 
     // The call shows up in the call log the user sees.
     await page.goto('/voice-agent/call-logs');

@@ -700,6 +700,28 @@ export type VoiceCallDoc<Id = ObjectId> = {
   voicemailMessage?: string | null;
   /** What she remembered about the caller when the call started (caller memory on). */
   memoryUsed?: { brief: string; lastCallAt: Date } | null;
+  /** What the call cost the owner, written by the engine when the call ends (absent on calls before 2026-10-21). */
+  cost?: VoiceCallCost | null;
+};
+
+/**
+ * A call's cost in US dollars. The engine writes it when the call ends (`backend/voice/costs.py`):
+ * Gemini from the tokens Gemini reported, the phone provider from the minutes at its list rate
+ * (`providerExact: false`), replaced by the provider's own charge once it reports one.
+ */
+export type VoiceCallCost = {
+  /** geminiUsd + providerUsd. */
+  totalUsd: number;
+  /** 0 when the owner's key is on Google's free tier (`geminiFreeTier`). */
+  geminiUsd: number;
+  geminiFreeTier: boolean;
+  /** Tokens Gemini reported for the whole call (every turn bills the conversation so far). */
+  geminiTokens: { textIn: number; audioIn: number; textOut: number; audioOut: number };
+  /** Absent on playground calls, which have no phone provider. */
+  provider?: VoiceProvider;
+  providerUsd: number;
+  /** True: the provider's own charge for the call. False: minutes × its list rate, until that charge arrives. */
+  providerExact: boolean;
 };
 
 export type VoiceCallToolCall = {

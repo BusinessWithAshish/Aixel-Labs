@@ -472,7 +472,16 @@ def call_doc(ctx: dict, record: dict, state: dict) -> dict:
     return doc
 
 
-def _insert(doc: dict):
+def _insert(doc: dict, ctx: dict | None = None, usage: dict | None = None):
+    """With the call's ctx and Gemini usage (bot.py), its `cost` is worked out here, off the event loop
+    (it reads the key's tier)."""
+    if ctx is not None:
+        import costs  # imports this module: loaded on first use
+
+        try:
+            doc["cost"] = costs.call_cost(doc, usage or {}, ctx.get("provider"))
+        except Exception as e:  # the call is written without one
+            logger.error(f"could not work out the call's cost: {e!r}")
     try:
         result = db().voice_calls.insert_one(doc)
         logger.info(f"voice_calls {result.inserted_id} written ({doc['channel']} {doc['direction']}, {doc['endedBy']})")
@@ -483,22 +492,23 @@ def _insert(doc: dict):
 _AFTER_CALL: set[asyncio.Task] = set()  # running analyses, kept referenced until they finish
 
 
-async def _insert_then_analyse(ctx: dict, doc: dict):
-    import analysis  # imports this module: loaded on first use
+async def _insert_then_analyse(ctx: dict, doc: dict, usage: dict):
+    import analysis, costs  # import this module: loaded on first use
 
-    await asyncio.to_thread(_insert, doc)
+    await asyncio.to_thread(_insert, doc, ctx, usage)
     await analysis.after_call(ctx, doc)
+    await costs.fill_provider_charge(ctx, doc)
 
 
 def save_call(ctx: dict, record: dict, state: dict):
     """Write the call's document off the event loop: other calls' audio must not wait on Mongo.
     The post-call analysis (analysis.py) follows in the same background task, so the call's
     teardown never waits for the model."""
-    doc = call_doc(ctx, record, state)
+    doc, usage = call_doc(ctx, record, state), record.get("gemini_usage") or {}
     try:
-        task = asyncio.get_running_loop().create_task(_insert_then_analyse(ctx, doc))
+        task = asyncio.get_running_loop().create_task(_insert_then_analyse(ctx, doc, usage))
     except RuntimeError:  # no loop (a test calling this directly)
-        _insert(doc)
+        _insert(doc, ctx, usage)
         return
     _AFTER_CALL.add(task)
     task.add_done_callback(_AFTER_CALL.discard)

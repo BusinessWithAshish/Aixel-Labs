@@ -19,7 +19,9 @@ import type { UseCallLogsPageReturn } from '../_hooks/use-call-logs-page';
 import { endedByLabel } from '@/helpers/voice-call-outcomes';
 import { formatShortDateTime } from '@/helpers/voice-time';
 import { formatDuration, formatGap, formatParty, median } from '../_utils/call-format';
+import { costPerMinute, formatUsd } from '@/helpers/voice-call-cost';
 import { callBookedSomething } from '@/helpers/voice-tool-calls';
+import { CallCostAmount, CallCostSummary } from './CallCost';
 import { CallOutcomeBadges } from './CallOutcomeBadges';
 import { CallTypeBadge } from './CallTypeBadge';
 
@@ -59,6 +61,13 @@ function CallType({ call }: { call: VoiceCallListItem }) {
             <CallOutcomeBadges analysis={call.analysis} />
         </span>
     );
+}
+
+/** "$0.031/min" under a call's cost; nothing for a call nobody heard. */
+function PerMinute({ call, className }: { call: VoiceCallListItem; className?: string }) {
+    const perMinute = call.cost ? costPerMinute(call.cost.totalUsd, call.durationSec) : null;
+    if (perMinute === null) return null;
+    return <span className={cn('text-muted-foreground text-xs tabular-nums', className)}>{formatUsd(perMinute)}/min</span>;
 }
 
 /** The analysis' summary, one line on a desktop row, two on a phone card. */
@@ -147,6 +156,8 @@ export function CallLogsContent() {
                 </div>
             </div>
 
+            <CallCostSummary />
+
             {loadError ? (
                 <Alert variant="destructive">
                     <AlertDescription>{loadError}</AlertDescription>
@@ -181,6 +192,7 @@ export function CallLogsContent() {
                                     <TableHead className="text-right">Duration</TableHead>
                                     <TableHead>Ended by</TableHead>
                                     <TableHead className="text-right">Median gap</TableHead>
+                                    <TableHead className="text-right">Cost</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -216,10 +228,14 @@ export function CallLogsContent() {
                                             <TableCell className="text-right tabular-nums">
                                                 {formatGap(median(call.gapsMs))}
                                             </TableCell>
+                                            <TableCell className="text-right">
+                                                <CallCostAmount cost={call.cost} />
+                                                <PerMinute call={call} className="block" />
+                                            </TableCell>
                                         </TableRow>
                                         {call.analysis?.summary ? (
                                             <TableRow className="cursor-pointer" onClick={() => router.push(callHref(call))}>
-                                                <TableCell colSpan={7} className="max-w-0 pt-0 whitespace-normal">
+                                                <TableCell colSpan={8} className="max-w-0 pt-0 whitespace-normal">
                                                     <CallSummaryLine call={call} className="truncate" />
                                                 </TableCell>
                                             </TableRow>
@@ -252,6 +268,11 @@ export function CallLogsContent() {
                                         <span className="tabular-nums">{formatDuration(call.durationSec)}</span>
                                         <span>{endedByLabel(call.endedBy)}</span>
                                         <span className="tabular-nums">gap {formatGap(median(call.gapsMs))}</span>
+                                        {call.cost ? (
+                                            <span>
+                                                <CallCostAmount cost={call.cost} /> <PerMinute call={call} />
+                                            </span>
+                                        ) : null}
                                     </div>
                                 </Link>
                             </li>

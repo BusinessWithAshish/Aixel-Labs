@@ -16,6 +16,7 @@ import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { CallAnalysisCard, CallerMemoryCard, CallVariablesCard } from './CallInsights';
 import { RecordingPlayer } from './RecordingPlayer';
 import { CallTypeBadge } from '../../_components/CallTypeBadge';
+import { CallCostAmount, CallCostBreakdown, formatCostPerMinute } from '../../_components/CallCost';
 
 function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
     return (
@@ -77,6 +78,19 @@ function CallSummary() {
                     <SummaryRow label="Longest gap">
                         <span className="tabular-nums">{formatGap(gapStats.max)}</span>
                     </SummaryRow>
+                    <SummaryRow label="Cost">
+                        <CallCostAmount cost={call.cost} />
+                    </SummaryRow>
+                    <SummaryRow label="Cost per minute">
+                        <span className="tabular-nums">{formatCostPerMinute(call.cost, call.durationSec)}</span>
+                    </SummaryRow>
+                    {call.cost ? (
+                        <div className="col-span-2">
+                            <SummaryRow label="Where it went">
+                                <CallCostBreakdown cost={call.cost} isPhone={isPhone} />
+                            </SummaryRow>
+                        </div>
+                    ) : null}
                     {call.voicemailMessage ? (
                         <div className="col-span-2" data-testid="call-voicemail-message">
                             <SummaryRow label="Voicemail message left">
