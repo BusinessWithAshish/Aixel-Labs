@@ -9,6 +9,7 @@ import { assertValidObjectId, runAuthenticatedAction, runPublicAction } from '@/
 import { assertCallerIsAdmin } from '@/server/auth';
 import { deleteOrphanedFirebaseUsers } from '@/server/auth/firebase-cleanup';
 import { deleteUserOwnedLeadData } from '@/server/leads/cascade-delete';
+import { deleteUserOwnedVoiceData } from '@/server/voice-agent/cascade-delete';
 
 export const getAllTenants = async (): Promise<ALApiResponse<Tenant[]>> =>
     runAuthenticatedAction(async function getAllTenants() {
@@ -141,7 +142,7 @@ export type DeleteTenantResult = {
 };
 
 /**
- * Deletes a tenant and cascades to its users and user-owned lead data.
+ * Deletes a tenant and cascades to its users and user-owned lead and voice data.
  * Shared `leads` documents are kept. Firebase Auth is deleted when no memberships remain.
  */
 export const deleteTenant = async (id: string): Promise<ALApiResponse<DeleteTenantResult>> =>
@@ -165,6 +166,7 @@ export const deleteTenant = async (id: string): Promise<ALApiResponse<DeleteTena
         const firebaseUids = users.map((user) => user.firebaseUid).filter((uid): uid is string => Boolean(uid));
 
         const { deletedUserLeads, deletedLeadLists } = await deleteUserOwnedLeadData(userIds);
+        await deleteUserOwnedVoiceData(userIds);
 
         const usersResult = await usersCollection.deleteMany({ tenantId: tenantObjectId });
         const tenantResult = await tenantsCollection.deleteOne({ _id: tenantObjectId });

@@ -21,6 +21,7 @@ import {
 } from '@/server/auth';
 import { deleteOrphanedFirebaseUsers } from '@/server/auth/firebase-cleanup';
 import { deleteUserOwnedLeadData } from '@/server/leads/cascade-delete';
+import { deleteUserOwnedVoiceData } from '@/server/voice-agent/cascade-delete';
 import type { Filter } from 'mongodb';
 
 const mapUserDocToUser = (user: UserDoc): User => ({
@@ -106,6 +107,7 @@ export const deleteUser = async (id: string): Promise<ALApiResponse<boolean>> =>
 
         const userOid = new MongoObjectId(id);
         await deleteUserOwnedLeadData([userOid]);
+        await deleteUserOwnedVoiceData([userOid]);
 
         const result = await usersCollection.deleteOne({ _id: userOid });
         if (result.deletedCount !== 1) {

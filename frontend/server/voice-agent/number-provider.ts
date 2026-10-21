@@ -1,6 +1,9 @@
 import 'server-only';
 
-import type { MongoObjectId, VoiceNumberDoc } from '@aixellabs/backend/db';
+import { VoiceProvider, type MongoObjectId, type VoiceNumberDoc } from '@aixellabs/backend/db';
+import { telnyxNumbers } from '@/server/voice-agent/telnyx-numbers';
+import { twilioNumbers } from '@/server/voice-agent/twilio-numbers';
+import { voicelinkNumbers } from '@/server/voice-agent/voicelink-numbers';
 
 export type OwnedNumberDoc = VoiceNumberDoc & { _id: MongoObjectId };
 
@@ -33,3 +36,13 @@ export type NumberProvider = {
     /** Before the number is forgotten: undo what we changed. Throws to keep the number. */
     release(doc: OwnedNumberDoc): Promise<void>;
 };
+
+const PROVIDERS: Record<VoiceProvider, NumberProvider> = {
+    [VoiceProvider.TELNYX]: telnyxNumbers,
+    [VoiceProvider.VOICELINK]: voicelinkNumbers,
+    [VoiceProvider.TWILIO]: twilioNumbers,
+};
+
+export function providerOf(doc: VoiceNumberDoc): NumberProvider {
+    return PROVIDERS[doc.provider] ?? telnyxNumbers;
+}

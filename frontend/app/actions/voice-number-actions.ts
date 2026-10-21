@@ -20,7 +20,7 @@ import { isBuiltinVariable } from '@/helpers/voice-agent-features';
 import { engineFetch, sealSecret } from '@/server/voice-agent/engine';
 import { assertGeminiKeySet, GEMINI_KEY_MISSING_MESSAGE } from '@/server/voice-agent/gemini-key';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
-import type { NumberProvider, OwnedNumberDoc, ProviderAccountNumber } from '@/server/voice-agent/number-provider';
+import { providerOf, type OwnedNumberDoc, type ProviderAccountNumber } from '@/server/voice-agent/number-provider';
 import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
 import { listTelnyxAccountNumbers, telnyxNumbers } from '@/server/voice-agent/telnyx-numbers';
 import type { TwilioAuth } from '@/server/voice-agent/twilio';
@@ -71,16 +71,6 @@ type EngineCallResponse = { ok: boolean; callId?: string; error?: string };
 
 const E164_PATTERN = /^\+[1-9]\d{7,14}$/;
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS;
-
-const PROVIDERS: Record<VoiceProvider, NumberProvider> = {
-    [VoiceProvider.TELNYX]: telnyxNumbers,
-    [VoiceProvider.VOICELINK]: voicelinkNumbers,
-    [VoiceProvider.TWILIO]: twilioNumbers,
-};
-
-function providerOf(doc: VoiceNumberDoc): NumberProvider {
-    return PROVIDERS[doc.provider] ?? telnyxNumbers;
-}
 
 function assertApiKey(apiKey: string): string {
     const key = typeof apiKey === 'string' ? apiKey.trim() : '';

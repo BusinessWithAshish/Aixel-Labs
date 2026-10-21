@@ -79,6 +79,7 @@ export function UserCard({ user, onEdit, onDelete, selected, onSelectedChange, c
                         variant="ghost"
                         className="h-7 w-7 sm:h-8 sm:w-8 shadow-sm hover:bg-secondary hover:text-red-500 cursor-pointer"
                         onClick={handleDeleteClick}
+                        aria-label={`Delete ${user.name || user.email}`}
                     >
                         <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>

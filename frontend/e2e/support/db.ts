@@ -128,6 +128,23 @@ export class E2eDb {
         );
     }
 
+    /** Adds `user` as another member of the e2e tenant (for specs that delete one); returns its id. */
+    async insertMember(user: E2eUser): Promise<ObjectId> {
+        const { tenantId } = await this.getUser(E2E_USER);
+        await this.users.deleteMany({ firebaseUid: user.firebaseUid });
+        const { insertedId } = await this.users.insertOne(
+            this.membership(user, tenantId, { moduleAccess: getDefaultModuleAccess(), credits: DEFAULT_USER_CREDITS }),
+        );
+        return insertedId;
+    }
+
+    /** How many docs each voice collection holds for one owner (by id, so it works after they are deleted). */
+    async countVoiceDocs(userId: ObjectId): Promise<Record<string, number>> {
+        const names = Object.values(MongoCollections).filter((name) => name.startsWith('voice_'));
+        const counts = await Promise.all(names.map((name) => this.db.collection(name).countDocuments({ userId })));
+        return Object.fromEntries(names.map((name, index) => [name, counts[index]]));
+    }
+
     async getUser(user: E2eUser) {
         const doc = await this.users.findOne({ firebaseUid: user.firebaseUid, tenantName: E2E_TENANT });
         if (!doc) throw new Error(`E2E user ${user.firebaseUid} is not seeded`);
