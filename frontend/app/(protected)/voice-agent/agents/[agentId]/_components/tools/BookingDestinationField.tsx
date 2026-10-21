@@ -20,7 +20,7 @@ const MISSING = 'missing';
  */
 export function BookingDestinationField() {
     const {
-        bookingDraft,
+        booking,
         savingBooking,
         activeConnections,
         calendars,
@@ -31,7 +31,7 @@ export function BookingDestinationField() {
         chooseBookingCalendar,
     } = usePage<UseVoiceAgentEditorPageReturn>();
 
-    const destination = bookingDraft.destination;
+    const destination = booking.destination;
     const connection = destination
         ? activeConnections.find((c) => c.connectedAccountId === destination.connectedAccountId)
         : undefined;

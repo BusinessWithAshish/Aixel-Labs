@@ -1,20 +1,19 @@
 'use client';
 
-import type { FormEvent } from 'react';
+import { FormProvider } from 'react-hook-form';
 import { formatDistanceToNow } from 'date-fns';
 import { ExternalLink, KeyRound, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { VoiceGeminiKeyStatus, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { useGeminiKeyCard, type UseGeminiKeyCardReturn } from '../_hooks/use-gemini-key-card';
 import { GEMINI_KEY_ANCHOR } from '@/helpers/voice-routes';
+import { useGeminiKeyCard, type UseGeminiKeyCardReturn } from '../_hooks/use-gemini-key-card';
 
 const AI_STUDIO_KEYS_URL = 'https://aistudio.google.com/apikey';
 
@@ -120,82 +119,67 @@ export function GeminiKeyCard({ initialKey, className }: GeminiKeyCardProps) {
 }
 
 function GeminiKeyDialog({ card }: { card: UseGeminiKeyCardReturn }) {
-    const onSubmit = (event: FormEvent) => {
-        event.preventDefault();
-        void card.save();
-    };
-
     return (
         <Dialog open={card.editOpen} onOpenChange={card.onEditOpenChange}>
             <DialogContent className="sm:max-w-lg">
-                <form onSubmit={onSubmit} className="grid gap-4">
-                    <DialogHeader>
-                        <DialogTitle>
-                            {card.view.set ? 'Replace your Gemini API key' : 'Add your Gemini API key'}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Your agents use it for every call. It takes a minute to get one.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <ol className="text-muted-foreground list-decimal space-y-1.5 pl-5 text-sm">
-                        <li>
-                            Open{' '}
-                            <a
-                                href={AI_STUDIO_KEYS_URL}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-primary inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline"
-                            >
-                                aistudio.google.com/apikey
-                                <ExternalLink className="size-3" aria-hidden />
-                            </a>{' '}
-                            and sign in with your Google account.
-                        </li>
-                        <li>Click &ldquo;Create API key&rdquo; and copy the key.</li>
-                        <li>Paste it below. We check it with Google before saving it.</li>
-                    </ol>
-                    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
-                        Use a key on Google&rsquo;s paid tier (turn on billing for its project in AI Studio). On the free
-                        tier, Google may use what is said on your calls to improve its products, and its low limits can cut
-                        calls short.
-                    </p>
-                    <div className="grid gap-2">
-                        <Label htmlFor="gemini-api-key">API key</Label>
-                        <Input
-                            id="gemini-api-key"
-                            type="password"
-                            autoComplete="off"
-                            spellCheck={false}
-                            placeholder="AIza…"
-                            value={card.keyInput}
-                            onChange={(event) => card.setKeyInput(event.target.value)}
-                            aria-invalid={!!card.saveError}
-                            aria-describedby="gemini-api-key-hint"
-                            autoFocus
-                        />
-                        <p
-                            id="gemini-api-key-hint"
-                            className={cn('text-xs', card.saveError ? 'text-destructive' : 'text-muted-foreground')}
-                            role={card.saveError ? 'alert' : undefined}
-                        >
-                            {card.saveError ?? 'Stored encrypted and never shown again. Only its last 4 characters are.'}
+                <FormProvider {...card.keyForm}>
+                    <form onSubmit={card.save} className="grid gap-4">
+                        <DialogHeader>
+                            <DialogTitle>
+                                {card.view.set ? 'Replace your Gemini API key' : 'Add your Gemini API key'}
+                            </DialogTitle>
+                            <DialogDescription>
+                                Your agents use it for every call. It takes a minute to get one.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <ol className="text-muted-foreground list-decimal space-y-1.5 pl-5 text-sm">
+                            <li>
+                                Open{' '}
+                                <a
+                                    href={AI_STUDIO_KEYS_URL}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-primary inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline"
+                                >
+                                    aistudio.google.com/apikey
+                                    <ExternalLink className="size-3" aria-hidden />
+                                </a>{' '}
+                                and sign in with your Google account.
+                            </li>
+                            <li>Click &ldquo;Create API key&rdquo; and copy the key.</li>
+                            <li>Paste it below. We check it with Google before saving it.</li>
+                        </ol>
+                        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                            Use a key on Google&rsquo;s paid tier (turn on billing for its project in AI Studio). On the free
+                            tier, Google may use what is said on your calls to improve its products, and its low limits can
+                            cut calls short.
                         </p>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => card.onEditOpenChange(false)}
-                            disabled={card.saving}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={card.saving || !card.keyInput.trim()}>
-                            {card.saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-                            {card.saving ? 'Checking with Google…' : 'Check and save'}
-                        </Button>
-                    </DialogFooter>
-                </form>
+                        <StringControlledField
+                            name="apiKey"
+                            id="gemini-api-key"
+                            label="API key"
+                            type="password"
+                            placeholder="AIza…"
+                            description="Stored encrypted and never shown again. Only its last 4 characters are."
+                            classNames={{ description: 'text-xs' }}
+                            inputProps={{ autoComplete: 'off', spellCheck: false, autoFocus: true }}
+                        />
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => card.onEditOpenChange(false)}
+                                disabled={card.saving}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={card.saving}>
+                                {card.saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                                {card.saving ? 'Checking with Google…' : 'Check and save'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </FormProvider>
             </DialogContent>
         </Dialog>
     );

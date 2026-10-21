@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Controller } from 'react-hook-form';
 import { BrainCircuit, Loader2 } from 'lucide-react';
 import { VOICE_AGENT_FEATURE_LIMITS, type VoiceCallerMemory } from '@aixellabs/backend/db/types';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
@@ -14,7 +15,7 @@ import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent
 
 /** Caller memory: on/off, and the callers it remembers, each of whom can be forgotten. */
 export function CallerMemorySettings() {
-    const { settingsDraft, setSettings, savingSettings, memories, forgetting, forgetCaller, forgetEveryone } =
+    const { settingsForm, settings, memories, forgetting, forgetCaller, forgetEveryone } =
         usePage<UseVoiceAgentEditorPageReturn>();
     const [confirm, setConfirm] = useState<VoiceCallerMemory | 'all' | null>(null);
 
@@ -34,12 +35,17 @@ export function CallerMemorySettings() {
             }
             description={`After each phone call, a short note on the person (up to ${VOICE_AGENT_FEATURE_LIMITS.memoryBriefMax} characters) is kept under their number. The next time this agent talks with that number, it starts with the note and the date of the last call. Only this agent sees it.`}
             action={
-                <Switch
-                    id="memory-enabled"
-                    checked={settingsDraft.memory}
-                    onCheckedChange={(memory) => setSettings({ memory })}
-                    disabled={savingSettings}
-                    className="mt-1"
+                <Controller
+                    control={settingsForm.control}
+                    name="memory"
+                    render={({ field }) => (
+                        <Switch
+                            id="memory-enabled"
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="mt-1"
+                        />
+                    )}
                 />
             }
             data-testid="memory-settings"
@@ -91,7 +97,7 @@ export function CallerMemorySettings() {
                         ))}
                     </ul>
                 </div>
-            ) : settingsDraft.memory ? (
+            ) : settings.memory ? (
                 <p className="text-muted-foreground text-xs">No callers remembered yet.</p>
             ) : null}
 

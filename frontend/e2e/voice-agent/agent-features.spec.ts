@@ -135,7 +135,7 @@ test('call settings: voicemail message, analysis fields and caller memory are sa
     await expect(card.getByRole('switch', { name: 'Remember callers' })).not.toBeChecked();
 
     await card.getByRole('radio', { name: /Leave a message/ }).click();
-    const message = card.getByLabel('Message');
+    const message = card.getByLabel('Message', { exact: true });
     await expect(message).toHaveValue(SUGGESTED_VOICEMAIL_MESSAGE);
     await message.fill('Hi {{first_name}}, this is {{agent_name}} from {{company}}. Call me back!');
     // A variable only the voicemail message uses still gets a default-value input.

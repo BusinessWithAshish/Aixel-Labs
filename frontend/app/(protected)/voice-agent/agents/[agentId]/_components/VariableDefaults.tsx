@@ -13,7 +13,7 @@ import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-ed
  * A call's own value (a campaign column, a test call) wins; built-ins are filled in on every call.
  */
 export function VariableDefaults() {
-    const { form, usedVariables, setVariable, saving } = usePage<UseVoiceAgentEditorPageReturn>();
+    const { agentForm, form, usedVariables } = usePage<UseVoiceAgentEditorPageReturn>();
 
     return (
         <div id="agent-variables" className="grid scroll-mt-4 gap-2" data-testid="agent-variables">
@@ -47,11 +47,9 @@ export function VariableDefaults() {
                                 </Label>
                                 <Input
                                     id={inputId}
-                                    value={value}
                                     maxLength={VOICE_AGENT_FEATURE_LIMITS.maxVariableLength}
                                     placeholder="Default value (optional)"
-                                    onChange={(e) => setVariable(name, e.target.value)}
-                                    disabled={saving}
+                                    {...agentForm.register(`variables.${name}`)}
                                     className="h-8"
                                 />
                             </li>

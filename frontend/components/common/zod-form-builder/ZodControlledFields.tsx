@@ -38,9 +38,10 @@ type StringControlledFieldProps = ControlledFieldBaseProps &
     ControlledFieldModifiedProps<ZodStringFieldProps | ZodTextAreaFieldProps> & {
         placeholder?: string;
         type?: HTMLInputTypeAttribute;
+        inputProps?: ZodStringFieldProps['inputProps'];
     };
 
-export const StringControlledField = ({ name, description, required, label, disabled, className, classNames, metadata, placeholder, type }: StringControlledFieldProps) => {
+export const StringControlledField = ({ name, id, description, required, label, disabled, className, classNames, metadata, placeholder, type, inputProps }: StringControlledFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
     const isTextArea = metadata === ZodMetaType.TEXT_AREA;
     const Component = isTextArea ? ZodTextAreaField : ZodStringField;
@@ -60,7 +61,9 @@ export const StringControlledField = ({ name, description, required, label, disa
                     disabled={disabled}
                     className={className}
                     classNames={classNames}
-                    {...(!isTextArea && { placeholder, type })}
+                    id={id}
+                    placeholder={placeholder}
+                    {...(!isTextArea && { type, inputProps })}
                 />
             )}
         />
@@ -71,6 +74,7 @@ type NumberControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModi
 
 export const NumberControlledField = ({
     name,
+    id,
     description,
     required,
     label,
@@ -89,6 +93,7 @@ export const NumberControlledField = ({
             render={({ value, invalid, errors, onChange }) => (
                 <ZodNumberField
                     name={name}
+                    id={id}
                     label={fieldLabel}
                     description={description}
                     value={value}
@@ -110,7 +115,7 @@ export const NumberControlledField = ({
 
 type BooleanControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodCheckboxFieldProps | ZodSwitchFieldProps>
 
-export const BooleanControlledField = ({ name, description, required, label, disabled, className, classNames, metadata }: BooleanControlledFieldProps) => {
+export const BooleanControlledField = ({ name, id, description, required, label, disabled, className, classNames, metadata }: BooleanControlledFieldProps) => {
 
     const fieldLabel = label ?? generateFieldLabel(name);
     const BooleanComponent = metadata === ZodMetaType.CHECKBOX ? ZodCheckboxField : ZodSwitchField;
@@ -120,6 +125,7 @@ export const BooleanControlledField = ({ name, description, required, label, dis
             render={({ value, invalid, errors, onChange }) => (
                 <BooleanComponent
                     name={name}
+                    id={id}
                     description={description}
                     label={fieldLabel}
                     value={value}
@@ -167,7 +173,7 @@ export const EnumControlledField = ({ name, description, required, label, disabl
 
 type SelectControlledFieldProps = ControlledFieldBaseProps & ControlledFieldModifiedProps<ZodSelectFieldProps>
 
-export const SelectControlledField = ({ name, description, required, label, disabled, className, classNames, options, isClearable, virtualized }: SelectControlledFieldProps) => {
+export const SelectControlledField = ({ name, id, description, required, label, disabled, className, classNames, options, isClearable, virtualized, placeholder }: SelectControlledFieldProps) => {
     const fieldLabel = label ?? generateFieldLabel(name);
     return (
         <FieldController
@@ -175,6 +181,8 @@ export const SelectControlledField = ({ name, description, required, label, disa
             render={({ value, invalid, errors, onChange }) => (
                 <ZodSelectField
                     name={name}
+                    id={id}
+                    placeholder={placeholder}
                     label={fieldLabel}
                     description={description}
                     value={value}

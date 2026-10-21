@@ -190,6 +190,19 @@ Rendered Array UI
    └─ Add case for your field type
 ```
 
+### 4. Controlled fields in a hand-laid-out form
+
+The `*ControlledField` components can be used directly inside any `FormProvider`
+(no `ZodFormBuilder`), e.g. a dialog with its own layout:
+
+- `id` sets the control's DOM id (the label points at it). Defaults to `name`; set it
+  when two forms on one page share a field name, or a test targets a stable id.
+- `StringControlledField` `inputProps` passes anything else to the `<input>`
+  (`autoComplete`, `inputMode`, `spellCheck`, `maxLength`, `autoFocus`).
+
+Rows in a list (`useFieldArray`) and inputs with custom chrome stay plain `ui/`
+primitives wired with `Controller` / `register`.
+
 ## State Management
 
 ```

@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { FormProvider, useForm, useFormContext } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { KeyRound, Loader2, Send } from 'lucide-react';
 import { VOICE_WEBHOOK_LIMITS, type VoiceAgent, type VoiceAgentWebhookToolView } from '@aixellabs/backend/db/types';
@@ -10,14 +12,22 @@ import {
     updateVoiceAgentWebhookTool,
     type VoiceWebhookTestResult,
 } from '@/app/actions/voice-agent-actions';
+import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
+import { ZodMetaType } from '@/components/common/zod-form-builder/zod-meta-types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Field, FieldDescription, FieldLabel, FieldTitle } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import {
+    schemaProblem,
+    webhookSecretInput,
+    webhookTestSchema,
+    webhookToolFormSchema,
+    type WebhookToolFormValues,
+} from '@/helpers/voice-schemas';
 import { cn } from '@/lib/utils';
+import { webhookToolFormValues } from '../../_utils/webhook-tool-form';
 import { WebhookParamRows } from './WebhookParamRows';
-import { draftToInput, sameDraft, toolToDraft, webhookDraftError, type WebhookToolDraft } from './webhook-tool-form';
 
 /** The answer to a test request, as the agent would get it. */
 function TestResult({ result }: { result: VoiceWebhookTestResult }) {
@@ -86,65 +96,131 @@ type WebhookToolDialogProps = {
     onSaved: (agent: VoiceAgent) => void;
 };
 
+/** The signing secret: set (kept), about to be removed, or a new one typed in. It is never shown. */
+function SecretField({ hasSecret, disabled }: { hasSecret: boolean; disabled: boolean }) {
+    const form = useFormContext<WebhookToolFormValues>();
+    const action = form.watch('secret.action');
+    const setAction = (next: WebhookToolFormValues['secret']['action']) =>
+        form.setValue('secret', { action: next, value: '' }, { shouldDirty: true });
+
+    return (
+        <Field data-testid="tool-secret">
+            <FieldLabel htmlFor="tool-secret">
+                Signing secret <span className="text-muted-foreground font-normal">(optional)</span>
+            </FieldLabel>
+            {action === 'keep' ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-sm" data-testid="tool-secret-set">
+                        <KeyRound className="text-muted-foreground size-4" />
+                        Secret set
+                    </span>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setAction('set')} disabled={disabled}>
+                        Replace
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setAction('clear')}
+                        disabled={disabled}
+                    >
+                        Remove
+                    </Button>
+                </div>
+            ) : action === 'clear' ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm">The secret is removed when you save.</span>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setAction('keep')} disabled={disabled}>
+                        Keep it
+                    </Button>
+                </div>
+            ) : (
+                <div className="flex items-center gap-2">
+                    <Input
+                        id="tool-secret"
+                        type="password"
+                        placeholder={hasSecret ? 'New secret' : 'Leave empty to send unsigned requests'}
+                        autoComplete="new-password"
+                        maxLength={VOICE_WEBHOOK_LIMITS.secretMax}
+                        className="min-w-0 flex-1"
+                        {...form.register('secret.value')}
+                    />
+                    {hasSecret ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setAction('keep')}
+                            disabled={disabled}
+                        >
+                            Cancel
+                        </Button>
+                    ) : null}
+                </div>
+            )}
+            <FieldDescription className="text-xs">
+                With a secret, each request carries <code className="font-mono">X-Aixel-Signature: sha256=…</code>, an
+                HMAC-SHA256 of the body, so your server can tell it came from us. It is never shown again.
+            </FieldDescription>
+        </Field>
+    );
+}
+
 /** Add or edit a custom tool, and send it a test request before saving. */
 export function WebhookToolDialog({ agentId, open, tool, otherNames, onOpenChange, onSaved }: WebhookToolDialogProps) {
-    const initial = useMemo(() => toolToDraft(tool), [tool]);
-    const [draft, setDraft] = useState<WebhookToolDraft>(initial);
+    const hasSecret = tool?.hasSecret ?? false;
+    const namesKey = otherNames.join(',');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuilt when the names change, not the array
+    const schema = useMemo(() => webhookToolFormSchema(hasSecret, otherNames), [hasSecret, namesKey]);
+    const form = useForm({ resolver: zodResolver(schema), defaultValues: webhookToolFormValues(tool) });
     const [error, setError] = useState<string | null>(null);
-    const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
     const [testResult, setTestResult] = useState<VoiceWebhookTestResult | null>(null);
+    const saving = form.formState.isSubmitting;
+    const dirty = form.formState.isDirty;
+    const busy = saving || testing;
 
     // A fresh form each time the dialog opens.
     useEffect(() => {
         if (!open) return;
-        setDraft(initial);
+        form.reset(webhookToolFormValues(tool));
         setError(null);
         setTestResult(null);
-    }, [open, initial]);
-
-    const dirty = !sameDraft(draft, initial);
-    const busy = saving || testing;
-    const set = (patch: Partial<WebhookToolDraft>) => setDraft((d) => ({ ...d, ...patch }));
+    }, [open, tool, form]);
 
     const close = (next: boolean) => {
         if (!next && saving) return;
         onOpenChange(next);
     };
 
-    const submit = async (event: FormEvent) => {
-        event.preventDefault();
-        const problem = webhookDraftError(draft, otherNames);
-        if (problem) {
-            setError(problem);
-            return;
-        }
-        setError(null);
-        setSaving(true);
-        const input = draftToInput(draft);
-        const response = tool
-            ? await updateVoiceAgentWebhookTool(agentId, tool.id, input)
-            : await createVoiceAgentWebhookTool(agentId, input);
-        setSaving(false);
-        if (!response.success || !response.data) {
-            setError(response.error ?? 'Could not save the tool');
-            return;
-        }
-        onSaved(response.data);
-        toast.success(tool ? 'Tool saved' : 'Tool added');
-        onOpenChange(false);
-    };
+    const submit = form.handleSubmit(
+        async (input) => {
+            setError(null);
+            const response = tool
+                ? await updateVoiceAgentWebhookTool(agentId, tool.id, input)
+                : await createVoiceAgentWebhookTool(agentId, input);
+            if (!response.success || !response.data) {
+                setError(response.error ?? 'Could not save the tool');
+                return;
+            }
+            onSaved(response.data);
+            toast.success(tool ? 'Tool saved' : 'Tool added');
+            onOpenChange(false);
+        },
+        () => setError(schemaProblem(schema, form.getValues())),
+    );
 
+    /** A test needs a working name, URL and parameters, not the description yet. */
     const sendTest = async () => {
-        const problem = webhookDraftError(draft, otherNames, true);
-        if (problem) {
-            setError(problem);
-            return;
-        }
-        setError(null);
+        const { name, url, parameters, secret } = form.getValues();
+        const input = { name, url, parameters, secret: webhookSecretInput(secret) };
+        const problem = schemaProblem(webhookTestSchema, input);
+        setError(problem);
+        if (problem) return;
         setTesting(true);
         setTestResult(null);
-        const response = await sendVoiceAgentWebhookTest(agentId, { toolId: tool?.id ?? null, tool: draftToInput(draft) });
+        const response = await sendVoiceAgentWebhookTest(agentId, { toolId: tool?.id ?? null, tool: input });
         setTesting(false);
         if (!response.success || !response.data) {
             setError(response.error ?? 'Could not send the test request');
@@ -170,157 +246,67 @@ export function WebhookToolDialog({ agentId, open, tool, otherNames, onOpenChang
                     </DialogDescription>
                 </DialogHeader>
 
-                <form id="webhook-tool-form" onSubmit={submit} className="grid min-w-0 gap-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="tool-name">Name</Label>
-                        <Input
+                <FormProvider {...form}>
+                    <form id="webhook-tool-form" onSubmit={submit} className="grid min-w-0 gap-4" noValidate>
+                        <StringControlledField
+                            name="name"
                             id="tool-name"
-                            value={draft.name}
-                            onChange={(e) => set({ name: e.target.value })}
+                            label="Name"
                             placeholder="check_order"
-                            autoComplete="off"
-                            spellCheck={false}
-                            maxLength={40}
-                            disabled={busy}
-                            className="font-mono text-base md:text-[13px]"
+                            description="Lowercase letters, numbers and _. The agent sees this name."
+                            classNames={{ input: 'font-mono text-base md:text-[13px]', description: 'text-xs' }}
+                            inputProps={{ autoComplete: 'off', spellCheck: false, maxLength: 40 }}
                         />
-                        <p className="text-muted-foreground text-xs">
-                            Lowercase letters, numbers and _. The agent sees this name.
-                        </p>
-                    </div>
-
-                    <div className="grid gap-2">
-                        <Label htmlFor="tool-description">When should the agent use this?</Label>
-                        <Textarea
+                        <StringControlledField
+                            name="description"
                             id="tool-description"
-                            value={draft.description}
-                            onChange={(e) => set({ description: e.target.value })}
+                            label="When should the agent use this?"
+                            metadata={ZodMetaType.TEXT_AREA}
                             placeholder="When the caller asks where their order is. Ask for the order number first."
-                            maxLength={VOICE_WEBHOOK_LIMITS.descriptionMax}
-                            disabled={busy}
-                            className="min-h-20"
+                            classNames={{ input: 'min-h-20' }}
                         />
-                    </div>
-
-                    <div className="grid gap-2">
-                        <Label htmlFor="tool-url">URL</Label>
-                        <Input
+                        <StringControlledField
+                            name="url"
                             id="tool-url"
+                            label="URL"
                             type="url"
-                            inputMode="url"
-                            value={draft.url}
-                            onChange={(e) => set({ url: e.target.value })}
                             placeholder="https://example.com/hooks/check-order"
-                            autoComplete="off"
-                            spellCheck={false}
-                            maxLength={VOICE_WEBHOOK_LIMITS.urlMax}
-                            disabled={busy}
+                            description={`We send a POST with JSON and wait up to ${VOICE_WEBHOOK_LIMITS.timeoutMs / 1000} seconds for the answer.`}
+                            classNames={{ description: 'text-xs' }}
+                            inputProps={{
+                                inputMode: 'url',
+                                autoComplete: 'off',
+                                spellCheck: false,
+                                maxLength: VOICE_WEBHOOK_LIMITS.urlMax,
+                            }}
                         />
-                        <p className="text-muted-foreground text-xs">
-                            We send a POST with JSON and wait up to {VOICE_WEBHOOK_LIMITS.timeoutMs / 1000} seconds for
-                            the answer.
-                        </p>
-                    </div>
 
-                    <div className="grid gap-2">
-                        <p className="text-sm leading-none font-medium">Parameters</p>
-                        <WebhookParamRows params={draft.params} onChange={(params) => set({ params })} disabled={busy} />
-                    </div>
+                        <Field>
+                            <FieldTitle>Parameters</FieldTitle>
+                            <WebhookParamRows disabled={busy} />
+                        </Field>
 
-                    <div className="grid gap-2" data-testid="tool-secret">
-                        <Label htmlFor="tool-secret">
-                            Signing secret <span className="text-muted-foreground font-normal">(optional)</span>
-                        </Label>
-                        {draft.secretMode === 'keep' ? (
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="inline-flex items-center gap-1.5 text-sm" data-testid="tool-secret-set">
-                                    <KeyRound className="text-muted-foreground size-4" />
-                                    Secret set
-                                </span>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => set({ secretMode: 'set', secretValue: '' })}
-                                    disabled={busy}
-                                >
-                                    Replace
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive"
-                                    onClick={() => set({ secretMode: 'clear' })}
-                                    disabled={busy}
-                                >
-                                    Remove
-                                </Button>
-                            </div>
-                        ) : draft.secretMode === 'clear' ? (
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm">The secret is removed when you save.</span>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => set({ secretMode: 'keep' })}
-                                    disabled={busy}
-                                >
-                                    Keep it
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    id="tool-secret"
-                                    type="password"
-                                    value={draft.secretValue}
-                                    onChange={(e) => set({ secretValue: e.target.value })}
-                                    placeholder={draft.hasSecret ? 'New secret' : 'Leave empty to send unsigned requests'}
-                                    autoComplete="new-password"
-                                    maxLength={VOICE_WEBHOOK_LIMITS.secretMax}
-                                    disabled={busy}
-                                    className="min-w-0 flex-1"
-                                />
-                                {draft.hasSecret ? (
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => set({ secretMode: 'keep', secretValue: '' })}
-                                        disabled={busy}
-                                    >
-                                        Cancel
-                                    </Button>
-                                ) : null}
-                            </div>
-                        )}
-                        <p className="text-muted-foreground text-xs">
-                            With a secret, each request carries{' '}
-                            <code className="font-mono">X-Aixel-Signature: sha256=…</code>, an HMAC-SHA256 of the body,
-                            so your server can tell it came from us. It is never shown again.
-                        </p>
-                    </div>
+                        <SecretField hasSecret={hasSecret} disabled={busy} />
 
-                    <div className="grid gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="justify-self-start"
-                            onClick={() => void sendTest()}
-                            disabled={busy}
-                        >
-                            {testing ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                            {testing ? 'Sending…' : 'Send test request'}
-                        </Button>
-                        <p className="text-muted-foreground text-xs">
-                            Sends example values for each parameter, exactly as a call would. Nothing is saved.
-                        </p>
-                        {testResult ? <TestResult result={testResult} /> : null}
-                    </div>
-                </form>
+                        <Field>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="justify-self-start"
+                                onClick={() => void sendTest()}
+                                disabled={busy}
+                            >
+                                {testing ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                                {testing ? 'Sending…' : 'Send test request'}
+                            </Button>
+                            <FieldDescription className="text-xs">
+                                Sends example values for each parameter, exactly as a call would. Nothing is saved.
+                            </FieldDescription>
+                            {testResult ? <TestResult result={testResult} /> : null}
+                        </Field>
+                    </form>
+                </FormProvider>
 
                 {error ? (
                     <p className="text-destructive text-sm" role="alert" data-testid="tool-error">

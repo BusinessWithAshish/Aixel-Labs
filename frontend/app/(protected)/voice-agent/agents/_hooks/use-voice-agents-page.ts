@@ -2,27 +2,34 @@
 
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import type { VoiceAgent, VoiceAgentCallType, VoiceAgentVoice } from '@aixellabs/backend/db/types';
+import type { VoiceAgent, VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import { createVoiceAgent } from '@/app/actions/voice-agent-actions';
 import { DEFAULT_VOICE_AGENT_NAME, DEFAULT_VOICE_AGENT_VOICE } from '@/helpers/voice-agent-defaults';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
+import { voiceAgentSchema } from '@/helpers/voice-schemas';
 
-export function useVoiceAgentsPage(initialAgents: VoiceAgent[]) {
+/** What the create dialog asks for once the call type is picked; the rest starts from that type's defaults. */
+const newAgentSchema = voiceAgentSchema.pick({ name: true, voice: true });
+const NEW_AGENT = { name: DEFAULT_VOICE_AGENT_NAME, voice: DEFAULT_VOICE_AGENT_VOICE };
+
+export function useVoiceAgentsPage(agents: VoiceAgent[]) {
     const router = useRouter();
     const [createOpen, setCreateOpen] = useState(false);
     /** null = the dialog's first step: pick inbound or outbound. */
     const [newCallType, setNewCallType] = useState<VoiceAgentCallType | null>(null);
-    const [newName, setNewName] = useState(DEFAULT_VOICE_AGENT_NAME);
-    const [newVoice, setNewVoice] = useState<VoiceAgentVoice>(DEFAULT_VOICE_AGENT_VOICE);
-    const [creating, setCreating] = useState(false);
+    const createForm = useForm({ resolver: zodResolver(newAgentSchema), defaultValues: NEW_AGENT, mode: 'onChange' });
+    /** Set once the agent exists, while the browser goes to it. */
+    const [opening, setOpening] = useState(false);
+    const creating = createForm.formState.isSubmitting || opening;
 
     const openCreate = useCallback(() => {
         setNewCallType(null);
-        setNewName(DEFAULT_VOICE_AGENT_NAME);
-        setNewVoice(DEFAULT_VOICE_AGENT_VOICE);
+        createForm.reset(NEW_AGENT);
         setCreateOpen(true);
-    }, []);
+    }, [createForm]);
 
     const onCreateOpenChange = useCallback(
         (open: boolean) => {
@@ -32,30 +39,26 @@ export function useVoiceAgentsPage(initialAgents: VoiceAgent[]) {
         [creating],
     );
 
-    const createAgent = useCallback(async () => {
-        if (!newCallType || !newName.trim() || creating) return;
-        setCreating(true);
-        const response = await createVoiceAgent({ callType: newCallType, name: newName, voice: newVoice });
+    const createAgent = createForm.handleSubmit(async (values) => {
+        if (!newCallType) return;
+        const response = await createVoiceAgent({ callType: newCallType, ...values });
         if (!response.success || !response.data?._id) {
             toast.error(response.error ?? 'Could not create the agent');
-            setCreating(false);
             return;
         }
+        setOpening(true);
         toast.success('Agent created');
         router.push(voiceAgentUrl(response.data._id));
-    }, [creating, newCallType, newName, newVoice, router]);
+    });
 
     return {
-        agents: initialAgents,
+        agents,
         createOpen,
         openCreate,
         onCreateOpenChange,
         newCallType,
         setNewCallType,
-        newName,
-        setNewName,
-        newVoice,
-        setNewVoice,
+        createForm,
         creating,
         createAgent,
     };

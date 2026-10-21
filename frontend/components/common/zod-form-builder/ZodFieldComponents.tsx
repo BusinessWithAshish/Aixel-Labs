@@ -19,6 +19,8 @@ import { OptionGroupType, SearchableGroupedMultiSelect } from '@/components/ui/s
 
 export type BaseZodFieldProps = {
     name: string;
+    /** The control's DOM id (the label points at it). Defaults to `name`. */
+    id?: string;
     label?: string;
     description?: string;
     invalid?: boolean;
@@ -40,20 +42,23 @@ export type ZodStringFieldProps = BaseZodFieldProps & {
     value?: string;
     onChange?: (value: string) => void;
     type?: React.HTMLInputTypeAttribute;
+    /** Anything else for the input itself (autoComplete, inputMode, spellCheck, maxLength…). */
+    inputProps?: Omit<React.ComponentProps<'input'>, 'id' | 'value' | 'onChange' | 'type' | 'placeholder'>;
 };
 
-export const ZodStringField = ({ name, label, description, value, invalid, errors, onChange, required, disabled, className, classNames, orientation, placeholder, type }: ZodStringFieldProps) => {
+export const ZodStringField = ({ name, id, label, description, value, invalid, errors, onChange, required, disabled, className, classNames, orientation, placeholder, type, inputProps }: ZodStringFieldProps) => {
 
     return (
         <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
-            <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+            <FieldLabel required={required} htmlFor={id ?? name} className={classNames?.label}>
                 {label ?? generateFieldLabel(name)}
             </FieldLabel>
             {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
             <Input
+                {...inputProps}
                 value={value}
                 onChange={(e) => onChange?.(e.target.value)}
-                id={name}
+                id={id ?? name}
                 type={type}
                 aria-invalid={invalid}
                 placeholder={placeholder ?? `Type ${label?.toLowerCase()}`}
@@ -74,6 +79,7 @@ export type ZodTextAreaFieldProps = BaseZodFieldProps & {
 
 export const ZodTextAreaField = ({
     name,
+    id,
     label,
     description,
     value,
@@ -89,14 +95,14 @@ export const ZodTextAreaField = ({
 }: ZodTextAreaFieldProps) => {
     return (
         <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
-            <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+            <FieldLabel required={required} htmlFor={id ?? name} className={classNames?.label}>
                 {label ?? generateFieldLabel(name)}
             </FieldLabel>
             {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
             <Textarea
                 value={value}
                 onChange={(e) => onChange?.(e.target.value)}
-                id={name}
+                id={id ?? name}
                 aria-invalid={invalid}
                 placeholder={placeholder ?? `Type ${label?.toLowerCase()}`}
                 required={required}
@@ -119,6 +125,7 @@ export type ZodNumberFieldProps = BaseZodFieldProps & {
 
 export const ZodNumberField = ({
     name,
+    id,
     label,
     description,
     value,
@@ -140,7 +147,7 @@ export const ZodNumberField = ({
 
     return (
         <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
-            <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+            <FieldLabel required={required} htmlFor={id ?? name} className={classNames?.label}>
                 {label ?? generateFieldLabel(name)}
             </FieldLabel>
             {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
@@ -148,7 +155,7 @@ export const ZodNumberField = ({
                 value={displayValue}
                 onChange={(e) => onChange?.(e.target.valueAsNumber)}
                 type="number"
-                id={name}
+                id={id ?? name}
                 aria-invalid={invalid}
                 placeholder={placeholder ?? `Type ${label?.toLowerCase()}`}
                 required={required}
@@ -171,6 +178,7 @@ export type ZodColorPickerFieldProps = BaseZodFieldProps & {
 
 export const ZodColorPicker = ({
     name,
+    id,
     label,
     description,
     value,
@@ -236,7 +244,7 @@ export const ZodColorPicker = ({
     return (
         <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
             <FieldContent>
-                <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                <FieldLabel required={required} htmlFor={id ?? name} className={classNames?.label}>
                     {fieldLabel}
                 </FieldLabel>
                 {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
@@ -264,7 +272,7 @@ export const ZodColorPicker = ({
                 <PopoverContent className="space-y-4">
                     <Input
                         type="color"
-                        id={name}
+                        id={id ?? name}
                         value={colorValue}
                         onChange={(e) => onChange?.(e.target.value)}
                         className="h-10 rounded-2xl w-16 cursor-pointer border-none bg-transparent p-0"
@@ -342,6 +350,7 @@ export type ZodCheckboxFieldProps = BaseZodFieldProps & {
 
 export const ZodCheckboxField = ({
     name,
+    id,
     label,
     description,
     value,
@@ -356,12 +365,12 @@ export const ZodCheckboxField = ({
 }: ZodCheckboxFieldProps) => (
     <Field orientation={orientation ?? 'horizontal'} data-invalid={invalid} className={className} data-disabled={disabled}>
         <FieldContent>
-            <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+            <FieldLabel required={required} htmlFor={id ?? name} className={classNames?.label}>
                 {label ?? generateFieldLabel(name)}
             </FieldLabel>
             {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
         </FieldContent>
-        <Checkbox id={name} name={name} checked={value} onCheckedChange={onChange} />
+        <Checkbox id={id ?? name} name={name} checked={value} onCheckedChange={onChange} />
         {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
     </Field>
 );
@@ -373,6 +382,7 @@ export type ZodSwitchFieldProps = BaseZodFieldProps & {
 
 export const ZodSwitchField = ({
     name,
+    id,
     label,
     description,
     value,
@@ -387,12 +397,12 @@ export const ZodSwitchField = ({
 }: ZodSwitchFieldProps) => (
     <Field orientation={orientation ?? 'horizontal'} data-invalid={invalid} className={className} data-disabled={disabled}>
         <FieldContent>
-            <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+            <FieldLabel required={required} htmlFor={id ?? name} className={classNames?.label}>
                 {label ?? generateFieldLabel(name)}
             </FieldLabel>
             {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
         </FieldContent>
-        <Switch id={name} name={name} checked={value} onCheckedChange={onChange} />
+        <Switch id={id ?? name} name={name} checked={value} onCheckedChange={onChange} />
         {invalid && errors && <FieldError errors={[errors]} className={classNames?.error} />}
     </Field>
 );
@@ -409,6 +419,7 @@ export type ZodSelectFieldProps = BaseZodFieldProps & {
 
 export const ZodSelectField = ({
     name,
+    id,
     description,
     value,
     invalid,
@@ -433,13 +444,16 @@ export const ZodSelectField = ({
     return (
         <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
             <FieldContent>
-                <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                <FieldLabel required={required} htmlFor={id ?? name} className={classNames?.label}>
                     {fieldLabel}
                 </FieldLabel>
                 {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
             </FieldContent>
             <Select name={name} value={selectedValue} onValueChange={onChange} disabled={disabled} aria-disabled={disabled}>
-                <SelectTrigger className={cn('w-full', classNames?.input, '[&_.select-clear-icon]:pointer-events-auto')}>
+                <SelectTrigger
+                    id={id ?? name}
+                    className={cn('w-full', classNames?.input, '[&_.select-clear-icon]:pointer-events-auto')}
+                >
                     <SelectValue
                         className="flex-1 truncate text-left"
                         placeholder={placeholder ?? `Select ${fieldLabel.toLowerCase()}`}
@@ -483,6 +497,7 @@ export type ZodSearchableSelectFieldProps = BaseZodFieldProps & {
 
 export const ZodSearchableSelectField = ({
     name,
+    id,
     description,
     value,
     invalid,
@@ -501,7 +516,7 @@ export const ZodSearchableSelectField = ({
     return (
         <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
             <FieldContent>
-                <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                <FieldLabel required={required} htmlFor={id ?? name} className={classNames?.label}>
                     {fieldLabel}
                 </FieldLabel>
                 {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
@@ -527,6 +542,7 @@ export type ZodSearchableMultiSelectFieldProps = BaseZodFieldProps & {
 
 export const ZodSearchableMultiSelectField = ({
     name,
+    id,
     description,
     values,
     invalid,
@@ -545,7 +561,7 @@ export const ZodSearchableMultiSelectField = ({
     return (
         <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
             <FieldContent>
-                <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                <FieldLabel required={required} htmlFor={id ?? name} className={classNames?.label}>
                     {fieldLabel}
                 </FieldLabel>
                 {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}
@@ -709,6 +725,7 @@ export type ZodSearchableGroupedMultiSelectFieldProps = BaseZodFieldProps & {
 
 export const ZodSearchableGroupedMultiSelectField = ({
     name,
+    id,
     description,
     values,
     invalid,
@@ -727,7 +744,7 @@ export const ZodSearchableGroupedMultiSelectField = ({
     return (
         <Field orientation={orientation} data-invalid={invalid} className={className} data-disabled={disabled}>
             <FieldContent>
-                <FieldLabel required={required} htmlFor={name} className={classNames?.label}>
+                <FieldLabel required={required} htmlFor={id ?? name} className={classNames?.label}>
                     {fieldLabel}
                 </FieldLabel>
                 {description && <FieldDescription className={classNames?.description}>{description}</FieldDescription>}

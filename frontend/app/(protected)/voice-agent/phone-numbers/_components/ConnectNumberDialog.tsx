@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
+import { Controller, FormProvider, useForm, useFormContext } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { z } from 'zod';
 import { VoiceProvider } from '@aixellabs/backend/db/types';
 import {
     connectTelnyx,
@@ -19,10 +22,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePage } from '@/contexts/PageStore';
-import { cn } from '@/lib/utils';
+import { RadioCards } from '@/components/wrappers/RadioCards';
 import { NUMBER_PROVIDER_ORDER, numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
 import { setupGuideFor, TELNYX_GUIDE_STEP, TWILIO_GUIDE_STEP } from '../_utils/setup-guides';
@@ -30,12 +34,56 @@ import { setupGuideFor, TELNYX_GUIDE_STEP, TWILIO_GUIDE_STEP } from '../_utils/s
 const FORM_ID = 'connect-number-form';
 
 /** How the customer signs us in to Twilio: an API key (recommended) or the account's Auth Token. */
-type TwilioAuthMode = 'apiKey' | 'authToken';
+const TWILIO_AUTH_MODES = [
+    { value: 'apiKey', title: 'API key (recommended)', description: 'Can be deleted without changing anything else.' },
+    { value: 'authToken', title: 'Auth Token', description: 'The account’s own secret.' },
+] as const;
 
-const TWILIO_AUTH_MODES: { value: TwilioAuthMode; label: string }[] = [
-    { value: 'apiKey', label: 'API key (recommended)' },
-    { value: 'authToken', label: 'Auth Token' },
-];
+const PROVIDER_OPTIONS = NUMBER_PROVIDER_ORDER.map((provider) => {
+    const { label, region } = numberProviderInfo(provider);
+    return { value: provider, title: label, description: region };
+});
+
+/** What the credentials step needs filled in before it can look up numbers (the server checks the rest). */
+const credentialsSchema = z
+    .object({
+        provider: z.nativeEnum(VoiceProvider),
+        apiKey: z.string().trim(),
+        apiToken: z.string().trim(),
+        clientId: z.string().trim(),
+        accountSid: z.string().trim(),
+        authMode: z.enum(['apiKey', 'authToken']),
+        apiKeySid: z.string().trim(),
+        secret: z.string().trim(),
+    })
+    .superRefine((c, ctx) => {
+        const missing = (field: keyof typeof c, message: string) =>
+            !c[field] && ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [field] });
+        if (c.provider === VoiceProvider.TELNYX) missing('apiKey', 'Paste your Telnyx API key');
+        if (c.provider === VoiceProvider.VOICELINK) missing('apiToken', 'Paste your VoiceLink API token');
+        if (c.provider === VoiceProvider.TWILIO) {
+            missing('accountSid', 'Paste your Twilio Account SID');
+            if (c.authMode === 'apiKey') missing('apiKeySid', 'Paste the API key SID');
+            missing('secret', c.authMode === 'apiKey' ? 'Paste the API key secret' : 'Paste the Auth Token');
+        }
+    });
+
+type Credentials = z.infer<typeof credentialsSchema>;
+
+const NO_CREDENTIALS: Credentials = {
+    provider: VoiceProvider.TELNYX,
+    apiKey: '',
+    apiToken: '',
+    clientId: '',
+    accountSid: '',
+    authMode: 'apiKey',
+    apiKeySid: '',
+    secret: '',
+};
+
+function twilioCredentials(c: Credentials): TwilioCredentials {
+    return { accountSid: c.accountSid, apiKeySid: c.authMode === 'apiKey' ? c.apiKeySid : null, secret: c.secret };
+}
 
 /** Where each provider keeps what the form asks for, and what to call it. */
 const CREDENTIAL_WORDS: Record<VoiceProvider, { secret: string; another: string }> = {
@@ -64,112 +112,79 @@ function GuideLink({ onClick }: { onClick: () => void }) {
     );
 }
 
-function ProviderPicker({
-    value,
-    disabled,
-    onChange,
-}: {
-    value: VoiceProvider;
-    disabled: boolean;
-    onChange: (provider: VoiceProvider) => void;
-}) {
+type CredentialFieldProps = {
+    name: keyof Credentials;
+    id: string;
+    label: React.ReactNode;
+    hint?: React.ReactNode;
+    /** Opens the provider's setup guide at the step that explains this field. */
+    onGuide?: () => void;
+    secret?: boolean;
+} & Pick<React.ComponentProps<'input'>, 'placeholder' | 'inputMode'>;
+
+/** One credential: label (with the guide link when there is one), the input, a hint on where to find it. */
+function CredentialField({ name, id, label, hint, onGuide, secret, ...inputProps }: CredentialFieldProps) {
+    const { register } = useFormContext<Credentials>();
     return (
-        <div role="radiogroup" aria-label="Phone provider" className="grid gap-2 sm:grid-cols-3">
-            {NUMBER_PROVIDER_ORDER.map((provider) => {
-                const { label, region } = numberProviderInfo(provider);
-                const checked = value === provider;
-                return (
-                    <button
-                        key={provider}
-                        type="button"
-                        role="radio"
-                        aria-checked={checked}
-                        aria-label={label}
-                        disabled={disabled}
-                        onClick={() => onChange(provider)}
-                        className={cn(
-                            'flex min-w-0 flex-col gap-0.5 rounded-lg border p-3 text-left transition-colors outline-none',
-                            'hover:bg-accent/50 focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-                            'disabled:pointer-events-none disabled:opacity-50',
-                            checked ? 'border-primary bg-primary/5 ring-primary ring-1' : 'border-border',
-                        )}
-                    >
-                        <span className="text-sm font-medium">{label}</span>
-                        <span className="text-muted-foreground text-xs">{region}</span>
-                    </button>
-                );
-            })}
-        </div>
+        <Field>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <FieldLabel htmlFor={id}>{label}</FieldLabel>
+                {onGuide ? <GuideLink onClick={onGuide} /> : null}
+            </div>
+            <Input
+                id={id}
+                type={secret ? 'password' : 'text'}
+                autoComplete="off"
+                spellCheck={false}
+                {...inputProps}
+                {...register(name)}
+            />
+            {hint ? <FieldDescription className="text-xs">{hint}</FieldDescription> : null}
+        </Field>
     );
 }
 
 export function ConnectNumberDialog() {
     const { connectOpen, setConnectOpen, addImported, openSetupGuide } = usePage<UsePhoneNumbersPageReturn>();
-    const [provider, setProvider] = useState<VoiceProvider>(VoiceProvider.TELNYX);
-    const [apiKey, setApiKey] = useState('');
-    const [apiToken, setApiToken] = useState('');
-    const [clientId, setClientId] = useState('');
-    const [twilioAccountSid, setTwilioAccountSid] = useState('');
-    const [twilioAuthMode, setTwilioAuthMode] = useState<TwilioAuthMode>('apiKey');
-    const [twilioKeySid, setTwilioKeySid] = useState('');
-    const [twilioSecret, setTwilioSecret] = useState('');
+    const form = useForm({ resolver: zodResolver(credentialsSchema), defaultValues: NO_CREDENTIALS, mode: 'onChange' });
     const [accountNumbers, setAccountNumbers] = useState<AccountNumber[] | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [error, setError] = useState<string | null>(null);
-    const [busy, setBusy] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const busy = form.formState.isSubmitting || importing;
 
+    const provider = form.watch('provider');
+    const authMode = form.watch('authMode');
     const isVoiceLink = provider === VoiceProvider.VOICELINK;
     const isTwilio = provider === VoiceProvider.TWILIO;
     const { label } = numberProviderInfo(provider);
     const words = CREDENTIAL_WORDS[provider];
-    const twilioReady =
-        !!twilioAccountSid.trim() && !!twilioSecret.trim() && (twilioAuthMode === 'authToken' || !!twilioKeySid.trim());
-    const credentialsReady = isTwilio ? twilioReady : isVoiceLink ? !!apiToken.trim() : !!apiKey.trim();
-    const hasSetupGuide = !!setupGuideFor(provider);
-    const twilioCredentials = (): TwilioCredentials => ({
-        accountSid: twilioAccountSid,
-        apiKeySid: twilioAuthMode === 'apiKey' ? twilioKeySid : null,
-        secret: twilioSecret,
-    });
+    const guide = (step: string) => (setupGuideFor(provider) ? () => openSetupGuide(provider, step) : undefined);
 
     /** Back to the key / token step, keeping the provider choice. */
     const resetCredentials = () => {
-        setApiKey('');
-        setApiToken('');
-        setClientId('');
-        setTwilioAccountSid('');
-        setTwilioAuthMode('apiKey');
-        setTwilioKeySid('');
-        setTwilioSecret('');
+        form.reset({ ...NO_CREDENTIALS, provider: form.getValues('provider') });
         setAccountNumbers(null);
         setSelected(new Set());
         setError(null);
-        setBusy(false);
     };
 
     const onOpenChange = (open: boolean) => {
         setConnectOpen(open);
         if (!open) {
             resetCredentials();
-            setProvider(VoiceProvider.TELNYX);
+            form.reset(NO_CREDENTIALS);
         }
     };
 
-    const chooseProvider = (next: VoiceProvider) => {
-        setProvider(next);
+    const findNumbers = form.handleSubmit(async (c) => {
         setError(null);
-    };
-
-    const findNumbers = async (event: FormEvent) => {
-        event.preventDefault();
-        setBusy(true);
-        setError(null);
-        const res = isTwilio
-            ? await connectTwilio(twilioCredentials())
-            : isVoiceLink
-              ? await connectVoiceLink({ apiToken, clientId })
-              : await connectTelnyx(apiKey);
-        setBusy(false);
+        const res =
+            c.provider === VoiceProvider.TWILIO
+                ? await connectTwilio(twilioCredentials(c))
+                : c.provider === VoiceProvider.VOICELINK
+                  ? await connectVoiceLink({ apiToken: c.apiToken, clientId: c.clientId })
+                  : await connectTelnyx(c.apiKey);
         if (!res.success || !res.data) {
             setError(res.error ?? `Could not reach ${label}`);
             return;
@@ -182,18 +197,19 @@ export function ConnectNumberDialog() {
                     .map((n) => n.providerNumberId),
             ),
         );
-    };
+    });
 
     const importSelected = async () => {
-        setBusy(true);
-        setError(null);
+        const c = form.getValues();
         const ids = [...selected];
+        setImporting(true);
+        setError(null);
         const res = isTwilio
-            ? await importTwilioNumbers(twilioCredentials(), ids)
+            ? await importTwilioNumbers(twilioCredentials(c), ids)
             : isVoiceLink
-              ? await importVoiceLinkNumbers({ apiToken, clientId }, ids)
-              : await importTelnyxNumbers(apiKey, ids);
-        setBusy(false);
+              ? await importVoiceLinkNumbers({ apiToken: c.apiToken, clientId: c.clientId }, ids)
+              : await importTelnyxNumbers(c.apiKey, ids);
+        setImporting(false);
         if (!res.success || !res.data) {
             setError(res.error ?? 'Could not import the numbers');
             return;
@@ -227,175 +243,124 @@ export function ConnectNumberDialog() {
                 </DialogHeader>
 
                 {accountNumbers === null ? (
-                    <form id={FORM_ID} onSubmit={findNumbers} className="flex min-w-0 flex-col gap-4">
-                        <ProviderPicker value={provider} disabled={busy} onChange={chooseProvider} />
-
-                        {isTwilio ? (
-                            <>
-                                <div className="flex flex-col gap-2">
-                                    <Label htmlFor="twilio-account-sid">Account SID</Label>
-                                    <Input
-                                        id="twilio-account-sid"
-                                        autoComplete="off"
-                                        spellCheck={false}
-                                        placeholder="AC…"
-                                        value={twilioAccountSid}
-                                        onChange={(event) => setTwilioAccountSid(event.target.value)}
+                    <FormProvider {...form}>
+                        <form id={FORM_ID} onSubmit={findNumbers} className="flex min-w-0 flex-col gap-4">
+                            <Controller
+                                control={form.control}
+                                name="provider"
+                                render={({ field }) => (
+                                    <RadioCards
+                                        value={field.value}
+                                        onValueChange={(next) => {
+                                            field.onChange(next);
+                                            setError(null);
+                                        }}
+                                        options={PROVIDER_OPTIONS}
+                                        disabled={busy}
+                                        aria-label="Phone provider"
+                                        className="sm:grid-cols-3"
                                     />
-                                    <p className="text-muted-foreground text-xs">
-                                        On the Twilio Console home page, under Account Info.
-                                    </p>
-                                </div>
-                                <div role="radiogroup" aria-label="Sign in with" className="grid grid-cols-2 gap-2">
-                                    {TWILIO_AUTH_MODES.map((mode) => {
-                                        const checked = twilioAuthMode === mode.value;
-                                        return (
-                                            <button
-                                                key={mode.value}
-                                                type="button"
-                                                role="radio"
-                                                aria-checked={checked}
-                                                disabled={busy}
-                                                onClick={() => setTwilioAuthMode(mode.value)}
-                                                className={cn(
-                                                    'rounded-md border px-3 py-2 text-left text-sm transition-colors outline-none',
-                                                    'hover:bg-accent/50 focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-                                                    'disabled:pointer-events-none disabled:opacity-50',
-                                                    checked
-                                                        ? 'border-primary bg-primary/5 ring-primary ring-1'
-                                                        : 'border-border',
-                                                )}
-                                            >
-                                                {mode.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                {twilioAuthMode === 'apiKey' ? (
-                                    <>
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                                                <Label htmlFor="twilio-api-key-sid">API key SID</Label>
-                                                {hasSetupGuide ? (
-                                                    <GuideLink
-                                                        onClick={() => openSetupGuide(provider, TWILIO_GUIDE_STEP.API_KEY)}
-                                                    />
-                                                ) : null}
-                                            </div>
-                                            <Input
-                                                id="twilio-api-key-sid"
-                                                autoComplete="off"
-                                                spellCheck={false}
-                                                placeholder="SK…"
-                                                value={twilioKeySid}
-                                                onChange={(event) => setTwilioKeySid(event.target.value)}
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-2">
-                                            <Label htmlFor="twilio-secret">API key secret</Label>
-                                            <Input
-                                                id="twilio-secret"
-                                                type="password"
-                                                autoComplete="off"
-                                                spellCheck={false}
-                                                value={twilioSecret}
-                                                onChange={(event) => setTwilioSecret(event.target.value)}
-                                            />
-                                            <p className="text-muted-foreground text-xs">
-                                                Twilio Console: Account, API keys &amp; tokens, Create API key (Restricted,
-                                                with the permissions in the guide). Twilio shows the secret only once.
-                                            </p>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                                            <Label htmlFor="twilio-secret">Auth Token</Label>
-                                            {hasSetupGuide ? (
-                                                <GuideLink
-                                                    onClick={() => openSetupGuide(provider, TWILIO_GUIDE_STEP.ACCOUNT_SID)}
-                                                />
-                                            ) : null}
-                                        </div>
-                                        <Input
-                                            id="twilio-secret"
-                                            type="password"
-                                            autoComplete="off"
-                                            spellCheck={false}
-                                            value={twilioSecret}
-                                            onChange={(event) => setTwilioSecret(event.target.value)}
-                                        />
-                                        <p className="text-muted-foreground text-xs">
-                                            Next to the Account SID on the Console home page. An API key is safer: you can
-                                            delete it without changing anything else.
-                                        </p>
-                                    </div>
                                 )}
-                            </>
-                        ) : isVoiceLink ? (
-                            <>
-                                <div className="flex flex-col gap-2">
-                                    <Label htmlFor="voicelink-api-token">VoiceLink API token</Label>
-                                    <Input
+                            />
+
+                            {isTwilio ? (
+                                <>
+                                    <CredentialField
+                                        name="accountSid"
+                                        id="twilio-account-sid"
+                                        label="Account SID"
+                                        placeholder="AC…"
+                                        hint="On the Twilio Console home page, under Account Info."
+                                    />
+                                    <Controller
+                                        control={form.control}
+                                        name="authMode"
+                                        render={({ field }) => (
+                                            <RadioCards
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                                options={TWILIO_AUTH_MODES}
+                                                disabled={busy}
+                                                aria-label="Sign in with"
+                                                className="grid-cols-2"
+                                            />
+                                        )}
+                                    />
+                                    {authMode === 'apiKey' ? (
+                                        <>
+                                            <CredentialField
+                                                name="apiKeySid"
+                                                id="twilio-api-key-sid"
+                                                label="API key SID"
+                                                placeholder="SK…"
+                                                onGuide={guide(TWILIO_GUIDE_STEP.API_KEY)}
+                                            />
+                                            <CredentialField
+                                                name="secret"
+                                                id="twilio-secret"
+                                                label="API key secret"
+                                                secret
+                                                hint="Twilio Console: Account, API keys & tokens, Create API key (Restricted, with the permissions in the guide). Twilio shows the secret only once."
+                                            />
+                                        </>
+                                    ) : (
+                                        <CredentialField
+                                            name="secret"
+                                            id="twilio-secret"
+                                            label="Auth Token"
+                                            secret
+                                            onGuide={guide(TWILIO_GUIDE_STEP.ACCOUNT_SID)}
+                                            hint="Next to the Account SID on the Console home page. An API key is safer: you can delete it without changing anything else."
+                                        />
+                                    )}
+                                </>
+                            ) : isVoiceLink ? (
+                                <>
+                                    <CredentialField
+                                        name="apiToken"
                                         id="voicelink-api-token"
-                                        type="password"
-                                        autoComplete="off"
-                                        spellCheck={false}
-                                        value={apiToken}
-                                        onChange={(event) => setApiToken(event.target.value)}
+                                        label="VoiceLink API token"
+                                        secret
+                                        hint="In your VoiceLink panel (app.voicelink.co.in), open the API section and create a token."
                                     />
-                                    <p className="text-muted-foreground text-xs">
-                                        In your VoiceLink panel (app.voicelink.co.in), open the API section and create a
-                                        token.
-                                    </p>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <Label htmlFor="voicelink-client-id">
-                                        Client ID{' '}
-                                        <span className="text-muted-foreground font-normal">(reseller accounts only)</span>
-                                    </Label>
-                                    <Input
+                                    <CredentialField
+                                        name="clientId"
                                         id="voicelink-client-id"
+                                        label={
+                                            <>
+                                                Client ID{' '}
+                                                <span className="text-muted-foreground font-normal">
+                                                    (reseller accounts only)
+                                                </span>
+                                            </>
+                                        }
                                         inputMode="numeric"
-                                        autoComplete="off"
                                         placeholder="The client the numbers belong to"
-                                        value={clientId}
-                                        onChange={(event) => setClientId(event.target.value)}
                                     />
-                                </div>
-                                <Alert role="note">
-                                    <Info className="size-4" />
-                                    <AlertDescription>
-                                        We add a WebSocket bot named &ldquo;Aixel Labs&nbsp;+91&hellip;&rdquo; to your
-                                        account when you turn on AI answering or an outbound agent. Keep its &ldquo;WebSocket
-                                        API&rdquo; switch off in the VoiceLink panel (WebSocket Bots): with it on, calls are
-                                        answered and dropped at once, and the API cannot set it for us.
-                                    </AlertDescription>
-                                </Alert>
-                            </>
-                        ) : (
-                            <div className="flex flex-col gap-2">
-                                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                                    <Label htmlFor="telnyx-api-key">Telnyx API key</Label>
-                                    {hasSetupGuide ? (
-                                        <GuideLink onClick={() => openSetupGuide(provider, TELNYX_GUIDE_STEP.API_KEY)} />
-                                    ) : null}
-                                </div>
-                                <Input
+                                    <Alert role="note">
+                                        <Info className="size-4" />
+                                        <AlertDescription>
+                                            We add a WebSocket bot named &ldquo;Aixel Labs&nbsp;+91&hellip;&rdquo; to your
+                                            account when you turn on AI answering or an outbound agent. Keep its
+                                            &ldquo;WebSocket API&rdquo; switch off in the VoiceLink panel (WebSocket Bots):
+                                            with it on, calls are answered and dropped at once, and the API cannot set it for
+                                            us.
+                                        </AlertDescription>
+                                    </Alert>
+                                </>
+                            ) : (
+                                <CredentialField
+                                    name="apiKey"
                                     id="telnyx-api-key"
-                                    type="password"
-                                    autoComplete="off"
-                                    spellCheck={false}
+                                    label="Telnyx API key"
+                                    secret
                                     placeholder="KEY0…"
-                                    value={apiKey}
-                                    onChange={(event) => setApiKey(event.target.value)}
+                                    onGuide={guide(TELNYX_GUIDE_STEP.API_KEY)}
+                                    hint="In the Telnyx portal: click your initials at the top right, then API keys."
                                 />
-                                <p className="text-muted-foreground text-xs">
-                                    In the Telnyx portal: click your initials at the top right, then API keys.
-                                </p>
-                            </div>
-                        )}
-                    </form>
+                            )}
+                        </form>
+                    </FormProvider>
                 ) : accountNumbers.length === 0 ? (
                     <p className="text-sm">{NO_NUMBERS[provider]}</p>
                 ) : (
@@ -442,7 +407,7 @@ export function ConnectNumberDialog() {
 
                 <DialogFooter>
                     {accountNumbers === null ? (
-                        <Button type="submit" form={FORM_ID} disabled={busy || !credentialsReady}>
+                        <Button type="submit" form={FORM_ID} disabled={busy || !form.formState.isValid}>
                             {busy ? 'Checking…' : 'Find my numbers'}
                         </Button>
                     ) : (

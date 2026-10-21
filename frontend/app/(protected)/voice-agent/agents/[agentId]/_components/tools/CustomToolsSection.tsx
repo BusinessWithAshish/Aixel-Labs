@@ -13,7 +13,7 @@ import { SettingsSection } from '@/components/common/SettingsSection';
 import { usePage } from '@/contexts/PageStore';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 import { WebhookToolDialog } from './WebhookToolDialog';
-import { urlHost } from './webhook-tool-form';
+import { urlHost } from '../../_utils/webhook-tool-form';
 
 /** Webhook tools the owner defines: list, on/off, add / edit dialog, delete. Each change saves at once. */
 export function CustomToolsSection() {

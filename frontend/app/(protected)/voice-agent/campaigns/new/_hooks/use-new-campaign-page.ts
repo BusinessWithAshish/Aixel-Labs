@@ -1,16 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import {
-    VOICE_CAMPAIGN_LIMITS,
-    VOICE_WEEKDAYS,
-    VoiceCampaignRetryOutcome,
-    type VoiceCampaignDay,
-    type VoiceCampaignRetry,
-    type VoiceCampaignWindow,
-} from '@aixellabs/backend/db/types';
+import { VOICE_CAMPAIGN_LIMITS, VOICE_WEEKDAYS, VoiceCampaignRetryOutcome } from '@aixellabs/backend/db/types';
 import {
     addVoiceCampaignContacts,
     createVoiceCampaign,
@@ -27,6 +22,7 @@ import {
     rowsToContactInputs,
     variableKeys,
 } from '@/helpers/voice-campaign-contacts';
+import { campaignDetailsSchema, campaignScheduleSchema, schemaProblem } from '@/helpers/voice-schemas';
 import { browserTimezone } from '@/helpers/voice-time';
 import { campaignUrl } from '@/helpers/voice-routes';
 
@@ -36,6 +32,9 @@ export type NewCampaignPageData = {
 };
 
 export const WIZARD_STEPS = ['Details', 'Contacts', 'Schedule', 'Review'] as const;
+
+/** Everything the wizard asks apart from the contacts, as the campaign action checks it. */
+const campaignFormSchema = campaignDetailsSchema.merge(campaignScheduleSchema);
 
 /** Biggest CSV the browser reads (10,000 contacts with a few columns is well under). */
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -57,31 +56,35 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
     const { agents, numbers } = data.setup;
     const [step, setStep] = useState(0);
 
-    const [name, setName] = useState('');
-    const [agentId, setAgentId] = useState(agents.length === 1 ? agents[0].id : '');
-    const [numberId, setNumberIdState] = useState(numbers.length === 1 ? numbers[0].id : '');
+    const form = useForm({
+        resolver: zodResolver(campaignFormSchema),
+        defaultValues: {
+            name: '',
+            agentId: agents.length === 1 ? agents[0].id : '',
+            numberId: numbers.length === 1 ? numbers[0].id : '',
+            window: { days: VOICE_WEEKDAYS.slice(0, 5), start: '09:00', end: '18:00', timezone: browserTimezone() },
+            maxConcurrent: 2,
+            retry: {
+                maxRetries: 1,
+                delayMinutes: 60,
+                on: [VoiceCampaignRetryOutcome.NO_ANSWER, VoiceCampaignRetryOutcome.BUSY],
+            },
+        },
+    });
+    const values = form.watch();
+    const { name, agentId, numberId, window: callWindow, maxConcurrent, retry } = values;
     const [country, setCountry] = useState(countryForNumber(numbers.length === 1 ? numbers[0].phoneNumber : undefined));
-    const setNumberId = (id: string) => {
-        setNumberIdState(id);
-        if (!csv) setCountry(countryForNumber(numbers.find((n) => n.id === id)?.phoneNumber));
-    };
 
     const [csv, setCsv] = useState<CsvFile | null>(null);
     const [csvError, setCsvError] = useState<string | null>(null);
     const [mapping, setMapping] = useState<{ phone: number | null; name: number | null }>({ phone: null, name: null });
 
-    const [callWindow, setCallWindow] = useState<VoiceCampaignWindow>({
-        days: VOICE_WEEKDAYS.slice(0, 5),
-        start: '09:00',
-        end: '18:00',
-        timezone: browserTimezone(),
-    });
-    const [maxConcurrent, setMaxConcurrent] = useState(2);
-    const [retry, setRetry] = useState<VoiceCampaignRetry>({
-        maxRetries: 1,
-        delayMinutes: 60,
-        on: [VoiceCampaignRetryOutcome.NO_ANSWER, VoiceCampaignRetryOutcome.BUSY],
-    });
+    // Until a CSV is read, numbers without a "+" are most likely local to the number calls go out from.
+    useEffect(() => {
+        if (!csv) setCountry(countryForNumber(numbers.find((n) => n.id === numberId)?.phoneNumber));
+        // Only when the number changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [numberId]);
 
     const [submitting, setSubmitting] = useState<null | 'draft' | 'start'>(null);
     const [uploaded, setUploaded] = useState<{ sent: number; total: number } | null>(null);
@@ -122,17 +125,8 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
         return checkContacts(rowsToContactInputs(csv.rows, { phone: mapping.phone, name: mapping.name }, variables), countryInfo);
     }, [csv, mapping.phone, mapping.name, variables, countryInfo]);
 
-    const toggleDay = (day: VoiceCampaignDay) =>
-        setCallWindow((w) => ({ ...w, days: w.days.includes(day) ? w.days.filter((d) => d !== day) : [...w.days, day] }));
-    const toggleRetryOn = (outcome: VoiceCampaignRetryOutcome) =>
-        setRetry((r) => ({ ...r, on: r.on.includes(outcome) ? r.on.filter((o) => o !== outcome) : [...r.on, outcome] }));
-
     const stepProblem = (index: number): string | null => {
-        if (index === 0) {
-            if (!name.trim()) return 'Give the campaign a name';
-            if (!agentId) return 'Pick the agent that places the calls';
-            if (!numberId) return 'Pick the number to call from';
-        }
+        if (index === 0) return schemaProblem(campaignDetailsSchema, values);
         if (index === 1) {
             if (!csv) return 'Upload a CSV of contacts';
             if (mapping.phone === null) return 'Pick the column with the phone numbers';
@@ -140,11 +134,7 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
             if (check.contacts.length > VOICE_CAMPAIGN_LIMITS.maxContacts)
                 return `A campaign holds at most ${VOICE_CAMPAIGN_LIMITS.maxContacts.toLocaleString()} contacts`;
         }
-        if (index === 2) {
-            if (callWindow.days.length === 0) return 'Pick at least one calling day';
-            if (!callWindow.start || !callWindow.end || callWindow.start >= callWindow.end) return 'Calling hours must end after they start';
-            if (retry.maxRetries > 0 && retry.on.length === 0) return 'Pick what to retry, or set retries to none';
-        }
+        if (index === 2) return schemaProblem(campaignScheduleSchema, values);
         return null;
     };
     const problem = stepProblem(step);
@@ -161,12 +151,7 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
         setSubmitError(null);
         setSubmitting(start ? 'start' : 'draft');
         const created = await createVoiceCampaign({
-            name,
-            agentId,
-            numberId,
-            window: callWindow,
-            maxConcurrent,
-            retry,
+            ...values,
             defaultCountry: country,
             variableKeys: variables.map((v) => v.key),
         });
@@ -213,12 +198,10 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
         back,
         goTo,
         problem,
+        form,
         name,
-        setName,
         agentId,
-        setAgentId,
         numberId,
-        setNumberId,
         country,
         setCountry,
         countryInfo,
@@ -231,13 +214,8 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
         variables,
         check,
         callWindow,
-        setCallWindow,
-        toggleDay,
         maxConcurrent,
-        setMaxConcurrent,
         retry,
-        setRetry,
-        toggleRetryOn,
         submit,
         submitting,
         uploaded,

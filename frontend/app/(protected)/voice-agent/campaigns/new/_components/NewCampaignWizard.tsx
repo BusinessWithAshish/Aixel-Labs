@@ -1,12 +1,13 @@
 'use client';
 
+import { FormProvider } from 'react-hook-form';
 import Link from 'next/link';
 import { Check, Loader2, Megaphone } from 'lucide-react';
 import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { EmptyState } from '@/components/common/EmptyState';
 import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
@@ -96,7 +97,7 @@ function Footer() {
 }
 
 export function NewCampaignWizard() {
-    const { step, agents, numbers, loadError } = usePage<UseNewCampaignPageReturn>();
+    const { step, agents, numbers, loadError, form } = usePage<UseNewCampaignPageReturn>();
 
     if (loadError) {
         return (
@@ -108,28 +109,23 @@ export function NewCampaignWizard() {
     if (agents.length === 0 || numbers.length === 0) {
         const needsAgent = agents.length === 0;
         return (
-            <Empty className="m-1 border" data-testid="campaign-setup-missing">
-                <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                        <Megaphone />
-                    </EmptyMedia>
-                    <EmptyTitle>{needsAgent ? 'Create an outbound agent first' : 'Connect a number first'}</EmptyTitle>
-                    <EmptyDescription>
-                        {needsAgent
-                            ? 'A campaign needs an outbound agent to place its calls.'
-                            : 'A campaign calls from one of your own numbers (Telnyx, Twilio or VoiceLink).'}
-                    </EmptyDescription>
-                </EmptyHeader>
-                <EmptyContent>
-                    <Button asChild variant="outline" size="sm">
-                        <Link
-                            href={SubModuleUrls[needsAgent ? VOICE_AGENT_SUB_MODULES.AGENTS : VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]}
-                        >
-                            {needsAgent ? 'Open agents' : 'Open phone numbers'}
-                        </Link>
-                    </Button>
-                </EmptyContent>
-            </Empty>
+            <EmptyState
+                icon={<Megaphone />}
+                title={needsAgent ? 'Create an outbound agent first' : 'Connect a number first'}
+                description={
+                    needsAgent
+                        ? 'A campaign needs an outbound agent to place its calls.'
+                        : 'A campaign calls from one of your own numbers (Telnyx, Twilio or VoiceLink).'
+                }
+                className="m-1"
+                data-testid="campaign-setup-missing"
+            >
+                <Button asChild variant="outline" size="sm">
+                    <Link href={SubModuleUrls[needsAgent ? VOICE_AGENT_SUB_MODULES.AGENTS : VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]}>
+                        {needsAgent ? 'Open agents' : 'Open phone numbers'}
+                    </Link>
+                </Button>
+            </EmptyState>
         );
     }
 
@@ -143,10 +139,12 @@ export function NewCampaignWizard() {
                     <CardDescription>{text.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {step === 0 ? <StepDetails /> : null}
-                    {step === 1 ? <StepContacts /> : null}
-                    {step === 2 ? <StepSchedule /> : null}
-                    {step === 3 ? <StepReview /> : null}
+                    <FormProvider {...form}>
+                        {step === 0 ? <StepDetails /> : null}
+                        {step === 1 ? <StepContacts /> : null}
+                        {step === 2 ? <StepSchedule /> : null}
+                        {step === 3 ? <StepReview /> : null}
+                    </FormProvider>
                 </CardContent>
                 <Footer />
             </Card>

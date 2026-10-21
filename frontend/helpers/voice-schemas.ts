@@ -40,6 +40,12 @@ export function firstIssue(error: z.ZodError, fallback: string): string {
     return error.issues[0]?.message ?? fallback;
 }
 
+/** The first thing that stops `value` from parsing, or null: a form's one-line summary, in the server's words. */
+export function schemaProblem(schema: z.ZodTypeAny, value: unknown): string | null {
+    const parsed = schema.safeParse(value);
+    return parsed.success ? null : firstIssue(parsed.error, 'Check the form');
+}
+
 /** Parses or throws the first message, for server actions. */
 export function parseOrThrow<S extends z.ZodTypeAny>(schema: S, input: unknown, fallback: string): z.output<S> {
     const parsed = schema.safeParse(input);
@@ -220,6 +226,8 @@ const bookingDaySchema = z.object({ open: bookingTimeSchema, close: bookingTimeS
 
 const weekdayLabel = (day: VoiceWeekday) => VOICE_WEEKDAY_OPTIONS.find((d) => d.key === day)?.label ?? day;
 
+const DAYS_AHEAD_RANGE = `Callers can book from ${VOICE_BOOKING_LIMITS.maxDaysAheadMin} to ${VOICE_BOOKING_LIMITS.maxDaysAheadMax} days ahead`;
+
 const bookingRules = {
     enabled: z.boolean(),
     timezone: z.string().trim().min(1, 'Pick a timezone').refine(isIanaTimezone, 'Pick a timezone from the list'),
@@ -233,16 +241,10 @@ const bookingRules = {
             `Appointment length goes in steps of ${VOICE_BOOKING_LIMITS.slotMinutesStep} minutes`,
         ),
     maxDaysAhead: z.coerce
-        .number({ invalid_type_error: 'Enter how many days ahead callers can book' })
-        .int('Days ahead is a whole number')
-        .min(
-            VOICE_BOOKING_LIMITS.maxDaysAheadMin,
-            `Callers can book at least ${VOICE_BOOKING_LIMITS.maxDaysAheadMin} day ahead`,
-        )
-        .max(
-            VOICE_BOOKING_LIMITS.maxDaysAheadMax,
-            `Callers can book at most ${VOICE_BOOKING_LIMITS.maxDaysAheadMax} days ahead`,
-        ),
+        .number({ invalid_type_error: DAYS_AHEAD_RANGE })
+        .int(DAYS_AHEAD_RANGE)
+        .min(VOICE_BOOKING_LIMITS.maxDaysAheadMin, DAYS_AHEAD_RANGE)
+        .max(VOICE_BOOKING_LIMITS.maxDaysAheadMax, DAYS_AHEAD_RANGE),
     /** Null = the built-in calendar. Ownership is checked against voice_calendar_connections on save. */
     destination: z
         .object({
@@ -372,19 +374,22 @@ const webhookSecretSchema = z.discriminatedUnion('action', [
 
 export type VoiceWebhookSecretInput = z.input<typeof webhookSecretSchema>;
 
+/** A custom tool's name, as the model sees it. */
+const toolNameSchema = z
+    .string()
+    .trim()
+    .min(1, 'Give the tool a name, like check_order')
+    .regex(
+        VOICE_TOOL_NAME_PATTERN,
+        'Tool names are 2 to 40 lowercase letters, numbers and _, starting with a letter (like check_order)',
+    )
+    .refine(
+        (name) => !(VOICE_RESERVED_TOOL_NAMES as readonly string[]).includes(name),
+        'That name belongs to a built-in tool. Pick another one.',
+    );
+
 const webhookToolFields = z.object({
-    name: z
-        .string()
-        .trim()
-        .min(1, 'Give the tool a name, like check_order')
-        .regex(
-            VOICE_TOOL_NAME_PATTERN,
-            'Tool names are 2 to 40 lowercase letters, numbers and _, starting with a letter (like check_order)',
-        )
-        .refine(
-            (name) => !(VOICE_RESERVED_TOOL_NAMES as readonly string[]).includes(name),
-            'That name belongs to a built-in tool. Pick another one.',
-        ),
+    name: toolNameSchema,
     description: z
         .string()
         .trim()
@@ -419,6 +424,8 @@ export type VoiceWebhookToolInput = z.input<typeof webhookToolSchema>;
 /** A test needs a working URL and parameters, not the description yet. */
 export const webhookTestSchema = webhookToolFields.omit({ description: true, enabled: true }).superRefine(uniqueParamNames);
 
+export type VoiceWebhookTestInput = z.input<typeof webhookTestSchema>;
+
 /** The secret as the dialog edits it: keep the saved one, type a new one, or remove it. */
 export type WebhookSecretMode = VoiceWebhookSecretInput['action'];
 
@@ -428,21 +435,26 @@ export type WebhookSecretMode = VoiceWebhookSecretInput['action'];
  */
 export function webhookToolFormSchema(hasSecret: boolean, otherNames: string[]) {
     return webhookToolFields
-        .extend({ secret: z.object({ action: z.enum(['keep', 'set', 'clear']), value: z.string() }) })
+        .extend({
+            name: toolNameSchema.superRefine((name, ctx) => {
+                if (otherNames.includes(name)) custom(ctx, `This agent already has a tool called ${name}`);
+            }),
+            secret: z.object({ action: z.enum(['keep', 'set', 'clear']), value: z.string() }),
+        })
         .superRefine((tool, ctx) => {
             uniqueParamNames(tool, ctx);
-            if (otherNames.includes(tool.name)) custom(ctx, `This agent already has a tool called ${tool.name}`, ['name']);
             if (hasSecret && tool.secret.action === 'set' && !tool.secret.value.trim()) {
                 custom(ctx, 'Enter the new secret, or keep the current one', ['secret', 'value']);
             }
         })
-        .transform(({ secret, ...tool }) => ({
-            ...tool,
-            // An empty secret on a tool that has none: requests go unsigned.
-            secret: (secret.action === 'set' && secret.value.trim()
-                ? { action: 'set', value: secret.value.trim() }
-                : { action: secret.action === 'keep' ? 'keep' : 'clear' }) as VoiceWebhookSecretInput,
-        }));
+        .transform(({ secret, ...tool }) => ({ ...tool, secret: webhookSecretInput(secret) }));
+}
+
+/** The dialog's secret as sent: a new value, keep the saved one, or none (an empty new secret goes unsigned). */
+export function webhookSecretInput(secret: { action: WebhookSecretMode; value: string }): VoiceWebhookSecretInput {
+    const value = secret.value.trim();
+    if (secret.action === 'set' && value) return { action: 'set', value };
+    return { action: secret.action === 'keep' ? 'keep' : 'clear' };
 }
 
 export type WebhookToolFormValues = z.input<ReturnType<typeof webhookToolFormSchema>>;

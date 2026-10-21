@@ -34,6 +34,7 @@ import {
     type VoiceAgentInput,
     voiceAgentSchema,
     type VoiceWebhookSecretInput,
+    type VoiceWebhookTestInput,
     type VoiceWebhookToolInput,
     webhookTestSchema,
     webhookToolSchema,
@@ -477,7 +478,7 @@ export const setVoiceAgentWebhookToolEnabled = async (
  */
 export const sendVoiceAgentWebhookTest = async (
     agentId: string,
-    input: { toolId: string | null; tool: VoiceWebhookToolInput },
+    input: { toolId: string | null; tool: VoiceWebhookTestInput },
 ): Promise<ALApiResponse<VoiceWebhookTestResult>> =>
     runAuthenticatedAction(async function sendVoiceAgentWebhookTest(userId) {
         const { userId: uid } = await agentOwner(userId);

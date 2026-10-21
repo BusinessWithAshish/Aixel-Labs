@@ -2,18 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { type FieldValues, useForm, type UseFormReturn } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import {
     VOICE_BUILTIN_VARIABLES,
     type VoiceAgent,
-    type VoiceAgentCallType,
-    type VoiceAgentVoice,
     type VoiceBookingDestination,
     type VoiceCalendarConnection,
     VoiceCalendarConnectionStatus,
     type VoiceCallerMemory,
-    type VoiceWeekday,
 } from '@aixellabs/backend/db/types';
+import type { ALApiResponse } from '@aixellabs/backend/api/types';
 import {
     deleteVoiceAgent,
     saveVoiceAgentBooking,
@@ -32,52 +32,25 @@ import {
     forgetVoiceCallerMemory,
     type VoiceCallerMemoryList,
 } from '@/app/actions/voice-caller-memory-actions';
+import { voiceAgentDefaults } from '@/helpers/voice-agent-defaults';
 import { customVariableNames, VOICE_BUILTIN_VARIABLE_INFO } from '@/helpers/voice-agent-features';
 import { defaultBookingTarget, voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
-import { voiceAgentDefaults } from '@/helpers/voice-agent-defaults';
-import type { VoiceAgentInput } from '@/helpers/voice-schemas';
-import { browserTimezone } from '@/helpers/voice-time';
 import { VOICE_AGENTS_URL } from '@/helpers/voice-routes';
 import {
-    type BookingDayDraft,
-    type BookingDraft,
-    bookingDraftError,
-    bookingToDraft,
-    draftToBooking,
-    sameBooking,
-} from '../_utils/booking-draft';
-import {
-    draftToSettings,
-    newFieldKey,
-    sameSettings,
-    settingsDraftError,
-    settingsToDraft,
-    type AnalysisFieldDraft,
-    type CallSettingsDraft,
-} from '../_utils/call-settings-draft';
+    bookingFormSchema,
+    callSettingsSchema,
+    schemaProblem,
+    voiceAgentSchema,
+    type BookingFormValues,
+} from '@/helpers/voice-schemas';
+import { browserTimezone } from '@/helpers/voice-time';
 import { VOICE_AGENT_TOOLS_ID } from '../_components/tools/VoiceAgentToolsCard';
+import { agentFormValues, bookingFormValues, callSettingsFormValues } from '../_utils/editor-form-values';
 import { toolsForPrompt, type PromptVariable } from '../_utils/prompt-tools';
-
-function toInput(agent: VoiceAgent): VoiceAgentInput {
-    return {
-        name: agent.name,
-        callType: agent.callType,
-        voice: agent.voice,
-        prompt: agent.prompt,
-        callNotes: agent.callNotes,
-        variables: { ...(agent.variables ?? {}) },
-    };
-}
 
 /** Default values with something in them, by name. */
 function filledValues(values: Record<string, string>): Record<string, string> {
     return Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
-}
-
-function sameValues(a: Record<string, string>, b: Record<string, string>): boolean {
-    const x = filledValues(a);
-    const y = filledValues(b);
-    return Object.keys(x).length === Object.keys(y).length && Object.entries(x).every(([k, v]) => y[k]?.trim() === v.trim());
 }
 
 export type VoiceAgentEditorData = {
@@ -95,6 +68,9 @@ export type VoiceAgentEditorData = {
 /** A calendar (or event type) on a connected app, as the destination picker lists it. */
 export type ConnectedAppCalendar = { id: string; name: string; primary: boolean; detail: string | null };
 
+/** What saving one card says. */
+type SectionWords = { saved: string; failed: string };
+
 export function useVoiceAgentEditorPage({
     agent: initialAgent,
     usage,
@@ -105,98 +81,66 @@ export function useVoiceAgentEditorPage({
     const router = useRouter();
     const agentId = initialAgent._id ?? '';
     const [saved, setSaved] = useState<VoiceAgent>(initialAgent);
-    const [form, setForm] = useState<VoiceAgentInput>(() => toInput(initialAgent));
-    const [saving, setSaving] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
-    // Booking settings: a draft against the last saved version, saved on their own (Tools card).
-    const [bookingBase, setBookingBase] = useState<BookingDraft>(() => bookingToDraft(initialAgent.tools.booking));
-    const [bookingDraft, setBookingDraft] = useState<BookingDraft>(bookingBase);
-    const [savingBooking, setSavingBooking] = useState(false);
+    // Three cards, each saved on its own: the agent itself, booking (Tools), call settings.
+    const agentForm = useForm({
+        resolver: zodResolver(voiceAgentSchema),
+        defaultValues: agentFormValues(initialAgent),
+    });
+    const bookingForm = useForm({
+        resolver: zodResolver(bookingFormSchema),
+        defaultValues: bookingFormValues(initialAgent.tools.booking),
+    });
+    const settingsForm = useForm({
+        resolver: zodResolver(callSettingsSchema),
+        defaultValues: callSettingsFormValues(initialAgent),
+    });
+
+    const form = agentForm.watch();
+    const booking = bookingForm.watch();
+    const settings = settingsForm.watch();
+    const agentDirty = agentForm.formState.isDirty;
+    const bookingDirty = bookingForm.formState.isDirty;
+    const settingsDirty = settingsForm.formState.isDirty;
+    const savingAgent = agentForm.formState.isSubmitting;
+    const savingBooking = bookingForm.formState.isSubmitting;
+    const savingSettings = settingsForm.formState.isSubmitting;
+
+    // What stops each card from saving, in the server's words (the same schemas parse it there).
+    const agentError = schemaProblem(voiceAgentSchema, form);
+    const bookingError = schemaProblem(bookingFormSchema, booking);
+    const settingsError = schemaProblem(callSettingsSchema, settings);
+    const canSaveAgent = agentDirty && !agentError && !savingAgent;
 
     // An agent without booking settings starts from the browser's zone. Known only after hydration.
     useEffect(() => {
-        if (initialAgent.tools.booking) return;
-        const timezone = browserTimezone();
-        setBookingBase((b) => ({ ...b, timezone }));
-        setBookingDraft((d) => ({ ...d, timezone }));
+        if (!initialAgent.tools.booking) bookingForm.reset(bookingFormValues(null, browserTimezone()));
         // Once, on mount.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const agentDirty = useMemo(() => {
-        const base = toInput(saved);
-        return (
-            form.name !== base.name ||
-            form.callType !== base.callType ||
-            form.voice !== base.voice ||
-            form.prompt !== base.prompt ||
-            form.callNotes !== base.callNotes ||
-            !sameValues(form.variables, base.variables)
-        );
-    }, [form, saved]);
-
-    const agentValid = form.name.trim().length > 0 && form.prompt.trim().length > 0;
-    const canSaveAgent = agentDirty && agentValid && !saving;
-
-    const bookingDirty = useMemo(() => !sameBooking(bookingDraft, bookingBase), [bookingDraft, bookingBase]);
-    const bookingError = useMemo(() => bookingDraftError(bookingDraft), [bookingDraft]);
-    const canSaveBooking = bookingDirty && !bookingError && !savingBooking;
-
-    const setName = useCallback((name: string) => setForm((f) => ({ ...f, name })), []);
-    /** Only the type: the prompt and call notes stay as they are. */
-    const setCallType = useCallback((callType: VoiceAgentCallType) => setForm((f) => ({ ...f, callType })), []);
-    const setVoice = useCallback((voice: VoiceAgentVoice) => setForm((f) => ({ ...f, voice })), []);
-    const setPrompt = useCallback((prompt: string) => setForm((f) => ({ ...f, prompt })), []);
-    const setCallNotes = useCallback((callNotes: string) => setForm((f) => ({ ...f, callNotes })), []);
     /** The defaults for the type picked on screen (which may not be saved yet). */
     const defaults = useMemo(() => voiceAgentDefaults(form.callType), [form.callType]);
-    const resetPrompt = useCallback(() => setForm((f) => ({ ...f, prompt: defaults.prompt })), [defaults]);
-    const resetCallNotes = useCallback(() => setForm((f) => ({ ...f, callNotes: defaults.callNotes })), [defaults]);
-    const discardAgentChanges = useCallback(() => setForm(toInput(saved)), [saved]);
-    const setVariable = useCallback(
-        (name: string, value: string) => setForm((f) => ({ ...f, variables: { ...f.variables, [name]: value } })),
-        [],
+    const setAgentField = useCallback(
+        (name: 'prompt' | 'callNotes', value: string) =>
+            agentForm.setValue(name, value, { shouldDirty: true, shouldValidate: true }),
+        [agentForm],
     );
-
-    // Call settings (voicemail, analysis, memory): a draft against the saved version, saved on their own.
-    const [settingsBase, setSettingsBase] = useState<CallSettingsDraft>(() => settingsToDraft(initialAgent));
-    const [settingsDraft, setSettingsDraft] = useState<CallSettingsDraft>(settingsBase);
-    const [savingSettings, setSavingSettings] = useState(false);
-    const settingsDirty = useMemo(() => !sameSettings(settingsDraft, settingsBase), [settingsDraft, settingsBase]);
-    const settingsError = useMemo(() => settingsDraftError(settingsDraft), [settingsDraft]);
-    const canSaveSettings = settingsDirty && !settingsError && !savingSettings;
-    const setSettings = useCallback(
-        (patch: Partial<CallSettingsDraft>) => setSettingsDraft((d) => ({ ...d, ...patch })),
-        [],
-    );
-    const setAnalysisField = useCallback(
-        (key: string, patch: Partial<AnalysisFieldDraft>) =>
-            setSettingsDraft((d) => ({ ...d, fields: d.fields.map((f) => (f.key === key ? { ...f, ...patch } : f)) })),
-        [],
-    );
-    const addAnalysisField = useCallback(
-        () =>
-            setSettingsDraft((d) => ({
-                ...d,
-                fields: [...d.fields, { key: newFieldKey(), name: '', type: 'text', description: '', options: '' }],
-            })),
-        [],
-    );
-    const removeAnalysisField = useCallback(
-        (key: string) => setSettingsDraft((d) => ({ ...d, fields: d.fields.filter((f) => f.key !== key) })),
-        [],
-    );
-    const discardSettingsChanges = useCallback(() => setSettingsDraft(settingsBase), [settingsBase]);
+    const resetPrompt = useCallback(() => setAgentField('prompt', defaults.prompt), [defaults, setAgentField]);
+    const resetCallNotes = useCallback(() => setAgentField('callNotes', defaults.callNotes), [defaults, setAgentField]);
 
     /** Custom variables the prompt, the call notes and the voicemail message use, in order. */
     const usedVariables = useMemo(
-        () => customVariableNames(form.prompt, form.callNotes, settingsDraft.voicemailMessage),
-        [form.prompt, form.callNotes, settingsDraft.voicemailMessage],
+        () => customVariableNames(form.prompt, form.callNotes, settings.voicemail.message),
+        [form.prompt, form.callNotes, settings.voicemail.message],
     );
-    /** What the prompt's "{{" menu offers, and how the prompt marks each name. */
-    const promptVariables = useMemo((): PromptVariable[] => {
+    /**
+     * What the prompt's "{{" menu offers, and how the prompt marks each name. Not memoised: the form edits
+     * `variables` in place, so its identity does not change when a default value does.
+     */
+    const promptVariables = ((): PromptVariable[] => {
         const custom = [...new Set([...usedVariables, ...Object.keys(filledValues(form.variables))])];
         return [
             ...VOICE_BUILTIN_VARIABLES.map((name) => ({
@@ -215,26 +159,88 @@ export function useVoiceAgentEditorPage({
                 };
             }),
         ];
-    }, [usedVariables, form.variables]);
-
-    const setBookingEnabled = useCallback((enabled: boolean) => setBookingDraft((d) => ({ ...d, enabled })), []);
-    const setBookingTimezone = useCallback((timezone: string) => setBookingDraft((d) => ({ ...d, timezone })), []);
-    const setBookingSlotMinutes = useCallback((slotMinutes: number) => setBookingDraft((d) => ({ ...d, slotMinutes })), []);
-    const setBookingMaxDaysAhead = useCallback(
-        (maxDaysAhead: string) => setBookingDraft((d) => ({ ...d, maxDaysAhead })),
-        [],
-    );
-    const setBookingDay = useCallback(
-        (day: VoiceWeekday, patch: Partial<BookingDayDraft>) =>
-            setBookingDraft((d) => ({ ...d, days: { ...d.days, [day]: { ...d.days[day], ...patch } } })),
-        [],
-    );
-    const discardBookingChanges = useCallback(() => setBookingDraft(bookingBase), [bookingBase]);
+    })();
 
     /** Tools the prompt can name: booking as it is on screen, custom tools as saved. */
     const promptTools = useMemo(
-        () => toolsForPrompt(bookingDraft, saved.tools.webhooks),
-        [bookingDraft, saved.tools.webhooks],
+        () => toolsForPrompt({ enabled: booking.enabled, destination: booking.destination ?? null }, saved.tools.webhooks),
+        [booking.enabled, booking.destination, saved.tools.webhooks],
+    );
+
+    /**
+     * Submits one card: its action saves what the form resolved to, and the saved agent becomes the form's
+     * new starting point. Resolves true when the saved version matches the screen.
+     */
+    const saveSection = useCallback(
+        async <V extends FieldValues, O>(
+            sectionForm: UseFormReturn<V, unknown, O>,
+            problem: string | null,
+            action: (values: O) => Promise<ALApiResponse<VoiceAgent>>,
+            toValues: (agent: VoiceAgent) => V,
+            words: SectionWords,
+        ): Promise<boolean> => {
+            if (!sectionForm.formState.isDirty) return true;
+            let done = false;
+            await sectionForm.handleSubmit(
+                async (values) => {
+                    const response = await action(values);
+                    if (!response.success || !response.data) {
+                        toast.error(response.error ?? words.failed);
+                        return;
+                    }
+                    setSaved(response.data);
+                    sectionForm.reset(toValues(response.data));
+                    toast.success(words.saved);
+                    done = true;
+                },
+                () => toast.error(problem ?? words.failed),
+            )();
+            return done;
+        },
+        [],
+    );
+
+    const saveAgent = useCallback(async (): Promise<boolean> => {
+        const ok = await saveSection(
+            agentForm,
+            agentError,
+            // Only defaults for variables still in use are kept.
+            (values) =>
+                updateVoiceAgent(agentId, {
+                    ...values,
+                    variables: Object.fromEntries(
+                        usedVariables.flatMap((n) => (values.variables[n] ? [[n, values.variables[n]]] : [])),
+                    ),
+                }),
+            agentFormValues,
+            { saved: 'Agent saved', failed: 'Could not save the agent' },
+        );
+        if (ok) router.refresh();
+        return ok;
+    }, [agentError, agentForm, agentId, router, saveSection, usedVariables]);
+
+    const saveBooking = useCallback(
+        () =>
+            saveSection(
+                bookingForm,
+                bookingError,
+                (values) => saveVoiceAgentBooking(agentId, values),
+                (agent) => bookingFormValues(agent.tools.booking, booking.timezone),
+                { saved: 'Booking settings saved', failed: 'Could not save the booking settings' },
+            ),
+        [agentId, booking.timezone, bookingError, bookingForm, saveSection],
+    );
+
+    const saveSettings = useCallback(
+        () =>
+            saveSection(
+                settingsForm,
+                settingsError,
+                (values) => saveVoiceAgentCallSettings(agentId, values),
+                callSettingsFormValues,
+                { saved: 'Call settings saved', failed: 'Could not save the call settings' },
+            ),
+        [agentId, saveSection, settingsError, settingsForm],
     );
 
     // Connected apps (Composio) and where bookings go.
@@ -250,8 +256,9 @@ export function useVoiceAgentEditorPage({
     const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
     const setBookingDestination = useCallback(
-        (destination: VoiceBookingDestination | null) => setBookingDraft((d) => ({ ...d, destination })),
-        [],
+        (destination: VoiceBookingDestination | null) =>
+            bookingForm.setValue('destination', destination, { shouldDirty: true, shouldValidate: true }),
+        [bookingForm],
     );
 
     /** The calendars on one connection, fetched once per page. */
@@ -286,7 +293,7 @@ export function useVoiceAgentEditorPage({
 
     /**
      * Where bookings go: "builtin" or a connection id. Picks the main calendar of a connection, or its
-     * event type when it has just one; with several, the owner chooses (the draft names none yet).
+     * event type when it has just one; with several, the owner chooses (the form names none yet).
      */
     const chooseBookingTarget = useCallback(
         async (target: string) => {
@@ -312,86 +319,17 @@ export function useVoiceAgentEditorPage({
 
     const chooseBookingCalendar = useCallback(
         (calendarId: string) => {
-            const current = bookingDraft.destination;
+            const current = booking.destination;
             if (!current) return;
             const connection = activeConnections.find((c) => c.connectedAccountId === current.connectedAccountId);
             const found = connection ? calendars[connection._id ?? '']?.find((c) => c.id === calendarId) : null;
             if (found) setBookingDestination({ ...current, calendarId: found.id, calendarName: found.name });
         },
-        [activeConnections, bookingDraft.destination, calendars, setBookingDestination],
+        [activeConnections, booking.destination, calendars, setBookingDestination],
     );
 
     /** A tool change saved elsewhere (custom tools): take the server's copy, keep every unsaved edit. */
     const applySavedAgent = useCallback((agent: VoiceAgent) => setSaved(agent), []);
-
-    /** Saves the booking settings. Resolves true when the saved version matches the screen. */
-    const saveBooking = useCallback(async (): Promise<boolean> => {
-        if (!bookingDirty) return true;
-        if (bookingError) {
-            toast.error(bookingError);
-            return false;
-        }
-        setSavingBooking(true);
-        const response = await saveVoiceAgentBooking(agentId, draftToBooking(bookingDraft));
-        setSavingBooking(false);
-        if (!response.success || !response.data) {
-            toast.error(response.error ?? 'Could not save the booking settings');
-            return false;
-        }
-        const next = bookingToDraft(response.data.tools.booking, bookingDraft.timezone);
-        setSaved(response.data);
-        setBookingBase(next);
-        setBookingDraft(next);
-        toast.success('Booking settings saved');
-        return true;
-    }, [agentId, bookingDirty, bookingDraft, bookingError]);
-
-    /** Saves the agent's fields. Resolves true when the saved version now matches what is on screen. */
-    const saveAgent = useCallback(async (): Promise<boolean> => {
-        if (!agentDirty) return true;
-        if (!agentValid) {
-            toast.error('Name and prompt are required');
-            return false;
-        }
-        setSaving(true);
-        // Only defaults for variables still in use are kept.
-        const variables = Object.fromEntries(
-            usedVariables.flatMap((name) => (form.variables[name]?.trim() ? [[name, form.variables[name].trim()]] : [])),
-        );
-        const response = await updateVoiceAgent(agentId, { ...form, variables });
-        setSaving(false);
-        if (!response.success || !response.data) {
-            toast.error(response.error ?? 'Could not save the agent');
-            return false;
-        }
-        setSaved(response.data);
-        setForm(toInput(response.data));
-        toast.success('Agent saved');
-        router.refresh();
-        return true;
-    }, [agentId, form, agentDirty, agentValid, router, usedVariables]);
-
-    /** Saves the call settings. Resolves true when the saved version matches the screen. */
-    const saveSettings = useCallback(async (): Promise<boolean> => {
-        if (!settingsDirty) return true;
-        if (settingsError) {
-            toast.error(settingsError);
-            return false;
-        }
-        setSavingSettings(true);
-        const response = await saveVoiceAgentCallSettings(agentId, draftToSettings(settingsDraft));
-        setSavingSettings(false);
-        if (!response.success || !response.data) {
-            toast.error(response.error ?? 'Could not save the call settings');
-            return false;
-        }
-        const next = settingsToDraft(response.data);
-        setSaved(response.data);
-        setSettingsBase(next);
-        setSettingsDraft(next);
-        toast.success('Call settings saved');
-        return true;
-    }, [agentId, settingsDirty, settingsDraft, settingsError]);
 
     // Caller memory: who the agent remembers, and forgetting them.
     const [memories, setMemories] = useState<VoiceCallerMemoryList>(initialMemories);
@@ -424,6 +362,7 @@ export function useVoiceAgentEditorPage({
 
     // Everything unsaved on the page, for the playground's "Save and start call".
     const isDirty = agentDirty || bookingDirty || settingsDirty;
+    const isValid = !agentError && (!bookingDirty || !bookingError) && (!settingsDirty || !settingsError);
 
     /** Sends the owner to Composio's Connect Link; they come back to the callback page. */
     const connectApp = useCallback(
@@ -455,11 +394,14 @@ export function useVoiceAgentEditorPage({
                 return false;
             }
             setConnections((list) => list.filter((c) => c._id !== id));
-            // The server moved every agent that booked there back to the built-in calendar.
-            const off = (b: BookingDraft) =>
-                b.destination?.connectedAccountId === connection.connectedAccountId ? { ...b, destination: null } : b;
-            setBookingBase(off);
-            setBookingDraft(off);
+            // The server moved every agent that booked there back to the built-in calendar: so does the form.
+            const bookedThere = (d?: VoiceBookingDestination | null) =>
+                d?.connectedAccountId === connection.connectedAccountId;
+            const { defaultValues } = bookingForm.formState;
+            if (defaultValues && bookedThere(defaultValues.destination as VoiceBookingDestination | null)) {
+                bookingForm.reset({ ...(defaultValues as BookingFormValues), destination: null }, { keepDirtyValues: true });
+            }
+            if (bookedThere(bookingForm.getValues('destination'))) setBookingDestination(null);
             toast.success(
                 `${voiceCalendarProviderLabel(connection.provider)} disconnected` +
                     (response.data.agentsReset
@@ -469,7 +411,7 @@ export function useVoiceAgentEditorPage({
             router.refresh();
             return true;
         },
-        [router],
+        [bookingForm, router, setBookingDestination],
     );
 
     // Back from Composio: say so and show the Tools card. The server already pointed this agent at the
@@ -480,25 +422,24 @@ export function useVoiceAgentEditorPage({
         welcomed.current = true;
         const connection = connections.find((c) => c._id === justConnected);
         if (!connection) return;
-        const into = bookingDraft.destination?.connectedAccountId === connection.connectedAccountId;
+        const { enabled, destination } = bookingForm.getValues();
+        const into = destination?.connectedAccountId === connection.connectedAccountId;
         toast.success(
             `${voiceCalendarProviderLabel(connection.provider)} connected${connection.label ? ` as ${connection.label}` : ''}`,
-            into ? { description: `Bookings now go to ${bookingDraft.destination?.calendarName}.` } : undefined,
+            into ? { description: `Bookings now go to ${destination?.calendarName}.` } : undefined,
         );
         document.getElementById(VOICE_AGENT_TOOLS_ID)?.scrollIntoView({ block: 'start' });
         const forget = () => window.history.replaceState(window.history.state, '', window.location.pathname);
-        if (bookingDraft.enabled && !bookingDraft.destination) void chooseBookingTarget(justConnected).finally(forget);
+        if (enabled && !destination) void chooseBookingTarget(justConnected).finally(forget);
         else forget();
         // Once, on mount.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    const isValid = agentValid && (!bookingDirty || !bookingError) && (!settingsDirty || !settingsError);
-    const save = useCallback(async (): Promise<boolean> => {
-        const agentSaved = await saveAgent();
-        if (!agentSaved) return false;
-        if (!(await saveBooking())) return false;
-        return saveSettings();
-    }, [saveAgent, saveBooking, saveSettings]);
+
+    const save = useCallback(
+        async (): Promise<boolean> => (await saveAgent()) && (await saveBooking()) && saveSettings(),
+        [saveAgent, saveBooking, saveSettings],
+    );
 
     const onDeleteOpenChange = useCallback(
         (open: boolean) => {
@@ -525,49 +466,32 @@ export function useVoiceAgentEditorPage({
         agentId,
         saved,
         usage,
+        agentForm,
         form,
         defaults,
-        setName,
-        setCallType,
-        setVoice,
-        setPrompt,
-        setCallNotes,
         resetPrompt,
         resetCallNotes,
-        discardAgentChanges,
-        setVariable,
         usedVariables,
         promptVariables,
-        settingsDraft,
+        promptTools,
+        agentDirty,
+        canSaveAgent,
+        saveAgent,
+        settingsForm,
+        settings,
         settingsDirty,
         settingsError,
-        canSaveSettings,
         savingSettings,
-        setSettings,
-        setAnalysisField,
-        addAnalysisField,
-        removeAnalysisField,
-        discardSettingsChanges,
         saveSettings,
         memories,
         forgetting,
         forgetCaller,
         forgetEveryone,
-        promptTools,
-        agentDirty,
-        canSaveAgent,
-        saveAgent,
-        bookingDraft,
+        bookingForm,
+        booking,
         bookingDirty,
         bookingError,
-        canSaveBooking,
         savingBooking,
-        setBookingEnabled,
-        setBookingTimezone,
-        setBookingSlotMinutes,
-        setBookingMaxDaysAhead,
-        setBookingDay,
-        discardBookingChanges,
         saveBooking,
         connectedAppsConfigured: connectedApps.configured,
         connections,
@@ -585,7 +509,7 @@ export function useVoiceAgentEditorPage({
         applySavedAgent,
         isDirty,
         isValid,
-        saving: saving || savingBooking || savingSettings,
+        saving: savingAgent || savingBooking || savingSettings,
         save,
         deleteOpen,
         setDeleteOpen: onDeleteOpenChange,
