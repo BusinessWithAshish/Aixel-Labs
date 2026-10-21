@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import product  # first: keeps the database settings above over .env
 from bson import ObjectId
 import campaigns as C
+import testdb
 
 db = product.db()
 assert db.name == DBNAME
@@ -134,7 +135,7 @@ OWNER = {"tenantId": ObjectId(), "userId": ObjectId()}
 
 
 def reset():
-    for name in ("voice_campaigns", "voice_campaign_contacts", "voice_calls", "voice_settings"):
+    for name in ("voice_campaigns", "voice_campaign_contacts", "voice_calls", "voice_accounts"):
         db[name].delete_many({})
     C.INFLIGHT.clear(); C.DIALING.clear()
 
@@ -461,7 +462,7 @@ def hook_tests():
     agent = {"_id": ObjectId(), "voice": "kore", "prompt": "Hi.", "callNotes": ""}
     num = {"_id": number, "tenantId": ObjectId(), "userId": ObjectId(), "phoneNumber": "+15550001111", "provider": "VOICELINK"}
     # Calls run on the owner's own Gemini key (product.gemini_key_for): give this owner one.
-    db.voice_settings.insert_one({"userId": num["userId"], "tenantId": num["tenantId"],
+    testdb.set_account(db, {"userId": num["userId"], "tenantId": num["tenantId"],
                                   "gemini": {"keySealed": product.seal_secret("AIza-unit-fake"), "last4": "fake"}})
     ctx = product.phone_call(num, agent, "OUTBOUND", "+919876500000")
     ok("product.phone_call carries them through _finish_ctx",

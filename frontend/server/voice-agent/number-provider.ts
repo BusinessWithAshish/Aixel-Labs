@@ -1,11 +1,13 @@
 import 'server-only';
 
-import { VoiceProvider, type MongoObjectId, type VoiceNumberDoc } from '@aixellabs/backend/db';
+import { VoiceProvider, type VoiceNumberDoc } from '@aixellabs/backend/db';
+import type { Owned } from '@/server/voice-agent/accounts';
 import { telnyxNumbers } from '@/server/voice-agent/telnyx-numbers';
 import { twilioNumbers } from '@/server/voice-agent/twilio-numbers';
 import { voicelinkNumbers } from '@/server/voice-agent/voicelink-numbers';
 
-export type OwnedNumberDoc = VoiceNumberDoc & { _id: MongoObjectId };
+/** A number (an item of its owner's `voice_accounts.numbers`) with its owner's ids. */
+export type OwnedNumberDoc = Owned<VoiceNumberDoc>;
 
 /** A number in the customer's provider account, as offered for import. */
 export type ProviderAccountNumber = {

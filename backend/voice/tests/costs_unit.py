@@ -48,11 +48,11 @@ def pricing_tests(user):
        and paid["providerExact"] is False, str(paid))
     ok("total is the sum", paid["totalUsd"] == round(paid["geminiUsd"] + paid["providerUsd"], 6))
 
-    product.db().voice_settings.update_one({"userId": user}, {"$set": {"gemini.tier": "free"}})
+    product.db().voice_accounts.update_one({"userId": user}, {"$set": {"gemini.tier": "free"}})
     free = costs.call_cost(doc_of(user, "PLAYGROUND", "PLAYGROUND"), USAGE, None)
     ok("free-tier key, playground: costs nothing, no provider", free["totalUsd"] == 0 and free["geminiFreeTier"]
        and "provider" not in free and free["geminiTokens"]["audioIn"] == 1745, str(free))
-    product.db().voice_settings.update_one({"userId": user}, {"$unset": {"gemini.tier": ""}})
+    product.db().voice_accounts.update_one({"userId": user}, {"$unset": {"gemini.tier": ""}})
 
     india = costs.call_cost(doc_of(user, direction="OUTBOUND", duration=61, to="+919876543210"), {}, "TWILIO")
     ok("Twilio to India: 2 minutes at $0.0496 + stream and recording", abs(india["providerUsd"] - 2 * (0.0496 + 0.0069)) < 1e-9,
@@ -96,8 +96,9 @@ async def twilio_tests(user):
            and abs(saved["providerUsd"] - want) < 1e-9 and abs(saved["totalUsd"] - (saved["geminiUsd"] + want)) < 1e-6, str(saved))
 
         # VoiceLink: no estimate; its call-log charge in rupees, on the number's own token, at today's rate.
-        number = {"_id": ObjectId(), "userId": user, "provider": "VOICELINK", "apiKeySealed": product.seal_secret("vl-token")}
-        product.db().voice_numbers.insert_one(number)
+        number = {"_id": ObjectId(), "userId": user, "tenantId": ObjectId(), "provider": "VOICELINK",
+                  "apiKeySealed": product.seal_secret("vl-token")}
+        testdb.insert_number(product.db(), number)
         costs._USD_RATES.update(at=__import__("time").time(), rates={"inr": 95.0})
         vctx = {"provider": "VOICELINK"}
         vdoc = {**doc_of(user, direction="INBOUND", duration=100), "_id": ObjectId(), "numberId": number["_id"],
@@ -115,12 +116,12 @@ async def twilio_tests(user):
 
 async def main():
     user = ObjectId()
-    product.db().voice_settings.insert_one({"tenantId": ObjectId(), "userId": user, "gemini": {"keySealed": "x"}})
+    testdb.set_account(product.db(), {"tenantId": ObjectId(), "userId": user, "gemini": {"keySealed": "x"}})
     try:
         pricing_tests(user)
         await twilio_tests(user)
     finally:
-        for name in ("voice_settings", "voice_calls", "voice_numbers"):
+        for name in ("voice_accounts", "voice_calls"):
             product.db()[name].delete_many({"userId": user})
     passed = sum(1 for _, p in RESULTS if p)
     print(f"\n{passed}/{len(RESULTS)} passed")

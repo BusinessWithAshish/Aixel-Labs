@@ -5,10 +5,11 @@ import {
     MongoCollections,
     VOICE_AGENT_SUB_MODULES,
     VoiceProvider,
-    type VoiceCallDoc,
     type VoiceNumberDoc,
+    type VoiceCallDoc,
 } from '@aixellabs/backend/db';
 import { toObjectId } from '@/helpers/server-action-helpers';
+import { findItem } from '@/server/voice-agent/accounts';
 import { openSecret } from '@/server/voice-agent/engine';
 import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
 import { listRecordingsForCall } from '@/server/voice-agent/telnyx';
@@ -91,8 +92,7 @@ export async function findCallRecording(owner: VoiceOwnerScope, call: VoiceCallD
         return { available: false, reason: 'This call was not placed through a phone number, so there is no recording.' };
     }
 
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    const number = await numbers.findOne({ _id: call.numberId, userId: owner.userId });
+    const number = await findItem('numbers', { _id: call.numberId }, owner.userId);
     if (number?.provider === VoiceProvider.VOICELINK) {
         return {
             available: false,

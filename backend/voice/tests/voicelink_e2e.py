@@ -60,10 +60,10 @@ def fixtures():
             "apiKeySealed": product.seal_secret(FAKE_TOKEN), "createdAt": now, "updatedAt": now}
     number = {**base, "phoneNumber": did, "inboundAgentId": agent["_id"], "outboundAgentId": agent["_id"],
               "voicelink": {"clientId": 77, "botId": 501, "routingId": 9001, "previousRouting": None}}
-    number["_id"] = db.voice_numbers.insert_one(number).inserted_id
+    number["_id"] = testdb.insert_number(db, number)
     bare = {**base, "phoneNumber": did[:-1] + str((int(did[-1]) + 1) % 10), "inboundAgentId": None, "outboundAgentId": None,
             "voicelink": {"clientId": None, "botId": 502}}
-    bare["_id"] = db.voice_numbers.insert_one(bare).inserted_id
+    bare["_id"] = testdb.insert_number(db, bare)
     CREATED["numbers"] += [number["_id"], bare["_id"]]; CREATED["agents"].append(agent["_id"])
     return agent, number, bare
 
@@ -567,9 +567,9 @@ async def main():
         dnc = HERE / "suppressed.jsonl"   # take back what this test put on the list: its fake numbers
         dnc.write_text("".join(l + "\n" for l in dnc.read_text().splitlines()
                                if '"quote": "voicelink_e2e"' not in l and CALLER not in l and CALLEE not in l))
-        db.voice_numbers.delete_many({"_id": {"$in": CREATED["numbers"]}}); db.voice_agents.delete_many({"_id": {"$in": CREATED["agents"]}})
+        testdb.delete_numbers(db, CREATED["numbers"]); db.voice_agents.delete_many({"_id": {"$in": CREATED["agents"]}})
         db.voice_calls.delete_many({"numberId": {"$in": CREATED["numbers"]}})
-        db.voice_settings.delete_many({"userId": {"$in": CREATED.get("owners", [])}})
+        db.voice_accounts.delete_many({"userId": {"$in": CREATED.get("owners", [])}})
     passed = sum(1 for _, p in RESULTS if p)
     print(f"\n{passed}/{len(RESULTS)} passed")
     for name, p in RESULTS:

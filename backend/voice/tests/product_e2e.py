@@ -51,11 +51,11 @@ def fixtures():
     base = {"tenantId": tenant, "userId": user, "provider": "TELNYX", "providerNumberId": "fake-pn-1",
             "apiKeySealed": product.seal_secret(FAKE_KEY), "createdAt": now, "updatedAt": now}
     full = {**base, "phoneNumber": "+15550001111", "texmlAppId": "fake-texml-app", "callControlAppId": "fake-cc-app", "inboundAgentId": agent["_id"], "outboundAgentId": agent["_id"]}
-    full["_id"] = db.voice_numbers.insert_one(full).inserted_id
+    full["_id"] = testdb.insert_number(db, full)
     no_agent = {**base, "phoneNumber": "+15550002222", "callControlAppId": "fake-cc-app", "inboundAgentId": None, "outboundAgentId": None}
-    no_agent["_id"] = db.voice_numbers.insert_one(no_agent).inserted_id
+    no_agent["_id"] = testdb.insert_number(db, no_agent)
     no_cc = {**base, "phoneNumber": "+15550003333", "outboundAgentId": agent["_id"]}
-    no_cc["_id"] = db.voice_numbers.insert_one(no_cc).inserted_id
+    no_cc["_id"] = testdb.insert_number(db, no_cc)
     return agent, full, no_agent, no_cc
 
 

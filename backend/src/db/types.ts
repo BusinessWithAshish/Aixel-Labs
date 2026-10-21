@@ -29,15 +29,14 @@ export enum MongoCollections {
   LEAD_LISTS = "lead_lists",
   COUPONS = "coupons",
   COUPON_REDEMPTIONS = "coupon_redemptions",
+  /** One per owner: their Gemini key, connected booking apps and phone numbers. */
+  VOICE_ACCOUNTS = "voice_accounts",
   VOICE_AGENTS = "voice_agents",
-  VOICE_NUMBERS = "voice_numbers",
+  /** One per call, with what the agent remembers about the caller after it (`memory`). */
   VOICE_CALLS = "voice_calls",
   VOICE_BOOKINGS = "voice_bookings",
-  VOICE_CALENDAR_CONNECTIONS = "voice_calendar_connections",
-  VOICE_SETTINGS = "voice_settings",
   VOICE_CAMPAIGNS = "voice_campaigns",
   VOICE_CAMPAIGN_CONTACTS = "voice_campaign_contacts",
-  VOICE_CALLER_MEMORIES = "voice_caller_memories",
 }
 
 export enum Modules {
@@ -233,7 +232,7 @@ export type CouponRedemption = Omit<CouponRedemptionDoc<string>, "createdAt"> & 
 
 // ---------------------------------------------------------------------------
 // Voice agents. The Python voice engine (~/voice-latency-trial, phone.py) reads
-// voice_agents / voice_numbers and writes voice_calls with these same shapes.
+// voice_agents / voice_accounts and writes voice_calls with these same shapes.
 // ---------------------------------------------------------------------------
 
 /** Gemini Live's prebuilt voices: key -> the character Google gives it. */
@@ -338,8 +337,9 @@ export type VoiceAgentBookingTool = {
 // ---------------------------------------------------------------------------
 // Customers' own booking apps, connected through Composio's managed auth (no Aixel Labs
 // OAuth app). Composio user_id = our user's _id as a string; one Composio auth config per
-// toolkit (Composio-managed), created on first use. The app keeps one
-// voice_calendar_connections doc per connection attempt (owner check for the callback).
+// toolkit (Composio-managed), created on first use. The app keeps one entry per connection
+// attempt in the owner's VoiceAccountDoc.calendars (owner check for the callback); attempts that
+// never connected are dropped once one connects.
 // ---------------------------------------------------------------------------
 
 /** A booking app an agent can book into. */
@@ -368,13 +368,11 @@ export enum VoiceCalendarConnectionStatus {
   FAILED = "FAILED",
 }
 
-/** One of the owner's connected booking apps (any of their agents can book into it). */
+/** One of the owner's connected booking apps (any of their agents can book into it), in VoiceAccountDoc.calendars. */
 export type VoiceCalendarConnectionDoc<Id = ObjectId> = {
-  _id?: Id;
-  tenantId: Id;
-  userId: Id;
+  _id: Id;
   provider: VoiceCalendarProvider;
-  /** Composio connected account id, unique. */
+  /** Composio connected account id, unique across owners. */
   connectedAccountId: string;
   /** The Composio auth config (Composio-managed) it was made with. */
   authConfigId: string;
@@ -393,6 +391,8 @@ export type VoiceCalendarConnectionDoc<Id = ObjectId> = {
 };
 
 export type VoiceCalendarConnection = Omit<VoiceCalendarConnectionDoc<string>, "createdAt" | "updatedAt" | "composioSessionId"> & {
+  tenantId: string;
+  userId: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -581,13 +581,12 @@ export type TwilioNumberState = {
   previousRouting?: TwilioVoiceRouting;
 };
 
-/** A number the customer brought, in their own provider account. */
+/** A number the customer brought, in their own provider account. Kept in its owner's VoiceAccountDoc.numbers. */
 export type VoiceNumberDoc<Id = ObjectId> = {
-  _id?: Id;
-  tenantId: Id;
-  userId: Id;
+  /** Calls, campaigns and campaign contacts point at it (`numberId`). */
+  _id: Id;
   provider: VoiceProvider;
-  /** E.164, e.g. "+13473703925". */
+  /** E.164, e.g. "+13473703925". Unique across owners: a number is connected to one account. */
   phoneNumber: string;
   /** The provider's id for the number (Telnyx phone_number id, VoiceLink DID id, Twilio IncomingPhoneNumber SID "PN…"). */
   providerNumberId: string;
@@ -623,6 +622,8 @@ export type VoiceNumberDoc<Id = ObjectId> = {
 
 /** Client view: no sealed key. */
 export type VoiceNumber = Omit<VoiceNumberDoc<string>, "apiKeySealed" | "createdAt" | "updatedAt"> & {
+  tenantId: string;
+  userId: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -657,7 +658,7 @@ export enum VoiceCallEndReason {
   FAILED = "failed",
   TIMEOUT = "timeout",
   ERROR = "error",
-  /** Gemini refused the owner's key; the reason is in `flags` and on their VoiceSettingsDoc. */
+  /** Gemini refused the owner's key; the reason is in `flags` and on their VoiceAccountDoc. */
   GEMINI_KEY_ERROR = "gemini_key_error",
 }
 
@@ -705,6 +706,10 @@ export type VoiceCallDoc<Id = ObjectId> = {
   voicemailMessage?: string | null;
   /** What she remembered about the caller when the call started (caller memory on). */
   memoryUsed?: { brief: string; lastCallAt: Date } | null;
+  /** The other party's number, E.164, on phone calls the engine answered or placed (what caller memory is kept under). */
+  callerPhone?: string | null;
+  /** What the agent remembers about the caller after this call (caller memory on). */
+  memory?: VoiceCallMemory | null;
   /** What the call cost the owner, written by the engine when the call ends (absent on calls before 2026-10-21). */
   cost?: VoiceCallCost | null;
 };
@@ -847,35 +852,42 @@ export type VoiceCallAnalysis = {
 /**
  * What an agent remembers about one caller: a short brief rewritten after each of their calls
  * (from the analysis pass), given to the agent at the start of the next call with that number.
- * Keyed by owner + agent + number (E.164): each agent remembers only its own conversations,
- * so turning memory off (or forgetting) on one agent never touches another.
+ * It lives on the call it was written after (VoiceCallDoc.memory, keyed by the call's agent and
+ * `callerPhone`); the latest one is `current`, the one the next call starts with. Each agent
+ * remembers only its own conversations, so turning memory off (or forgetting) on one agent never
+ * touches another. Forgetting removes `memory` from every call with that caller.
  */
-export type VoiceCallerMemoryDoc<Id = ObjectId> = {
-  _id?: Id;
-  tenantId: Id;
-  userId: Id;
-  agentId: Id;
-  /** E.164. Unique per agent. */
-  phone: string;
+export type VoiceCallMemory = {
   /** Up to `memoryBriefMax` characters. */
   brief: string;
-  lastCallId: Id;
-  lastCallAt: Date;
   /** Calls the brief covers. */
   calls: number;
-  createdAt: Date;
-  updatedAt: Date;
+  /** When the agent first remembered this caller. */
+  since: Date;
+  /** Set on the caller's latest brief only (one per agent + number). */
+  current?: true;
 };
 
-export type VoiceCallerMemory = Omit<VoiceCallerMemoryDoc<string>, "lastCallAt" | "createdAt" | "updatedAt"> & {
+/** Client view of one remembered caller: their current brief, `_id` and `lastCallId` being the call it is on. */
+export type VoiceCallerMemory = {
+  _id: string;
+  tenantId: string;
+  userId: string;
+  agentId: string;
+  /** E.164. */
+  phone: string;
+  brief: string;
+  lastCallId: string;
   lastCallAt: string;
+  calls: number;
   createdAt: string;
   updatedAt: string;
 };
 
 // ---------------------------------------------------------------------------
-// Voice settings: one voice_settings doc per owner (the user who owns the agents and numbers;
-// every voice doc above is scoped by `userId`, so the owner is the user, not the tenant).
+// Voice accounts: one voice_accounts doc per owner (the user who owns the agents and numbers;
+// every voice doc is scoped by `userId`, so the owner is the user, not the tenant). It holds what
+// the owner connected: their Gemini key, their booking apps and their phone numbers.
 //
 // Customers bring their own Gemini API key: every call their agents take or place (Telnyx,
 // Twilio, VoiceLink, playground) runs on it, never on Aixel Labs' key. No key = no calls.
@@ -912,13 +924,22 @@ export type VoiceGeminiKey = {
 
 export type VoiceGeminiKeyTier = "free" | "paid";
 
-export type VoiceSettingsDoc<Id = ObjectId> = {
+/** Numbers one owner may connect; keeps their VoiceAccountDoc far below MongoDB's 16 MB. */
+export const VOICE_NUMBER_LIMITS = {
+  maxPerOwner: 500,
+} as const;
+
+export type VoiceAccountDoc<Id = ObjectId> = {
   _id?: Id;
   tenantId: Id;
-  /** Owner. Unique: one settings doc per user. */
+  /** Owner. Unique: one account doc per user. */
   userId: Id;
   /** Absent / null = no key: the owner's agents cannot take or place calls. */
   gemini?: VoiceGeminiKey | null;
+  /** Connected booking apps. Absent = none. */
+  calendars?: VoiceCalendarConnectionDoc<Id>[];
+  /** Phone numbers, up to `VOICE_NUMBER_LIMITS.maxPerOwner`. Absent = none. */
+  numbers?: VoiceNumberDoc<Id>[];
   createdAt: Date;
   updatedAt: Date;
 };

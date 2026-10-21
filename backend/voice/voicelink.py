@@ -367,8 +367,7 @@ def _settle(number_id: str, call: dict, last: bool) -> bool:
     """Give the call's document its recording, or write the document of a call that never
     reached us. False: nothing found yet, look again later."""
     db = product.db()
-    nid = product.oid(number_id)
-    number = db.voice_numbers.find_one({"_id": nid}) if nid else None
+    number = product.find_number(number_id)
     if not number:
         logger.warning(f"voicelink-events: number {number_id} is gone, ignoring call {call['id']}")
         return True

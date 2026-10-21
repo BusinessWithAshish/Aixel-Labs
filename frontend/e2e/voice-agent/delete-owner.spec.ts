@@ -57,7 +57,7 @@ test('deleting a user deletes everything voice they own', async ({ page, db }) =
         lastCallAt: now,
     });
     const before = await db.countVoiceDocs(userId);
-    expect(Object.values(before).filter((count) => count > 0).length).toBeGreaterThanOrEqual(7);
+    expect(Object.values(before).filter((count) => count > 0).length).toBeGreaterThanOrEqual(5);
 
     await page.goto(`${MANAGE_TENANTS_PREFIX}${E2E_TENANT}`);
     const card = page.locator('[data-slot="card"]').filter({ hasText: LEAVER.email });

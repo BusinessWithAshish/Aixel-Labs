@@ -55,10 +55,10 @@ def fixtures():
     number = {"tenantId": tenant, "userId": user, "provider": "TELNYX", "providerNumberId": "fake-pn-campaign",
               "apiKeySealed": product.seal_secret(FAKE_KEY), "phoneNumber": "+15550004444", "callControlAppId": "fake-cc-app",
               "inboundAgentId": None, "outboundAgentId": agent["_id"], "createdAt": now, "updatedAt": now}
-    number["_id"] = db.voice_numbers.insert_one(number).inserted_id
+    number["_id"] = testdb.insert_number(db, number)
     # Every call runs on the owner's own Gemini key (product.gemini_key_for): this run's own key, sealed.
     key = os.environ["GEMINI_API_KEY"]
-    db.voice_settings.insert_one({"tenantId": tenant, "userId": user, "createdAt": now, "updatedAt": now,
+    testdb.set_account(db, {"tenantId": tenant, "userId": user, "createdAt": now, "updatedAt": now,
                                   "gemini": {"keySealed": product.seal_secret(key), "last4": key[-4:], "status": "OK",
                                              "checkedAt": now, "savedAt": now}})
     return agent, number

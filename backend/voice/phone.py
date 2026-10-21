@@ -1024,7 +1024,7 @@ def make_app() -> FastAPI:
         form = dict(parse_qsl((await request.body()).decode(errors="replace")))
         creds = None
         try:
-            number = await asyncio.to_thread(lambda: product.db().voice_numbers.find_one({"_id": product.oid(number_id)}))
+            number = await asyncio.to_thread(product.find_number, number_id)
             if number and number.get("provider") == "TWILIO":
                 creds = twilio.creds_of(number, product.open_secret(number["apiKeySealed"]))
         except Exception as e:

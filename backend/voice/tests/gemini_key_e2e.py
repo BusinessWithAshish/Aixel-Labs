@@ -52,7 +52,7 @@ def owner(key: str | None):
         n = {"tenantId": tenant, "userId": user, "provider": provider, "phoneNumber": phone, "providerNumberId": "pn-" + uuid.uuid4().hex[:8],
              "apiKeySealed": product.seal_secret(pe.FAKE_KEY), "inboundAgentId": inbound["_id"], "outboundAgentId": outbound["_id"],
              "createdAt": now, "updatedAt": now, **extra}
-        n["_id"] = db.voice_numbers.insert_one(n).inserted_id
+        n["_id"] = testdb.insert_number(db, n)
         CREATED["numbers"].append(n["_id"])
         return n
     seq = str(len(CREATED["owners"]))
@@ -65,7 +65,7 @@ def owner(key: str | None):
 
 
 def settings(o):
-    return db.voice_settings.find_one({"userId": o["user"]}) or {}
+    return db.voice_accounts.find_one({"userId": o["user"]}) or {}
 
 
 async def wait_doc(query, secs=8.0):
@@ -273,9 +273,9 @@ async def main():
     finally:
         await fake.cleanup()
         db.voice_calls.delete_many({"agentId": {"$in": CREATED["agents"]}})
-        db.voice_numbers.delete_many({"_id": {"$in": CREATED["numbers"]}})
+        testdb.delete_numbers(db, CREATED["numbers"])
         db.voice_agents.delete_many({"_id": {"$in": CREATED["agents"]}})
-        db.voice_settings.delete_many({"userId": {"$in": CREATED["owners"]}})
+        db.voice_accounts.delete_many({"userId": {"$in": CREATED["owners"]}})
     passed = sum(1 for _, p in RESULTS if p)
     print(f"\n{passed}/{len(RESULTS)} passed")
     for name, p in RESULTS:

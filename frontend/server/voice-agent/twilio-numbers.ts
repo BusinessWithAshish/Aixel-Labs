@@ -1,13 +1,12 @@
 import 'server-only';
 
 import {
-    getCollection,
-    MongoCollections,
     type TwilioVoiceRouting,
     type VoiceNumberDoc,
     VoiceProvider,
 } from '@aixellabs/backend/db';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
+import { updateItem } from '@/server/voice-agent/accounts';
 import { numberWebhookUrl, openSecret } from '@/server/voice-agent/engine';
 import type { NumberProvider, OwnedNumberDoc, ProviderAccountNumber } from '@/server/voice-agent/number-provider';
 import {
@@ -104,14 +103,12 @@ function pointsAtEngine(n: TwilioIncomingNumber, doc: OwnedNumberDoc): boolean {
 }
 
 async function savePreviousRouting(doc: OwnedNumberDoc, routing: TwilioVoiceRouting): Promise<void> {
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    await numbers.updateOne({ _id: doc._id }, { $set: { 'twilio.previousRouting': routing, updatedAt: new Date() } });
+    await updateItem('numbers', { _id: doc._id }, { set: { 'twilio.previousRouting': routing } });
     if (doc.twilio) doc.twilio.previousRouting = routing;
 }
 
 async function forgetPreviousRouting(doc: OwnedNumberDoc): Promise<void> {
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    await numbers.updateOne({ _id: doc._id }, { $unset: { 'twilio.previousRouting': '' }, $set: { updatedAt: new Date() } });
+    await updateItem('numbers', { _id: doc._id }, { unset: ['twilio.previousRouting'] });
     if (doc.twilio) delete doc.twilio.previousRouting;
 }
 

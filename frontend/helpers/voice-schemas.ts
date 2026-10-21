@@ -245,7 +245,7 @@ const bookingRules = {
         .int(DAYS_AHEAD_RANGE)
         .min(VOICE_BOOKING_LIMITS.maxDaysAheadMin, DAYS_AHEAD_RANGE)
         .max(VOICE_BOOKING_LIMITS.maxDaysAheadMax, DAYS_AHEAD_RANGE),
-    /** Null = the built-in calendar. Ownership is checked against voice_calendar_connections on save. */
+    /** Null = the built-in calendar. Ownership is checked against the owner's connected apps (voice_accounts.calendars) on save. */
     destination: z
         .object({
             provider: z.nativeEnum(VoiceCalendarProvider, {

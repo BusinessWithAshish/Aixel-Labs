@@ -1,25 +1,16 @@
 import 'server-only';
 
-import {
-    getCollection,
-    MongoCollections,
-    type MongoObjectId,
-    type VoiceCalendarConnectionDoc,
-    type VoiceNumberDoc,
-} from '@aixellabs/backend/db';
+import { getCollection, MongoCollections, type MongoObjectId, type VoiceAccountDoc } from '@aixellabs/backend/db';
 import { deleteCalendarSession, deleteConnectedAccount } from '@/server/voice-agent/composio';
-import { providerOf, type OwnedNumberDoc } from '@/server/voice-agent/number-provider';
+import { providerOf } from '@/server/voice-agent/number-provider';
 
 const OWNED_VOICE_COLLECTIONS = [
+    MongoCollections.VOICE_ACCOUNTS,
     MongoCollections.VOICE_AGENTS,
-    MongoCollections.VOICE_NUMBERS,
     MongoCollections.VOICE_CALLS,
     MongoCollections.VOICE_BOOKINGS,
-    MongoCollections.VOICE_CALENDAR_CONNECTIONS,
-    MongoCollections.VOICE_SETTINGS,
     MongoCollections.VOICE_CAMPAIGNS,
     MongoCollections.VOICE_CAMPAIGN_CONTACTS,
-    MongoCollections.VOICE_CALLER_MEMORIES,
 ] as const;
 
 /**
@@ -32,22 +23,23 @@ export async function deleteUserOwnedVoiceData(userIds: MongoObjectId[]): Promis
     if (userIds.length === 0) return;
     const filter = { userId: { $in: userIds } };
 
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    for (const doc of await numbers.find(filter).toArray()) {
-        try {
-            await providerOf(doc).release(doc as OwnedNumberDoc);
-        } catch (error) {
-            console.warn(`voice cascade: could not release number ${doc.phoneNumber}`, error);
+    const accounts = await getCollection<VoiceAccountDoc>(MongoCollections.VOICE_ACCOUNTS);
+    for (const account of await accounts.find(filter).toArray()) {
+        const owner = { tenantId: account.tenantId, userId: account.userId };
+        for (const number of account.numbers ?? []) {
+            try {
+                await providerOf(number).release({ ...number, ...owner });
+            } catch (error) {
+                console.warn(`voice cascade: could not release number ${number.phoneNumber}`, error);
+            }
         }
-    }
-
-    const connections = await getCollection<VoiceCalendarConnectionDoc>(MongoCollections.VOICE_CALENDAR_CONNECTIONS);
-    for (const doc of await connections.find(filter).toArray()) {
-        try {
-            await deleteConnectedAccount(doc.connectedAccountId);
-            if (doc.composioSessionId) await deleteCalendarSession(doc.composioSessionId);
-        } catch (error) {
-            console.warn(`voice cascade: could not remove connected app ${doc.connectedAccountId}`, error);
+        for (const app of account.calendars ?? []) {
+            try {
+                await deleteConnectedAccount(app.connectedAccountId);
+                if (app.composioSessionId) await deleteCalendarSession(app.composioSessionId);
+            } catch (error) {
+                console.warn(`voice cascade: could not remove connected app ${app.connectedAccountId}`, error);
+            }
         }
     }
 

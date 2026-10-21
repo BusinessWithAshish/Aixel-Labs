@@ -6,6 +6,7 @@ import {
     MongoObjectId,
     VOICE_AGENT_SUB_MODULES,
     VoiceAgentCallType,
+    VOICE_NUMBER_LIMITS,
     VoiceProvider,
     type VoiceAgentDoc,
     type VoiceNumber,
@@ -19,7 +20,7 @@ import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
 import { isBuiltinVariable } from '@/helpers/voice-agent-features';
 import { engineFetch, sealSecret } from '@/server/voice-agent/engine';
 import { assertGeminiKeySet, GEMINI_KEY_MISSING_MESSAGE } from '@/server/voice-agent/gemini-key';
-import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
+import { countNumbers, findItem, findItemsAnywhere, listItems, pullItems, pushItem, updateItem } from '@/server/voice-agent/accounts';
 import { providerOf, type OwnedNumberDoc, type ProviderAccountNumber } from '@/server/voice-agent/number-provider';
 import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
 import { listTelnyxAccountNumbers, telnyxNumbers } from '@/server/voice-agent/telnyx-numbers';
@@ -171,11 +172,11 @@ function idString(id: MongoObjectId | null | undefined): string | null {
     return id ? id.toString() : null;
 }
 
-function mapVoiceNumberDoc(doc: VoiceNumberDoc, names: Map<string, string>): VoiceNumberListItem {
+function mapVoiceNumberDoc(doc: OwnedNumberDoc, names: Map<string, string>): VoiceNumberListItem {
     const inboundAgentId = idString(doc.inboundAgentId);
     const outboundAgentId = idString(doc.outboundAgentId);
     return {
-        _id: doc._id?.toString(),
+        _id: doc._id.toString(),
         tenantId: doc.tenantId.toString(),
         userId: doc.userId.toString(),
         provider: doc.provider,
@@ -204,10 +205,9 @@ async function agentNamesById(ids: (MongoObjectId | null | undefined)[]): Promis
 }
 
 async function findOwnedNumber(owner: VoiceOwnerScope, numberId: string): Promise<OwnedNumberDoc> {
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    const doc = await numbers.findOne({ _id: toObjectId(numberId, 'Number ID'), userId: owner.userId });
-    if (!doc?._id) throw new Error('Number not found');
-    return doc as OwnedNumberDoc;
+    const doc = await findItem('numbers', { _id: toObjectId(numberId, 'Number ID') }, owner.userId);
+    if (!doc) throw new Error('Number not found');
+    return doc;
 }
 
 const CALL_TYPE_WORD: Record<VoiceAgentCallType, string> = {
@@ -235,8 +235,7 @@ async function findOwnedAgent(
 }
 
 async function listItemFor(owner: VoiceOwnerScope, numberId: MongoObjectId): Promise<VoiceNumberListItem> {
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    const doc = await numbers.findOne({ _id: numberId, userId: owner.userId }, { projection: { apiKeySealed: 0 } });
+    const doc = await findItem('numbers', { _id: numberId }, owner.userId);
     if (!doc) throw new Error('Number not found');
     const names = await agentNamesById([doc.inboundAgentId, doc.outboundAgentId]);
     return mapVoiceNumberDoc(doc, names);
@@ -248,14 +247,11 @@ async function withImportState(
     provider: VoiceProvider,
     accountNumbers: ProviderAccountNumber[],
 ): Promise<AccountNumber[]> {
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    const existing = await numbers
-        .find(
-            { provider, phoneNumber: { $in: accountNumbers.map((n) => n.phoneNumber) } },
-            { projection: { phoneNumber: 1, userId: 1 } },
-        )
-        .toArray();
-    const ownerOf = new Map(existing.map((doc) => [doc.phoneNumber, doc.userId.toString()]));
+    const wanted = new Set(accountNumbers.map((n) => n.phoneNumber));
+    const existing = await findItemsAnywhere('numbers', { phoneNumber: { $in: [...wanted] } });
+    const ownerOf = new Map(
+        existing.filter((doc) => wanted.has(doc.phoneNumber)).map((doc) => [doc.phoneNumber, doc.userId.toString()]),
+    );
     const me = owner.userId.toString();
 
     return accountNumbers.map((n) => {
@@ -292,14 +288,15 @@ async function importNumbers(owner: VoiceOwnerScope, input: ImportInput): Promis
         if (problem) throw new Error(problem);
     }
 
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
+    if ((await countNumbers(owner.userId)) + chosen.length > VOICE_NUMBER_LIMITS.maxPerOwner) {
+        throw new Error(`One account can connect up to ${VOICE_NUMBER_LIMITS.maxPerOwner} numbers`);
+    }
     const imported: VoiceNumberListItem[] = [];
 
     for (const n of chosen) {
         const now = new Date();
         const doc: VoiceNumberDoc = {
-            tenantId: owner.tenantId,
-            userId: owner.userId,
+            _id: new MongoObjectId(),
             provider: input.provider,
             phoneNumber: n.phoneNumber,
             providerNumberId: n.providerNumberId,
@@ -311,26 +308,26 @@ async function importNumbers(owner: VoiceOwnerScope, input: ImportInput): Promis
             createdAt: now,
             updatedAt: now,
         };
+        let added: boolean;
         try {
-            const { insertedId } = await numbers.insertOne(doc);
-            imported.push(mapVoiceNumberDoc({ ...doc, _id: insertedId }, new Map()));
+            added = await pushItem('numbers', owner, doc, { phoneNumber: n.phoneNumber });
         } catch (error) {
             if (!isMongoDuplicateKeyError(error)) throw error;
-            const mine = await numbers.findOne({
-                provider: input.provider,
-                phoneNumber: n.phoneNumber,
-                userId: owner.userId,
-            });
-            if (!mine) throw new Error(`${n.phoneNumber} is already connected to another Aixel Labs account`);
+            throw new Error(`${n.phoneNumber} is already connected to another Aixel Labs account`);
+        }
+        if (added) {
+            imported.push(mapVoiceNumberDoc({ ...doc, tenantId: owner.tenantId, userId: owner.userId }, new Map()));
+        } else {
             // Re-import of a number we already have: refresh the key (it may have been rotated).
-            const refresh: Record<string, unknown> = { apiKeySealed: input.apiKeySealed, updatedAt: now };
+            const refresh: Record<string, unknown> = { apiKeySealed: input.apiKeySealed };
             if (input.extra?.voicelink) refresh['voicelink.clientId'] = input.extra.voicelink.clientId ?? null;
             // The routing saved before AI answering (twilio.previousRouting) is kept.
             if (input.extra?.twilio) {
                 refresh['twilio.accountSid'] = input.extra.twilio.accountSid;
                 refresh['twilio.apiKeySid'] = input.extra.twilio.apiKeySid;
             }
-            await numbers.updateOne({ _id: mine._id }, { $set: refresh });
+            const same = await updateItem('numbers', { phoneNumber: n.phoneNumber, provider: input.provider }, { set: refresh });
+            if (!same) throw new Error(`${n.phoneNumber} is already connected through another provider. Remove it there first.`);
         }
     }
 
@@ -353,7 +350,6 @@ export const importTelnyxNumbers = async (
     runAuthenticatedAction(async function importTelnyxNumbers(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const key = assertApiKey(apiKey);
-        await ensureVoiceAgentIndexes();
         return importNumbers(owner, {
             provider: VoiceProvider.TELNYX,
             accountNumbers: await listTelnyxAccountNumbers(key),
@@ -382,7 +378,6 @@ export const importVoiceLinkNumbers = async (
     runAuthenticatedAction(async function importVoiceLinkNumbers(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const auth = assertVoiceLinkCredentials(credentials);
-        await ensureVoiceAgentIndexes();
         return importNumbers(owner, {
             provider: VoiceProvider.VOICELINK,
             accountNumbers: await listVoiceLinkAccountNumbers(auth),
@@ -414,7 +409,6 @@ export const importTwilioNumbers = async (
     runAuthenticatedAction(async function importTwilioNumbers(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const auth = assertTwilioCredentials(credentials);
-        await ensureVoiceAgentIndexes();
         return importNumbers(owner, {
             provider: VoiceProvider.TWILIO,
             accountNumbers: await listTwilioAccountNumbers(auth),
@@ -430,12 +424,7 @@ export const importTwilioNumbers = async (
 export const listMyNumbers = async (): Promise<ALApiResponse<VoiceNumberListItem[]>> =>
     runAuthenticatedAction(async function listMyNumbers(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
-        await ensureVoiceAgentIndexes();
-        const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-        const docs = await numbers
-            .find({ userId: owner.userId }, { projection: { apiKeySealed: 0 } })
-            .sort({ createdAt: -1 })
-            .toArray();
+        const docs = await listItems('numbers', owner.userId);
         const names = await agentNamesById(docs.flatMap((doc) => [doc.inboundAgentId, doc.outboundAgentId]));
         return docs.map((doc) => mapVoiceNumberDoc(doc, names));
     });
@@ -464,10 +453,9 @@ export const setNumberAgent = async (
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const doc = await findOwnedNumber(owner, numberId);
         const provider = providerOf(doc);
-        const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
         const save = (fields: Pick<VoiceNumberDoc, 'inboundAgentId' | 'outboundAgentId'>) => {
             Object.assign(doc, fields);
-            return numbers.updateOne({ _id: doc._id, userId: owner.userId }, { $set: { ...fields, updatedAt: new Date() } });
+            return updateItem('numbers', { _id: doc._id }, { set: fields });
         };
 
         const agent = callType && agentId ? await findOwnedAgent(owner, agentId, callType) : null;
@@ -506,8 +494,7 @@ export const removeNumber = async (numberId: string): Promise<ALApiResponse<{ re
         const doc = await findOwnedNumber(owner, numberId);
         await providerOf(doc).release(doc);
 
-        const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-        await numbers.deleteOne({ _id: doc._id, userId: owner.userId });
+        await pullItems('numbers', owner.userId, { _id: doc._id });
         return { removed: true as const };
     });
 };

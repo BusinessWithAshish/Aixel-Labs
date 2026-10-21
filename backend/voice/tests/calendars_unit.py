@@ -209,7 +209,7 @@ async def provider_tests(fake: FakeComposio):
 async def session_tests(fake: FakeComposio):
     print("\n== the Composio session (direct tools preset) ==")
     import aiohttp
-    conns = product.db().voice_calendar_connections
+    conns = testdb.Connections(product.db())
     user = ObjectId()
     d = day_ahead(3)
     a, b = at(d, 0), at(d, 23, 59)
@@ -252,7 +252,7 @@ async def session_tests(fake: FakeComposio):
         n1 = len(fake.created())
         o = calendars.Outlook(str(user), "ca_s2", "primary")
         await o.availability(a, b, KOL)
-        ok("the session the app stored on voice_calendar_connections is used, none made",
+        ok("the session the app stored on the connection is used, none made",
            len(fake.created()) == n1 and fake.calls("OUTLOOK_GET_CALENDAR_VIEW")[-1]["session_id"] == app_sid)
 
         # Composio forgets it: the tool still answers, from a new session that is stored for next time.

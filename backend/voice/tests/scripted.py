@@ -92,14 +92,14 @@ def tts(text, quiet=False):
     raise RuntimeError(f"all TTS models failed for {text!r}: {last}")
 
 def give_owner_key(db, tenant, user, key=None):
-    """The owner's Gemini API key, saved as the app saves it (voice_settings, sealed): every customer call
+    """The owner's Gemini API key, saved as the app saves it (voice_accounts, sealed): every customer call
     runs on it. Tests use the real key from .env as the fixture owner's key (`key` overrides)."""
     import product
     from datetime import datetime, timezone
     key, now = key or os.environ["GEMINI_API_KEY"], datetime.now(timezone.utc)
     gemini = {"keySealed": product.seal_secret(key), "last4": key[-4:], "status": "OK", "statusMessage": None,
               "checkedAt": now, "savedAt": now}
-    db.voice_settings.update_one({"userId": user}, {"$set": {"tenantId": tenant, "gemini": gemini, "updatedAt": now},
+    db.voice_accounts.update_one({"userId": user}, {"$set": {"tenantId": tenant, "gemini": gemini, "updatedAt": now},
                                                      "$setOnInsert": {"createdAt": now}}, upsert=True)
 
 def number_sig(number):   # a customer number's webhooks are signed, like the app signs them (product.sign)
@@ -221,7 +221,7 @@ async def run(port, name, callee=None, save=None, inbound=False, ring=0.0, texml
     return {"stream": sid, "first_sound": first, "true_gaps_ms": true_gaps}
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("port"); ap.add_argument("scenario"); ap.add_argument("--warm", action="store_true"); ap.add_argument("--callee"); ap.add_argument("--save"); ap.add_argument("--inbound", action="store_true"); ap.add_argument("--ring", type=float, default=0.0); ap.add_argument("--texml", action="store_true"); ap.add_argument("--number", help="with --texml: a customer number id (voice_numbers)")
+    ap = argparse.ArgumentParser(); ap.add_argument("port"); ap.add_argument("scenario"); ap.add_argument("--warm", action="store_true"); ap.add_argument("--callee"); ap.add_argument("--save"); ap.add_argument("--inbound", action="store_true"); ap.add_argument("--ring", type=float, default=0.0); ap.add_argument("--texml", action="store_true"); ap.add_argument("--number", help="with --texml: a customer number id (an item of voice_accounts.numbers)")
     a = ap.parse_args()
     if a.warm:
         for ln in SCEN[a.scenario]:

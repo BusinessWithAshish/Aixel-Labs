@@ -231,7 +231,7 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     await input.fill('not a key');
     await save.click();
     await expect(dialog.getByRole('alert')).toContainText('That does not look like a Gemini API key.');
-    expect((await db.getVoiceSettings(E2E_USER))?.gemini).toBeNull();
+    expect((await db.getVoiceAccount(E2E_USER))?.gemini).toBeNull();
 
     await input.fill(GOOD_KEY);
     await dialog.getByRole('radio', { name: /^Free tier/ }).click();
@@ -242,7 +242,7 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     await expect(card(page).getByTestId('gemini-key-summary')).toContainText(`Key ending in ${GOOD_KEY.slice(-4)}`);
     expect(gemini.keys).toEqual([INVALID_KEY, DISABLED_KEY, QUOTA_KEY, GOOD_KEY]);
 
-    const stored = (await db.getVoiceSettings(E2E_USER))?.gemini;
+    const stored = (await db.getVoiceAccount(E2E_USER))?.gemini;
     expect(stored).toMatchObject({
         last4: GOOD_KEY.slice(-4),
         status: VoiceGeminiKeyStatus.OK,
@@ -260,7 +260,7 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     await card(page).getByTestId('gemini-key-tier').click();
     await page.getByRole('option', { name: 'Paid tier' }).click();
     await expect(page.getByText('Saved: paid tier')).toBeVisible();
-    await expect.poll(async () => (await db.getVoiceSettings(E2E_USER))?.gemini?.tier).toBe('paid');
+    await expect.poll(async () => (await db.getVoiceAccount(E2E_USER))?.gemini?.tier).toBe('paid');
     await expect(page.getByTestId('voice-agent-card').first().getByTestId('gemini-key-line')).toContainText('· paid tier');
 
     // Calls can start now.
@@ -338,7 +338,7 @@ test('a key Google refused on a call: the card, the playground and the call log 
     await card(page).getByRole('button', { name: 'Check now' }).click();
     await expect(page.getByText('Google accepts the key')).toBeVisible();
     await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Working');
-    expect((await db.getVoiceSettings(E2E_USER))?.gemini?.status).toBe(VoiceGeminiKeyStatus.OK);
+    expect((await db.getVoiceAccount(E2E_USER))?.gemini?.status).toBe(VoiceGeminiKeyStatus.OK);
 
     await card(page).getByRole('button', { name: 'Remove' }).click();
     const confirm = page.getByRole('dialog', { name: 'Remove your Gemini API key?' });
@@ -346,7 +346,7 @@ test('a key Google refused on a call: the card, the playground and the call log 
     await confirm.getByRole('button', { name: 'Remove key' }).click();
     await expect(page.getByText('Gemini API key removed')).toBeVisible();
     await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Not set');
-    expect((await db.getVoiceSettings(E2E_USER))?.gemini).toBeNull();
+    expect((await db.getVoiceAccount(E2E_USER))?.gemini).toBeNull();
 });
 
 test('the open page asks Google about the key again every 10 minutes, with the free list-models call', async ({
@@ -369,7 +369,7 @@ test('the open page asks Google about the key again every 10 minutes, with the f
     await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Working');
     expect(gemini.keys.slice(before)).toEqual([GOOD_KEY]);
     expect(gemini.urls.slice(before)).toEqual(['/v1beta/models?pageSize=1']);
-    expect((await db.getVoiceSettings(E2E_USER))?.gemini?.status).toBe(VoiceGeminiKeyStatus.OK);
+    expect((await db.getVoiceAccount(E2E_USER))?.gemini?.status).toBe(VoiceGeminiKeyStatus.OK);
 });
 
 test('the playground shows the engine’s key refusal in plain words with a link to the key', async ({ page, db }) => {

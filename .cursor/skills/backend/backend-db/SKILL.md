@@ -53,6 +53,12 @@ Scrapers never write Mongo. Persistence is frontend-owned; shapes are backend-ow
 | `LEAD_LISTS` | `lead_lists` | `UserLeadListDoc` |
 | `COUPONS` | `coupons` | `CouponDoc` |
 | `COUPON_REDEMPTIONS` | `coupon_redemptions` | `CouponRedemptionDoc` |
+| `VOICE_ACCOUNTS` | `voice_accounts` | `VoiceAccountDoc` — one per owner: Gemini key, `numbers[]`, `calendars[]` |
+| `VOICE_AGENTS` | `voice_agents` | `VoiceAgentDoc` |
+| `VOICE_CALLS` | `voice_calls` | `VoiceCallDoc` — engine-written; caller memory is `memory` on the call |
+| `VOICE_BOOKINGS` | `voice_bookings` | `VoiceBookingDoc` |
+| `VOICE_CAMPAIGNS` | `voice_campaigns` | `VoiceCampaignDoc` |
+| `VOICE_CAMPAIGN_CONTACTS` | `voice_campaign_contacts` | `VoiceCampaignContactDoc` — engine claims with leases |
 
 Always use `MongoCollections.*` — never raw collection name strings in new code.
 
@@ -82,6 +88,7 @@ LeadSource   →  LeadDoc.source  (via getLeadSoruceFromSubModule on FE)
   `LEAD_GENERATION_SUB_MODULES` here, then FE checklist
   (`frontend-business-lead-generation`).
 - Shared `leads` docs are **never** cascade-deleted; only `user_leads` / `lead_lists`.
+- Deleting a user or tenant also deletes their voice docs (`server/voice-agent/cascade-delete.ts`).
 
 Credits are a field on `UserDoc` (`credits?`) — not a separate collection.
 

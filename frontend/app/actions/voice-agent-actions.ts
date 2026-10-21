@@ -7,8 +7,7 @@ import {
     MongoObjectId,
     type VoiceAgent,
     type VoiceAgentDoc,
-    type VoiceCallerMemoryDoc,
-    type VoiceNumberDoc,
+    type VoiceCallDoc,
 } from '@aixellabs/backend/db';
 import {
     VOICE_AGENT_SUB_MODULES,
@@ -48,6 +47,7 @@ import {
 import { openSecret, playgroundSocketUrl, sealSecret } from '@/server/voice-agent/engine';
 import { assertGeminiKeySet } from '@/server/voice-agent/gemini-key';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
+import { listItems, updateItem } from '@/server/voice-agent/accounts';
 import { assertUsableDestination } from '@/server/voice-agent/calendar-connections';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 import { parseWebhookUrl } from '@/server/voice-agent/public-url';
@@ -241,14 +241,9 @@ export const getVoiceAgentUsage = async (agentId: string): Promise<ALApiResponse
     runAuthenticatedAction(async function getVoiceAgentUsage(userId) {
         const uid = requireUserObjectId(userId);
         const id = toObjectId(agentId, 'Agent ID');
-        const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-        const docs = await numbers
-            .find(
-                { userId: uid, $or: [{ inboundAgentId: id }, { outboundAgentId: id }] },
-                { projection: { phoneNumber: 1, provider: 1, inboundAgentId: 1, outboundAgentId: 1 } },
-            )
-            .sort({ phoneNumber: 1 })
-            .toArray();
+        const docs = (await listItems('numbers', uid))
+            .filter((doc) => doc.inboundAgentId?.equals(id) || doc.outboundAgentId?.equals(id))
+            .sort((a, b) => a.phoneNumber.localeCompare(b.phoneNumber));
         const use = (doc: (typeof docs)[number]): VoiceAgentNumberUse => ({
             id: doc._id.toString(),
             phoneNumber: doc.phoneNumber,
@@ -267,15 +262,13 @@ export const deleteVoiceAgent = async (agentId: string): Promise<ALApiResponse<{
         const id = toObjectId(agentId, 'Agent ID');
 
         const agents = await agentsCollection();
-        const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
+        const numbers = await listItems('numbers', uid);
 
         // A number answered by this agent is pointed at the engine in its provider account (Telnyx:
         // our TeXML app; VoiceLink: our bot; Twilio: its Voice URL). Dropping the agent here would
         // leave its callers ringing into nothing, so AI answering must be turned off first (that also
         // puts the number's own routing back).
-        const answering = await numbers
-            .find({ userId: uid, inboundAgentId: id }, { projection: { phoneNumber: 1 } })
-            .toArray();
+        const answering = numbers.filter((n) => n.inboundAgentId?.equals(id));
         if (answering.length > 0) {
             const list = answering.map((n) => n.phoneNumber).join(', ');
             throw new Error(`This agent answers calls on ${list}. Turn AI answering off there first, then delete it.`);
@@ -284,13 +277,12 @@ export const deleteVoiceAgent = async (agentId: string): Promise<ALApiResponse<{
         const { deletedCount } = await agents.deleteOne({ _id: id, userId: uid });
         if (deletedCount === 0) throw new Error('Agent not found');
 
-        await numbers.updateMany(
-            { userId: uid, outboundAgentId: id },
-            { $set: { outboundAgentId: null, updatedAt: new Date() } },
-        );
+        for (const n of numbers.filter((n) => n.outboundAgentId?.equals(id))) {
+            await updateItem('numbers', { _id: n._id }, { set: { outboundAgentId: null } });
+        }
         // What it remembered about callers goes with it (call logs stay).
-        const memories = await getCollection<VoiceCallerMemoryDoc>(MongoCollections.VOICE_CALLER_MEMORIES);
-        await memories.deleteMany({ userId: uid, agentId: id });
+        const calls = await getCollection<VoiceCallDoc>(MongoCollections.VOICE_CALLS);
+        await calls.updateMany({ userId: uid, agentId: id, memory: { $exists: true } }, { $unset: { memory: '' } });
 
         return { id: agentId };
     });

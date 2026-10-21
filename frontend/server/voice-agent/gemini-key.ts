@@ -1,16 +1,15 @@
 import 'server-only';
 
 import {
-    getCollection,
-    MongoCollections,
     VoiceGeminiKeyStatus,
     type MongoObjectId,
+    type VoiceAccountDoc,
     type VoiceGeminiKeyView,
-    type VoiceSettingsDoc,
 } from '@aixellabs/backend/db';
+import { voiceAccountsCollection } from '@/server/voice-agent/accounts';
 
 /**
- * Each owner runs their agents on their own Gemini API key (`VoiceSettingsDoc.gemini`, sealed).
+ * Each owner runs their agents on their own Gemini API key (`VoiceAccountDoc.gemini`, sealed).
  * This module and the engine's `product.gemini_key_for` are the only places that decide which key
  * a call uses; a later "use Aixel Labs credits" option would be chosen here.
  *
@@ -95,10 +94,6 @@ export async function checkGeminiKey(key: string): Promise<void> {
     throw refusal(res.status, body);
 }
 
-export async function voiceSettingsCollection() {
-    return getCollection<VoiceSettingsDoc>(MongoCollections.VOICE_SETTINGS);
-}
-
 /** The view when no key is saved (also what a page shows if the status could not be read). */
 export const NO_GEMINI_KEY: VoiceGeminiKeyView = {
     set: false,
@@ -109,7 +104,7 @@ export const NO_GEMINI_KEY: VoiceGeminiKeyView = {
     tier: null,
 };
 
-export function toGeminiKeyView(doc: Pick<VoiceSettingsDoc, 'gemini'> | null): VoiceGeminiKeyView {
+export function toGeminiKeyView(doc: Pick<VoiceAccountDoc, 'gemini'> | null): VoiceGeminiKeyView {
     const gemini = doc?.gemini;
     if (!gemini) return NO_GEMINI_KEY;
     return {
@@ -124,14 +119,14 @@ export function toGeminiKeyView(doc: Pick<VoiceSettingsDoc, 'gemini'> | null): V
 
 /** What the owner's key looks like to the UI (never the key). */
 export async function loadGeminiKeyView(userId: MongoObjectId): Promise<VoiceGeminiKeyView> {
-    const settings = await voiceSettingsCollection();
-    const doc = await settings.findOne({ userId }, { projection: { 'gemini.keySealed': 0 } });
+    const accounts = await voiceAccountsCollection();
+    const doc = await accounts.findOne({ userId }, { projection: { 'gemini.keySealed': 0 } });
     return toGeminiKeyView(doc);
 }
 
 /** Throws a plain message when the owner has no key: nothing that runs a call may start without one. */
 export async function assertGeminiKeySet(userId: MongoObjectId): Promise<void> {
-    const settings = await voiceSettingsCollection();
-    const has = await settings.countDocuments({ userId, gemini: { $type: 'object' } }, { limit: 1 });
+    const accounts = await voiceAccountsCollection();
+    const has = await accounts.countDocuments({ userId, gemini: { $type: 'object' } }, { limit: 1 });
     if (!has) throw new Error(GEMINI_KEY_MISSING_MESSAGE);
 }

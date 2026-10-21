@@ -121,7 +121,7 @@ def product_tests():
     print("\n== product: call id, tools, customer phone, the doc ==")
     tenant, user = ObjectId(), ObjectId()
     # Every customer call runs on its owner's own Gemini key (product.gemini_key_for): saved as the app saves it.
-    product.db().voice_settings.insert_one({"tenantId": tenant, "userId": user, "gemini": {"keySealed": product.seal_secret("AIza-unit-test-key")}})
+    testdb.set_account(product.db(), {"tenantId": tenant, "userId": user, "gemini": {"keySealed": product.seal_secret("AIza-unit-test-key")}})
     agent = {"_id": ObjectId(), "tenantId": tenant, "userId": user, "voice": "kore", "prompt": "You are Priya.", "callNotes": "Note.",
              "tools": {"booking": BOOKING}}
     number = {"_id": ObjectId(), "tenantId": tenant, "userId": user, "phoneNumber": "+15550001111", "provider": "TELNYX",
@@ -157,7 +157,7 @@ def product_tests():
         except product.AgentNoPrompt as e:
             refused = e.code == "agent_no_prompt" and e.words == product.AGENT_NO_PROMPT
         ok(f"an agent with no prompt ({blank!r}) gets no call (AgentNoPrompt), call notes or not", refused)
-    product.db().voice_settings.delete_many({"userId": user})
+    product.db().voice_accounts.delete_many({"userId": user})
     rec = {"turns": [{"who": "agent", "text": "Hi"}], "voice": "kore", "tool_calls": [{"name": "check_availability"}]}
     inbound["live_at"] = product.now()
     doc = product.call_doc(inbound, rec, {"gaps": [900]})

@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { getCollection, MongoCollections, type VoiceNumberDoc, VoiceProvider } from '@aixellabs/backend/db';
+import { type VoiceNumberDoc, VoiceProvider } from '@aixellabs/backend/db';
+import { findItemsAnywhere, updateItem } from '@/server/voice-agent/accounts';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { numberWebhookUrl, openSecret } from '@/server/voice-agent/engine';
 import type { NumberProvider, OwnedNumberDoc, ProviderAccountNumber } from '@/server/voice-agent/number-provider';
@@ -35,8 +36,7 @@ const CALL_CONTROL_APP_LABEL = 'Aixel Labs voice agents';
 const ACCOUNT_LIMIT_CODE = '10039';
 
 async function setNumberFields(doc: OwnedNumberDoc, fields: Partial<VoiceNumberDoc>): Promise<void> {
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    await numbers.updateOne({ _id: doc._id }, { $set: { ...fields, updatedAt: new Date() } });
+    await updateItem('numbers', { _id: doc._id }, { set: fields });
 }
 
 /**
@@ -83,12 +83,8 @@ async function ensureCallControlApp(doc: OwnedNumberDoc, key: string): Promise<s
 /** Deletes the shared Call Control app only when it is ours and no other number still uses it. */
 async function releaseCallControlApp(doc: OwnedNumberDoc, key: string): Promise<void> {
     if (!doc.callControlAppId) return;
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    const stillUsed = await numbers.countDocuments(
-        { _id: { $ne: doc._id }, callControlAppId: doc.callControlAppId },
-        { limit: 1 },
-    );
-    if (stillUsed) return;
+    const users = await findItemsAnywhere('numbers', { callControlAppId: doc.callControlAppId });
+    if (users.some((n) => !n._id.equals(doc._id) && n.callControlAppId === doc.callControlAppId)) return;
     const apps = await listCallControlApplications(key);
     const app = apps.find((a) => a.id === doc.callControlAppId);
     if (app?.application_name === CALL_CONTROL_APP_LABEL) await deleteCallControlApplication(key, app.id);

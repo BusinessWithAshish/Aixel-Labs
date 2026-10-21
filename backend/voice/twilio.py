@@ -255,7 +255,7 @@ def _write_unanswered(number_id: str, agent_id: str, form: dict, ended_by: str):
     call_sid = form.get("CallSid")
     if _has_doc(call_sid):
         return
-    number = db.voice_numbers.find_one({"_id": product.oid(number_id)}) if product.oid(number_id) else None
+    number = product.find_number(number_id)
     if not number:
         logger.warning(f"twilio-events: number {number_id} is gone, ignoring call {call_sid}")
         return

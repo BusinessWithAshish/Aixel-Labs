@@ -6,7 +6,7 @@ was a success by the owner's own definition, and up to 10 custom fields. With ca
 on (`memory: true`) the same pass also rewrites what the agent remembers about the caller.
 
     voice_calls.analysis      {summary, sentiment, successful, fields: {...}, model, error?}
-    voice_caller_memories     one brief per owner + agent + caller number (product.load_memory)
+    voice_calls.memory        the brief after this call, the caller's `current` one (product.load_memory)
 
 It runs in the background task that writes the call's document (product.save_call), on the
 call's own Gemini key (the owner's), with structured JSON output. It never delays the call's
@@ -21,6 +21,7 @@ import re
 
 import aiohttp
 from loguru import logger
+from pymongo.errors import DuplicateKeyError
 
 import product
 
@@ -222,18 +223,22 @@ async def generate(key: str, body: dict) -> str:
 
 
 def _store(ctx: dict, doc: dict, result: dict, brief: str | None):
-    product.db().voice_calls.update_one({"_id": doc["_id"]}, {"$set": {"analysis": result}})
+    """The analysis on the call, and with a new brief, the caller's memory: it becomes the current one."""
+    calls = product.db().voice_calls
     phone = ctx.get("memory_phone")
     if not brief or not phone:
+        calls.update_one({"_id": doc["_id"]}, {"$set": {"analysis": result}})
         return
-    at = product.now()
-    product.db().voice_caller_memories.update_one(
-        {"userId": doc["userId"], "agentId": doc["agentId"], "phone": phone},
-        {"$set": {"tenantId": doc["tenantId"], "brief": brief, "lastCallId": doc["_id"], "lastCallAt": doc["startedAt"],
-                  "updatedAt": at},
-         "$inc": {"calls": 1}, "$setOnInsert": {"createdAt": at}},
-        upsert=True,
-    )
+    previous = ctx.get("memory_used") or {}
+    memory = {"brief": brief, "calls": int(previous.get("calls") or 0) + 1,
+              "since": previous.get("since") or doc["startedAt"], "current": True}
+    calls.update_many({"userId": doc["userId"], "agentId": doc["agentId"], "callerPhone": phone,
+                       "memory.current": True, "_id": {"$ne": doc["_id"]}}, {"$unset": {"memory.current": ""}})
+    try:
+        calls.update_one({"_id": doc["_id"]}, {"$set": {"analysis": result, "callerPhone": phone, "memory": memory}})
+    except DuplicateKeyError:  # a call with the same caller stored its brief a moment ago: that one stays current
+        memory.pop("current")
+        calls.update_one({"_id": doc["_id"]}, {"$set": {"analysis": result, "callerPhone": phone, "memory": memory}})
 
 
 async def after_call(ctx: dict, doc: dict):

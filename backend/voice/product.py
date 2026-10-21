@@ -1,16 +1,15 @@
 """The voice agents product: customers' agents, their numbers, and the record of each call.
 
-The Aixel Labs app (Next.js, `frontend/server/voice-agent/engine.ts`) keeps three
-Mongo collections, and this engine reads two of them and writes the third:
+The Aixel Labs app (Next.js, `frontend/server/voice-agent/engine.ts`) keeps the voice
+collections; this engine reads the owner's setup and writes what happens on calls:
 
-    voice_agents   name, voice, prompt, call notes          read per call
-    voice_numbers  a customer's Telnyx, VoiceLink or Twilio number  read per call
-    voice_calls    one document per call, however it ended  written here
-    voice_bookings appointments the agent booked              written by tools.py
-    voice_settings the owner's own Gemini API key             read per call
-    voice_caller_memories  what an agent remembers about a caller   read per call, written by analysis.py
+    voice_accounts  one per owner: their Gemini key, numbers, connected apps   read per call
+    voice_agents    name, voice, prompt, call notes                            read per call
+    voice_calls     one document per call, however it ended                    written here;
+                    `memory`: what the agent remembers about the caller        written by analysis.py
+    voice_bookings  appointments the agent booked                              written by tools.py
 
-The shapes are `VoiceAgentDoc` / `VoiceNumberDoc` / `VoiceCallDoc` in the
+The shapes are `VoiceAccountDoc` / `VoiceAgentDoc` / `VoiceCallDoc` in the
 backend's `src/db/types.ts`. Both sides share one secret, `VOICELAB_KEY` (the app
 calls it VOICE_ENGINE_SECRET): it signs URLs and tokens, and it seals the
 customers' Telnyx keys and VoiceLink tokens at rest.
@@ -128,6 +127,16 @@ def load_agent(agent_id, user_id) -> dict | None:
     return db().voice_agents.find_one({"_id": aid, "userId": uid})
 
 
+def find_number(number_id) -> dict | None:
+    """A customer's number (an item of its owner's voice_accounts.numbers), with the owner's
+    `userId` and `tenantId` on it as on the rest of the code's number dicts; None if there is none."""
+    nid = oid(number_id)
+    account = db().voice_accounts.find_one({"numbers._id": nid}, {"numbers.$": 1, "userId": 1, "tenantId": 1}) if nid else None
+    if not account or not account.get("numbers"):
+        return None
+    return {**account["numbers"][0], "userId": account["userId"], "tenantId": account["tenantId"]}
+
+
 def load_number(number_id, direction: str = "INBOUND", agent_id=None) -> tuple[dict | None, dict | None]:
     """A customer's number and the agent for this call (None for either that is missing).
 
@@ -135,8 +144,7 @@ def load_number(number_id, direction: str = "INBOUND", agent_id=None) -> tuple[d
     agent the app asked for, else the number's `outboundAgentId`. Numbers saved before the
     split carry a single `agentId`, which then does both.
     """
-    nid = oid(number_id)
-    number = db().voice_numbers.find_one({"_id": nid}) if nid else None
+    number = find_number(number_id)
     agent = None
     if number:
         field = "inboundAgentId" if direction == "INBOUND" else "outboundAgentId"
@@ -148,8 +156,8 @@ def load_number(number_id, direction: str = "INBOUND", agent_id=None) -> tuple[d
 
 # --- The owner's Gemini key ---------------------------------------------------------------------
 # Every customer call (Telnyx, Twilio, VoiceLink, playground) runs on its owner's own Gemini API
-# key: voice_settings.gemini.keySealed, saved in the app, sealed like the number keys
-# (`VoiceSettingsDoc` in the backend's types.ts). Never on ours: GEMINI_API_KEY in .env is for
+# key: voice_accounts.gemini.keySealed, saved in the app, sealed like the number keys
+# (`VoiceAccountDoc` in the backend's types.ts). Never on ours: GEMINI_API_KEY in .env is for
 # Ashish's own line only (/texml?key=, /telnyx without n, --call, /a). gemini_key_for is the one
 # place that picks a customer call's key; a later "use Aixel Labs credits" option would be
 # decided here (with the app's server/voice-agent/gemini-key.ts).
@@ -190,7 +198,7 @@ def require_prompt(agent: dict):
 
 def gemini_key_for(user_id) -> tuple[str, str]:
     """(key, sealed) of the owner's Gemini API key. Raises GeminiKeyMissing."""
-    doc = db().voice_settings.find_one({"userId": oid(user_id)}, {"gemini.keySealed": 1})
+    doc = db().voice_accounts.find_one({"userId": oid(user_id)}, {"gemini.keySealed": 1})
     sealed = ((doc or {}).get("gemini") or {}).get("keySealed")
     if not sealed:
         raise GeminiKeyMissing("no Gemini API key is saved")
@@ -203,7 +211,7 @@ def gemini_key_for(user_id) -> tuple[str, str]:
 def note_key_problem(user_id, sealed: str, status: str, words: str, google: str):
     """Tells the app Google refused the key (a VoiceGeminiKeyStatus and plain words), unless it was replaced since."""
     try:
-        db().voice_settings.update_one(
+        db().voice_accounts.update_one(
             {"userId": oid(user_id), "gemini.keySealed": sealed},
             {"$set": {"gemini.status": status, "gemini.statusMessage": f"{words} (Google: {google[:160]})",
                       "gemini.checkedAt": now()}},
@@ -347,8 +355,9 @@ def voicemail_message(agent: dict, values: dict[str, str]) -> str | None:
     return " ".join(render(str(vm.get("message") or ""), values).split())[:VOICEMAIL_MAX] or None
 
 
-# --- Caller memory (voice_caller_memories, written by analysis.py) ------------------------------
-# Keyed by owner + agent + the caller's E.164 number: each agent remembers its own conversations only.
+# --- Caller memory (voice_calls.memory, written by analysis.py) -----------------------------------
+# On the call it was written after, keyed by its agent + `callerPhone` (E.164); the caller's latest
+# brief is `memory.current`. Each agent remembers its own conversations only.
 
 
 def memory_phone(ctx: dict) -> str | None:
@@ -358,7 +367,11 @@ def memory_phone(ctx: dict) -> str | None:
 
 
 def load_memory(doc: dict, phone: str) -> dict | None:
-    return db().voice_caller_memories.find_one({"userId": doc["userId"], "agentId": doc["agentId"], "phone": phone})
+    """The caller's current memory: {brief, calls, since, lastCallAt} (the call it is on), or None."""
+    call = db().voice_calls.find_one(
+        {"userId": doc["userId"], "agentId": doc["agentId"], "callerPhone": phone, "memory.current": True},
+        {"memory": 1, "startedAt": 1})
+    return {**call["memory"], "lastCallAt": call["startedAt"]} if call else None
 
 
 def memory_section(memory: dict, tz: ZoneInfo = ZoneInfo("UTC")) -> str:
@@ -390,7 +403,9 @@ def _finish_ctx(ctx: dict, agent: dict) -> dict:
     if ctx["doc"]["direction"] == "OUTBOUND":
         ctx["voicemail"] = voicemail_message(agent, values)
     ctx["analysis"] = analysis.settings(agent)
-    ctx["memory_phone"] = memory_phone(ctx) if agent.get("memory") is True else None
+    if phone := memory_phone(ctx):
+        ctx["doc"]["callerPhone"] = phone
+    ctx["memory_phone"] = phone if agent.get("memory") is True else None
     parts = [agent_prompt(agent, values)]
     if ctx["memory_phone"]:
         try:

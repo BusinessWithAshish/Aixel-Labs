@@ -15,7 +15,6 @@ import {
     type VoiceCampaignDoc,
     type VoiceCampaignRetry,
     type VoiceCampaignWindow,
-    type VoiceNumberDoc,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
@@ -24,22 +23,14 @@ import { campaignSettingsSchema, parseOrThrow, type VoiceCampaignSettingsInput }
 import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key';
 import { assertGeminiKeySet } from '@/server/voice-agent/gemini-key';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
-import type { NumberProvider, OwnedNumberDoc } from '@/server/voice-agent/number-provider';
+import { findItem, listItems } from '@/server/voice-agent/accounts';
+import { providerOf, type OwnedNumberDoc } from '@/server/voice-agent/number-provider';
 import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
-import { telnyxNumbers } from '@/server/voice-agent/telnyx-numbers';
-import { twilioNumbers } from '@/server/voice-agent/twilio-numbers';
-import { voicelinkNumbers } from '@/server/voice-agent/voicelink-numbers';
 
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.CAMPAIGNS;
 /** Contacts per addVoiceCampaignContacts call: keeps each request well under the 1 MB action body limit. */
 const CONTACTS_PER_REQUEST = 500;
 const CONTACTS_SHOWN = 500;
-
-const PROVIDERS: Record<VoiceProvider, NumberProvider> = {
-    [VoiceProvider.TELNYX]: telnyxNumbers,
-    [VoiceProvider.VOICELINK]: voicelinkNumbers,
-    [VoiceProvider.TWILIO]: twilioNumbers,
-};
 
 // ---------------------------------------------------------------------------
 // Client shapes
@@ -185,10 +176,10 @@ async function statsByCampaign(ids: MongoObjectId[]): Promise<Map<string, VoiceC
 
 async function namesFor(docs: VoiceCampaignDoc[]) {
     const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
     const [agentDocs, numberDocs] = await Promise.all([
         agents.find({ _id: { $in: docs.map((d) => d.agentId) } }, { projection: { name: 1 } }).toArray(),
-        numbers.find({ _id: { $in: docs.map((d) => d.numberId) } }, { projection: { phoneNumber: 1 } }).toArray(),
+        // A campaign's number is its owner's; every campaign listed here has the same owner.
+        docs.length ? listItems('numbers', docs[0].userId) : [],
     ]);
     return {
         agent: new Map(agentDocs.map((d) => [d._id.toString(), d.name])),
@@ -264,10 +255,9 @@ async function findOutboundAgent(owner: VoiceOwnerScope, agentId: string) {
 }
 
 async function findOwnedNumber(owner: VoiceOwnerScope, numberId: string): Promise<OwnedNumberDoc> {
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    const doc = await numbers.findOne({ _id: toObjectId(numberId, 'Number ID'), userId: owner.userId });
-    if (!doc?._id) throw new Error('That number is no longer connected');
-    return doc as OwnedNumberDoc;
+    const doc = await findItem('numbers', { _id: toObjectId(numberId, 'Number ID') }, owner.userId);
+    if (!doc) throw new Error('That number is no longer connected');
+    return doc;
 }
 
 /** Everything a running campaign needs before the engine may dial: the agent, the number ready at its provider, a Gemini key. */
@@ -275,7 +265,7 @@ async function assertReadyToCall(owner: VoiceOwnerScope, campaign: VoiceCampaign
     await findOutboundAgent(owner, campaign.agentId.toString());
     const number = await findOwnedNumber(owner, campaign.numberId.toString());
     await assertGeminiKeySet(owner.userId);
-    await (PROVIDERS[number.provider] ?? telnyxNumbers).prepareCall(number);
+    await providerOf(number).prepareCall(number);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,16 +277,12 @@ export const getVoiceCampaignSetup = async (): Promise<ALApiResponse<VoiceCampai
     runAuthenticatedAction(async function getVoiceCampaignSetup(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
-        const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
         const [agentDocs, numberDocs] = await Promise.all([
             agents
                 .find({ userId: owner.userId, callType: { $ne: VoiceAgentCallType.INBOUND } }, { projection: { name: 1 } })
                 .sort({ name: 1 })
                 .toArray(),
-            numbers
-                .find({ userId: owner.userId }, { projection: { phoneNumber: 1, provider: 1 } })
-                .sort({ createdAt: -1 })
-                .toArray(),
+            listItems('numbers', owner.userId),
         ]);
         return {
             agents: agentDocs.map((d) => ({ id: d._id.toString(), name: d.name })),

@@ -11,7 +11,7 @@ The caller (tools_e2e's spoken lines) asks for "this Saturday at 2 pm" as Ravi K
   google  Saturday 2 pm is free in Google: the event is created there (Meet link asked for), mirrored into
           voice_bookings with `external`, availability was prefetched when the call connected; every tool ran
           in one Composio session (direct tools preset) pinned to the account, made at connect and stored on
-          the voice_calendar_connections doc; nothing used the legacy direct-execute path.
+          the connection (voice_accounts.calendars); nothing used the legacy direct-execute path.
   busy    Saturday 2 pm is busy in Google: no event and no booking at 2 pm.
   down    Composio answers 500: no times offered, no booking, she offers to take a message.
 One Live session at a time; fixtures are deleted afterwards. Never production Mongo.
@@ -55,7 +55,7 @@ async def test_google(port, fake, user, tenant):
     print("\n== Google Calendar: book Saturday at 2 pm, mirrored ==")
     fake.account("ca_e2e_google", str(user), "GOOGLE_CALENDAR", delay=0.3)
     # As the app leaves it before sessions existed: no composioSessionId yet.
-    conn = db.voice_calendar_connections.insert_one({
+    conn = testdb.Connections(db).insert_one({
         "tenantId": tenant, "userId": user, "provider": "GOOGLE_CALENDAR", "connectedAccountId": "ca_e2e_google",
         "authConfigId": "ac_e2e", "status": "ACTIVE", "label": "ravi@example.com", "statusReason": None,
         "createdAt": te.datetime.now(timezone.utc), "updatedAt": te.datetime.now(timezone.utc)}).inserted_id
@@ -80,7 +80,7 @@ async def test_google(port, fake, user, tenant):
     ok("google: the voice_bookings mirror points at it", mirror and (mirror.get("external") or {}).get("eventId") == (events[0]["id"] if events else None)
        and mirror["external"]["provider"] == "GOOGLE_CALENDAR" and mirror["external"]["connectedAccountId"] == "ca_e2e_google",
        str(mirror and mirror.get("external")))
-    sid = (db.voice_calendar_connections.find_one({"_id": conn}) or {}).get("composioSessionId")
+    sid = (testdb.Connections(db).find_one({"_id": conn}) or {}).get("composioSessionId")
     made = [r for r in reqs if r["kind"] == "session.create"]
     runs = [r for r in reqs if r["kind"] == "execute"]
     ok("google: one Composio session (direct tools preset, pinned to the account, the doc's auth config), stored on the connection",
@@ -142,6 +142,7 @@ async def main():
     fake = FakeComposio()
     runner = await fake.start(FAKE_PORT)
     user, tenant = ObjectId(), ObjectId()
+    scripted.give_owner_key(db, tenant, user)  # every customer call runs on its owner's own Gemini key
     tests = {"google": test_google, "busy": test_busy, "down": test_down}
     try:
         for i, name in enumerate(which):
@@ -153,7 +154,7 @@ async def main():
         db.voice_bookings.delete_many({"agentId": {"$in": CREATED}})
         db.voice_calls.delete_many({"agentId": {"$in": CREATED}})
         db.voice_agents.delete_many({"_id": {"$in": CREATED}})
-        db.voice_calendar_connections.delete_many({"userId": user})
+        testdb.Connections(db).delete_many({"userId": user})
     passed = sum(1 for _, p in te.RESULTS if p)
     print(f"\n{passed}/{len(te.RESULTS)} passed")
     for name, p in te.RESULTS:

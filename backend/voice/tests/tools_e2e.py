@@ -95,7 +95,7 @@ def fixtures():
              "inboundAgentId": agent_id, "outboundAgentId": agent_id}
         if provider == "TELNYX":
             n.update(texmlAppId="fake-texml-app", callControlAppId="fake-cc-app")
-        n["_id"] = db.voice_numbers.insert_one(n).inserted_id
+        n["_id"] = testdb.insert_number(db, n)
         CREATED["numbers"].append(n["_id"])
         return n
     stamp = str(int(time.time()))[-6:]
@@ -555,9 +555,9 @@ async def main():
         await fake.cleanup(); await hooks.cleanup()
         db.voice_bookings.delete_many({"agentId": {"$in": CREATED["agents"]}})
         db.voice_calls.delete_many({"agentId": {"$in": CREATED["agents"]}})
-        db.voice_numbers.delete_many({"_id": {"$in": CREATED["numbers"]}})
+        testdb.delete_numbers(db, CREATED["numbers"])
         db.voice_agents.delete_many({"_id": {"$in": CREATED["agents"]}})
-        db.voice_settings.delete_many({"userId": {"$in": CREATED.get("owners", [])}})
+        db.voice_accounts.delete_many({"userId": {"$in": CREATED.get("owners", [])}})
     passed = sum(1 for _, p in RESULTS if p)
     print(f"\n{passed}/{len(RESULTS)} passed")
     for name, p in RESULTS:

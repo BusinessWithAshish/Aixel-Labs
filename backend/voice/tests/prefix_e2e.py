@@ -154,10 +154,10 @@ def fixtures():
     base = {"tenantId": tenant, "userId": user, "inboundAgentId": agent["_id"], "outboundAgentId": agent["_id"], "createdAt": now, "updatedAt": now}
     tel = {**base, "provider": "TELNYX", "providerNumberId": "fake-pn-prefix", "phoneNumber": "+15550004441",
            "apiKeySealed": product.seal_secret(TELNYX_KEY), "texmlAppId": "fake-texml", "callControlAppId": "fake-cc"}
-    tel["_id"] = db.voice_numbers.insert_one(tel).inserted_id
+    tel["_id"] = testdb.insert_number(db, tel)
     tw = {**base, "provider": "TWILIO", "providerNumberId": "PN" + "4" * 32, "phoneNumber": "+15550004442",
           "apiKeySealed": product.seal_secret(AUTH_TOKEN), "twilio": {"accountSid": "AC" + "4" * 32, "apiKeySid": None}}
-    tw["_id"] = db.voice_numbers.insert_one(tw).inserted_id
+    tw["_id"] = testdb.insert_number(db, tw)
     import scripted
     scripted.give_owner_key(db, tenant, user)  # every customer call runs on its owner's own Gemini key
     return agent, tel, tw
@@ -166,8 +166,8 @@ def fixtures():
 def cleanup(agent, tel, tw, t0):
     ids = [tel["_id"], tw["_id"]]
     calls = db.voice_calls.delete_many({"$or": [{"agentId": agent["_id"]}, {"numberId": {"$in": ids}}]}).deleted_count
-    db.voice_numbers.delete_many({"_id": {"$in": ids}}); db.voice_agents.delete_one({"_id": agent["_id"]})
-    db.voice_settings.delete_many({"userId": agent["userId"]})
+    testdb.delete_numbers(db, ids); db.voice_agents.delete_one({"_id": agent["_id"]})
+    db.voice_accounts.delete_many({"userId": agent["userId"]})
     moved = 0   # this run's call records go where test records live
     (HERE / "calls" / "_tests").mkdir(exist_ok=True)
     for f in (HERE / "calls").glob("*.json"):

@@ -61,7 +61,7 @@ def fixtures():
     def number(phone, secret, twilio_state, inbound, outbound):
         n = {**base, "phoneNumber": phone, "providerNumberId": "PN" + uuid.uuid4().hex, "apiKeySealed": product.seal_secret(secret),
              "inboundAgentId": inbound, "outboundAgentId": outbound, "twilio": twilio_state}
-        n["_id"] = db.voice_numbers.insert_one(n).inserted_id
+        n["_id"] = testdb.insert_number(db, n)
         CREATED["numbers"].append(n["_id"])
         return n
     numbers = {
@@ -316,8 +316,8 @@ async def test_rest(port, agents, numbers):
     st, body = await ahttp("POST", url, {"numberId": nid, "to": TRIAL_BLOCKED}, auth)
     ok("trial account, unverified number -> 424 with Twilio's words", st == 424 and "Twilio refused the call" in body
        and "Trial accounts may only make calls to verified numbers" in body, f"HTTP {st} {body}")
-    wrong = db.voice_numbers.insert_one({**{k: v for k, v in n.items() if k != "_id"}, "phoneNumber": n["phoneNumber"] + "9",
-                                         "apiKeySealed": product.seal_secret("not-the-secret")}).inserted_id
+    wrong = testdb.insert_number(db, {**{k: v for k, v in n.items() if k != "_id"}, "phoneNumber": n["phoneNumber"] + "9",
+                                         "apiKeySealed": product.seal_secret("not-the-secret")})
     CREATED["numbers"].append(wrong)
     st, body = await ahttp("POST", url, {"numberId": str(wrong), "to": CALLEE}, auth)
     ok("rejected credentials -> 424 in plain words", st == 424 and "rejected the number's credentials" in body, f"HTTP {st} {body}")
@@ -523,7 +523,7 @@ async def main():
         ids = CREATED["numbers"] + te.CREATED["numbers"]
         db.voice_calls.delete_many({"numberId": {"$in": ids}})
         db.voice_bookings.delete_many({"agentId": {"$in": CREATED["agents"] + te.CREATED["agents"]}})
-        db.voice_numbers.delete_many({"_id": {"$in": ids}})
+        testdb.delete_numbers(db, ids)
         db.voice_agents.delete_many({"_id": {"$in": CREATED["agents"] + te.CREATED["agents"]}})
     passed = sum(1 for _, p in RESULTS if p)
     print(f"\n{passed}/{len(RESULTS)} passed")

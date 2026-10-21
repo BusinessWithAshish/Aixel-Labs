@@ -1,14 +1,12 @@
 import 'server-only';
 
 import {
-    getCollection,
-    MongoCollections,
     type VoiceLinkNumberState,
     type VoiceLinkRouting,
-    type VoiceNumberDoc,
     VoiceProvider,
 } from '@aixellabs/backend/db';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
+import { updateItem } from '@/server/voice-agent/accounts';
 import { numberWebhookUrl, openSecret, voicelinkSocketUrl } from '@/server/voice-agent/engine';
 import type { NumberProvider, OwnedNumberDoc, ProviderAccountNumber } from '@/server/voice-agent/number-provider';
 import {
@@ -92,19 +90,14 @@ function botInput(doc: OwnedNumberDoc, status: 0 | 1): VoiceLinkBotInput {
 }
 
 async function saveState(doc: OwnedNumberDoc, fields: Partial<VoiceLinkNumberState>): Promise<void> {
-    const set: Record<string, unknown> = { updatedAt: new Date() };
+    const set: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(fields)) set[`voicelink.${key}`] = value;
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    await numbers.updateOne({ _id: doc._id }, { $set: set });
+    await updateItem('numbers', { _id: doc._id }, { set });
     doc.voicelink = { ...doc.voicelink, ...fields };
 }
 
 async function forgetPreviousRouting(doc: OwnedNumberDoc): Promise<void> {
-    const numbers = await getCollection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
-    await numbers.updateOne(
-        { _id: doc._id },
-        { $unset: { 'voicelink.previousRouting': '' }, $set: { updatedAt: new Date() } },
-    );
+    await updateItem('numbers', { _id: doc._id }, { unset: ['voicelink.previousRouting'] });
     if (doc.voicelink) delete doc.voicelink.previousRouting;
 }
 

@@ -86,7 +86,7 @@ def fixtures():
               "apiKeySealed": product.seal_secret("KEY_FAKE_CUSTOMER_AF"), "phoneNumber": "+15550004444",
               "texmlAppId": "fake-texml-app", "callControlAppId": "fake-cc-app",
               "inboundAgentId": agent["_id"], "outboundAgentId": agent["_id"], "createdAt": now, "updatedAt": now}
-    number["_id"] = db.voice_numbers.insert_one(number).inserted_id
+    number["_id"] = testdb.insert_number(db, number)
     return agent, quiet, number
 
 
@@ -160,14 +160,14 @@ async def test_vars(port, agent, number):
     # in the transcript: caller_name must come back null, not guessed.
     ok("custom fields: has_voicemail true (they said so), interest an option (or null), caller_name null (never said)",
        f.get("has_voicemail") is True and "interest" in f and f["interest"] in ("High", "Medium", "Low", None) and f.get("caller_name") is None, str(f))
-    mem = db.voice_caller_memories.find_one({"userId": agent["userId"], "agentId": agent["_id"], "phone": OUT})
+    mem = testdb.memory_of(db, {"userId": agent["userId"], "agentId": agent["_id"], "phone": OUT})
     ok("caller memory saved for (owner, agent, +number), <= 600 chars", mem and 0 < len(mem["brief"]) <= 600
        and mem["lastCallId"] == doc["_id"], str(mem and mem["brief"]))
 
 
 async def test_memory(port, agent, number):
     print("\n== the same number calls in: she starts with what she remembers ==")
-    mem = db.voice_caller_memories.find_one({"userId": agent["userId"], "agentId": agent["_id"], "phone": IN_CALLER})
+    mem = testdb.memory_of(db, {"userId": agent["userId"], "agentId": agent["_id"], "phone": IN_CALLER})
     ok("a memory exists from the first call", mem is not None)
     if not mem:
         return
@@ -187,7 +187,7 @@ async def test_memory(port, agent, number):
        used.get("brief") == mem["brief"] and used.get("lastCallAt") is not None, str(used)[:200])
     print(f"    her words: {agent_words(doc)[:240]!r}")
     doc = await analysed(doc["_id"])
-    mem2 = db.voice_caller_memories.find_one({"_id": mem["_id"]})
+    mem2 = testdb.memory_of(db, {"userId": agent["userId"], "agentId": agent["_id"], "phone": IN_CALLER})
     ok("memory rewritten after the second call (2 calls, newest call id)", mem2["calls"] == 2 and mem2["lastCallId"] == doc["_id"],
        str(mem2 and mem2["brief"]))
 
@@ -204,7 +204,7 @@ async def test_voicemail(port, agent, number):
        and doc.get("voicemailMessage") == want, f"{doc['endedBy']} {doc.get('voicemailMessage')!r}")
     ok("flagged as voicemail + message left", {"voicemail", "voicemail_message_left"} <= {f["flag"] for f in doc["flags"]},
        str(doc["flags"]))
-    mem = db.voice_caller_memories.find_one({"userId": agent["userId"], "phone": VM_TO})
+    mem = testdb.memory_of(db, {"userId": agent["userId"], "phone": VM_TO})
     doc = await analysed(doc["_id"])
     ok("a voicemail is analysed but nothing is remembered about the number", doc.get("analysis") and mem is None,
        str(doc.get("analysis"))[:200])
@@ -234,7 +234,7 @@ async def main():
         if "hangup" in which: await test_hangup(port, quiet, number)
     finally:
         await fake.cleanup()
-        for name in ("voice_agents", "voice_numbers", "voice_calls", "voice_caller_memories", "voice_settings"):
+        for name in ("voice_agents", "voice_accounts", "voice_calls"):
             db[name].delete_many({"userId": agent["userId"]})
     passed = sum(1 for _, p in RESULTS if p)
     print(f"\n{passed}/{len(RESULTS)} passed")

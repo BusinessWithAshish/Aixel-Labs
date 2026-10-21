@@ -33,13 +33,13 @@ def ok(name, cond, detail=""):
 
 def owner():
     tenant, user = ObjectId(), ObjectId()
-    product.db().voice_settings.insert_one({"tenantId": tenant, "userId": user,
+    testdb.set_account(product.db(), {"tenantId": tenant, "userId": user,
                                             "gemini": {"keySealed": product.seal_secret("AIza-unit-test-key")}})
     return tenant, user
 
 
 def cleanup(user):
-    for name in ("voice_settings", "voice_calls", "voice_caller_memories"):
+    for name in ("voice_accounts", "voice_calls"):
         product.db()[name].delete_many({"userId": user})
 
 
@@ -237,7 +237,7 @@ async def memory_tests():
         ok("ran on the call's own key, with structured JSON output", gem.requests[-1]["key"] == "AIza-unit-test-key"
            and gem.requests[-1]["body"]["generationConfig"]["responseMimeType"] == "application/json"
            and gem.requests[-1]["path"].endswith(f"{analysis.MODEL}:generateContent"))
-        mem = product.db().voice_caller_memories.find_one({"userId": user})
+        mem = testdb.memory_of(product.db(), {"userId": user})
         ok("memory keyed by owner + agent + number", mem and mem["agentId"] == agent["_id"] and mem["phone"] == "+15557770000"
            and mem["brief"] == "Ravi wants a Thursday slot." and mem["calls"] == 1 and mem["lastCallId"] == doc["_id"])
         second = product.phone_call(number, agent, "INBOUND", "+15557770000")
@@ -259,10 +259,10 @@ async def memory_tests():
         gem.answer = {"summary": "Ravi confirmed.", "sentiment": "positive", "memory": "Ravi, booked Thursday 10:00."}
         await analysis.after_call(second, doc2)
         sent = gem.requests[-1]["body"]["contents"][0]["parts"][0]["text"]
-        mem = product.db().voice_caller_memories.find_one({"userId": user})
+        mem = testdb.memory_of(product.db(), {"userId": user})
         ok("second pass is given the earlier note and rewrites it", "Earlier note: Ravi wants a Thursday slot." in sent
            and mem["brief"] == "Ravi, booked Thursday 10:00." and mem["calls"] == 2
-           and product.db().voice_caller_memories.count_documents({"userId": user}) == 1)
+           and testdb.count_memories(product.db(), {"userId": user}) == 1)
         n = len(gem.requests)
         silent = {**product.call_doc(second, {"voice": "kore", "turns": [{"who": "agent", "text": "Hello?"}]}, {}), "_id": ObjectId()}
         product._insert(silent)
@@ -275,7 +275,7 @@ async def memory_tests():
         await analysis.after_call(second, doc3)
         failed = product.db().voice_calls.find_one({"_id": doc3["_id"]})["analysis"]
         ok("a refused key: the failure is recorded, not raised; memory untouched", "error" in failed and failed["model"] == analysis.MODEL
-           and "not a valid API key" in failed["error"] and product.db().voice_caller_memories.find_one({"userId": user})["calls"] == 2,
+           and "not a valid API key" in failed["error"] and testdb.memory_of(product.db(), {"userId": user})["calls"] == 2,
            failed.get("error", ""))
         gem.status = 200
         save_ctx = product.phone_call(number, agent, "INBOUND", "+15557770000")

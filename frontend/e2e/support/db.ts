@@ -14,7 +14,14 @@ import { DEFAULT_USER_CREDITS, E2E_ADMIN, E2E_USER, type E2eUser } from './users
 import { VoiceAgentCallType, type VoiceAgentDoc, type VoiceAgentVoice } from '@aixellabs/backend/db/types';
 import { ObjectId as MongoObjectId } from 'mongodb';
 // Voice numbers + call logs (e2e/voice-agent/phone-numbers + call-logs specs).
-import { VoiceProvider, type VoiceCallDoc, type VoiceNumberDoc } from '@aixellabs/backend/db/types';
+import {
+    VoiceCallChannel,
+    VoiceCallDirection,
+    VoiceProvider,
+    type VoiceAccountDoc,
+    type VoiceCallDoc,
+    type VoiceNumberDoc,
+} from '@aixellabs/backend/db/types';
 // Bookings (e2e/voice-agent/bookings spec).
 import { type VoiceBookingDoc } from '@aixellabs/backend/db/types';
 // Connected apps (e2e/voice-agent/connected-apps spec).
@@ -26,12 +33,9 @@ import {
     VoiceGeminiKeyStatus,
     type VoiceCampaignContactDoc,
     type VoiceCampaignDoc,
-    type VoiceSettingsDoc,
 } from '@aixellabs/backend/db/types';
 // Gemini API key (e2e/voice-agent/gemini-key spec; the seeded user has one so calls can run).
 import { type VoiceGeminiKey } from '@aixellabs/backend/db/types';
-// Agent features: call settings, caller memory (e2e/voice-agent/agent-features spec).
-import { type VoiceCallerMemoryDoc } from '@aixellabs/backend/db/types';
 import { sealForE2e } from '../voice-agent/fake-telephony';
 
 /** Direct Mongo access for seeding and for asserting what the server actions persisted. */
@@ -229,18 +233,44 @@ export class E2eDb {
         agents: { inboundAgentId?: string | null; outboundAgentId?: string | null },
     ): Promise<void> {
         const toId = (id: string | null) => (id ? new MongoObjectId(id) : null);
-        const $set: { inboundAgentId?: MongoObjectId | null; outboundAgentId?: MongoObjectId | null } = {};
-        if (agents.inboundAgentId !== undefined) $set.inboundAgentId = toId(agents.inboundAgentId);
-        if (agents.outboundAgentId !== undefined) $set.outboundAgentId = toId(agents.outboundAgentId);
-        await this.db.collection(MongoCollections.VOICE_NUMBERS).updateOne({ _id: new MongoObjectId(numberId) }, { $set });
+        const $set: Record<string, MongoObjectId | null> = {};
+        if (agents.inboundAgentId !== undefined) $set['numbers.$.inboundAgentId'] = toId(agents.inboundAgentId);
+        if (agents.outboundAgentId !== undefined) $set['numbers.$.outboundAgentId'] = toId(agents.outboundAgentId);
+        await this.voiceAccounts.updateOne({ 'numbers._id': new MongoObjectId(numberId) }, { $set });
     }
 
     // -----------------------------------------------------------------------
     // Voice numbers + call logs (e2e/voice-agent/phone-numbers.spec.ts, call-logs.spec.ts)
     // -----------------------------------------------------------------------
 
-    private get voiceNumbers() {
-        return this.db.collection<VoiceNumberDoc>(MongoCollections.VOICE_NUMBERS);
+    /** One per owner: the Gemini key, `numbers` and `calendars` (connected apps). */
+    private get voiceAccounts() {
+        return this.db.collection<VoiceAccountDoc>(MongoCollections.VOICE_ACCOUNTS);
+    }
+
+    /** The user's account doc, made when missing (as the app does on first use). */
+    private async voiceAccount(user: E2eUser): Promise<{ userId: ObjectId; tenantId: ObjectId }> {
+        const { _id: userId, tenantId } = await this.getUser(user);
+        const now = new Date();
+        await this.voiceAccounts.updateOne(
+            { userId },
+            { $setOnInsert: { tenantId, userId, createdAt: now, updatedAt: now } },
+            { upsert: true },
+        );
+        return { userId, tenantId };
+    }
+
+    /** Items of one of the user's account lists, oldest first, with the owner's ids on each. */
+    private async accountItems<K extends 'numbers' | 'calendars'>(
+        user: E2eUser,
+        key: K,
+    ): Promise<(NonNullable<VoiceAccountDoc[K]>[number] & { tenantId: ObjectId; userId: ObjectId })[]> {
+        const { _id: userId } = await this.getUser(user);
+        const doc = await this.voiceAccounts.findOne({ userId });
+        const items: { createdAt: Date }[] = doc?.[key] ?? [];
+        return items
+            .map((item) => ({ ...item, tenantId: doc!.tenantId, userId }))
+            .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()) as never;
     }
 
     private get voiceCalls() {
@@ -250,13 +280,15 @@ export class E2eDb {
     /** Removes the user's numbers and call logs. */
     async resetVoiceTelephony(user: E2eUser): Promise<void> {
         const { _id: userId } = await this.getUser(user);
-        await Promise.all([this.voiceNumbers.deleteMany({ userId }), this.voiceCalls.deleteMany({ userId })]);
+        await Promise.all([
+            this.voiceAccounts.updateOne({ userId }, { $unset: { numbers: '' } }),
+            this.voiceCalls.deleteMany({ userId }),
+        ]);
     }
 
     /** The user's numbers as stored (sealed key included), oldest first. */
     async getVoiceNumbers(user: E2eUser) {
-        const { _id: userId } = await this.getUser(user);
-        return this.voiceNumbers.find({ userId }).sort({ createdAt: 1 }).toArray();
+        return this.accountItems(user, 'numbers');
     }
 
     /**
@@ -280,11 +312,10 @@ export class E2eDb {
                 >
             >,
     ): Promise<string> {
-        const { _id: userId, tenantId } = await this.getUser(user);
+        const { userId } = await this.voiceAccount(user);
         const now = new Date();
-        const { insertedId } = await this.voiceNumbers.insertOne({
-            tenantId,
-            userId,
+        const number: VoiceNumberDoc = {
+            _id: new MongoObjectId(),
             provider: VoiceProvider.TELNYX,
             inboundAgentId: null,
             outboundAgentId: null,
@@ -292,8 +323,9 @@ export class E2eDb {
             ...fields,
             createdAt: now,
             updatedAt: now,
-        });
-        return insertedId.toString();
+        };
+        await this.voiceAccounts.updateOne({ userId }, { $push: { numbers: number } });
+        return number._id.toString();
     }
 
     /** The user's call logs as stored, oldest first. */
@@ -362,20 +394,15 @@ export class E2eDb {
     // Connected apps (e2e/voice-agent/connected-apps.spec.ts)
     // -----------------------------------------------------------------------
 
-    private get calendarConnections() {
-        return this.db.collection<VoiceCalendarConnectionDoc>(MongoCollections.VOICE_CALENDAR_CONNECTIONS);
-    }
-
     /** Removes the user's connected apps. */
     async resetVoiceCalendarConnections(user: E2eUser): Promise<void> {
         const { _id: userId } = await this.getUser(user);
-        await this.calendarConnections.deleteMany({ userId });
+        await this.voiceAccounts.updateOne({ userId }, { $unset: { calendars: '' } });
     }
 
     /** The user's connected apps as stored, oldest first. */
     async getVoiceCalendarConnections(user: E2eUser) {
-        const { _id: userId } = await this.getUser(user);
-        return this.calendarConnections.find({ userId }).sort({ createdAt: 1 }).toArray();
+        return this.accountItems(user, 'calendars');
     }
 
     /** Inserts a connected app as the callback leaves it; returns its id. */
@@ -384,11 +411,10 @@ export class E2eDb {
         fields: Pick<VoiceCalendarConnectionDoc, 'provider' | 'connectedAccountId'> &
             Partial<Pick<VoiceCalendarConnectionDoc, 'status' | 'label' | 'authConfigId' | 'composioSessionId'>>,
     ): Promise<string> {
-        const { _id: userId, tenantId } = await this.getUser(user);
+        const { userId } = await this.voiceAccount(user);
         const now = new Date();
-        const { insertedId } = await this.calendarConnections.insertOne({
-            tenantId,
-            userId,
+        const connection: VoiceCalendarConnectionDoc = {
+            _id: new MongoObjectId(),
             authConfigId: 'ac_e2e_seeded',
             status: VoiceCalendarConnectionStatus.ACTIVE,
             label: null,
@@ -396,8 +422,9 @@ export class E2eDb {
             createdAt: now,
             updatedAt: now,
             ...fields,
-        });
-        return insertedId.toString();
+        };
+        await this.voiceAccounts.updateOne({ userId }, { $push: { calendars: connection } });
+        return connection._id.toString();
     }
 
     // -----------------------------------------------------------------------
@@ -485,8 +512,7 @@ export class E2eDb {
 
     /** Gives the user a Gemini key (sealed placeholder): starting a campaign needs one. `null` removes it. */
     async setCampaignGeminiKey(user: E2eUser, keySealed: string | null): Promise<void> {
-        const { _id: userId, tenantId } = await this.getUser(user);
-        const settings = this.db.collection<VoiceSettingsDoc>(MongoCollections.VOICE_SETTINGS);
+        const { userId } = await this.voiceAccount(user);
         const now = new Date();
         const gemini = keySealed
             ? {
@@ -498,11 +524,7 @@ export class E2eDb {
                   savedAt: now,
               }
             : null;
-        await settings.updateOne(
-            { userId },
-            { $set: { gemini, updatedAt: now }, $setOnInsert: { tenantId, userId, createdAt: now } },
-            { upsert: true },
-        );
+        await this.voiceAccounts.updateOne({ userId }, { $set: { gemini, updatedAt: now } });
     }
 
     // -----------------------------------------------------------------------
@@ -511,7 +533,7 @@ export class E2eDb {
 
     /** Saves `key` as the user's Gemini key the way the app does (sealed), `fields` on top; `null` removes it. */
     async setVoiceGeminiKey(user: E2eUser, key: string | null, fields: Partial<VoiceGeminiKey> = {}): Promise<void> {
-        const { _id: userId, tenantId } = await this.getUser(user);
+        const { userId } = await this.voiceAccount(user);
         const now = new Date();
         const gemini: VoiceGeminiKey | null = key
             ? {
@@ -524,28 +546,18 @@ export class E2eDb {
                   ...fields,
               }
             : null;
-        await this.db
-            .collection<VoiceSettingsDoc>(MongoCollections.VOICE_SETTINGS)
-            .updateOne(
-                { userId },
-                { $set: { gemini, updatedAt: now }, $setOnInsert: { tenantId, userId, createdAt: now } },
-                { upsert: true },
-            );
+        await this.voiceAccounts.updateOne({ userId }, { $set: { gemini, updatedAt: now } });
     }
 
-    /** The user's voice settings as stored (sealed key included). */
-    async getVoiceSettings(user: E2eUser) {
+    /** The user's voice account as stored (sealed key included). */
+    async getVoiceAccount(user: E2eUser) {
         const { _id: userId } = await this.getUser(user);
-        return this.db.collection<VoiceSettingsDoc>(MongoCollections.VOICE_SETTINGS).findOne({ userId });
+        return this.voiceAccounts.findOne({ userId });
     }
 
     // -----------------------------------------------------------------------
     // Agent features: variables, call settings, caller memory (e2e/voice-agent/agent-features.spec.ts)
     // -----------------------------------------------------------------------
-
-    private get voiceCallerMemories() {
-        return this.db.collection<VoiceCallerMemoryDoc>(MongoCollections.VOICE_CALLER_MEMORIES);
-    }
 
     /** Sets fields on an agent the editor would otherwise save (prompt, variables, voicemail, analysis, memory). */
     async setVoiceAgentFields(
@@ -557,30 +569,64 @@ export class E2eDb {
 
     async resetVoiceCallerMemories(user: E2eUser): Promise<void> {
         const { _id: userId } = await this.getUser(user);
-        await this.voiceCallerMemories.deleteMany({ userId });
+        await this.voiceCalls.updateMany({ userId, memory: { $exists: true } }, { $unset: { memory: '' } });
     }
 
-    /** Inserts what an agent remembers about a number, the way the engine writes it; returns its id. */
+    /**
+     * Stores what an agent remembers about a number the way the engine writes it: as the current
+     * memory on the call `lastCallId` (a minimal inbound call from `phone` is inserted when there
+     * is no such call yet). Returns the call's id, which is the memory's id.
+     */
     async insertVoiceCallerMemory(
         user: E2eUser,
-        fields: Pick<VoiceCallerMemoryDoc, 'agentId' | 'phone' | 'brief' | 'lastCallId' | 'lastCallAt'> &
-            Partial<Pick<VoiceCallerMemoryDoc, 'calls'>>,
+        fields: { agentId: ObjectId; phone: string; brief: string; lastCallId: ObjectId; lastCallAt: Date; calls?: number },
     ): Promise<string> {
         const { _id: userId, tenantId } = await this.getUser(user);
-        const now = new Date();
-        const { insertedId } = await this.voiceCallerMemories.insertOne({
-            tenantId,
-            userId,
-            calls: 1,
-            ...fields,
-            createdAt: now,
-            updatedAt: now,
-        });
-        return insertedId.toString();
+        const memory = { brief: fields.brief, calls: fields.calls ?? 1, since: fields.lastCallAt, current: true as const };
+        const existing = await this.voiceCalls.updateOne(
+            { _id: fields.lastCallId, userId },
+            { $set: { callerPhone: fields.phone, memory } },
+        );
+        if (existing.matchedCount === 0) {
+            await this.voiceCalls.insertOne({
+                _id: fields.lastCallId,
+                tenantId,
+                userId,
+                agentId: fields.agentId,
+                numberId: null,
+                channel: VoiceCallChannel.PHONE,
+                direction: VoiceCallDirection.INBOUND,
+                from: fields.phone,
+                to: '+15550000000',
+                voice: 'sulafat',
+                startedAt: fields.lastCallAt,
+                endedAt: fields.lastCallAt,
+                durationSec: 60,
+                endedBy: 'goodbye',
+                flags: [],
+                turns: [],
+                gapsMs: [],
+                callerPhone: fields.phone,
+                memory,
+            });
+        }
+        return fields.lastCallId.toString();
     }
 
+    /** What the user's agents remember now, one entry per agent + caller, latest call first. */
     async getVoiceCallerMemories(user: E2eUser) {
         const { _id: userId } = await this.getUser(user);
-        return this.voiceCallerMemories.find({ userId }).sort({ lastCallAt: -1 }).toArray();
+        const calls = await this.voiceCalls
+            .find({ userId, 'memory.current': true })
+            .sort({ startedAt: -1 })
+            .toArray();
+        return calls.map((call) => ({
+            _id: call._id,
+            agentId: call.agentId,
+            phone: call.callerPhone ?? '',
+            brief: call.memory?.brief ?? '',
+            calls: call.memory?.calls ?? 1,
+            lastCallAt: call.startedAt,
+        }));
     }
 }

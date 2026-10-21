@@ -1,7 +1,7 @@
 """What a call cost its owner, in US dollars: `voice_calls.cost` (`VoiceCallCost` in the backend's types.ts).
 
     gemini    the tokens Gemini reported for the call (bot.py `usage`) at Google's list price; 0 when the
-              owner's key is on Google's free tier (voice_settings.gemini.tier "free", set in the app)
+              owner's key is on Google's free tier (voice_accounts.gemini.tier "free", set in the app)
     provider  the phone minutes at the provider's list rate, written with the call (providerExact false).
               Twilio's own charge for the call (its Call resource `price`) replaces it once Twilio fills it
               in (fill_provider_charge, after the call, in the same background task as the analysis:
@@ -65,7 +65,7 @@ def provider_estimate(provider: str, direction: str, to: str | None, duration_se
 
 def free_tier(user_id) -> bool:
     """The owner's key is on Google's free tier (set in the app; missing = paid)."""
-    doc = product.db().voice_settings.find_one({"userId": user_id}, {"gemini.tier": 1})
+    doc = product.db().voice_accounts.find_one({"userId": user_id}, {"gemini.tier": 1})
     return ((doc or {}).get("gemini") or {}).get("tier") == "free"
 
 
@@ -102,7 +102,7 @@ async def voicelink_price(number_id, call_id: str) -> float | None:
     own token, at today's rate), or None while unset. The account's own rate: VoiceLink publishes none."""
     import voicelink  # imports product: loaded on first use
 
-    number = await asyncio.to_thread(product.db().voice_numbers.find_one, {"_id": number_id}, {"apiKeySealed": 1})
+    number = await asyncio.to_thread(product.find_number, number_id)
     if not number:
         return None
     data = await voicelink.api_get("/v1/call-log/details", product.open_secret(number["apiKeySealed"]), {"call_id": call_id})

@@ -28,7 +28,7 @@ import { voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
  *   `{tool_slug, arguments}` (the session pins the account; Composio refuses an `account` field
  *   while multi-account is off, 400 code 4300); `result_type` (`completed` / `failed` / `input_required`)
  *   decides, never `error` alone. One session per connection, its id on
- *   voice_calendar_connections (`composioSessionId`): sessions persist on Composio's side and
+ *   the connection in voice_accounts.calendars (`composioSessionId`): sessions persist on Composio's side and
  *   do not expire, so both the app and the engine reuse it, and make a new one only when there
  *   is none or Composio says it is gone (`ComposioSessionGone`).
  * - **Connect**: `POST /tool_router/session/{id}/link` (what `session.authorize()` calls; the
@@ -36,7 +36,7 @@ import { voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
  *   on a session made for that attempt, with in-chat auth off. The owner signs in on the
  *   hosted Connect Link and Composio sends the browser back to our callback page with
  *   `status` + `connected_account_id`. We only trust that id when it matches the attempt we
- *   stored (voice_calendar_connections, PENDING) and Composio lists it under the owner's
+ *   stored (voice_accounts.calendars, PENDING) and Composio lists it under the owner's
  *   `user_id`; the callback polls until Composio says ACTIVE, then makes the connection's own
  *   session pinned to that account (a session that pins an account for a toolkit cannot make
  *   links for it, so the link session is deleted then).

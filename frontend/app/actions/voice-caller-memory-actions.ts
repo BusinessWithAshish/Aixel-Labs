@@ -6,7 +6,7 @@ import {
     VOICE_AGENT_SUB_MODULES,
     type VoiceCallDoc,
     type VoiceCallerMemory,
-    type VoiceCallerMemoryDoc,
+    type MongoObjectId,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import {
@@ -20,34 +20,40 @@ import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 
 /**
- * Caller memory: what an agent remembers about each number it talked with (`voice_caller_memories`,
- * written by the engine's analysis pass after each call, read at the start of the next one).
- * Owners can see it and forget a caller, or everyone, at any time.
+ * Caller memory: what an agent remembers about each number it talked with. The engine's analysis
+ * pass writes it after each call onto that call (`voice_calls.memory`, keyed by the call's agent and
+ * `callerPhone`, the latest one `current`) and reads the current one at the start of the next call.
+ * Owners can see it and forget a caller, or everyone, at any time: forgetting removes it from
+ * every call with that caller.
  */
 
 /** An agent's remembered callers shown in the editor, most recent first. */
 const LIST_LIMIT = 50;
 
-function mapMemory(doc: VoiceCallerMemoryDoc): VoiceCallerMemory {
+type MemoryCall = VoiceCallDoc & { _id: MongoObjectId; memory: NonNullable<VoiceCallDoc['memory']> };
+
+function mapMemory(doc: MemoryCall): VoiceCallerMemory {
     return {
-        _id: doc._id?.toString(),
+        _id: doc._id.toString(),
         tenantId: doc.tenantId.toString(),
         userId: doc.userId.toString(),
         agentId: doc.agentId.toString(),
-        phone: doc.phone,
-        brief: doc.brief,
-        lastCallId: doc.lastCallId.toString(),
-        lastCallAt: doc.lastCallAt.toISOString(),
-        calls: doc.calls ?? 1,
-        createdAt: doc.createdAt.toISOString(),
-        updatedAt: doc.updatedAt.toISOString(),
+        phone: doc.callerPhone ?? '',
+        brief: doc.memory.brief,
+        lastCallId: doc._id.toString(),
+        lastCallAt: doc.startedAt.toISOString(),
+        calls: doc.memory.calls ?? 1,
+        createdAt: (doc.memory.since ?? doc.startedAt).toISOString(),
+        updatedAt: doc.endedAt.toISOString(),
     };
 }
 
-async function memoriesCollection() {
+async function callsCollection() {
     await ensureVoiceAgentIndexes();
-    return getCollection<VoiceCallerMemoryDoc>(MongoCollections.VOICE_CALLER_MEMORIES);
+    return getCollection<VoiceCallDoc>(MongoCollections.VOICE_CALLS);
 }
+
+const CURRENT = { 'memory.current': true } as const;
 
 export type VoiceCallerMemoryList = { memories: VoiceCallerMemory[]; total: number };
 
@@ -55,13 +61,13 @@ export type VoiceCallerMemoryList = { memories: VoiceCallerMemory[]; total: numb
 export const listVoiceCallerMemories = async (agentId: string): Promise<ALApiResponse<VoiceCallerMemoryList>> =>
     runAuthenticatedAction(async function listVoiceCallerMemories(userId) {
         const uid = requireUserObjectId(userId);
-        const filter = { userId: uid, agentId: toObjectId(agentId, 'Agent ID') };
-        const memories = await memoriesCollection();
+        const filter = { userId: uid, agentId: toObjectId(agentId, 'Agent ID'), ...CURRENT };
+        const calls = await callsCollection();
         const [docs, total] = await Promise.all([
-            memories.find(filter).sort({ lastCallAt: -1 }).limit(LIST_LIMIT).toArray(),
-            memories.countDocuments(filter),
+            calls.find(filter).sort({ startedAt: -1 }).limit(LIST_LIMIT).toArray(),
+            calls.countDocuments(filter),
         ]);
-        return { memories: docs.map(mapMemory), total };
+        return { memories: (docs as MemoryCall[]).map(mapMemory), total };
     });
 
 /** What the call's agent remembers now about the call's other party, or null. */
@@ -70,29 +76,32 @@ export const getCallerMemoryForCall = async (callId: string): Promise<ALApiRespo
 
     return runAuthenticatedAction(async function getCallerMemoryForCall(userId) {
         const owner = await requireVoiceOwner(userId, VOICE_AGENT_SUB_MODULES.CALL_LOGS);
-        const calls = await getCollection<VoiceCallDoc>(MongoCollections.VOICE_CALLS);
+        const calls = await callsCollection();
         const call = await calls.findOne(
             { _id: toObjectId(callId, 'Call ID'), userId: owner.userId },
-            { projection: { agentId: 1, direction: 1, from: 1, to: 1 } },
+            { projection: { agentId: 1, direction: 1, from: 1, to: 1, callerPhone: 1 } },
         );
         if (!call) throw new Error('Call not found');
-        const phone = memoryPhoneOf(call);
+        const phone = call.callerPhone ?? memoryPhoneOf(call);
         if (!phone) return null;
-        const memories = await memoriesCollection();
-        const doc = await memories.findOne({ userId: owner.userId, agentId: call.agentId, phone });
-        return doc ? mapMemory(doc) : null;
+        const doc = await calls.findOne({ userId: owner.userId, agentId: call.agentId, callerPhone: phone, ...CURRENT });
+        return doc ? mapMemory(doc as MemoryCall) : null;
     });
 };
 
-/** Forgets one caller: the agent starts their next call knowing nothing about them. */
+/** Forgets one caller (`memoryId`: the call their memory is on): the agent starts their next call knowing nothing about them. */
 export const forgetVoiceCallerMemory = async (memoryId: string): Promise<ALApiResponse<{ id: string }>> => {
     assertValidObjectId(memoryId, 'Memory ID');
 
     return runAuthenticatedAction(async function forgetVoiceCallerMemory(userId) {
         const uid = requireUserObjectId(userId);
-        const memories = await memoriesCollection();
-        const { deletedCount } = await memories.deleteOne({ _id: toObjectId(memoryId, 'Memory ID'), userId: uid });
-        if (deletedCount === 0) throw new Error('That caller was already forgotten');
+        const calls = await callsCollection();
+        const doc = await calls.findOne({ _id: toObjectId(memoryId, 'Memory ID'), userId: uid, ...CURRENT });
+        if (!doc) throw new Error('That caller was already forgotten');
+        await calls.updateMany(
+            { userId: uid, agentId: doc.agentId, callerPhone: doc.callerPhone, memory: { $exists: true } },
+            { $unset: { memory: '' } },
+        );
         return { id: memoryId };
     });
 };
@@ -101,7 +110,9 @@ export const forgetVoiceCallerMemory = async (memoryId: string): Promise<ALApiRe
 export const forgetAllVoiceCallerMemories = async (agentId: string): Promise<ALApiResponse<{ deleted: number }>> =>
     runAuthenticatedAction(async function forgetAllVoiceCallerMemories(userId) {
         const uid = requireUserObjectId(userId);
-        const memories = await memoriesCollection();
-        const { deletedCount } = await memories.deleteMany({ userId: uid, agentId: toObjectId(agentId, 'Agent ID') });
-        return { deleted: deletedCount };
+        const agent = toObjectId(agentId, 'Agent ID');
+        const calls = await callsCollection();
+        const deleted = await calls.countDocuments({ userId: uid, agentId: agent, ...CURRENT });
+        await calls.updateMany({ userId: uid, agentId: agent, memory: { $exists: true } }, { $unset: { memory: '' } });
+        return { deleted };
     });

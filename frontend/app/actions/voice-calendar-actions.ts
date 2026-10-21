@@ -7,21 +7,21 @@ import {
     VOICE_AGENT_SUB_MODULES,
     VoiceCalendarConnectionStatus,
     VoiceCalendarProvider,
-    type MongoObjectId,
+    MongoObjectId,
     type VoiceAgentDoc,
     type VoiceBookingDestination,
     type VoiceCalendarConnection,
-    type VoiceCalendarConnectionDoc,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { defaultBookingTarget, voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
 import { CONNECTED_APP_CALLBACK_URL } from '@/helpers/voice-routes';
+import { findItem, listItems, pullItems, pushItem, updateItem } from '@/server/voice-agent/accounts';
 import {
     assertUsableDestination,
-    calendarConnectionsCollection,
     connectionToolRunner,
     mapCalendarConnectionDoc,
+    type OwnedCalendarConnection,
 } from '@/server/voice-agent/calendar-connections';
 import {
     COMPOSIO_TOOLKITS,
@@ -48,6 +48,7 @@ const SUB_MODULE = VOICE_AGENT_SUB_MODULES.AGENTS;
 /** How long the callback waits for Composio to finish activating the account. */
 const CONFIRM_TRIES = 8;
 const CONFIRM_WAIT_MS = 750;
+const STALE_ATTEMPT_MS = 24 * 60 * 60 * 1000;
 const PROVIDERS = Object.values(VoiceCalendarProvider);
 
 export type VoiceConnectedApps = {
@@ -72,7 +73,7 @@ function assertProvider(provider: string): asserts provider is VoiceCalendarProv
 }
 
 /** Who the account is and what it can book into, read in its session; null when that fails now. */
-async function describeConnection(doc: VoiceCalendarConnectionDoc): Promise<ProviderAccount | null> {
+async function describeConnection(doc: OwnedCalendarConnection): Promise<ProviderAccount | null> {
     try {
         return await describeProviderAccount(doc.provider, connectionToolRunner(doc));
     } catch (error) {
@@ -82,7 +83,7 @@ async function describeConnection(doc: VoiceCalendarConnectionDoc): Promise<Prov
 }
 
 /** Composio's own made-up account name ("googlecalendar_trench-flue"), which older connections were labelled with. */
-function hasComposioWordId(doc: VoiceCalendarConnectionDoc): boolean {
+function hasComposioWordId(doc: OwnedCalendarConnection): boolean {
     return new RegExp(`^${COMPOSIO_TOOLKITS[doc.provider]}_[a-z]+(-[a-z]+)*$`).test(doc.label ?? '');
 }
 
@@ -90,16 +91,15 @@ function hasComposioWordId(doc: VoiceCalendarConnectionDoc): boolean {
  * Active connections with no account label yet (made before labels were read, or the read failed
  * then) get it now. An account that names nobody is stored as '' so it is not asked again.
  */
-async function backfillLabels(docs: VoiceCalendarConnectionDoc[]): Promise<VoiceCalendarConnectionDoc[]> {
-    const connections = await calendarConnectionsCollection();
+async function backfillLabels(docs: OwnedCalendarConnection[]): Promise<OwnedCalendarConnection[]> {
     return Promise.all(
         docs.map(async (doc) => {
             const stale = doc.label == null || hasComposioWordId(doc);
-            if (!doc._id || doc.status !== VoiceCalendarConnectionStatus.ACTIVE || !stale) return doc;
+            if (doc.status !== VoiceCalendarConnectionStatus.ACTIVE || !stale) return doc;
             const account = await describeConnection(doc);
             if (!account) return { ...doc, label: null };
             const label = account.label ?? '';
-            await connections.updateOne({ _id: doc._id }, { $set: { label, updatedAt: new Date() } });
+            await updateItem('calendars', { _id: doc._id }, { set: { label } });
             return { ...doc, label };
         }),
     );
@@ -112,7 +112,7 @@ async function backfillLabels(docs: VoiceCalendarConnectionDoc[]): Promise<Voice
 async function bookIntoConnection(
     ownerId: MongoObjectId,
     agentId: string,
-    doc: VoiceCalendarConnectionDoc,
+    doc: OwnedCalendarConnection,
     calendars: ProviderCalendar[],
 ): Promise<VoiceBookingDestination | null> {
     const target = defaultBookingTarget(doc.provider, calendars);
@@ -148,12 +148,9 @@ async function requestOrigin(): Promise<string> {
 export const listVoiceConnectedApps = async (): Promise<ALApiResponse<VoiceConnectedApps>> =>
     runAuthenticatedAction(async function listVoiceConnectedApps(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
-        const connections = await calendarConnectionsCollection();
-        const docs = await connections
-            .find({ userId: owner.userId, status: { $ne: VoiceCalendarConnectionStatus.PENDING } })
-            .sort({ createdAt: -1 })
-            .limit(50)
-            .toArray();
+        const docs = (await listItems('calendars', owner.userId))
+            .filter((doc) => doc.status !== VoiceCalendarConnectionStatus.PENDING)
+            .slice(0, 50);
         const labelled = await backfillLabels(docs);
         return { configured: isComposioConfigured(), connections: labelled.map(mapCalendarConnectionDoc) };
     });
@@ -186,10 +183,13 @@ export const startVoiceAppConnection = async (
             throw error;
         }
         const now = new Date();
-        const connections = await calendarConnectionsCollection();
-        await connections.insertOne({
-            tenantId: owner.tenantId,
-            userId: owner.userId,
+        // Attempts abandoned at Composio's page stay PENDING; a day on, nobody is coming back to them.
+        await pullItems('calendars', owner.userId, {
+            status: VoiceCalendarConnectionStatus.PENDING,
+            createdAt: { $lt: new Date(now.getTime() - STALE_ATTEMPT_MS) },
+        });
+        await pushItem('calendars', owner, {
+            _id: new MongoObjectId(),
             provider,
             connectedAccountId: link.connectedAccountId,
             authConfigId,
@@ -228,9 +228,8 @@ export const confirmVoiceAppConnection = async (
     return runAuthenticatedAction(async function confirmVoiceAppConnection(userId) {
         if (!/^[A-Za-z0-9_-]{3,100}$/.test(connectedAccountId ?? '')) throw new Error('That link is not a connection');
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
-        const connections = await calendarConnectionsCollection();
-        const doc = await connections.findOne({ userId: owner.userId, connectedAccountId });
-        if (!doc?._id) throw new Error('This connection was not started from your account. Try connecting again.');
+        const doc = await findItem('calendars', { connectedAccountId }, owner.userId);
+        if (!doc) throw new Error('This connection was not started from your account. Try connecting again.');
         const providerLabel = voiceCalendarProviderLabel(doc.provider);
         if (doc.status === VoiceCalendarConnectionStatus.ACTIVE) {
             return { connection: mapCalendarConnectionDoc(doc), providerLabel, destination: null };
@@ -264,19 +263,19 @@ export const confirmVoiceAppConnection = async (
             await dropSession(composioSessionId);
             composioSessionId = pinned;
         }
-        const updated = await connections.findOneAndUpdate(
+        await updateItem(
+            'calendars',
             { _id: doc._id },
             {
-                $set: {
+                set: {
                     status,
                     composioSessionId,
                     label: state?.label ?? null,
                     statusReason: state ? state.statusReason : 'Composio does not list this connection under your account',
-                    updatedAt: new Date(),
                 },
             },
-            { returnDocument: 'after' },
         );
+        const updated = await findItem('calendars', { _id: doc._id }, owner.userId);
         if (!updated) throw new Error('Connection not found');
         if (status === VoiceCalendarConnectionStatus.PENDING) {
             throw new Error(`${providerLabel} has not finished connecting yet. Refresh this page in a moment.`);
@@ -286,15 +285,11 @@ export const confirmVoiceAppConnection = async (
         }
 
         // Earlier attempts at this app that never connected are superseded by this one.
-        await connections.deleteMany({
-            userId: owner.userId,
-            provider: doc.provider,
-            status: VoiceCalendarConnectionStatus.FAILED,
-        });
+        await pullItems('calendars', owner.userId, { provider: doc.provider, status: VoiceCalendarConnectionStatus.FAILED });
         const account = await describeConnection(updated);
         if (!account) return { connection: mapCalendarConnectionDoc(updated), providerLabel, destination: null };
         const label = account.label ?? updated.label ?? '';
-        await connections.updateOne({ _id: doc._id }, { $set: { label } });
+        await updateItem('calendars', { _id: doc._id }, { set: { label } });
         const destination = agentId ? await bookIntoConnection(owner.userId, agentId, updated, account.calendars) : null;
         return { connection: mapCalendarConnectionDoc({ ...updated, label }), providerLabel, destination };
     });
@@ -306,8 +301,7 @@ export const listVoiceAppCalendars = async (connectionId: string): Promise<ALApi
 
     return runAuthenticatedAction(async function listVoiceAppCalendars(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
-        const connections = await calendarConnectionsCollection();
-        const doc = await connections.findOne({ _id: toObjectId(connectionId, 'Connection ID'), userId: owner.userId });
+        const doc = await findItem('calendars', { _id: toObjectId(connectionId, 'Connection ID') }, owner.userId);
         if (!doc) throw new Error('Connected app not found');
         await assertUsableDestination(owner.userId, {
             provider: doc.provider,
@@ -333,12 +327,11 @@ export const disconnectVoiceApp = async (connectionId: string): Promise<ALApiRes
 
     return runAuthenticatedAction(async function disconnectVoiceApp(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
-        const connections = await calendarConnectionsCollection();
-        const doc = await connections.findOne({ _id: toObjectId(connectionId, 'Connection ID'), userId: owner.userId });
-        if (!doc?._id) throw new Error('Connected app not found');
+        const doc = await findItem('calendars', { _id: toObjectId(connectionId, 'Connection ID') }, owner.userId);
+        if (!doc) throw new Error('Connected app not found');
         await deleteConnectedAccount(doc.connectedAccountId);
         await dropSession(doc.composioSessionId);
-        await connections.deleteOne({ _id: doc._id });
+        await pullItems('calendars', owner.userId, { _id: doc._id });
         const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
         const reset = await agents.updateMany(
             { userId: owner.userId, 'tools.booking.destination.connectedAccountId': doc.connectedAccountId },

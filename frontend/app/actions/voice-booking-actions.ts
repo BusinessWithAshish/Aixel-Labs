@@ -12,7 +12,8 @@ import {
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
-import { calendarConnectionsCollection, connectionToolRunner } from '@/server/voice-agent/calendar-connections';
+import { findItem } from '@/server/voice-agent/accounts';
+import { connectionToolRunner } from '@/server/voice-agent/calendar-connections';
 import { cancelExternalBooking } from '@/server/voice-agent/composio';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
@@ -121,10 +122,7 @@ export const cancelBooking = async (bookingId: string): Promise<ALApiResponse<Vo
         const current = await bookings.findOne({ _id, userId: owner.userId, status: VoiceBookingStatus.BOOKED });
         // Disconnected since: nothing left to cancel it through (Composio deleted that account).
         const connection = current?.external
-            ? await (await calendarConnectionsCollection()).findOne({
-                  userId: owner.userId,
-                  connectedAccountId: current.external.connectedAccountId,
-              })
+            ? await findItem('calendars', { connectedAccountId: current.external.connectedAccountId }, owner.userId)
             : null;
         if (current?.external && connection) {
             try {

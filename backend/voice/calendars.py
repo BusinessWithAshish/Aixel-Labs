@@ -25,7 +25,7 @@ no in-chat auth, no sandbox (https://docs.composio.dev/docs/configuring-sessions
 
 `result_type` decides success (a failed run can have an empty `error`). Sessions persist on
 Composio's side and do not expire, so the app makes one when the owner connects and stores its
-id on the voice_calendar_connections doc (`composioSessionId`); we read it once per process,
+id on the connection (`composioSessionId` on its owner's voice_accounts.calendars item); we read it once per process,
 and only make one ourselves when there is none, or when Composio says the stored one is gone
 (execute answers 404/410 and GET /tool_router/session/{id} agrees), then run the tool once more.
 The prefetch at call connect is what resolves it, so a tool call never waits for that.
@@ -209,8 +209,9 @@ _locks: dict[tuple[int, str, str], asyncio.Lock] = {}
 
 def _connection(user_id: str, account: str) -> dict | None:
     try:
-        return product.db().voice_calendar_connections.find_one(
-            {"connectedAccountId": account, "userId": product.oid(user_id)}, {"composioSessionId": 1, "authConfigId": 1})
+        doc = product.db().voice_accounts.find_one(
+            {"userId": product.oid(user_id), "calendars.connectedAccountId": account}, {"calendars.$": 1})
+        return (doc or {}).get("calendars", [None])[0]
     except Exception as e:
         logger.warning(f"calendars: could not read the connection of {account}: {e}")
         return None
@@ -219,8 +220,9 @@ def _connection(user_id: str, account: str) -> dict | None:
 def _store(doc_id, old: str | None, session_id: str) -> bool:
     """Stores the session id over the one we read (the app writes it too); False when someone else stored one first."""
     try:
-        r = product.db().voice_calendar_connections.update_one({"_id": doc_id, "composioSessionId": old},
-                                                               {"$set": {"composioSessionId": session_id}})
+        r = product.db().voice_accounts.update_one(
+            {"calendars": {"$elemMatch": {"_id": doc_id, "composioSessionId": old}}},
+            {"$set": {"calendars.$.composioSessionId": session_id}})
         return r.matched_count == 1
     except Exception as e:
         logger.warning(f"calendars: could not store session {session_id} on connection {doc_id}: {e}")

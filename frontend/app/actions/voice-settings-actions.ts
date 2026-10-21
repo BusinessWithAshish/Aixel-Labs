@@ -15,9 +15,8 @@ import {
     GeminiKeyError,
     loadGeminiKeyView,
     toGeminiKeyView,
-    voiceSettingsCollection,
 } from '@/server/voice-agent/gemini-key';
-import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
+import { voiceAccountsCollection } from '@/server/voice-agent/accounts';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.AGENTS;
@@ -65,9 +64,8 @@ export const saveGeminiKey = async (apiKey: string, tier: VoiceGeminiKeyTier): P
             savedAt: now,
             tier,
         };
-        await ensureVoiceAgentIndexes();
-        const settings = await voiceSettingsCollection();
-        await settings.updateOne(
+        const accounts = await voiceAccountsCollection();
+        await accounts.updateOne(
             { userId: owner.userId },
             { $set: { gemini, updatedAt: now }, $setOnInsert: { tenantId: owner.tenantId, createdAt: now } },
             { upsert: true },
@@ -83,8 +81,8 @@ export const saveGeminiKey = async (apiKey: string, tier: VoiceGeminiKeyTier): P
 export const recheckGeminiKey = async (): Promise<ALApiResponse<VoiceGeminiKeyView>> =>
     runAuthenticatedAction(async function recheckGeminiKey(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
-        const settings = await voiceSettingsCollection();
-        const doc = await settings.findOne({ userId: owner.userId });
+        const accounts = await voiceAccountsCollection();
+        const doc = await accounts.findOne({ userId: owner.userId });
         if (!doc?.gemini) throw new Error('No Gemini API key is saved');
 
         let status = VoiceGeminiKeyStatus.OK;
@@ -97,7 +95,7 @@ export const recheckGeminiKey = async (): Promise<ALApiResponse<VoiceGeminiKeyVi
             statusMessage = error.message;
         }
         const checkedAt = new Date();
-        await settings.updateOne(
+        await accounts.updateOne(
             { userId: owner.userId, 'gemini.keySealed': doc.gemini.keySealed },
             { $set: { 'gemini.status': status, 'gemini.statusMessage': statusMessage, 'gemini.checkedAt': checkedAt } },
         );
@@ -109,8 +107,8 @@ export const setGeminiKeyTier = async (tier: VoiceGeminiKeyTier): Promise<ALApiR
     runAuthenticatedAction(async function setGeminiKeyTier(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         assertTier(tier);
-        const settings = await voiceSettingsCollection();
-        const doc = await settings.findOneAndUpdate(
+        const accounts = await voiceAccountsCollection();
+        const doc = await accounts.findOneAndUpdate(
             { userId: owner.userId, gemini: { $type: 'object' } },
             { $set: { 'gemini.tier': tier, updatedAt: new Date() } },
             { returnDocument: 'after', projection: { 'gemini.keySealed': 0 } },
@@ -123,7 +121,7 @@ export const setGeminiKeyTier = async (tier: VoiceGeminiKeyTier): Promise<ALApiR
 export const removeGeminiKey = async (): Promise<ALApiResponse<VoiceGeminiKeyView>> =>
     runAuthenticatedAction(async function removeGeminiKey(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
-        const settings = await voiceSettingsCollection();
-        await settings.updateOne({ userId: owner.userId }, { $set: { gemini: null, updatedAt: new Date() } });
+        const accounts = await voiceAccountsCollection();
+        await accounts.updateOne({ userId: owner.userId }, { $set: { gemini: null, updatedAt: new Date() } });
         return toGeminiKeyView(null);
     });

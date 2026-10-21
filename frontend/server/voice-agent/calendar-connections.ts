@@ -1,8 +1,6 @@
 import 'server-only';
 
 import {
-    getCollection,
-    MongoCollections,
     MongoObjectId,
     VoiceCalendarConnectionStatus,
     type VoiceBookingDestination,
@@ -16,25 +14,14 @@ import {
     executeSessionTool,
     type ComposioToolRunner,
 } from '@/server/voice-agent/composio';
+import { findItem, updateItem, type Owned } from '@/server/voice-agent/accounts';
 
-let indexesEnsured = false;
+/** One of the owner's connected booking apps (`voice_accounts.calendars`, see `server/voice-agent/composio.ts`). */
+export type OwnedCalendarConnection = Owned<VoiceCalendarConnectionDoc>;
 
-/** The owner's connected booking apps (see `server/voice-agent/composio.ts`). */
-export async function calendarConnectionsCollection() {
-    const connections = await getCollection<VoiceCalendarConnectionDoc>(MongoCollections.VOICE_CALENDAR_CONNECTIONS);
-    if (!indexesEnsured) {
-        await Promise.all([
-            connections.createIndex({ userId: 1, createdAt: -1 }),
-            connections.createIndex({ connectedAccountId: 1 }, { unique: true }),
-        ]);
-        indexesEnsured = true;
-    }
-    return connections;
-}
-
-export function mapCalendarConnectionDoc(doc: VoiceCalendarConnectionDoc): VoiceCalendarConnection {
+export function mapCalendarConnectionDoc(doc: OwnedCalendarConnection): VoiceCalendarConnection {
     return {
-        _id: doc._id?.toString(),
+        _id: doc._id.toString(),
         tenantId: doc.tenantId.toString(),
         userId: doc.userId.toString(),
         provider: doc.provider,
@@ -52,9 +39,8 @@ export function mapCalendarConnectionDoc(doc: VoiceCalendarConnectionDoc): Voice
 export async function assertUsableDestination(
     userId: MongoObjectId,
     destination: VoiceBookingDestination,
-): Promise<VoiceCalendarConnectionDoc> {
-    const connections = await calendarConnectionsCollection();
-    const doc = await connections.findOne({ userId, connectedAccountId: destination.connectedAccountId });
+): Promise<OwnedCalendarConnection> {
+    const doc = await findItem('calendars', { connectedAccountId: destination.connectedAccountId }, userId);
     if (!doc) throw new Error('That connected app was not found. Connect it again.');
     if (doc.provider !== destination.provider) throw new Error('That calendar belongs to a different app');
     if (doc.status !== VoiceCalendarConnectionStatus.ACTIVE) {
@@ -67,14 +53,12 @@ export async function assertUsableDestination(
  * Stores the connection's session id, only over the one it was read with (the engine writes it
  * too); false when someone else stored one first.
  */
-async function storeSessionId(doc: VoiceCalendarConnectionDoc, sessionId: string): Promise<boolean> {
-    if (!doc._id) return true;
-    const connections = await calendarConnectionsCollection();
-    const result = await connections.updateOne(
+async function storeSessionId(doc: OwnedCalendarConnection, sessionId: string): Promise<boolean> {
+    return updateItem(
+        'calendars',
         { _id: doc._id, composioSessionId: doc.composioSessionId ?? null },
-        { $set: { composioSessionId: sessionId, updatedAt: new Date() } },
+        { set: { composioSessionId: sessionId } },
     );
-    return result.matchedCount === 1;
 }
 
 /**
@@ -83,13 +67,12 @@ async function storeSessionId(doc: VoiceCalendarConnectionDoc, sessionId: string
  * one made since by the engine is used if there is one, else a new one, and the tool is run once
  * more (nothing ran the first time).
  */
-export function connectionToolRunner(doc: VoiceCalendarConnectionDoc): ComposioToolRunner {
+export function connectionToolRunner(doc: OwnedCalendarConnection): ComposioToolRunner {
     let current = doc;
     let sessionId: string | null = doc.composioSessionId ?? null;
 
     const renew = async (dead: string | null): Promise<string> => {
-        const connections = await calendarConnectionsCollection();
-        const fresh = doc._id ? await connections.findOne({ _id: doc._id }) : null;
+        const fresh = await findItem('calendars', { _id: doc._id });
         if (fresh) current = fresh;
         if (fresh?.composioSessionId && fresh.composioSessionId !== dead) return fresh.composioSessionId;
         const created = await createCalendarSession({
@@ -98,9 +81,9 @@ export function connectionToolRunner(doc: VoiceCalendarConnectionDoc): ComposioT
             authConfigId: doc.authConfigId,
             connectedAccountId: doc.connectedAccountId,
         });
-        if (!(await storeSessionId(current, created)) && doc._id) {
+        if (!(await storeSessionId(current, created))) {
             // Another request made one meanwhile: use that, and leave no second session behind.
-            const winner = (await connections.findOne({ _id: doc._id }))?.composioSessionId;
+            const winner = (await findItem('calendars', { _id: doc._id }))?.composioSessionId;
             if (winner && winner !== dead) {
                 await deleteCalendarSession(created).catch(() => undefined);
                 return winner;
