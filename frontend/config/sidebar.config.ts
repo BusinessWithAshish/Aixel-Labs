@@ -51,7 +51,7 @@ export type SidebarNavItem = {
 export type SidebarUser = {
     name: string;
     email: string;
-    avatar: string;
+    avatar?: string;
     isAdmin: boolean;
     tenantId: string;
 };

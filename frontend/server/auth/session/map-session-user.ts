@@ -9,6 +9,7 @@ export function mapUserDocToAppSessionUser(
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        avatar: user.avatar,
         isAdmin: user.isAdmin,
         tenantId: tenantName,
         tenantName,

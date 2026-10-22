@@ -36,7 +36,7 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
     const user = {
         name: session?.user?.name || 'User',
         email: session?.user?.email || 'user@example.com',
-        avatar: 'https://github.com/shadcn.png',
+        avatar: session?.user?.avatar,
         isAdmin: isAdmin,
         tenantName: session?.user?.tenantName || '',
         tenantId: session?.user?.tenantId || '',

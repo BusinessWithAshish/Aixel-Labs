@@ -52,6 +52,7 @@ Returns `CreateSessionActionResult` / `void` — not `ALApiResponse`.
 | `deleteUser` | Admin | Cascades owned lead data + orphaned Firebase |
 | `bulkUpdateUsersModuleAccess` | Admin | Skips admins (`isAdmin: { $ne: true }`) |
 | `updateCurrentUserName` | Self | `parseUserName` |
+| `updateCurrentUserAvatar` | Self | `parseUserAvatar` (JPEG data URL); `null` removes |
 | `getCurrentUserCredits` | Self | Wraps `getUserCreditsState` |
 
 ## `coupon-actions.ts`

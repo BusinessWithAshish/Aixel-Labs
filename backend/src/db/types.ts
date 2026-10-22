@@ -134,6 +134,8 @@ export type UserDoc<Id = ObjectId> = {
   email: string;
   deviceFingerprint: string;
   name?: string;
+  /** Profile photo: a small `data:image/jpeg;base64,…` URL (FE `helpers/user-avatar.ts` validates it). */
+  avatar?: string;
   isAdmin: boolean;
   tenantId: Id;
   tenantName: string;

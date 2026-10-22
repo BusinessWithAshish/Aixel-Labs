@@ -13,6 +13,7 @@ import {
 import { mapMongoDocToClient } from '@/helpers/normalize-helpers';
 import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
 import { parseUserName } from '@/helpers/user-name';
+import { parseUserAvatar } from '@/helpers/user-avatar';
 import { normalizeCredits, parseCreditsInput, type UserCreditsState } from '@/helpers/credits';
 import { getUserCreditsState } from '@/app/actions/credit-db';
 import {
@@ -37,7 +38,10 @@ export const getAllUsersByTenant = async (tenantId: string): Promise<ALApiRespon
         const tenantObjectId = await getTenantObjectIdByName(tenantId);
 
         const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
-        const users = await usersCollection.find({ tenantId: tenantObjectId }).toArray();
+        // Profile photos are not shown in the admin list; skip shipping them.
+        const users = await usersCollection
+            .find({ tenantId: tenantObjectId }, { projection: { avatar: 0 } })
+            .toArray();
         return users.map(mapUserDocToUser);
     });
 
@@ -159,6 +163,19 @@ export const updateCurrentUserName = async (name: string): Promise<ALApiResponse
         }
 
         return { name: updatedUser.name ?? normalizedName };
+    });
+
+/** Sets (JPEG data URL) or removes (`null`) the authenticated user's own profile photo. */
+export const updateCurrentUserAvatar = async (avatar: string | null): Promise<ALApiResponse<{ avatar: string | null }>> =>
+    runAuthenticatedAction(async function updateCurrentUserAvatar(userId) {
+        assertValidObjectId(userId, 'User ID');
+        const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
+        const update = avatar === null ? { $unset: { avatar: '' as const } } : { $set: { avatar: parseUserAvatar(avatar) } };
+        const result = await usersCollection.updateOne({ _id: new MongoObjectId(userId) }, update);
+        if (result.matchedCount !== 1) {
+            throw new Error('User not found');
+        }
+        return { avatar };
     });
 
 /** Returns the authenticated user's credit balance (and whether they are credit-exempt). */

@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { getAppSession } from '@/server/auth';
 import { redirect } from 'next/navigation';
 import { ProfileNameForm } from './_components/ProfileNameForm';
+import { ProfilePhotoForm } from './_components/ProfilePhotoForm';
 import { AppearanceSettings } from './_components/AppearanceSettings';
 import { CreditsBalanceCard } from './_components/CreditsBalanceCard';
 
@@ -20,6 +21,8 @@ export default async function AccountSettingsPage() {
         <PageLayout title="Account Settings">
             <div className="flex flex-col gap-4 sm:gap-6">
                 <CreditsBalanceCard />
+
+                <ProfilePhotoForm name={initialName || email} email={email} avatar={session.user.avatar} />
 
                 <ProfileNameForm initialName={initialName} email={email} />
 
