@@ -89,10 +89,6 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
         icon: Instagram,
         color: '!text-pink-500',
     },
-    [LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH]: {
-        icon: Instagram,
-        color: '!text-pink-500',
-    },
     [LEAD_GENERATION_SUB_MODULES.FACEBOOK]: {
         icon: FacebookIcon,
         color: '!text-blue-600',

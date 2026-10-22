@@ -1,5 +1,5 @@
 import { LEAD_GENERATION_SUB_MODULES, Modules } from '@aixellabs/backend/db/types';
-import { LEAD_GEN_SCRAPE_API_ROUTE, SubModuleUrls } from '@/config/app-config';
+import { LEAD_GEN_SCRAPE_API_ROUTE } from '@/config/app-config';
 import { SIGN_IN_PATH } from '@/lib/auth/constants';
 import { expect, test } from '../support/fixtures';
 import { USER_STORAGE_STATE } from '../support/env';
@@ -46,19 +46,5 @@ test.describe('user without the submodule', () => {
             data: { subModule: LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH, body: {} },
         });
         expect(res.status()).toBe(403);
-    });
-});
-
-test.describe('submodule without a built page', () => {
-    test.use({ storageState: USER_STORAGE_STATE });
-
-    test('is left out of the sidebar and cannot be opened', async ({ page, db }) => {
-        await db.resetUser(E2E_USER);
-        await page.goto(GOOGLE_ADVANCED_SEARCH_URL);
-        await expect(page.getByRole('link', { name: 'Instagram Search', exact: true })).toBeVisible();
-        await expect(page.getByRole('link', { name: 'Instagram Advanced Search' })).toHaveCount(0);
-
-        await page.goto(SubModuleUrls[LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH]);
-        await expect(page.getByRole('heading', { name: '404 - Page Not Found' }).first()).toBeVisible();
     });
 });

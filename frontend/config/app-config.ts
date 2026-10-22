@@ -20,7 +20,6 @@ export const SubModuleUrls: Record<SubModule, string> = {
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS_ADVANCED]: '/lead-generation/google-maps-advanced',
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH]: '/lead-generation/google-advanced-search',
     [LEAD_GENERATION_SUB_MODULES.INSTAGRAM_SEARCH]: '/lead-generation/instagram-search',
-    [LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH]: '/lead-generation/instagram-advanced-search',
     [LEAD_GENERATION_SUB_MODULES.FACEBOOK]: '/lead-generation/facebook',
     [LEAD_GENERATION_SUB_MODULES.LINKEDIN]: '/lead-generation/linkedin',
     [LEAD_GENERATION_SUB_MODULES.CRAWL]: '/lead-generation/crawl',

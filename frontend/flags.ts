@@ -22,7 +22,6 @@ export enum FeatureFlagKey {
     NL_CHAT_INSTAGRAM_SEARCH = 'nl-chat-instagram-search',
     NL_CHAT_LINKEDIN = 'nl-chat-linkedin',
     LINKEDIN_BY_PEOPLE = 'linkedin-by-people',
-    INSTAGRAM_ADVANCED_SEARCH = 'instagram-advanced-search',
     VOICE_WEB_DIALER = 'voice-web-dialer',
     VOICE_AGENT_ANALYTICS = 'voice-agent-analytics',
     MESSAGING = 'messaging',
@@ -76,7 +75,6 @@ function pageFlag(key: FeatureFlagKey, description: string, enabled: boolean) {
  * disappears) and its URL 404s for every user, admins included, except admins on {@link PREVIEW_TENANT}.
  * The page code stays in place.
  */
-export const instagramAdvancedFlag = pageFlag(FeatureFlagKey.INSTAGRAM_ADVANCED_SEARCH, 'Instagram advanced search', false);
 export const voiceWebDialerFlag = pageFlag(FeatureFlagKey.VOICE_WEB_DIALER, 'Voice agent web dialer', false);
 export const voiceAgentAnalyticsFlag = pageFlag(FeatureFlagKey.VOICE_AGENT_ANALYTICS, 'Voice agent analytics', false);
 export const messagingFlag = pageFlag(FeatureFlagKey.MESSAGING, 'Messaging module', false);
@@ -88,7 +86,6 @@ const FLAG_BY_KEY = {
     [FeatureFlagKey.NL_CHAT_INSTAGRAM_SEARCH]: nlChatInstagramFlag,
     [FeatureFlagKey.NL_CHAT_LINKEDIN]: nlChatLinkedInFlag,
     [FeatureFlagKey.LINKEDIN_BY_PEOPLE]: linkedInByPeopleFlag,
-    [FeatureFlagKey.INSTAGRAM_ADVANCED_SEARCH]: instagramAdvancedFlag,
     [FeatureFlagKey.VOICE_WEB_DIALER]: voiceWebDialerFlag,
     [FeatureFlagKey.VOICE_AGENT_ANALYTICS]: voiceAgentAnalyticsFlag,
     [FeatureFlagKey.MESSAGING]: messagingFlag,
@@ -105,7 +102,6 @@ const wholeModule = (subModules: Record<string, SubModule>, key: FeatureFlagKey)
 
 /** Submodules whose page sits behind a flag. Unlisted submodules only need module access. */
 export const SUB_MODULE_FLAG_KEY: Partial<Record<SubModule, FeatureFlagKey>> = {
-    [LEAD_GENERATION_SUB_MODULES.INSTAGRAM_ADVANCED_SEARCH]: FeatureFlagKey.INSTAGRAM_ADVANCED_SEARCH,
     [VOICE_AGENT_SUB_MODULES.WEB_DIALER]: FeatureFlagKey.VOICE_WEB_DIALER,
     [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: FeatureFlagKey.VOICE_AGENT_ANALYTICS,
     ...wholeModule(MESSAGING_SUB_MODULES, FeatureFlagKey.MESSAGING),

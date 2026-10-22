@@ -42,7 +42,7 @@ write Mongo; the Next.js app persists leads/credits/tenants.
 
 | Item | Notes |
 |------|--------|
-| Instagram Advanced | BE routes exist; FE is Coming Soon; not in credit/dispatch maps |
+| Instagram Advanced | BE + MCP only: `/advanced/posts` feeds Instagram Search thumbnails; content search has no FE page |
 | Website contacts | `POST /website-contacts` live on BE; not wired to FE lead-gen / `LeadData` yet |
 | YouTube / Trends product UI | HTTP + MCP only |
 | Email / lead enrichment | Module enums + sidebar URLs; no pages |

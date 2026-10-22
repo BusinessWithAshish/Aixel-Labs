@@ -40,7 +40,7 @@ Under `app/(protected)/lead-generation/`: Google Maps (+ advanced), Google
 Advanced Search, Instagram Search, Facebook, LinkedIn (company; people behind a
 flag), lead lists. Credits debit only after successful save (`createUserLeads`).
 
-Incomplete relative to backend: Instagram Advanced UI, website-contacts wiring,
+Incomplete relative to backend: Instagram content search, website-contacts wiring,
 YouTube / Trends product UI.
 
 ## Agents
