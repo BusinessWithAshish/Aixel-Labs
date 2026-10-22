@@ -92,7 +92,7 @@ export function CampaignDetail() {
 
     return (
         <>
-            <Card className="gap-4">
+            <Card className="h-auto gap-4">
                 <CardContent className="flex flex-col gap-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="flex min-w-0 flex-col gap-1.5">

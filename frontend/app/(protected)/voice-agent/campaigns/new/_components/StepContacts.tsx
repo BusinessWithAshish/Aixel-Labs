@@ -23,7 +23,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { usePage } from '@/contexts/PageStore';
 import { CAMPAIGN_COUNTRIES, formatPhone, normalizePhone } from '@/helpers/voice-campaign-contacts';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
@@ -34,6 +33,7 @@ const NONE = 'none';
 const PREVIEW_ROWS = 5;
 const ISSUES_SHOWN = 50;
 const PHONE_EXAMPLES = 4;
+const COLUMN_GRID = 'gap-x-3 sm:grid-cols-[minmax(0,10rem)_minmax(0,12rem)_minmax(0,1fr)] sm:items-center';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
@@ -91,17 +91,16 @@ function FileBar() {
     const { csv, clearFile } = usePage<UseNewCampaignPageReturn>();
     if (!csv) return null;
     return (
-        <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-lg border p-3">
-            <span className="flex min-w-0 items-center gap-2 text-sm">
-                <FileSpreadsheet className="text-muted-foreground size-4 shrink-0" aria-hidden />
-                <span className="truncate font-medium" data-testid="campaign-csv-name">
-                    {csv.fileName}
-                </span>
-                <span className="text-muted-foreground shrink-0 tabular-nums">
-                    {plural(csv.rows.length - 1, 'row')} · {plural(csv.headers.length, 'column')}
-                </span>
+        <div className="bg-muted/40 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border p-3 text-sm">
+            <FileSpreadsheet className="text-muted-foreground size-4 shrink-0" aria-hidden />
+            {/* Takes the line to itself on a phone before it truncates; the counts and button wrap below. */}
+            <span className="min-w-0 grow basis-40 truncate font-medium" data-testid="campaign-csv-name">
+                {csv.fileName}
             </span>
-            <Button type="button" variant="ghost" size="sm" onClick={clearFile}>
+            <span className="text-muted-foreground tabular-nums">
+                {plural(csv.rows.length - 1, 'row')} · {plural(csv.headers.length, 'column')}
+            </span>
+            <Button type="button" variant="ghost" size="sm" onClick={clearFile} className="ml-auto">
                 <X className="size-4" />
                 Change file
             </Button>
@@ -226,34 +225,37 @@ function ColumnMatching() {
                     onChange={(name) => setMapping((m) => ({ ...m, name: name === m.phone ? null : name }))}
                 />
             </div>
-            <Table data-testid="campaign-variables" aria-label="Your columns and what they become">
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Your column</TableHead>
-                        <TableHead>Example</TableHead>
-                        <TableHead>Becomes</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {columns.map((column) => {
-                        const note = emptyNote(column, defaults);
-                        return (
-                            <TableRow key={column.index}>
-                                <TableCell className="max-w-40 truncate font-medium">{column.header}</TableCell>
-                                <TableCell className="text-muted-foreground max-w-48 truncate">
-                                    {column.sample ?? 'All empty'}
-                                </TableCell>
-                                <TableCell className="whitespace-normal">
-                                    <div className="flex flex-col gap-0.5">
-                                        <ColumnUse column={column} />
-                                        {note ? <span className="text-muted-foreground text-xs">{note}</span> : null}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        );
-                    })}
-                </TableBody>
-            </Table>
+            {/* A table from sm up; on a phone each column stacks: header and example, then what it becomes. */}
+            <ul
+                className="divide-y rounded-lg border text-sm"
+                data-testid="campaign-variables"
+                aria-label="Your columns and what they become"
+            >
+                <li
+                    className={cn(COLUMN_GRID, 'text-muted-foreground hidden px-3 py-2 text-xs font-medium sm:grid')}
+                    aria-hidden
+                >
+                    <span>Your column</span>
+                    <span>Example</span>
+                    <span>Becomes</span>
+                </li>
+                {columns.map((column) => {
+                    const note = emptyNote(column, defaults);
+                    return (
+                        <li key={column.index} className={cn(COLUMN_GRID, 'grid gap-y-1 px-3 py-2')}>
+                            <span className="truncate font-medium">{column.header}</span>
+                            <span className="text-muted-foreground truncate">
+                                <span className="sm:hidden">e.g. </span>
+                                {column.sample ?? 'All empty'}
+                            </span>
+                            <span className="flex min-w-0 flex-col gap-0.5">
+                                <ColumnUse column={column} />
+                                {note ? <span className="text-muted-foreground text-xs">{note}</span> : null}
+                            </span>
+                        </li>
+                    );
+                })}
+            </ul>
         </SettingsSection>
     );
 }

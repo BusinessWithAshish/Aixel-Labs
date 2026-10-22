@@ -27,37 +27,44 @@ const STEP_TEXT = [
 function Stepper() {
     const { step, goTo } = usePage<UseNewCampaignPageReturn>();
     return (
-        <ol className="flex items-center gap-1.5 sm:gap-2" aria-label="Steps">
-            {WIZARD_STEPS.map((label, index) => {
-                const done = index < step;
-                const current = index === step;
-                return (
-                    <li key={label} className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
-                        <button
-                            type="button"
-                            onClick={() => goTo(index)}
-                            aria-current={current ? 'step' : undefined}
-                            className={cn(
-                                'flex min-w-0 items-center gap-2 rounded-md text-sm',
-                                current ? 'text-foreground font-medium' : 'text-muted-foreground',
-                            )}
-                        >
-                            <span
+        <nav className="flex flex-col gap-2" aria-label="Steps">
+            <p className="text-sm font-medium sm:hidden">
+                Step {step + 1} of {WIZARD_STEPS.length} · {WIZARD_STEPS[step]}
+            </p>
+            <ol className="flex items-center gap-1.5 sm:gap-2">
+                {WIZARD_STEPS.map((label, index) => {
+                    const done = index < step;
+                    const current = index === step;
+                    return (
+                        <li key={label} className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+                            <button
+                                type="button"
+                                onClick={() => goTo(index)}
+                                aria-current={current ? 'step' : undefined}
                                 className={cn(
-                                    'flex size-6 shrink-0 items-center justify-center rounded-full border text-xs tabular-nums',
-                                    current && 'border-primary bg-primary text-primary-foreground',
-                                    done && 'border-primary text-primary',
+                                    'flex min-w-0 items-center gap-2 rounded-md text-sm',
+                                    current ? 'text-foreground font-medium' : 'text-muted-foreground',
                                 )}
                             >
-                                {done ? <Check className="size-3.5" aria-hidden /> : index + 1}
-                            </span>
-                            <span className={cn('truncate', !current && 'hidden sm:inline')}>{label}</span>
-                        </button>
-                        {index < WIZARD_STEPS.length - 1 ? <span className="bg-border h-px min-w-3 flex-1" aria-hidden /> : null}
-                    </li>
-                );
-            })}
-        </ol>
+                                <span
+                                    className={cn(
+                                        'flex size-6 shrink-0 items-center justify-center rounded-full border text-xs tabular-nums',
+                                        current && 'border-primary bg-primary text-primary-foreground',
+                                        done && 'border-primary text-primary',
+                                    )}
+                                >
+                                    {done ? <Check className="size-3.5" aria-hidden /> : index + 1}
+                                </span>
+                                <span className="hidden truncate sm:inline">{label}</span>
+                            </button>
+                            {index < WIZARD_STEPS.length - 1 ? (
+                                <span className="bg-border h-px min-w-3 flex-1" aria-hidden />
+                            ) : null}
+                        </li>
+                    );
+                })}
+            </ol>
+        </nav>
     );
 }
 
