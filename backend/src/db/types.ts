@@ -727,8 +727,21 @@ export type VoiceCallDoc<Id = ObjectId> = {
  * Gemini from the tokens Gemini reported, the post-call analysis from its tokens, the phone provider
  * from the minutes at its list rate (`providerExact: false`), replaced by the provider's own charge once it reports one.
  */
+/** One part of a PIPELINE call's cost. `priced` false: the model has no rate in the rates file (usd 0). */
+type VoiceCallStackPartCost = { provider: VoiceKeyProvider; model: string; usd: number; priced: boolean };
+
+export type VoiceCallStackCost = {
+  /** stt + llm + tts. */
+  usd: number;
+  /** Billed on the call's minutes (the stream is open the whole call). */
+  stt: VoiceCallStackPartCost & { minutes: number };
+  llm: VoiceCallStackPartCost & { tokensIn: number; tokensOut: number };
+  /** Billed on characters (Cartesia, ElevenLabs) or minutes of audio made (Gemini, OpenAI). */
+  tts: VoiceCallStackPartCost & { chars: number; audioMinutes: number };
+};
+
 export type VoiceCallCost = {
-  /** geminiUsd + analysisUsd + providerUsd. */
+  /** geminiUsd + stack.usd + analysisUsd + providerUsd. */
   totalUsd: number;
   /** 0 when the owner's key is on Google's free tier (`geminiFreeTier`). */
   geminiUsd: number;
@@ -738,6 +751,8 @@ export type VoiceCallCost = {
   /** The post-call analysis on the same key (0 on the free tier). Absent when it did not run, or on older calls. */
   analysisUsd?: number;
   analysisTokens?: { textIn: number; textOut: number };
+  /** A PIPELINE call: each part at its model's list rate (voice-call-rates.json `pipeline`); geminiUsd is then 0. Absent on REALTIME calls. */
+  stack?: VoiceCallStackCost;
   /** Absent on playground calls, which have no phone provider. */
   provider?: VoiceProvider;
   providerUsd: number;

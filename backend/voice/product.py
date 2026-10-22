@@ -404,11 +404,13 @@ def _finish_ctx(ctx: dict, agent: dict) -> dict:
     during the call can point at it; the agent's tools and speech settings; and her whole system prompt
     (the agent's with its `{{variables}}` filled in, what she remembers about the caller,
     then `# Right now` and `# Your tools`, tools.prompt_sections)."""
-    import analysis, campaigns, speech, tools  # import this module: loaded on first use
+    import analysis, campaigns, cascade, speech, tools  # import this module: loaded on first use
 
     # The agent's prompt and the owner's own Gemini key, or no call (AgentNoPrompt, GeminiKeyMissing).
     require_prompt(agent)
     ctx["gemini_key"], ctx["gemini_sealed"] = gemini_key_for(ctx["doc"]["userId"], agent)
+    # A PIPELINE stack (cascade.py): its parts and keys, or no call (ProviderKeyMissing). None = Gemini Live.
+    ctx["stack"], ctx["tts_voice"] = cascade.resolve(ctx["doc"]["userId"], agent), agent.get("ttsVoice")
     campaigns.tag(ctx)  # a campaign's call: its contact's variables (ctx["variables"]) and links
     if "variables" not in ctx and (held := _take_call_variables(ctx["doc"])) is not None:
         ctx["variables"] = ctx["doc"]["variables"] = held  # a test call's variables (POST /calls)

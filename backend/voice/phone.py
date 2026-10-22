@@ -39,6 +39,7 @@ from loguru import logger
 
 import product  # before bot: it keeps the Mongo settings the process was started with (see there)
 import campaigns
+import cascade
 import speech
 import tools
 import twilio
@@ -487,12 +488,14 @@ async def start_recording(call_control_id: str, api_key: str | None = None):
 
 
 def build_pipeline_parts(voice: str, prompt: str | None, call_tools: "tools.CallTools | None", gemini_key: str,
-                         settings: dict | None = None):
+                         settings: dict | None = None, ctx: dict | None = None):
     """The Gemini Live half of the call, tuned for a phone line. `prompt` is a
     customer agent's; without one she runs on prompt.md. `call_tools`: the agent's
     tools (tools.py), offered to the model as functions; none = exactly as before.
     `gemini_key`: a customer call's owner's own key (product.gemini_key_for), ours only
-    on Ashish's line. `settings`: the agent's speech settings (speech.py); none = the defaults."""
+    on Ashish's line. `settings`: the agent's speech settings (speech.py); none = the defaults.
+    A call whose `ctx` runs on a PIPELINE stack gets cascade.py's text model instead, with the same
+    turn taking; its STT and TTS are `llm.stt` / `llm.tts` (stack_ends)."""
     settings = settings or speech.DEFAULTS
     vad_stop, turn_stop = REPLY_WAIT[settings["replyWait"]]
     context = LLMContext()
@@ -519,6 +522,11 @@ def build_pipeline_parts(voice: str, prompt: str | None, call_tools: "tools.Call
         ),
     )
 
+    if cascade.is_pipeline(ctx):
+        context = LLMContext(tools=call_tools.schema()) if call_tools else LLMContext()
+        llm = cascade.build(ctx, prompt or load_prompt(), context, call_tools)
+        return llm, context, LLMContextAggregatorPair(context, user_params=user_params)
+
     # TurnSafeGeminiLive (bot.py): a caller who resumes while she composes is held back
     # until her reply shows, so Gemini never discards what they said.
     llm = (tools.ToolsGeminiLive if call_tools else TurnSafeGeminiLive)(
@@ -544,6 +552,12 @@ def build_pipeline_parts(voice: str, prompt: str | None, call_tools: "tools.Call
         call_tools.flush = tools.ToolFlush(context, name="tool_flush")
     pair = LLMContextAggregatorPair(context, realtime_service_mode=True, user_params=user_params)
     return llm, context, pair
+
+
+def stack_ends(llm) -> tuple[list, list]:
+    """What a PIPELINE stack adds around its model: speech-to-text before the user aggregator, the TTS
+    and its meter after the model. Nothing for Gemini Live."""
+    return ([llm.stt], [llm.tts, llm.meter]) if getattr(llm, "speaks_text", False) else ([], [])
 
 
 # What someone calling a customer's number hears when the owner's Gemini key cannot take the call
@@ -1371,7 +1385,10 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
     # A customer's call runs on its owner's key, never ours (product.gemini_key_for); ours is Ashish's line.
     gemini_key = ctx["gemini_key"] if ctx else os.environ["GEMINI_API_KEY"]
     llm, context, pair = build_pipeline_parts(voice, ctx["prompt"] if ctx else None, call_tools or None, gemini_key,
-                                              ctx and ctx["speech"])
+                                              ctx and ctx["speech"], ctx)
+    stt, tts = stack_ends(llm)
+    clips = cascade.clip_voice(ctx, voice)  # None: her voice is another provider's, no Gemini clips
+    state["from_vad"] = bool(stt)  # TurnTimer: a PIPELINE reply's gap starts at the end of speech
     if ctx:
         async def end_refused():
             if not started.done():
@@ -1394,14 +1411,18 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
             # Listens for the beep that ends a voicemail greeting.
             BeepDetector(guard, name="beep"),
             TurnTimer(state, "phone", name="timer_in"),
-            pair.user(),
             # The caller's transcription travels UPSTREAM out of the Gemini
             # service, so it is only visible before the service; the agent's
-            # text goes downstream. One logger each side, same record.
-            CallLog(record, guard=guard, name="log_caller"),
+            # text goes downstream. One logger each side, same record. A PIPELINE
+            # stack's STT sends it downstream into the user aggregator, which keeps
+            # it: there the logger sits in front of the aggregator.
+            *stt, *([CallLog(record, guard=guard, name="log_caller")] if stt else []),
+            pair.user(),
+            *([] if stt else [CallLog(record, guard=guard, name="log_caller")]),
             # Only with tools: hands the model a tool's answer the caller talked over.
-            *([call_tools.flush] if call_tools else []),
+            *([call_tools.flush] if call_tools and call_tools.flush else []),
             llm,
+            *tts,
             hold,
             # Drops a reply that starts while the caller is still talking.
             # Before the agent log, so a reply nobody heard is not recorded.
@@ -1410,10 +1431,10 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
             # Hangs up after her goodbye, or after the reply that follows a
             # stop request, a wrong number, an objection to recording, abuse.
             # On a voicemail: leave the agent's own message (its voicemail setting), or hang up.
-            GuardAgent(guard, voice=voice, gemini_key=ctx and gemini_key,
+            GuardAgent(guard, voice=clips, gemini_key=ctx and gemini_key,
                        message=ctx.get("voicemail") if ctx else VOICEMAIL_TEXT, name="guard_out"),
             TurnTimer(state, "phone", name="timer_out"),
-            ThinkingCue(voice, guard=guard, gemini_key=ctx and gemini_key, name="thinking_cue"),
+            *([ThinkingCue(clips, guard=guard, gemini_key=ctx and gemini_key, name="thinking_cue")] if clips else []),
             transport.output(),
             pair.assistant(),
         ]
@@ -1584,9 +1605,11 @@ class PlayEvents(FrameProcessor):
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
-        if direction == FrameDirection.UPSTREAM:
-            if isinstance(frame, TranscriptionFrame) and frame.text.strip():
+        if isinstance(frame, TranscriptionFrame):  # up from Gemini Live; down from a PIPELINE stack's STT
+            if frame.text.strip():
                 await self._send({"type": "transcript", "role": "caller", "text": frame.text.strip()})
+        elif direction == FrameDirection.UPSTREAM:
+            pass
         elif isinstance(frame, TTSTextFrame) and frame.text.strip():
             self._reply += " " + frame.text.strip()
         elif isinstance(frame, (LLMFullResponseStartFrame, LLMFullResponseEndFrame, InterruptionFrame, EndFrame)):
@@ -1638,7 +1661,10 @@ async def _play_session(websocket: WebSocket, ctx: dict, slot: str):
     )
     # The same model settings and turn taking as her phone calls, so the playground is a fair preview.
     call_tools = tools.CallTools(ctx, record)
-    llm, context, pair = build_pipeline_parts(voice, ctx["prompt"], call_tools or None, ctx["gemini_key"], ctx["speech"])
+    llm, context, pair = build_pipeline_parts(voice, ctx["prompt"], call_tools or None, ctx["gemini_key"], ctx["speech"], ctx)
+    stt, tts = stack_ends(llm)
+    clips = cascade.clip_voice(ctx, voice)
+    state["from_vad"] = bool(stt)
     end_on_key_error(llm, ctx, record, end=lambda: runner.cancel(),
                      tell=lambda message: llm.push_frame(PlayMessage(message=message)))
     if call_tools:  # the page shows each tool run as it finishes
@@ -1649,17 +1675,18 @@ async def _play_session(websocket: WebSocket, ctx: dict, slot: str):
         [
             transport.input(),
             TurnTimer(state, "play", name="timer_in"),
+            *stt, *([CallLog(record, guard=guard, name="log_caller"), PlayEvents(state, name="events_caller")] if stt else []),
             pair.user(),
-            CallLog(record, guard=guard, name="log_caller"),
-            PlayEvents(state, name="events_caller"),
-            *([call_tools.flush] if call_tools else []),
+            *([] if stt else [CallLog(record, guard=guard, name="log_caller"), PlayEvents(state, name="events_caller")]),
+            *([call_tools.flush] if call_tools and call_tools.flush else []),
             llm,
+            *tts,
             TalkOverGate(name="gate"),
             CallLog(record, name="log_agent"),
             GuardAgent(guard, name="guard_out"),  # no voice: a "voicemail" here is hung up on, no message left
             TurnTimer(state, "play", name="timer_out"),
             PlayEvents(state, name="events_agent"),
-            ThinkingCue(voice, guard=guard, gemini_key=ctx["gemini_key"], name="thinking_cue"),
+            *([ThinkingCue(clips, guard=guard, gemini_key=ctx["gemini_key"], name="thinking_cue")] if clips else []),
             transport.output(),
             pair.assistant(),
         ]

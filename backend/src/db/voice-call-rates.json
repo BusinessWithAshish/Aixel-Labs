@@ -34,6 +34,30 @@
   "providersWithoutRates": {
     "VOICELINK": "No published rate: each account's plan sets its own inbound_rate, outbound_rate and pulse_seconds (app.voicelink.co.in/documentation/plans and the API context file, read 2026-10-21). The engine takes each call's own charge from GET /api/v1/call-log/details (total_cost, rupees) instead."
   },
+  "pipeline": {
+    "readAt": "2026-10-22",
+    "note": "What the engine bills each part of a PIPELINE stack on (costs.pipeline_cost), by model. stt: the whole call's minutes (the stream is open from start to end); llm: tokens in and out (thinking counts as out); tts: characters sent, or minutes of audio made for the token-billed ones (Gemini about 1,500 audio tokens a minute, 25 a second).",
+    "stt": {
+      "nova-3": { "usdPerMinute": 0.0058, "source": "deepgram.com/pricing: Nova-3 Multilingual streaming, pay as you go." },
+      "gemini-3.5-transcribe-live": { "usdPerMinute": 0.009, "source": "ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22): $0.005/min audio in + $0.004/min text out." },
+      "gpt-4o-mini-transcribe": { "usdPerMinute": 0.003, "source": "developers.openai.com/api/docs/pricing" },
+      "gpt-4o-transcribe": { "usdPerMinute": 0.006, "source": "developers.openai.com/api/docs/pricing" }
+    },
+    "llm": {
+      "gemini-3.5-flash-lite": { "usdPerMillionTokens": { "in": 0.3, "out": 2.5 }, "source": "ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22)" },
+      "gemini-3.8-flash": { "usdPerMillionTokens": { "in": 0.75, "out": 3.75 }, "source": "ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22); $1.50 / $7.50 from 2027-01-01." },
+      "gpt-4.1-mini": { "usdPerMillionTokens": { "in": 0.4, "out": 1.6 }, "source": "developers.openai.com/api/docs/pricing" },
+      "gpt-5.4-nano": { "usdPerMillionTokens": { "in": 0.2, "out": 1.25 }, "source": "developers.openai.com/api/docs/pricing" }
+    },
+    "tts": {
+      "sonic-3.6": { "usdPerMillionChars": 39, "source": "cartesia.ai/pricing: 1 credit = 1 character, Startup plan $49 for 1.25M credits." },
+      "eleven_flash_v2_5": { "usdPerMillionChars": 40, "source": "elevenlabs.io/pricing/api: $0.04 per 1K characters (Flash / Turbo)." },
+      "eleven_v4_turbo": { "usdPerMillionChars": 40, "source": "elevenlabs.io/pricing/api: $0.04 per 1K characters." },
+      "gpt-4o-mini-tts": { "usdPerAudioMinute": 0.015, "source": "developers.openai.com/api/docs/pricing: $12 per 1M audio tokens out, about $0.015 a minute." },
+      "gemini-3.8-flash-tts": { "usdPerAudioMinute": 0.0135, "source": "ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22): $9 per 1M audio tokens out ($18 from 2027-01-01); text in $0.50/M, left out." },
+      "gemini-3.8-flash-lite-tts": { "usdPerAudioMinute": 0.009, "source": "ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22): $6 per 1M audio tokens out ($12 from 2027-01-01); text in $0.50/M, left out." }
+    }
+  },
   "estimate": {
     "source": "backend/voice/research/gemini-cost-2026-10-17.md: with session rotation, a booking agent (about 1,200 prompt tokens a turn, engine sections included) costs $0.0348 a talk-minute and a 5,479-token prompt $0.079.",
     "geminiUsdPerMinute": 0.0224,

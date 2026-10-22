@@ -59,6 +59,7 @@ from pipecat.frames.frames import (
     TTSTextFrame,
     UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
+    VADUserStoppedSpeakingFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
@@ -185,7 +186,13 @@ class TurnTimer(FrameProcessor):
             # stop has no reply still to come, so timing it would pair it with
             # the next chunk of the same answer and log a 40-170 ms gap.
             if not self._state.get("answered"):
-                self._state["stopped_at"] = time.perf_counter()
+                # A PIPELINE stack (cascade.py) ends the turn only once its STT has the words, so its gap
+                # starts where the caller's speech ended (the voice detector's stop), as Gemini Live's
+                # does: Smart Turn ends ~9 turns in 10 right at that stop.
+                self._state["stopped_at"] = (self._state.get("vad_stopped_at") if self._state.get("from_vad")
+                                             else None) or time.perf_counter()
+        elif isinstance(frame, VADUserStoppedSpeakingFrame):
+            self._state["vad_stopped_at"] = time.perf_counter()
         elif isinstance(frame, OutputAudioRawFrame):
             self._state["answered"] = True
             stopped_at = self._state.pop("stopped_at", None)

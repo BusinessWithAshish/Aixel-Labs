@@ -11,6 +11,8 @@
               until its call-log API gives the call's own charge, which then fills it in like Twilio's.
     analysis  the post-call analysis (analysis.py) on the same key: its tokens at the analysis model's list price,
               0 on a free-tier key. Added once the analysis ran (analysis_cost), absent when it did not run.
+    stack     a PIPELINE call (cascade.py) instead of Gemini Live: each part (stt, llm, tts) at its model's list
+              rate (voice-call-rates.json `pipeline`), on what cascade.Meter counted; gemini is then 0.
 
 Prices excl. tax, with their sources and dates: backend/src/db/voice-call-rates.json, shared with the app
 (`VOICE_CALL_RATES` in types.ts, which also estimates an agent's cost before any call).
@@ -30,6 +32,8 @@ import product
 RATES = json.loads((Path(__file__).resolve().parents[1] / "src/db/voice-call-rates.json").read_text())
 # USD per 1M tokens, paid tier. Thinking bills as text out; Live has no cache price.
 GEMINI_USD_PER_M = RATES["gemini"]["usdPerMillionTokens"]
+# A PIPELINE stack's parts (cascade.py), by model: what each is billed on (pipeline_cost).
+STACK_RATES = RATES["pipeline"]
 # USD per 1M tokens for the post-call analysis's text model.
 ANALYSIS_USD_PER_M = RATES["analysis"]["usdPerMillionTokens"]
 # USD a minute, every part the engine uses (voice, media stream, recording), by provider and direction.
@@ -74,7 +78,7 @@ def analysis_cost(cost: dict, usage: dict) -> dict:
               "textOut": usage.get("candidatesTokenCount", 0) + usage.get("thoughtsTokenCount", 0)}
     usd = 0.0 if cost.get("geminiFreeTier") else sum(n * ANALYSIS_USD_PER_M[k] for k, n in tokens.items()) / 1e6
     return {"analysisUsd": round(usd, 6), "analysisTokens": tokens,
-            "totalUsd": round(cost["geminiUsd"] + cost["providerUsd"] + usd, 6)}
+            "totalUsd": total({**cost, "analysisUsd": usd})}
 
 
 def free_tier(user_id, sealed: str | None = None) -> bool:
@@ -95,8 +99,40 @@ def call_cost(doc: dict, usage: dict, provider: str | None, sealed: str | None =
     if doc["channel"] == "PHONE" and (provider, doc["direction"]) in PROVIDER_USD_PER_MIN:
         cost["provider"] = provider
         cost["providerUsd"] = round(provider_estimate(provider, doc["direction"], doc.get("to"), doc["durationSec"]), 6)
-    cost["totalUsd"] = round(cost["geminiUsd"] + cost["providerUsd"], 6)
+    if usage.get("stack") == "PIPELINE":
+        # shortcut: a Gemini part is free when the call's Gemini key is; per-part keys' tiers are not read.
+        cost["stack"] = pipeline_cost(usage, doc["durationSec"], free)
+    cost["totalUsd"] = total(cost)
     return cost
+
+
+def total(cost: dict) -> float:
+    """totalUsd: every part of the call."""
+    return round(cost["geminiUsd"] + cost.get("stack", {}).get("usd", 0) + cost.get("analysisUsd", 0) + cost["providerUsd"], 6)
+
+
+def pipeline_cost(usage: dict, duration_sec: int, gemini_free: bool) -> dict:
+    """`cost.stack` of a PIPELINE call, from cascade.Meter's usage: each part's model, what it was billed on and
+    its USD at list price. A model with no rate (not in voice-call-rates.json `pipeline`) costs 0 and says so."""
+    parts = usage["parts"]
+    out = {}
+    for part, billed in (("stt", {"minutes": round(max(duration_sec, 0) / 60, 3)}),
+                         ("llm", {"tokensIn": usage.get("llm_in", 0), "tokensOut": usage.get("llm_out", 0)}),
+                         ("tts", {"chars": usage.get("tts_chars", 0), "audioMinutes": round(usage.get("tts_secs", 0) / 60, 3)})):
+        rate = STACK_RATES[part].get(parts[part]["model"])
+        usd = 0.0
+        if rate and not (gemini_free and parts[part]["provider"] == "gemini"):
+            if "usdPerMinute" in rate:
+                usd = billed["minutes"] * rate["usdPerMinute"]
+            elif "usdPerMillionTokens" in rate:
+                usd = (billed["tokensIn"] * rate["usdPerMillionTokens"]["in"] + billed["tokensOut"] * rate["usdPerMillionTokens"]["out"]) / 1e6
+            elif "usdPerMillionChars" in rate:
+                usd = billed["chars"] * rate["usdPerMillionChars"] / 1e6
+            else:
+                usd = billed["audioMinutes"] * rate["usdPerAudioMinute"]
+        out[part] = {**parts[part], **billed, "usd": round(usd, 6), "priced": bool(rate)}
+    out["usd"] = round(sum(out[p]["usd"] for p in ("stt", "llm", "tts")), 6)
+    return out
 
 
 async def twilio_price(creds: dict, call_sid: str) -> float | None:
@@ -166,7 +202,7 @@ async def fill_provider_charge(ctx: dict, doc: dict):
         usd = round(charged + minutes(doc["durationSec"]) * EXTRAS_USD_PER_MIN.get(provider, 0), 6)
         await asyncio.to_thread(product.db().voice_calls.update_one, {"_id": doc["_id"]}, {"$set": {
             "cost.provider": provider, "cost.providerUsd": usd, "cost.providerExact": True,
-            "cost.totalUsd": round(cost["geminiUsd"] + cost.get("analysisUsd", 0) + usd, 6)}})
+            "cost.totalUsd": total({**cost, "providerUsd": usd})}})
         logger.info(f"cost of call {doc['_id']}: {provider} charged ${charged:.4f}, phone part ${usd}")
     except Exception as e:
         logger.warning(f"cost of call {doc.get('_id')}: could not get {provider}'s charge: {e!r}")

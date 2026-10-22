@@ -44,6 +44,7 @@ from pipecat.frames.frames import (
     Frame,
     LLMContextFrame,
     OutputAudioRawFrame,
+    TTSSpeakFrame,
     UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
 )
@@ -522,7 +523,7 @@ class CallTools:
         for name in ([*BUILTIN] if self.cal else []) + list(self.webhooks):
             llm.register_function(name, self._handle, timeout_secs=WEBHOOK_TIMEOUT + 4)
         self.llm = llm
-        if self.speech["toolWait"] == "SAY":
+        if self.speech["toolWait"] == "SAY" and not getattr(llm, "speaks_text", False):
             # Made now, in her voice on the call's own key, so it is ready by the first tool (~2-5 s).
             self._line = asyncio.ensure_future(asyncio.to_thread(
                 fillers.get_line, voice, self.speech["toolWaitLine"], self.ctx.get("gemini_key"), LINE_SECS))
@@ -595,7 +596,12 @@ class CallTools:
     async def _say_line(self):
         """SAY: her line goes out as the tool starts (the model was told to say nothing itself). Skipped
         when its audio is not ready yet: the tool is never held up for it. Played ahead of her answer, so
-        a quick tool's answer waits for the line to finish."""
+        a quick tool's answer waits for the line to finish. A PIPELINE stack's TTS says it as text (cascade.py)."""
+        if getattr(self.llm, "speaks_text", False):
+            if time.monotonic() - self._said_at >= SAY_AGAIN_SECS:
+                self._said_at = time.monotonic()
+                await self.llm.push_frame(TTSSpeakFrame(self.speech["toolWaitLine"]))
+            return
         line = self._line
         if not (line and line.done() and not line.cancelled() and not line.exception() and line.result()):
             return

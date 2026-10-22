@@ -20,6 +20,7 @@ URLs, short-lived stream tokens, `VOICELAB_KEY`, Twilio's signature).
 | `campaigns.py` | Outbound campaigns: the dialling loop, leases, retries, calling windows |
 | `analysis.py` | Post-call analysis and caller memory |
 | `speech.py` | The agent's speech settings (`VoiceAgentSpeech`): what she does while a tool works, reply wait (presets in `phone.REPLY_WAIT`), the silence check-in, the time limit |
+| `cascade.py` | The PIPELINE stack (an agent's or owner's `stack`, `VoiceStackKind.PIPELINE`): speech-to-text, a text model and text-to-speech (Deepgram / Gemini / OpenAI STT, Gemini / OpenAI text, Cartesia / ElevenLabs / OpenAI / Gemini TTS) on the owner's keys, inside the same call as Gemini Live (turn taking, guard, tools, record). No stack, or REALTIME = Gemini Live |
 | `costs.py` | Each call's cost (`voice_calls.cost`): Gemini tokens at list price (0 on a free-tier key), the phone minutes at the provider's list rate, then the provider's own charge after the call (Twilio's Call `price`, VoiceLink's call-log `total_cost`). Rates, sources and dates: `backend/src/db/voice-call-rates.json`, shared with the app |
 | `twilio.py`, `voicelink.py` | Twilio and VoiceLink numbers (Telnyx is built into `phone.py`) |
 | `fillers.py`, `fillers/` | The short "mm" and voicemail clips in each voice (shipped ones; others are made once and kept in `cache/`) |
@@ -89,10 +90,10 @@ exact command (engine settings, fake ports). Most use real Gemini Live sessions,
 
 ```bash
 export MONGODB_URI=mongodb://127.0.0.1:27018 MONGODB_DB_NAME=AixelLabsVoiceEngineDev
-.venv/bin/python tests/tools_unit.py          # also: calendars_unit, agent_features_unit, campaigns_unit, guard_unit, costs_unit, speech_unit
+.venv/bin/python tests/tools_unit.py          # also: calendars_unit, agent_features_unit, campaigns_unit, guard_unit, costs_unit, speech_unit, cascade_unit
 .venv/bin/python tests/drain_e2e.py 8131      # starts its own two slots: SIGTERM drain + event handover
 ```
 
 End-to-end: `product_e2e`, `tools_e2e`, `twilio_e2e`, `voicelink_e2e`, `gemini_key_e2e`,
-`agent_features_e2e`, `calendars_e2e`, `campaigns_e2e`, `prefix_e2e` (through a local Caddy built
+`agent_features_e2e`, `calendars_e2e`, `campaigns_e2e`, `cascade_e2e` (the PIPELINE stack beside Gemini Live), `prefix_e2e` (through a local Caddy built
 from the repo's Caddyfile).
