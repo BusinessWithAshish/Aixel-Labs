@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubModuleUrls } from '@/config/app-config';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
-import { formatDuration } from '../../call-logs/_utils/call-format';
+import { formatDuration } from '@/helpers/voice-call-format';
 import { Dialpad } from './Dialpad';
 import { PhoneDisplay } from './PhoneDisplay';
 import { CallActions } from './CallActions';
