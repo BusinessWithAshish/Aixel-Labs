@@ -6,7 +6,7 @@ import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 
 type GeminiKeyLineProps = {
     view: VoiceGeminiKeyView;
-    /** Links to the key card; off inside something that is already a link (the agent cards). */
+    /** Links to the key in voice settings; off inside something that is already a link (the agent cards). */
     link?: boolean;
     className?: string;
 };

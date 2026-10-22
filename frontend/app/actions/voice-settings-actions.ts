@@ -19,7 +19,7 @@ import {
 import { voiceAccountsCollection } from '@/server/voice-agent/accounts';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 
-const SUB_MODULE = VOICE_AGENT_SUB_MODULES.AGENTS;
+const SUB_MODULE = VOICE_AGENT_SUB_MODULES.SETTINGS;
 
 function assertKeyShape(apiKey: string): string {
     const key = typeof apiKey === 'string' ? apiKey.trim() : '';
@@ -76,7 +76,7 @@ export const saveGeminiKey = async (apiKey: string, tier: VoiceGeminiKeyTier): P
 /**
  * Asks Google about the stored key again (the free list-models call), e.g. after turning the API on
  * or adding billing, and keeps what it says. The key card also runs it every 10 minutes while the
- * agents page is open. Only a network failure is an error.
+ * settings page is open. Only a network failure is an error.
  */
 export const recheckGeminiKey = async (): Promise<ALApiResponse<VoiceGeminiKeyView>> =>
     runAuthenticatedAction(async function recheckGeminiKey(userId) {

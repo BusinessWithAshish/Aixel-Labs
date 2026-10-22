@@ -9,7 +9,7 @@ import { CreateVoiceAgentDialog } from './CreateVoiceAgentDialog';
 import { VoiceAgentCard } from './VoiceAgentCard';
 
 export function VoiceAgentsList() {
-    const { agents, geminiKey, openCreate } = usePage<UseVoiceAgentsPageReturn>();
+    const { agents, openCreate } = usePage<UseVoiceAgentsPageReturn>();
     const newAgentButton = (
         <Button onClick={openCreate} data-testid="new-voice-agent">
             <Plus className="size-4" />
@@ -38,7 +38,7 @@ export function VoiceAgentsList() {
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         {agents.map((agent) => (
-                            <VoiceAgentCard key={agent._id} agent={agent} geminiKey={geminiKey} />
+                            <VoiceAgentCard key={agent._id} agent={agent} />
                         ))}
                     </div>
                 </>

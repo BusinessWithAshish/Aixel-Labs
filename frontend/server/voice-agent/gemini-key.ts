@@ -17,7 +17,7 @@ import { voiceAccountsCollection } from '@/server/voice-agent/accounts';
  */
 
 export const GEMINI_KEY_MISSING_MESSAGE =
-    'Add your Gemini API key first (Voice agents page, Gemini API key). Your agents run on your own key.';
+    'Add your Gemini API key first, under Voice agent > Settings. Your agents run on your own key.';
 
 const CHECK_TIMEOUT_MS = 10_000;
 

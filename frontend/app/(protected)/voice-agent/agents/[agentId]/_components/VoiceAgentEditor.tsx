@@ -135,14 +135,13 @@ export function VoiceAgentEditor() {
                                     <Field>
                                         <FieldLabel id="agent-call-type-label">Call type</FieldLabel>
                                         <VoiceAgentCallTypePicker
-                                            size="sm"
                                             value={field.value}
                                             onChange={field.onChange}
                                             labelledBy="agent-call-type-label"
                                         />
                                         <FieldDescription className="text-xs" data-testid="call-type-note">
-                                            Changing the type does not rewrite the prompt or call notes. Edit them yourself,
-                                            or start from a template below.
+                                            Changing it does not rewrite the prompt or call notes: edit them, or start from a
+                                            template below.
                                         </FieldDescription>
                                     </Field>
                                 )}

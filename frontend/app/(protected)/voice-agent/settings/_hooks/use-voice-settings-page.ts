@@ -16,11 +16,16 @@ const keySchema = z.object({
 /** How often the open page asks Google about the key again. The check is free (it lists models). */
 const KEY_PING_MS = 10 * 60_000;
 
+export type VoiceSettingsPageData = {
+    geminiKey: VoiceGeminiKeyView;
+};
+
 /**
- * The Gemini API key card: add / replace (checked with Google first), its tier, check now (and every
- * 10 minutes while the page is open), remove. The view lives with the page so agent cards follow it.
+ * Voice settings. Today only the Gemini API key: add / replace (checked with Google first), its tier,
+ * check now (and every 10 minutes while the page is open), remove.
  */
-export function useGeminiKeyCard(view: VoiceGeminiKeyView, setView: (view: VoiceGeminiKeyView) => void) {
+export function useVoiceSettingsPage({ geminiKey }: VoiceSettingsPageData) {
+    const [view, setView] = useState(geminiKey);
     const [editOpen, setEditOpen] = useState(false);
     const keyForm = useForm({
         resolver: zodResolver(keySchema),
@@ -125,4 +130,4 @@ export function useGeminiKeyCard(view: VoiceGeminiKeyView, setView: (view: Voice
     };
 }
 
-export type UseGeminiKeyCardReturn = ReturnType<typeof useGeminiKeyCard>;
+export type UseVoiceSettingsPageReturn = ReturnType<typeof useVoiceSettingsPage>;

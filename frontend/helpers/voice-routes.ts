@@ -7,9 +7,11 @@ export const VOICE_AGENTS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.AGENTS];
 
 export const VOICE_PHONE_NUMBERS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS];
 
-/** The Gemini API key card on the agents page. */
+export const VOICE_SETTINGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.SETTINGS];
+
+/** The Gemini API key section of voice settings. */
 export const GEMINI_KEY_ANCHOR = 'gemini-key';
-export const GEMINI_KEY_URL = `${VOICE_AGENTS_URL}#${GEMINI_KEY_ANCHOR}`;
+export const GEMINI_KEY_URL = `${VOICE_SETTINGS_URL}#${GEMINI_KEY_ANCHOR}`;
 
 /** Where Composio sends the browser back to (under Agents, so the same access applies). */
 export const CONNECTED_APP_CALLBACK_URL = `${VOICE_AGENTS_URL}/connected-apps/callback`;

@@ -5,35 +5,29 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import type { VoiceAgent, VoiceAgentCallType, VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
+import { type VoiceAgent, VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import { createVoiceAgent } from '@/app/actions/voice-agent-actions';
 import { DEFAULT_VOICE_AGENT_NAME, DEFAULT_VOICE_AGENT_VOICE } from '@/helpers/voice-agent-defaults';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
 import { voiceAgentSchema } from '@/helpers/voice-schemas';
 
-/** What the create dialog asks for once the call type is picked; the rest starts from that type's defaults. */
-const newAgentSchema = voiceAgentSchema.pick({ name: true, voice: true });
-const NEW_AGENT = { name: DEFAULT_VOICE_AGENT_NAME, voice: DEFAULT_VOICE_AGENT_VOICE };
-
-export type VoiceAgentsPageData = {
-    agents: VoiceAgent[];
-    /** The owner's key, which every agent runs on: the key card changes it, the agent cards show it. */
-    geminiKey: VoiceGeminiKeyView;
+/** What the create dialog asks for; the rest starts from the call type's defaults. */
+const newAgentSchema = voiceAgentSchema.pick({ callType: true, name: true, voice: true });
+const NEW_AGENT = {
+    callType: VoiceAgentCallType.INBOUND,
+    name: DEFAULT_VOICE_AGENT_NAME,
+    voice: DEFAULT_VOICE_AGENT_VOICE,
 };
 
-export function useVoiceAgentsPage({ agents, geminiKey: initialKey }: VoiceAgentsPageData) {
+export function useVoiceAgentsPage({ agents }: { agents: VoiceAgent[] }) {
     const router = useRouter();
-    const [geminiKey, setGeminiKey] = useState(initialKey);
     const [createOpen, setCreateOpen] = useState(false);
-    /** null = the dialog's first step: pick inbound or outbound. */
-    const [newCallType, setNewCallType] = useState<VoiceAgentCallType | null>(null);
     const createForm = useForm({ resolver: zodResolver(newAgentSchema), defaultValues: NEW_AGENT, mode: 'onChange' });
     /** Set once the agent exists, while the browser goes to it. */
     const [opening, setOpening] = useState(false);
     const creating = createForm.formState.isSubmitting || opening;
 
     const openCreate = useCallback(() => {
-        setNewCallType(null);
         createForm.reset(NEW_AGENT);
         setCreateOpen(true);
     }, [createForm]);
@@ -47,8 +41,7 @@ export function useVoiceAgentsPage({ agents, geminiKey: initialKey }: VoiceAgent
     );
 
     const createAgent = createForm.handleSubmit(async (values) => {
-        if (!newCallType) return;
-        const response = await createVoiceAgent({ callType: newCallType, ...values });
+        const response = await createVoiceAgent(values);
         if (!response.success || !response.data?._id) {
             toast.error(response.error ?? 'Could not create the agent');
             return;
@@ -60,13 +53,9 @@ export function useVoiceAgentsPage({ agents, geminiKey: initialKey }: VoiceAgent
 
     return {
         agents,
-        geminiKey,
-        setGeminiKey,
         createOpen,
         openCreate,
         onCreateOpenChange,
-        newCallType,
-        setNewCallType,
         createForm,
         creating,
         createAgent,

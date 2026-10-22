@@ -31,6 +31,7 @@ import {
     CalendarCheck,
     Megaphone,
     ChartColumn,
+    Settings,
 } from 'lucide-react';
 
 /** Sidebar labels that differ from the enum's title case. */
@@ -138,6 +139,10 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
     [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: {
         icon: ChartColumn,
         color: '!text-indigo-500',
+    },
+    [VOICE_AGENT_SUB_MODULES.SETTINGS]: {
+        icon: Settings,
+        color: '!text-slate-600',
     },
     [MESSAGING_SUB_MODULES.WHATSAPP]: {
         icon: MessageCircleMore,
