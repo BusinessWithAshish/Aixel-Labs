@@ -37,6 +37,7 @@ import {
 /** Sidebar labels that differ from the enum's title case. */
 export const subModuleLabelMap: Partial<Record<SubModule, string>> = {
     [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: 'Bookings',
+    [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: 'Analytics',
 };
 
 export type SidebarNavItem = {

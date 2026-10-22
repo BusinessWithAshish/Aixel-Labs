@@ -63,13 +63,19 @@ export function CallCostBreakdown({ cost, isPhone }: { cost: VoiceCallCost; isPh
     );
 }
 
-/** Above the list: what the shown agent's calls (or every agent's) have cost so far. */
+/** Above the list: the listed calls added up, with the cost of those that have one. */
 export function CallCostSummary() {
-    const { costTotal, agentFilterName } = usePage<UseCallLogsPageReturn>();
+    const { calls, summary, agentFilterName } = usePage<UseCallLogsPageReturn>();
     const currency = useDisplayCurrency();
-    if (costTotal.calls === 0) return null;
+    if (calls.length === 0) return null;
     const money = (usd: number) => formatMoney(usd, currency);
-    const perMinute = costPerMinute(costTotal.totalUsd, costTotal.durationSec);
+    const perMinute = costPerMinute(summary.totalUsd, summary.pricedSec);
+    const costLabel =
+        summary.priced === calls.length
+            ? agentFilterName
+                ? `${agentFilterName}’s calls cost`
+                : 'These calls cost'
+            : `Cost of ${summary.priced} priced ${summary.priced === 1 ? 'call' : 'calls'}`;
 
     return (
         <dl
@@ -78,13 +84,10 @@ export function CallCostSummary() {
             data-testid="call-cost-summary"
         >
             {[
-                [agentFilterName ? `${agentFilterName}’s calls cost` : 'Your calls cost', money(costTotal.totalUsd)],
+                ['Calls', `${calls.length} · ${formatDuration(summary.durationSec)} talking`],
+                [costLabel, `${money(summary.totalUsd)}${summary.estimated ? ' est.' : ''}`],
                 ['Average per minute', perMinute === null ? '—' : money(perMinute)],
-                ['Calls', `${costTotal.calls} · ${formatDuration(costTotal.durationSec)} talking`],
-                [
-                    'Gemini · phone',
-                    `${money(costTotal.geminiUsd)} · ${money(costTotal.providerUsd)}${costTotal.estimated ? ' est.' : ''}`,
-                ],
+                ['Gemini · phone', `${money(summary.geminiUsd)} · ${money(summary.providerUsd)}`],
             ].map(([label, value]) => (
                 <div key={label} className="flex flex-col gap-0.5">
                     <dt className="text-muted-foreground text-xs">{label}</dt>

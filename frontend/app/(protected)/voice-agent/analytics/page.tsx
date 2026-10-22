@@ -1,4 +1,6 @@
+import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import PageLayout from '@/components/common/PageLayout';
+import { subModuleLabelMap } from '@/config/sidebar.config';
 import { withPageHandler } from '@/components/hocs/with-page-handler';
 import { PageProvider } from '@/contexts/PageStore';
 import { getVoiceAnalytics } from '@/app/actions/voice-analytics-actions';
@@ -8,7 +10,7 @@ import { useVoiceAnalyticsPage } from './_hooks/use-voice-analytics-page';
 import { ANALYTICS_RANGES, DEFAULT_ANALYTICS_RANGE } from './_utils/analytics-ranges';
 import { VoiceAnalyticsContent } from './_components/VoiceAnalyticsContent';
 
-const PAGE_TITLE = 'Analytics';
+const PAGE_TITLE = subModuleLabelMap[VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS];
 
 async function VoiceAnalyticsPage({
     searchParams,
