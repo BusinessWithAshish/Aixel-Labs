@@ -13,16 +13,10 @@ import {
     type VoiceCampaignDetail,
 } from '@/app/actions/voice-campaign-actions';
 import { CAMPAIGNS_URL } from '@/helpers/voice-routes';
+import { CAMPAIGN_ACTION_DONE } from '../../_utils/campaign-format';
 
 /** While it runs, the page follows the engine's progress on its own. */
 const REFRESH_MS = 4000;
-
-const ACTION_DONE: Record<VoiceCampaignAction, string> = {
-    start: 'Campaign started',
-    pause: 'Campaign paused. Calls already ringing will finish.',
-    resume: 'Campaign resumed',
-    cancel: 'Campaign cancelled',
-};
 
 export function useCampaignDetailPage(data: VoiceCampaignDetail) {
     const router = useRouter();
@@ -68,7 +62,7 @@ export function useCampaignDetailPage(data: VoiceCampaignDetail) {
             return;
         }
         setDetail((d) => ({ ...d, campaign: res.data! }));
-        toast.success(ACTION_DONE[action]);
+        toast.success(CAMPAIGN_ACTION_DONE[action]);
         void refresh();
     };
 

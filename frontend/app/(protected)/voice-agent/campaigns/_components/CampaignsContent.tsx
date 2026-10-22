@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import { Megaphone, Plus } from 'lucide-react';
+import { VoiceCampaignStatus } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/common/EmptyState';
+import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { usePage } from '@/contexts/PageStore';
+import { formatMoney } from '@/helpers/voice-call-cost';
 import type { UseCampaignsPageReturn } from '../_hooks/use-campaigns-page';
 import { NEW_CAMPAIGN_URL } from '@/helpers/voice-routes';
 import { CampaignCard } from './CampaignCard';
@@ -23,6 +26,9 @@ function NewCampaignButton() {
 
 export function CampaignsContent() {
     const { campaigns, loadError } = usePage<UseCampaignsPageReturn>();
+    const currency = useDisplayCurrency();
+    const running = campaigns.filter((c) => c.status === VoiceCampaignStatus.RUNNING).length;
+    const spent = campaigns.reduce((sum, c) => sum + c.costUsd, 0);
 
     return (
         <>
@@ -47,8 +53,9 @@ export function CampaignsContent() {
                 <>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="text-muted-foreground max-w-prose text-sm">
-                            {campaigns.length} {campaigns.length === 1 ? 'campaign' : 'campaigns'}. Numbers on the do-not-call
-                            list are always skipped.
+                            {campaigns.length} {campaigns.length === 1 ? 'campaign' : 'campaigns'}
+                            {running ? `, ${running} running` : ''} · {formatMoney(spent, currency)} spent in all. Numbers on
+                            the do-not-call list are always skipped.
                         </p>
                         <NewCampaignButton />
                     </div>

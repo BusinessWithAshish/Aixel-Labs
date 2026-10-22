@@ -14,7 +14,7 @@ async function NewCampaignPage() {
         <PageLayout title={PAGE_TITLE}>
             <PageProvider
                 data={{
-                    setup: res.success && res.data ? res.data : { agents: [], numbers: [] },
+                    setup: res.success && res.data ? res.data : { agents: [], numbers: [], geminiFreeTier: false },
                     loadError: res.success ? null : (res.error ?? 'Could not load your agents and numbers'),
                 }}
                 usePageHook={useNewCampaignPage}

@@ -1,8 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { VoiceCampaignStatus } from '@aixellabs/backend/db/types';
-import { listMyCampaigns, type VoiceCampaignListItem } from '@/app/actions/voice-campaign-actions';
+import {
+    listMyCampaigns,
+    setVoiceCampaignStatus,
+    type VoiceCampaignAction,
+    type VoiceCampaignListItem,
+} from '@/app/actions/voice-campaign-actions';
+import { CAMPAIGN_ACTION_DONE } from '../_utils/campaign-format';
 
 export type CampaignsPageData = {
     campaigns: VoiceCampaignListItem[];
@@ -14,6 +21,7 @@ const REFRESH_MS = 8000;
 
 export function useCampaignsPage(data: CampaignsPageData) {
     const [campaigns, setCampaigns] = useState(data.campaigns);
+    const [busy, setBusy] = useState<{ id: string; action: VoiceCampaignAction } | null>(null);
     useEffect(() => setCampaigns(data.campaigns), [data.campaigns]);
 
     const running = campaigns.some((c) => c.status === VoiceCampaignStatus.RUNNING || c.stats.calling > 0);
@@ -26,7 +34,21 @@ export function useCampaignsPage(data: CampaignsPageData) {
         return () => clearInterval(timer);
     }, [running]);
 
-    return { campaigns, loadError: data.loadError };
+    /** Start, pause or resume from the card; the updated campaign replaces its card. */
+    const runAction = useCallback(async (id: string, action: VoiceCampaignAction) => {
+        setBusy({ id, action });
+        const res = await setVoiceCampaignStatus(id, action);
+        setBusy(null);
+        if (!res.success || !res.data) {
+            toast.error(res.error ?? 'Something went wrong');
+            return;
+        }
+        const updated = res.data;
+        setCampaigns((list) => list.map((c) => (c.id === id ? updated : c)));
+        toast.success(CAMPAIGN_ACTION_DONE[action]);
+    }, []);
+
+    return { campaigns, loadError: data.loadError, busy, runAction };
 }
 
 export type UseCampaignsPageReturn = ReturnType<typeof useCampaignsPage>;

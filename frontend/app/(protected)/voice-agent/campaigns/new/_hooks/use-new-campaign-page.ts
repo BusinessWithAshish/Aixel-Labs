@@ -17,6 +17,8 @@ import {
     CAMPAIGN_COUNTRIES,
     campaignCountry,
     checkContacts,
+    columnFill,
+    countryOfE164,
     guessColumns,
     parseCsv,
     rowsToContactInputs,
@@ -42,13 +44,21 @@ const CONTACTS_PER_REQUEST = 500;
 
 export type CsvFile = { fileName: string; headers: string[]; rows: string[][] };
 
+/** One CSV column: an example cell, how many rows leave it empty, and what it becomes. */
+export type CsvColumn = {
+    index: number;
+    header: string;
+    sample: string | null;
+    empty: number;
+    /** `unused`: past the most variables a campaign keeps. */
+    use: 'phone' | 'name' | 'variable' | 'unused';
+    /** The `{{variable}}` a variable column fills. */
+    key: string | null;
+};
+
 /** The country of the number calls go out from: numbers without a "+" are most likely local to it. */
 function countryForNumber(phoneNumber: string | undefined): string {
-    if (!phoneNumber) return 'IN';
-    const match = [...CAMPAIGN_COUNTRIES]
-        .sort((a, b) => b.dial.length - a.dial.length)
-        .find((c) => phoneNumber.startsWith(`+${c.dial}`));
-    return match?.code ?? 'IN';
+    return (phoneNumber && countryOfE164(phoneNumber)?.code) || 'IN';
 }
 
 export function useNewCampaignPage(data: NewCampaignPageData) {
@@ -119,6 +129,25 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
         () => (csv ? variableKeys(csv.headers, [mapping.phone, mapping.name]) : []),
         [csv, mapping.phone, mapping.name],
     );
+    const columns = useMemo<CsvColumn[]>(() => {
+        if (!csv) return [];
+        const keys = new Map(variables.map((v) => [v.index, v.key]));
+        return csv.headers.map((header, index) => ({
+            index,
+            header,
+            ...columnFill(csv.rows, index),
+            use: index === mapping.phone ? 'phone' : index === mapping.name ? 'name' : keys.has(index) ? 'variable' : 'unused',
+            key: keys.get(index) ?? null,
+        }));
+    }, [csv, mapping.phone, mapping.name, variables]);
+
+    // The {{variables}} the agent's prompt uses, with its defaults, and those no column fills.
+    const agent = agents.find((a) => a.id === agentId) ?? null;
+    const promptVariables = agent?.variables ?? [];
+    const unfilledVariables = promptVariables.filter((v) =>
+        v.name === 'name' ? mapping.name === null : !variables.some((c) => c.key === v.name),
+    );
+
     const countryInfo = campaignCountry(country) ?? CAMPAIGN_COUNTRIES[0];
     const check = useMemo(() => {
         if (!csv || mapping.phone === null) return null;
@@ -192,6 +221,8 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
     return {
         agents,
         numbers,
+        agent,
+        geminiFreeTier: data.setup.geminiFreeTier,
         loadError: data.loadError,
         step,
         next,
@@ -212,6 +243,9 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
         mapping,
         setMapping,
         variables,
+        columns,
+        promptVariables,
+        unfilledVariables,
         check,
         callWindow,
         maxConcurrent,

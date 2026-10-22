@@ -11,17 +11,20 @@ import {
     VoiceCampaignStatus,
     VoiceProvider,
     type VoiceAgentDoc,
+    type VoiceCallDoc,
     type VoiceCampaignContactDoc,
     type VoiceCampaignDoc,
     type VoiceCampaignRetry,
     type VoiceCampaignWindow,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
+import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
+import { customVariableNames } from '@/helpers/voice-agent-features';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { type CampaignContactInput, campaignCountry, checkContacts } from '@/helpers/voice-campaign-contacts';
 import { campaignSettingsSchema, parseOrThrow, type VoiceCampaignSettingsInput } from '@/helpers/voice-schemas';
 import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key';
-import { assertGeminiKeySet } from '@/server/voice-agent/gemini-key';
+import { assertGeminiKeySet, loadGeminiKeyView } from '@/server/voice-agent/gemini-key';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
 import { findItem, listItems } from '@/server/voice-agent/accounts';
 import { providerOf, type OwnedNumberDoc } from '@/server/voice-agent/number-provider';
@@ -65,6 +68,8 @@ export type VoiceCampaignListItem = {
     variableKeys: string[];
     lastError: string | null;
     stats: VoiceCampaignStats;
+    /** What its calls have cost so far, in US dollars (calls before costs were kept count as 0). */
+    costUsd: number;
     createdAt: string;
     startedAt: string | null;
     completedAt: string | null;
@@ -95,8 +100,11 @@ export type VoiceCampaignDetail = {
 };
 
 export type VoiceCampaignSetup = {
-    agents: { id: string; name: string }[];
+    /** Outbound agents, with the `{{variables}}` their prompt uses (for matching CSV columns) and its length (cost). */
+    agents: VoiceAgentOption[];
     numbers: { id: string; phoneNumber: string; provider: VoiceProvider }[];
+    /** The owner's Gemini key is on Google's free tier: calls cost only the phone minutes. */
+    geminiFreeTier: boolean;
 };
 
 export type AddCampaignContactsResult = {
@@ -174,6 +182,19 @@ async function statsByCampaign(ids: MongoObjectId[]): Promise<Map<string, VoiceC
     return out;
 }
 
+/** Per campaign: the summed cost of the calls it placed. */
+async function costByCampaign(userId: MongoObjectId, ids: MongoObjectId[]): Promise<Map<string, number>> {
+    if (ids.length === 0) return new Map();
+    const calls = await getCollection<VoiceCallDoc>(MongoCollections.VOICE_CALLS);
+    const rows = await calls
+        .aggregate<{ _id: MongoObjectId; usd: number }>([
+            { $match: { userId, campaignId: { $in: ids } } },
+            { $group: { _id: '$campaignId', usd: { $sum: { $ifNull: ['$cost.totalUsd', 0] } } } },
+        ])
+        .toArray();
+    return new Map(rows.map((r) => [r._id.toString(), r.usd]));
+}
+
 async function namesFor(docs: VoiceCampaignDoc[]) {
     const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
     const [agentDocs, numberDocs] = await Promise.all([
@@ -190,6 +211,7 @@ async function namesFor(docs: VoiceCampaignDoc[]) {
 function mapCampaign(
     doc: VoiceCampaignDoc,
     stats: VoiceCampaignStats | undefined,
+    costUsd: number | undefined,
     names: Awaited<ReturnType<typeof namesFor>>,
 ): VoiceCampaignListItem {
     return {
@@ -207,6 +229,7 @@ function mapCampaign(
         variableKeys: doc.variableKeys ?? [],
         lastError: doc.lastError ?? null,
         stats: stats ?? { ...EMPTY_STATS },
+        costUsd: costUsd ?? 0,
         createdAt: doc.createdAt.toISOString(),
         startedAt: doc.startedAt ? doc.startedAt.toISOString() : null,
         completedAt: doc.completedAt ? doc.completedAt.toISOString() : null,
@@ -238,8 +261,13 @@ async function findOwnedCampaign(owner: VoiceOwnerScope, campaignId: string): Pr
 }
 
 async function loadCampaignItem(owner: VoiceOwnerScope, doc: VoiceCampaignDoc & { _id: MongoObjectId }) {
-    const [stats, names] = await Promise.all([statsByCampaign([doc._id]), namesFor([doc])]);
-    return mapCampaign(doc, stats.get(doc._id.toString()), names);
+    const [stats, costs, names] = await Promise.all([
+        statsByCampaign([doc._id]),
+        costByCampaign(owner.userId, [doc._id]),
+        namesFor([doc]),
+    ]);
+    const key = doc._id.toString();
+    return mapCampaign(doc, stats.get(key), costs.get(key), names);
 }
 
 async function findOutboundAgent(owner: VoiceOwnerScope, agentId: string) {
@@ -277,16 +305,31 @@ export const getVoiceCampaignSetup = async (): Promise<ALApiResponse<VoiceCampai
     runAuthenticatedAction(async function getVoiceCampaignSetup(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
-        const [agentDocs, numberDocs] = await Promise.all([
+        const [agentDocs, numberDocs, geminiKey] = await Promise.all([
             agents
-                .find({ userId: owner.userId, callType: { $ne: VoiceAgentCallType.INBOUND } }, { projection: { name: 1 } })
+                .find(
+                    { userId: owner.userId, callType: { $ne: VoiceAgentCallType.INBOUND } },
+                    { projection: { name: 1, prompt: 1, callNotes: 1, variables: 1, 'voicemail.message': 1 } },
+                )
                 .sort({ name: 1 })
                 .toArray(),
             listItems('numbers', owner.userId),
+            loadGeminiKeyView(owner.userId),
         ]);
         return {
-            agents: agentDocs.map((d) => ({ id: d._id.toString(), name: d.name })),
+            // Same shape as getVoiceAgentOptions, for the owner the campaign is created for.
+            agents: agentDocs.map((d) => ({
+                id: d._id.toString(),
+                name: d.name,
+                callType: VoiceAgentCallType.OUTBOUND,
+                variables: customVariableNames(d.prompt ?? '', d.callNotes ?? '', d.voicemail?.message ?? '').map((name) => ({
+                    name,
+                    value: d.variables?.[name] ?? '',
+                })),
+                promptChars: (d.prompt ?? '').length + (d.callNotes ?? '').length,
+            })),
             numbers: numberDocs.map((d) => ({ id: d._id.toString(), phoneNumber: d.phoneNumber, provider: d.provider })),
+            geminiFreeTier: geminiKey.tier === 'free',
         };
     });
 
@@ -298,8 +341,12 @@ export const listMyCampaigns = async (): Promise<ALApiResponse<VoiceCampaignList
         const campaigns = await campaignsCollection();
         const docs = await campaigns.find({ userId: owner.userId }).sort({ createdAt: -1 }).limit(200).toArray();
         const ids = docs.flatMap((d) => (d._id ? [d._id] : []));
-        const [stats, names] = await Promise.all([statsByCampaign(ids), namesFor(docs)]);
-        return docs.map((doc) => mapCampaign(doc, stats.get(String(doc._id)), names));
+        const [stats, costs, names] = await Promise.all([
+            statsByCampaign(ids),
+            costByCampaign(owner.userId, ids),
+            namesFor(docs),
+        ]);
+        return docs.map((doc) => mapCampaign(doc, stats.get(String(doc._id)), costs.get(String(doc._id)), names));
     });
 
 /** One campaign, its progress, and its contacts (first CONTACTS_SHOWN matching `filter`, in CSV order). */

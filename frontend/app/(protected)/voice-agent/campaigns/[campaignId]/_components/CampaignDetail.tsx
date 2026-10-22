@@ -1,121 +1,89 @@
 'use client';
 
 import Link from 'next/link';
-import { Bot, Clock, Loader2, Pause, Phone, Play, RotateCcw, Trash2, X } from 'lucide-react';
+import { Bot, Braces, Clock, Phone, RotateCcw, Trash2, Wallet, X, type LucideIcon } from 'lucide-react';
 import { VoiceCampaignStatus } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { usePage } from '@/contexts/PageStore';
+import { formatPhone } from '@/helpers/voice-campaign-contacts';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
 import type { UseCampaignDetailPageReturn } from '../_hooks/use-campaign-detail-page';
+import { CampaignActionButton } from '../../_components/CampaignActionButton';
+import { CampaignCost } from '../../_components/CampaignCost';
 import { CampaignProgress } from '../../_components/CampaignProgress';
 import { CampaignStatusBadge } from '../../_components/CampaignStatusBadge';
-import { formatShortDateTime, minutesLabel } from '@/helpers/voice-time';
-import { isWindowOpen, RETRY_OUTCOMES, windowLabel } from '../../_utils/campaign-format';
+import { campaignStateText, retryLabel, windowLabel } from '../../_utils/campaign-format';
 import { CampaignContacts } from './CampaignContacts';
 
 function Actions() {
     const { campaign, busy, runAction, setConfirm } = usePage<UseCampaignDetailPageReturn>();
-    const spin = (action: string) => (busy === action ? <Loader2 className="size-4 animate-spin" /> : null);
-    const disabled = busy !== null;
+    const live = campaign.status === VoiceCampaignStatus.RUNNING || campaign.status === VoiceCampaignStatus.PAUSED;
 
     return (
         <div className="flex flex-wrap gap-2">
-            {campaign.status === VoiceCampaignStatus.DRAFT ? (
-                <Button onClick={() => void runAction('start')} disabled={disabled}>
-                    {spin('start') ?? <Play className="size-4" />}
-                    Start
-                </Button>
-            ) : null}
-            {campaign.status === VoiceCampaignStatus.RUNNING ? (
-                <Button variant="outline" onClick={() => void runAction('pause')} disabled={disabled}>
-                    {spin('pause') ?? <Pause className="size-4" />}
-                    Pause
-                </Button>
-            ) : null}
-            {campaign.status === VoiceCampaignStatus.PAUSED ? (
-                <Button onClick={() => void runAction('resume')} disabled={disabled}>
-                    {spin('resume') ?? <RotateCcw className="size-4" />}
-                    Resume
-                </Button>
-            ) : null}
-            {campaign.status === VoiceCampaignStatus.RUNNING || campaign.status === VoiceCampaignStatus.PAUSED ? (
-                <Button variant="ghost" onClick={() => setConfirm('cancel')} disabled={disabled}>
+            <CampaignActionButton status={campaign.status} busy={busy} onAction={(action) => void runAction(action)} />
+            {live ? (
+                <Button variant="ghost" onClick={() => setConfirm('cancel')} disabled={busy !== null}>
                     <X className="size-4" />
                     Cancel campaign
                 </Button>
-            ) : null}
-            {campaign.status !== VoiceCampaignStatus.RUNNING && campaign.status !== VoiceCampaignStatus.PAUSED ? (
-                <Button variant="ghost" onClick={() => setConfirm('delete')} disabled={disabled}>
+            ) : (
+                <Button variant="ghost" onClick={() => setConfirm('delete')} disabled={busy !== null}>
                     <Trash2 className="size-4" />
                     Delete
                 </Button>
-            ) : null}
+            )}
         </div>
     );
 }
 
-/** What the campaign is doing right now, in one line. */
-function StateLine() {
-    const { campaign } = usePage<UseCampaignDetailPageReturn>();
-    const open = isWindowOpen(campaign.window);
-    let text: string;
-    switch (campaign.status) {
-        case VoiceCampaignStatus.DRAFT:
-            text = 'Draft: nobody is called until you start it.';
-            break;
-        case VoiceCampaignStatus.RUNNING:
-            text = open
-                ? 'Calling now, inside its hours.'
-                : 'Outside its calling hours now: calls start again when they open.';
-            break;
-        case VoiceCampaignStatus.PAUSED:
-            text = 'Paused: no new calls until you resume.';
-            break;
-        case VoiceCampaignStatus.COMPLETED:
-            text = campaign.completedAt ? `Finished ${formatShortDateTime(campaign.completedAt)}.` : 'Finished.';
-            break;
-        default:
-            text = 'Cancelled: contacts not called yet were dropped.';
-    }
+function Fact({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: React.ReactNode }) {
     return (
-        <p className="text-muted-foreground text-sm" data-testid="campaign-state" suppressHydrationWarning>
-            {text}
-        </p>
+        <div className="flex min-w-0 gap-2.5">
+            <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+            <div className="flex min-w-0 flex-col">
+                <dt className="text-muted-foreground text-xs">{label}</dt>
+                <dd className="text-sm break-words">{children}</dd>
+            </div>
+        </div>
     );
 }
 
 function Settings() {
     const { campaign } = usePage<UseCampaignDetailPageReturn>();
-    const retryOn = RETRY_OUTCOMES.filter((o) => campaign.retry.on.includes(o.value))
-        .map((o) => o.label.toLowerCase())
-        .join(', ');
     return (
-        <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
-            <Link
-                href={voiceAgentUrl(campaign.agentId)}
-                className="hover:text-foreground inline-flex min-w-0 items-center gap-1 underline-offset-4 hover:underline"
-            >
-                <Bot className="size-3.5 shrink-0" aria-hidden />
-                <span className="truncate">{campaign.agentName ?? 'Deleted agent'}</span>
-            </Link>
-            <span className="inline-flex items-center gap-1 tabular-nums">
-                <Phone className="size-3.5 shrink-0" aria-hidden />
-                {campaign.phoneNumber ?? 'Removed number'}
-            </span>
-            <span className="inline-flex min-w-0 items-center gap-1">
-                <Clock className="size-3.5 shrink-0" aria-hidden />
-                <span className="break-words">{windowLabel(campaign.window)}</span>
-            </span>
-            <span>
-                {campaign.maxConcurrent} at once ·{' '}
-                {campaign.retry.maxRetries === 0 || !retryOn
-                    ? 'no retries'
-                    : `${campaign.retry.maxRetries} ${campaign.retry.maxRetries === 1 ? 'retry' : 'retries'} on ${retryOn}, ${minutesLabel(campaign.retry.delayMinutes)} apart`}
-            </span>
-        </div>
+        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Fact icon={Bot} label="Agent">
+                <Link href={voiceAgentUrl(campaign.agentId)} className="text-primary underline-offset-4 hover:underline">
+                    {campaign.agentName ?? 'Deleted agent'}
+                </Link>
+            </Fact>
+            <Fact icon={Phone} label="Calls from">
+                <span className="tabular-nums">
+                    {campaign.phoneNumber ? formatPhone(campaign.phoneNumber) : 'Removed number'}
+                </span>
+            </Fact>
+            <Fact icon={Clock} label="Calling hours">
+                {windowLabel(campaign.window)}, {campaign.maxConcurrent} at a time
+            </Fact>
+            <Fact icon={RotateCcw} label="If nobody answers">
+                {retryLabel(campaign.retry)}
+            </Fact>
+            <Fact icon={Braces} label="Columns the agent gets">
+                {campaign.variableKeys.length ? (
+                    <span className="font-mono text-xs">{campaign.variableKeys.map((k) => `{{${k}}}`).join(' ')}</span>
+                ) : (
+                    'Name and phone only'
+                )}
+            </Fact>
+            <Fact icon={Wallet} label="Cost so far">
+                <CampaignCost campaign={campaign} className="[&>svg]:hidden" />
+            </Fact>
+        </dl>
     );
 }
 
@@ -134,11 +102,16 @@ export function CampaignDetail() {
                                 </h2>
                                 <CampaignStatusBadge status={campaign.status} />
                             </div>
-                            <StateLine />
+                            <p
+                                className="text-muted-foreground text-sm"
+                                data-testid="campaign-state"
+                                suppressHydrationWarning
+                            >
+                                {campaignStateText(campaign)}
+                            </p>
                         </div>
                         <Actions />
                     </div>
-                    <Settings />
                     {campaign.lastError && campaign.status === VoiceCampaignStatus.PAUSED ? (
                         <Alert variant="destructive" data-testid="campaign-error">
                             <AlertTitle>The engine paused this campaign</AlertTitle>
@@ -146,6 +119,8 @@ export function CampaignDetail() {
                         </Alert>
                     ) : null}
                     <CampaignProgress stats={campaign.stats} detailed />
+                    <Separator />
+                    <Settings />
                 </CardContent>
             </Card>
 

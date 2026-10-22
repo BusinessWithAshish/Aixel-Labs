@@ -52,6 +52,27 @@ export function campaignCountry(code: string): CampaignCountry | null {
     return CAMPAIGN_COUNTRIES.find((c) => c.code === code) ?? null;
 }
 
+/** The country an E.164 number is from, by the longest calling code it starts with (+1 reads as the US). */
+export function countryOfE164(e164: string): CampaignCountry | null {
+    return (
+        [...CAMPAIGN_COUNTRIES]
+            .sort((a, b) => b.dial.length - a.dial.length)
+            .find((c) => e164.startsWith(`+${c.dial}`)) ?? null
+    );
+}
+
+/** "+919876543210" -> "+91 98765 43210", "+12025550123" -> "+1 202 555 0123"; unknown codes as they are. */
+export function formatPhone(e164: string): string {
+    const country = countryOfE164(e164);
+    if (!country) return e164;
+    const national = e164.slice(country.dial.length + 1);
+    const groups =
+        country.dial === '1' && national.length === 10
+            ? [national.slice(0, 3), national.slice(3, 6), national.slice(6)]
+            : [national.slice(0, Math.ceil(national.length / 2)), national.slice(Math.ceil(national.length / 2))];
+    return `+${country.dial} ${groups.join(' ')}`;
+}
+
 export type PhoneParse = { ok: true; e164: string } | { ok: false; reason: string };
 
 const E164 = /^\+[1-9]\d{7,14}$/;
@@ -150,6 +171,12 @@ export function variableKey(header: string): string {
         .slice(0, 40);
     if (!slug) return 'column';
     return /^[0-9]/.test(slug) ? `col_${slug}` : slug;
+}
+
+/** A column's first filled cell and how many contact rows leave it empty (`rows`: header first). */
+export function columnFill(rows: string[][], index: number): { sample: string | null; empty: number } {
+    const cells = rows.slice(1).map((r) => (r[index] ?? '').trim());
+    return { sample: cells.find(Boolean) ?? null, empty: cells.filter((c) => !c).length };
 }
 
 /** Variable names for the extra columns, unique (a repeated header gets _2, _3...). */
