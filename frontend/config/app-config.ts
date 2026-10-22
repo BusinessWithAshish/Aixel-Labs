@@ -32,7 +32,7 @@ export const SubModuleUrls: Record<SubModule, string> = {
     [VOICE_AGENT_SUB_MODULES.WEB_DIALER]: '/voice-agent/web-dialer',
     [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: '/voice-agent/bookings',
     [VOICE_AGENT_SUB_MODULES.CAMPAIGNS]: '/voice-agent/campaigns',
-    [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: '/voice-agent',
+    [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: '/voice-agent/analytics',
     [MESSAGING_SUB_MODULES.WHATSAPP]: '/messaging/whatsapp',
     [MESSAGING_SUB_MODULES.SMS]: '/messaging/sms',
     [EMAIL_SUB_MODULES.COLD_OUTREACH]: '/email',

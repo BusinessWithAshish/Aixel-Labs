@@ -10,7 +10,7 @@ import { usePage } from '@/contexts/PageStore';
 import { endedByLabel } from '@/helpers/voice-call-outcomes';
 import { cn } from '@/lib/utils';
 import type { UseCallDetailPageReturn } from '../_hooks/use-call-detail-page';
-import { formatDuration, formatGap, formatParty } from '../../_utils/call-format';
+import { formatDuration, formatGap, formatParty } from '@/helpers/voice-call-format';
 import { ToolCallRow } from '@/components/common/voice-agent/ToolCallRow';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { CallAnalysisCard, CallerMemoryCard, CallVariablesCard } from './CallInsights';

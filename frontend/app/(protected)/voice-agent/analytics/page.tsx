@@ -1,0 +1,45 @@
+import PageLayout from '@/components/common/PageLayout';
+import { withPageHandler } from '@/components/hocs/with-page-handler';
+import { PageProvider } from '@/contexts/PageStore';
+import { getVoiceAnalytics } from '@/app/actions/voice-analytics-actions';
+import { getVoiceAgentOptions } from '@/app/actions/voice-agent-actions';
+import { isValidObjectId } from '@/helpers/object-id';
+import { useVoiceAnalyticsPage } from './_hooks/use-voice-analytics-page';
+import { ANALYTICS_RANGES, DEFAULT_ANALYTICS_RANGE } from './_utils/analytics-ranges';
+import { VoiceAnalyticsContent } from './_components/VoiceAnalyticsContent';
+
+const PAGE_TITLE = 'Analytics';
+
+async function VoiceAnalyticsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ agent?: string | string[]; range?: string | string[] }>;
+}) {
+    const { agent, range: rangeParam } = await searchParams;
+    const agentFilter = typeof agent === 'string' && isValidObjectId(agent) ? agent : null;
+    const range = ANALYTICS_RANGES.find((r) => r.value === rangeParam)?.value ?? DEFAULT_ANALYTICS_RANGE;
+
+    const [analyticsRes, agentsRes] = await Promise.all([
+        getVoiceAnalytics({ agentId: agentFilter, range }),
+        getVoiceAgentOptions(),
+    ]);
+
+    return (
+        <PageLayout title={PAGE_TITLE} className="flex flex-col gap-4 p-1">
+            <PageProvider
+                data={{
+                    analytics: analyticsRes.success && analyticsRes.data ? analyticsRes.data : null,
+                    agents: agentsRes.success && agentsRes.data ? agentsRes.data : [],
+                    agentFilter,
+                    range,
+                    loadError: analyticsRes.success ? null : (analyticsRes.error ?? 'Could not load your analytics'),
+                }}
+                usePageHook={useVoiceAnalyticsPage}
+            >
+                <VoiceAnalyticsContent />
+            </PageProvider>
+        </PageLayout>
+    );
+}
+
+export default withPageHandler(VoiceAnalyticsPage);

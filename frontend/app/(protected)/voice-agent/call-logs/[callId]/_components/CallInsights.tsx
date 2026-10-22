@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { usePage } from '@/contexts/PageStore';
 import { formatDay } from '@/helpers/voice-time';
 import type { UseCallDetailPageReturn } from '../_hooks/use-call-detail-page';
-import { formatFieldValue } from '../../_utils/call-format';
+import { formatFieldValue } from '@/helpers/voice-call-format';
 import { CallOutcomeBadges } from '../../_components/CallOutcomeBadges';
 
 /** What the post-call analysis worked out: summary, verdicts, custom fields (or why it failed). */

@@ -6,7 +6,7 @@ import { usePage } from '@/contexts/PageStore';
 import { costPerMinute, formatMoney, isCostEstimated } from '@/helpers/voice-call-cost';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UseCallLogsPageReturn } from '../_hooks/use-call-logs-page';
-import { formatDuration } from '../_utils/call-format';
+import { formatDuration } from '@/helpers/voice-call-format';
 
 const ESTIMATE_NOTE = 'The phone part is worked out from the minutes until the provider reports its own charge.';
 
@@ -88,7 +88,7 @@ export function CallCostSummary() {
             ].map(([label, value]) => (
                 <div key={label} className="flex flex-col gap-0.5">
                     <dt className="text-muted-foreground text-xs">{label}</dt>
-                    <dd className="font-medium tabular-nums">{value}</dd>
+                    <dd className="text-base font-semibold tabular-nums">{value}</dd>
                 </div>
             ))}
         </dl>

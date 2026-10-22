@@ -5,6 +5,8 @@ import {
     type VoiceCallTurn,
 } from '@aixellabs/backend/db/types';
 
+/** Calls in words and numbers (Call logs, call detail, Analytics). */
+
 export function callTypeLabel(channel: VoiceCallChannel, direction: VoiceCallDirection): string {
     if (channel === VoiceCallChannel.PLAYGROUND || direction === VoiceCallDirection.PLAYGROUND) return 'Playground';
     return direction === VoiceCallDirection.INBOUND ? 'Inbound' : 'Outbound';

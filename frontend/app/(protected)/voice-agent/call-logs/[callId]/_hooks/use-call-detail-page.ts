@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { VoiceCallChannel, type VoiceCallerMemory } from '@aixellabs/backend/db/types';
 import { getCallRecordingUrl, type CallRecordingResult, type VoiceCallListItem } from '@/app/actions/voice-call-actions';
 import { forgetVoiceCallerMemory } from '@/app/actions/voice-caller-memory-actions';
-import { gapsByTurn, median, mergeTurns } from '../../_utils/call-format';
+import { gapsByTurn, median, mergeTurns } from '@/helpers/voice-call-format';
 import { placeToolCalls } from '@/helpers/voice-tool-calls';
 
 export type RecordingState =

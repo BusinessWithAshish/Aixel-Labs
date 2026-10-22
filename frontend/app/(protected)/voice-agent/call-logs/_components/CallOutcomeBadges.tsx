@@ -1,7 +1,7 @@
 import { CircleCheck, CircleX } from 'lucide-react';
 import type { VoiceCallAnalysis } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
-import { SENTIMENT_LABELS, sentimentVariant } from '../_utils/call-format';
+import { SENTIMENT_LABELS, sentimentVariant } from '@/helpers/voice-call-format';
 
 /** The analysis' verdicts on a call: whether it succeeded, and the caller's sentiment. Nothing when not analysed. */
 export function CallOutcomeBadges({ analysis }: { analysis: VoiceCallAnalysis | null | undefined }) {
