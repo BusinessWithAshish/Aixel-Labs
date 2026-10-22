@@ -4,7 +4,7 @@ The Aixel Labs app (Next.js, `frontend/server/voice-agent/engine.ts`) keeps the 
 collections; this engine reads the owner's setup and writes what happens on calls:
 
     voice_accounts  one per owner: their Gemini key, numbers, connected apps   read per call
-    voice_agents    name, voice, prompt, call notes                            read per call
+    voice_agents    name, voice, prompt (business facts included)              read per call
     voice_calls     one document per call, however it ended                    written here;
                     `memory`: what the agent remembers about the caller        written by analysis.py
     voice_bookings  appointments the agent booked                              written by tools.py
@@ -261,7 +261,7 @@ def save_refused(number: dict, agent: dict, direction: str, other: str | None, r
     })
 
 
-# --- {{variables}} in the prompt, the call notes and the voicemail message --------------------------
+# --- {{variables}} in the prompt and the voicemail message ------------------------------------------
 # A call's values: the agent's defaults ("variables" on the agent), then the call's own
 # (ctx["variables"]: a campaign contact's CSV columns via campaigns.tag, or POST /calls
 # "variables"), then the built-ins below, which nothing overrides. Unknown names render empty.
@@ -337,11 +337,10 @@ def _take_call_variables(doc: dict) -> dict | None:
 
 
 def agent_prompt(agent: dict, values: dict[str, str] | None = None) -> str:
-    """The agent's own prompt, then the notes about this call, `{{variables}}` filled in when given."""
-    prompt, notes = (agent.get("prompt") or "").strip(), (agent.get("callNotes") or "").strip()
-    if values is not None:
-        prompt, notes = render(prompt, values).strip(), render(notes, values).strip()
-    return f"{prompt}\n\n# This call\n\n{notes}" if notes else prompt
+    """The agent's own prompt, `{{variables}}` filled in when given. Its facts are in it (the old
+    `callNotes` field was moved into the prompt on 2026-10-22 and is ignored)."""
+    prompt = (agent.get("prompt") or "").strip()
+    return render(prompt, values).strip() if values is not None else prompt
 
 
 VOICEMAIL_MAX = 500  # characters (VOICE_AGENT_FEATURE_LIMITS.voicemailMessageMax), ~30 s spoken

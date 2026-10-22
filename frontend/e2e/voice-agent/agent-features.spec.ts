@@ -78,8 +78,7 @@ async function shot(page: Page, name: string, width?: number): Promise<void> {
 test('the prompt marks {{variables}}, offers them after "{{", and saves default values', async ({ page, db }) => {
     const agentId = await db.insertVoiceAgent(E2E_USER, {
         name: 'Sales',
-        prompt: 'Hi {{first_name}}, this is {{agent_name}} from {{ company }}. Today is {{weekday}}.',
-        callNotes: 'Lead source: {{source}}',
+        prompt: 'Hi {{first_name}}, this is {{agent_name}} from {{ company }}. Today is {{weekday}}.\nLead source: {{source}}',
     });
     await openVoiceAgent(page, agentId);
 
@@ -92,7 +91,7 @@ test('the prompt marks {{variables}}, offers them after "{{", and saves default 
     // A variable's name is not taken for a tool name.
     await expect(page.getByTestId('prompt-mirror').locator('mark[data-tool]')).toHaveCount(0);
 
-    // One input per custom variable, from the prompt and the call notes.
+    // One input per custom variable in the prompt.
     const rows = page.getByTestId('agent-variable');
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(0)).toHaveAttribute('data-variable', 'first_name');
@@ -431,7 +430,6 @@ test('a test call sends the values typed for the agent’s variables', async ({ 
     const agentId = await db.insertVoiceAgent(E2E_USER, {
         name: 'Sales',
         prompt: 'Ask for {{first_name}} at {{company}}. It is {{weekday}}.',
-        callNotes: '',
     });
     await db.setVoiceAgentFields(agentId, { variables: { company: 'Acme Dental' } });
     const numberId = await db.insertVoiceNumber(E2E_USER, {

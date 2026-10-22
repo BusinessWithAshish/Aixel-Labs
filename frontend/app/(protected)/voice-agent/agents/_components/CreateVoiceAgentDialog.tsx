@@ -2,26 +2,19 @@
 
 import { Controller, FormProvider } from 'react-hook-form';
 import { Loader2 } from 'lucide-react';
-import { VOICE_AGENT_LIMITS, VoiceAgentCallType } from '@aixellabs/backend/db/types';
+import { VOICE_AGENT_LIMITS } from '@aixellabs/backend/db/types';
 import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
 import type { UseVoiceAgentsPageReturn } from '../_hooks/use-voice-agents-page';
-import { VoiceAgentCallTypePicker } from './VoiceAgentCallTypePicker';
+import { VoiceAgentCallTypeSelect } from './VoiceAgentCallTypeSelect';
 import { VoiceSelect } from './VoiceSelect';
-
-const STARTS_FROM: Record<VoiceAgentCallType, string> = {
-    [VoiceAgentCallType.INBOUND]:
-        'Next you give it a prompt: start from the receptionist template or write your own. Its call notes start as a form for your hours and services.',
-    [VoiceAgentCallType.OUTBOUND]: 'Next you give it a prompt: start from the tested cold-call template or write your own.',
-};
 
 /** Inbound or outbound, a name and a voice; the prompt comes next, on the agent's page. */
 export function CreateVoiceAgentDialog() {
     const { createOpen, onCreateOpenChange, createForm, creating, createAgent } = usePage<UseVoiceAgentsPageReturn>();
-    const callType = createForm.watch('callType');
 
     return (
         <Dialog open={createOpen} onOpenChange={onCreateOpenChange}>
@@ -30,19 +23,21 @@ export function CreateVoiceAgentDialog() {
                     <form onSubmit={createAgent} className="grid gap-4">
                         <DialogHeader>
                             <DialogTitle>New voice agent</DialogTitle>
-                            <DialogDescription>{STARTS_FROM[callType]}</DialogDescription>
+                            <DialogDescription>
+                                Next you pick a template for its prompt, or write your own.
+                            </DialogDescription>
                         </DialogHeader>
                         <Controller
                             control={createForm.control}
                             name="callType"
                             render={({ field }) => (
                                 <Field>
-                                    <FieldLabel id="new-agent-call-type-label">What will it do?</FieldLabel>
-                                    <VoiceAgentCallTypePicker
+                                    <FieldLabel htmlFor="new-agent-call-type">Call type</FieldLabel>
+                                    <VoiceAgentCallTypeSelect
+                                        id="new-agent-call-type"
                                         value={field.value}
                                         onChange={field.onChange}
                                         disabled={creating}
-                                        labelledBy="new-agent-call-type-label"
                                     />
                                 </Field>
                             )}

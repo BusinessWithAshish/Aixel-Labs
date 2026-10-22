@@ -12,7 +12,6 @@ export function agentFormValues(agent: VoiceAgent): VoiceAgentInput {
         callType: agent.callType,
         voice: agent.voice,
         prompt: agent.prompt,
-        callNotes: agent.callNotes,
         variables: { ...(agent.variables ?? {}) },
     };
 }

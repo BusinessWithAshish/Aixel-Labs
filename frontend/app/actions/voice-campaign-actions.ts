@@ -309,7 +309,7 @@ export const getVoiceCampaignSetup = async (): Promise<ALApiResponse<VoiceCampai
             agents
                 .find(
                     { userId: owner.userId, callType: { $ne: VoiceAgentCallType.INBOUND } },
-                    { projection: { name: 1, prompt: 1, callNotes: 1, variables: 1, 'voicemail.message': 1 } },
+                    { projection: { name: 1, prompt: 1, variables: 1, 'voicemail.message': 1 } },
                 )
                 .sort({ name: 1 })
                 .toArray(),
@@ -322,11 +322,11 @@ export const getVoiceCampaignSetup = async (): Promise<ALApiResponse<VoiceCampai
                 id: d._id.toString(),
                 name: d.name,
                 callType: VoiceAgentCallType.OUTBOUND,
-                variables: customVariableNames(d.prompt ?? '', d.callNotes ?? '', d.voicemail?.message ?? '').map((name) => ({
+                variables: customVariableNames(d.prompt ?? '', d.voicemail?.message ?? '').map((name) => ({
                     name,
                     value: d.variables?.[name] ?? '',
                 })),
-                promptChars: (d.prompt ?? '').length + (d.callNotes ?? '').length,
+                promptChars: (d.prompt ?? '').length,
             })),
             numbers: numberDocs.map((d) => ({ id: d._id.toString(), phoneNumber: d.phoneNumber, provider: d.provider })),
             geminiFreeTier: geminiKey.tier === 'free',

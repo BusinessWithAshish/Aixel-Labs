@@ -138,8 +138,8 @@ def product_tests():
     ok("each call gets its own voice_calls _id at the start", all(isinstance(c["doc"]["_id"], ObjectId) for c in (inbound, outbound, play))
        and len({c["doc"]["_id"] for c in (inbound, outbound, play)}) == 3)
     p = inbound["prompt"]
-    ok("prompt = agent prompt, # This call, # Right now, # Your tools (in that order)",
-       p.startswith("You are Priya.") and p.index("# This call") < p.index("# Right now") < p.index("# Your tools"), p[:120])
+    ok("prompt = agent prompt, # Right now, # Your tools (in that order); old call notes ignored",
+       p.startswith("You are Priya.") and "Note." not in p and p.index("# Right now") < p.index("# Your tools"), p[:120])
     plain = {**agent, "tools": None}
     pc = product.play_call(plain)
     ok("an agent without tools: prompt + # Right now only", "# Right now" in pc["prompt"] and "# Your tools" not in pc["prompt"] and pc["tools"] == {})

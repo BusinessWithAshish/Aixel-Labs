@@ -26,7 +26,6 @@ import { requireUserObjectId, runAuthenticatedAction, toObjectId } from '@/helpe
 import {
     DEFAULT_VOICE_AGENT_NAME,
     DEFAULT_VOICE_AGENT_VOICE,
-    newVoiceAgentCallNotes,
     VOICE_AGENT_NO_PROMPT_MESSAGE,
 } from '@/helpers/voice-agent-defaults';
 import { customVariableNames } from '@/helpers/voice-agent-features';
@@ -55,7 +54,7 @@ import { sampleArguments, sendWebhookTest, type VoiceWebhookTestResult } from '@
 
 export type { VoiceWebhookTestResult };
 
-/** A `{{variable}}` an agent uses (prompt, call notes, voicemail message) and its default value ('' = none). */
+/** A `{{variable}}` an agent uses (prompt, voicemail message) and its default value ('' = none). */
 export type VoiceAgentVariableOption = { name: string; value: string };
 
 export type VoiceAgentOption = {
@@ -64,7 +63,7 @@ export type VoiceAgentOption = {
     callType: VoiceAgentCallType;
     /** Its custom variables, for a test call to fill in. */
     variables: VoiceAgentVariableOption[];
-    /** Length of its prompt and call notes, for the cost estimate (`estimateAgentCost`). */
+    /** Length of its prompt, for the cost estimate (`estimateAgentCost`). */
     promptChars: number;
 };
 
@@ -129,7 +128,6 @@ function mapVoiceAgentDocToVoiceAgent(doc: VoiceAgentDoc): VoiceAgent {
         callType: callTypeOf(doc),
         voice: doc.voice,
         prompt: doc.prompt,
-        callNotes: doc.callNotes,
         tools: mapVoiceAgentTools(doc.tools),
         variables: doc.variables ?? {},
         voicemail: doc.voicemail ?? null,
@@ -164,20 +162,18 @@ export const getVoiceAgentOptions = async (): Promise<ALApiResponse<VoiceAgentOp
         const uid = requireUserObjectId(userId);
         const agents = await agentsCollection();
         const docs = await agents
-            .find(
-                { userId: uid },
-                { projection: { name: 1, callType: 1, prompt: 1, callNotes: 1, variables: 1, 'voicemail.message': 1 } },
-            )
+            .find({ userId: uid }, { projection: { name: 1, callType: 1, prompt: 1, variables: 1, 'voicemail.message': 1 } })
             .sort({ name: 1 })
             .toArray();
         return docs.map((doc) => ({
             id: doc._id.toString(),
             name: doc.name,
             callType: callTypeOf(doc),
-            variables: customVariableNames(doc.prompt ?? '', doc.callNotes ?? '', doc.voicemail?.message ?? '').map(
-                (name) => ({ name, value: doc.variables?.[name] ?? '' }),
-            ),
-            promptChars: (doc.prompt ?? '').length + (doc.callNotes ?? '').length,
+            variables: customVariableNames(doc.prompt ?? '', doc.voicemail?.message ?? '').map((name) => ({
+                name,
+                value: doc.variables?.[name] ?? '',
+            })),
+            promptChars: (doc.prompt ?? '').length,
         }));
     });
 
@@ -194,7 +190,7 @@ export type CreateVoiceAgentInput = Partial<Pick<VoiceAgentInput, 'name' | 'voic
 
 /**
  * Creates an agent of the given call type with an empty prompt: the editor offers templates, and
- * neither a save nor the playground goes ahead without a prompt. Call notes start from that type's.
+ * neither a save nor the playground goes ahead without a prompt.
  */
 export const createVoiceAgent = async (input: CreateVoiceAgentInput): Promise<ALApiResponse<VoiceAgent>> =>
     runAuthenticatedAction(async function createVoiceAgent(userId) {
@@ -205,7 +201,6 @@ export const createVoiceAgent = async (input: CreateVoiceAgentInput): Promise<AL
                 name: input.name ?? DEFAULT_VOICE_AGENT_NAME,
                 callType: input.callType,
                 voice: input.voice ?? DEFAULT_VOICE_AGENT_VOICE,
-                callNotes: newVoiceAgentCallNotes(input.callType),
                 variables: {},
             },
             'Invalid agent',

@@ -103,13 +103,6 @@ export const voiceAgentSchema = z.object({
             VOICE_AGENT_LIMITS.promptMax,
             `Prompt must be ${VOICE_AGENT_LIMITS.promptMax.toLocaleString('en-US')} characters or fewer`,
         ),
-    callNotes: z
-        .string()
-        .trim()
-        .max(
-            VOICE_AGENT_LIMITS.callNotesMax,
-            `Call notes must be ${VOICE_AGENT_LIMITS.callNotesMax.toLocaleString('en-US')} characters or fewer`,
-        ),
     /** Default values for the prompt's `{{variables}}` (empty ones are not kept). */
     variables: variableValuesSchema,
 });

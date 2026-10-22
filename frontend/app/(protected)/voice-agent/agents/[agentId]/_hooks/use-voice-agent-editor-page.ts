@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import {
     VOICE_BUILTIN_VARIABLES,
     type VoiceAgent,
+    VoiceAgentCallType,
     type VoiceBookingDestination,
     type VoiceCalendarConnection,
     VoiceCalendarConnectionStatus,
@@ -23,6 +24,7 @@ import {
     type VoiceAgentUsage,
 } from '@/app/actions/voice-agent-actions';
 import type { VoiceAgentCostTotals } from '@/app/actions/voice-call-actions';
+import { setNumberAgent, unlinkAgentNumber } from '@/app/actions/voice-number-actions';
 import { estimateAgentCost } from '@/helpers/voice-call-cost';
 import {
     disconnectVoiceApp,
@@ -35,7 +37,7 @@ import {
     forgetVoiceCallerMemory,
     type VoiceCallerMemoryList,
 } from '@/app/actions/voice-caller-memory-actions';
-import { VOICE_AGENT_PROMPT_TEMPLATES, type VoiceAgentPromptTemplate } from '@/helpers/voice-agent-defaults';
+import type { VoiceAgentPromptTemplate } from '@/helpers/voice-agent-defaults';
 import { customVariableNames, VOICE_BUILTIN_VARIABLE_INFO } from '@/helpers/voice-agent-features';
 import { defaultBookingTarget, voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
 import { VOICE_AGENTS_URL } from '@/helpers/voice-routes';
@@ -66,7 +68,7 @@ export type VoiceAgentEditorData = {
     justConnected: string | null;
     /** The callers the agent remembers (caller memory), latest first. */
     memories: VoiceCallerMemoryList;
-    /** The owner's Gemini key, which this agent (like all of theirs) runs on. */
+    /** The Gemini key this agent runs on. */
     geminiKey: VoiceGeminiKeyView;
     /** What its calls have really cost so far (null: none priced yet). */
     costTotals: VoiceAgentCostTotals | null;
@@ -77,6 +79,17 @@ export type ConnectedAppCalendar = { id: string; name: string; primary: boolean;
 
 /** What saving one card says. */
 type SectionWords = { saved: string; failed: string };
+
+/** The prompt the owner can switch back to after picking a template, and what each one is called. */
+type PromptAlternate = { text: string; label: string; currentLabel: string };
+
+/** What happens to the agent's numbers when its call type changes: they follow it, or are let go. */
+export type NumbersOnTypeChange = 'switch' | 'unlink';
+
+/** The numbers an agent of this type is linked to: those it answers, or those it calls from. */
+export function linkedNumbers(usage: VoiceAgentUsage, callType: VoiceAgentCallType) {
+    return callType === VoiceAgentCallType.INBOUND ? usage.inbound : usage.outbound;
+}
 
 export function useVoiceAgentEditorPage({
     agent: initialAgent,
@@ -130,23 +143,38 @@ export function useVoiceAgentEditorPage({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    /** Fills the prompt from a template, and the call notes too unless the owner wrote their own. */
+    // After a template replaces the owner's own words, both stay one click apart until the page is left.
+    const [alternate, setAlternate] = useState<PromptAlternate | null>(null);
+
+    /** Fills the prompt from a template, keeping what was there to switch back to, and its variables' defaults. */
     const applyTemplate = useCallback(
         (template: VoiceAgentPromptTemplate) => {
             const set = { shouldDirty: true, shouldValidate: true };
+            const current = agentForm.getValues('prompt');
+            if (current.trim() && current !== template.prompt) {
+                setAlternate({ text: current, label: 'your prompt', currentLabel: template.title });
+            }
             agentForm.setValue('prompt', template.prompt, set);
-            const notes = agentForm.getValues('callNotes').trim();
-            if (!notes || VOICE_AGENT_PROMPT_TEMPLATES.some((t) => t.callNotes.trim() === notes)) {
-                agentForm.setValue('callNotes', template.callNotes, set);
+            const variables = agentForm.getValues('variables');
+            for (const [name, value] of Object.entries(template.variables ?? {})) {
+                if (!variables[name]?.trim()) agentForm.setValue(`variables.${name}`, value, set);
             }
         },
         [agentForm],
     );
 
-    /** Custom variables the prompt, the call notes and the voicemail message use, in order. */
+    /** Swaps the prompt with the one it replaced; nothing is lost either way. */
+    const switchPrompt = useCallback(() => {
+        if (!alternate) return;
+        const current = agentForm.getValues('prompt');
+        agentForm.setValue('prompt', alternate.text, { shouldDirty: true, shouldValidate: true });
+        setAlternate({ text: current, label: alternate.currentLabel, currentLabel: alternate.label });
+    }, [agentForm, alternate]);
+
+    /** Custom variables the prompt and the voicemail message use, in order. */
     const usedVariables = useMemo(
-        () => customVariableNames(form.prompt, form.callNotes, settings.voicemail.message),
-        [form.prompt, form.callNotes, settings.voicemail.message],
+        () => customVariableNames(form.prompt, settings.voicemail.message),
+        [form.prompt, settings.voicemail.message],
     );
     /**
      * What the prompt's "{{" menu offers, and how the prompt marks each name. Not memoised: the form edits
@@ -212,24 +240,70 @@ export function useVoiceAgentEditorPage({
         [],
     );
 
-    const saveAgent = useCallback(async (): Promise<boolean> => {
-        const ok = await saveSection(
-            agentForm,
-            agentError,
-            // Only defaults for variables still in use are kept.
-            (values) =>
-                updateVoiceAgent(agentId, {
-                    ...values,
-                    variables: Object.fromEntries(
-                        usedVariables.flatMap((n) => (values.variables[n] ? [[n, values.variables[n]]] : [])),
-                    ),
-                }),
-            agentFormValues,
-            { saved: 'Agent saved', failed: 'Could not save the agent' },
-        );
-        if (ok) router.refresh();
-        return ok;
-    }, [agentError, agentForm, agentId, router, saveSection, usedVariables]);
+    // Numbers follow the agent's saved type: an inbound agent's answer calls, an outbound one's place them.
+    const numbers = linkedNumbers(usage, saved.callType);
+    const [linking, setLinking] = useState(false);
+
+    /**
+     * Links numbers to this agent (their job follows its saved call type) or unlinks them. One number at
+     * a time, as each changes the number's routing in its provider account. Resolves true when all went.
+     */
+    const linkNumbers = useCallback(
+        async (ids: string[], link: boolean): Promise<boolean> => {
+            if (ids.length === 0) return true;
+            setLinking(true);
+            let failed = 0;
+            for (const id of ids) {
+                const response = await (link ? setNumberAgent(id, agentId) : unlinkAgentNumber(agentId, id)).catch(
+                    (e: Error) => ({ success: false as const, error: e.message }),
+                );
+                if (!response.success) {
+                    failed++;
+                    toast.error(response.error ?? 'Could not change the number');
+                }
+            }
+            setLinking(false);
+            router.refresh();
+            return failed === 0;
+        },
+        [agentId, router],
+    );
+
+    // Saving a new call type while numbers are linked asks first what they should do.
+    const [typeChangeOpen, setTypeChangeOpen] = useState(false);
+
+    const saveAgent = useCallback(
+        async (onNumbers?: NumbersOnTypeChange): Promise<boolean> => {
+            const typeChanged = agentForm.getValues('callType') !== saved.callType;
+            if (typeChanged && numbers.length > 0 && !onNumbers) {
+                setTypeChangeOpen(true);
+                return false;
+            }
+            setTypeChangeOpen(false);
+            const ids = numbers.map((n) => n.id);
+            if (typeChanged && onNumbers === 'unlink' && !(await linkNumbers(ids, false))) return false;
+            const ok = await saveSection(
+                agentForm,
+                agentError,
+                // Only defaults for variables still in use are kept.
+                (values) =>
+                    updateVoiceAgent(agentId, {
+                        ...values,
+                        variables: Object.fromEntries(
+                            usedVariables.flatMap((n) => (values.variables[n] ? [[n, values.variables[n]]] : [])),
+                        ),
+                    }),
+                agentFormValues,
+                { saved: 'Agent saved', failed: 'Could not save the agent' },
+            );
+            if (!ok) return false;
+            // A number checks the agent's saved type, so it switches once the agent is saved.
+            if (typeChanged && onNumbers === 'switch') return linkNumbers(ids, true);
+            router.refresh();
+            return true;
+        },
+        [agentError, agentForm, agentId, linkNumbers, numbers, router, saveSection, saved.callType, usedVariables],
+    );
 
     const saveBooking = useCallback(
         () =>
@@ -463,6 +537,12 @@ export function useVoiceAgentEditorPage({
 
     const confirmDelete = useCallback(async () => {
         setDeleting(true);
+        // The server keeps an agent that still answers a number (its callers would ring into nothing): let those go first.
+        const answering = usage.inbound.map((n) => n.id);
+        if (!(await linkNumbers(answering, false))) {
+            setDeleting(false);
+            return;
+        }
         const response = await deleteVoiceAgent(agentId);
         if (!response.success) {
             setDeleting(false);
@@ -472,14 +552,24 @@ export function useVoiceAgentEditorPage({
         toast.success('Agent deleted');
         router.replace(VOICE_AGENTS_URL);
         router.refresh();
-    }, [agentId, router]);
+    }, [agentId, linkNumbers, router, usage.inbound]);
 
-    // What a minute should cost, as the prompt on screen stands, on the numbers it is on.
+    // What a minute should cost, as the prompt and booking on screen stand, on the numbers it is on.
     const costEstimate = estimateAgentCost({
-        promptChars: form.prompt.length + form.callNotes.length,
+        promptChars: form.prompt.length,
         freeTier: geminiKey.tier === 'free',
         callType: form.callType,
-        providers: [...usage.inbound, ...usage.outbound].map((n) => n.provider),
+        providers: numbers.map((n) => n.provider),
+        tools: [
+            ...(booking.enabled ? [{ kind: 'booking' as const }] : []),
+            ...saved.tools.webhooks
+                .filter((tool) => tool.enabled)
+                .map((tool) => ({
+                    kind: 'custom' as const,
+                    name: tool.name,
+                    chars: 2 * tool.description.length + tool.parameters.reduce((n, p) => n + p.description.length, 0),
+                })),
+        ],
     });
 
     return {
@@ -492,6 +582,13 @@ export function useVoiceAgentEditorPage({
         agentForm,
         form,
         applyTemplate,
+        alternate,
+        switchPrompt,
+        numbers,
+        linking,
+        linkNumbers,
+        typeChangeOpen,
+        setTypeChangeOpen,
         usedVariables,
         promptVariables,
         promptTools,

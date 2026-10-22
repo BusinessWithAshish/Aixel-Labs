@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowDown, AudioLines, Info, Loader2, Mic, Phone, PhoneOff, Timer } from 'lucide-react';
-import { VoiceKeyStatus } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,14 +74,8 @@ export function VoicePlayground({ className }: { className?: string }) {
         <Card className={cn('h-auto min-w-0 gap-4', className)} data-testid="voice-playground">
             <CardHeader>
                 <CardTitle>Playground</CardTitle>
-                <CardDescription className="grid gap-1 font-normal">
-                    <span>
-                        Talk to {saved.name} through your microphone, as if you were on the phone together. It uses the saved
-                        version of the agent.
-                    </span>
-                    {geminiKey.set && geminiKey.status === VoiceKeyStatus.OK ? (
-                        <GeminiKeyLine view={geminiKey} link />
-                    ) : null}
+                <CardDescription>
+                    <GeminiKeyLine view={geminiKey} link />
                 </CardDescription>
                 <CardAction>
                     <Badge variant={badge.variant} data-testid="playground-status">
@@ -101,12 +94,6 @@ export function VoicePlayground({ className }: { className?: string }) {
                         {VOICE_AGENT_NO_PROMPT_MESSAGE}
                     </p>
                 ) : null}
-                {isDirty && !busy && !noPrompt ? (
-                    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                        You have unsaved changes. Starting a call saves them first.
-                    </p>
-                ) : null}
-
                 <div className="flex flex-wrap items-center gap-3">
                     {busy ? (
                         <Button variant="destructive" onClick={end}>

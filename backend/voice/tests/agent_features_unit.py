@@ -66,8 +66,8 @@ def variables_tests():
     utc = product.call_variables({}, {"tools": None}, AT)
     ok("no booking timezone: UTC, caller_number empty", utc["business_timezone"] == "UTC" and utc["now"].endswith("11:20 AM")
        and utc["caller_number"] == "")
-    p = product.agent_prompt({"prompt": "You call for {{clinic}}.", "callNotes": "Owner: {{first_name}}"}, v)
-    ok("agent_prompt fills the prompt and the call notes", p == "You call for Smile Dental.\n\n# This call\n\nOwner: Ravi", p)
+    p = product.agent_prompt({"prompt": "You call for {{clinic}}.\n\n# This call\n\nOwner: {{first_name}}", "callNotes": "old"}, v)
+    ok("agent_prompt fills the prompt and ignores old call notes", p == "You call for Smile Dental.\n\n# This call\n\nOwner: Ravi", p)
     ok("agent_prompt without values leaves them as written (unchanged behaviour)",
        product.agent_prompt({"prompt": "{{x}}", "callNotes": ""}) == "{{x}}")
 
@@ -77,7 +77,7 @@ def calls_tests():
     tenant, user = owner()
     try:
         agent = {"_id": ObjectId(), "tenantId": tenant, "userId": user, "name": "Maya", "voice": "kore",
-                 "prompt": "Ask for {{contact}} at {{company}}. Today is {{weekday}}.", "callNotes": "Lead: {{company}}",
+                 "prompt": "Ask for {{contact}} at {{company}}. Today is {{weekday}}.\n\n# This call\n\nLead: {{company}}",
                  "variables": {"company": "Acme", "contact": "the owner"},
                  "voicemail": {"action": "MESSAGE", "message": "Hi {{contact}}, it's {{agent_name}} about {{company}}.\nCall back."}}
         number = {"_id": ObjectId(), "tenantId": tenant, "userId": user, "phoneNumber": "+15550001111", "provider": "TELNYX",

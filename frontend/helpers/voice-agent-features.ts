@@ -14,7 +14,7 @@ import {
 
 /**
  * Agent features the engine applies per call (`product.py` / `analysis.py` in the voice engine):
- * `{{variables}}` in the prompt, call notes and voicemail message, the voicemail message itself,
+ * `{{variables}}` in the prompt and voicemail message, the voicemail message itself,
  * the post-call analysis and caller memory. Shared by the editor, its server actions and the
  * test-call dialog.
  */

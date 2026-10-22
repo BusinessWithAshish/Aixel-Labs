@@ -232,9 +232,9 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await check('agents');
             await page.getByRole('button', { name: 'New agent' }).click();
             const create = page.getByRole('dialog', { name: 'New voice agent' });
-            await expect(create.getByRole('radio')).toHaveCount(2);
+            await create.getByRole('combobox', { name: 'Call type' }).click();
             await check('create-agent-type');
-            await create.getByRole('radio', { name: /^Inbound/ }).click();
+            await page.getByRole('option', { name: /^Inbound/ }).click();
             await expect(create.getByLabel('Name')).toBeVisible();
             await check('create-agent-details');
             await page.keyboard.press('Escape');

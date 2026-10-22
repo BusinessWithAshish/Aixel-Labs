@@ -73,45 +73,82 @@ export function providerUsdPerMinute(provider: VoiceProvider, callType: VoiceAge
     return rate === undefined ? null : rate + (rates?.extrasUsdPerMinute ?? 0);
 }
 
+/** A tool the agent has on, as the estimate prices it: booking, or a custom tool and the text it sends. */
+export type CostTool = { kind: 'booking' } | { kind: 'custom'; name: string; chars: number };
+
 export type AgentCostEstimate = {
-    /** Prompt tokens Gemini reads every turn: the agent's words plus the engine's own sections. */
+    /** Prompt tokens Gemini reads every turn: the agent's words plus the engine's own sections (tools apart). */
     promptTokens: number;
+    /** Gemini's talk time, before the prompt: nothing on a free-tier key. */
     geminiUsdPerMinute: number;
+    /** What reading the prompt every turn adds. */
+    promptUsdPerMinute: number;
+    /** One row per tool: what it adds every turn plus its uses, spread over a typical call. */
+    tools: { tool: CostTool; tokens: number; usesPerCall: number; usdPerMinute: number }[];
     /** One row per provider the agent is on; `usdPerMinute` null when its rate is not published. */
     providers: { provider: VoiceProvider; usdPerMinute: number | null }[];
-    /** Gemini plus the dearest known provider. */
+    /** Every line together, with the dearest known provider. */
     usdPerMinute: number;
     typicalCallMinutes: number;
 };
 
 /**
- * What a minute with an agent should cost before any call: Gemini grows with the prompt (it is read
- * again every turn), nothing on a free-tier key; the phone part is the providers' list rates.
+ * What a minute with an agent should cost before any call, as a bill: Gemini's talk time, the prompt
+ * (read again every turn), each tool (its text every turn, and its uses: the answer read as text and
+ * the line held open while it runs), and the phone at the providers' list rates. Gemini parts are
+ * free on a free-tier key.
  */
 export function estimateAgentCost(input: {
-    /** The prompt and call notes as written. */
+    /** The prompt as written. */
     promptChars: number;
     freeTier: boolean;
     callType: VoiceAgentCallType;
     providers: VoiceProvider[];
     /** Where the calls go (or the number called); the US when unknown. */
     phone?: string;
+    /** The tools that are on. Absent: not counted. */
+    tools?: CostTool[];
 }): AgentCostEstimate {
     const model = VOICE_CALL_RATES.estimate;
-    const promptTokens = Math.ceil(input.promptChars / model.charsPerToken) + model.engineTokens;
-    const geminiUsdPerMinute = input.freeTier
-        ? 0
-        : model.geminiUsdPerMinute + promptTokens * model.geminiUsdPerPromptTokenMinute;
+    const per = model.tools;
+    const { usdPerMillionTokens } = VOICE_CALL_RATES.gemini;
+    const gemini = input.freeTier ? 0 : 1;
     const providers = [...new Set(input.providers)].map((provider) => ({
         provider,
         usdPerMinute: providerUsdPerMinute(provider, input.callType, input.phone),
     }));
-    const dearest = Math.max(0, ...providers.map((p) => p.usdPerMinute ?? 0));
+    const phoneUsdPerMinute = Math.max(0, ...providers.map((p) => p.usdPerMinute ?? 0));
+
+    const tokens = (chars: number) => Math.ceil(chars / model.charsPerToken);
+    const promptTokens = tokens(input.promptChars) + model.engineTokens;
+    const geminiUsdPerMinute = gemini * model.geminiUsdPerMinute;
+    const promptUsdPerMinute = gemini * promptTokens * model.geminiUsdPerPromptTokenMinute;
+    const useTextUsd =
+        (per.useTextInTokens * usdPerMillionTokens.textIn + per.useTextOutTokens * usdPerMillionTokens.textOut) / 1e6;
+    const tools = (input.tools ?? []).map((tool) => {
+        const kind = tool.kind;
+        const toolTokens = tokens(kind === 'booking' ? per.bookingChars : per.toolBaseChars + tool.chars);
+        // Each use: its text, and the seconds the line is held open (Gemini and the phone both run).
+        const useUsd =
+            gemini * useTextUsd +
+            (per.useSeconds[kind] / 60) * (geminiUsdPerMinute + promptUsdPerMinute + phoneUsdPerMinute);
+        return {
+            tool,
+            tokens: toolTokens,
+            usesPerCall: per.usesPerCall[kind],
+            usdPerMinute:
+                gemini * toolTokens * model.geminiUsdPerPromptTokenMinute +
+                (per.usesPerCall[kind] * useUsd) / model.typicalCallMinutes,
+        };
+    });
     return {
         promptTokens,
         geminiUsdPerMinute,
+        promptUsdPerMinute,
+        tools,
         providers,
-        usdPerMinute: geminiUsdPerMinute + dearest,
+        usdPerMinute:
+            geminiUsdPerMinute + promptUsdPerMinute + tools.reduce((sum, t) => sum + t.usdPerMinute, 0) + phoneUsdPerMinute,
         typicalCallMinutes: model.typicalCallMinutes,
     };
 }

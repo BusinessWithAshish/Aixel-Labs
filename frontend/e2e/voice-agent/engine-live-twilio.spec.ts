@@ -56,8 +56,7 @@ test('a call into a Twilio number: TwiML, the media stream, her greeting, the lo
         name: 'Twilio desk',
         voice: 'kore',
         callType: VoiceAgentCallType.INBOUND,
-        prompt: 'You are Maya, the receptionist at Sunrise Dental. Keep every reply to one short sentence.',
-        callNotes: 'Open by saying thanks for calling Sunrise Dental.',
+        prompt: 'You are Maya, the receptionist at Sunrise Dental. Keep every reply to one short sentence. Open by saying thanks for calling Sunrise Dental.',
     });
     const numberId = await db.insertVoiceNumber(E2E_USER, {
         provider: VoiceProvider.TWILIO,

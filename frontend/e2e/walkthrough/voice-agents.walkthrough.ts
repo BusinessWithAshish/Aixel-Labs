@@ -11,11 +11,7 @@ import {
     waitForHydration,
 } from '../support/voice-agents';
 import { VoiceAgentCallType } from '@aixellabs/backend/db/types';
-import {
-    DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES,
-    DEFAULT_INBOUND_VOICE_AGENT_PROMPT,
-    DEFAULT_VOICE_AGENT_PROMPT,
-} from '@/helpers/voice-agent-defaults';
+import { DEFAULT_INBOUND_VOICE_AGENT_PROMPT, DEFAULT_VOICE_AGENT_PROMPT } from '@/helpers/voice-agent-defaults';
 
 /**
  * Not a pass/fail suite: screenshots of the voice agents list, editor and a playground call
@@ -63,10 +59,8 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await page.getByTestId('new-voice-agent').click();
             await expect(page.getByRole('dialog')).toBeVisible();
             await capture('create-dialog-type', false);
-            await page
-                .getByRole('dialog')
-                .getByRole('radio', { name: /^Inbound/ })
-                .click();
+            await page.getByRole('dialog').getByRole('combobox', { name: 'Call type' }).click();
+            await page.getByRole('option', { name: /^Inbound/ }).click();
             await expect(page.getByRole('dialog').getByLabel('Name')).toBeVisible();
             await capture('create-dialog-details', false);
             await page.keyboard.press('Escape');
@@ -81,7 +75,6 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
                 callType: VoiceAgentCallType.INBOUND,
                 voice: 'kore',
                 prompt: DEFAULT_INBOUND_VOICE_AGENT_PROMPT,
-                callNotes: DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES,
             });
             await db.insertVoiceAgent(E2E_USER, { name: 'Dental clinic follow-up', voice: 'puck' });
             const main = await db.insertVoiceNumber(E2E_USER, {
@@ -102,14 +95,14 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
 
             await openVoiceAgent(page, frontDesk);
             await capture('editor-inbound');
-            await page.getByTestId('voice-agent-used-on').scrollIntoViewIfNeeded();
-            await capture('editor-used-on', false);
+            await page.getByTestId('agent-numbers').scrollIntoViewIfNeeded();
+            await capture('editor-numbers', false);
 
             const engine = await FakePlaygroundEngine.install(page);
             await openVoiceAgent(page, agentId);
             await capture('editor');
 
-            await page.locator('#agent-call-notes').fill('Website: none found. Hours: 9 to 6.');
+            await page.locator('#agent-name').fill('Maya (demo calls)');
             await capture('editor-unsaved', false);
 
             await page.getByRole('button', { name: 'Save and start call' }).click();

@@ -412,7 +412,7 @@ test('the agent page starts a test call with that agent, from a number that uses
     const answering = await seedNumber(db, SECOND_NUMBER, { inboundAgentId: new ObjectId(frontDesk) });
     await openVoiceAgent(page, frontDesk);
 
-    await page.getByTestId('voice-agent-used-on').getByRole('button', { name: 'Test call' }).click();
+    await page.getByTestId('agent-numbers').getByRole('button', { name: 'Test call' }).click();
     const dialog = page.getByRole('dialog', { name: 'Test call' });
     // The agent is fixed; the number it answers on is picked first.
     await expect(dialog.getByRole('combobox', { name: 'Agent that calls' })).toHaveCount(0);
@@ -492,7 +492,7 @@ test.describe('linking from the agent editor', () => {
         });
         await seedNumber(db);
         await expect(linkNumber(page, draft, FIRST_NUMBER)).rejects.toThrow();
-        await expect(page.getByText(VOICE_AGENT_NO_PROMPT_MESSAGE)).toBeVisible();
+        await expect(page.locator('[data-sonner-toast]').getByText(VOICE_AGENT_NO_PROMPT_MESSAGE)).toBeVisible();
         expect(telnyxWrites()).toHaveLength(0);
         expect((await db.getVoiceNumbers(E2E_USER))[0].inboundAgentId).toBeNull();
     });

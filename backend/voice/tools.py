@@ -859,7 +859,7 @@ def right_now(tools: dict | None, now: datetime | None = None) -> str:
 
 
 def prompt_sections(ctx: dict, now: datetime | None = None) -> str:
-    """What goes after the agent's prompt and `# This call`: always `# Right now`, then
+    """What goes after the agent's prompt: always `# Right now`, then
     `# Your tools` when the agent has any."""
     parts = [right_now(ctx.get("tools"), now)]
     tools = CallTools(ctx, {"turns": []}, prefetch=False).prompt()

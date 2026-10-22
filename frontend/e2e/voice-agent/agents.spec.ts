@@ -8,12 +8,12 @@ import {
     VoiceProvider,
 } from '@aixellabs/backend/db/types';
 import {
-    DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES,
     DEFAULT_INBOUND_VOICE_AGENT_PROMPT,
-    DEFAULT_VOICE_AGENT_CALL_NOTES,
     DEFAULT_VOICE_AGENT_NAME,
     DEFAULT_VOICE_AGENT_PROMPT,
     DEFAULT_VOICE_AGENT_VOICE,
+    defaultVoiceBookingTool,
+    VOICE_AGENT_PROMPT_TEMPLATES,
 } from '@/helpers/voice-agent-defaults';
 import type { Page } from '@playwright/test';
 import { expect, test } from '../support/fixtures';
@@ -45,12 +45,14 @@ async function createThroughDialog(page: Page, type: RegExp, name: string, voice
     await waitForHydration(page, '[data-testid="new-voice-agent"]');
     await page.getByRole('button', { name: 'New agent' }).click();
     const dialog = page.getByRole('dialog', { name: 'New voice agent' });
-    // One step: the inbound/outbound switch (inbound picked), name and voice together.
-    await expect(dialog.getByRole('radio')).toHaveCount(2);
-    await expect(dialog.getByRole('radio', { name: /^Inbound/ })).toHaveAttribute('aria-checked', 'true');
+    // One step: the call type dropdown (inbound picked), name and voice together.
+    const callType = dialog.getByRole('combobox', { name: 'Call type' });
+    await expect(callType).toHaveText('Inbound');
     await expect(dialog.getByLabel('Name')).toHaveValue(DEFAULT_VOICE_AGENT_NAME);
-    await dialog.getByRole('radio', { name: type }).click();
-    await expect(dialog.getByRole('radio', { name: type })).toHaveAttribute('aria-checked', 'true');
+    await callType.click();
+    // Each option says what it does.
+    await expect(page.getByRole('option', { name: /^Outbound/ })).toContainText('Makes calls from your number');
+    await page.getByRole('option', { name: type }).click();
     await dialog.getByLabel('Name').fill(name);
     await dialog.getByRole('combobox', { name: 'Voice' }).click();
     await page.getByRole('option', { name: voice }).click();
@@ -61,10 +63,12 @@ async function createThroughDialog(page: Page, type: RegExp, name: string, voice
     await expect(page.locator('#agent-name')).toHaveValue(name);
 }
 
-test('a new outbound agent starts with an empty prompt: nothing runs until a template or own text fills it', async ({
-    page,
-    db,
-}) => {
+/** The template picker, opened from the button beside a prompt that has text. */
+function templatesDialog(page: Page) {
+    return page.getByRole('dialog', { name: 'Templates' });
+}
+
+test('a new outbound agent starts with an empty prompt: a template is read in full, then used', async ({ page, db }) => {
     await page.goto(VOICE_AGENTS_URL);
     await expect(page.getByText('No voice agents yet')).toBeVisible();
     await createThroughDialog(page, /^Outbound/, 'Sales caller', /Kore/);
@@ -72,70 +76,90 @@ test('a new outbound agent starts with an empty prompt: nothing runs until a tem
     await expect(page.getByTestId('voice-agent-call-type').first()).toHaveText('Outbound · makes calls');
     const [agent] = await db.getVoiceAgents(E2E_USER);
     const user = await db.getUser(E2E_USER);
-    expect(agent).toMatchObject({
-        name: 'Sales caller',
-        callType: VoiceAgentCallType.OUTBOUND,
-        voice: 'kore',
-        prompt: '',
-        callNotes: '',
-    });
+    expect(agent).toMatchObject({ name: 'Sales caller', callType: VoiceAgentCallType.OUTBOUND, voice: 'kore', prompt: '' });
+    expect(agent).not.toHaveProperty('callNotes');
     expect(agent.userId.equals(user._id)).toBe(true);
     expect(agent.tenantId.equals(user.tenantId)).toBe(true);
     expect(page.url()).toContain(agent._id.toString());
     expect(DEFAULT_VOICE_AGENT_VOICE).toBe('sulafat');
 
-    // Empty: the templates are offered, and the playground says plainly why it will not start.
+    // Empty: its type's templates are offered, and the playground says plainly why it will not start.
     await expect(page.locator('#agent-prompt')).toHaveValue('');
     await expect(page.getByTestId('prompt-empty')).toContainText('cannot be saved or talked to');
     const playground = page.getByTestId('voice-playground');
     await expect(playground.getByTestId('playground-no-prompt')).toContainText('This agent has no prompt yet');
     await expect(playground.getByRole('button', { name: 'Start call' })).toBeDisabled();
+    const cards = page.getByTestId('prompt-templates').getByRole('button').filter({ hasNotText: 'All templates' });
+    const outbound = VOICE_AGENT_PROMPT_TEMPLATES.filter((t) => t.callType === VoiceAgentCallType.OUTBOUND);
+    await expect(cards).toHaveCount(outbound.length);
+    await expect(cards.first()).toContainText('Cold call for a demo');
 
-    // Outbound templates first; picking one fills the empty prompt and notes at once.
-    const templates = page.getByTestId('prompt-templates').getByRole('button');
-    await expect(templates.first()).toContainText('Cold call for a demo');
-    await templates.first().click();
+    // A card opens the preview; Cancel leaves the prompt empty.
+    await cards.first().click();
+    const dialog = templatesDialog(page);
+    await expect(dialog.getByTestId('template-preview')).toContainText('You are Maya, an AI calling assistant');
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.locator('#agent-prompt')).toHaveValue('');
+
+    // Used: the prompt, and the default for its {{website}} (a campaign's CSV column wins per call).
+    await cards.first().click();
+    await dialog.getByRole('button', { name: 'Use Cold call for a demo' }).click();
     await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_VOICE_AGENT_PROMPT);
-    await expect(page.locator('#agent-call-notes')).toHaveValue(DEFAULT_VOICE_AGENT_CALL_NOTES);
+    await expect(page.getByLabel('{{website}}')).toHaveValue('none found');
     await expect(page.getByTestId('prompt-templates')).toHaveCount(0);
     await expect(playground.getByTestId('playground-no-prompt')).toHaveCount(0);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Agent saved')).toBeVisible();
     expect((await db.getVoiceAgents(E2E_USER))[0]).toMatchObject({
         prompt: DEFAULT_VOICE_AGENT_PROMPT,
-        callNotes: DEFAULT_VOICE_AGENT_CALL_NOTES,
+        variables: { website: 'none found' },
     });
-    // The template is the tested prompt minus its per-call section.
-    expect(DEFAULT_VOICE_AGENT_PROMPT).not.toContain('# This call');
 });
 
-test('a new inbound agent starts with the business-facts notes; a template keeps notes the owner wrote', async ({
-    page,
-    db,
-}) => {
+test('templates are grouped by call type; switching to one keeps your own prompt one click away', async ({ page, db }) => {
     await createThroughDialog(page, /^Inbound/, 'Front desk', /Puck/);
-
     await expect(page.getByTestId('voice-agent-call-type').first()).toHaveText('Inbound · answers calls');
-    await expect(page.locator('#agent-prompt')).toHaveValue('');
-    const [agent] = await db.getVoiceAgents(E2E_USER);
-    expect(agent).toMatchObject({
-        name: 'Front desk',
-        callType: VoiceAgentCallType.INBOUND,
-        voice: 'puck',
-        prompt: '',
-        callNotes: DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES,
-    });
-    expect(DEFAULT_INBOUND_VOICE_AGENT_PROMPT).not.toContain('# This call');
-    expect(DEFAULT_INBOUND_VOICE_AGENT_PROMPT.length).toBeLessThan(6_000);
+    expect((await db.getVoiceAgents(E2E_USER))[0]).toMatchObject({ callType: VoiceAgentCallType.INBOUND, voice: 'puck' });
 
-    await page.locator('#agent-call-notes').fill('Business: Sunrise Dental');
-    const templates = page.getByTestId('prompt-templates').getByRole('button');
-    await expect(templates.first()).toContainText('Receptionist');
-    await templates.first().click();
+    // Every template ends with the facts the owner fills in; none relies on call notes. The new ones
+    // stay well under the tested cold call's length.
+    for (const template of VOICE_AGENT_PROMPT_TEMPLATES) {
+        if (template.id === 'cold-call') continue;
+        expect(template.prompt, template.id).toMatch(/# Business facts/);
+        expect(template.prompt.length, template.id).toBeLessThan(10_000);
+    }
+    expect(DEFAULT_VOICE_AGENT_PROMPT).toMatch(/# This call\n\nTheir website: \{\{website\}\}$/);
+    expect(VOICE_AGENT_PROMPT_TEMPLATES.length).toBeGreaterThanOrEqual(12);
+
+    await page.getByTestId('prompt-templates').getByRole('button', { name: 'All templates' }).click();
+    const dialog = templatesDialog(page);
+    const list = dialog.getByTestId('template-list');
+    await expect(list.getByRole('button')).toHaveCount(VOICE_AGENT_PROMPT_TEMPLATES.length);
+    await expect(list.getByText('Inbound · answers calls')).toBeVisible();
+    await expect(list.getByText('Outbound · makes calls')).toBeVisible();
+    // Its own type first: the receptionist is picked.
+    await expect(list.getByRole('button', { name: 'Receptionist' })).toHaveAttribute('aria-pressed', 'true');
+    await dialog.getByRole('button', { name: 'Use Receptionist' }).click();
     await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_INBOUND_VOICE_AGENT_PROMPT);
-    await expect(page.locator('#agent-call-notes')).toHaveValue('Business: Sunrise Dental');
+    await expect(page.getByTestId('prompt-alternate')).toHaveCount(0); // nothing of the owner's was replaced
+
+    // Own words, then a template over them: both stay one click apart.
+    await page.locator('#agent-prompt').fill('You are the front desk at Sunrise Dental.');
+    await page.getByRole('button', { name: 'Templates' }).click();
+    await list.getByRole('button', { name: 'Restaurant reservations' }).click();
+    await expect(dialog.getByTestId('template-preview')).toContainText('# Business facts');
+    await dialog.getByRole('button', { name: 'Use Restaurant reservations' }).click();
+    const restaurant = VOICE_AGENT_PROMPT_TEMPLATES.find((t) => t.id === 'restaurant')!;
+    await expect(page.locator('#agent-prompt')).toHaveValue(restaurant.prompt);
+    const alternate = page.getByTestId('prompt-alternate');
+    await expect(alternate).toContainText('Showing Restaurant reservations');
+    await alternate.getByRole('button', { name: 'Switch to your prompt' }).click();
+    await expect(page.locator('#agent-prompt')).toHaveValue('You are the front desk at Sunrise Dental.');
+    await alternate.getByRole('button', { name: 'Switch to Restaurant reservations' }).click();
+    await expect(page.locator('#agent-prompt')).toHaveValue(restaurant.prompt);
 
     // The list says plainly when an agent has no prompt yet.
+    await page.getByRole('button', { name: 'Discard' }).click();
     await db.insertVoiceAgent(E2E_USER, { name: 'Blank', prompt: '' });
     await page.goto(VOICE_AGENTS_URL);
     const card = (name: string) => page.getByTestId('voice-agent-card').filter({ hasText: name });
@@ -148,14 +172,12 @@ test('the type can be changed back in the create dialog', async ({ page, db }) =
     await waitForHydration(page, '[data-testid="new-voice-agent"]');
     await page.getByRole('button', { name: 'New agent' }).click();
     const dialog = page.getByRole('dialog', { name: 'New voice agent' });
-    const outbound = dialog.getByRole('radio', { name: /^Outbound/ });
-    await outbound.click();
-    await dialog.getByRole('radio', { name: /^Inbound/ }).click();
-    await outbound.click();
-    // Clicking the picked side again keeps it picked: the switch never ends up with no type.
-    await outbound.click();
-    await expect(outbound).toHaveAttribute('aria-checked', 'true');
-    await expect(dialog.getByRole('radio', { name: /^Inbound/ })).toHaveAttribute('aria-checked', 'false');
+    const callType = dialog.getByRole('combobox', { name: 'Call type' });
+    for (const type of ['Outbound', 'Inbound', 'Outbound']) {
+        await callType.click();
+        await page.getByRole('option', { name: new RegExp(`^${type}`) }).click();
+        await expect(callType).toHaveText(type);
+    }
     await dialog.getByRole('button', { name: 'Create agent' }).click();
     await expect(page).toHaveURL(new RegExp(`${VOICE_AGENTS_URL}/[0-9a-f]{24}$`));
     expect((await db.getVoiceAgents(E2E_USER))[0].callType).toBe(VoiceAgentCallType.OUTBOUND);
@@ -173,46 +195,46 @@ test("list cards show each agent's type; agents saved before types read as outbo
     await expect(card('Old one').getByTestId('voice-agent-call-type')).toHaveText('Outbound · makes calls');
 });
 
-test('changing the type keeps the prompt; a template replaces it only after asking', async ({ page, db }) => {
+test('changing the type keeps the prompt; with numbers linked, saving asks what they should do', async ({ page, db }) => {
     const agentId = await db.insertVoiceAgent(E2E_USER, {
         name: 'Maya',
         callType: VoiceAgentCallType.OUTBOUND,
         prompt: DEFAULT_VOICE_AGENT_PROMPT,
-        callNotes: DEFAULT_VOICE_AGENT_CALL_NOTES,
     });
     await openVoiceAgent(page, agentId);
     await expect(page.getByTestId('prompt-templates')).toHaveCount(0);
 
-    await page.getByRole('radio', { name: /^Inbound/ }).click();
-    await expect(page.getByRole('radio', { name: /^Inbound/ })).toHaveAttribute('aria-checked', 'true');
+    // The editor uses the same dropdown as the create dialog.
+    const callType = page.getByRole('combobox', { name: 'Call type' });
+    await callType.click();
+    await page.getByRole('option', { name: /^Inbound/ }).click();
+    await expect(callType).toHaveText('Inbound');
     await expect(page.getByTestId('voice-agent-call-type').first()).toHaveText('Inbound · answers calls');
     await expect(page.getByTestId('call-type-note')).toContainText('does not rewrite the prompt');
     await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_VOICE_AGENT_PROMPT);
+    // Numbers follow the saved type, so they wait for the save.
+    await expect(page.getByTestId('agent-numbers-change')).toBeDisabled();
 
+    // No number yet: it just saves.
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Agent saved')).toBeVisible();
-    let [agent] = await db.getVoiceAgents(E2E_USER);
+    const [agent] = await db.getVoiceAgents(E2E_USER);
     expect(agent.callType).toBe(VoiceAgentCallType.INBOUND);
     expect(agent.prompt).toBe(DEFAULT_VOICE_AGENT_PROMPT);
-    expect(agent.callNotes).toBe(DEFAULT_VOICE_AGENT_CALL_NOTES);
 
-    // Cancelling the question changes nothing.
-    await page.getByRole('button', { name: 'Templates' }).click();
-    await page.getByRole('menuitem', { name: /^Receptionist/ }).click();
-    const confirm = page.getByRole('dialog', { name: 'Replace your prompt with “Receptionist”?' });
-    await confirm.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_VOICE_AGENT_PROMPT);
-
-    // The notes were the other template's, so they are replaced too.
-    await page.getByRole('button', { name: 'Templates' }).click();
-    await page.getByRole('menuitem', { name: /^Receptionist/ }).click();
-    await confirm.getByRole('button', { name: 'Replace prompt' }).click();
-    await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_INBOUND_VOICE_AGENT_PROMPT);
-    await expect(page.locator('#agent-call-notes')).toHaveValue(DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES);
+    // On a number: saving a new type asks first; Cancel saves nothing.
+    await db.setVoiceNumberAgents(await seedNumber(db, '+15550100021'), { inboundAgentId: agentId });
+    await page.reload();
+    await waitForHydration(page, '#agent-prompt');
+    await callType.click();
+    await page.getByRole('option', { name: /^Outbound/ }).click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect.poll(async () => (await db.getVoiceAgents(E2E_USER))[0].prompt).toBe(DEFAULT_INBOUND_VOICE_AGENT_PROMPT);
-    [agent] = await db.getVoiceAgents(E2E_USER);
-    expect(agent.callNotes).toBe(DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES);
+    const ask = page.getByRole('dialog', { name: 'Make it outbound?' });
+    await expect(ask).toContainText('It is on +15550100021');
+    await expect(ask.getByRole('button', { name: 'Switch it' })).toBeVisible();
+    await expect(ask.getByRole('button', { name: 'Unlink' })).toBeVisible();
+    await ask.getByRole('button', { name: 'Cancel' }).click();
+    expect((await db.getVoiceAgents(E2E_USER))[0].callType).toBe(VoiceAgentCallType.INBOUND);
 
     // Emptying the prompt blocks saving, in plain words.
     await page.locator('#agent-prompt').fill('');
@@ -220,58 +242,72 @@ test('changing the type keeps the prompt; a template replaces it only after aski
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });
 
-test('"Used on" lists the numbers that use the agent for incoming and outgoing calls', async ({ page, db }) => {
+test('the agent card shows its numbers and its Gemini key, and opens a picker of all numbers', async ({ page, db }) => {
+    await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
     const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Maya', callType: VoiceAgentCallType.INBOUND });
     const otherId = await db.insertVoiceAgent(E2E_USER, { name: 'Other' });
     const answers = await seedNumber(db, '+15550100001');
     const places = await seedNumber(db, '+15550100002');
     const elsewhere = await seedNumber(db, '+15550100003');
     await db.setVoiceNumberAgents(answers, { inboundAgentId: agentId });
-    await db.setVoiceNumberAgents(places, { inboundAgentId: otherId, outboundAgentId: agentId });
-    await db.setVoiceNumberAgents(elsewhere, { inboundAgentId: otherId, outboundAgentId: otherId });
+    await db.setVoiceNumberAgents(places, { outboundAgentId: agentId });
+    await db.setVoiceNumberAgents(elsewhere, { inboundAgentId: otherId });
 
     await openVoiceAgent(page, agentId);
-    const usedOn = page.getByTestId('voice-agent-used-on');
-    await expect(usedOn.getByTestId('used-on-inbound')).toContainText('+15550100001');
-    await expect(usedOn.getByTestId('used-on-inbound')).not.toContainText('+15550100002');
-    await expect(usedOn.getByTestId('used-on-outbound')).toContainText('+15550100002');
-    await expect(usedOn).not.toContainText('+15550100003');
-    // An inbound agent placing calls from a number is allowed, and pointed out.
-    await expect(usedOn).toContainText('It is an inbound agent, but 1 number still places calls with it.');
-    await expect(usedOn.getByRole('link', { name: /Phone numbers/ })).toHaveAttribute('href', '/voice-agent/phone-numbers');
+    await expect(page.getByTestId('voice-agent-used-on')).toHaveCount(0); // the separate card is gone
+    const numbers = page.getByTestId('agent-numbers');
+    await expect(numbers.getByTestId('agent-numbers-list')).toHaveText('+15550100001');
+    await expect(numbers).toContainText('Calls to these numbers are answered by this agent.');
+    // A number left calling with it from before it was inbound is pointed out, with a way out.
+    await expect(numbers.getByTestId('agent-numbers-stray')).toContainText('+15550100002 still calls with it');
+    await expect(numbers.getByTestId('agent-numbers-stray').getByRole('button', { name: 'Unlink' })).toBeVisible();
+    await expect(page.getByTestId('gemini-key-line').first()).toContainText('Runs on your Gemini key ending');
+    await expect(page.getByRole('link', { name: 'Change' })).toHaveAttribute('href', '/voice-agent/settings#gemini-key');
+
+    await numbers.getByTestId('agent-numbers-change').click();
+    const picker = page.getByRole('dialog', { name: 'Numbers it answers' });
+    await expect(picker.getByRole('checkbox')).toHaveCount(3);
+    await expect(picker.getByRole('checkbox', { name: /\+15550100001/ })).toBeChecked();
+    await expect(picker.getByRole('checkbox', { name: /\+15550100003/ })).not.toBeChecked();
+    await expect(picker).toContainText('now answers with Other');
+    await picker.getByRole('button', { name: 'Cancel' }).click();
 
     const unusedId = await db.insertVoiceAgent(E2E_USER, { name: 'Unused' });
     await openVoiceAgent(page, unusedId);
-    await expect(page.getByTestId('voice-agent-used-on')).toContainText('No number uses it yet');
+    await expect(page.getByTestId('agent-numbers')).toContainText('No number yet: pick the ones it calls from.');
 });
 
-test('the cost card estimates a minute from the prompt, the key’s tier and the number, then shows the real average', async ({
-    page,
-    db,
-}) => {
+test('the cost card is a bill: Gemini, the prompt, each tool and the phone, then the real average', async ({ page, db }) => {
     await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
-    // 2,400 characters = 600 tokens, plus the engine's own 600: Gemini $0.0224 + 1,200 × $0.0000103 = $0.035 a minute.
+    // 2,400 characters = 600 tokens, plus the engine's own 600: 1,200 × $0.0000103 = $0.012 a minute.
     const agentId = await db.insertVoiceAgent(E2E_USER, {
         name: 'Maya',
         callType: VoiceAgentCallType.INBOUND,
         prompt: 'x'.repeat(2400),
-        callNotes: '',
     });
     await db.setVoiceNumberAgents(await seedNumber(db, '+15550100001'), { inboundAgentId: agentId });
 
     await openVoiceAgent(page, agentId);
     const card = page.getByTestId('agent-cost-estimate');
-    // Plus Telnyx's $0.0107 a minute in: $0.045 a minute, $0.136 for 3 minutes.
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('About $0.045');
-    await expect(card).toContainText('a 3-minute call is about $0.136');
-    await expect(card.getByTestId('agent-cost-parts')).toContainText('Gemini: $0.035 (a prompt of about 1,200 tokens');
-    await expect(card.getByTestId('agent-cost-parts')).toContainText('Telnyx: $0.011');
+    const parts = card.getByTestId('agent-cost-parts');
+    // Gemini $0.0224 + prompt $0.0124 + Telnyx in $0.0107 = $0.045 a minute, $0.136 for 3 minutes.
+    await expect(parts).toContainText('Gemini talk time · audio in and out$0.022');
+    await expect(parts).toContainText('Prompt · 1,200 tokens, read every turn$0.012');
+    await expect(parts).toContainText('Telnyx · list rate$0.011');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.045');
+    await expect(parts).toContainText('A 3-minute call$0.136');
     await expect(card.getByTestId('agent-cost-real')).toHaveText('No calls yet to compare with.');
 
     // A longer prompt, before saving: 6,000 characters = 2,100 tokens a turn, $0.055 a minute.
     await page.locator('#agent-prompt').fill('y'.repeat(6000));
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('About $0.055');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.055');
     await page.locator('#agent-prompt').fill('x'.repeat(2400)); // back as saved, so leaving asks nothing
+
+    // Booking adds its 525 tokens a turn and two uses a call: $0.006 a minute.
+    await db.setVoiceAgentTools(agentId, { booking: { ...defaultVoiceBookingTool('UTC'), enabled: true }, webhooks: [] });
+    await openVoiceAgent(page, agentId);
+    await expect(parts).toContainText('Booking · 525 tokens a turn, ~2 uses a call$0.006');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.052');
 
     // A free-tier key pays nothing for Gemini; a priced call gives the real average.
     await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY, { tier: 'free' });
@@ -300,8 +336,8 @@ test('the cost card estimates a minute from the prompt, the key’s tier and the
         },
     ]);
     await openVoiceAgent(page, agentId);
-    await expect(card.getByTestId('agent-cost-parts')).toContainText('Gemini: free');
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('About $0.011');
+    await expect(parts).toContainText('Gemini talk time · free-tier key$0.000');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.011');
     await expect(card.getByTestId('agent-cost-real')).toHaveText(
         'Real so far: $0.030 a minute over 1 call (phone part partly estimated).',
     );
@@ -315,12 +351,12 @@ test('edits and saves every field', async ({ page, db }) => {
 
     const save = page.getByRole('button', { name: 'Save', exact: true });
     await expect(save).toBeDisabled();
+    await expect(page.locator('#agent-call-notes')).toHaveCount(0);
 
     await page.locator('#agent-name').fill('Maya v2');
     await page.getByRole('combobox', { name: 'Voice' }).click();
     await page.getByRole('option', { name: /Puck/ }).click();
     await page.locator('#agent-prompt').fill('You are Maya. Be brief.');
-    await page.locator('#agent-call-notes').fill('Website: example.com');
     await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible();
 
     await save.click();
@@ -328,12 +364,7 @@ test('edits and saves every field', async ({ page, db }) => {
     await expect(save).toBeDisabled();
 
     const [agent] = await db.getVoiceAgents(E2E_USER);
-    expect(agent).toMatchObject({
-        name: 'Maya v2',
-        voice: 'puck',
-        prompt: 'You are Maya. Be brief.',
-        callNotes: 'Website: example.com',
-    });
+    expect(agent).toMatchObject({ name: 'Maya v2', voice: 'puck', prompt: 'You are Maya. Be brief.' });
     expect(agent.updatedAt.getTime()).toBeGreaterThan(before.getTime());
 
     await page.goto(VOICE_AGENTS_URL);
@@ -354,24 +385,28 @@ test('will not save an agent without a name', async ({ page, db }) => {
     expect((await db.getVoiceAgents(E2E_USER))[0].name).toBe('Maya');
 });
 
-test('will not delete an agent that answers a number, then deletes it once answering is off', async ({ page, db }) => {
+test('Delete sits beside Save; deleting lets its numbers go, and keeps it when a number cannot be let go', async ({
+    page,
+    db,
+}) => {
     const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Short lived' });
     const keepId = await db.insertVoiceAgent(E2E_USER, { name: 'Keeper' });
     const both = await seedNumber(db, '+15550100011');
     const mixed = await seedNumber(db, '+15550100012');
-    await db.setVoiceNumberAgents(both, { inboundAgentId: agentId, outboundAgentId: agentId });
+    await db.setVoiceNumberAgents(both, { inboundAgentId: agentId });
     await db.setVoiceNumberAgents(mixed, { inboundAgentId: keepId, outboundAgentId: agentId });
     await openVoiceAgent(page, agentId);
 
-    // It still answers +15550100011: deleting it would leave that number ringing into nothing.
+    // It answers +15550100011, whose provider account cannot be reached here: nothing is deleted.
     await page.getByRole('button', { name: 'Delete agent' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete agent' }).click();
-    await expect(page.getByText(/answers calls on \+15550100011.*Turn AI answering off/)).toBeVisible();
+    await expect(page.locator('[data-sonner-toast][data-type="error"]').first()).toBeVisible();
     expect((await db.getVoiceAgents(E2E_USER)).map((a) => a.name)).toEqual(['Short lived', 'Keeper']);
 
-    // Once AI answering is off there, it goes, and it is taken off the numbers it called from.
+    // Once nothing answers with it, it goes, and it is taken off the numbers it called from.
     await db.setVoiceNumberAgents(both, { inboundAgentId: null });
     await page.reload();
+    await waitForHydration(page, '#agent-prompt');
     await page.getByRole('button', { name: 'Delete agent' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete agent' }).click();
 
@@ -381,7 +416,6 @@ test('will not delete an agent that answers a number, then deletes it once answe
 
     const numbers = await db.getVoiceNumbers(E2E_USER);
     const byPhone = (phone: string) => numbers.find((n) => n.phoneNumber === phone);
-    expect(byPhone('+15550100011')).toMatchObject({ inboundAgentId: null, outboundAgentId: null });
     expect(byPhone('+15550100012')?.inboundAgentId?.toString()).toBe(keepId);
     expect(byPhone('+15550100012')?.outboundAgentId).toBeNull();
 });

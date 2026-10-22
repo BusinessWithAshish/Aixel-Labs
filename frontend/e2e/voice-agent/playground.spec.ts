@@ -107,7 +107,6 @@ test('saves unsaved edits before the call starts', async ({ page, db }) => {
     await openVoiceAgent(page, agentId);
 
     await page.locator('#agent-prompt').fill('New prompt, tested live.');
-    await expect(page.getByText('Starting a call saves them first.')).toBeVisible();
     await page.getByRole('button', { name: 'Save and start call' }).click();
 
     await expect(page.getByTestId('playground-status')).toHaveText('Live');

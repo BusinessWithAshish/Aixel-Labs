@@ -261,7 +261,6 @@ export enum VoiceAgentCallType {
 export const VOICE_AGENT_LIMITS = {
   nameMax: 80,
   promptMax: 50_000,
-  callNotesMax: 4_000,
 } as const;
 
 export type VoiceAgentDoc<Id = ObjectId> = {
@@ -272,14 +271,12 @@ export type VoiceAgentDoc<Id = ObjectId> = {
   name: string;
   callType: VoiceAgentCallType;
   voice: VoiceAgentVoice;
-  /** The whole system prompt the model runs on. */
+  /** The whole system prompt the model runs on, the business's facts included (per-call facts come from `{{variables}}`). */
   prompt: string;
-  /** Facts about the business being called, appended to the prompt per call ("Website: none found."). */
-  callNotes: string;
   /** Actions the agent can take during a call. Absent = none (ending the call is always available). */
   tools?: VoiceAgentTools;
   /**
-   * Default values for the `{{variables}}` in the prompt and call notes. A call's own variables
+   * Default values for the `{{variables}}` in the prompt. A call's own variables
    * (a campaign contact's CSV columns, a test call's) win; built-ins (VOICE_BUILTIN_VARIABLES) win
    * over both. A variable with no value anywhere is left empty.
    */

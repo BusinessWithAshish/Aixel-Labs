@@ -1,111 +1,138 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, LayoutTemplate } from 'lucide-react';
-import type { VoiceAgentCallType } from '@aixellabs/backend/db/types';
-import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
+import { LayoutTemplate } from 'lucide-react';
+import { VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import { Button } from '@/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     VOICE_AGENT_CALL_TYPES,
     VOICE_AGENT_PROMPT_TEMPLATES,
     type VoiceAgentPromptTemplate,
 } from '@/helpers/voice-agent-defaults';
+import { cn } from '@/lib/utils';
 
 type PromptTemplatesProps = {
     /** The agent's type on screen: its templates come first. */
     callType: VoiceAgentCallType;
-    onPick: (template: VoiceAgentPromptTemplate) => void;
+    /** An empty prompt shows its type's templates as cards; else a button opens the picker. */
+    empty: boolean;
+    onUse: (template: VoiceAgentPromptTemplate) => void;
 };
 
-function templatesFor(callType: VoiceAgentCallType): VoiceAgentPromptTemplate[] {
-    return [...VOICE_AGENT_PROMPT_TEMPLATES].sort(
-        (a, b) => Number(b.callType === callType) - Number(a.callType === callType),
-    );
+/** The call types, the agent's own first: the picker's groups. */
+function groupsFor(callType: VoiceAgentCallType): VoiceAgentCallType[] {
+    const other = callType === VoiceAgentCallType.INBOUND ? VoiceAgentCallType.OUTBOUND : VoiceAgentCallType.INBOUND;
+    return [callType, other];
 }
 
-function TemplateText({ template }: { template: VoiceAgentPromptTemplate }) {
-    return (
-        <>
-            <span className="text-sm font-medium">
-                {template.title}
-                <span className="text-muted-foreground font-normal">
-                    {' '}
-                    · for {VOICE_AGENT_CALL_TYPES[template.callType].label.toLowerCase()} agents
-                </span>
-            </span>
-            <span className="text-muted-foreground text-xs whitespace-normal">{template.description}</span>
-        </>
-    );
-}
+const ofType = (callType: VoiceAgentCallType) => VOICE_AGENT_PROMPT_TEMPLATES.filter((t) => t.callType === callType);
 
-/** The templates as cards, for an empty prompt: one click fills it. */
-export function PromptTemplateList({ callType, onPick }: PromptTemplatesProps) {
-    return (
-        <div className="grid gap-2 rounded-md border border-dashed p-3" data-testid="prompt-templates">
-            <p className="text-sm font-medium">Start from a template, or write your own below</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-                {templatesFor(callType).map((template) => (
-                    <Button
-                        key={template.id}
-                        type="button"
-                        variant="outline"
-                        className="h-auto flex-col items-start gap-1 px-3 py-2 text-left"
-                        onClick={() => onPick(template)}
-                    >
-                        <TemplateText template={template} />
-                    </Button>
-                ))}
-            </div>
-        </div>
-    );
-}
+/**
+ * Templates for the prompt: picked from a list grouped by call type, read in full before using one.
+ * Using one replaces the prompt; the editor keeps what was there to switch back to.
+ */
+export function PromptTemplates({ callType, empty, onUse }: PromptTemplatesProps) {
+    const [open, setOpen] = useState(false);
+    const [picked, setPicked] = useState<VoiceAgentPromptTemplate>(ofType(callType)[0]);
 
-/** A menu of templates beside a prompt that has text: picking one asks before replacing it. */
-export function PromptTemplateMenu({ callType, onPick }: PromptTemplatesProps) {
-    const [replacing, setReplacing] = useState<VoiceAgentPromptTemplate | null>(null);
+    const preview = (template: VoiceAgentPromptTemplate) => {
+        setPicked(template);
+        setOpen(true);
+    };
 
     return (
         <>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button type="button" variant="ghost" size="sm" className="h-7">
-                        <LayoutTemplate className="size-3.5" />
-                        Templates
-                        <ChevronDown className="size-3.5" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                    <DropdownMenuLabel>Replace the prompt with a template</DropdownMenuLabel>
-                    {templatesFor(callType).map((template) => (
-                        <DropdownMenuItem
-                            key={template.id}
-                            className="flex-col items-start gap-0.5"
-                            onSelect={() => setReplacing(template)}
+            {empty ? (
+                <div className="grid gap-2 rounded-md border border-dashed p-3" data-testid="prompt-templates">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-medium">Start from a template, or write your own below</p>
+                        <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => setOpen(true)}>
+                            All templates
+                        </Button>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                        {ofType(callType).map((template) => (
+                            <Button
+                                key={template.id}
+                                type="button"
+                                variant="outline"
+                                className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left whitespace-normal"
+                                onClick={() => preview(template)}
+                            >
+                                <span className="text-sm font-medium">{template.title}</span>
+                                <span className="text-muted-foreground text-xs font-normal">{template.description}</span>
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <Button type="button" variant="ghost" size="sm" className="h-7" onClick={() => setOpen(true)}>
+                    <LayoutTemplate className="size-3.5" />
+                    Templates
+                </Button>
+            )}
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="grid-rows-[auto_minmax(0,1fr)_auto] sm:max-h-[85dvh] sm:max-w-4xl">
+                    <DialogHeader>
+                        <DialogTitle>Templates</DialogTitle>
+                        <DialogDescription>
+                            Using one replaces the prompt. You can switch back to yours until you leave the page.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid min-h-0 gap-4 sm:grid-cols-[14rem_minmax(0,1fr)]">
+                        <div
+                            className="grid max-h-44 content-start gap-3 overflow-y-auto sm:max-h-none"
+                            data-testid="template-list"
                         >
-                            <TemplateText template={template} />
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
-            <ConfirmDialog
-                open={replacing !== null}
-                onOpenChange={(open) => !open && setReplacing(null)}
-                title={`Replace your prompt with “${replacing?.title ?? ''}”?`}
-                alertMessage="What is in the prompt now is replaced (and the call notes too, unless you wrote your own). Nothing is saved until you press Save; Discard brings back your saved version."
-                confirmText="Replace prompt"
-                variant="default"
-                onConfirm={() => {
-                    if (replacing) onPick(replacing);
-                    setReplacing(null);
-                }}
-            />
+                            {groupsFor(callType).map((group) => (
+                                <div key={group} className="grid gap-1">
+                                    <p className="text-muted-foreground px-2 text-xs font-medium">
+                                        {VOICE_AGENT_CALL_TYPES[group].label} · {VOICE_AGENT_CALL_TYPES[group].short}
+                                    </p>
+                                    {ofType(group).map((template) => (
+                                        <Button
+                                            key={template.id}
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            aria-pressed={picked.id === template.id}
+                                            className={cn('justify-start', picked.id === template.id && 'bg-accent')}
+                                            onClick={() => setPicked(template)}
+                                        >
+                                            {template.title}
+                                        </Button>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
+                            <p className="text-muted-foreground text-sm">{picked.description}</p>
+                            <pre
+                                className="bg-muted/40 max-h-[45dvh] overflow-y-auto rounded-md border p-3 font-sans text-xs whitespace-pre-wrap sm:max-h-none"
+                                data-testid="template-preview"
+                            >
+                                {picked.prompt}
+                            </pre>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => {
+                                onUse(picked);
+                                setOpen(false);
+                            }}
+                        >
+                            Use {picked.title}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

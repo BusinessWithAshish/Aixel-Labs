@@ -47,8 +47,10 @@ test('she checks availability, books Saturday at 2 pm, and the booking is on the
         name: 'Front desk',
         voice: 'kore',
         callType: VoiceAgentCallType.INBOUND,
-        prompt: DEFAULT_INBOUND_VOICE_AGENT_PROMPT,
-        callNotes: 'Business: Sunrise Dental\nHours: Monday to Saturday, 9am to 6pm\nServices: cleanings, check-ups, whitening',
+        prompt: DEFAULT_INBOUND_VOICE_AGENT_PROMPT.replace(
+            /# Business facts[\s\S]*$/,
+            '# Business facts\n\nBusiness: Sunrise Dental\nHours: Monday to Saturday, 9am to 6pm\nServices: cleanings, check-ups, whitening',
+        ),
     });
     await db.setVoiceAgentTools(agentId, {
         booking: {

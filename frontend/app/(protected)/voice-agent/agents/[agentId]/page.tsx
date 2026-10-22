@@ -11,7 +11,6 @@ import { isValidObjectId } from '@/helpers/object-id';
 import { NO_GEMINI_KEY } from '@/server/voice-agent/gemini-key';
 import { useVoiceAgentEditorPage } from './_hooks/use-voice-agent-editor-page';
 import { VoiceAgentEditor } from './_components/VoiceAgentEditor';
-import { VoiceAgentUsedOn } from './_components/VoiceAgentUsedOn';
 import { VoiceAgentCostEstimate } from './_components/VoiceAgentCostEstimate';
 import { VoicePlayground } from './_components/VoicePlayground';
 
@@ -43,7 +42,7 @@ async function VoiceAgentPage({
     const justConnected = typeof connected === 'string' && isValidObjectId(connected) ? connected : null;
     const memories = memoriesResponse.success && memoriesResponse.data ? memoriesResponse.data : NO_MEMORIES;
 
-    // Editor beside the numbers it is on and the playground on wide screens, stacked on narrow ones.
+    // Editor beside its cost and the playground on wide screens, stacked on narrow ones.
     return (
         <PageLayout
             title={response.data.name}
@@ -63,7 +62,6 @@ async function VoiceAgentPage({
             >
                 <VoiceAgentEditor />
                 <div className="grid min-w-0 gap-4 lg:sticky lg:top-0">
-                    <VoiceAgentUsedOn />
                     <VoiceAgentCostEstimate />
                     <VoicePlayground />
                 </div>

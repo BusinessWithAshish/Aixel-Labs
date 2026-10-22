@@ -200,7 +200,6 @@ export class E2eDb {
             callType?: VoiceAgentCallType;
             voice?: VoiceAgentVoice;
             prompt?: string;
-            callNotes?: string;
         },
     ): Promise<string> {
         const { _id: userId, tenantId } = await this.getUser(user);
@@ -212,7 +211,6 @@ export class E2eDb {
             callType: fields.callType ?? VoiceAgentCallType.OUTBOUND,
             voice: fields.voice ?? 'sulafat',
             prompt: fields.prompt ?? 'You are a test agent.',
-            callNotes: fields.callNotes ?? 'Website: none found.',
             createdAt: now,
             updatedAt: now,
         });

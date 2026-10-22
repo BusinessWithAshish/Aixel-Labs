@@ -40,6 +40,15 @@
     "geminiUsdPerPromptTokenMinute": 0.0000103,
     "engineTokens": 600,
     "charsPerToken": 4,
-    "typicalCallMinutes": 3
+    "typicalCallMinutes": 3,
+    "tools": {
+      "source": "backend/voice/tools.py: the booking functions' declarations plus their '# Your tools' lines are about 2,100 characters; a custom tool sends its description twice (declaration and prompt) plus its parameters. A use reads the tool's answer as text and keeps the line open while it runs.",
+      "bookingChars": 2100,
+      "toolBaseChars": 160,
+      "usesPerCall": { "booking": 2, "custom": 1 },
+      "useTextInTokens": 150,
+      "useTextOutTokens": 40,
+      "useSeconds": { "booking": 1.5, "custom": 2 }
+    }
   }
 }

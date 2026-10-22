@@ -37,8 +37,7 @@ test('a playground call reaches the engine, she talks, the caller is heard, and 
     const agentId = await db.insertVoiceAgent(E2E_USER, {
         name: 'Live test',
         voice: 'kore',
-        prompt: 'You are Maya, a receptionist for Sunrise Dental. Keep every reply to one short sentence.',
-        callNotes: 'Open by saying thanks for calling Sunrise Dental.',
+        prompt: 'You are Maya, a receptionist for Sunrise Dental. Keep every reply to one short sentence. Open by saying thanks for calling Sunrise Dental.',
     });
     await openVoiceAgent(page, agentId);
 

@@ -9,7 +9,7 @@ import { VOICE_BUILTIN_VARIABLE_INFO } from '@/helpers/voice-agent-features';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 
 /**
- * Default values for the custom `{{variables}}` the prompt, call notes and voicemail message use.
+ * Default values for the custom `{{variables}}` the prompt and voicemail message use.
  * A call's own value (a campaign column, a test call) wins; built-ins are filled in on every call.
  */
 export function VariableDefaults() {
@@ -19,7 +19,7 @@ export function VariableDefaults() {
         <div id="agent-variables" className="grid scroll-mt-4 gap-2" data-testid="agent-variables">
             <p className="text-sm leading-none font-medium">Variables</p>
             <p className="text-muted-foreground text-xs">
-                Write <code className="font-mono">{'{{name}}'}</code> in the prompt or call notes (type{' '}
+                Write <code className="font-mono">{'{{name}}'}</code> in the prompt (type{' '}
                 <code className="font-mono">{'{{'}</code> for the list). Each call fills it in from its own values (a
                 campaign&rsquo;s CSV columns, a test call&rsquo;s), else the default below; with neither it is left empty.
             </p>
