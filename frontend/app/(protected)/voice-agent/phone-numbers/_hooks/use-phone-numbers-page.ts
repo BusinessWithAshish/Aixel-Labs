@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { VoiceAgentCallType, VoiceProvider, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
-import { removeNumber, setNumberAgent, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
+import { removeNumber, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 
 export type PhoneNumbersPageData = {
     numbers: VoiceNumberListItem[];
@@ -14,43 +14,14 @@ export type PhoneNumbersPageData = {
     geminiKey: VoiceGeminiKeyView;
 };
 
-/**
- * What a number does: answers calls, makes calls, or nothing yet. `null` = numbers set up before a
- * number did one job only, with both an answering and a calling agent, until the owner picks one.
- */
-export type NumberJob = VoiceAgentCallType | 'NONE';
-
-export function numberJob(number: VoiceNumberListItem): NumberJob | null {
-    if (number.inboundAgentId && number.outboundAgentId) return null;
-    if (number.inboundAgentId) return VoiceAgentCallType.INBOUND;
-    if (number.outboundAgentId) return VoiceAgentCallType.OUTBOUND;
-    return 'NONE';
-}
-
-export type NumberBadge = { label: string; variant: 'green' | 'blue' | 'secondary' | 'yellow' };
-
-/** What the number does today, in the words the row shows. */
-export function numberBadge(number: VoiceNumberListItem): NumberBadge {
-    switch (numberJob(number)) {
-        case VoiceAgentCallType.INBOUND:
-            return { label: 'Answers calls', variant: 'green' };
-        case VoiceAgentCallType.OUTBOUND:
-            return { label: 'Makes calls', variant: 'blue' };
-        case 'NONE':
-            return { label: 'Not used yet', variant: 'secondary' };
-        default:
-            return { label: 'Pick one job', variant: 'yellow' };
-    }
-}
-
 /** The provider setup guide dialog: which guide, the step it opened at, and whether it is showing. */
 export type SetupGuideState = { provider: VoiceProvider; stepId: string | null; open: boolean };
 
 export function usePhoneNumbersPage(data: PhoneNumbersPageData) {
     const [numbers, setNumbers] = useState<VoiceNumberListItem[]>(data.numbers);
     const [connectOpen, setConnectOpen] = useState(false);
-    /** The number whose job or agent is being saved. */
-    const [saving, setSaving] = useState<string | null>(null);
+    /** The number whose Change dialog is open (kept while it animates closed); `opened` counts openings, so each starts fresh. */
+    const [jobDialog, setJobDialog] = useState({ numberId: null as string | null, open: false, opened: 0 });
     const [testCallNumber, setTestCallNumber] = useState<VoiceNumberListItem | null>(null);
     const [removeTarget, setRemoveTarget] = useState<VoiceNumberListItem | null>(null);
     const [removing, setRemoving] = useState(false);
@@ -76,41 +47,11 @@ export function usePhoneNumbersPage(data: PhoneNumbersPageData) {
         setNumbers((prev) => prev.map((n) => (n._id === updated._id ? updated : n)));
     };
 
-    /** Gives the number one job (`callType`) with `agentId`, or none (`null`): the server undoes the old job. */
-    const changeNumberAgent = async (
-        number: VoiceNumberListItem,
-        callType: VoiceAgentCallType | null,
-        agentId: string | null,
-    ) => {
-        if (!number._id) return;
-        const current = callType === VoiceAgentCallType.INBOUND ? number.inboundAgentId : number.outboundAgentId;
-        if (numberJob(number) === (callType ?? 'NONE') && (callType === null || current === agentId)) return;
-        setSaving(number._id);
-        const res = await setNumberAgent(number._id, callType, agentId);
-        setSaving(null);
-        if (!res.success || !res.data) {
-            toast.error(res.error ?? `Could not change what ${number.phoneNumber} does`);
-            return;
-        }
-        const updated = res.data;
-        replaceNumber(updated);
-        if (callType === VoiceAgentCallType.INBOUND) {
-            toast.success(`${updated.inboundAgentName} now answers every call to ${number.phoneNumber}`);
-        } else if (callType === VoiceAgentCallType.OUTBOUND) {
-            toast.success(`${updated.outboundAgentName} now makes the calls from ${number.phoneNumber}`);
-        } else {
-            toast.success(`The AI is off for ${number.phoneNumber}. Calls to it ring the way they did before.`);
-        }
-    };
-
-    /** Picks the number's job, keeping its agent for that job when it has one, else the first agent made for it. */
-    const chooseJob = (number: VoiceNumberListItem, job: NumberJob) => {
-        if (job === 'NONE') return changeNumberAgent(number, null, null);
-        const inbound = job === VoiceAgentCallType.INBOUND;
-        const agentId =
-            (inbound ? number.inboundAgentId : number.outboundAgentId) ?? (inbound ? inboundAgents : outboundAgents)[0]?.id;
-        if (agentId) return changeNumberAgent(number, job, agentId);
-    };
+    const openJobDialog = (number: VoiceNumberListItem) =>
+        setJobDialog((prev) => ({ numberId: number._id ?? null, open: true, opened: prev.opened + 1 }));
+    const closeJobDialog = () => setJobDialog((prev) => ({ ...prev, open: false }));
+    /** Read from the list, so the dialog sees each step's result as it lands. */
+    const jobNumber = numbers.find((n) => n._id === jobDialog.numberId) ?? null;
 
     const confirmRemove = async () => {
         if (!removeTarget?._id) return;
@@ -138,9 +79,11 @@ export function usePhoneNumbersPage(data: PhoneNumbersPageData) {
         connectOpen,
         setConnectOpen,
         addImported,
-        saving,
-        chooseJob,
-        changeNumberAgent,
+        replaceNumber,
+        jobNumber,
+        jobDialog,
+        openJobDialog,
+        closeJobDialog,
         testCallNumber,
         setTestCallNumber,
         removeTarget,

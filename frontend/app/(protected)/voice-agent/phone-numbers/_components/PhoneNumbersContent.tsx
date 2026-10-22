@@ -11,6 +11,7 @@ import { ConnectNumberDialog } from './ConnectNumberDialog';
 import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
 import { TestCallDialog } from '@/components/common/voice-agent/TestCallDialog';
 import { SETUP_GUIDE_PROVIDERS, setupGuideFor } from '../_utils/setup-guides';
+import { NumberJobDialog } from './NumberJobDialog';
 import { PhoneNumberRow } from './PhoneNumberRow';
 import { ProviderSetupGuide } from './ProviderSetupGuide';
 import { RemoveNumberDialog } from './RemoveNumberDialog';
@@ -141,6 +142,7 @@ export function PhoneNumbersContent() {
             )}
 
             <ConnectNumberDialog />
+            <NumberJobDialog />
             <NumberTestCallDialog />
             <RemoveNumberDialog />
             <SetupGuideDialog />

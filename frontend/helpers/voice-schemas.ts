@@ -532,3 +532,17 @@ export const campaignSettingsSchema = campaignDetailsSchema.merge(campaignSchedu
 });
 
 export type VoiceCampaignSettingsInput = z.input<typeof campaignSettingsSchema>;
+
+// ---------------------------------------------------------------------------
+// Phone numbers
+// ---------------------------------------------------------------------------
+
+/** What a number does, as its Change dialog edits it: answer calls, make calls, or nothing, and with which agent. */
+export const numberJobSchema = z
+    .object({
+        job: z.enum([VoiceAgentCallType.INBOUND, VoiceAgentCallType.OUTBOUND, 'NONE']),
+        agentId: z.string(),
+    })
+    .refine((v) => v.job === 'NONE' || isValidObjectId(v.agentId), { message: 'Choose an agent', path: ['agentId'] });
+
+export type NumberJobFormValues = z.input<typeof numberJobSchema>;
