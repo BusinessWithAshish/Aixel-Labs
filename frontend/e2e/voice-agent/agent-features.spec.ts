@@ -457,9 +457,9 @@ test('a test call sends the values typed for the agent’s variables', async ({ 
     await expect(fieldset.getByLabel('{{company}}')).toHaveAttribute('placeholder', 'Acme Dental');
     await expect(fieldset.getByLabel('{{first_name}}')).toHaveAttribute('placeholder', 'Empty');
     await fieldset.getByLabel('{{first_name}}').fill('  Ravi ');
-    await dialog.getByLabel('Number to call').fill(CALLER);
+    await dialog.getByLabel('Your phone number').fill(CALLER);
     await dialog.screenshot({ path: path.join(SHOTS, 'test-call-variables.png') });
-    await dialog.getByRole('button', { name: 'Call now' }).click();
+    await dialog.getByRole('button', { name: 'Call me now' }).click();
     await expect(dialog.getByRole('status')).toContainText(`Calling ${CALLER} now`);
 
     expect(engine.requests).toHaveLength(1);
