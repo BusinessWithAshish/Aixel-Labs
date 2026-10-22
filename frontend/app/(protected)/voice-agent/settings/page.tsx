@@ -1,30 +1,22 @@
 import PageLayout from '@/components/common/PageLayout';
 import { withPageHandler } from '@/components/hocs/with-page-handler';
-import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { PageProvider } from '@/contexts/PageStore';
-import { getGeminiKeyStatus } from '@/app/actions/voice-settings-actions';
-import { NO_GEMINI_KEY } from '@/server/voice-agent/gemini-key';
+import { getVoiceStackSettings } from '@/app/actions/voice-settings-actions';
 import { useVoiceSettingsPage } from './_hooks/use-voice-settings-page';
-import { AiModelSection } from './_components/AiModelSection';
-import { GeminiKeySection } from './_components/GeminiKeySection';
+import { ProviderKeysCard } from './_components/ProviderKeysCard';
+import { VoiceStackCard } from './_components/VoiceStackCard';
 
 const PAGE_TITLE = 'Voice settings';
 
-/** Settings shared by all of the owner's agents. A new area (voices, speech providers) is one more section. */
+/** Settings shared by all of the owner's agents: the stack they run on and the API keys behind it. */
 async function VoiceSettingsPage() {
-    const keyResponse = await getGeminiKeyStatus();
+    const response = await getVoiceStackSettings();
 
     return (
-        <PageLayout title={PAGE_TITLE} className="p-1">
-            <PageProvider data={{ geminiKey: keyResponse.data ?? NO_GEMINI_KEY }} usePageHook={useVoiceSettingsPage}>
-                <Card className="h-auto max-w-3xl">
-                    <CardContent className="grid gap-5">
-                        <AiModelSection />
-                        <Separator />
-                        <GeminiKeySection />
-                    </CardContent>
-                </Card>
+        <PageLayout title={PAGE_TITLE} className="flex max-w-3xl flex-col gap-4 p-1">
+            <PageProvider data={response.data ?? { keys: [], stack: null }} usePageHook={useVoiceSettingsPage}>
+                <VoiceStackCard />
+                <ProviderKeysCard />
             </PageProvider>
         </PageLayout>
     );

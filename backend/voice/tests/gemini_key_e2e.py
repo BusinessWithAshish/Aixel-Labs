@@ -133,7 +133,7 @@ async def test_play(port, a, b, c):
     doc = await wait_doc({"agentId": b["inbound"]["_id"], "channel": "PLAYGROUND", "startedAt": {"$gte": t_start}})
     ok("B: the call is logged with endedBy gemini_key_error and why", doc and doc["endedBy"] == "gemini_key_error"
        and any(f["flag"] == "gemini_key_error" for f in doc["flags"]), str(doc and (doc["endedBy"], doc["flags"])))
-    s = (settings(b).get("gemini") or {})
+    s = (settings(b).get("keys") or [{}])[0]
     ok("B: the owner's key is marked INVALID for the app, in plain words", s.get("status") == "INVALID"
        and "not a valid API key" in (s.get("statusMessage") or ""), str({k: s.get(k) for k in ("status", "statusMessage")}))
 
@@ -142,7 +142,7 @@ async def test_play(port, a, b, c):
     agent_lines = [e["text"] for e in r["events"] if e["type"] == "transcript" and e["role"] == "agent"]
     ok("A, own key: she speaks and answers", r["audio"] > 48000 and agent_lines and not any(e["type"] == "error" for e in r["events"]),
        f"{r['audio'] / 48000:.1f} s of audio, {agent_lines[:1]}")
-    ok("A: the key stays OK", (settings(a).get("gemini") or {}).get("status") == "OK")
+    ok("A: the key stays OK", (settings(a).get("keys") or [{}])[0].get("status") == "OK")
 
 
 # --- POST /calls ----------------------------------------------------------------------------------------

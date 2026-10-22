@@ -12,7 +12,7 @@ import { voiceAgentUrl } from '@/helpers/voice-routes';
 import { voiceAgentSchema } from '@/helpers/voice-schemas';
 
 /** What the create dialog asks for; the rest starts from the call type's defaults. */
-const newAgentSchema = voiceAgentSchema.pick({ callType: true, name: true, voice: true });
+const newAgentSchema = voiceAgentSchema.pick({ callType: true, name: true, voice: true, ttsVoice: true });
 const NEW_AGENT = {
     callType: VoiceAgentCallType.INBOUND,
     name: DEFAULT_VOICE_AGENT_NAME,

@@ -188,7 +188,7 @@ async def watch_tests():
 async def product_tests():
     print("\n== a call reads them from the agent ==")
     tenant, user = ObjectId(), ObjectId()
-    testdb.set_account(product.db(), {"tenantId": tenant, "userId": user, "gemini": {"keySealed": product.seal_secret("AIza-unit-test-key")}})
+    testdb.set_account(product.db(), {"tenantId": tenant, "userId": user, "keys": testdb.gemini_keys(product.seal_secret("AIza-unit-test-key"))})
     try:
         agent = {"_id": ObjectId(), "tenantId": tenant, "userId": user, "name": "Priya", "voice": "kore", "prompt": "You are Priya.",
                  "callNotes": "", "speech": {"toolWait": "SAY", "toolWaitLine": "{{agent_name}} here, one moment.", "replyWait": "QUICK",

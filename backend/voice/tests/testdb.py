@@ -38,8 +38,14 @@ def engine_on(port, name: str):
 
 
 def set_account(db, fields: dict):
-    """Sets fields (e.g. `gemini`) on the owner's voice_accounts doc, made when missing. `fields` has the owner's userId."""
+    """Sets fields (e.g. `keys`) on the owner's voice_accounts doc, made when missing. `fields` has the owner's userId."""
     db.voice_accounts.update_one({"userId": fields["userId"]}, {"$set": fields}, upsert=True)
+
+
+def gemini_keys(sealed: str, **fields) -> list:
+    """`voice_accounts.keys` with one Gemini key, the owner's default, as the app saves it."""
+    from bson import ObjectId
+    return [{"_id": ObjectId(), "provider": "gemini", "label": "Main", "keySealed": sealed, "status": "OK", **fields}]
 
 
 def insert_number(db, number: dict):

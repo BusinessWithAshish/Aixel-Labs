@@ -11,6 +11,7 @@ export function agentFormValues(agent: VoiceAgent): VoiceAgentInput {
         name: agent.name,
         callType: agent.callType,
         voice: agent.voice,
+        ttsVoice: agent.ttsVoice ?? null,
         prompt: agent.prompt,
         variables: { ...(agent.variables ?? {}) },
     };

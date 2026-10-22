@@ -19,6 +19,7 @@
 !/tests/*.py
 __pycache__/
 *.pyc
-# one-offs: the move off the voicelab tunnel; the 9 -> 6 voice collections (2026-10-21). Delete once done.
+# one-offs: the move off the voicelab tunnel; the 9 -> 6 voice collections (2026-10-21); provider keys (2026-10-22). Delete once done.
 /repoint_numbers.py
 /migrate_voice_accounts.py
+/migrate_voice_keys.py

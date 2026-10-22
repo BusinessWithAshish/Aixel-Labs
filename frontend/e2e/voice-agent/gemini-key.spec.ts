@@ -1,6 +1,13 @@
 import { createServer, type Server } from 'node:http';
 import type { Page, Request } from '@playwright/test';
-import { VoiceAgentCallType, VoiceCallChannel, VoiceCallDirection, VoiceKeyStatus } from '@aixellabs/backend/db/types';
+import {
+    VoiceAgentCallType,
+    VoiceCallChannel,
+    VoiceCallDirection,
+    VoiceKeyProvider,
+    VoiceKeyStatus,
+    VoiceStackKind,
+} from '@aixellabs/backend/db/types';
 import type { E2eDb } from '../support/db';
 import { expect, test } from '../support/fixtures';
 import { E2E_GEMINI_API_BASE, E2E_GEMINI_API_KEY, USER_STORAGE_STATE } from '../support/env';
@@ -24,6 +31,8 @@ const GOOD_KEY = 'AIzaGoodE2eKey0123456789abcdefghijkWxYz';
 const INVALID_KEY = 'AIzaBadE2eKey0123456789abcdefghijklmnop';
 const DISABLED_KEY = 'AIzaDisabledE2eKey0123456789abcdefghijk';
 const QUOTA_KEY = 'AIzaQuotaE2eKey0123456789abcdefghijklmn';
+const SECOND_KEY = 'AIzaGoodSecondE2eKey0123456789abcdQrSt';
+const CARTESIA_KEY = 'sk_car_GoodE2eCartesiaKey0123456789';
 const NUMBER = '+13473700001';
 
 function googleError(code: number, status: string, reason: string, message: string) {
@@ -34,18 +43,26 @@ function googleError(code: number, status: string, reason: string, message: stri
 class FakeGemini {
     readonly keys: string[] = [];
     readonly urls: string[] = [];
+    /** `{path} {key}` of each request to another provider. */
+    readonly providerCalls: string[] = [];
     private constructor(private readonly server: Server) {}
 
     static async start(): Promise<FakeGemini> {
         const fake: FakeGemini = new FakeGemini(
             createServer((req, res) => {
-                const key = String(req.headers['x-goog-api-key'] ?? '');
-                fake.keys.push(key);
-                fake.urls.push(req.url ?? '');
                 const reply = (status: number, body: unknown) => {
                     res.writeHead(status, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(body));
                 };
+                // The other providers (VOICE_PROVIDER_API_BASE): a key with "Good" in it works.
+                if (req.url?.startsWith('/providers/')) {
+                    const auth = String(req.headers.authorization ?? req.headers['xi-api-key'] ?? '');
+                    fake.providerCalls.push(`${req.url} ${auth.replace(/^(Bearer|Token) /, '')}`);
+                    return auth.includes('Good') ? reply(200, {}) : reply(401, { error: 'invalid key' });
+                }
+                const key = String(req.headers['x-goog-api-key'] ?? '');
+                fake.keys.push(key);
+                fake.urls.push(req.url ?? '');
                 if (!req.url?.startsWith('/v1beta/models'))
                     return reply(404, googleError(404, 'NOT_FOUND', '', 'Not found'));
                 if (key.startsWith('AIzaGood')) return reply(200, { models: [{ name: 'models/gemini-3.8-live' }] });
@@ -116,7 +133,7 @@ async function openAgents(page: Page): Promise<void> {
 /** Voice settings, where the key is added, checked and removed. */
 async function openSettings(page: Page): Promise<void> {
     await page.goto(VOICE_SETTINGS_URL);
-    await waitForHydration(page, '[data-testid="gemini-key-card"] button');
+    await waitForHydration(page, '[data-testid="voice-keys-card"] button');
 }
 
 async function openPhoneNumbers(page: Page): Promise<void> {
@@ -136,7 +153,10 @@ async function seedAgentsAndNumber(db: E2eDb) {
     return { inbound, outbound };
 }
 
-const card = (page: Page) => page.getByTestId('gemini-key-card');
+const card = (page: Page) => page.getByTestId('voice-keys-card');
+/** The status badge of the user's (first) key. */
+const keyStatus = (page: Page) => card(page).getByTestId('voice-key-status').first();
+const storedKeys = async (db: E2eDb) => (await db.getVoiceAccount(E2E_USER))?.keys ?? [];
 const numberRow = (page: Page, phoneNumber = NUMBER) =>
     page.getByTestId('voice-number-row').filter({ hasText: phoneNumber });
 
@@ -164,9 +184,10 @@ test('without a key: the card says so, and the playground, answering, making cal
     );
 
     await openSettings(page);
-    await expect(page.getByTestId('ai-model-gemini-live')).toContainText('In use');
-    await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Not set');
-    await expect(card(page)).toContainText('Your agents cannot take or make calls until you add your own key.');
+    await expect(page.getByTestId('voice-stack-card').getByRole('radio', { name: /^One voice model/ })).toBeChecked();
+    await expect(page.getByTestId('voice-stack-missing-keys')).toContainText('Calls need a key for Gemini');
+    await expect(card(page).getByTestId('voice-key')).toHaveCount(0);
+    await expect(card(page)).toContainText('Your agents cannot take or make calls until you add your own Gemini key.');
     await expect(card(page).getByRole('button', { name: 'Add key' })).toBeVisible();
 
     await openVoiceAgent(page, inbound);
@@ -248,7 +269,7 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
 
     await openSettings(page);
     await card(page).getByRole('button', { name: 'Add key' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Add your Gemini API key' });
+    const dialog = page.getByRole('dialog', { name: 'Add an API key' });
     await expect(dialog.getByRole('link', { name: /aistudio\.google\.com\/apikey/ })).toHaveAttribute(
         'href',
         'https://aistudio.google.com/apikey',
@@ -270,20 +291,23 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     }
     await input.fill('not a key');
     await save.click();
-    await expect(dialog.getByRole('alert')).toContainText('That does not look like a Gemini API key.');
-    expect((await db.getVoiceAccount(E2E_USER))?.gemini).toBeNull();
+    await expect(dialog.getByRole('alert')).toContainText('That does not look like an API key');
+    expect(await storedKeys(db)).toEqual([]);
 
     await input.fill(GOOD_KEY);
     await dialog.getByRole('radio', { name: /^Free tier/ }).click();
     await save.click();
-    await expect(page.getByText('Gemini API key saved. Your agents now run on it.')).toBeVisible();
+    await expect(page.getByText('Gemini key saved')).toBeVisible();
     await expect(dialog).toBeHidden();
-    await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Working');
-    await expect(card(page).getByTestId('gemini-key-summary')).toContainText(`Key ending in ${GOOD_KEY.slice(-4)}`);
+    await expect(keyStatus(page)).toHaveText('Working');
+    await expect(card(page).getByTestId('voice-key')).toContainText(`Ending in ${GOOD_KEY.slice(-4)}`);
+    await expect(card(page).getByTestId('voice-key')).toContainText('Default');
     expect(gemini.keys).toEqual([INVALID_KEY, DISABLED_KEY, QUOTA_KEY, GOOD_KEY]);
 
-    const stored = (await db.getVoiceAccount(E2E_USER))?.gemini;
+    const [stored] = await storedKeys(db);
     expect(stored).toMatchObject({
+        provider: 'gemini',
+        label: `Key ending ${GOOD_KEY.slice(-4)}`,
         last4: GOOD_KEY.slice(-4),
         status: VoiceKeyStatus.OK,
         statusMessage: null,
@@ -292,14 +316,15 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     expect(stored?.keySealed).toMatch(/^v1\./);
     expect(stored?.keySealed).not.toContain(GOOD_KEY);
 
-    await expect(card(page).getByTestId('gemini-key-tier')).toHaveText('Free tier');
+    const tier = card(page).getByRole('combobox', { name: /^Google tier of/ });
+    await expect(tier).toHaveText('Free tier');
 
     // The tier can be changed in place.
-    await card(page).getByTestId('gemini-key-tier').click();
+    await tier.click();
     await page.getByRole('option', { name: 'Paid tier' }).click();
     await expect(page.getByText('Saved: paid tier')).toBeVisible();
-    await expect.poll(async () => (await db.getVoiceAccount(E2E_USER))?.gemini?.tier).toBe('paid');
-    await expect(card(page).getByTestId('gemini-key-tier')).toHaveText('Paid tier');
+    await expect.poll(async () => (await storedKeys(db))[0]?.tier).toBe('paid');
+    await expect(tier).toHaveText('Paid tier');
 
     // Calls can start now.
     await openVoiceAgent(page, inbound);
@@ -378,20 +403,20 @@ test('a key Google refused on a call: the card, the playground and the call log 
     );
 
     await openSettings(page);
-    await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Not valid');
-    await expect(card(page).getByRole('alert')).toContainText('Google refused this key: it is not a valid API key');
+    await expect(keyStatus(page)).toHaveText('Not valid');
+    await expect(card(page).getByRole('alert')).toContainText('Gemini refused this key: it is not a valid API key');
     await card(page).getByRole('button', { name: 'Check now' }).click();
-    await expect(page.getByText('Google accepts the key')).toBeVisible();
-    await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Working');
-    expect((await db.getVoiceAccount(E2E_USER))?.gemini?.status).toBe(VoiceKeyStatus.OK);
+    await expect(page.getByText('Gemini accepts the key')).toBeVisible();
+    await expect(keyStatus(page)).toHaveText('Working');
+    expect((await storedKeys(db))[0]?.status).toBe(VoiceKeyStatus.OK);
 
-    await card(page).getByRole('button', { name: 'Remove' }).click();
-    const confirm = page.getByRole('dialog', { name: 'Remove your Gemini API key?' });
-    await expect(confirm).toContainText('Your agents stop taking and making calls until you add a key again.');
+    await card(page).getByRole('button', { name: 'Remove Main' }).click();
+    const confirm = page.getByRole('dialog', { name: 'Remove Main?' });
+    await expect(confirm).toContainText("Agents on this key move to the provider's next key.");
     await confirm.getByRole('button', { name: 'Remove key' }).click();
-    await expect(page.getByText('Gemini API key removed')).toBeVisible();
-    await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Not set');
-    expect((await db.getVoiceAccount(E2E_USER))?.gemini).toBeNull();
+    await expect(page.getByText('Key removed')).toBeVisible();
+    await expect(card(page).getByTestId('voice-key')).toHaveCount(0);
+    expect(await storedKeys(db)).toEqual([]);
 });
 
 test('the open page asks Google about the key again every 10 minutes, with the free list-models call', async ({
@@ -404,16 +429,16 @@ test('the open page asks Google about the key again every 10 minutes, with the f
     });
     await page.clock.install();
     await openSettings(page);
-    await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Out of quota');
+    await expect(keyStatus(page)).toHaveText('Out of quota');
     const before = gemini.urls.length;
 
     await page.clock.fastForward('09:00');
     expect(gemini.urls.length).toBe(before);
     await page.clock.fastForward('01:30');
-    await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Working');
+    await expect(keyStatus(page)).toHaveText('Working');
     expect(gemini.keys.slice(before)).toEqual([GOOD_KEY]);
     expect(gemini.urls.slice(before)).toEqual(['/v1beta/models?pageSize=1']);
-    expect((await db.getVoiceAccount(E2E_USER))?.gemini?.status).toBe(VoiceKeyStatus.OK);
+    expect((await storedKeys(db))[0]?.status).toBe(VoiceKeyStatus.OK);
 });
 
 test('the playground shows the engine’s key refusal in plain words with a link to the key', async ({ page, db }) => {
@@ -433,7 +458,7 @@ test('the playground shows the engine’s key refusal in plain words with a link
     await expect(alert.getByRole('link', { name: 'Check your key' })).toHaveAttribute('href', GEMINI_KEY_URL);
 });
 
-test('the key card fits a phone screen', async ({ page }) => {
+test('the settings page fits a phone screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     // The page scrolls inside #page-children-container: nothing may make it, the document or the dialog scroll sideways.
     const sideways = () =>
@@ -450,6 +475,151 @@ test('the key card fits a phone screen', async ({ page }) => {
     await expect(card(page)).toBeVisible();
     expect(Math.max(...(await sideways()))).toBeLessThanOrEqual(1);
     await card(page).getByRole('button', { name: 'Add key' }).click();
-    await expect(page.getByRole('dialog', { name: 'Add your Gemini API key' }).getByLabel('API key')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Add an API key' }).getByLabel('API key')).toBeVisible();
     expect(Math.max(...(await sideways()))).toBeLessThanOrEqual(1);
+});
+
+test('several keys and the stack: a second Gemini key, the default, a pipeline stack (beta), an agent’s own key', async ({
+    page,
+    db,
+}) => {
+    const { inbound } = await seedAgentsAndNumber(db);
+    await db.setVoiceGeminiKey(E2E_USER, GOOD_KEY);
+    await openSettings(page);
+
+    // A second Gemini key, with a name, and a Cartesia key (checked with Cartesia).
+    const add = async (provider: string, label: string, key: string) => {
+        await card(page).getByRole('button', { name: 'Add key' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Add an API key' });
+        if (provider !== 'Gemini') {
+            await dialog.getByLabel('Provider').click();
+            await page.getByRole('option', { name: provider }).click();
+        }
+        await dialog.getByLabel('Name (optional)').fill(label);
+        await dialog.getByLabel('API key').fill(key);
+        await dialog.getByRole('button', { name: 'Check and save' }).click();
+        await expect(page.getByText(`${provider} key saved`)).toBeVisible();
+    };
+    await add('Gemini', 'Clinic', SECOND_KEY);
+    await card(page).getByRole('button', { name: 'Add key' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add an API key' });
+    await dialog.getByLabel('Provider').click();
+    await page.getByRole('option', { name: 'Cartesia' }).click();
+    await expect(dialog.getByRole('link', { name: /play\.cartesia\.ai/ })).toBeVisible();
+    await dialog.getByLabel('API key').fill('sk_car_BadE2eCartesiaKey0123456789');
+    await dialog.getByRole('button', { name: 'Check and save' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('Cartesia says this is not a valid API key.');
+    await page.keyboard.press('Escape');
+    await add('Cartesia', 'Voices', CARTESIA_KEY);
+    expect(gemini.providerCalls.at(-1)).toBe(`/providers/cartesia/voices?limit=1 ${CARTESIA_KEY}`);
+
+    await expect(card(page).getByTestId('voice-key')).toHaveCount(3);
+    const clinic = card(page).getByTestId('voice-key').filter({ hasText: 'Clinic' });
+    await clinic.getByRole('button', { name: 'Make default' }).click();
+    await expect(page.getByText('Clinic is now your default Gemini key')).toBeVisible();
+    await expect(clinic).toContainText('Default');
+    const keys = await storedKeys(db);
+    expect(keys.map((k) => [k.provider, k.label])).toEqual([
+        ['gemini', 'Clinic'],
+        ['gemini', 'Main'],
+        ['cartesia', 'Voices'],
+    ]);
+    const [clinicId, mainId] = keys.map((k) => k._id.toString());
+
+    // The pipeline stack: each step's model, and which keys it still needs.
+    const stack = page.getByTestId('voice-stack-card');
+    await stack.getByRole('radio', { name: /^Pick each step/ }).click();
+    await expect(stack).toContainText('Beta');
+    await expect(stack.locator('#stack-stt-model')).toContainText('Deepgram Nova-3');
+    await expect(page.getByTestId('voice-stack-missing-keys')).toContainText('Calls need a key for Deepgram.');
+    await stack.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText('Saved. New calls use this stack.')).toBeVisible();
+    await expect
+        .poll(async () => (await db.getVoiceAccount(E2E_USER))?.stack)
+        .toMatchObject({
+            kind: 'PIPELINE',
+            stt: { provider: 'deepgram', model: 'nova-3', keyId: null },
+            llm: { provider: 'gemini', model: 'gemini-3.5-flash-lite', keyId: null },
+            tts: { provider: 'cartesia', model: 'sonic-3.6', keyId: null },
+        });
+
+    // Back to one model, on the "Main" key.
+    await stack.getByRole('radio', { name: /^One voice model/ }).click();
+    await stack.locator('#stack-realtime-key').click();
+    await page.getByRole('option', { name: /^Main/ }).click();
+    await stack.getByRole('button', { name: 'Save' }).click();
+    await expect.poll(async () => (await db.getVoiceAccount(E2E_USER))?.stack?.kind).toBe('REALTIME');
+    const saved = (await db.getVoiceAccount(E2E_USER))?.stack;
+    expect(saved).toMatchObject({ kind: 'REALTIME', provider: 'gemini', model: 'gemini-3.8-live' });
+    expect(String(saved && 'keyId' in saved ? saved.keyId : '')).toBe(mainId);
+
+    // An agent runs on the owner's stack until it picks its own key.
+    await openVoiceAgent(page, inbound);
+    await expect(page.getByTestId('gemini-key-line').first()).toContainText(`ending ${GOOD_KEY.slice(-4)}`);
+    await page.getByTestId('agent-key-select').click();
+    await page.getByRole('option', { name: /^Clinic/ }).click();
+    await expect(page.getByText('Key saved for this agent')).toBeVisible();
+    await expect(page.getByTestId('gemini-key-line').first()).toContainText(`ending ${SECOND_KEY.slice(-4)}`);
+    const agentStack = (await db.getVoiceAgentDoc(inbound)).stack;
+    expect(agentStack).toMatchObject({ kind: 'REALTIME', provider: 'gemini' });
+    expect(String(agentStack && 'keyId' in agentStack ? agentStack.keyId : '')).toBe(clinicId);
+
+    await page.getByRole('button', { name: 'Use Settings' }).click();
+    await expect(page.getByText('Back on the stack and key from Settings')).toBeVisible();
+    expect((await db.getVoiceAgentDoc(inbound)).stack).toBeNull();
+});
+
+test('the voice picker: Gemini Live voices on the one-model stack, text-to-speech voices on a pipeline', async ({
+    page,
+    db,
+}) => {
+    await db.setVoiceGeminiKey(E2E_USER, GOOD_KEY);
+    const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Maya' });
+    await openVoiceAgent(page, agentId);
+
+    await page.getByTestId('voice-picker-trigger').click();
+    const picker = page.getByTestId('voice-picker');
+    await expect(picker).toContainText('This agent speaks in Gemini Live’s own voices.');
+    await expect(picker.getByTestId('voice-option')).toHaveCount(30);
+    // The agent's own voice (Sulafat) is picked already.
+    await expect(page.getByTestId('voice-picker-selection')).toHaveText('Sulafat · Gemini');
+    await picker.getByLabel('Search voices').fill('excitable');
+    await expect(picker.getByTestId('voice-option')).toHaveCount(1);
+    await picker.getByRole('button', { name: /^Fenrir/ }).click();
+    await expect(page.getByTestId('voice-picker-selection')).toHaveText('Fenrir · Gemini');
+    await picker.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('voice-picker-trigger')).toContainText('Fenrir');
+    await page.getByRole('button', { name: 'Save' }).first().click();
+    await expect.poll(async () => (await db.getVoiceAgentDoc(agentId)).voice).toBe('fenrir');
+
+    // Text-to-speech voices need the pipeline stack: shown to listen to, not to pick.
+    await page.getByTestId('voice-picker-trigger').click();
+    await picker.getByRole('tab', { name: 'Text-to-speech voices' }).click();
+    await picker.getByRole('radio', { name: /ElevenLabs/ }).click();
+    await expect(picker).toContainText('These voices need the "Pick each step" stack (beta)');
+    await expect(picker.getByRole('button', { name: 'Play Sarah' })).toBeVisible();
+    await expect(picker.getByRole('button', { name: /^Sarah/ })).toBeDisabled();
+    await picker.getByLabel('Gender').click();
+    await page.getByRole('option', { name: 'Male', exact: true }).click();
+    await expect(picker.getByTestId('voice-option').filter({ hasText: 'Sarah' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    // On a pipeline speaking through ElevenLabs, its voices are the ones to pick.
+    await db.setVoiceKeys(E2E_USER, [{ keySealed: sealForE2e(GOOD_KEY), last4: 'WxYz' }], {
+        kind: VoiceStackKind.PIPELINE,
+        stt: { provider: VoiceKeyProvider.DEEPGRAM, model: 'nova-3' },
+        llm: { provider: VoiceKeyProvider.GEMINI, model: 'gemini-3.5-flash-lite' },
+        tts: { provider: VoiceKeyProvider.ELEVENLABS, model: 'eleven_flash_v2_5' },
+    });
+    await openVoiceAgent(page, agentId);
+    await page.getByTestId('voice-picker-trigger').click();
+    await expect(picker).toContainText('This agent speaks through ElevenLabs.');
+    await picker.getByRole('button', { name: /^Alice/ }).click();
+    await picker.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('voice-picker-trigger')).toContainText('Alice');
+    await page.getByRole('button', { name: 'Save' }).first().click();
+    await expect
+        .poll(async () => (await db.getVoiceAgentDoc(agentId)).ttsVoice)
+        .toEqual({ provider: 'elevenlabs', voiceId: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice' });
+    expect((await db.getVoiceAgentDoc(agentId)).voice).toBe('fenrir');
 });

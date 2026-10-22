@@ -45,6 +45,7 @@ import {
 } from '@/helpers/voice-schemas';
 import { openSecret, playgroundSocketUrl, sealSecret } from '@/server/voice-agent/engine';
 import { assertGeminiKeySet } from '@/server/voice-agent/gemini-key';
+import { stackView } from '@/server/voice-agent/provider-keys';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
 import { listItems, updateItem } from '@/server/voice-agent/accounts';
 import { assertUsableDestination } from '@/server/voice-agent/calendar-connections';
@@ -127,6 +128,8 @@ function mapVoiceAgentDocToVoiceAgent(doc: VoiceAgentDoc): VoiceAgent {
         name: doc.name,
         callType: callTypeOf(doc),
         voice: doc.voice,
+        ttsVoice: doc.ttsVoice ?? null,
+        stack: doc.stack ? stackView(doc.stack) : null,
         prompt: doc.prompt,
         tools: mapVoiceAgentTools(doc.tools),
         variables: doc.variables ?? {},
@@ -186,7 +189,9 @@ export const getVoiceAgent = async (agentId: string): Promise<ALApiResponse<Voic
         return mapVoiceAgentDocToVoiceAgent(doc);
     });
 
-export type CreateVoiceAgentInput = Partial<Pick<VoiceAgentInput, 'name' | 'voice'>> & { callType: VoiceAgentCallType };
+export type CreateVoiceAgentInput = Partial<Pick<VoiceAgentInput, 'name' | 'voice' | 'ttsVoice'>> & {
+    callType: VoiceAgentCallType;
+};
 
 /**
  * Creates an agent of the given call type with an empty prompt: the editor offers templates, and
@@ -201,6 +206,7 @@ export const createVoiceAgent = async (input: CreateVoiceAgentInput): Promise<AL
                 name: input.name ?? DEFAULT_VOICE_AGENT_NAME,
                 callType: input.callType,
                 voice: input.voice ?? DEFAULT_VOICE_AGENT_VOICE,
+                ttsVoice: input.ttsVoice ?? null,
                 variables: {},
             },
             'Invalid agent',

@@ -463,7 +463,7 @@ def hook_tests():
     num = {"_id": number, "tenantId": ObjectId(), "userId": ObjectId(), "phoneNumber": "+15550001111", "provider": "VOICELINK"}
     # Calls run on the owner's own Gemini key (product.gemini_key_for): give this owner one.
     testdb.set_account(db, {"userId": num["userId"], "tenantId": num["tenantId"],
-                                  "gemini": {"keySealed": product.seal_secret("AIza-unit-fake"), "last4": "fake"}})
+                                  "keys": testdb.gemini_keys(product.seal_secret("AIza-unit-fake"), last4="fake")})
     ctx = product.phone_call(num, agent, "OUTBOUND", "+919876500000")
     ok("product.phone_call carries them through _finish_ctx",
        ctx.get("variables", {}).get("city") == "Pune" and ctx["doc"]["campaignContactId"] == cid and "_id" in ctx["doc"])

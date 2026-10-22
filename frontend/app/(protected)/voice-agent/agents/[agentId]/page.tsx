@@ -30,7 +30,7 @@ async function VoiceAgentPage({
         getVoiceAgent(agentId),
         getVoiceAgentUsage(agentId),
         listVoiceConnectedApps(),
-        getGeminiKeyStatus(),
+        getGeminiKeyStatus(agentId),
         listVoiceCallerMemories(agentId),
         getAgentCostTotals(agentId),
     ]);

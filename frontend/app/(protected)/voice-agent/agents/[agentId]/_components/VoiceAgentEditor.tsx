@@ -1,7 +1,6 @@
 'use client';
 
 import type { FormEvent } from 'react';
-import Link from 'next/link';
 import { format } from 'date-fns';
 import { Controller, FormProvider } from 'react-hook-form';
 import { Loader2, Save, Trash2 } from 'lucide-react';
@@ -14,11 +13,10 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
 import { VOICE_AGENT_CALL_TYPES } from '@/helpers/voice-agent-defaults';
-import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
-import { GeminiKeyLine } from '../../_components/GeminiKeyLine';
 import { VoiceAgentCallTypeBadge } from '../../_components/VoiceAgentCallTypeBadge';
 import { VoiceAgentCallTypeSelect } from '../../_components/VoiceAgentCallTypeSelect';
-import { VoiceSelect } from '../../_components/VoiceSelect';
+import { VoicePicker } from '@/components/common/voice-agent/VoicePicker';
+import { AgentKeyPicker } from '../../_components/AgentKeyPicker';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import type { PromptTool } from '../_utils/prompt-tools';
 import { AgentNumbersField } from './AgentNumbersField';
@@ -153,25 +151,11 @@ export function VoiceAgentEditor() {
                                         </Field>
                                     )}
                                 />
-                                <Controller
-                                    control={agentForm.control}
-                                    name="voice"
-                                    render={({ field }) => (
-                                        <Field>
-                                            <FieldLabel htmlFor="agent-voice">Voice</FieldLabel>
-                                            <VoiceSelect id="agent-voice" value={field.value} onChange={field.onChange} />
-                                        </Field>
-                                    )}
-                                />
                                 <Field>
-                                    <div className="flex items-end justify-between gap-2">
-                                        <FieldLabel>Gemini key</FieldLabel>
-                                        <Button variant="ghost" size="sm" className="h-7" asChild>
-                                            <Link href={GEMINI_KEY_URL}>Change</Link>
-                                        </Button>
-                                    </div>
-                                    <GeminiKeyLine view={geminiKey} className="min-h-9" />
+                                    <FieldLabel htmlFor="agent-voice">Voice</FieldLabel>
+                                    <VoicePicker id="agent-voice" agentId={saved._id} />
                                 </Field>
+                                <AgentKeyPicker agentId={saved._id!} view={geminiKey} />
                             </div>
 
                             <AgentNumbersField />

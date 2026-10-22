@@ -15,6 +15,7 @@ import {
     VOICE_WEBHOOK_LIMITS,
     VOICE_WEBHOOK_PARAM_TYPES,
     VOICE_KEY_LIMITS,
+    VOICE_STACK_MODELS,
     VOICE_WEEKDAYS,
     VoiceAgentCallType,
     type VoiceAgentVoice,
@@ -23,12 +24,14 @@ import {
     VoiceKeyProvider,
     VoiceReplyWait,
     VoiceStackKind,
+    type VoiceStackPartName,
     VoiceToolWait,
     VoiceVoicemailAction,
     type VoiceWeekday,
 } from '@aixellabs/backend/db/types';
 import { isValidObjectId } from '@/helpers/object-id';
 import { isBuiltinVariable } from '@/helpers/voice-agent-features';
+import { PIPELINE_PARTS } from '@/helpers/voice-stack';
 import { campaignCountry } from '@/helpers/voice-campaign-contacts';
 import { voiceCalendarProviderInfo } from '@/helpers/voice-calendar-providers';
 import { isIanaTimezone, minutesOf, VOICE_WEEKDAY_OPTIONS } from '@/helpers/voice-time';
@@ -105,6 +108,8 @@ export const voiceAgentSchema = z.object({
         ),
     /** Default values for the prompt's `{{variables}}` (empty ones are not kept). */
     variables: variableValuesSchema,
+    /** The voice on a PIPELINE stack (`voice` is the REALTIME one). */
+    ttsVoice: z.lazy(() => voiceTtsVoiceSchema.nullable().default(null)),
 });
 
 export type VoiceAgentInput = z.input<typeof voiceAgentSchema>;
@@ -593,16 +598,29 @@ const stackPartSchema = z.object({
     keyId: keyIdSchema,
 });
 
-/** The owner's default stack, or an agent's own. */
-export const voiceStackSchema = z.discriminatedUnion('kind', [
-    stackPartSchema.extend({ kind: z.literal(VoiceStackKind.REALTIME) }),
-    z.object({
-        kind: z.literal(VoiceStackKind.PIPELINE),
-        stt: stackPartSchema,
-        llm: stackPartSchema,
-        tts: stackPartSchema,
-    }),
-]);
+const isListedModel = (part: VoiceStackPartName, p: { provider: string; model: string }) =>
+    VOICE_STACK_MODELS[part].some((m) => m.model === p.model && m.provider === p.provider);
+
+/** The owner's default stack, or an agent's own. Which keys exist is checked on the server. */
+export const voiceStackSchema = z
+    .discriminatedUnion('kind', [
+        stackPartSchema.extend({ kind: z.literal(VoiceStackKind.REALTIME) }),
+        z.object({
+            kind: z.literal(VoiceStackKind.PIPELINE),
+            stt: stackPartSchema,
+            llm: stackPartSchema,
+            tts: stackPartSchema,
+        }),
+    ])
+    .superRefine((stack, ctx) => {
+        const parts =
+            stack.kind === VoiceStackKind.REALTIME
+                ? ([['realtime', stack, []]] as const)
+                : PIPELINE_PARTS.map((part) => [part, stack[part], [part]] as const);
+        for (const [part, value, path] of parts) {
+            if (!isListedModel(part, value)) custom(ctx, 'Pick one of the listed models', [...path, 'model']);
+        }
+    });
 
 export type VoiceStackInput = z.input<typeof voiceStackSchema>;
 

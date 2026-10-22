@@ -59,8 +59,8 @@ def fixtures():
     # Every call runs on the owner's own Gemini key (product.gemini_key_for): this run's own key, sealed.
     key = os.environ["GEMINI_API_KEY"]
     testdb.set_account(db, {"tenantId": tenant, "userId": user, "createdAt": now, "updatedAt": now,
-                                  "gemini": {"keySealed": product.seal_secret(key), "last4": key[-4:], "status": "OK",
-                                             "checkedAt": now, "savedAt": now}})
+                                  "keys": testdb.gemini_keys(product.seal_secret(key), last4=key[-4:],
+                                                                 checkedAt=now, savedAt=now)})
     return agent, number
 
 

@@ -34,7 +34,7 @@ def ok(name, cond, detail=""):
 def owner():
     tenant, user = ObjectId(), ObjectId()
     testdb.set_account(product.db(), {"tenantId": tenant, "userId": user,
-                                            "gemini": {"keySealed": product.seal_secret("AIza-unit-test-key")}})
+                                            "keys": testdb.gemini_keys(product.seal_secret("AIza-unit-test-key"))})
     return tenant, user
 
 

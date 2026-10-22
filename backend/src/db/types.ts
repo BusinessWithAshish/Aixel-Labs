@@ -1017,6 +1017,20 @@ export type VoiceStack<Id = ObjectId> =
   | ({ kind: VoiceStackKind.REALTIME } & VoiceStackPart<Id>)
   | { kind: VoiceStackKind.PIPELINE; stt: VoiceStackPart<Id>; llm: VoiceStackPart<Id>; tts: VoiceStackPart<Id> };
 
+export type VoiceStackPartName = "realtime" | "stt" | "llm" | "tts";
+
+/** A model a stack part may use, with its list price per call-minute. */
+export type VoiceStackModel = {
+  provider: VoiceKeyProvider;
+  model: string;
+  name: string;
+  usdPerMinute: number;
+  source: string;
+};
+
+/** The models each part of a stack offers (`stack` in voice-call-rates.json, which the engine reads too): first = default. */
+export const VOICE_STACK_MODELS = voiceCallRates.stack as unknown as Record<VoiceStackPartName, VoiceStackModel[]>;
+
 /** The stack of an owner who never picked one: what every agent ran on before stacks existed. */
 export const VOICE_DEFAULT_STACK: VoiceStack<never> = {
   kind: VoiceStackKind.REALTIME,

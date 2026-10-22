@@ -1,7 +1,7 @@
 """What a call cost its owner, in US dollars: `voice_calls.cost` (`VoiceCallCost` in the backend's types.ts).
 
     gemini    the tokens Gemini reported for the call (bot.py `usage`) at Google's list price; 0 when the
-              owner's key is on Google's free tier (voice_accounts.gemini.tier "free", set in the app)
+              call's key is on Google's free tier (its voice_accounts.keys[].tier "free", set in the app)
     provider  the phone minutes at the provider's list rate, written with the call (providerExact false).
               Twilio's own charge for the call (its Call resource `price`) replaces it once Twilio fills it
               in (fill_provider_charge, after the call, in the same background task as the analysis:
@@ -77,16 +77,18 @@ def analysis_cost(cost: dict, usage: dict) -> dict:
             "totalUsd": round(cost["geminiUsd"] + cost["providerUsd"] + usd, 6)}
 
 
-def free_tier(user_id) -> bool:
-    """The owner's key is on Google's free tier (set in the app; missing = paid)."""
-    doc = product.db().voice_accounts.find_one({"userId": user_id}, {"gemini.tier": 1})
-    return ((doc or {}).get("gemini") or {}).get("tier") == "free"
+def free_tier(user_id, sealed: str | None = None) -> bool:
+    """The call's Gemini key (`sealed`; None = the owner's default) is on Google's free tier (set in the app; missing = paid)."""
+    doc = product.db().voice_accounts.find_one({"userId": user_id}, {"keys.keySealed": 1, "keys.provider": 1, "keys.tier": 1})
+    keys = [k for k in (doc or {}).get("keys") or [] if k.get("provider") == "gemini"]
+    key = next((k for k in keys if sealed and k.get("keySealed") == sealed), None) or (keys[0] if keys else {})
+    return key.get("tier") == "free"
 
 
-def call_cost(doc: dict, usage: dict, provider: str | None) -> dict:
+def call_cost(doc: dict, usage: dict, provider: str | None, sealed: str | None = None) -> dict:
     """The `cost` of a finished call's voice_calls document. Reads the key's tier: run it off the event loop."""
     tokens = gemini_tokens(usage)
-    free = free_tier(doc["userId"])
+    free = free_tier(doc["userId"], sealed)
     gemini = 0.0 if free else sum(n * GEMINI_USD_PER_M[kind] for kind, n in tokens.items()) / 1e6
     cost = {"geminiUsd": round(gemini, 6), "geminiFreeTier": free, "geminiTokens": tokens,
             "providerUsd": 0.0, "providerExact": False}

@@ -110,6 +110,8 @@ export function e2eServerEnv(worker: number): Record<string, string> {
         COMPOSIO_API_BASE: composioApiBase(worker),
         COMPOSIO_API_KEY: E2E_COMPOSIO_API_KEY,
         GEMINI_API_BASE: geminiApiBase(worker),
+        // The other providers' key checks and voice lists, on the same fake (`/providers/{provider}/…`).
+        VOICE_PROVIDER_API_BASE: `${geminiApiBase(worker)}/providers`,
         FLAGS_SECRET: E2E_FLAGS_SECRET,
         FIREBASE_AUTH_EMULATOR_HOST: E2E_AUTH_EMULATOR_HOST,
         FIREBASE_ADMIN_PROJECT_ID: E2E_FIREBASE_PROJECT_ID,

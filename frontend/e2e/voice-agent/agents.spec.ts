@@ -54,13 +54,23 @@ async function createThroughDialog(page: Page, type: RegExp, name: string, voice
     await expect(page.getByRole('option', { name: /^Outbound/ })).toContainText('Makes calls from your number');
     await page.getByRole('option', { name: type }).click();
     await dialog.getByLabel('Name').fill(name);
-    await dialog.getByRole('combobox', { name: 'Voice' }).click();
-    await page.getByRole('option', { name: voice }).click();
+    await pickVoice(page, voice);
     await dialog.getByRole('button', { name: 'Create agent' }).click();
     // The first visit to the editor in a run waits for `next dev` to compile it (well over 15 s
     // in a full suite run), so allow for that here rather than in every test.
     await expect(page).toHaveURL(new RegExp(`${VOICE_AGENTS_URL}/[0-9a-f]{24}$`), { timeout: 60_000 });
     await expect(page.locator('#agent-name')).toHaveValue(name);
+}
+
+/** Picks a voice in the voice picker (the agent editor's, or the new-agent dialog's). */
+async function pickVoice(page: Page, voice: RegExp) {
+    await page.getByTestId('voice-picker-trigger').click();
+    const picker = page.getByTestId('voice-picker');
+    await picker.getByRole('button', { name: voice }).click();
+    const save = picker.getByRole('button', { name: 'Save' });
+    // Already this agent's voice: nothing to save.
+    await ((await save.isEnabled()) ? save : picker.getByRole('button', { name: 'Cancel' })).click();
+    await expect(picker).toBeHidden();
 }
 
 /** The template picker, opened from the button beside a prompt that has text. */
@@ -262,7 +272,10 @@ test('the agent card shows its numbers and its Gemini key, and opens a picker of
     await expect(numbers.getByTestId('agent-numbers-stray')).toContainText('+15550100002 still calls with it');
     await expect(numbers.getByTestId('agent-numbers-stray').getByRole('button', { name: 'Unlink' })).toBeVisible();
     await expect(page.getByTestId('gemini-key-line').first()).toContainText('Runs on your Gemini key ending');
-    await expect(page.getByRole('link', { name: 'Change' })).toHaveAttribute('href', '/voice-agent/settings#gemini-key');
+    await expect(page.getByRole('link', { name: 'Manage keys' })).toHaveAttribute(
+        'href',
+        '/voice-agent/settings#gemini-key',
+    );
 
     await numbers.getByTestId('agent-numbers-change').click();
     const picker = page.getByRole('dialog', { name: 'Numbers it answers' });
@@ -354,8 +367,7 @@ test('edits and saves every field', async ({ page, db }) => {
     await expect(page.locator('#agent-call-notes')).toHaveCount(0);
 
     await page.locator('#agent-name').fill('Maya v2');
-    await page.getByRole('combobox', { name: 'Voice' }).click();
-    await page.getByRole('option', { name: /Puck/ }).click();
+    await pickVoice(page, /^Puck/);
     await page.locator('#agent-prompt').fill('You are Maya. Be brief.');
     await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible();
 

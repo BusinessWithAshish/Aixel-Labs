@@ -30,7 +30,9 @@ import { VoiceCalendarConnectionStatus, type VoiceCalendarConnectionDoc } from '
 import {
     VoiceCampaignContactStatus,
     VoiceCampaignStatus,
+    VoiceKeyProvider,
     VoiceKeyStatus,
+    type VoiceProviderKeyDoc,
     type VoiceCampaignContactDoc,
     type VoiceCampaignDoc,
 } from '@aixellabs/backend/db/types';
@@ -509,45 +511,49 @@ export class E2eDb {
 
     /** Gives the user a Gemini key (sealed placeholder): starting a campaign needs one. `null` removes it. */
     async setCampaignGeminiKey(user: E2eUser, keySealed: string | null): Promise<void> {
-        const { userId } = await this.voiceAccount(user);
-        const now = new Date();
-        const gemini = keySealed
-            ? {
-                  keySealed,
-                  last4: 'e2e0',
-                  status: VoiceKeyStatus.OK,
-                  statusMessage: null,
-                  checkedAt: now,
-                  savedAt: now,
-              }
-            : null;
-        await this.voiceAccounts.updateOne({ userId }, { $set: { gemini, updatedAt: now } });
+        await this.setVoiceKeys(user, keySealed ? [{ keySealed, last4: 'e2e0' }] : []);
     }
 
     // -----------------------------------------------------------------------
-    // Gemini API key (e2e/voice-agent/gemini-key.spec.ts)
+    // API keys (e2e/voice-agent/gemini-key.spec.ts)
     // -----------------------------------------------------------------------
 
-    /** Saves `key` as the user's Gemini key the way the app does (sealed), `fields` on top; `null` removes it. */
-    async setVoiceGeminiKey(
+    /**
+     * Replaces the user's keys and stack: each key a Gemini key unless it says, OK, `fields` on top. Returns
+     * their ids, in order (the first of a provider is its default).
+     */
+    async setVoiceKeys(
         user: E2eUser,
-        key: string | null,
-        fields: Partial<NonNullable<VoiceAccountDoc['gemini']>> = {},
-    ): Promise<void> {
+        keys: Partial<VoiceProviderKeyDoc>[],
+        stack: VoiceAccountDoc['stack'] = null,
+    ): Promise<string[]> {
         const { userId } = await this.voiceAccount(user);
         const now = new Date();
-        const gemini: VoiceAccountDoc['gemini'] = key
-            ? {
-                  keySealed: sealForE2e(key),
-                  last4: key.slice(-4),
-                  status: VoiceKeyStatus.OK,
-                  statusMessage: null,
-                  checkedAt: now,
-                  savedAt: now,
-                  ...fields,
-              }
-            : null;
-        await this.voiceAccounts.updateOne({ userId }, { $set: { gemini, updatedAt: now } });
+        const docs: VoiceProviderKeyDoc[] = keys.map((fields, i) => ({
+            _id: new MongoObjectId(),
+            provider: VoiceKeyProvider.GEMINI,
+            label: `Key ${i + 1}`,
+            keySealed: '',
+            last4: '',
+            status: VoiceKeyStatus.OK,
+            statusMessage: null,
+            checkedAt: now,
+            savedAt: now,
+            ...fields,
+        }));
+        await this.voiceAccounts.updateOne(
+            { userId },
+            { $set: { keys: docs, stack, updatedAt: now }, $unset: { gemini: '' } },
+        );
+        return docs.map((d) => d._id.toString());
+    }
+
+    /** Saves `key` as the user's one Gemini key the way the app does (sealed), `fields` on top; `null` removes every key. */
+    async setVoiceGeminiKey(user: E2eUser, key: string | null, fields: Partial<VoiceProviderKeyDoc> = {}): Promise<void> {
+        await this.setVoiceKeys(
+            user,
+            key ? [{ keySealed: sealForE2e(key), last4: key.slice(-4), label: 'Main', ...fields }] : [],
+        );
     }
 
     /** The user's voice account as stored (sealed key included). */

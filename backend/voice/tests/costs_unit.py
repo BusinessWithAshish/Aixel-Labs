@@ -48,11 +48,14 @@ def pricing_tests(user):
        and paid["providerExact"] is False, str(paid))
     ok("total is the sum", paid["totalUsd"] == round(paid["geminiUsd"] + paid["providerUsd"], 6))
 
-    product.db().voice_accounts.update_one({"userId": user}, {"$set": {"gemini.tier": "free"}})
+    product.db().voice_accounts.update_one({"userId": user}, {"$set": {"keys": [
+        {"_id": ObjectId(), "provider": "gemini", "keySealed": "s1", "tier": "free"},
+        {"_id": ObjectId(), "provider": "gemini", "keySealed": "s2", "tier": "paid"}]}})
+    ok("the call's own key decides: a paid second key is priced", costs.free_tier(user, "s2") is False)
     free = costs.call_cost(doc_of(user, "PLAYGROUND", "PLAYGROUND"), USAGE, None)
     ok("free-tier key, playground: costs nothing, no provider", free["totalUsd"] == 0 and free["geminiFreeTier"]
        and "provider" not in free and free["geminiTokens"]["audioIn"] == 1745, str(free))
-    product.db().voice_accounts.update_one({"userId": user}, {"$unset": {"gemini.tier": ""}})
+    product.db().voice_accounts.update_one({"userId": user}, {"$unset": {"keys": ""}})
 
     india = costs.call_cost(doc_of(user, direction="OUTBOUND", duration=61, to="+919876543210"), {}, "TWILIO")
     ok("Twilio to India: 2 minutes at $0.0496 + stream and recording", abs(india["providerUsd"] - 2 * (0.0496 + 0.0069)) < 1e-9,
@@ -121,10 +124,43 @@ async def twilio_tests(user):
         await runner.cleanup()
 
 
+def key_tests():
+    """Which Gemini key a call runs on (product.gemini_key_for): the agent's stack, the owner's, the default."""
+    user, first, second, other = ObjectId(), ObjectId(), ObjectId(), ObjectId()
+    sealed = {name: product.seal_secret(f"AIza-{name}") for name in ("first", "second", "cartesia")}
+    keys = [{"_id": other, "provider": "cartesia", "keySealed": sealed["cartesia"]},
+            {"_id": first, "provider": "gemini", "keySealed": sealed["first"]},
+            {"_id": second, "provider": "gemini", "keySealed": sealed["second"]}]
+    testdb.set_account(product.db(), {"tenantId": ObjectId(), "userId": user, "keys": keys})
+    try:
+        realtime = lambda key_id: {"stack": {"kind": "REALTIME", "provider": "gemini", "model": "gemini-3.8-live", "keyId": key_id}}
+        ok("no stack anywhere: the owner's first Gemini key", product.gemini_key_for(user)[0] == "AIza-first")
+        ok("the agent's own key", product.gemini_key_for(user, realtime(second))[0] == "AIza-second")
+        ok("a removed key: back to the first", product.gemini_key_for(user, realtime(ObjectId()))[0] == "AIza-first")
+        product.db().voice_accounts.update_one({"userId": user}, {"$set": realtime(second)})
+        ok("the owner's stack names a key", product.gemini_key_for(user, {"stack": None})[0] == "AIza-second")
+        pipeline = {"kind": "PIPELINE", "stt": {"provider": "deepgram", "model": "nova-3"},
+                    "llm": {"provider": "gemini", "model": "gemini-3.5-flash-lite", "keyId": first},
+                    "tts": {"provider": "cartesia", "model": "sonic-3.6", "keyId": other}}
+        ok("a pipeline: its LLM step's Gemini key", product.gemini_key_for(user, {"stack": pipeline})[0] == "AIza-first")
+        product.note_key_problem(user, sealed["second"], "INVALID", "not valid", "API key not valid")
+        saved = {k["_id"]: k for k in product.db().voice_accounts.find_one({"userId": user})["keys"]}
+        ok("a refusal is noted on that key only", saved[second].get("status") == "INVALID" and "status" not in saved[first])
+        product.db().voice_accounts.update_one({"userId": user}, {"$set": {"keys": keys[:1]}})
+        try:
+            product.gemini_key_for(user)
+            ok("no Gemini key: refused", False)
+        except product.GeminiKeyMissing:
+            ok("no Gemini key: refused", True)
+    finally:
+        product.db().voice_accounts.delete_many({"userId": user})
+
+
 async def main():
     user = ObjectId()
-    testdb.set_account(product.db(), {"tenantId": ObjectId(), "userId": user, "gemini": {"keySealed": "x"}})
+    testdb.set_account(product.db(), {"tenantId": ObjectId(), "userId": user, "keys": testdb.gemini_keys("x")})
     try:
+        key_tests()
         pricing_tests(user)
         await twilio_tests(user)
     finally:

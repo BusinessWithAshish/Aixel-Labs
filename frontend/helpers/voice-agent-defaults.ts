@@ -633,13 +633,6 @@ export function voiceAgentVoiceCharacter(voice: string): string | undefined {
     return Object.hasOwn(VOICE_AGENT_VOICES, voice) ? VOICE_AGENT_VOICES[voice as VoiceAgentVoice] : undefined;
 }
 
-/** Every voice, alphabetical, for pickers. */
-export const VOICE_AGENT_VOICE_OPTIONS = (Object.keys(VOICE_AGENT_VOICES) as VoiceAgentVoice[]).map((voice) => ({
-    value: voice,
-    name: voiceAgentVoiceName(voice),
-    character: VOICE_AGENT_VOICES[voice],
-}));
-
 // ---------------------------------------------------------------------------
 // Tools (appointment booking + custom webhook tools): what the editor offers. Limits and name
 // rules are in `@aixellabs/backend/db/types`, validation in `helpers/voice-schemas.ts`.

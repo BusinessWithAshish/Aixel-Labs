@@ -5,127 +5,235 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import type { VoiceGeminiKeyTier, VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
-import { recheckGeminiKey, removeGeminiKey, saveGeminiKey, setGeminiKeyTier } from '@/app/actions/voice-settings-actions';
+import {
+    VOICE_DEFAULT_STACK,
+    VoiceKeyProvider,
+    VoiceStackKind,
+    type VoiceGeminiKeyTier,
+    type VoiceProviderKey,
+    type VoiceStack,
+    type VoiceStackPartName,
+} from '@aixellabs/backend/db/types';
+import {
+    addVoiceKey,
+    makeDefaultVoiceKey,
+    recheckVoiceKey,
+    removeVoiceKey,
+    saveVoiceStack,
+    setGeminiKeyTier,
+    type VoiceStackSettings,
+} from '@/app/actions/voice-settings-actions';
+import { voiceKeyInputSchema, type VoiceKeyInput } from '@/helpers/voice-schemas';
+import { defaultStackPart, PIPELINE_PARTS, stackModel, VOICE_KEY_PROVIDERS } from '@/helpers/voice-stack';
 
-const keySchema = z.object({
-    apiKey: z.string().trim().min(1, 'Paste your Gemini API key'),
-    tier: z.enum(['free', 'paid']),
-});
-
-/** How often the open page asks Google about the key again. The check is free (it lists models). */
+/** How often the open page asks each provider about its keys again. The checks are free. */
 const KEY_PING_MS = 10 * 60_000;
 
-export type VoiceSettingsPageData = {
-    geminiKey: VoiceGeminiKeyView;
-};
+/** A Select item cannot have the empty value: this one means "the provider's default key". */
+export const DEFAULT_KEY = 'default';
+
+const partForm = z.object({ model: z.string().min(1, 'Pick a model'), keyId: z.string() });
+const stackFormSchema = z.object({
+    kind: z.nativeEnum(VoiceStackKind),
+    realtime: partForm,
+    stt: partForm,
+    llm: partForm,
+    tts: partForm,
+});
+export type StackFormValues = z.infer<typeof stackFormSchema>;
+
+/** Every part filled in, so switching stacks keeps a sensible pick for the other one. */
+function stackFormValues(stack: VoiceStack<string> | null): StackFormValues {
+    const s = stack ?? (VOICE_DEFAULT_STACK as VoiceStack<string>);
+    const part = (name: VoiceStackPartName) => {
+        const saved =
+            s.kind === VoiceStackKind.REALTIME ? (name === 'realtime' ? s : null) : name === 'realtime' ? null : s[name];
+        const { model, keyId } = saved ?? defaultStackPart(name);
+        return { model, keyId: keyId ?? DEFAULT_KEY };
+    };
+    return { kind: s.kind, realtime: part('realtime'), stt: part('stt'), llm: part('llm'), tts: part('tts') };
+}
+
+function toStack(values: StackFormValues): VoiceStack<string> {
+    const part = (name: VoiceStackPartName) => {
+        const { model, keyId } = values[name];
+        return {
+            provider: stackModel(name, model)?.provider ?? VoiceKeyProvider.GEMINI,
+            model,
+            keyId: keyId === DEFAULT_KEY ? null : keyId,
+        };
+    };
+    if (values.kind === VoiceStackKind.REALTIME) return { kind: values.kind, ...part('realtime') };
+    return { kind: values.kind, stt: part('stt'), llm: part('llm'), tts: part('tts') };
+}
+
+export type VoiceSettingsPageData = VoiceStackSettings;
 
 /**
- * Voice settings. Today only the Gemini API key: add / replace (checked with Google first), its tier,
- * check now (and every 10 minutes while the page is open), remove.
+ * Voice settings: the stack the agents run on (Save / Discard), and the owner's API keys: add
+ * (checked with the provider first), make default, Gemini tier, check now (and every 10 minutes while
+ * the page is open), remove.
  */
-export function useVoiceSettingsPage({ geminiKey }: VoiceSettingsPageData) {
-    const [view, setView] = useState(geminiKey);
-    const [editOpen, setEditOpen] = useState(false);
-    const keyForm = useForm({
-        resolver: zodResolver(keySchema),
-        defaultValues: { apiKey: '', tier: 'paid' as VoiceGeminiKeyTier },
+export function useVoiceSettingsPage({ keys: initialKeys, stack }: VoiceSettingsPageData) {
+    const [keys, setKeys] = useState(initialKeys);
+
+    // --- Stack ---
+    const stackForm = useForm<StackFormValues>({
+        resolver: zodResolver(stackFormSchema),
+        defaultValues: stackFormValues(stack),
     });
-    const saving = keyForm.formState.isSubmitting;
-    const [checking, setChecking] = useState(false);
-    const [savingTier, setSavingTier] = useState(false);
-    const [removeOpen, setRemoveOpen] = useState(false);
-    const [removing, setRemoving] = useState(false);
-
-    const openEdit = () => {
-        keyForm.reset({ apiKey: '', tier: view.tier ?? 'paid' });
-        setEditOpen(true);
-    };
-
-    const onEditOpenChange = (open: boolean) => {
-        if (!open && saving) return;
-        setEditOpen(open);
-    };
-
-    /** Google's answer shows under the field when it refuses the key. */
-    const save = keyForm.handleSubmit(async ({ apiKey, tier }) => {
-        const res = await saveGeminiKey(apiKey, tier);
+    const saveStack = stackForm.handleSubmit(async (values) => {
+        const res = await saveVoiceStack(toStack(values));
         if (!res.success || !res.data) {
-            keyForm.setError('apiKey', { message: res.error ?? 'Could not save the key' });
+            toast.error(res.error ?? 'Could not save the stack');
             return;
         }
-        setView(res.data);
-        setEditOpen(false);
-        toast.success('Gemini API key saved. Your agents now run on it.');
+        stackForm.reset(stackFormValues(res.data));
+        toast.success('Saved. New calls use this stack.');
+    });
+    const discardStack = () => stackForm.reset();
+
+    // A model from another provider cannot run on the key picked before: back to that provider's default.
+    useEffect(() => {
+        const sub = stackForm.watch((form, { name }) => {
+            const part = name?.endsWith('.model') ? (name.split('.')[0] as VoiceStackPartName) : null;
+            if (!part || !form[part]) return;
+            const provider = stackModel(part, form[part].model ?? '')?.provider;
+            const keyId = form[part].keyId;
+            if (keyId !== DEFAULT_KEY && !keys.some((k) => k._id === keyId && k.provider === provider)) {
+                stackForm.setValue(`${part}.keyId`, DEFAULT_KEY, { shouldDirty: true });
+            }
+        });
+        return () => sub.unsubscribe();
+    }, [stackForm, keys]);
+
+    /** Providers the picked stack needs a key for and has none. */
+    const values = stackForm.watch();
+    const parts: VoiceStackPartName[] = values.kind === VoiceStackKind.REALTIME ? ['realtime'] : [...PIPELINE_PARTS];
+    const missingKeys = [
+        ...new Set(parts.map((part) => stackModel(part, values[part].model)?.provider).filter((p) => p !== undefined)),
+    ].filter((provider) => !keys.some((key) => key.provider === provider));
+
+    // --- Keys ---
+    const [addOpen, setAddOpen] = useState(false);
+    const addForm = useForm<VoiceKeyInput>({
+        resolver: zodResolver(voiceKeyInputSchema),
+        defaultValues: { provider: VoiceKeyProvider.GEMINI, label: '', apiKey: '', tier: 'paid' },
+    });
+    const adding = addForm.formState.isSubmitting;
+
+    const openAdd = (provider: VoiceKeyProvider = VoiceKeyProvider.GEMINI) => {
+        addForm.reset({ provider, label: '', apiKey: '', tier: 'paid' });
+        setAddOpen(true);
+    };
+    const onAddOpenChange = (open: boolean) => {
+        if (!open && adding) return;
+        setAddOpen(open);
+    };
+
+    /** The provider's answer shows under the field when it refuses the key. */
+    const add = addForm.handleSubmit(async (input) => {
+        const res = await addVoiceKey(input);
+        if (!res.success || !res.data) {
+            addForm.setError('apiKey', { message: res.error ?? 'Could not save the key' });
+            return;
+        }
+        setKeys(res.data);
+        setAddOpen(false);
+        toast.success(`${VOICE_KEY_PROVIDERS[input.provider].name} key saved`);
     });
 
-    /** `quiet`: the timed check, which only updates the card. */
-    const check = useCallback(
-        async (quiet: boolean) => {
-            setChecking(true);
-            const res = await recheckGeminiKey().catch(() => null);
-            setChecking(false);
-            if (!res?.success || !res.data) {
-                if (!quiet) toast.error(res?.error ?? 'Could not check the key');
-                return;
-            }
-            setView(res.data);
-            if (quiet) return;
-            if (res.data.statusMessage) toast.error('Google refuses the key');
-            else toast.success('Google accepts the key');
-        },
-        [setView],
-    );
+    const [busyKeyId, setBusyKeyId] = useState<string | null>(null);
+    const replaceKey = (key: VoiceProviderKey) => setKeys((all) => all.map((k) => (k._id === key._id ? key : k)));
 
+    /** `quiet`: the timed check, which only updates the list. */
+    const check = useCallback(async (keyId: string, quiet: boolean) => {
+        if (!quiet) setBusyKeyId(keyId);
+        const res = await recheckVoiceKey(keyId).catch(() => null);
+        if (!quiet) setBusyKeyId(null);
+        if (!res?.success || !res.data) {
+            if (!quiet) toast.error(res?.error ?? 'Could not check the key');
+            return;
+        }
+        setKeys((all) => all.map((k) => (k._id === res.data!._id ? res.data! : k)));
+        if (quiet) return;
+        const { name } = VOICE_KEY_PROVIDERS[res.data.provider];
+        if (res.data.statusMessage) toast.error(`${name} refuses the key`);
+        else toast.success(`${name} accepts the key`);
+    }, []);
+
+    const keyIds = keys.map((k) => k._id).join(',');
     useEffect(() => {
-        if (!view.set) return;
+        if (!keyIds) return;
         const timer = setInterval(() => {
-            if (document.visibilityState === 'visible') void check(true);
+            if (document.visibilityState !== 'visible') return;
+            for (const id of keyIds.split(',')) void check(id, true);
         }, KEY_PING_MS);
         return () => clearInterval(timer);
-    }, [view.set, check]);
+    }, [keyIds, check]);
 
-    const changeTier = async (tier: VoiceGeminiKeyTier) => {
-        if (tier === view.tier) return;
-        setSavingTier(true);
-        const res = await setGeminiKeyTier(tier);
-        setSavingTier(false);
+    const changeTier = async (key: VoiceProviderKey, tier: VoiceGeminiKeyTier) => {
+        if (tier === key.tier) return;
+        setBusyKeyId(key._id);
+        const res = await setGeminiKeyTier(key._id, tier);
+        setBusyKeyId(null);
         if (!res.success || !res.data) {
             toast.error(res.error ?? 'Could not save the tier');
             return;
         }
-        setView(res.data);
+        replaceKey(res.data);
         toast.success(tier === 'free' ? 'Saved: free tier' : 'Saved: paid tier');
     };
 
+    const makeDefault = async (key: VoiceProviderKey) => {
+        setBusyKeyId(key._id);
+        const res = await makeDefaultVoiceKey(key._id);
+        setBusyKeyId(null);
+        if (!res.success || !res.data) {
+            toast.error(res.error ?? 'Could not change the default key');
+            return;
+        }
+        setKeys(res.data);
+        toast.success(`${key.label} is now your default ${VOICE_KEY_PROVIDERS[key.provider].name} key`);
+    };
+
+    const [removing, setRemoving] = useState<VoiceProviderKey | null>(null);
+    const [removeBusy, setRemoveBusy] = useState(false);
     const remove = async () => {
-        setRemoving(true);
-        const res = await removeGeminiKey();
-        setRemoving(false);
+        if (!removing) return;
+        setRemoveBusy(true);
+        const res = await removeVoiceKey(removing._id);
+        setRemoveBusy(false);
         if (!res.success || !res.data) {
             toast.error(res.error ?? 'Could not remove the key');
             return;
         }
-        setView(res.data);
-        setRemoveOpen(false);
-        toast.success('Gemini API key removed');
+        setKeys(res.data);
+        setRemoving(null);
+        toast.success('Key removed');
     };
 
     return {
-        view,
-        editOpen,
-        openEdit,
-        onEditOpenChange,
-        keyForm,
-        saving,
-        save,
-        checking,
-        checkNow: () => void check(false),
-        savingTier,
+        keys,
+        stackForm,
+        saveStack,
+        discardStack,
+        savingStack: stackForm.formState.isSubmitting,
+        stackDirty: stackForm.formState.isDirty,
+        missingKeys,
+        addOpen,
+        openAdd,
+        onAddOpenChange,
+        addForm,
+        adding,
+        add,
+        busyKeyId,
+        checkNow: (keyId: string) => void check(keyId, false),
         changeTier,
-        removeOpen,
-        setRemoveOpen,
+        makeDefault,
         removing,
+        setRemoving,
+        removeBusy,
         remove,
     };
 }

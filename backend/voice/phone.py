@@ -1093,7 +1093,7 @@ def make_app() -> FastAPI:
         # or one Google refuses, rings nobody.
         try:
             product.require_prompt(agent)
-            gemini_key, sealed = await asyncio.to_thread(product.gemini_key_for, number["userId"])
+            gemini_key, sealed = await asyncio.to_thread(product.gemini_key_for, number["userId"], agent)
         except product.CallRefused as e:
             logger.warning(f"/calls: number {number_id}: {e}")
             return JSONResponse({"error": e.words, "code": e.code}, status_code=409)

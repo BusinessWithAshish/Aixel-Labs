@@ -121,7 +121,7 @@ def product_tests():
     print("\n== product: call id, tools, customer phone, the doc ==")
     tenant, user = ObjectId(), ObjectId()
     # Every customer call runs on its owner's own Gemini key (product.gemini_key_for): saved as the app saves it.
-    testdb.set_account(product.db(), {"tenantId": tenant, "userId": user, "gemini": {"keySealed": product.seal_secret("AIza-unit-test-key")}})
+    testdb.set_account(product.db(), {"tenantId": tenant, "userId": user, "keys": testdb.gemini_keys(product.seal_secret("AIza-unit-test-key"))})
     agent = {"_id": ObjectId(), "tenantId": tenant, "userId": user, "voice": "kore", "prompt": "You are Priya.", "callNotes": "Note.",
              "tools": {"booking": BOOKING}}
     number = {"_id": ObjectId(), "tenantId": tenant, "userId": user, "phoneNumber": "+15550001111", "provider": "TELNYX",

@@ -10,7 +10,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
 import type { UseVoiceAgentsPageReturn } from '../_hooks/use-voice-agents-page';
 import { VoiceAgentCallTypeSelect } from './VoiceAgentCallTypeSelect';
-import { VoiceSelect } from './VoiceSelect';
+import { VoicePicker } from '@/components/common/voice-agent/VoicePicker';
 
 /** Inbound or outbound, a name and a voice; the prompt comes next, on the agent's page. */
 export function CreateVoiceAgentDialog() {
@@ -51,21 +51,10 @@ export function CreateVoiceAgentDialog() {
                             classNames={{ description: 'text-xs' }}
                             inputProps={{ maxLength: VOICE_AGENT_LIMITS.nameMax, autoFocus: true }}
                         />
-                        <Controller
-                            control={createForm.control}
-                            name="voice"
-                            render={({ field }) => (
-                                <Field>
-                                    <FieldLabel htmlFor="new-agent-voice">Voice</FieldLabel>
-                                    <VoiceSelect
-                                        id="new-agent-voice"
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        disabled={creating}
-                                    />
-                                </Field>
-                            )}
-                        />
+                        <Field>
+                            <FieldLabel htmlFor="new-agent-voice">Voice</FieldLabel>
+                            <VoicePicker id="new-agent-voice" disabled={creating} />
+                        </Field>
                         <DialogFooter>
                             <Button
                                 type="button"

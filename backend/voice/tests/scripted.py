@@ -94,12 +94,11 @@ def tts(text, quiet=False):
 def give_owner_key(db, tenant, user, key=None):
     """The owner's Gemini API key, saved as the app saves it (voice_accounts, sealed): every customer call
     runs on it. Tests use the real key from .env as the fixture owner's key (`key` overrides)."""
-    import product
+    import product, testdb
     from datetime import datetime, timezone
     key, now = key or os.environ["GEMINI_API_KEY"], datetime.now(timezone.utc)
-    gemini = {"keySealed": product.seal_secret(key), "last4": key[-4:], "status": "OK", "statusMessage": None,
-              "checkedAt": now, "savedAt": now}
-    db.voice_accounts.update_one({"userId": user}, {"$set": {"tenantId": tenant, "gemini": gemini, "updatedAt": now},
+    keys = testdb.gemini_keys(product.seal_secret(key), last4=key[-4:], statusMessage=None, checkedAt=now, savedAt=now)
+    db.voice_accounts.update_one({"userId": user}, {"$set": {"tenantId": tenant, "keys": keys, "updatedAt": now},
                                                      "$setOnInsert": {"createdAt": now}}, upsert=True)
 
 def number_sig(number):   # a customer number's webhooks are signed, like the app signs them (product.sign)

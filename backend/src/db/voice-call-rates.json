@@ -50,5 +50,29 @@
       "useTextOutTokens": 40,
       "useSeconds": { "booking": 1.5, "custom": 2 }
     }
+  },
+  "stack": {
+    "readAt": "2026-10-22",
+    "note": "What each stack part costs per minute of call, from the vendors' list prices, read 2026-10-22. Derived ones say how. Settings and the voice picker show these; the engine's own costs.py bills realtime Gemini from its tokens.",
+    "realtime": [
+      {"provider": "gemini", "model": "gemini-3.8-live", "name": "Gemini 3.8 Live", "usdPerMinute": 0.0224, "source": "ai.google.dev/gemini-api/docs/pricing: audio in $0.005/min, out $0.018/min; with the prompt re-billed each turn a booking agent measured $0.0224/min (estimate.geminiUsdPerMinute)."}
+    ],
+    "stt": [
+      {"provider": "deepgram", "model": "nova-3", "name": "Deepgram Nova-3", "usdPerMinute": 0.0058, "source": "deepgram.com/pricing: Nova-3 Multilingual streaming $0.0058/min pay-as-you-go (monolingual $0.0048), promotional rates."},
+      {"provider": "openai", "model": "gpt-4o-mini-transcribe", "name": "OpenAI GPT-4o mini Transcribe", "usdPerMinute": 0.003, "source": "developers.openai.com/api/docs/pricing: $0.003/min."},
+      {"provider": "openai", "model": "gpt-4o-transcribe", "name": "OpenAI GPT-4o Transcribe", "usdPerMinute": 0.006, "source": "developers.openai.com/api/docs/pricing: $0.006/min."}
+    ],
+    "llm": [
+      {"provider": "gemini", "model": "gemini-3.5-flash-lite", "name": "Gemini 3.5 Flash-Lite", "usdPerMinute": 0.0036, "source": "ai.google.dev/gemini-api/docs/pricing: $0.30 in / $2.50 out per 1M tokens. Derived: 9,000 tokens in + 360 out a minute (6 turns of 1,500 + 60)."},
+      {"provider": "gemini", "model": "gemini-3.8-flash", "name": "Gemini 3.8 Flash", "usdPerMinute": 0.0081, "source": "ai.google.dev/gemini-api/docs/pricing: $0.75 in / $3.75 out per 1M tokens, doubling after 2026-12-31. Derived as for Flash-Lite."},
+      {"provider": "openai", "model": "gpt-4.1-mini", "name": "OpenAI GPT-4.1 mini", "usdPerMinute": 0.0042, "source": "developers.openai.com/api/docs/pricing: $0.40 in / $1.60 out per 1M tokens. Derived as for Flash-Lite."},
+      {"provider": "openai", "model": "gpt-5.4-nano", "name": "OpenAI GPT-5.4 nano", "usdPerMinute": 0.0023, "source": "developers.openai.com/api/docs/pricing: $0.20 in / $1.25 out per 1M tokens. Derived as for Flash-Lite."}
+    ],
+    "tts": [
+      {"provider": "cartesia", "model": "sonic-3.6", "name": "Cartesia Sonic 3.6", "usdPerMinute": 0.039, "source": "cartesia.ai/pricing: 1 credit = 1 character, Startup plan $49 for 1.25M credits. Derived: about 1,000 characters a spoken minute."},
+      {"provider": "elevenlabs", "model": "eleven_flash_v2_5", "name": "ElevenLabs Flash v2.5", "usdPerMinute": 0.04, "source": "elevenlabs.io/pricing/api: $0.04 per 1K characters (Flash / Turbo). Derived: about 1,000 characters a spoken minute."},
+      {"provider": "elevenlabs", "model": "eleven_v4_turbo", "name": "ElevenLabs v4 Turbo", "usdPerMinute": 0.04, "source": "elevenlabs.io/pricing/api: $0.04 per 1K characters. Derived as for Flash v2.5."},
+      {"provider": "openai", "model": "gpt-4o-mini-tts", "name": "OpenAI GPT-4o mini TTS", "usdPerMinute": 0.0144, "source": "developers.openai.com/api/docs/pricing: $12 per 1M audio tokens out. Derived: about 1,200 audio tokens a minute (unverified for TTS)."}
+    ]
   }
 }

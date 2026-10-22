@@ -156,8 +156,9 @@ def load_number(number_id, direction: str = "INBOUND", agent_id=None) -> tuple[d
 
 # --- The owner's Gemini key ---------------------------------------------------------------------
 # Every customer call (Telnyx, Twilio, VoiceLink, playground) runs on its owner's own Gemini API
-# key: voice_accounts.gemini.keySealed, saved in the app, sealed like the number keys
-# (`VoiceAccountDoc` in the backend's types.ts). Never on ours: GEMINI_API_KEY in .env is for
+# key: one of voice_accounts.keys, saved in the app, sealed like the number keys (`VoiceAccountDoc`
+# in the backend's types.ts). The agent's stack names it (stack_for, key_for: the same rule as the
+# app's voiceStackFor / voiceKeyFor); no stack or key named = the owner's first Gemini key. Never on ours: GEMINI_API_KEY in .env is for
 # Ashish's own line only (/texml?key=, /telnyx without n, --call, /a). gemini_key_for is the one
 # place that picks a customer call's key; a later "use Aixel Labs credits" option would be
 # decided here (with the app's server/voice-agent/gemini-key.ts).
@@ -196,25 +197,41 @@ def require_prompt(agent: dict):
         raise AgentNoPrompt("the agent has no prompt")
 
 
-def gemini_key_for(user_id) -> tuple[str, str]:
-    """(key, sealed) of the owner's Gemini API key. Raises GeminiKeyMissing."""
-    doc = db().voice_accounts.find_one({"userId": oid(user_id)}, {"gemini.keySealed": 1})
-    sealed = ((doc or {}).get("gemini") or {}).get("keySealed")
-    if not sealed:
+DEFAULT_STACK = {"kind": "REALTIME", "provider": "gemini", "model": "gemini-3.8-live"}
+
+
+def stack_for(agent: dict | None, account: dict | None) -> dict:
+    """The stack a call runs on: the agent's own, else the owner's, else DEFAULT_STACK."""
+    return (agent or {}).get("stack") or (account or {}).get("stack") or DEFAULT_STACK
+
+
+def key_for(keys: list | None, provider: str, key_id=None) -> dict | None:
+    """The owner's key `key_id` of `provider` while they still have it, else that provider's first key."""
+    own = [k for k in keys or [] if k.get("provider") == provider]
+    return next((k for k in own if key_id is not None and k.get("_id") == key_id), None) or (own[0] if own else None)
+
+
+def gemini_key_for(user_id, agent: dict | None = None) -> tuple[str, str]:
+    """(key, sealed) of the Gemini key the agent's stack runs on. Raises GeminiKeyMissing."""
+    doc = db().voice_accounts.find_one({"userId": oid(user_id)}, {"keys": 1, "stack": 1})
+    stack = stack_for(agent, doc)
+    part = stack if stack.get("kind") == "REALTIME" else stack.get("llm") or {}
+    key = key_for((doc or {}).get("keys"), "gemini", part.get("keyId") if part.get("provider") == "gemini" else None)
+    if not key or not key.get("keySealed"):
         raise GeminiKeyMissing("no Gemini API key is saved")
     try:
-        return open_secret(sealed), sealed
+        return open_secret(key["keySealed"]), key["keySealed"]
     except Exception as e:
         raise GeminiKeyMissing(f"the saved Gemini API key cannot be opened ({e})") from e
 
 
 def note_key_problem(user_id, sealed: str, status: str, words: str, google: str):
-    """Tells the app Google refused the key (a VoiceGeminiKeyStatus and plain words), unless it was replaced since."""
+    """Tells the app Google refused the key (a VoiceKeyStatus and plain words), unless it was removed since."""
     try:
         db().voice_accounts.update_one(
-            {"userId": oid(user_id), "gemini.keySealed": sealed},
-            {"$set": {"gemini.status": status, "gemini.statusMessage": f"{words} (Google: {google[:160]})",
-                      "gemini.checkedAt": now()}},
+            {"userId": oid(user_id), "keys.keySealed": sealed},
+            {"$set": {"keys.$.status": status, "keys.$.statusMessage": f"{words} (Google: {google[:160]})",
+                      "keys.$.checkedAt": now()}},
         )
     except Exception as e:
         logger.error(f"could not note the Gemini key problem of owner {user_id}: {e}")
@@ -391,7 +408,7 @@ def _finish_ctx(ctx: dict, agent: dict) -> dict:
 
     # The agent's prompt and the owner's own Gemini key, or no call (AgentNoPrompt, GeminiKeyMissing).
     require_prompt(agent)
-    ctx["gemini_key"], ctx["gemini_sealed"] = gemini_key_for(ctx["doc"]["userId"])
+    ctx["gemini_key"], ctx["gemini_sealed"] = gemini_key_for(ctx["doc"]["userId"], agent)
     campaigns.tag(ctx)  # a campaign's call: its contact's variables (ctx["variables"]) and links
     if "variables" not in ctx and (held := _take_call_variables(ctx["doc"])) is not None:
         ctx["variables"] = ctx["doc"]["variables"] = held  # a test call's variables (POST /calls)
@@ -521,7 +538,7 @@ def _insert(doc: dict, ctx: dict | None = None, usage: dict | None = None):
         import costs  # imports this module: loaded on first use
 
         try:
-            doc["cost"] = costs.call_cost(doc, usage or {}, ctx.get("provider"))
+            doc["cost"] = costs.call_cost(doc, usage or {}, ctx.get("provider"), ctx.get("gemini_sealed"))
         except Exception as e:  # the call is written without one
             logger.error(f"could not work out the call's cost: {e!r}")
     try:
