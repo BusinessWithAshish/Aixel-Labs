@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowDown, AudioLines, Info, Loader2, Mic, Phone, PhoneOff, Timer } from 'lucide-react';
-import { VoiceGeminiKeyStatus } from '@aixellabs/backend/db/types';
+import { VoiceKeyStatus } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,7 +80,7 @@ export function VoicePlayground({ className }: { className?: string }) {
                         Talk to {saved.name} through your microphone, as if you were on the phone together. It uses the saved
                         version of the agent.
                     </span>
-                    {geminiKey.set && geminiKey.status === VoiceGeminiKeyStatus.OK ? (
+                    {geminiKey.set && geminiKey.status === VoiceKeyStatus.OK ? (
                         <GeminiKeyLine view={geminiKey} link />
                     ) : null}
                 </CardDescription>

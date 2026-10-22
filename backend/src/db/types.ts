@@ -293,6 +293,10 @@ export type VoiceAgentDoc<Id = ObjectId> = {
   memory?: boolean;
   /** How she takes turns and fills waits during a call. Absent = today's defaults (agent decides, NORMAL, both off). */
   speech?: VoiceAgentSpeech | null;
+  /** This agent's own stack (models and keys). Absent / null = the owner's (`VoiceAccountDoc.stack`); see `voiceStackFor`. */
+  stack?: VoiceStack<Id> | null;
+  /** The voice it speaks in on a PIPELINE stack. A REALTIME stack speaks in `voice` (Gemini Live's own voices). Absent = none picked yet. */
+  ttsVoice?: VoiceTtsVoice | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -933,42 +937,126 @@ export type VoiceCallerMemory = {
 // ---------------------------------------------------------------------------
 // Voice accounts: one voice_accounts doc per owner (the user who owns the agents and numbers;
 // every voice doc is scoped by `userId`, so the owner is the user, not the tenant). It holds what
-// the owner connected: their Gemini key, their booking apps and their phone numbers.
+// the owner connected: their provider API keys, their default voice stack, their booking apps and
+// their phone numbers.
 //
-// Customers bring their own Gemini API key: every call their agents take or place (Telnyx,
-// Twilio, VoiceLink, playground) runs on it, never on Aixel Labs' key. No key = no calls.
-// A later "use Aixel Labs credits" option would be a choice stored here, read by the app's
-// `server/voice-agent/gemini-key.ts` and the engine's `product.gemini_key_for` (the only two
-// places that pick the key); it does not exist yet.
+// Customers bring their own keys: every call their agents take or place (Telnyx, Twilio, VoiceLink,
+// playground) runs on them, never on Aixel Labs' keys. No key for a provider the stack uses = no calls.
+// `frontend/server/voice-agent/provider-keys.ts` and the engine's `product.gemini_key_for` are the only
+// two places that pick a call's key (`voiceStackFor` below says how).
 // ---------------------------------------------------------------------------
 
-/** What Google last said about an owner's key. The app sets OK on save; the engine sets a problem when a call is refused. */
-export enum VoiceGeminiKeyStatus {
+/** Whose API key it is. The same ids name the provider of a stack part and of a voice. */
+export enum VoiceKeyProvider {
+  GEMINI = "gemini",
+  OPENAI = "openai",
+  DEEPGRAM = "deepgram",
+  CARTESIA = "cartesia",
+  ELEVENLABS = "elevenlabs",
+}
+
+/** What the provider last said about a key. The app sets OK on save; the engine sets a problem when a call is refused. */
+export enum VoiceKeyStatus {
   OK = "OK",
   /** Not a valid key (mistyped, deleted, expired). */
   INVALID = "INVALID",
-  /** The Gemini API is not turned on for the key's Google Cloud project, or the key is not allowed to use it. */
+  /** The API is not turned on for the key's project, or the key is not allowed to use it. */
   API_DISABLED = "API_DISABLED",
   /** Out of quota, or billing is not set up for what was asked. */
   QUOTA = "QUOTA",
 }
 
-export type VoiceGeminiKey = {
+export type VoiceGeminiKeyTier = "free" | "paid";
+
+/** Keys one owner may keep, all providers together. */
+export const VOICE_KEY_LIMITS = {
+  maxPerOwner: 20,
+  labelMax: 40,
+} as const;
+
+/** One of the owner's API keys, in VoiceAccountDoc.keys. Agents and stacks point at it by `_id`. */
+export type VoiceProviderKeyDoc<Id = ObjectId> = {
+  _id: Id;
+  provider: VoiceKeyProvider;
+  /** The owner's name for it ("Clinic project"). */
+  label: string;
   /** The key, sealed like number API keys (see frontend/server/voice-agent/engine.ts). Never sent to the client. */
   keySealed: string;
   /** Last 4 characters, to tell keys apart. */
   last4: string;
-  status: VoiceGeminiKeyStatus;
-  /** Google's own words when status is not OK. */
+  status: VoiceKeyStatus;
+  /** The provider's own words when status is not OK. */
   statusMessage?: string | null;
-  /** When the status was learned: the save's check, or the call that was refused. */
+  /** When the status was learned: the save's check, the "Check now", or the call that was refused. */
   checkedAt: Date;
   savedAt: Date;
-  /** Google's tier for the key's project, as the owner says. Missing = "paid". Calls on a free-tier key cost the owner nothing. */
+  /** Gemini only: Google's tier for the key's project, as the owner says. Missing = "paid". Calls on a free-tier key cost the owner nothing. */
   tier?: VoiceGeminiKeyTier;
 };
 
-export type VoiceGeminiKeyTier = "free" | "paid";
+/** Client view of one key (never the key). */
+export type VoiceProviderKey = Omit<VoiceProviderKeyDoc<string>, "keySealed" | "checkedAt" | "savedAt"> & {
+  checkedAt: string;
+  savedAt: string;
+};
+
+/** How a call hears, thinks and speaks. */
+export enum VoiceStackKind {
+  /** One speech-to-speech model hears the caller and answers in its own voice (Gemini Live). */
+  REALTIME = "REALTIME",
+  /** Speech-to-text, then a text model (LLM), then text-to-speech, each from its own provider. */
+  PIPELINE = "PIPELINE",
+}
+
+/** One model of a stack, on one of the owner's keys of the same provider. */
+export type VoiceStackPart<Id = ObjectId> = {
+  provider: VoiceKeyProvider;
+  /** The provider's model id, one of `VOICE_STACK_MODELS` for this part. */
+  model: string;
+  /** One of the owner's keys of `provider` (VoiceProviderKeyDoc._id). Absent / null / not found = that provider's default key, the first one in `keys`. */
+  keyId?: Id | null;
+};
+
+export type VoiceStack<Id = ObjectId> =
+  | ({ kind: VoiceStackKind.REALTIME } & VoiceStackPart<Id>)
+  | { kind: VoiceStackKind.PIPELINE; stt: VoiceStackPart<Id>; llm: VoiceStackPart<Id>; tts: VoiceStackPart<Id> };
+
+/** The stack of an owner who never picked one: what every agent ran on before stacks existed. */
+export const VOICE_DEFAULT_STACK: VoiceStack<never> = {
+  kind: VoiceStackKind.REALTIME,
+  provider: VoiceKeyProvider.GEMINI,
+  model: voiceCallRates.gemini.model,
+};
+
+/** The stack a call runs on: the agent's own, else the owner's, else VOICE_DEFAULT_STACK. The engine does the same (product.stack_for). */
+export function voiceStackFor<Id>(
+  agent: { stack?: VoiceStack<Id> | null } | null | undefined,
+  account: { stack?: VoiceStack<Id> | null } | null | undefined,
+): VoiceStack<Id> {
+  return agent?.stack ?? account?.stack ?? VOICE_DEFAULT_STACK;
+}
+
+/**
+ * The key a stack part runs on: `keyId` when the owner still has it, else the provider's first key.
+ * Null = the owner has no key for that provider (no calls).
+ */
+export function voiceKeyFor<K extends { _id: unknown; provider: VoiceKeyProvider }>(
+  keys: K[] | null | undefined,
+  part: { provider: VoiceKeyProvider; keyId?: unknown },
+): K | null {
+  const own = (keys ?? []).filter((key) => key.provider === part.provider);
+  const id = part.keyId == null ? null : String(part.keyId);
+  return own.find((key) => String(key._id) === id) ?? own[0] ?? null;
+}
+
+/** A voice a pipeline agent speaks in: a text-to-speech provider's voice. */
+export type VoiceTtsVoice = {
+  provider: VoiceKeyProvider;
+  /** The provider's voice id (Cartesia voice UUID, ElevenLabs voice_id). */
+  voiceId: string;
+  /** Shown in the app and the call log ("Katie"). */
+  name: string;
+};
 
 /** Numbers one owner may connect; keeps their VoiceAccountDoc far below MongoDB's 16 MB. */
 export const VOICE_NUMBER_LIMITS = {
@@ -980,8 +1068,12 @@ export type VoiceAccountDoc<Id = ObjectId> = {
   tenantId: Id;
   /** Owner. Unique: one account doc per user. */
   userId: Id;
-  /** Absent / null = no key: the owner's agents cannot take or place calls. */
-  gemini?: VoiceGeminiKey | null;
+  /** @deprecated The single Gemini key before 2026-10-22; migrate_voice_keys.py moves it into `keys`. Read until the app and engine switch to `keys`. */
+  gemini?: Omit<VoiceProviderKeyDoc<Id>, "_id" | "provider" | "label"> | null;
+  /** API keys, up to `VOICE_KEY_LIMITS.maxPerOwner`, oldest first: the first key of a provider is its default. Absent = none. */
+  keys?: VoiceProviderKeyDoc<Id>[];
+  /** What the owner's agents run on unless an agent has its own (`VoiceAgentDoc.stack`). Absent / null = VOICE_DEFAULT_STACK. */
+  stack?: VoiceStack<Id> | null;
   /** Connected booking apps. Absent = none. */
   calendars?: VoiceCalendarConnectionDoc<Id>[];
   /** Phone numbers, up to `VOICE_NUMBER_LIMITS.maxPerOwner`. Absent = none. */
@@ -990,11 +1082,14 @@ export type VoiceAccountDoc<Id = ObjectId> = {
   updatedAt: Date;
 };
 
-/** Client view of the owner's key: whether one is set and how it is doing, never the key. */
+/** Client view of the Gemini key something runs on (an agent's, or the owner's default): how it is doing, never the key. */
 export type VoiceGeminiKeyView = {
   set: boolean;
+  /** The key's VoiceProviderKeyDoc._id. Null when no key is set. */
+  id: string | null;
+  label: string | null;
   last4: string | null;
-  status: VoiceGeminiKeyStatus | null;
+  status: VoiceKeyStatus | null;
   statusMessage: string | null;
   checkedAt: string | null;
   /** null when no key is set. */

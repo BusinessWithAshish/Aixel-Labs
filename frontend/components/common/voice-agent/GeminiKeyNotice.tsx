@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { KeyRound } from 'lucide-react';
-import { VoiceGeminiKeyStatus, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
+import { VoiceKeyStatus, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
@@ -17,7 +17,7 @@ type GeminiKeyNoticeProps = {
  * with a link to the key in voice settings. Renders nothing while the key is fine.
  */
 export function GeminiKeyNotice({ view, action, className }: GeminiKeyNoticeProps) {
-    if (view.set && view.status === VoiceGeminiKeyStatus.OK) return null;
+    if (view.set && view.status === VoiceKeyStatus.OK) return null;
     return (
         <Alert variant={view.set ? 'destructive' : 'default'} className={cn(className)} data-testid="gemini-key-notice">
             <KeyRound className="size-4" aria-hidden />

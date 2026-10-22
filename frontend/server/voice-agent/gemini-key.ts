@@ -1,11 +1,6 @@
 import 'server-only';
 
-import {
-    VoiceGeminiKeyStatus,
-    type MongoObjectId,
-    type VoiceAccountDoc,
-    type VoiceGeminiKeyView,
-} from '@aixellabs/backend/db';
+import { VoiceKeyStatus, type MongoObjectId, type VoiceAccountDoc, type VoiceGeminiKeyView } from '@aixellabs/backend/db';
 import { voiceAccountsCollection } from '@/server/voice-agent/accounts';
 
 /**
@@ -29,7 +24,7 @@ function geminiApiBase(): string {
 export class GeminiKeyError extends Error {
     constructor(
         message: string,
-        readonly status: VoiceGeminiKeyStatus | null,
+        readonly status: VoiceKeyStatus | null,
     ) {
         super(message);
     }
@@ -43,31 +38,31 @@ function refusal(httpStatus: number, body: GoogleError): GeminiKeyError {
     if (reasons.includes('API_KEY_EXPIRED') || /expired/i.test(message)) {
         return new GeminiKeyError(
             'This API key has expired. Create a new one in Google AI Studio (aistudio.google.com/apikey).',
-            VoiceGeminiKeyStatus.INVALID,
+            VoiceKeyStatus.INVALID,
         );
     }
     if (httpStatus === 400 || reasons.includes('API_KEY_INVALID')) {
         return new GeminiKeyError(
             'Google says this is not a valid API key. Copy it again from Google AI Studio (aistudio.google.com/apikey).',
-            VoiceGeminiKeyStatus.INVALID,
+            VoiceKeyStatus.INVALID,
         );
     }
     if (reasons.includes('SERVICE_DISABLED') || /has not been used in project|is disabled/i.test(message)) {
         return new GeminiKeyError(
             'The Gemini API is turned off for the Google Cloud project this key belongs to. Turn on the "Generative Language API" for that project, or create the key in Google AI Studio, which turns it on for you.',
-            VoiceGeminiKeyStatus.API_DISABLED,
+            VoiceKeyStatus.API_DISABLED,
         );
     }
     if (httpStatus === 403) {
         return new GeminiKeyError(
             'This key is not allowed to use the Gemini API (its API restrictions block it). Allow the "Generative Language API" on the key in Google Cloud, or create a new key in Google AI Studio.',
-            VoiceGeminiKeyStatus.API_DISABLED,
+            VoiceKeyStatus.API_DISABLED,
         );
     }
     if (httpStatus === 429) {
         return new GeminiKeyError(
             'Google says this key is out of quota right now. Check the plan and billing of its project in Google AI Studio, or try again later.',
-            VoiceGeminiKeyStatus.QUOTA,
+            VoiceKeyStatus.QUOTA,
         );
     }
     return new GeminiKeyError(`Google could not check the key right now (HTTP ${httpStatus}). Try again in a minute.`, null);
@@ -97,6 +92,8 @@ export async function checkGeminiKey(key: string): Promise<void> {
 /** The view when no key is saved (also what a page shows if the status could not be read). */
 export const NO_GEMINI_KEY: VoiceGeminiKeyView = {
     set: false,
+    id: null,
+    label: null,
     last4: null,
     status: null,
     statusMessage: null,
@@ -109,6 +106,8 @@ export function toGeminiKeyView(doc: Pick<VoiceAccountDoc, 'gemini'> | null): Vo
     if (!gemini) return NO_GEMINI_KEY;
     return {
         set: true,
+        id: null,
+        label: null,
         last4: gemini.last4,
         status: gemini.status,
         statusMessage: gemini.statusMessage ?? null,

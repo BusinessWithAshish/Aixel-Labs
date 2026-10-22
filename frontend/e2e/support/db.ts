@@ -30,12 +30,11 @@ import { VoiceCalendarConnectionStatus, type VoiceCalendarConnectionDoc } from '
 import {
     VoiceCampaignContactStatus,
     VoiceCampaignStatus,
-    VoiceGeminiKeyStatus,
+    VoiceKeyStatus,
     type VoiceCampaignContactDoc,
     type VoiceCampaignDoc,
 } from '@aixellabs/backend/db/types';
 // Gemini API key (e2e/voice-agent/gemini-key spec; the seeded user has one so calls can run).
-import { type VoiceGeminiKey } from '@aixellabs/backend/db/types';
 import { sealForE2e } from '../voice-agent/fake-telephony';
 
 /** Direct Mongo access for seeding and for asserting what the server actions persisted. */
@@ -518,7 +517,7 @@ export class E2eDb {
             ? {
                   keySealed,
                   last4: 'e2e0',
-                  status: VoiceGeminiKeyStatus.OK,
+                  status: VoiceKeyStatus.OK,
                   statusMessage: null,
                   checkedAt: now,
                   savedAt: now,
@@ -532,14 +531,18 @@ export class E2eDb {
     // -----------------------------------------------------------------------
 
     /** Saves `key` as the user's Gemini key the way the app does (sealed), `fields` on top; `null` removes it. */
-    async setVoiceGeminiKey(user: E2eUser, key: string | null, fields: Partial<VoiceGeminiKey> = {}): Promise<void> {
+    async setVoiceGeminiKey(
+        user: E2eUser,
+        key: string | null,
+        fields: Partial<NonNullable<VoiceAccountDoc['gemini']>> = {},
+    ): Promise<void> {
         const { userId } = await this.voiceAccount(user);
         const now = new Date();
-        const gemini: VoiceGeminiKey | null = key
+        const gemini: VoiceAccountDoc['gemini'] = key
             ? {
                   keySealed: sealForE2e(key),
                   last4: key.slice(-4),
-                  status: VoiceGeminiKeyStatus.OK,
+                  status: VoiceKeyStatus.OK,
                   statusMessage: null,
                   checkedAt: now,
                   savedAt: now,
@@ -616,10 +619,7 @@ export class E2eDb {
     /** What the user's agents remember now, one entry per agent + caller, latest call first. */
     async getVoiceCallerMemories(user: E2eUser) {
         const { _id: userId } = await this.getUser(user);
-        const calls = await this.voiceCalls
-            .find({ userId, 'memory.current': true })
-            .sort({ startedAt: -1 })
-            .toArray();
+        const calls = await this.voiceCalls.find({ userId, 'memory.current': true }).sort({ startedAt: -1 }).toArray();
         return calls.map((call) => ({
             _id: call._id,
             agentId: call.agentId,

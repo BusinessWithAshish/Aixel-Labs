@@ -3,7 +3,7 @@
 import { Controller, FormProvider } from 'react-hook-form';
 import { formatDistanceToNow } from 'date-fns';
 import { ExternalLink, KeyRound, Loader2, RefreshCw, Trash2 } from 'lucide-react';
-import { VoiceGeminiKeyStatus, type VoiceGeminiKeyTier, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
+import { VoiceKeyStatus, type VoiceGeminiKeyTier, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import { SettingsSection } from '@/components/common/SettingsSection';
 import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
@@ -34,11 +34,11 @@ const TIER_OPTIONS: RadioCardOption<VoiceGeminiKeyTier>[] = [
     },
 ];
 
-const STATUS_BADGE: Record<VoiceGeminiKeyStatus, { label: string; variant: 'green' | 'red' | 'yellow' }> = {
-    [VoiceGeminiKeyStatus.OK]: { label: 'Working', variant: 'green' },
-    [VoiceGeminiKeyStatus.INVALID]: { label: 'Not valid', variant: 'red' },
-    [VoiceGeminiKeyStatus.API_DISABLED]: { label: 'API turned off', variant: 'red' },
-    [VoiceGeminiKeyStatus.QUOTA]: { label: 'Out of quota', variant: 'yellow' },
+const STATUS_BADGE: Record<VoiceKeyStatus, { label: string; variant: 'green' | 'red' | 'yellow' }> = {
+    [VoiceKeyStatus.OK]: { label: 'Working', variant: 'green' },
+    [VoiceKeyStatus.INVALID]: { label: 'Not valid', variant: 'red' },
+    [VoiceKeyStatus.API_DISABLED]: { label: 'API turned off', variant: 'red' },
+    [VoiceKeyStatus.QUOTA]: { label: 'Out of quota', variant: 'yellow' },
 };
 
 function statusBadge(view: VoiceGeminiKeyView) {
@@ -51,7 +51,7 @@ export function GeminiKeySection() {
     const page = usePage<UseVoiceSettingsPageReturn>();
     const { view } = page;
     const badge = statusBadge(view);
-    const problem = view.set && view.status !== VoiceGeminiKeyStatus.OK;
+    const problem = view.set && view.status !== VoiceKeyStatus.OK;
 
     return (
         <SettingsSection

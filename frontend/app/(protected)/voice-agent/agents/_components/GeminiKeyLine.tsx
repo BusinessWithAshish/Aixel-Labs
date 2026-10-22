@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { KeyRound } from 'lucide-react';
-import { VoiceGeminiKeyStatus, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
+import { VoiceKeyStatus, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import { cn } from '@/lib/utils';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 
@@ -13,7 +13,7 @@ type GeminiKeyLineProps = {
 
 /** One line saying which Gemini key an agent runs on, or why it cannot run. Every agent uses the owner's one key. */
 export function GeminiKeyLine({ view, link = false, className }: GeminiKeyLineProps) {
-    const ok = view.set && view.status === VoiceGeminiKeyStatus.OK;
+    const ok = view.set && view.status === VoiceKeyStatus.OK;
     const text = !view.set
         ? 'No Gemini key yet: it cannot take or make calls'
         : ok

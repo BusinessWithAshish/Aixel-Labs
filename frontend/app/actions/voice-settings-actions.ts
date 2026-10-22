@@ -2,20 +2,15 @@
 
 import {
     VOICE_AGENT_SUB_MODULES,
-    VoiceGeminiKeyStatus,
-    type VoiceGeminiKey,
+    VoiceKeyStatus,
+    type VoiceAccountDoc,
     type VoiceGeminiKeyTier,
     type VoiceGeminiKeyView,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { requireUserObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
 import { openSecret, sealSecret } from '@/server/voice-agent/engine';
-import {
-    checkGeminiKey,
-    GeminiKeyError,
-    loadGeminiKeyView,
-    toGeminiKeyView,
-} from '@/server/voice-agent/gemini-key';
+import { checkGeminiKey, GeminiKeyError, loadGeminiKeyView, toGeminiKeyView } from '@/server/voice-agent/gemini-key';
 import { voiceAccountsCollection } from '@/server/voice-agent/accounts';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 
@@ -55,10 +50,10 @@ export const saveGeminiKey = async (apiKey: string, tier: VoiceGeminiKeyTier): P
         await checkGeminiKey(key);
 
         const now = new Date();
-        const gemini: VoiceGeminiKey = {
+        const gemini: NonNullable<VoiceAccountDoc['gemini']> = {
             keySealed: sealSecret(key),
             last4: key.slice(-4),
-            status: VoiceGeminiKeyStatus.OK,
+            status: VoiceKeyStatus.OK,
             statusMessage: null,
             checkedAt: now,
             savedAt: now,
@@ -85,7 +80,7 @@ export const recheckGeminiKey = async (): Promise<ALApiResponse<VoiceGeminiKeyVi
         const doc = await accounts.findOne({ userId: owner.userId });
         if (!doc?.gemini) throw new Error('No Gemini API key is saved');
 
-        let status = VoiceGeminiKeyStatus.OK;
+        let status = VoiceKeyStatus.OK;
         let statusMessage: string | null = null;
         try {
             await checkGeminiKey(openSecret(doc.gemini.keySealed));

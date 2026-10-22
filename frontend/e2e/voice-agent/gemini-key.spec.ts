@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { Page, Request } from '@playwright/test';
-import { VoiceAgentCallType, VoiceCallChannel, VoiceCallDirection, VoiceGeminiKeyStatus } from '@aixellabs/backend/db/types';
+import { VoiceAgentCallType, VoiceCallChannel, VoiceCallDirection, VoiceKeyStatus } from '@aixellabs/backend/db/types';
 import type { E2eDb } from '../support/db';
 import { expect, test } from '../support/fixtures';
 import { E2E_GEMINI_API_BASE, E2E_GEMINI_API_KEY, USER_STORAGE_STATE } from '../support/env';
@@ -300,7 +300,7 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     const stored = (await db.getVoiceAccount(E2E_USER))?.gemini;
     expect(stored).toMatchObject({
         last4: GOOD_KEY.slice(-4),
-        status: VoiceGeminiKeyStatus.OK,
+        status: VoiceKeyStatus.OK,
         statusMessage: null,
         tier: 'free',
     });
@@ -350,7 +350,7 @@ test('a key Google refused on a call: the card, the playground and the call log 
     const { inbound } = await seedAgentsAndNumber(db);
     // What the engine leaves when Google refuses the key on a call.
     await db.setVoiceGeminiKey(E2E_USER, GOOD_KEY, {
-        status: VoiceGeminiKeyStatus.INVALID,
+        status: VoiceKeyStatus.INVALID,
         statusMessage: 'it is not a valid API key (Google: 1007 None. API key not valid.)',
     });
     const [callId] = await db.insertVoiceCalls(E2E_USER, [
@@ -401,7 +401,7 @@ test('a key Google refused on a call: the card, the playground and the call log 
     await card(page).getByRole('button', { name: 'Check now' }).click();
     await expect(page.getByText('Google accepts the key')).toBeVisible();
     await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Working');
-    expect((await db.getVoiceAccount(E2E_USER))?.gemini?.status).toBe(VoiceGeminiKeyStatus.OK);
+    expect((await db.getVoiceAccount(E2E_USER))?.gemini?.status).toBe(VoiceKeyStatus.OK);
 
     await card(page).getByRole('button', { name: 'Remove' }).click();
     const confirm = page.getByRole('dialog', { name: 'Remove your Gemini API key?' });
@@ -417,7 +417,7 @@ test('the open page asks Google about the key again every 10 minutes, with the f
     db,
 }) => {
     await db.setVoiceGeminiKey(E2E_USER, GOOD_KEY, {
-        status: VoiceGeminiKeyStatus.QUOTA,
+        status: VoiceKeyStatus.QUOTA,
         statusMessage: 'Google says this key is out of quota right now.',
     });
     await page.clock.install();
@@ -431,7 +431,7 @@ test('the open page asks Google about the key again every 10 minutes, with the f
     await expect(card(page).getByTestId('gemini-key-status')).toHaveText('Working');
     expect(gemini.keys.slice(before)).toEqual([GOOD_KEY]);
     expect(gemini.urls.slice(before)).toEqual(['/v1beta/models?pageSize=1']);
-    expect((await db.getVoiceAccount(E2E_USER))?.gemini?.status).toBe(VoiceGeminiKeyStatus.OK);
+    expect((await db.getVoiceAccount(E2E_USER))?.gemini?.status).toBe(VoiceKeyStatus.OK);
 });
 
 test('the playground shows the engine’s key refusal in plain words with a link to the key', async ({ page, db }) => {

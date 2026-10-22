@@ -14,12 +14,15 @@ import {
     VOICE_VARIABLE_NAME_PATTERN,
     VOICE_WEBHOOK_LIMITS,
     VOICE_WEBHOOK_PARAM_TYPES,
+    VOICE_KEY_LIMITS,
     VOICE_WEEKDAYS,
     VoiceAgentCallType,
     type VoiceAgentVoice,
     VoiceCalendarProvider,
     VoiceCampaignRetryOutcome,
+    VoiceKeyProvider,
     VoiceReplyWait,
+    VoiceStackKind,
     VoiceToolWait,
     VoiceVoicemailAction,
     type VoiceWeekday,
@@ -577,3 +580,56 @@ export const numberJobSchema = z
     .refine((v) => v.job === 'NONE' || isValidObjectId(v.agentId), { message: 'Choose an agent', path: ['agentId'] });
 
 export type NumberJobFormValues = z.input<typeof numberJobSchema>;
+
+// ---------------------------------------------------------------------------
+// Provider keys, voice stack and voices (shapes in `@aixellabs/backend/db/types`: VoiceProviderKeyDoc,
+// VoiceStack, VoiceTtsVoice)
+// ---------------------------------------------------------------------------
+
+const keyProviderSchema = z.nativeEnum(VoiceKeyProvider, { errorMap: () => ({ message: 'Pick a provider' }) });
+const keyIdSchema = z
+    .string()
+    .nullish()
+    .refine((id) => !id || isValidObjectId(id), 'Pick one of your keys')
+    .transform((id) => id || null);
+
+/** A key being added: checked with its provider, then stored sealed. */
+export const voiceKeyInputSchema = z.object({
+    provider: keyProviderSchema,
+    label: z.string().trim().max(VOICE_KEY_LIMITS.labelMax, `Names are up to ${VOICE_KEY_LIMITS.labelMax} characters`),
+    apiKey: z
+        .string()
+        .trim()
+        .min(1, 'Paste the API key')
+        .refine((key) => key.length >= 20 && key.length <= 300 && !/\s/.test(key), 'That does not look like an API key'),
+    /** Gemini only. */
+    tier: z.enum(['free', 'paid']).default('paid'),
+});
+
+export type VoiceKeyInput = z.input<typeof voiceKeyInputSchema>;
+
+const stackPartSchema = z.object({
+    provider: keyProviderSchema,
+    model: z.string().trim().min(1, 'Pick a model').max(100),
+    keyId: keyIdSchema,
+});
+
+/** The owner's default stack, or an agent's own. */
+export const voiceStackSchema = z.discriminatedUnion('kind', [
+    stackPartSchema.extend({ kind: z.literal(VoiceStackKind.REALTIME) }),
+    z.object({
+        kind: z.literal(VoiceStackKind.PIPELINE),
+        stt: stackPartSchema,
+        llm: stackPartSchema,
+        tts: stackPartSchema,
+    }),
+]);
+
+export type VoiceStackInput = z.input<typeof voiceStackSchema>;
+
+/** A pipeline agent's voice. */
+export const voiceTtsVoiceSchema = z.object({
+    provider: keyProviderSchema,
+    voiceId: z.string().trim().min(1, 'Pick a voice').max(100),
+    name: z.string().trim().min(1).max(100),
+});
