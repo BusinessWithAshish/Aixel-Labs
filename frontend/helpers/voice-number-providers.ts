@@ -7,12 +7,29 @@ export type NumberProviderInfo = {
     region: string;
     /** An example number to call, in the format the provider dials. */
     callExample: string;
+    /** The provider's own mark, under public/brand-logos. */
+    logo: string;
 };
 
 export const NUMBER_PROVIDERS: Record<VoiceProvider, NumberProviderInfo> = {
-    [VoiceProvider.TELNYX]: { label: 'Telnyx', region: 'US and international numbers', callExample: '+14155550123' },
-    [VoiceProvider.TWILIO]: { label: 'Twilio', region: 'US and international numbers', callExample: '+14155550123' },
-    [VoiceProvider.VOICELINK]: { label: 'VoiceLink', region: 'Indian numbers (+91)', callExample: '+919876543210' },
+    [VoiceProvider.TELNYX]: {
+        label: 'Telnyx',
+        region: 'US and international numbers',
+        callExample: '+14155550123',
+        logo: '/brand-logos/telnyx.png',
+    },
+    [VoiceProvider.TWILIO]: {
+        label: 'Twilio',
+        region: 'US and international numbers',
+        callExample: '+14155550123',
+        logo: '/brand-logos/twilio.svg',
+    },
+    [VoiceProvider.VOICELINK]: {
+        label: 'VoiceLink',
+        region: 'Indian numbers (+91)',
+        callExample: '+919876543210',
+        logo: '/brand-logos/voicelink.png',
+    },
 };
 
 export const NUMBER_PROVIDER_ORDER: VoiceProvider[] = [VoiceProvider.TELNYX, VoiceProvider.TWILIO, VoiceProvider.VOICELINK];

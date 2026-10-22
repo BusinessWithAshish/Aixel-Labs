@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,15 +14,13 @@ type ProviderSetupGuideProps = {
     onOpenChange: (open: boolean) => void;
     /** Step to show each time the dialog opens; the first step when unset. */
     initialStepId?: string | null;
-    /** Shown under the title, e.g. a switch between providers' guides. */
-    headerExtra?: ReactNode;
 };
 
 /**
- * A provider's setup steps as a carousel in a dialog: a few sentences per step, with a screenshot
+ * A provider's setup steps as a carousel in a dialog: a few sentences per step, with a picture
  * when the step has one (a step without one shows its text only).
  */
-export function ProviderSetupGuide({ guide, open, onOpenChange, initialStepId, headerExtra }: ProviderSetupGuideProps) {
+export function ProviderSetupGuide({ guide, open, onOpenChange, initialStepId }: ProviderSetupGuideProps) {
     const [index, setIndex] = useState(() => setupGuideStepIndex(guide, initialStepId));
     const [zoomed, setZoomed] = useState(false);
     const [shownFor, setShownFor] = useState({ open, guide, initialStepId });
@@ -69,7 +67,6 @@ export function ProviderSetupGuide({ guide, open, onOpenChange, initialStepId, h
                     <DialogDescription aria-live="polite" data-testid="setup-guide-counter">
                         Step {index + 1} of {steps.length}
                     </DialogDescription>
-                    {headerExtra}
                 </DialogHeader>
 
                 <section
@@ -89,7 +86,7 @@ export function ProviderSetupGuide({ guide, open, onOpenChange, initialStepId, h
                                 <button
                                     type="button"
                                     onClick={() => setZoomed((z) => !z)}
-                                    aria-label={zoomed ? 'Fit the screenshot' : 'Zoom in on the screenshot'}
+                                    aria-label={zoomed ? 'Fit the picture' : 'Zoom in on the picture'}
                                     className={cn(
                                         'block w-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                                         zoomed ? 'w-max cursor-zoom-out' : 'cursor-zoom-in',

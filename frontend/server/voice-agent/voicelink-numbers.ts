@@ -277,7 +277,7 @@ export const voicelinkNumbers: NumberProvider = {
     async prepareCall(doc) {
         if (!doc.outboundAgentId) {
             throw new Error(
-                `VoiceLink only places AI calls from a number set to "Make calls". Set ${doc.phoneNumber} to "Make calls" on the Phone numbers page, or call from another number.`,
+                `VoiceLink only places AI calls from a number an agent makes calls from. Link ${doc.phoneNumber} to an agent that makes calls, on the agent's page, or call from another number.`,
             );
         }
     },

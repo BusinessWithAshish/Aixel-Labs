@@ -20,7 +20,15 @@ import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
 import { isBuiltinVariable } from '@/helpers/voice-agent-features';
 import { engineFetch, sealSecret } from '@/server/voice-agent/engine';
 import { assertGeminiKeySet, GEMINI_KEY_MISSING_MESSAGE } from '@/server/voice-agent/gemini-key';
-import { countNumbers, findItem, findItemsAnywhere, listItems, pullItems, pushItem, updateItem } from '@/server/voice-agent/accounts';
+import {
+    countNumbers,
+    findItem,
+    findItemsAnywhere,
+    listItems,
+    pullItems,
+    pushItem,
+    updateItem,
+} from '@/server/voice-agent/accounts';
 import { providerOf, type OwnedNumberDoc, type ProviderAccountNumber } from '@/server/voice-agent/number-provider';
 import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
 import { listTelnyxAccountNumbers, telnyxNumbers } from '@/server/voice-agent/telnyx-numbers';
@@ -210,28 +218,18 @@ async function findOwnedNumber(owner: VoiceOwnerScope, numberId: string): Promis
     return doc;
 }
 
-const CALL_TYPE_WORD: Record<VoiceAgentCallType, string> = {
-    [VoiceAgentCallType.INBOUND]: 'an inbound',
-    [VoiceAgentCallType.OUTBOUND]: 'an outbound',
-};
+type OwnedAgent = { _id: MongoObjectId; name: string; callType: VoiceAgentCallType };
 
-/** The caller's agent, refused when it was made for the other kind of call (any kind when `callType` is absent) or has no prompt yet. */
-async function findOwnedAgent(
-    owner: VoiceOwnerScope,
-    agentId: string,
-    callType?: VoiceAgentCallType,
-): Promise<{ _id: MongoObjectId; name: string }> {
+/** The caller's agent and the calls it is for (agents saved before types make calls), refused when it has no prompt yet. */
+async function findOwnedAgent(owner: VoiceOwnerScope, agentId: string): Promise<OwnedAgent> {
     const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
     const agent = await agents.findOne(
         { _id: toObjectId(agentId, 'Agent ID'), userId: owner.userId },
         { projection: { name: 1, callType: 1, prompt: 1 } },
     );
     if (!agent?._id) throw new Error('Agent not found');
-    if (callType && agent.callType && agent.callType !== callType) {
-        throw new Error(`${agent.name} is ${CALL_TYPE_WORD[agent.callType]} agent. Pick ${CALL_TYPE_WORD[callType]} agent.`);
-    }
     if (!agent.prompt?.trim()) throw new Error(VOICE_AGENT_NO_PROMPT_MESSAGE);
-    return { _id: agent._id, name: agent.name };
+    return { _id: agent._id, name: agent.name, callType: agent.callType ?? VoiceAgentCallType.OUTBOUND };
 }
 
 async function listItemFor(owner: VoiceOwnerScope, numberId: MongoObjectId): Promise<VoiceNumberListItem> {
@@ -326,8 +324,13 @@ async function importNumbers(owner: VoiceOwnerScope, input: ImportInput): Promis
                 refresh['twilio.accountSid'] = input.extra.twilio.accountSid;
                 refresh['twilio.apiKeySid'] = input.extra.twilio.apiKeySid;
             }
-            const same = await updateItem('numbers', { phoneNumber: n.phoneNumber, provider: input.provider }, { set: refresh });
-            if (!same) throw new Error(`${n.phoneNumber} is already connected through another provider. Remove it there first.`);
+            const same = await updateItem(
+                'numbers',
+                { phoneNumber: n.phoneNumber, provider: input.provider },
+                { set: refresh },
+            );
+            if (!same)
+                throw new Error(`${n.phoneNumber} is already connected through another provider. Remove it there first.`);
         }
     }
 
@@ -430,54 +433,75 @@ export const listMyNumbers = async (): Promise<ALApiResponse<VoiceNumberListItem
     });
 
 /**
- * What the number does: answers calls with an inbound agent (`callType` INBOUND), places calls with
- * an outbound agent (OUTBOUND), or nothing yet (null; `agentId` is ignored). A number does one job
- * at a time, so the job it stops doing is undone in the provider account first and saved at once
- * (Telnyx: back on its own connection; Twilio: its voice settings put back exactly; VoiceLink: that
- * half of the DID's routing put back), then the new one is set up (Telnyx: our TeXML app, or the
- * Call Control app; Twilio: its Voice URL; VoiceLink: that half on our bot). Changing the agent
- * within a job changes no routing. Choosing an agent needs the owner's Gemini API key; nothing never does.
+ * Gives the number to `agent` (null: to none). The agent's type is the number's job: an inbound agent
+ * answers its calls, an outbound one places calls from it. A number does one job at a time, so the
+ * job it stops doing is undone in the provider account first and saved at once (Telnyx: back on its
+ * own connection; Twilio: its voice settings put back exactly; VoiceLink: that half of the DID's
+ * routing put back), then the new one is set up (Telnyx: our TeXML app, or the Call Control app;
+ * Twilio: its Voice URL; VoiceLink: that half on our bot). Another agent of the same type changes no routing.
+ */
+async function linkAgent(
+    owner: VoiceOwnerScope,
+    doc: OwnedNumberDoc,
+    agent: OwnedAgent | null,
+): Promise<VoiceNumberListItem> {
+    const provider = providerOf(doc);
+    const callType = agent?.callType ?? null;
+    const save = (fields: Pick<VoiceNumberDoc, 'inboundAgentId' | 'outboundAgentId'>) => {
+        Object.assign(doc, fields);
+        return updateItem('numbers', { _id: doc._id }, { set: fields });
+    };
+
+    if (doc.inboundAgentId && callType !== VoiceAgentCallType.INBOUND) {
+        await provider.stopAnswering(doc);
+        await save({ inboundAgentId: null });
+    }
+    if (doc.outboundAgentId && callType !== VoiceAgentCallType.OUTBOUND) {
+        await provider.stopPlacingCalls(doc);
+        await save({ outboundAgentId: null });
+    }
+    if (agent && callType === VoiceAgentCallType.INBOUND) {
+        if (!doc.inboundAgentId) await provider.startAnswering(doc);
+        await save({ inboundAgentId: agent._id });
+    }
+    if (agent && callType === VoiceAgentCallType.OUTBOUND) {
+        if (!doc.outboundAgentId) await provider.startPlacingCalls(doc);
+        await save({ outboundAgentId: agent._id });
+    }
+    return listItemFor(owner, doc._id);
+}
+
+/**
+ * Links the number to `agentId`, or unlinks it from any agent (null). The job comes from the agent's
+ * own type (see `linkAgent`), so the two can never disagree. Linking needs the owner's Gemini API
+ * key; unlinking never does.
  */
 export const setNumberAgent = async (
     numberId: string,
-    callType: VoiceAgentCallType | null,
     agentId: string | null,
 ): Promise<ALApiResponse<VoiceNumberListItem>> => {
     assertValidObjectId(numberId, 'Number ID');
-    if (callType !== null) {
-        if (!Object.values(VoiceAgentCallType).includes(callType)) throw new Error('Choose what this number does');
-        assertValidObjectId(agentId ?? '', 'Agent ID');
-    }
+    if (agentId !== null) assertValidObjectId(agentId, 'Agent ID');
 
     return runAuthenticatedAction(async function setNumberAgent(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const doc = await findOwnedNumber(owner, numberId);
-        const provider = providerOf(doc);
-        const save = (fields: Pick<VoiceNumberDoc, 'inboundAgentId' | 'outboundAgentId'>) => {
-            Object.assign(doc, fields);
-            return updateItem('numbers', { _id: doc._id }, { set: fields });
-        };
-
-        const agent = callType && agentId ? await findOwnedAgent(owner, agentId, callType) : null;
+        const agent = agentId ? await findOwnedAgent(owner, agentId) : null;
         if (agent) await assertGeminiKeySet(owner.userId);
+        return linkAgent(owner, doc, agent);
+    });
+};
 
-        if (doc.inboundAgentId && callType !== VoiceAgentCallType.INBOUND) {
-            await provider.stopAnswering(doc);
-            await save({ inboundAgentId: null });
-        }
-        if (doc.outboundAgentId && callType !== VoiceAgentCallType.OUTBOUND) {
-            await provider.stopPlacingCalls(doc);
-            await save({ outboundAgentId: null });
-        }
-        if (agent && callType === VoiceAgentCallType.INBOUND) {
-            if (!doc.inboundAgentId) await provider.startAnswering(doc);
-            await save({ inboundAgentId: agent._id });
-        }
-        if (agent && callType === VoiceAgentCallType.OUTBOUND) {
-            if (!doc.outboundAgentId) await provider.startPlacingCalls(doc);
-            await save({ outboundAgentId: agent._id });
-        }
-        return listItemFor(owner, doc._id);
+/** Unlinks the number from this agent. Nothing changes when the number is no longer this agent's. */
+export const unlinkAgentNumber = async (agentId: string, numberId: string): Promise<ALApiResponse<VoiceNumberListItem>> => {
+    assertValidObjectId(agentId, 'Agent ID');
+    assertValidObjectId(numberId, 'Number ID');
+
+    return runAuthenticatedAction(async function unlinkAgentNumber(userId) {
+        const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        const doc = await findOwnedNumber(owner, numberId);
+        const linked = [doc.inboundAgentId, doc.outboundAgentId].some((id) => id?.toString() === agentId);
+        return linked ? linkAgent(owner, doc, null) : listItemFor(owner, doc._id);
     });
 };
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { VoiceAgentCallType, VoiceProvider, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
+import { VoiceProvider, type VoiceGeminiKeyView } from '@aixellabs/backend/db/types';
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
 import { removeNumber, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 
@@ -19,9 +19,8 @@ export type SetupGuideState = { provider: VoiceProvider; stepId: string | null; 
 
 export function usePhoneNumbersPage(data: PhoneNumbersPageData) {
     const [numbers, setNumbers] = useState<VoiceNumberListItem[]>(data.numbers);
-    const [connectOpen, setConnectOpen] = useState(false);
-    /** The number whose Change dialog is open (kept while it animates closed); `opened` counts openings, so each starts fresh. */
-    const [jobDialog, setJobDialog] = useState({ numberId: null as string | null, open: false, opened: 0 });
+    /** `opened` counts openings, so each starts with an empty form. */
+    const [connect, setConnect] = useState({ provider: VoiceProvider.TELNYX, open: false, opened: 0 });
     const [testCallNumber, setTestCallNumber] = useState<VoiceNumberListItem | null>(null);
     const [removeTarget, setRemoveTarget] = useState<VoiceNumberListItem | null>(null);
     const [removing, setRemoving] = useState(false);
@@ -31,27 +30,18 @@ export function usePhoneNumbersPage(data: PhoneNumbersPageData) {
         open: false,
     });
 
-    const openSetupGuide = (provider: VoiceProvider = VoiceProvider.TELNYX, stepId: string | null = null) =>
-        setSetupGuide({ provider, stepId, open: true });
+    const openConnect = (provider: VoiceProvider) =>
+        setConnect((prev) => ({ provider, open: true, opened: prev.opened + 1 }));
     /** Keeps the provider, so the dialog does not change content while it animates closed. */
-    const closeSetupGuide = () => setSetupGuide((prev) => ({ ...prev, open: false }));
+    const closeConnect = () => setConnect((prev) => ({ ...prev, open: false }));
 
-    const inboundAgents = data.agents.filter((a) => a.callType === VoiceAgentCallType.INBOUND);
-    const outboundAgents = data.agents.filter((a) => a.callType === VoiceAgentCallType.OUTBOUND);
+    const openSetupGuide = (provider: VoiceProvider, stepId: string | null = null) =>
+        setSetupGuide({ provider, stepId, open: true });
+    const closeSetupGuide = () => setSetupGuide((prev) => ({ ...prev, open: false }));
 
     const addImported = (imported: VoiceNumberListItem[]) => {
         setNumbers((prev) => [...imported, ...prev.filter((n) => !imported.some((i) => i._id === n._id))]);
     };
-
-    const replaceNumber = (updated: VoiceNumberListItem) => {
-        setNumbers((prev) => prev.map((n) => (n._id === updated._id ? updated : n)));
-    };
-
-    const openJobDialog = (number: VoiceNumberListItem) =>
-        setJobDialog((prev) => ({ numberId: number._id ?? null, open: true, opened: prev.opened + 1 }));
-    const closeJobDialog = () => setJobDialog((prev) => ({ ...prev, open: false }));
-    /** Read from the list, so the dialog sees each step's result as it lands. */
-    const jobNumber = numbers.find((n) => n._id === jobDialog.numberId) ?? null;
 
     const confirmRemove = async () => {
         if (!removeTarget?._id) return;
@@ -71,19 +61,13 @@ export function usePhoneNumbersPage(data: PhoneNumbersPageData) {
     return {
         numbers,
         agents: data.agents,
-        inboundAgents,
-        outboundAgents,
         loadError: data.loadError,
         geminiKey: data.geminiKey,
         hasGeminiKey: data.geminiKey.set,
-        connectOpen,
-        setConnectOpen,
+        connect,
+        openConnect,
+        closeConnect,
         addImported,
-        replaceNumber,
-        jobNumber,
-        jobDialog,
-        openJobDialog,
-        closeJobDialog,
         testCallNumber,
         setTestCallNumber,
         removeTarget,

@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { ObjectId } from 'mongodb';
 import type { Page } from '@playwright/test';
 import { VoiceAgentCallType, VoiceProvider, type VoiceNumberDoc } from '@aixellabs/backend/db/types';
 import type { E2eDb } from '../support/db';
@@ -10,11 +11,20 @@ import {
     FAKE_VOICELINK_TOKEN,
     FakeVoiceEngine,
     FakeVoiceLink,
-    PHONE_NUMBERS_URL,
     sealForE2e,
     VOICELINK_CUSTOMER_TRUNK_ID,
     type FakeVoiceLinkRouting,
 } from './fake-telephony';
+import {
+    LINK_UI_PENDING,
+    linkNumber,
+    numberRow,
+    numberUse,
+    openConnect,
+    openPhoneNumbers,
+    openRemove,
+    unlinkNumber,
+} from './phone-numbers-page';
 
 /** DID 501: both halves on the customer's SIP trunk (the update path). */
 const TRUNK_NUMBER = '+919484950416';
@@ -57,65 +67,8 @@ let voicelink: FakeVoiceLink;
 let engine: FakeVoiceEngine;
 let originalTrunkRule: FakeVoiceLinkRouting;
 
-async function openPhoneNumbers(page: Page): Promise<void> {
-    await page.goto(PHONE_NUMBERS_URL);
-    await waitForHydration(page, '#header');
-}
-
-function numberRow(page: Page, phoneNumber: string) {
-    return page.getByTestId('voice-number-row').filter({ hasText: phoneNumber });
-}
-
-type Job = 'Answer calls' | 'Make calls' | 'Not used yet';
-
-/** `agent`: pick this one. `preselected`: the agent the dialog must pick by itself for the new job. */
-type JobChoice = { agent?: string; preselected?: string };
-
-/** Opens the number's Change dialog, picks `job` (and its agent) and saves; returns the dialog showing each step's progress. */
-async function saveJob(page: Page, phoneNumber: string, job: Job, { agent, preselected }: JobChoice = {}) {
-    await numberRow(page, phoneNumber).getByRole('button', { name: `Change what ${phoneNumber} does` }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('radio', { name: job }).click();
-    const combobox = job === 'Answer calls' ? 'Agent that answers' : 'Agent that makes the calls';
-    // Soft: switching straight between answering and making calls empties the agent (app bug); still save to check the provider.
-    if (preselected) await expect.soft(dialog.getByRole('combobox', { name: combobox })).toHaveText(preselected);
-    const pick = agent ?? preselected;
-    if (pick) await chooseOption(page, combobox, pick);
-    await dialog.getByRole('button', { name: 'Save' }).click();
-    return dialog;
-}
-
-/** Changes what the number does and waits for every step to finish; `says` is the result the dialog must show. */
-async function changeJob(page: Page, phoneNumber: string, job: Job, { says, ...choice }: JobChoice & { says?: string } = {}) {
-    const dialog = await saveJob(page, phoneNumber, job, choice);
-    await expect(dialog.getByRole('heading', { name: 'All set' })).toBeVisible();
-    if (says) await expect(dialog.getByRole('status')).toContainText(says);
-    await page.keyboard.press('Escape');
-    await expect(dialog).toBeHidden();
-}
-
-/** The badge that says what the number does now. */
-function jobBadge(page: Page, phoneNumber: string) {
-    return numberRow(page, phoneNumber).getByTestId('number-job');
-}
-
-/** Remove sits in the row's "More" menu; returns the confirm dialog. */
-async function openRemove(page: Page, phoneNumber: string) {
-    await numberRow(page, phoneNumber).getByRole('button', { name: `More for ${phoneNumber}` }).click();
-    await page.getByRole('menuitem', { name: 'Remove' }).click();
-    return page.getByRole('dialog');
-}
-
-async function chooseOption(page: Page, combobox: string, option: string): Promise<void> {
-    await page.getByRole('combobox', { name: combobox }).click();
-    await page.getByRole('option', { name: option, exact: true }).click();
-}
-
 async function openVoiceLinkConnect(page: Page, token = FAKE_VOICELINK_TOKEN, clientId = '') {
-    await page.getByRole('button', { name: 'Connect a number' }).first().click();
-    const dialog = page.getByRole('dialog', { name: 'Connect a number' });
-    await dialog.getByRole('radio', { name: 'VoiceLink' }).click();
-    await expect(dialog.getByRole('radio', { name: 'VoiceLink' })).toHaveAttribute('aria-checked', 'true');
+    const dialog = await openConnect(page, 'VoiceLink');
     await dialog.getByLabel('VoiceLink API token').fill(token);
     if (clientId) await dialog.getByLabel('Client ID').fill(clientId);
     await dialog.getByRole('button', { name: 'Find my numbers' }).click();
@@ -131,13 +84,19 @@ async function seedAgents(db: E2eDb) {
     };
 }
 
-async function seedVoiceLinkNumber(db: E2eDb, phoneNumber: string, didId: number): Promise<string> {
+async function seedVoiceLinkNumber(
+    db: E2eDb,
+    phoneNumber: string,
+    didId: number,
+    agents: Pick<VoiceNumberDoc, 'inboundAgentId' | 'outboundAgentId'> = {},
+): Promise<string> {
     return db.insertVoiceNumber(E2E_USER, {
         provider: VoiceProvider.VOICELINK,
         phoneNumber,
         providerNumberId: String(didId),
         apiKeySealed: sealForE2e(FAKE_VOICELINK_TOKEN),
         voicelink: { clientId: null, botId: null, routingId: null },
+        ...agents,
     });
 }
 
@@ -185,7 +144,8 @@ test('connecting VoiceLink lists the DIDs and imports without changing anything;
     await expect(page.getByText('Nothing changed in VoiceLink')).toBeVisible();
 
     const row = numberRow(page, TRUNK_NUMBER);
-    await expect(row.getByTestId('number-job')).toHaveText('Not used yet');
+    await expect(numberUse(page, TRUNK_NUMBER)).toHaveText('Not linked to an agent');
+    await expect(row.getByTestId('number-provider-logo-VOICELINK')).toBeVisible();
     await expect(row.getByTestId('number-provider')).toHaveText('VoiceLink');
     await expect(numberRow(page, BARE_NUMBER)).toHaveCount(0);
 
@@ -244,260 +204,28 @@ test('a DID another account already connected cannot be imported', async ({ page
     }
 });
 
-test('answering calls creates the bot with signed URLs, takes only the inbound half, and "Not used yet" puts the trunk back', async ({
+test('a VoiceLink number places test calls only when an agent makes calls from it; an answering one is called instead', async ({
     page,
     db,
 }) => {
-    const { frontDesk, afterHours } = await seedAgents(db);
-    const numberId = await seedVoiceLinkNumber(db, TRUNK_NUMBER, TRUNK_DID_ID);
+    const { afterHours, followUps } = await seedAgents(db);
+    await seedVoiceLinkNumber(db, TRUNK_NUMBER, TRUNK_DID_ID, { inboundAgentId: new ObjectId(afterHours) });
+    const numberId = await seedVoiceLinkNumber(db, BARE_NUMBER, BARE_DID_ID, { outboundAgentId: new ObjectId(followUps) });
     await openPhoneNumbers(page);
-
-    await changeJob(page, TRUNK_NUMBER, 'Answer calls', {
-        says: `When someone calls ${TRUNK_NUMBER}, After hours picks up and talks to them.`,
-    });
-    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Answers calls');
-
-    expect(writeLines()).toEqual(['POST /v1/websocket-bot/create', `POST /v1/call-routing/update/${TRUNK_RULE_ID}`]);
-    const [botCreate, routingUpdate] = voicelink.writes();
-    expect(botCreate.body).toEqual(botBody(numberId, TRUNK_NUMBER, 1));
-    const [bot] = [...voicelink.bots.values()];
-    // Inbound to our bot; the outbound half resent exactly as it was.
-    expect(routingUpdate.body).toEqual({
-        for_inbound_call: 3,
-        for_outbound_call: 2,
-        status: 1,
-        inbound_websocket_bot_id: bot.id,
-        outbound_sip_trunk_id: TRUNK,
-    });
-    expect(voicelink.routings.get(TRUNK_DID_ID)).toMatchObject({
-        for_inbound_call: 3,
-        inbound_websocket_bot_id: bot.id,
-        for_outbound_call: 2,
-        outbound_sip_trunk_id: TRUNK,
-        status: 1,
-    });
-
-    let stored = await storedNumber(db);
-    expect(stored.inboundAgentId?.toString()).toBe(afterHours);
-    expect(stored.voicelink).toEqual({
-        clientId: null,
-        botId: bot.id,
-        routingId: TRUNK_RULE_ID,
-        previousRouting: TRUNK_RULE_SAVED,
-    });
-
-    // Changing the agent while on changes nothing at VoiceLink.
-    voicelink.clear();
-    await changeJob(page, TRUNK_NUMBER, 'Answer calls', {
-        agent: 'Front desk',
-        says: `When someone calls ${TRUNK_NUMBER}, Front desk picks up and talks to them.`,
-    });
-    expect(voicelink.requests).toHaveLength(0);
-    expect((await storedNumber(db)).inboundAgentId?.toString()).toBe(frontDesk);
-
-    // Not used: the inbound half goes back to the trunk, and the rule is exactly the customer's again.
-    await changeJob(page, TRUNK_NUMBER, 'Not used yet', {
-        says: `The AI does nothing with ${TRUNK_NUMBER}. Calls to it ring the way they always have.`,
-    });
-    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Not used yet');
-    expect(writeLines()).toEqual([`POST /v1/call-routing/update/${TRUNK_RULE_ID}`]);
-    expect(voicelink.writes()[0].body).toEqual({
-        for_inbound_call: 2,
-        for_outbound_call: 2,
-        status: 1,
-        inbound_sip_trunk_id: TRUNK,
-        outbound_sip_trunk_id: TRUNK,
-    });
-    expect(voicelink.routings.get(TRUNK_DID_ID)).toEqual(originalTrunkRule);
-    stored = await storedNumber(db);
-    expect(stored.inboundAgentId).toBeNull();
-    expect(stored.voicelink).toEqual({ clientId: null, botId: bot.id, routingId: TRUNK_RULE_ID });
-
-    // Answering again reuses the bot and saves the rule afresh.
-    voicelink.clear();
-    await changeJob(page, TRUNK_NUMBER, 'Answer calls');
-    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Answers calls');
-    expect(writeLines()).toEqual([`POST /v1/call-routing/update/${TRUNK_RULE_ID}`]);
-    expect((await storedNumber(db)).voicelink?.previousRouting).toEqual(TRUNK_RULE_SAVED);
-});
-
-test('making calls takes only the outbound half; switching to answering swaps the halves, and "Not used yet" restores the rule', async ({
-    page,
-    db,
-}) => {
-    const { sales } = await seedAgents(db);
-    await seedVoiceLinkNumber(db, TRUNK_NUMBER, TRUNK_DID_ID);
-    await openPhoneNumbers(page);
-
-    await changeJob(page, TRUNK_NUMBER, 'Make calls', {
-        says: `Follow-ups makes the calls you start from ${TRUNK_NUMBER}.`,
-    });
-    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Makes calls');
-    const [bot] = [...voicelink.bots.values()];
-    expect(writeLines()).toEqual(['POST /v1/websocket-bot/create', `POST /v1/call-routing/update/${TRUNK_RULE_ID}`]);
-    expect(voicelink.writes()[1].body).toEqual({
-        for_inbound_call: 2,
-        for_outbound_call: 3,
-        status: 1,
-        inbound_sip_trunk_id: TRUNK,
-        outbound_websocket_bot_id: bot.id,
-    });
-    // Another agent for the same job changes nothing at VoiceLink.
-    voicelink.clear();
-    await changeJob(page, TRUNK_NUMBER, 'Make calls', {
-        agent: 'Sales outreach',
-        says: `Sales outreach makes the calls you start from ${TRUNK_NUMBER}.`,
-    });
-    expect(voicelink.writes()).toHaveLength(0);
-    let stored = await storedNumber(db);
-    expect(stored.outboundAgentId?.toString()).toBe(sales);
-    expect(stored.voicelink?.previousRouting).toEqual(TRUNK_RULE_SAVED);
-
-    // Answering instead: the outbound half goes back to the trunk first, then the inbound half is ours.
-    voicelink.clear();
-    await changeJob(page, TRUNK_NUMBER, 'Answer calls', { preselected: 'After hours' });
-    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Answers calls');
-    expect(voicelink.writes().map((r) => r.body)).toEqual([
-        {
-            for_inbound_call: 2,
-            for_outbound_call: 2,
-            status: 1,
-            inbound_sip_trunk_id: TRUNK,
-            outbound_sip_trunk_id: TRUNK,
-        },
-        {
-            for_inbound_call: 3,
-            for_outbound_call: 2,
-            status: 1,
-            inbound_websocket_bot_id: bot.id,
-            outbound_sip_trunk_id: TRUNK,
-        },
-    ]);
-    stored = await storedNumber(db);
-    expect(stored.outboundAgentId).toBeNull();
-    expect(stored.voicelink?.previousRouting).toEqual(TRUNK_RULE_SAVED);
-
-    // Not used: the rule is the customer's again.
-    voicelink.clear();
-    await changeJob(page, TRUNK_NUMBER, 'Not used yet');
-    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Not used yet');
-    expect(voicelink.routings.get(TRUNK_DID_ID)).toEqual(originalTrunkRule);
-    stored = await storedNumber(db);
-    expect(stored.inboundAgentId).toBeNull();
-    expect(stored.voicelink).not.toHaveProperty('previousRouting');
-});
-
-test('a DID with no rule gets one made for it, switched off again once nothing of ours uses it', async ({ page, db }) => {
-    await seedAgents(db);
-    await seedVoiceLinkNumber(db, BARE_NUMBER, BARE_DID_ID);
-    await openPhoneNumbers(page);
-    expect(voicelink.routings.has(BARE_DID_ID)).toBe(false);
-
-    await changeJob(page, BARE_NUMBER, 'Answer calls');
-    await expect(jobBadge(page, BARE_NUMBER)).toHaveText('Answers calls');
-    const [bot] = [...voicelink.bots.values()];
-    expect(writeLines()).toEqual(['POST /v1/websocket-bot/create', 'POST /v1/call-routing/create']);
-    expect(voicelink.writes()[1].body).toEqual({
-        did_number: '918069450100',
-        did_id: BARE_DID_ID,
-        for_inbound_call: 3,
-        for_outbound_call: 4,
-        status: 1,
-        inbound_websocket_bot_id: bot.id,
-    });
-    const rule = voicelink.routings.get(BARE_DID_ID) as FakeVoiceLinkRouting;
-    let stored = await storedNumber(db);
-    // null: the DID had no rule before us.
-    expect(stored.voicelink).toEqual({ clientId: null, botId: bot.id, routingId: rule.id, previousRouting: null });
-
-    // Nothing of ours left: the rule we made is switched off as it stands (VoiceLink has no delete).
-    voicelink.clear();
-    await changeJob(page, BARE_NUMBER, 'Not used yet');
-    await expect(jobBadge(page, BARE_NUMBER)).toHaveText('Not used yet');
-    expect(voicelink.writes().map((r) => r.body)).toEqual([
-        { for_inbound_call: 3, for_outbound_call: 4, status: 0, inbound_websocket_bot_id: bot.id },
-    ]);
-    expect(voicelink.routings.get(BARE_DID_ID)?.status).toBe(0);
-    stored = await storedNumber(db);
-    expect(stored.voicelink).toEqual({ clientId: null, botId: bot.id, routingId: rule.id });
-
-    // Next time the leftover is not mistaken for the customer's own handler.
-    voicelink.clear();
-    await changeJob(page, BARE_NUMBER, 'Answer calls');
-    await expect(jobBadge(page, BARE_NUMBER)).toHaveText('Answers calls');
-    expect((await storedNumber(db)).voicelink?.previousRouting).toEqual({
-        forInboundCall: null,
-        forOutboundCall: 4,
-        inboundSipTrunkId: null,
-        inboundWebsocketBotId: null,
-        outboundSipTrunkId: null,
-        outboundWebsocketBotId: null,
-        status: 0,
-    });
-    expect(voicelink.writes().map((r) => r.body)).toEqual([
-        { for_inbound_call: 3, for_outbound_call: 4, status: 1, inbound_websocket_bot_id: bot.id },
-    ]);
-});
-
-test('removing a VoiceLink number puts its rule back exactly and switches the bot off', async ({ page, db }) => {
-    await seedAgents(db);
-    const numberId = await seedVoiceLinkNumber(db, TRUNK_NUMBER, TRUNK_DID_ID);
-    await openPhoneNumbers(page);
-    // It made calls first, then switched to answering them.
-    await changeJob(page, TRUNK_NUMBER, 'Make calls');
-    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Makes calls');
-    await changeJob(page, TRUNK_NUMBER, 'Answer calls', { preselected: 'After hours' });
-    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Answers calls');
-    const [bot] = [...voicelink.bots.values()];
-    voicelink.clear();
-
-    const dialog = await openRemove(page, TRUNK_NUMBER);
-    await expect(dialog).toContainText('calls ring the way they did before you connected it');
-    await dialog.getByRole('button', { name: 'Remove number' }).click();
-    await expect(page.getByText('No phone numbers yet')).toBeVisible();
-
-    expect(writeLines()).toEqual([
-        `POST /v1/call-routing/update/${TRUNK_RULE_ID}`,
-        `POST /v1/websocket-bot/update/${bot.id}`,
-    ]);
-    expect(voicelink.writes()[0].body).toEqual({
-        for_inbound_call: 2,
-        for_outbound_call: 2,
-        status: 1,
-        inbound_sip_trunk_id: TRUNK,
-        outbound_sip_trunk_id: TRUNK,
-    });
-    expect(voicelink.writes()[1].body).toEqual(botBody(numberId, TRUNK_NUMBER, 0));
-    expect(voicelink.routings.get(TRUNK_DID_ID)).toEqual(originalTrunkRule);
-    expect(voicelink.bots.get(bot.id)?.status).toBe(0);
-    expect(await db.getVoiceNumbers(E2E_USER)).toHaveLength(0);
-});
-
-test('a VoiceLink number places test calls only when set to make calls; an answering one is called instead', async ({
-    page,
-    db,
-}) => {
-    const { followUps } = await seedAgents(db);
-    const numberId = await seedVoiceLinkNumber(db, TRUNK_NUMBER, TRUNK_DID_ID);
-    await openPhoneNumbers(page);
-    await changeJob(page, TRUNK_NUMBER, 'Answer calls');
-    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Answers calls');
 
     await numberRow(page, TRUNK_NUMBER).getByRole('button', { name: 'Test call' }).click();
     let dialog = page.getByRole('dialog', { name: 'Test call' });
-    await expect(dialog).toContainText('VoiceLink only places AI calls from a number set to “Make calls”.');
+    await expect(dialog).toContainText('VoiceLink only places AI calls from a number an agent makes calls from.');
     await expect(dialog).toContainText(`To try After hours, call ${TRUNK_NUMBER} from your phone: it answers.`);
     await expect(dialog.getByRole('button', { name: 'Call me now' })).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
 
-    await changeJob(page, TRUNK_NUMBER, 'Make calls', { preselected: 'Follow-ups' });
-    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Makes calls');
-    voicelink.clear();
-
-    await numberRow(page, TRUNK_NUMBER).getByRole('button', { name: 'Test call' }).click();
+    await numberRow(page, BARE_NUMBER).getByRole('button', { name: 'Test call' }).click();
     dialog = page.getByRole('dialog', { name: 'Test call' });
     await expect(dialog).toContainText('The call is charged to your VoiceLink balance');
+    // VoiceLink publishes no rate: only Gemini is counted.
+    await expect(dialog.getByTestId('test-call-cost')).toContainText('a minute to India (an estimate, without VoiceLink’s charge).');
     await expect(dialog.getByLabel('Your phone number')).toHaveAttribute('placeholder', '+919876543210');
     await expect(dialog.getByRole('combobox', { name: 'Agent that calls' })).toHaveText('Follow-ups (makes calls)');
     await dialog.getByLabel('Your phone number').fill('+91 98765 43210');
@@ -511,7 +239,7 @@ test('a VoiceLink number places test calls only when set to make calls; an answe
         authorization: `Bearer ${E2E_VOICE_ENGINE_SECRET}`,
         body: { numberId, to: '+919876543210', agentId: followUps },
     });
-    // The routing was set with "Make calls"; the call itself changes nothing at VoiceLink.
+    // The call itself changes nothing at VoiceLink.
     expect(voicelink.writes()).toHaveLength(0);
 });
 
@@ -520,4 +248,211 @@ test('a wrong VoiceLink token is refused and nothing is stored', async ({ page, 
     const dialog = await openVoiceLinkConnect(page, '41|not_a_real_token');
     await expect(dialog.getByRole('alert')).toContainText('VoiceLink rejected this API token');
     expect(await db.getVoiceNumbers(E2E_USER)).toHaveLength(0);
+});
+
+/** VoiceLink routing as the agent editor links and unlinks numbers (the agent's type is the number's job). */
+test.describe('linking from the agent editor', () => {
+    test.fixme(LINK_UI_PENDING !== null, LINK_UI_PENDING ?? '');
+
+    test('an inbound agent creates the bot with signed URLs, takes only the inbound half, and unlinking puts the trunk back', async ({
+        page,
+        db,
+    }) => {
+        const { frontDesk, afterHours } = await seedAgents(db);
+        const numberId = await seedVoiceLinkNumber(db, TRUNK_NUMBER, TRUNK_DID_ID);
+        await linkNumber(page, afterHours, TRUNK_NUMBER);
+
+        expect(writeLines()).toEqual(['POST /v1/websocket-bot/create', `POST /v1/call-routing/update/${TRUNK_RULE_ID}`]);
+        const [botCreate, routingUpdate] = voicelink.writes();
+        expect(botCreate.body).toEqual(botBody(numberId, TRUNK_NUMBER, 1));
+        const [bot] = [...voicelink.bots.values()];
+        // Inbound to our bot; the outbound half resent exactly as it was.
+        expect(routingUpdate.body).toEqual({
+            for_inbound_call: 3,
+            for_outbound_call: 2,
+            status: 1,
+            inbound_websocket_bot_id: bot.id,
+            outbound_sip_trunk_id: TRUNK,
+        });
+        expect(voicelink.routings.get(TRUNK_DID_ID)).toMatchObject({
+            for_inbound_call: 3,
+            inbound_websocket_bot_id: bot.id,
+            for_outbound_call: 2,
+            outbound_sip_trunk_id: TRUNK,
+            status: 1,
+        });
+
+        let stored = await storedNumber(db);
+        expect(stored.inboundAgentId?.toString()).toBe(afterHours);
+        expect(stored.voicelink).toEqual({
+            clientId: null,
+            botId: bot.id,
+            routingId: TRUNK_RULE_ID,
+            previousRouting: TRUNK_RULE_SAVED,
+        });
+
+        // Another inbound agent changes nothing at VoiceLink.
+        voicelink.clear();
+        await linkNumber(page, frontDesk, TRUNK_NUMBER);
+        expect(voicelink.requests).toHaveLength(0);
+        expect((await storedNumber(db)).inboundAgentId?.toString()).toBe(frontDesk);
+
+        // Unlinked: the inbound half goes back to the trunk, and the rule is exactly the customer's again.
+        await unlinkNumber(page, frontDesk, TRUNK_NUMBER);
+        expect(writeLines()).toEqual([`POST /v1/call-routing/update/${TRUNK_RULE_ID}`]);
+        expect(voicelink.writes()[0].body).toEqual({
+            for_inbound_call: 2,
+            for_outbound_call: 2,
+            status: 1,
+            inbound_sip_trunk_id: TRUNK,
+            outbound_sip_trunk_id: TRUNK,
+        });
+        expect(voicelink.routings.get(TRUNK_DID_ID)).toEqual(originalTrunkRule);
+        stored = await storedNumber(db);
+        expect(stored.inboundAgentId).toBeNull();
+        expect(stored.voicelink).toEqual({ clientId: null, botId: bot.id, routingId: TRUNK_RULE_ID });
+
+        // Answering again reuses the bot and saves the rule afresh.
+        voicelink.clear();
+        await linkNumber(page, afterHours, TRUNK_NUMBER);
+        expect(writeLines()).toEqual([`POST /v1/call-routing/update/${TRUNK_RULE_ID}`]);
+        expect((await storedNumber(db)).voicelink?.previousRouting).toEqual(TRUNK_RULE_SAVED);
+    });
+
+    test('an outbound agent takes only the outbound half; an inbound one swaps the halves, and unlinking restores the rule', async ({
+        page,
+        db,
+    }) => {
+        const { sales, followUps, afterHours } = await seedAgents(db);
+        await seedVoiceLinkNumber(db, TRUNK_NUMBER, TRUNK_DID_ID);
+        await linkNumber(page, followUps, TRUNK_NUMBER);
+        const [bot] = [...voicelink.bots.values()];
+        expect(writeLines()).toEqual(['POST /v1/websocket-bot/create', `POST /v1/call-routing/update/${TRUNK_RULE_ID}`]);
+        expect(voicelink.writes()[1].body).toEqual({
+            for_inbound_call: 2,
+            for_outbound_call: 3,
+            status: 1,
+            inbound_sip_trunk_id: TRUNK,
+            outbound_websocket_bot_id: bot.id,
+        });
+        // Another agent for the same job changes nothing at VoiceLink.
+        voicelink.clear();
+        await linkNumber(page, sales, TRUNK_NUMBER);
+        expect(voicelink.writes()).toHaveLength(0);
+        let stored = await storedNumber(db);
+        expect(stored.outboundAgentId?.toString()).toBe(sales);
+        expect(stored.voicelink?.previousRouting).toEqual(TRUNK_RULE_SAVED);
+
+        // Answering instead: the outbound half goes back to the trunk first, then the inbound half is ours.
+        voicelink.clear();
+        await linkNumber(page, afterHours, TRUNK_NUMBER);
+        expect(voicelink.writes().map((r) => r.body)).toEqual([
+            {
+                for_inbound_call: 2,
+                for_outbound_call: 2,
+                status: 1,
+                inbound_sip_trunk_id: TRUNK,
+                outbound_sip_trunk_id: TRUNK,
+            },
+            {
+                for_inbound_call: 3,
+                for_outbound_call: 2,
+                status: 1,
+                inbound_websocket_bot_id: bot.id,
+                outbound_sip_trunk_id: TRUNK,
+            },
+        ]);
+        stored = await storedNumber(db);
+        expect(stored.outboundAgentId).toBeNull();
+        expect(stored.voicelink?.previousRouting).toEqual(TRUNK_RULE_SAVED);
+
+        // Unlinked: the rule is the customer's again.
+        voicelink.clear();
+        await unlinkNumber(page, afterHours, TRUNK_NUMBER);
+        expect(voicelink.routings.get(TRUNK_DID_ID)).toEqual(originalTrunkRule);
+        stored = await storedNumber(db);
+        expect(stored.inboundAgentId).toBeNull();
+        expect(stored.voicelink).not.toHaveProperty('previousRouting');
+    });
+
+    test('a DID with no rule gets one made for it, switched off again once nothing of ours uses it', async ({ page, db }) => {
+        const { afterHours } = await seedAgents(db);
+        await seedVoiceLinkNumber(db, BARE_NUMBER, BARE_DID_ID);
+        expect(voicelink.routings.has(BARE_DID_ID)).toBe(false);
+
+        await linkNumber(page, afterHours, BARE_NUMBER);
+        const [bot] = [...voicelink.bots.values()];
+        expect(writeLines()).toEqual(['POST /v1/websocket-bot/create', 'POST /v1/call-routing/create']);
+        expect(voicelink.writes()[1].body).toEqual({
+            did_number: '918069450100',
+            did_id: BARE_DID_ID,
+            for_inbound_call: 3,
+            for_outbound_call: 4,
+            status: 1,
+            inbound_websocket_bot_id: bot.id,
+        });
+        const rule = voicelink.routings.get(BARE_DID_ID) as FakeVoiceLinkRouting;
+        let stored = await storedNumber(db);
+        // null: the DID had no rule before us.
+        expect(stored.voicelink).toEqual({ clientId: null, botId: bot.id, routingId: rule.id, previousRouting: null });
+
+        // Nothing of ours left: the rule we made is switched off as it stands (VoiceLink has no delete).
+        voicelink.clear();
+        await unlinkNumber(page, afterHours, BARE_NUMBER);
+        expect(voicelink.writes().map((r) => r.body)).toEqual([
+            { for_inbound_call: 3, for_outbound_call: 4, status: 0, inbound_websocket_bot_id: bot.id },
+        ]);
+        expect(voicelink.routings.get(BARE_DID_ID)?.status).toBe(0);
+        stored = await storedNumber(db);
+        expect(stored.voicelink).toEqual({ clientId: null, botId: bot.id, routingId: rule.id });
+
+        // Next time the leftover is not mistaken for the customer's own handler.
+        voicelink.clear();
+        await linkNumber(page, afterHours, BARE_NUMBER);
+        expect((await storedNumber(db)).voicelink?.previousRouting).toEqual({
+            forInboundCall: null,
+            forOutboundCall: 4,
+            inboundSipTrunkId: null,
+            inboundWebsocketBotId: null,
+            outboundSipTrunkId: null,
+            outboundWebsocketBotId: null,
+            status: 0,
+        });
+        expect(voicelink.writes().map((r) => r.body)).toEqual([
+            { for_inbound_call: 3, for_outbound_call: 4, status: 1, inbound_websocket_bot_id: bot.id },
+        ]);
+    });
+
+    test('removing a VoiceLink number puts its rule back exactly and switches the bot off', async ({ page, db }) => {
+        const { followUps, afterHours } = await seedAgents(db);
+        const numberId = await seedVoiceLinkNumber(db, TRUNK_NUMBER, TRUNK_DID_ID);
+        // It made calls first, then switched to answering them.
+        await linkNumber(page, followUps, TRUNK_NUMBER);
+        await linkNumber(page, afterHours, TRUNK_NUMBER);
+        const [bot] = [...voicelink.bots.values()];
+        voicelink.clear();
+
+        await openPhoneNumbers(page);
+
+        const dialog = await openRemove(page, TRUNK_NUMBER);
+        await expect(dialog).toContainText('calls ring the way they did before you connected it');
+        await dialog.getByRole('button', { name: 'Remove number' }).click();
+        await expect(page.getByText('No phone numbers yet')).toBeVisible();
+
+        expect(writeLines()).toEqual([
+            `POST /v1/call-routing/update/${TRUNK_RULE_ID}`,
+            `POST /v1/websocket-bot/update/${bot.id}`,
+        ]);
+        expect(voicelink.writes()[0].body).toEqual({
+            for_inbound_call: 2,
+            for_outbound_call: 2,
+            status: 1,
+            inbound_sip_trunk_id: TRUNK,
+            outbound_sip_trunk_id: TRUNK,
+        });
+        expect(voicelink.writes()[1].body).toEqual(botBody(numberId, TRUNK_NUMBER, 0));
+        expect(voicelink.routings.get(TRUNK_DID_ID)).toEqual(originalTrunkRule);
+        expect(voicelink.bots.get(bot.id)?.status).toBe(0);
+        expect(await db.getVoiceNumbers(E2E_USER)).toHaveLength(0);
+    });
 });

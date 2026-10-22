@@ -25,7 +25,7 @@ import { SubModuleUrls } from '@/config/app-config';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
-import { estimateAgentCost, formatMoney } from '@/helpers/voice-call-cost';
+import { estimateAgentCost, formatMoney, RATE_COUNTRY_NAME, rateCountry } from '@/helpers/voice-call-cost';
 
 /** What to know before calling through each provider. */
 const PROVIDER_NOTE: Record<VoiceProvider, string> = {
@@ -97,20 +97,26 @@ export function TestCallDialog({ open, onOpenChange, numbers, agents, geminiKey,
     const agent = agents.find((a) => a.id === form.watch('agentId')) ?? null;
     const agentName = agent?.name ?? 'The agent';
     const currency = useDisplayCurrency();
-    // The engine dials out for every test call; VoiceLink publishes no rate, so only Gemini is counted there.
+    const to = form.watch('to');
+    // The engine dials out for every test call, priced by where it goes (the number's own country until
+    // one is typed). VoiceLink publishes no rate, nor Telnyx for India: only Gemini is counted there.
     const costLine = (() => {
         if (!agent || !number) return null;
+        const phone = to.trim().startsWith('+') ? to : number.phoneNumber;
+        const country = rateCountry(phone);
         const estimate = estimateAgentCost({
             promptChars: agent.promptChars,
             freeTier: geminiKey.tier === 'free',
             callType: VoiceAgentCallType.OUTBOUND,
             providers: [number.provider],
+            phone,
         });
+        const where = country ? ` to ${RATE_COUNTRY_NAME[country]}` : '';
         const without =
             estimate.providers[0].usdPerMinute === null
                 ? `, without ${numberProviderInfo(number.provider).label}’s charge`
                 : '';
-        return `It should cost about ${formatMoney(estimate.usdPerMinute, currency)} a minute (an estimate${without}).`;
+        return `It should cost about ${formatMoney(estimate.usdPerMinute, currency)} a minute${where} (an estimate${without}).`;
     })();
     const from = number ? <span className="font-medium tabular-nums">{number.phoneNumber}</span> : 'your number';
     // Calling the number itself is the real test of an agent that answers it.
@@ -148,10 +154,10 @@ export function TestCallDialog({ open, onOpenChange, numbers, agents, geminiKey,
                     </>
                 ) : (
                     <>
-                        VoiceLink only places AI calls from a number set to &ldquo;Make calls&rdquo;.
+                        VoiceLink only places AI calls from a number an agent makes calls from.
                         {answeredBy && numbers.length === 1
                             ? ` To try ${answeredBy}, call ${numbers[0].phoneNumber} from your phone: it answers.`
-                            : ' Set one of your numbers to “Make calls” on the Phone numbers page first.'}
+                            : ' Link an agent that makes calls to one of your numbers first, from the agent’s page.'}
                     </>
                 )}
             </p>

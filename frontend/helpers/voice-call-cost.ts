@@ -47,13 +47,30 @@ export function isCostEstimated(cost: Pick<VoiceCallCost, 'provider' | 'provider
     return !!cost.provider && !cost.providerExact;
 }
 
-type ProviderRates = { usdPerMinute: Record<string, number>; extrasUsdPerMinute: number };
+type ProviderRates = { usdPerMinute: Record<string, number | undefined>; extrasUsdPerMinute: number };
 
-/** A provider's list rate a minute for a direction, or null when it publishes none. */
-export function providerUsdPerMinute(provider: VoiceProvider, callType: VoiceAgentCallType): number | null {
+/** The countries the list rates cover, in words. */
+export const RATE_COUNTRY_NAME = { US: 'the US', IN: 'India' } as const;
+
+/** The countries the list rates cover, by the number's prefix: the US (+1) and India (+91); null for any other. */
+export function rateCountry(phone: string): keyof typeof RATE_COUNTRY_NAME | null {
+    const digits = phone.replace(/[^\d+]/g, '');
+    if (digits.startsWith('+1')) return 'US';
+    if (digits.startsWith('+91')) return 'IN';
+    return null;
+}
+
+/**
+ * A provider's list rate a minute, or null when it publishes none. `phone` is where the call goes
+ * (a call out) or the number called (a call in); without one, the US rate. The engine prices calls
+ * the same way (backend/voice/costs.py).
+ */
+export function providerUsdPerMinute(provider: VoiceProvider, callType: VoiceAgentCallType, phone?: string): number | null {
     const rates = (VOICE_CALL_RATES.providers as Record<string, ProviderRates | undefined>)[provider];
-    if (!rates) return null;
-    return rates.usdPerMinute[callType] + rates.extrasUsdPerMinute;
+    const country = phone ? rateCountry(phone) : 'US';
+    const key = country === 'US' ? callType : country === 'IN' ? `${callType}_IN` : null;
+    const rate = rates && key ? rates.usdPerMinute[key] : undefined;
+    return rate === undefined ? null : rate + (rates?.extrasUsdPerMinute ?? 0);
 }
 
 export type AgentCostEstimate = {
@@ -77,6 +94,8 @@ export function estimateAgentCost(input: {
     freeTier: boolean;
     callType: VoiceAgentCallType;
     providers: VoiceProvider[];
+    /** Where the calls go (or the number called); the US when unknown. */
+    phone?: string;
 }): AgentCostEstimate {
     const model = VOICE_CALL_RATES.estimate;
     const promptTokens = Math.ceil(input.promptChars / model.charsPerToken) + model.engineTokens;
@@ -85,7 +104,7 @@ export function estimateAgentCost(input: {
         : model.geminiUsdPerMinute + promptTokens * model.geminiUsdPerPromptTokenMinute;
     const providers = [...new Set(input.providers)].map((provider) => ({
         provider,
-        usdPerMinute: providerUsdPerMinute(provider, input.callType),
+        usdPerMinute: providerUsdPerMinute(provider, input.callType, input.phone),
     }));
     const dearest = Math.max(0, ...providers.map((p) => p.usdPerMinute ?? 0));
     return {

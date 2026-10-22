@@ -14,7 +14,7 @@ export type SetupGuideStep = {
     title: string;
     /** One or two short paragraphs. */
     body: string[];
-    /** A screenshot of the step. Optional: a step without one shows its text only. */
+    /** A screenshot or an illustration of the step. Optional: a step without one shows its text only. */
     image?: SetupGuideImage;
     /** A page in the provider's own portal, opened in a new tab. */
     link?: { href: string; label: string };
@@ -36,12 +36,12 @@ export const TELNYX_GUIDE_STEP = {
     CHANGES: 'changes',
 } as const;
 
-const TELNYX_IMAGE_DIR = '/voice-agent/guides/telnyx';
-const SCREENSHOT_SIZE = { width: 1400, height: 875 };
-
-function telnyxImage(file: string, alt: string): SetupGuideImage {
-    return { src: `${TELNYX_IMAGE_DIR}/${file}`, alt, ...SCREENSHOT_SIZE };
+/** Every guide image is 1400x875, under `public/voice-agent/guides/<provider>/`. */
+function guideImage(provider: string, file: string, alt: string): SetupGuideImage {
+    return { src: `/voice-agent/guides/${provider}/${file}`, alt, width: 1400, height: 875 };
 }
+
+const telnyxImage = (file: string, alt: string) => guideImage('telnyx', file, alt);
 
 const TELNYX_GUIDE: SetupGuide = {
     provider: VoiceProvider.TELNYX,
@@ -103,7 +103,7 @@ const TELNYX_GUIDE: SetupGuide = {
             id: TELNYX_GUIDE_STEP.CONNECT,
             title: 'Paste the key here and pick your number',
             body: [
-                'On this page, click Connect a number, choose Telnyx, paste the key and click Find my numbers.',
+                'On this page, open Connect a number, choose Telnyx, paste the key and click Find my numbers.',
                 'Tick the numbers you want and import them. Importing changes nothing in Telnyx: each number keeps ringing where it does.',
             ],
             image: telnyxImage(
@@ -115,8 +115,8 @@ const TELNYX_GUIDE: SetupGuide = {
             id: TELNYX_GUIDE_STEP.CHANGES,
             title: 'What Aixel Labs changes in your Telnyx account',
             body: [
-                'When a number is set to “Make calls” (or places a test call), we add a Voice API app named “Aixel Labs voice agents” (Voice Suite, Programmable Voice). A trial account can hold only one, so if you already have one we use it as it is.',
-                'When a number is set to “Answer calls”, we add a TeXML app for that number and point the number at it. Pick another job for it, or remove it, and the number goes back to the connection it had before; removing it also deletes the apps we added.',
+                'When an agent that makes calls uses a number (or it places a test call), we add a Voice API app named “Aixel Labs voice agents” (Voice Suite, Programmable Voice). A trial account can hold only one, so if you already have one we use it as it is.',
+                'When an agent that answers calls uses a number, we add a TeXML app for that number and point the number at it. Unlink it from the agent, or remove it, and the number goes back to the connection it had before; removing it also deletes the apps we added.',
             ],
             image: telnyxImage(
                 '6-what-we-change.webp',
@@ -138,16 +138,7 @@ export const TWILIO_GUIDE_STEP = {
     CHANGES: 'changes',
 } as const;
 
-type TwilioGuideStepId = (typeof TWILIO_GUIDE_STEP)[keyof typeof TWILIO_GUIDE_STEP];
-
-/**
- * Screenshots for the Twilio guide, by step. None exist yet (they need a Twilio account to be taken
- * from, and only plain screenshots of the Console: no Twilio logos or brand art). To add one, save
- * it as `public/voice-agent/guides/twilio/<n>-<step>.webp` at 1400x875, like the Telnyx ones, and
- * add `[TWILIO_GUIDE_STEP.X]: { src: '/voice-agent/guides/twilio/…', alt, ...SCREENSHOT_SIZE }`
- * here; the step shows it from then on (the setup-guide spec checks that every image loads).
- */
-const TWILIO_SCREENSHOTS: Partial<Record<TwilioGuideStepId, SetupGuideImage>> = {};
+const twilioImage = (file: string, alt: string) => guideImage('twilio', file, alt);
 
 const TWILIO_GUIDE: SetupGuide = {
     provider: VoiceProvider.TWILIO,
@@ -160,7 +151,10 @@ const TWILIO_GUIDE: SetupGuide = {
                 'Twilio is the phone company your agents call through, with your own account and your own bill. A free trial account is enough to try it.',
                 'A trial account can only call numbers you verify (Phone Numbers, Verified Caller IDs), and plays a short trial message first: on calls your agent places, the person has to press a key before they hear the agent. Upgrade the account before you call real leads.',
             ],
-            image: TWILIO_SCREENSHOTS[TWILIO_GUIDE_STEP.ACCOUNT],
+            image: twilioImage(
+                '1-twilio-account.webp',
+                'An illustration of the Twilio sign-up form, with the form and the Log in link highlighted',
+            ),
             link: { href: 'https://www.twilio.com/try-twilio', label: 'Create a Twilio account' },
         },
         {
@@ -171,7 +165,10 @@ const TWILIO_GUIDE: SetupGuide = {
                 'Give it only what your agents use. Phone Numbers: read and update your numbers (to list them and point a number at your agent). Voice: Calls (create, read and update: to place calls and hang up) and Call Recordings (create and read: to record calls and play them in Call logs). A Standard key works too, with access to everything.',
                 'Copy the SID (it starts with SK) and the Secret right away: Twilio shows the secret only once. You can paste your Auth Token instead, but an API key is safer: you can delete it at any time without changing anything else.',
             ],
-            image: TWILIO_SCREENSHOTS[TWILIO_GUIDE_STEP.API_KEY],
+            image: twilioImage(
+                '2-api-key.webp',
+                'An illustration of creating an API key in the Twilio Console, with the Restricted key type and the Create button highlighted',
+            ),
             link: {
                 href: 'https://console.twilio.com/us1/account/keys-credentials/api-keys',
                 label: 'Open API keys & tokens',
@@ -184,7 +181,10 @@ const TWILIO_GUIDE: SetupGuide = {
                 'Your Account SID starts with AC. It is on the Twilio Console home page, under Account Info, next to the Auth Token.',
                 'We need it with the API key: Twilio files every number and call under the account.',
             ],
-            image: TWILIO_SCREENSHOTS[TWILIO_GUIDE_STEP.ACCOUNT_SID],
+            image: twilioImage(
+                '3-account-sid.webp',
+                'An illustration of Account Info on the Twilio Console home page, with the Account SID highlighted',
+            ),
             link: { href: 'https://console.twilio.com/', label: 'Open the Twilio Console' },
         },
         {
@@ -194,7 +194,10 @@ const TWILIO_GUIDE: SetupGuide = {
                 'Your agents call from, and answer, a number in your own Twilio account. Phone Numbers, Manage, Active numbers lists the ones you have. No number yet? Buy one there, with Voice ticked.',
                 'Numbers that only send messages cannot take calls, so they cannot be imported.',
             ],
-            image: TWILIO_SCREENSHOTS[TWILIO_GUIDE_STEP.NUMBER],
+            image: twilioImage(
+                '4-phone-number.webp',
+                'An illustration of Active numbers in the Twilio Console, with a number that has Voice and the Buy a number button highlighted',
+            ),
             link: {
                 href: 'https://console.twilio.com/us1/develop/phone-numbers/manage/incoming',
                 label: 'Open Active numbers',
@@ -206,7 +209,10 @@ const TWILIO_GUIDE: SetupGuide = {
             body: [
                 'Twilio only places calls to countries you have allowed. Open Voice, Settings, Geo permissions, tick every country you plan to call and save.',
             ],
-            image: TWILIO_SCREENSHOTS[TWILIO_GUIDE_STEP.GEO_PERMISSIONS],
+            image: twilioImage(
+                '5-geo-permissions.webp',
+                'An illustration of Voice Geo permissions in the Twilio Console, with the ticked countries and the Save button highlighted',
+            ),
             link: {
                 href: 'https://console.twilio.com/us1/develop/voice/settings/geo-permissions',
                 label: 'Open Geo permissions',
@@ -216,19 +222,25 @@ const TWILIO_GUIDE: SetupGuide = {
             id: TWILIO_GUIDE_STEP.CONNECT,
             title: 'Paste the details here and pick your number',
             body: [
-                'On this page, click Connect a number and choose Twilio. Paste the Account SID, the API key SID and its secret, and click Find my numbers.',
+                'On this page, open Connect a number and choose Twilio. Paste the Account SID, the API key SID and its secret, and click Find my numbers.',
                 'Tick the numbers you want and import them. Importing changes nothing in Twilio: each number keeps ringing where it does.',
             ],
-            image: TWILIO_SCREENSHOTS[TWILIO_GUIDE_STEP.CONNECT],
+            image: twilioImage(
+                '6-connect-in-aixel-labs.webp',
+                'An illustration of the Connect a Twilio number dialog in Aixel Labs, with the credential fields highlighted',
+            ),
         },
         {
             id: TWILIO_GUIDE_STEP.CHANGES,
             title: 'What Aixel Labs changes in your Twilio account',
             body: [
-                'When a number is set to “Answer calls”, we set its Voice URL (A call comes in, Webhook) to our agent. If the number was on a TwiML app or a SIP trunk, we take it off. We save its settings first: pick another job for it, or remove it, and they go back exactly as they were.',
+                'When an agent that answers calls uses a number, we set its Voice URL (A call comes in, Webhook) to our agent. If the number was on a TwiML app or a SIP trunk, we take it off. We save its settings first: unlink it from the agent, or remove it, and they go back exactly as they were.',
                 'Calls your agents place need no change in your account. They connect when the person answers, and are recorded in your Twilio account (Monitor, Call recordings).',
             ],
-            image: TWILIO_SCREENSHOTS[TWILIO_GUIDE_STEP.CHANGES],
+            image: twilioImage(
+                '7-what-we-change.webp',
+                'An illustration of a number’s voice configuration in the Twilio Console, with the webhook Aixel Labs sets highlighted',
+            ),
             link: {
                 href: 'https://console.twilio.com/us1/develop/phone-numbers/manage/incoming',
                 label: 'Open Active numbers',
@@ -237,17 +249,106 @@ const TWILIO_GUIDE: SetupGuide = {
     ],
 };
 
-const SETUP_GUIDES: Partial<Record<VoiceProvider, SetupGuide>> = {
-    [VoiceProvider.TELNYX]: TELNYX_GUIDE,
-    [VoiceProvider.TWILIO]: TWILIO_GUIDE,
+/** Step ids other components open the VoiceLink guide at. */
+export const VOICELINK_GUIDE_STEP = {
+    ACCOUNT: 'account',
+    API_TOKEN: 'api-token',
+    NUMBER: 'number',
+    WEBSOCKET: 'websocket',
+    CONNECT: 'connect',
+    CHANGES: 'changes',
+} as const;
+
+const voicelinkImage = (file: string, alt: string) => guideImage('voicelink', file, alt);
+
+const VOICELINK_GUIDE: SetupGuide = {
+    provider: VoiceProvider.VOICELINK,
+    title: 'Set up VoiceLink for your voice agents',
+    steps: [
+        {
+            id: VOICELINK_GUIDE_STEP.ACCOUNT,
+            title: 'Sign in to your VoiceLink panel',
+            body: [
+                'VoiceLink is an Indian phone company: your agents call from, and answer, your own +91 numbers, on your own VoiceLink plan and bill.',
+                'No account yet? Ask VoiceLink, or the reseller that sold you your numbers, to open one.',
+            ],
+            image: voicelinkImage(
+                '1-voicelink-account.webp',
+                'An illustration of the VoiceLink panel sign-in form, highlighted',
+            ),
+            link: { href: 'https://app.voicelink.co.in/', label: 'Open the VoiceLink panel' },
+        },
+        {
+            id: VOICELINK_GUIDE_STEP.API_TOKEN,
+            title: 'Create an API token and copy it',
+            body: [
+                'In the panel, open the API section and create a token. Name it something like “Aixel Labs” and copy it.',
+                'Bought your numbers through a reseller? Note the client ID they belong to as well: the connect form asks for it.',
+            ],
+            image: voicelinkImage(
+                '2-api-token.webp',
+                'An illustration of the API section of the VoiceLink panel, with the Create token button and the new token highlighted',
+            ),
+        },
+        {
+            id: VOICELINK_GUIDE_STEP.NUMBER,
+            title: 'Have a number (DID) in VoiceLink',
+            body: [
+                'Your numbers are listed under DIDs. No number yet? Ask VoiceLink, or your reseller, to assign one to your account.',
+            ],
+            image: voicelinkImage(
+                '3-dids.webp',
+                'An illustration of the DIDs list in the VoiceLink panel, with the numbers highlighted',
+            ),
+        },
+        {
+            id: VOICELINK_GUIDE_STEP.WEBSOCKET,
+            title: 'Keep the “WebSocket API” switch off',
+            body: [
+                'When an agent starts using a number, we add a WebSocket bot named “Aixel Labs +91…” to your account (WebSocket Bots).',
+                'Leave its “WebSocket API” switch off. With it on, calls are answered and dropped at once, and the API cannot change it for us.',
+            ],
+            image: voicelinkImage(
+                '4-websocket-switch.webp',
+                'An illustration of WebSocket Bots in the VoiceLink panel, with the WebSocket API switch of the Aixel Labs bot highlighted, off',
+            ),
+        },
+        {
+            id: VOICELINK_GUIDE_STEP.CONNECT,
+            title: 'Paste the token here and pick your number',
+            body: [
+                'On this page, open Connect a number and choose VoiceLink. Paste the token (and the client ID on a reseller account), and click Find my numbers.',
+                'Tick the numbers you want and import them. Importing changes nothing in VoiceLink: each number keeps ringing where it does.',
+            ],
+            image: voicelinkImage(
+                '5-connect-in-aixel-labs.webp',
+                'An illustration of the Connect a VoiceLink number dialog in Aixel Labs, with the token and client ID fields highlighted',
+            ),
+        },
+        {
+            id: VOICELINK_GUIDE_STEP.CHANGES,
+            title: 'What Aixel Labs changes in your VoiceLink account',
+            body: [
+                'Each number has one routing rule with two halves: incoming and outgoing calls. An agent that answers calls takes only the incoming half; one that makes calls takes only the outgoing half. The other half stays as you set it.',
+                'We save the rule before the first change. Unlink the number from the agent, or remove it, and that half goes back exactly as it was. Removing the number also switches our bot off.',
+            ],
+            image: voicelinkImage(
+                '6-what-we-change.webp',
+                'An illustration of a number’s routing rule in the VoiceLink panel, with the incoming half set to the Aixel Labs bot highlighted',
+            ),
+        },
+    ],
 };
 
-/** Providers that have a guide, in the order the guide switcher lists them. */
-export const SETUP_GUIDE_PROVIDERS: VoiceProvider[] = [VoiceProvider.TELNYX, VoiceProvider.TWILIO];
+const SETUP_GUIDES: Record<VoiceProvider, SetupGuide> = {
+    [VoiceProvider.TELNYX]: TELNYX_GUIDE,
+    [VoiceProvider.TWILIO]: TWILIO_GUIDE,
+    [VoiceProvider.VOICELINK]: VOICELINK_GUIDE,
+};
 
-/** The step-by-step setup guide for a provider, or `null` when it has none yet. */
-export function setupGuideFor(provider: VoiceProvider): SetupGuide | null {
-    return SETUP_GUIDES[provider] ?? null;
+/** Every provider's step-by-step setup guide (the setup-guide spec opens each one). */
+export function setupGuideFor(provider: VoiceProvider): SetupGuide {
+    return SETUP_GUIDES[provider];
 }
 
 /** Index of a step by id; the first step when the id is missing or unknown. */

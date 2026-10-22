@@ -1,12 +1,12 @@
 import { createHmac } from 'node:crypto';
 import { ObjectId } from 'mongodb';
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { Modules, VOICE_AGENT_SUB_MODULES, VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
 import type { E2eDb } from '../support/db';
 import { expect, test } from '../support/fixtures';
 import { E2E_GEMINI_API_KEY, E2E_VOICE_ENGINE_SECRET, E2E_VOICE_ENGINE_URL, USER_STORAGE_STATE } from '../support/env';
-import { openVoiceAgent, waitForHydration } from '../support/voice-agents';
+import { openVoiceAgent, voiceAgentUrl, waitForHydration } from '../support/voice-agents';
 import { E2E_USER } from '../support/users';
 import {
     CUSTOMER_CONNECTION_ID,
@@ -18,6 +18,16 @@ import {
     PHONE_NUMBERS_URL,
     sealForE2e,
 } from './fake-telephony';
+import {
+    LINK_UI_PENDING,
+    linkNumber,
+    numberRow,
+    numberUse,
+    openConnect,
+    openPhoneNumbers,
+    openRemove,
+    unlinkNumber,
+} from './phone-numbers-page';
 
 /** What `numberWebhookUrl` must produce: the engine path, the number id and its permanent signature. */
 function signedEngineUrl(path: '/texml' | '/telnyx-events', numberId: string): string {
@@ -25,16 +35,8 @@ function signedEngineUrl(path: '/texml' | '/telnyx-events', numberId: string): s
     return `${E2E_VOICE_ENGINE_URL}${path}?n=${numberId}&sig=${sig}`;
 }
 
-async function openPhoneNumbers(page: Page): Promise<void> {
-    await page.goto(PHONE_NUMBERS_URL);
-    await waitForHydration(page, '#header');
-}
-
 async function connectAndImport(page: Page, keep: string[]): Promise<void> {
-    await page.getByRole('button', { name: 'Connect a number' }).first().click();
-    const dialog = page.getByRole('dialog', { name: 'Connect a number' });
-    // Telnyx is the default provider.
-    await expect(dialog.getByRole('radio', { name: 'Telnyx' })).toHaveAttribute('aria-checked', 'true');
+    const dialog = await openConnect(page, 'Telnyx');
     await dialog.getByLabel('Telnyx API key').fill(FAKE_TELNYX_KEY);
     await dialog.getByRole('button', { name: 'Find my numbers' }).click();
     await expect(dialog.getByRole('checkbox')).toHaveCount(2);
@@ -50,81 +52,9 @@ const FIRST_NUMBER_ID = '1293384261075731499';
 const SECOND_NUMBER = '+13475550142';
 const SECOND_NUMBER_ID = '1293384261075731500';
 
-function numberRow(page: Page, phoneNumber: string) {
-    return page.getByTestId('voice-number-row').filter({ hasText: phoneNumber });
-}
-
-type Job = 'Answer calls' | 'Make calls' | 'Not used yet';
-
-/** The badge that says what the number does now. */
-function jobBadge(page: Page, phoneNumber: string) {
-    return numberRow(page, phoneNumber).getByTestId('number-job');
-}
-
-const answerAgent = 'Agent that answers';
-const callerAgent = 'Agent that makes the calls';
-
-/** What the dialog says the number does once saved (`jobSummary`). */
-function jobSummary(job: Job, agent: string, phoneNumber: string): string {
-    if (job === 'Answer calls') return `When someone calls ${phoneNumber}, ${agent} picks up and talks to them.`;
-    if (job === 'Make calls') return `${agent} makes the calls you start from ${phoneNumber}.`;
-    return `The AI does nothing with ${phoneNumber}. Calls to it ring the way they always have.`;
-}
-
-/** Opens the number's Change dialog: the job and agent are a draft until Save. */
-async function openJobDialog(page: Page, phoneNumber: string): Promise<Locator> {
-    await numberRow(page, phoneNumber).getByRole('button', { name: `Change what ${phoneNumber} does` }).click();
-    await expect(page.getByRole('dialog', { name: `What ${phoneNumber} does` })).toBeVisible();
-    // Its title changes while saving ("Updating …", "All set"), so it is found by role alone.
-    return page.getByRole('dialog');
-}
-
-/** Picks `job` in the open Change dialog, then `agent` when given (else the one it suggests stays). */
-async function pickJob(dialog: Locator, job: Job, agent?: string): Promise<void> {
-    await dialog.getByRole('radio', { name: job }).click();
-    if (agent) await chooseOption(dialog.page(), job === 'Answer calls' ? answerAgent : callerAgent, agent);
-}
-
-/** Saves the draft, waits for every step to land with `summary` shown, then closes the dialog. */
-async function saveJob(dialog: Locator, summary: string): Promise<void> {
-    await dialog.getByRole('button', { name: 'Save' }).click();
-    await expect(dialog.getByRole('heading', { name: 'All set' })).toBeVisible();
-    await expect(dialog.getByRole('status')).toContainText(summary);
-    await dialog.getByRole('button', { name: 'Close' }).first().click();
-    await expect(dialog).toBeHidden();
-}
-
-/** Saves the draft and expects it to stop on `error`, saying where the number stands now. */
-async function saveJobFails(dialog: Locator, error: string, standing: string): Promise<void> {
-    await dialog.getByRole('button', { name: 'Save' }).click();
-    await expect(dialog.getByRole('heading', { name: 'That did not finish' })).toBeVisible();
-    await expect(dialog.getByRole('alert')).toContainText(error);
-    await expect(dialog.getByRole('alert')).toContainText(`Right now: ${standing}`);
-}
-
-/** Gives the number `job` with `agent` through the Change dialog, and checks the row says so. */
-async function setJob(page: Page, phoneNumber: string, job: Job, agent = ''): Promise<void> {
-    const dialog = await openJobDialog(page, phoneNumber);
-    await pickJob(dialog, job, agent || undefined);
-    await saveJob(dialog, jobSummary(job, agent, phoneNumber));
-    await expect(jobBadge(page, phoneNumber)).toHaveText(
-        { 'Answer calls': 'Answers calls', 'Make calls': 'Makes calls', 'Not used yet': 'Not used yet' }[job],
-    );
-}
-
-/** The job picked in the Change dialog: opens it, checks, and cancels. */
-async function expectJobPicked(page: Page, phoneNumber: string, job: Job): Promise<void> {
-    const dialog = await openJobDialog(page, phoneNumber);
-    await expect(dialog.getByRole('radio', { name: job })).toBeChecked();
-    await dialog.getByRole('button', { name: 'Cancel' }).click();
-    await expect(dialog).toBeHidden();
-}
-
-/** Remove, from the row's menu. */
-async function removeNumber(page: Page, phoneNumber: string): Promise<void> {
-    await numberRow(page, phoneNumber).getByRole('button', { name: `More for ${phoneNumber}` }).click();
-    await page.getByRole('menuitem', { name: 'Remove' }).click();
-}
+const answers = (agent: string) => `Answers calls with ${agent}`;
+const places = (agent: string) => `Places calls with ${agent}`;
+const NOT_LINKED = 'Not linked to an agent';
 
 async function chooseOption(page: Page, combobox: string, option: string): Promise<void> {
     await page.getByRole('combobox', { name: combobox }).click();
@@ -136,6 +66,17 @@ async function optionsOf(page: Page, combobox: string): Promise<string[]> {
     const names = await page.getByRole('option').allTextContents();
     await page.keyboard.press('Escape');
     return names;
+}
+
+/** A test call from the row; returns the dialog once it says the call is placed (or `error`). */
+async function testCall(page: Page, phoneNumber: string, to = '+14155550123', error?: string) {
+    await numberRow(page, phoneNumber).getByRole('button', { name: 'Test call' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Test call' });
+    await dialog.getByLabel('Your phone number').fill(to);
+    await dialog.getByRole('button', { name: 'Call me now' }).click();
+    if (error) await expect(dialog.getByRole('alert').last()).toContainText(error);
+    else await expect(dialog.getByRole('status')).toContainText(`Calling ${to} now`);
+    return dialog;
 }
 
 /** Agents of both kinds, so every picker has something it must leave out. */
@@ -194,10 +135,10 @@ test('importing a number changes nothing in Telnyx and the key never reaches the
     await expect(page.getByText('No phone numbers yet')).toBeVisible();
 
     await connectAndImport(page, [FIRST_NUMBER]);
-    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Not used yet');
+    await expect(numberUse(page, FIRST_NUMBER)).toHaveText(NOT_LINKED);
     await expect(numberRow(page, FIRST_NUMBER).getByTestId('number-provider')).toHaveText('Telnyx');
+    await expect(numberRow(page, FIRST_NUMBER).getByTestId('number-provider-logo-TELNYX')).toBeVisible();
     await expect(numberRow(page, SECOND_NUMBER)).toHaveCount(0);
-    await expectJobPicked(page, FIRST_NUMBER, 'Not used yet');
 
     const [stored] = await db.getVoiceNumbers(E2E_USER);
     expect(stored).toMatchObject({
@@ -223,30 +164,90 @@ test('importing a number changes nothing in Telnyx and the key never reaches the
     expect(html).not.toContain('apiKeySealed');
 });
 
-test('each job offers only agents made for it, and a test call may use any agent', async ({ page, db }) => {
+test('connect is a menu of providers, each opening its own dialog and its own setup guide', async ({ page }) => {
+    await openPhoneNumbers(page);
+    await page.getByRole('button', { name: 'Connect a number' }).click();
+    await expect(page.getByRole('menuitem')).toHaveText([
+        /^TelnyxUS and international numbers/,
+        /^TwilioUS and international numbers/,
+        /^VoiceLinkIndian numbers \(\+91\)/,
+    ]);
+    await page.keyboard.press('Escape');
+
+    for (const provider of ['Telnyx', 'Twilio', 'VoiceLink'] as const) {
+        const dialog = await openConnect(page, provider);
+        // No switching to another provider in here.
+        await expect(dialog.getByRole('radio', { name: /Telnyx|Twilio|VoiceLink/ })).toHaveCount(0);
+        await dialog.getByRole('button', { name: `${provider} setup guide` }).click();
+        const guide = page.getByRole('dialog', { name: `Set up ${provider} for your voice agents` });
+        await expect(guide).toBeVisible();
+        await expect(guide.getByRole('radio')).toHaveCount(0);
+        await page.keyboard.press('Escape');
+        await expect(guide).toBeHidden();
+        await page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+    }
+    // One way in: no banner, no separate guide button on the page.
+    await expect(page.getByRole('region', { name: 'Setup guide' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Setup guide' })).toHaveCount(0);
+});
+
+test('each row says which agent uses the number and how, links to it, and has no job controls', async ({ page, db }) => {
+    const { frontDesk, sales } = await seedAgents(db);
+    await seedNumber(db, FIRST_NUMBER, { inboundAgentId: new ObjectId(frontDesk) });
+    await seedNumber(db, SECOND_NUMBER, { outboundAgentId: new ObjectId(sales) });
+    await openPhoneNumbers(page);
+
+    await expect(numberUse(page, FIRST_NUMBER)).toHaveText(answers('Front desk'));
+    await expect(numberRow(page, FIRST_NUMBER).getByRole('link', { name: 'Front desk' })).toHaveAttribute(
+        'href',
+        voiceAgentUrl(frontDesk),
+    );
+    await expect(numberUse(page, SECOND_NUMBER)).toHaveText(places('Sales outreach'));
+    await expect(numberRow(page, SECOND_NUMBER).getByRole('link', { name: 'Sales outreach' })).toHaveAttribute(
+        'href',
+        voiceAgentUrl(sales),
+    );
+    for (const phone of [FIRST_NUMBER, SECOND_NUMBER]) {
+        const row = numberRow(page, phone);
+        await expect(row.getByRole('button', { name: /Change/ })).toHaveCount(0);
+        await expect(row.getByRole('button', { name: /More for/ })).toHaveCount(0);
+        await expect(row.getByRole('button', { name: `Remove ${phone}` })).toBeVisible();
+    }
+
+    await numberRow(page, FIRST_NUMBER).getByRole('link', { name: 'Front desk' }).click();
+    await expect(page).toHaveURL(new RegExp(`${voiceAgentUrl(frontDesk)}$`));
+});
+
+test('numbers set up before the agent decided the job say what to fix', async ({ page, db }) => {
+    const { frontDesk, sales } = await seedAgents(db);
+    // Two jobs at once, and an outbound agent answering calls.
+    await seedNumber(db, FIRST_NUMBER, { inboundAgentId: new ObjectId(frontDesk), outboundAgentId: new ObjectId(sales) });
+    await seedNumber(db, SECOND_NUMBER, { inboundAgentId: new ObjectId(sales) });
+    await openPhoneNumbers(page);
+
+    const both = numberRow(page, FIRST_NUMBER).getByTestId('number-use');
+    await expect(both).toContainText(answers('Front desk'));
+    await expect(both).toContainText(places('Sales outreach'));
+    await expect(both).toContainText('A number now does one job. Link it again from the agent that keeps it.');
+
+    const swapped = numberRow(page, SECOND_NUMBER).getByTestId('number-use');
+    await expect(swapped).toContainText(answers('Sales outreach'));
+    await expect(swapped).toContainText('Sales outreach is now an agent that makes calls. Link the number again from it.');
+    // Nothing changed on its own.
+    expect((await db.getVoiceNumbers(E2E_USER)).find((n) => n.phoneNumber === FIRST_NUMBER)).toMatchObject({
+        inboundAgentId: new ObjectId(frontDesk),
+        outboundAgentId: new ObjectId(sales),
+    });
+});
+
+test('a test call may use any agent', async ({ page, db }) => {
     await seedAgents(db);
     await seedNumber(db);
     await openPhoneNumbers(page);
 
-    let dialog = await openJobDialog(page, FIRST_NUMBER);
-    await pickJob(dialog, 'Make calls');
-    // The first agent made for calling out is suggested.
-    await expect(dialog.getByRole('combobox', { name: callerAgent })).toHaveText('Follow-ups');
-    await expect(dialog).toContainText(jobSummary('Make calls', 'Follow-ups', FIRST_NUMBER));
-    expect(await optionsOf(page, callerAgent)).toEqual(['Follow-ups', 'Sales outreach']);
-
-    await pickJob(dialog, 'Answer calls');
-    // Soft: the app clears the suggested agent when the job switches with the picker already shown
-    // (agentId reset to ''), so the agent is also picked by hand to let the rest of the test run.
-    await expect.soft(dialog.getByRole('combobox', { name: answerAgent })).toHaveText('After hours');
-    expect(await optionsOf(page, answerAgent)).toEqual(['After hours', 'Front desk']);
-    await expect(page.getByRole('combobox', { name: callerAgent })).toHaveCount(0);
-    await chooseOption(page, answerAgent, 'After hours');
-    await saveJob(dialog, jobSummary('Answer calls', 'After hours', FIRST_NUMBER));
-    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Answers calls');
-
     await numberRow(page, FIRST_NUMBER).getByRole('button', { name: 'Test call' }).click();
-    dialog = page.getByRole('dialog', { name: 'Test call' });
+    const dialog = page.getByRole('dialog', { name: 'Test call' });
     expect(await optionsOf(page, 'Agent that calls')).toEqual([
         'After hours (answers calls)',
         'Follow-ups (makes calls)',
@@ -256,13 +257,15 @@ test('each job offers only agents made for it, and a test call may use any agent
     await expect(dialog).toBeVisible();
 });
 
-test('an outbound agent creates only the Call Control app and leaves the routing alone', async ({ page, db }) => {
+test("a test call makes the one Call Control app every number shares, and at the trial limit uses the customer's own untouched", async ({
+    page,
+    db,
+}) => {
     const { sales } = await seedAgents(db);
-    const numberId = await seedNumber(db);
+    const numberId = await seedNumber(db, FIRST_NUMBER, { outboundAgentId: new ObjectId(sales) });
     await openPhoneNumbers(page);
 
-    await setJob(page, FIRST_NUMBER, 'Make calls', 'Sales outreach');
-
+    await testCall(page, FIRST_NUMBER);
     expect(telnyxWrites().map((r) => `${r.method} ${r.path}`)).toEqual(['POST /v2/call_control_applications']);
     expect(telnyxWrites()[0].body).toEqual({
         application_name: 'Aixel Labs voice agents',
@@ -273,214 +276,76 @@ test('an outbound agent creates only the Call Control app and leaves the routing
     expect(telnyx.numbers[0].connection_id).toBe(CUSTOMER_CONNECTION_ID);
     expect(telnyx.requests.every((r) => r.authorization === `Bearer ${FAKE_TELNYX_KEY}`)).toBe(true);
     const [callControlApp] = [...telnyx.callControlApps.values()];
+    expect((await db.getVoiceNumbers(E2E_USER))[0].callControlAppId).toBe(callControlApp.id);
 
-    const [stored] = await db.getVoiceNumbers(E2E_USER);
-    expect(stored.outboundAgentId?.toString()).toBe(sales);
-    expect(stored.callControlAppId).toBe(callControlApp.id);
-    expect(stored.inboundAgentId).toBeNull();
-    expect(stored.texmlAppId).toBeUndefined();
-
-    // Not used any more: the app is kept for next time.
-    await setJob(page, FIRST_NUMBER, 'Not used yet');
-    expect((await db.getVoiceNumbers(E2E_USER))[0].outboundAgentId).toBeNull();
-    expect(telnyxWrites()).toHaveLength(1);
-});
-
-test("one Call Control app serves every number, and at the trial limit the customer's own app is used untouched", async ({
-    page,
-    db,
-}) => {
-    const { sales } = await seedAgents(db);
     // A trial account: one Call Control app allowed, and the customer already has it.
+    await db.resetVoiceTelephony(E2E_USER);
+    telnyx.reset();
     telnyx.callControlAppLimit = 1;
     const theirs = telnyx.addCustomerCallControlApp('voicelab-outbound');
-    await seedNumber(db);
+    await seedNumber(db, FIRST_NUMBER, { outboundAgentId: new ObjectId(sales) });
     await openPhoneNumbers(page);
-
-    await setJob(page, FIRST_NUMBER, 'Make calls', 'Sales outreach');
-    const [stored] = await db.getVoiceNumbers(E2E_USER);
-    expect(stored.outboundAgentId?.toString()).toBe(sales);
-    expect(stored.callControlAppId).toBe(theirs);
+    await testCall(page, FIRST_NUMBER);
+    expect((await db.getVoiceNumbers(E2E_USER))[0].callControlAppId).toBe(theirs);
     // Their app is used as it is: no PATCH, no DELETE, nothing renamed.
     expect(telnyxWrites().filter((r) => r.method !== 'POST')).toHaveLength(0);
     expect(telnyx.callControlApps.size).toBe(1);
+    await page.keyboard.press('Escape');
 
     // Removing the number leaves their app alone.
-    await removeNumber(page, FIRST_NUMBER);
-    await page.getByRole('dialog').getByRole('button', { name: 'Remove number' }).click();
+    await (await openRemove(page, FIRST_NUMBER)).getByRole('button', { name: 'Remove number' }).click();
     await expect(page.getByText('No phone numbers yet')).toBeVisible();
     expect(telnyx.callControlApps.has(theirs)).toBe(true);
     expect(telnyx.find('DELETE', /call_control_applications/)).toHaveLength(0);
 });
 
-test('an agent with no prompt yet cannot answer or place calls from a number', async ({ page, db }) => {
+test('an agent with no prompt yet cannot place a test call', async ({ page, db }) => {
     await db.insertVoiceAgent(E2E_USER, { name: 'Draft caller', callType: VoiceAgentCallType.OUTBOUND, prompt: '' });
-    await db.insertVoiceAgent(E2E_USER, { name: 'Draft desk', callType: VoiceAgentCallType.INBOUND, prompt: '  ' });
     await seedNumber(db);
     await openPhoneNumbers(page);
-    const notUsed = jobSummary('Not used yet', '', FIRST_NUMBER);
 
-    const jobDialog = await openJobDialog(page, FIRST_NUMBER);
-    await pickJob(jobDialog, 'Answer calls');
-    await saveJobFails(jobDialog, VOICE_AGENT_NO_PROMPT_MESSAGE, notUsed);
-    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Not used yet');
-
-    await jobDialog.getByRole('button', { name: 'Back' }).click();
-    await pickJob(jobDialog, 'Make calls', 'Draft caller');
-    await saveJobFails(jobDialog, VOICE_AGENT_NO_PROMPT_MESSAGE, notUsed);
-    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Not used yet');
-    await jobDialog.getByRole('button', { name: 'Close' }).first().click();
-    await expect(jobDialog).toBeHidden();
-
-    expect(telnyxWrites()).toHaveLength(0);
-    const [stored] = await db.getVoiceNumbers(E2E_USER);
-    expect(stored.inboundAgentId).toBeNull();
-    expect(stored.outboundAgentId).toBeNull();
-
-    // A test call with it is refused before the engine is asked.
-    await numberRow(page, FIRST_NUMBER).getByRole('button', { name: 'Test call' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Test call' });
-    await chooseOption(page, 'Agent that calls', 'Draft caller (makes calls)');
-    await dialog.getByLabel('Your phone number').fill('+14155550123');
-    await dialog.getByRole('button', { name: 'Call me now' }).click();
-    await expect(dialog.getByRole('alert').last()).toHaveText(VOICE_AGENT_NO_PROMPT_MESSAGE);
+    await testCall(page, FIRST_NUMBER, '+14155550123', VOICE_AGENT_NO_PROMPT_MESSAGE);
     expect(engine.requests).toHaveLength(0);
+    expect(telnyxWrites()).toHaveLength(0);
 });
 
 test('an account without an outbound voice profile gets a clear error and no apps', async ({ page, db }) => {
-    await seedAgents(db);
-    await seedNumber(db);
+    const { sales } = await seedAgents(db);
+    await seedNumber(db, FIRST_NUMBER, { outboundAgentId: new ObjectId(sales) });
     telnyx.outboundVoiceProfiles = [];
     await openPhoneNumbers(page);
 
-    const dialog = await openJobDialog(page, FIRST_NUMBER);
-    await pickJob(dialog, 'Make calls');
-    await saveJobFails(
-        dialog,
-        'Your Telnyx account has no outbound voice profile',
-        jobSummary('Not used yet', '', FIRST_NUMBER),
-    );
-    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Not used yet');
-    await dialog.getByRole('button', { name: 'Close' }).first().click();
-    await expectJobPicked(page, FIRST_NUMBER, 'Not used yet');
+    await testCall(page, FIRST_NUMBER, '+14155550123', 'Your Telnyx account has no outbound voice profile');
     expect(telnyxWrites()).toHaveLength(0);
-    const [stored] = await db.getVoiceNumbers(E2E_USER);
-    expect(stored.outboundAgentId).toBeNull();
-    expect(stored.callControlAppId).toBeUndefined();
+    expect(engine.requests).toHaveLength(0);
+    expect((await db.getVoiceNumbers(E2E_USER))[0].callControlAppId).toBeUndefined();
 });
 
-test('answering calls saves the previous connection, points the number at the TeXML app, and "Not used yet" restores it', async ({
+test('a test call names the chosen agent, prices a minute by where it goes, and spells out the trial limit', async ({
     page,
     db,
 }) => {
-    const { frontDesk, afterHours } = await seedAgents(db);
-    const numberId = await seedNumber(db);
-    await openPhoneNumbers(page);
-
-    let dialog = await openJobDialog(page, FIRST_NUMBER);
-    await pickJob(dialog, 'Answer calls');
-    // The first agent made for answering is suggested.
-    await expect(dialog.getByRole('combobox', { name: answerAgent })).toHaveText('After hours');
-    await saveJob(dialog, jobSummary('Answer calls', 'After hours', FIRST_NUMBER));
-    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Answers calls');
-
-    const [texmlCreate] = telnyx.find('POST', '/v2/texml_applications');
-    expect(texmlCreate.body).toEqual({
-        friendly_name: `Aixel Labs voice agent ${FIRST_NUMBER}`,
-        voice_url: signedEngineUrl('/texml', numberId),
-        voice_method: 'post',
-    });
-    const [texmlApp] = [...telnyx.texmlApps.values()];
-    // Read where it rang, then point it at our app. No Call Control app: that is for calls out.
-    expect(telnyx.requests.map((r) => `${r.method} ${r.path}`)).toEqual([
-        'POST /v2/texml_applications',
-        `GET /v2/phone_numbers/${FIRST_NUMBER_ID}`,
-        `PATCH /v2/phone_numbers/${FIRST_NUMBER_ID}`,
-    ]);
-    expect(telnyx.find('PATCH', `/v2/phone_numbers/${FIRST_NUMBER_ID}`)[0].body).toEqual({ connection_id: texmlApp.id });
-    expect(telnyx.numbers[0].connection_id).toBe(texmlApp.id);
-
-    let [stored] = await db.getVoiceNumbers(E2E_USER);
-    expect(stored.inboundAgentId?.toString()).toBe(afterHours);
-    expect(stored.previousConnectionId).toBe(CUSTOMER_CONNECTION_ID);
-    expect(stored.texmlAppId).toBe(texmlApp.id);
-    expect(stored.callControlAppId).toBeUndefined();
-
-    // Changing the agent while on only changes the field.
-    telnyx.clear();
-    dialog = await openJobDialog(page, FIRST_NUMBER);
-    await expect(dialog.getByRole('radio', { name: 'Answer calls' })).toBeChecked();
-    await chooseOption(page, answerAgent, 'Front desk');
-    await expect(dialog).toContainText('Switch to Front desk. Nothing changes in Telnyx.');
-    await saveJob(dialog, jobSummary('Answer calls', 'Front desk', FIRST_NUMBER));
-    expect(telnyx.requests).toHaveLength(0);
-    expect((await db.getVoiceNumbers(E2E_USER))[0].inboundAgentId?.toString()).toBe(frontDesk);
-
-    // Not used: back on the customer's connection, our app kept for next time.
-    await setJob(page, FIRST_NUMBER, 'Not used yet');
-    await expectJobPicked(page, FIRST_NUMBER, 'Not used yet');
-    expect(telnyx.find('PATCH', `/v2/phone_numbers/${FIRST_NUMBER_ID}`).map((r) => r.body)).toEqual([
-        { connection_id: CUSTOMER_CONNECTION_ID },
-    ]);
-    expect(telnyx.numbers[0].connection_id).toBe(CUSTOMER_CONNECTION_ID);
-    expect(telnyx.find('DELETE', /applications/)).toHaveLength(0);
-    [stored] = await db.getVoiceNumbers(E2E_USER);
-    expect(stored.inboundAgentId).toBeNull();
-    expect(stored.previousConnectionId).toBeNull();
-    expect(stored.texmlAppId).toBe(texmlApp.id);
-
-    // Answering again reuses the app.
-    telnyx.clear();
-    await setJob(page, FIRST_NUMBER, 'Answer calls', 'After hours');
-    expect(telnyx.find('POST', /applications$/)).toHaveLength(0);
-    expect((await db.getVoiceNumbers(E2E_USER))[0].previousConnectionId).toBe(CUSTOMER_CONNECTION_ID);
-});
-
-test('a number that had no connection goes back to none, and a Telnyx refusal is explained', async ({ page, db }) => {
-    await seedAgents(db);
-    await seedNumber(db, SECOND_NUMBER);
-    await openPhoneNumbers(page);
-
-    await setJob(page, SECOND_NUMBER, 'Answer calls', 'After hours');
-    expect((await db.getVoiceNumbers(E2E_USER))[0].previousConnectionId).toBeNull();
-
-    telnyx.refuseNullConnection = true;
-    const dialog = await openJobDialog(page, SECOND_NUMBER);
-    await pickJob(dialog, 'Not used yet');
-    await saveJobFails(
-        dialog,
-        `${SECOND_NUMBER} had no connection in Telnyx before the AI answered it`,
-        jobSummary('Answer calls', 'After hours', SECOND_NUMBER),
-    );
-    await expect(jobBadge(page, SECOND_NUMBER)).toHaveText('Answers calls');
-    expect((await db.getVoiceNumbers(E2E_USER))[0].inboundAgentId).not.toBeNull();
-
-    // Back to the draft, and the same change again once Telnyx takes it.
-    telnyx.refuseNullConnection = false;
-    telnyx.clear();
-    await dialog.getByRole('button', { name: 'Back' }).click();
-    await saveJob(dialog, jobSummary('Not used yet', '', SECOND_NUMBER));
-    await expect(jobBadge(page, SECOND_NUMBER)).toHaveText('Not used yet');
-    await expectJobPicked(page, SECOND_NUMBER, 'Not used yet');
-    expect(telnyx.find('PATCH', `/v2/phone_numbers/${SECOND_NUMBER_ID}`).map((r) => r.body)).toEqual([
-        { connection_id: null },
-    ]);
-    expect(telnyx.numbers[1].connection_id).toBeNull();
-});
-
-test('a test call names the chosen agent and the trial limit is spelled out', async ({ page, db }) => {
     const { sales, followUps } = await seedAgents(db);
     const numberId = await seedNumber(db, FIRST_NUMBER, { outboundAgentId: new ObjectId(sales) });
     await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY); // paid: Gemini is priced
     await openPhoneNumbers(page);
-    // A 41-character prompt: Gemini $0.0287 a minute (paid key), plus Telnyx's $0.0125 out.
-    await expect(numberRow(page, FIRST_NUMBER).getByTestId('number-cost-estimate')).toHaveText('about $0.041 a minute');
-    await expect(numberRow(page, FIRST_NUMBER)).toContainText('with Sales outreach');
+    // A 41-character prompt: Gemini $0.0287 a minute (paid key), plus Telnyx's $0.0125 out to the US.
+    await expect(numberRow(page, FIRST_NUMBER).getByTestId('number-cost-estimate')).toHaveText(
+        'About $0.041 a minute to the US',
+    );
+    await expect(numberUse(page, FIRST_NUMBER)).toHaveText(places('Sales outreach'));
 
     await numberRow(page, FIRST_NUMBER).getByRole('button', { name: 'Test call' }).click();
     const dialog = page.getByRole('dialog', { name: 'Test call' });
     await expect(dialog).toContainText('On a Telnyx trial account, calls only go to numbers you have verified');
-    await expect(dialog.getByTestId('test-call-cost')).toHaveText('It should cost about $0.041 a minute (an estimate).');
+    await expect(dialog.getByTestId('test-call-cost')).toHaveText(
+        'It should cost about $0.041 a minute to the US (an estimate).',
+    );
+    // Telnyx publishes no rate for India: only Gemini is counted.
+    await dialog.getByLabel('Your phone number').fill('+919876543210');
+    await expect(dialog.getByTestId('test-call-cost')).toHaveText(
+        'It should cost about $0.029 a minute to India (an estimate, without Telnyx’s charge).',
+    );
     await expect(dialog.getByRole('combobox', { name: 'Agent that calls' })).toHaveText('Sales outreach (makes calls)');
 
     await dialog.getByLabel('Your phone number').fill('4155550123');
@@ -515,84 +380,6 @@ test('a test call names the chosen agent and the trial limit is spelled out', as
     // The number had no Call Control app yet: the first call made one, and the routing was left alone.
     expect(telnyxWrites().map((r) => `${r.method} ${r.path}`)).toEqual(['POST /v2/call_control_applications']);
     expect(telnyx.numbers[0].connection_id).toBe(CUSTOMER_CONNECTION_ID);
-});
-
-test('a number does one job: switching from answering to making calls puts its connection back first', async ({
-    page,
-    db,
-}) => {
-    const { sales } = await seedAgents(db);
-    await seedNumber(db);
-    await openPhoneNumbers(page);
-    await setJob(page, FIRST_NUMBER, 'Answer calls', 'After hours');
-    telnyx.clear();
-
-    let dialog = await openJobDialog(page, FIRST_NUMBER);
-    await pickJob(dialog, 'Make calls');
-    // Soft: the app clears the suggested agent when the job switches with the picker already shown
-    // (agentId reset to ''), so the agent is also picked by hand to let the rest of the test run.
-    await expect.soft(dialog.getByRole('combobox', { name: callerAgent })).toHaveText('Follow-ups');
-    await chooseOption(page, callerAgent, 'Follow-ups');
-    // Two steps, in this order: stop answering, then start calling.
-    await expect(dialog.getByRole('listitem')).toContainText([
-        'Stop answering calls. Telnyx sends them back to where they rang before.',
-        'Let Follow-ups make calls from this number.',
-    ]);
-    await saveJob(dialog, jobSummary('Make calls', 'Follow-ups', FIRST_NUMBER));
-    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Makes calls');
-    // The number rings the customer's own way again before the Call Control app is made.
-    expect(telnyxWrites().map((r) => `${r.method} ${r.path}`)).toEqual([
-        `PATCH /v2/phone_numbers/${FIRST_NUMBER_ID}`,
-        'POST /v2/call_control_applications',
-    ]);
-    expect(telnyx.numbers[0].connection_id).toBe(CUSTOMER_CONNECTION_ID);
-    let [stored] = await db.getVoiceNumbers(E2E_USER);
-    expect(stored.inboundAgentId).toBeNull();
-    expect(stored.previousConnectionId).toBeNull();
-    expect(stored.outboundAgentId).not.toBeNull();
-
-    dialog = await openJobDialog(page, FIRST_NUMBER);
-    await expect(dialog.getByRole('radio', { name: 'Answer calls' })).not.toBeChecked();
-    await expect(dialog.getByRole('radio', { name: 'Make calls' })).toBeChecked();
-    await chooseOption(page, callerAgent, 'Sales outreach');
-    await saveJob(dialog, jobSummary('Make calls', 'Sales outreach', FIRST_NUMBER));
-    [stored] = await db.getVoiceNumbers(E2E_USER);
-    expect(stored.outboundAgentId?.toString()).toBe(sales);
-    expect(stored.inboundAgentId).toBeNull();
-});
-
-test('a number set up with two jobs before says so and keeps only the job the owner picks', async ({ page, db }) => {
-    const { frontDesk, sales } = await seedAgents(db);
-    await seedNumber(db, FIRST_NUMBER, { inboundAgentId: new ObjectId(frontDesk), outboundAgentId: new ObjectId(sales) });
-    await openPhoneNumbers(page);
-
-    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Pick one job');
-    await expect(numberRow(page, FIRST_NUMBER)).toContainText(
-        'Front desk answers its calls and Sales outreach makes calls from it. A number now does one job: pick the one it keeps.',
-    );
-    // The dialog starts on answering, its first job, as a draft: keeping it would only stop the calling.
-    const dialog = await openJobDialog(page, FIRST_NUMBER);
-    await expect(dialog.getByRole('radio', { name: 'Answer calls' })).toBeChecked();
-    await expect(dialog.getByRole('listitem')).toContainText(['Stop making calls from this number.']);
-    // Nothing changed on its own.
-    expect((await db.getVoiceNumbers(E2E_USER))[0]).toMatchObject({
-        inboundAgentId: new ObjectId(frontDesk),
-        outboundAgentId: new ObjectId(sales),
-    });
-
-    await pickJob(dialog, 'Make calls');
-    // Soft: the app clears the suggested agent when the job switches with the picker already shown
-    // (agentId reset to ''), so the agent is also picked by hand to let the rest of the test run.
-    await expect.soft(dialog.getByRole('combobox', { name: callerAgent })).toHaveText('Sales outreach');
-    await chooseOption(page, callerAgent, 'Sales outreach');
-    await expect(dialog.getByRole('listitem')).toContainText([
-        'Stop answering calls. Telnyx sends them back to where they rang before.',
-    ]);
-    await saveJob(dialog, jobSummary('Make calls', 'Sales outreach', FIRST_NUMBER));
-    await expect(jobBadge(page, FIRST_NUMBER)).toHaveText('Makes calls');
-    const [stored] = await db.getVoiceNumbers(E2E_USER);
-    expect(stored.inboundAgentId).toBeNull();
-    expect(stored.outboundAgentId?.toString()).toBe(sales);
 });
 
 test('an agent that answers calls can ring the owner for a test call, booking tool and all', async ({ page, db }) => {
@@ -638,53 +425,16 @@ test('the agent page starts a test call with that agent, from a number that uses
     expect(engine.requests[0].body).toEqual({ numberId: answering, to: '+14155550123', agentId: frontDesk });
 });
 
-test('removing an answering number restores its connection, then deletes both apps', async ({ page, db }) => {
-    await seedAgents(db);
-    await seedNumber(db);
-    await openPhoneNumbers(page);
-    // It made calls first (the Call Control app), then switched to answering them (the TeXML app).
-    await setJob(page, FIRST_NUMBER, 'Make calls', 'Sales outreach');
-    await setJob(page, FIRST_NUMBER, 'Answer calls', 'After hours');
-    const [{ texmlAppId, callControlAppId }] = await db.getVoiceNumbers(E2E_USER);
-    telnyx.clear();
-
-    await removeNumber(page, FIRST_NUMBER);
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toContainText('calls ring the way they did before you connected it');
-    await dialog.getByRole('button', { name: 'Remove number' }).click();
-    await expect(page.getByText('No phone numbers yet')).toBeVisible();
-
-    const calls = telnyx.requests.map((r) => `${r.method} ${r.path}`);
-    expect(calls.slice(0, 2)).toEqual([
-        `GET /v2/phone_numbers/${FIRST_NUMBER_ID}`,
-        `PATCH /v2/phone_numbers/${FIRST_NUMBER_ID}`,
-    ]);
-    expect(telnyx.requests[1].body).toEqual({ connection_id: CUSTOMER_CONNECTION_ID });
-    // The shared Call Control app is checked (is it ours, does another number use it?) before it goes.
-    expect(
-        calls
-            .slice(2)
-            .filter((c) => !c.startsWith('GET '))
-            .sort(),
-    ).toEqual(
-        [`DELETE /v2/call_control_applications/${callControlAppId}`, `DELETE /v2/texml_applications/${texmlAppId}`].sort(),
-    );
-    expect(telnyx.numbers[0].connection_id).toBe(CUSTOMER_CONNECTION_ID);
-    expect(telnyx.texmlApps.size).toBe(0);
-    expect(telnyx.callControlApps.size).toBe(0);
-    expect(await db.getVoiceNumbers(E2E_USER)).toHaveLength(0);
-});
-
 test('removing a number the AI never answered leaves its routing alone', async ({ page, db }) => {
-    await seedAgents(db);
-    await seedNumber(db);
+    const { sales } = await seedAgents(db);
+    await seedNumber(db, FIRST_NUMBER, { outboundAgentId: new ObjectId(sales) });
     await openPhoneNumbers(page);
-    await setJob(page, FIRST_NUMBER, 'Make calls', 'Sales outreach');
+    await testCall(page, FIRST_NUMBER);
+    await page.keyboard.press('Escape');
     const [{ callControlAppId }] = await db.getVoiceNumbers(E2E_USER);
     telnyx.clear();
 
-    await removeNumber(page, FIRST_NUMBER);
-    await page.getByRole('dialog').getByRole('button', { name: 'Remove number' }).click();
+    await (await openRemove(page, FIRST_NUMBER)).getByRole('button', { name: 'Remove number' }).click();
     await expect(page.getByText('No phone numbers yet')).toBeVisible();
     expect(telnyxWrites().map((r) => `${r.method} ${r.path}`)).toEqual([
         `DELETE /v2/call_control_applications/${callControlAppId}`,
@@ -694,8 +444,7 @@ test('removing a number the AI never answered leaves its routing alone', async (
 
 test('a wrong key is refused and nothing is stored', async ({ page, db }) => {
     await openPhoneNumbers(page);
-    await page.getByRole('button', { name: 'Connect a number' }).first().click();
-    const dialog = page.getByRole('dialog', { name: 'Connect a number' });
+    const dialog = await openConnect(page, 'Telnyx');
     await dialog.getByLabel('Telnyx API key').fill('KEY_not_a_real_key');
     await dialog.getByRole('button', { name: 'Find my numbers' }).click();
     await expect(dialog.getByRole('alert')).toContainText('Telnyx rejected this API key');
@@ -706,4 +455,173 @@ test('a user without the Phone numbers grant gets a 404', async ({ page, db }) =
     await db.resetUser(E2E_USER, { moduleAccess: { [Modules.VOICE_AGENT]: [VOICE_AGENT_SUB_MODULES.CALL_LOGS] } });
     await page.goto(PHONE_NUMBERS_URL);
     await expect(page.getByRole('heading', { name: '404 - Page Not Found' }).first()).toBeVisible();
+});
+
+/** Telnyx routing as the agent editor links and unlinks numbers (the agent's type is the number's job). */
+test.describe('linking from the agent editor', () => {
+    test.fixme(LINK_UI_PENDING !== null, LINK_UI_PENDING ?? '');
+
+    test('an outbound agent creates only the Call Control app and leaves the routing alone; unlinking keeps the app', async ({
+        page,
+        db,
+    }) => {
+        const { sales } = await seedAgents(db);
+        const numberId = await seedNumber(db);
+        await linkNumber(page, sales, FIRST_NUMBER);
+
+        expect(telnyxWrites().map((r) => `${r.method} ${r.path}`)).toEqual(['POST /v2/call_control_applications']);
+        expect(telnyxWrites()[0].body).toMatchObject({ webhook_event_url: signedEngineUrl('/telnyx-events', numberId) });
+        expect(telnyx.numbers[0].connection_id).toBe(CUSTOMER_CONNECTION_ID);
+        const [stored] = await db.getVoiceNumbers(E2E_USER);
+        expect(stored.outboundAgentId?.toString()).toBe(sales);
+        expect(stored.inboundAgentId).toBeNull();
+        expect(stored.texmlAppId).toBeUndefined();
+        await openPhoneNumbers(page);
+        await expect(numberUse(page, FIRST_NUMBER)).toHaveText(places('Sales outreach'));
+
+        await unlinkNumber(page, sales, FIRST_NUMBER);
+        expect((await db.getVoiceNumbers(E2E_USER))[0].outboundAgentId).toBeNull();
+        expect(telnyxWrites()).toHaveLength(1);
+    });
+
+    test('an agent with no prompt yet cannot be linked', async ({ page, db }) => {
+        const draft = await db.insertVoiceAgent(E2E_USER, {
+            name: 'Draft desk',
+            callType: VoiceAgentCallType.INBOUND,
+            prompt: ' ',
+        });
+        await seedNumber(db);
+        await expect(linkNumber(page, draft, FIRST_NUMBER)).rejects.toThrow();
+        await expect(page.getByText(VOICE_AGENT_NO_PROMPT_MESSAGE)).toBeVisible();
+        expect(telnyxWrites()).toHaveLength(0);
+        expect((await db.getVoiceNumbers(E2E_USER))[0].inboundAgentId).toBeNull();
+    });
+
+    test('an inbound agent saves the previous connection and points the number at the TeXML app; unlinking restores it', async ({
+        page,
+        db,
+    }) => {
+        const { frontDesk, afterHours } = await seedAgents(db);
+        const numberId = await seedNumber(db);
+        await linkNumber(page, afterHours, FIRST_NUMBER);
+
+        const [texmlCreate] = telnyx.find('POST', '/v2/texml_applications');
+        expect(texmlCreate.body).toEqual({
+            friendly_name: `Aixel Labs voice agent ${FIRST_NUMBER}`,
+            voice_url: signedEngineUrl('/texml', numberId),
+            voice_method: 'post',
+        });
+        const [texmlApp] = [...telnyx.texmlApps.values()];
+        // Read where it rang, then point it at our app. No Call Control app: that is for calls out.
+        expect(telnyx.requests.map((r) => `${r.method} ${r.path}`)).toEqual([
+            'POST /v2/texml_applications',
+            `GET /v2/phone_numbers/${FIRST_NUMBER_ID}`,
+            `PATCH /v2/phone_numbers/${FIRST_NUMBER_ID}`,
+        ]);
+        expect(telnyx.numbers[0].connection_id).toBe(texmlApp.id);
+        let [stored] = await db.getVoiceNumbers(E2E_USER);
+        expect(stored.inboundAgentId?.toString()).toBe(afterHours);
+        expect(stored.previousConnectionId).toBe(CUSTOMER_CONNECTION_ID);
+        expect(stored.texmlAppId).toBe(texmlApp.id);
+
+        // Another inbound agent only changes the field.
+        telnyx.clear();
+        await linkNumber(page, frontDesk, FIRST_NUMBER);
+        expect(telnyx.requests).toHaveLength(0);
+        expect((await db.getVoiceNumbers(E2E_USER))[0].inboundAgentId?.toString()).toBe(frontDesk);
+
+        // Unlinked: back on the customer's connection, our app kept for next time.
+        await unlinkNumber(page, frontDesk, FIRST_NUMBER);
+        expect(telnyx.find('PATCH', `/v2/phone_numbers/${FIRST_NUMBER_ID}`).map((r) => r.body)).toEqual([
+            { connection_id: CUSTOMER_CONNECTION_ID },
+        ]);
+        expect(telnyx.find('DELETE', /applications/)).toHaveLength(0);
+        [stored] = await db.getVoiceNumbers(E2E_USER);
+        expect(stored.inboundAgentId).toBeNull();
+        expect(stored.previousConnectionId).toBeNull();
+        expect(stored.texmlAppId).toBe(texmlApp.id);
+
+        // Answering again reuses the app.
+        telnyx.clear();
+        await linkNumber(page, afterHours, FIRST_NUMBER);
+        expect(telnyx.find('POST', /applications$/)).toHaveLength(0);
+        expect((await db.getVoiceNumbers(E2E_USER))[0].previousConnectionId).toBe(CUSTOMER_CONNECTION_ID);
+    });
+
+    test('a number that had no connection goes back to none, and a Telnyx refusal is explained', async ({ page, db }) => {
+        const { afterHours } = await seedAgents(db);
+        await seedNumber(db, SECOND_NUMBER);
+        await linkNumber(page, afterHours, SECOND_NUMBER);
+        expect((await db.getVoiceNumbers(E2E_USER))[0].previousConnectionId).toBeNull();
+
+        telnyx.refuseNullConnection = true;
+        await expect(unlinkNumber(page, afterHours, SECOND_NUMBER)).rejects.toThrow();
+        await expect(page.getByText(`${SECOND_NUMBER} had no connection in Telnyx before the AI answered it`)).toBeVisible();
+        expect((await db.getVoiceNumbers(E2E_USER))[0].inboundAgentId).not.toBeNull();
+
+        telnyx.refuseNullConnection = false;
+        telnyx.clear();
+        await unlinkNumber(page, afterHours, SECOND_NUMBER);
+        expect(telnyx.find('PATCH', `/v2/phone_numbers/${SECOND_NUMBER_ID}`).map((r) => r.body)).toEqual([
+            { connection_id: null },
+        ]);
+    });
+
+    test('a number does one job: linking an outbound agent to an answering number puts its connection back first', async ({
+        page,
+        db,
+    }) => {
+        const { afterHours, followUps } = await seedAgents(db);
+        await seedNumber(db);
+        await linkNumber(page, afterHours, FIRST_NUMBER);
+        telnyx.clear();
+
+        await linkNumber(page, followUps, FIRST_NUMBER);
+        expect(telnyxWrites().map((r) => `${r.method} ${r.path}`)).toEqual([
+            `PATCH /v2/phone_numbers/${FIRST_NUMBER_ID}`,
+            'POST /v2/call_control_applications',
+        ]);
+        expect(telnyx.numbers[0].connection_id).toBe(CUSTOMER_CONNECTION_ID);
+        const [stored] = await db.getVoiceNumbers(E2E_USER);
+        expect(stored.inboundAgentId).toBeNull();
+        expect(stored.previousConnectionId).toBeNull();
+        expect(stored.outboundAgentId?.toString()).toBe(followUps);
+    });
+
+    test('removing an answering number restores its connection, then deletes both apps', async ({ page, db }) => {
+        const { sales, afterHours } = await seedAgents(db);
+        await seedNumber(db);
+        // It made calls first (the Call Control app), then answered them (the TeXML app).
+        await linkNumber(page, sales, FIRST_NUMBER);
+        await linkNumber(page, afterHours, FIRST_NUMBER);
+        const [{ texmlAppId, callControlAppId }] = await db.getVoiceNumbers(E2E_USER);
+        telnyx.clear();
+
+        await openPhoneNumbers(page);
+        const dialog = await openRemove(page, FIRST_NUMBER);
+        await expect(dialog).toContainText('calls ring the way they did before you connected it');
+        await dialog.getByRole('button', { name: 'Remove number' }).click();
+        await expect(page.getByText('No phone numbers yet')).toBeVisible();
+
+        const calls = telnyx.requests.map((r) => `${r.method} ${r.path}`);
+        expect(calls.slice(0, 2)).toEqual([
+            `GET /v2/phone_numbers/${FIRST_NUMBER_ID}`,
+            `PATCH /v2/phone_numbers/${FIRST_NUMBER_ID}`,
+        ]);
+        expect(telnyx.requests[1].body).toEqual({ connection_id: CUSTOMER_CONNECTION_ID });
+        expect(
+            calls
+                .slice(2)
+                .filter((c) => !c.startsWith('GET '))
+                .sort(),
+        ).toEqual(
+            [
+                `DELETE /v2/call_control_applications/${callControlAppId}`,
+                `DELETE /v2/texml_applications/${texmlAppId}`,
+            ].sort(),
+        );
+        expect(telnyx.texmlApps.size).toBe(0);
+        expect(telnyx.callControlApps.size).toBe(0);
+        expect(await db.getVoiceNumbers(E2E_USER)).toHaveLength(0);
+    });
 });

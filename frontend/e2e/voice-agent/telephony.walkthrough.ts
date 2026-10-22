@@ -91,18 +91,19 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await open(PHONE_NUMBERS_URL);
             await capture('numbers-empty');
 
-            await page.getByRole('region', { name: 'Setup guide' }).getByRole('button', { name: 'See the guide' }).click();
+            await page.getByRole('button', { name: 'Connect a number' }).first().click();
+            await page.getByRole('menuitem', { name: /^Telnyx/ }).click();
+            const connect = page.getByRole('dialog', { name: 'Connect a Telnyx number' });
+            await connect.getByRole('button', { name: 'Telnyx setup guide' }).click();
             const guide = page.getByRole('dialog', { name: 'Set up Telnyx for your voice agents' });
             await capture('setup-guide', false);
             await page.keyboard.press('ArrowRight');
             await capture('setup-guide-api-key', false);
-            await guide.getByRole('button', { name: 'Zoom in on the screenshot' }).click();
+            await guide.getByRole('button', { name: 'Zoom in on the picture' }).click();
             await capture('setup-guide-zoomed', false);
             await page.keyboard.press('Escape');
             await expect(guide).toBeHidden();
 
-            await page.getByRole('button', { name: 'Connect a number' }).first().click();
-            const connect = page.getByRole('dialog', { name: 'Connect a number' });
             await connect.getByLabel('Telnyx API key').fill(FAKE_TELNYX_KEY);
             await capture('connect-key', false);
             await connect.getByRole('button', { name: 'Find my numbers' }).click();
@@ -112,14 +113,15 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await expect(connect).toBeHidden();
 
             await page.getByRole('button', { name: 'Connect a number' }).first().click();
-            await connect.getByRole('radio', { name: 'VoiceLink' }).click();
-            await connect.getByLabel('VoiceLink API token').fill(FAKE_VOICELINK_TOKEN);
+            await page.getByRole('menuitem', { name: /^VoiceLink/ }).click();
+            const voicelinkConnect = page.getByRole('dialog', { name: 'Connect a VoiceLink number' });
+            await voicelinkConnect.getByLabel('VoiceLink API token').fill(FAKE_VOICELINK_TOKEN);
             await capture('connect-voicelink', false);
-            await connect.getByRole('button', { name: 'Find my numbers' }).click();
-            await expect(connect.getByRole('checkbox')).toHaveCount(2);
-            await connect.getByRole('checkbox', { name: '+918069450100' }).click();
-            await connect.getByRole('button', { name: 'Import 1 number' }).click();
-            await expect(connect).toBeHidden();
+            await voicelinkConnect.getByRole('button', { name: 'Find my numbers' }).click();
+            await expect(voicelinkConnect.getByRole('checkbox')).toHaveCount(2);
+            await voicelinkConnect.getByRole('checkbox', { name: '+918069450100' }).click();
+            await voicelinkConnect.getByRole('button', { name: 'Import 1 number' }).click();
+            await expect(voicelinkConnect).toBeHidden();
 
             const row = (phoneNumber: string) => page.getByTestId('voice-number-row').filter({ hasText: phoneNumber });
             await capture('numbers-imported');

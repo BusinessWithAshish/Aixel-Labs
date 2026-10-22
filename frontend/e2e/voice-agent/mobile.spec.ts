@@ -269,12 +269,16 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await check('agent-playground-live');
             await page.getByRole('button', { name: 'End call' }).click();
 
-            // Phone numbers: list with the setup tip, the guide carousel, the connect dialog.
-            await page.evaluate(() => window.localStorage.clear());
+            // Phone numbers: the list, the provider menu, the connect dialog and its guide carousel.
             await open(PHONE_NUMBERS_URL);
             await expect(page.getByTestId('voice-number-row')).toHaveCount(2);
             await check('phone-numbers');
-            await page.getByRole('button', { name: 'Setup guide' }).click();
+            await page.getByRole('button', { name: 'Connect a number' }).first().click();
+            await expect(page.getByRole('menuitem')).toHaveCount(3);
+            await check('connect-number-menu');
+            await page.getByRole('menuitem', { name: /^Telnyx/ }).click();
+            const connect = page.getByRole('dialog', { name: 'Connect a Telnyx number' });
+            await connect.getByRole('button', { name: 'Telnyx setup guide' }).click();
             const guide = page.getByRole('dialog', { name: /Set up Telnyx/ });
             await expect(guide).toBeVisible();
             await check('setup-guide');
@@ -282,8 +286,6 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await check('setup-guide-step-2');
             await page.keyboard.press('Escape');
             await expect(guide).toBeHidden();
-            await page.getByRole('button', { name: 'Connect a number' }).first().click();
-            const connect = page.getByRole('dialog', { name: 'Connect a number' });
             await connect.getByLabel('Telnyx API key').fill(FAKE_TELNYX_KEY);
             await check('connect-number');
             await connect.getByRole('button', { name: 'Find my numbers' }).click();
@@ -317,11 +319,11 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await open(BOOKINGS_URL);
             await check('bookings-empty');
 
-            // A first-time user's Phone numbers page, with the setup-guide tip.
+            // A first-time user's Phone numbers page: one way in, the Connect a number menu.
             await db.resetVoiceTelephony(E2E_USER);
             await open(PHONE_NUMBERS_URL);
-            await expect(page.getByRole('region', { name: 'Setup guide' })).toBeVisible();
-            await check('phone-numbers-empty-with-tip');
+            await expect(page.getByRole('button', { name: 'Connect a number' })).toBeVisible();
+            await check('phone-numbers-empty');
 
             expect(problems).toEqual([]);
         });

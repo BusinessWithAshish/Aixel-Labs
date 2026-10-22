@@ -140,15 +140,6 @@ const card = (page: Page) => page.getByTestId('gemini-key-card');
 const numberRow = (page: Page, phoneNumber = NUMBER) =>
     page.getByTestId('voice-number-row').filter({ hasText: phoneNumber });
 
-/** The number's Change dialog (its job is a draft until Save). Its title changes while saving, so it is found by role. */
-async function openJobDialog(page: Page) {
-    await numberRow(page)
-        .getByRole('button', { name: `Change what ${NUMBER} does` })
-        .click();
-    await expect(page.getByRole('dialog', { name: `What ${NUMBER} does` })).toBeVisible();
-    return page.getByRole('dialog');
-}
-
 test('without a key: the card says so, and the playground, answering, making calls and test calls explain it', async ({
     page,
     db,
@@ -195,12 +186,6 @@ test('without a key: the card says so, and the playground, answering, making cal
         'href',
         GEMINI_KEY_URL,
     );
-    const jobDialog = await openJobDialog(page);
-    await expect(jobDialog.getByRole('radio', { name: 'Answer calls' })).toBeDisabled();
-    await expect(jobDialog.getByRole('radio', { name: 'Make calls' })).toBeDisabled();
-    await expect(jobDialog.getByText('Needs your Gemini API key first.')).toHaveCount(2); // under both
-    await jobDialog.getByRole('button', { name: 'Cancel' }).click();
-    await expect(jobDialog).toBeHidden();
     await numberRow(page).getByRole('button', { name: 'Test call' }).click();
     const dialog = page.getByRole('dialog', { name: 'Test call' });
     await expect(dialog.getByTestId('gemini-key-notice')).toContainText(
@@ -215,7 +200,7 @@ test('without a key: the card says so, and the playground, answering, making cal
     await expect(card(page)).toBeInViewport();
 });
 
-test('the server refuses too: a key removed after the page loaded blocks answering calls and the playground', async ({
+test('the server refuses too: a key removed after the page loaded blocks test calls and the playground', async ({
     page,
     db,
 }) => {
@@ -225,14 +210,14 @@ test('the server refuses too: a key removed after the page loaded blocks answeri
     await openPhoneNumbers(page);
     await expect(page.getByTestId('gemini-key-notice')).toHaveCount(0);
     await db.setVoiceGeminiKey(E2E_USER, null);
-    const jobDialog = await openJobDialog(page);
-    await jobDialog.getByRole('radio', { name: 'Answer calls' }).click();
-    await jobDialog.getByRole('button', { name: 'Save' }).click();
-    await expect(jobDialog.getByRole('heading', { name: 'That did not finish' })).toBeVisible();
-    await expect(jobDialog.getByRole('alert')).toContainText('Add your Gemini API key first, under Voice agent > Settings.');
-    await jobDialog.getByRole('button', { name: 'Close' }).first().click();
-    await expect(numberRow(page).getByTestId('number-job')).toHaveText('Not used yet');
-    expect((await db.getVoiceNumbers(E2E_USER))[0].inboundAgentId).toBeNull();
+    await numberRow(page).getByRole('button', { name: 'Test call' }).click();
+    const testCall = page.getByRole('dialog', { name: 'Test call' });
+    await testCall.getByLabel('Your phone number').fill('+14155550123');
+    await testCall.getByRole('button', { name: 'Call me now' }).click();
+    await expect(testCall.getByRole('alert').last()).toContainText(
+        'Add your Gemini API key first, under Voice agent > Settings.',
+    );
+    await page.keyboard.press('Escape');
 
     await db.setVoiceGeminiKey(E2E_USER, GOOD_KEY);
     const engine = await FakePlaygroundEngine.install(page);
@@ -327,9 +312,6 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     );
     await openPhoneNumbers(page);
     await expect(page.getByTestId('gemini-key-notice')).toHaveCount(0);
-    const jobDialog = await openJobDialog(page);
-    await expect(jobDialog.getByRole('radio', { name: 'Answer calls' })).toBeEnabled();
-    await jobDialog.getByRole('button', { name: 'Cancel' }).click();
 
     // Neither the key nor its sealed form is in any page or action payload.
     await openSettings(page);

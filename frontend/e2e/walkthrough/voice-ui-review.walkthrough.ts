@@ -236,9 +236,10 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
                 await open(URLS.numbers);
                 await expect(page.getByTestId('voice-number-row')).toHaveCount(1);
                 await capture('numbers');
-                await page.getByRole('button', { name: `Change what ${NUMBER} does` }).click();
-                await expect(page.getByRole('dialog')).toBeVisible();
-                await capture('numbers-change-job-dialog', false);
+                await page.getByRole('button', { name: 'Connect a number' }).click();
+                await page.getByRole('menuitem', { name: /^Twilio/ }).click();
+                await expect(page.getByRole('dialog', { name: 'Connect a Twilio number' })).toBeVisible();
+                await capture('numbers-connect-twilio', false);
                 await page.keyboard.press('Escape');
             });
 
