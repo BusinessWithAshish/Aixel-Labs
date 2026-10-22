@@ -41,6 +41,7 @@
     "engineTokens": 600,
     "charsPerToken": 4,
     "typicalCallMinutes": 3,
+    "llmTokensPerTurn": 1500,
     "tools": {
       "source": "backend/voice/tools.py: the booking functions' declarations plus their '# Your tools' lines are about 2,100 characters; a custom tool sends its description twice (declaration and prompt) plus its parameters. A use reads the tool's answer as text and keeps the line open while it runs.",
       "bookingChars": 2100,

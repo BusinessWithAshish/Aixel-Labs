@@ -5,7 +5,9 @@ import {
     VoiceAgentCallType,
     VoiceCallChannel,
     VoiceCallDirection,
+    VoiceKeyProvider,
     VoiceProvider,
+    VoiceStackKind,
 } from '@aixellabs/backend/db/types';
 import {
     DEFAULT_INBOUND_VOICE_AGENT_PROMPT,
@@ -290,7 +292,10 @@ test('the agent card shows its numbers and its Gemini key, and opens a picker of
     await expect(page.getByTestId('agent-numbers')).toContainText('No number yet: pick the ones it calls from.');
 });
 
-test('the cost card is a bill: Gemini, the prompt, each tool and the phone, then the real average', async ({ page, db }) => {
+test('the cost card is a bill: the voice stack, the prompt, each tool and the phone, then the real average', async ({
+    page,
+    db,
+}) => {
     await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
     // 2,400 characters = 600 tokens, plus the engine's own 600: 1,200 × $0.0000103 = $0.012 a minute.
     const agentId = await db.insertVoiceAgent(E2E_USER, {
@@ -304,7 +309,7 @@ test('the cost card is a bill: Gemini, the prompt, each tool and the phone, then
     const card = page.getByTestId('agent-cost-estimate');
     const parts = card.getByTestId('agent-cost-parts');
     // Gemini $0.0224 + prompt $0.0124 + Telnyx in $0.0107 = $0.045 a minute, $0.136 for 3 minutes.
-    await expect(parts).toContainText('Gemini talk time · audio in and out$0.022');
+    await expect(parts).toContainText('Gemini 3.8 Live · talk time$0.022');
     await expect(parts).toContainText('Prompt · 1,200 tokens, read every turn$0.012');
     await expect(parts).toContainText('Telnyx · list rate$0.011');
     await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.045');
@@ -321,6 +326,24 @@ test('the cost card is a bill: Gemini, the prompt, each tool and the phone, then
     await openVoiceAgent(page, agentId);
     await expect(parts).toContainText('Booking · 525 tokens a turn, ~2 uses a call$0.006');
     await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.052');
+
+    // A pipeline stack bills its three parts; thinking grows with the prompt (its list rate assumes 1,500
+    // tokens a turn), and so do the tools' tokens: $0.0058 + $0.0029 + $0.039 + booking $0.0024 + Telnyx.
+    await db.setVoiceAgentFields(agentId, {
+        stack: {
+            kind: VoiceStackKind.PIPELINE,
+            stt: { provider: VoiceKeyProvider.DEEPGRAM, model: 'nova-3' },
+            llm: { provider: VoiceKeyProvider.GEMINI, model: 'gemini-3.5-flash-lite' },
+            tts: { provider: VoiceKeyProvider.CARTESIA, model: 'sonic-3.6' },
+        },
+    });
+    await openVoiceAgent(page, agentId);
+    await expect(parts).toContainText('Speech to text · Deepgram Nova-3$0.006');
+    await expect(parts).toContainText('Thinking (LLM) · Gemini 3.5 Flash-Lite, 1,200 tokens a turn$0.003');
+    await expect(parts).toContainText('Text to speech · Cartesia Sonic 3.6$0.039');
+    await expect(parts).not.toContainText('Gemini 3.8 Live');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.061');
+    await db.setVoiceAgentFields(agentId, { stack: null });
 
     // A free-tier key pays nothing for Gemini; a priced call gives the real average.
     await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY, { tier: 'free' });
@@ -349,7 +372,7 @@ test('the cost card is a bill: Gemini, the prompt, each tool and the phone, then
         },
     ]);
     await openVoiceAgent(page, agentId);
-    await expect(parts).toContainText('Gemini talk time · free-tier key$0.000');
+    await expect(parts).toContainText('Gemini 3.8 Live · free-tier key$0.000');
     await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.011');
     await expect(card.getByTestId('agent-cost-real')).toHaveText(
         'Real so far: $0.030 a minute over 1 call (phone part partly estimated).',

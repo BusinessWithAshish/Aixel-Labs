@@ -1,9 +1,15 @@
 import {
     VOICE_CALL_RATES,
+    VOICE_DEFAULT_STACK,
+    VoiceKeyProvider,
+    VoiceStackKind,
+    type VoiceStack,
+    type VoiceStackPartName,
     type VoiceAgentCallType,
     type VoiceCallCost,
     type VoiceProvider,
 } from '@aixellabs/backend/db/types';
+import { PIPELINE_PARTS, stackModel, VOICE_STACK_PART_LABELS } from '@/helpers/voice-stack';
 
 /**
  * Call costs in words (Call logs, call detail, the agent's estimate, test calls). Costs are kept in US
@@ -97,13 +103,14 @@ export function providerUsdPerMinute(provider: VoiceProvider, callType: VoiceAge
 /** A tool the agent has on, as the estimate prices it: booking, or a custom tool and the text it sends. */
 export type CostTool = { kind: 'booking' } | { kind: 'custom'; name: string; chars: number };
 
+/** One line of the bill: the voice model, or one part of a pipeline. */
+export type AgentCostLine = { label: string; detail: string; usdPerMinute: number };
+
 export type AgentCostEstimate = {
-    /** Prompt tokens Gemini reads every turn: the agent's words plus the engine's own sections (tools apart). */
+    /** Prompt tokens read every turn: the agent's words plus the engine's own sections (tools apart). */
     promptTokens: number;
-    /** Gemini's talk time, before the prompt: nothing on a free-tier key. */
-    geminiUsdPerMinute: number;
-    /** What reading the prompt every turn adds. */
-    promptUsdPerMinute: number;
+    /** What the voice stack costs: a realtime model's talk time and prompt, or a pipeline's three parts. */
+    stack: AgentCostLine[];
     /** One row per tool: what it adds every turn plus its uses, spread over a typical call. */
     tools: { tool: CostTool; tokens: number; usesPerCall: number; usdPerMinute: number }[];
     /** One row per provider the agent is on; `usdPerMinute` null when its rate is not published. */
@@ -114,14 +121,16 @@ export type AgentCostEstimate = {
 };
 
 /**
- * What a minute with an agent should cost before any call, as a bill: Gemini's talk time, the prompt
- * (read again every turn), each tool (its text every turn, and its uses: the answer read as text and
- * the line held open while it runs), and the phone at the providers' list rates. Gemini parts are
- * free on a free-tier key.
+ * What a minute with an agent should cost before any call, as a bill: the voice stack (a realtime
+ * model's talk time plus its prompt, read again every turn; or a pipeline's speech to text, thinking
+ * and text to speech), each tool (its text every turn, and its uses: the answer read as text and the
+ * line held open while it runs), and the phone at the providers' list rates. Gemini parts are free
+ * on a free-tier key.
  */
 export function estimateAgentCost(input: {
     /** The prompt as written. */
     promptChars: number;
+    /** The agent's Gemini key is on Google's free tier. */
     freeTier: boolean;
     callType: VoiceAgentCallType;
     providers: VoiceProvider[];
@@ -129,11 +138,14 @@ export function estimateAgentCost(input: {
     phone?: string;
     /** The tools that are on. Absent: not counted. */
     tools?: CostTool[];
+    /** What its calls run on. Absent: the default (Gemini Live). */
+    stack?: VoiceStack<unknown>;
 }): AgentCostEstimate {
     const model = VOICE_CALL_RATES.estimate;
     const per = model.tools;
     const { usdPerMillionTokens } = VOICE_CALL_RATES.gemini;
-    const gemini = input.freeTier ? 0 : 1;
+    const stack = input.stack ?? VOICE_DEFAULT_STACK;
+    const paid = (provider: VoiceKeyProvider) => (input.freeTier && provider === VoiceKeyProvider.GEMINI ? 0 : 1);
     const providers = [...new Set(input.providers)].map((provider) => ({
         provider,
         usdPerMinute: providerUsdPerMinute(provider, input.callType, input.phone),
@@ -142,34 +154,66 @@ export function estimateAgentCost(input: {
 
     const tokens = (chars: number) => Math.ceil(chars / model.charsPerToken);
     const promptTokens = tokens(input.promptChars) + model.engineTokens;
-    const geminiUsdPerMinute = gemini * model.geminiUsdPerMinute;
-    const promptUsdPerMinute = gemini * promptTokens * model.geminiUsdPerPromptTokenMinute;
+    const name = (part: VoiceStackPartName, id: string) => stackModel(part, id)?.name ?? id;
+    const rate = (part: VoiceStackPartName, id: string) => stackModel(part, id)?.usdPerMinute ?? 0;
+
+    // What one prompt token read every turn costs a minute, on the model that reads it.
+    let thinker: VoiceKeyProvider;
+    let tokenUsdPerMinute: number;
+    let lines: AgentCostLine[];
+    if (stack.kind === VoiceStackKind.REALTIME) {
+        thinker = stack.provider;
+        tokenUsdPerMinute = paid(thinker) * model.geminiUsdPerPromptTokenMinute;
+        lines = [
+            {
+                label: name('realtime', stack.model),
+                detail: paid(thinker) ? 'talk time' : 'free-tier key',
+                usdPerMinute: paid(thinker) * rate('realtime', stack.model),
+            },
+            {
+                label: 'Prompt',
+                detail: `${promptTokens.toLocaleString('en-US')} tokens, read every turn`,
+                usdPerMinute: promptTokens * tokenUsdPerMinute,
+            },
+        ];
+    } else {
+        thinker = stack.llm.provider;
+        // shortcut: an LLM's list rate assumes llmTokensPerTurn read a turn; scaled linearly by the prompt. Upgrade with per-token prices.
+        tokenUsdPerMinute = (paid(thinker) * rate('llm', stack.llm.model)) / model.llmTokensPerTurn;
+        lines = PIPELINE_PARTS.map((part) => {
+            const { provider, model: id } = stack[part];
+            const llm = part === 'llm';
+            return {
+                label: VOICE_STACK_PART_LABELS[part].title,
+                detail: `${name(part, id)}${llm ? `, ${promptTokens.toLocaleString('en-US')} tokens a turn` : ''}${paid(provider) ? '' : ', free-tier key'}`,
+                usdPerMinute: llm ? promptTokens * tokenUsdPerMinute : paid(provider) * rate(part, id),
+            };
+        });
+    }
+    const stackUsdPerMinute = lines.reduce((sum, line) => sum + line.usdPerMinute, 0);
+
     const useTextUsd =
-        (per.useTextInTokens * usdPerMillionTokens.textIn + per.useTextOutTokens * usdPerMillionTokens.textOut) / 1e6;
+        (paid(thinker) *
+            (per.useTextInTokens * usdPerMillionTokens.textIn + per.useTextOutTokens * usdPerMillionTokens.textOut)) /
+        1e6;
     const tools = (input.tools ?? []).map((tool) => {
         const kind = tool.kind;
         const toolTokens = tokens(kind === 'booking' ? per.bookingChars : per.toolBaseChars + tool.chars);
-        // Each use: its text, and the seconds the line is held open (Gemini and the phone both run).
-        const useUsd =
-            gemini * useTextUsd +
-            (per.useSeconds[kind] / 60) * (geminiUsdPerMinute + promptUsdPerMinute + phoneUsdPerMinute);
+        // Each use: its text, and the seconds the line is held open (the stack and the phone both run).
+        const useUsd = useTextUsd + (per.useSeconds[kind] / 60) * (stackUsdPerMinute + phoneUsdPerMinute);
         return {
             tool,
             tokens: toolTokens,
             usesPerCall: per.usesPerCall[kind],
-            usdPerMinute:
-                gemini * toolTokens * model.geminiUsdPerPromptTokenMinute +
-                (per.usesPerCall[kind] * useUsd) / model.typicalCallMinutes,
+            usdPerMinute: toolTokens * tokenUsdPerMinute + (per.usesPerCall[kind] * useUsd) / model.typicalCallMinutes,
         };
     });
     return {
         promptTokens,
-        geminiUsdPerMinute,
-        promptUsdPerMinute,
+        stack: lines,
         tools,
         providers,
-        usdPerMinute:
-            geminiUsdPerMinute + promptUsdPerMinute + tools.reduce((sum, t) => sum + t.usdPerMinute, 0) + phoneUsdPerMinute,
+        usdPerMinute: stackUsdPerMinute + tools.reduce((sum, t) => sum + t.usdPerMinute, 0) + phoneUsdPerMinute,
         typicalCallMinutes: model.typicalCallMinutes,
     };
 }

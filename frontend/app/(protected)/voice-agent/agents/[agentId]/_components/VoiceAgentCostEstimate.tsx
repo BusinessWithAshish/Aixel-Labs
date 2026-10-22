@@ -25,15 +25,9 @@ export function VoiceAgentCostEstimate() {
     const currency = useDisplayCurrency();
     const money = (usd: number) => formatMoney(usd, currency);
     const real = costTotals ? costPerMinute(costTotals.totalUsd, costTotals.durationSec) : null;
-    const free = estimate.geminiUsdPerMinute === 0;
 
     const lines: { label: string; detail: string; usd: number | null }[] = [
-        { label: 'Gemini talk time', detail: free ? 'free-tier key' : 'audio in and out', usd: estimate.geminiUsdPerMinute },
-        {
-            label: 'Prompt',
-            detail: `${count(estimate.promptTokens)} tokens, read every turn`,
-            usd: estimate.promptUsdPerMinute,
-        },
+        ...estimate.stack.map(({ label, detail, usdPerMinute }) => ({ label, detail, usd: usdPerMinute })),
         ...estimate.tools.map(({ tool, tokens, usesPerCall, usdPerMinute }) => ({
             label: tool.kind === 'booking' ? 'Booking' : tool.name,
             detail: `${count(tokens)} tokens a turn, ~${usesPerCall} ${usesPerCall === 1 ? 'use' : 'uses'} a call`,

@@ -14,6 +14,7 @@ import {
     VoiceCalendarConnectionStatus,
     type VoiceCallerMemory,
     type VoiceGeminiKeyView,
+    type VoiceStack,
 } from '@aixellabs/backend/db/types';
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
 import {
@@ -72,6 +73,8 @@ export type VoiceAgentEditorData = {
     geminiKey: VoiceGeminiKeyView;
     /** What its calls have really cost so far (null: none priced yet). */
     costTotals: VoiceAgentCostTotals | null;
+    /** What its calls run on: its own stack, else the owner's. */
+    stack: VoiceStack<string>;
 };
 
 /** A calendar (or event type) on a connected app, as the destination picker lists it. */
@@ -99,6 +102,7 @@ export function useVoiceAgentEditorPage({
     memories: initialMemories,
     geminiKey,
     costTotals,
+    stack,
 }: VoiceAgentEditorData) {
     const router = useRouter();
     const agentId = initialAgent._id ?? '';
@@ -558,6 +562,7 @@ export function useVoiceAgentEditorPage({
         freeTier: geminiKey.tier === 'free',
         callType: form.callType,
         providers: numbers.map((n) => n.provider),
+        stack,
         tools: [
             ...(booking.enabled ? [{ kind: 'booking' as const }] : []),
             ...saved.tools.webhooks

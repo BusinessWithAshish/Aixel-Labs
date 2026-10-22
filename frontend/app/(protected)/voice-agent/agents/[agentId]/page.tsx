@@ -1,11 +1,12 @@
 import { notFound } from 'next/navigation';
+import { VOICE_DEFAULT_STACK } from '@aixellabs/backend/db/types';
 import PageLayout from '@/components/common/PageLayout';
 import { withPageHandler } from '@/components/hocs/with-page-handler';
 import { PageProvider } from '@/contexts/PageStore';
 import { getVoiceAgent, getVoiceAgentUsage, type VoiceAgentUsage } from '@/app/actions/voice-agent-actions';
 import { listVoiceConnectedApps, type VoiceConnectedApps } from '@/app/actions/voice-calendar-actions';
 import { listVoiceCallerMemories, type VoiceCallerMemoryList } from '@/app/actions/voice-caller-memory-actions';
-import { getGeminiKeyStatus } from '@/app/actions/voice-settings-actions';
+import { getAgentStack, getGeminiKeyStatus } from '@/app/actions/voice-settings-actions';
 import { getAgentCostTotals } from '@/app/actions/voice-call-actions';
 import { isValidObjectId } from '@/helpers/object-id';
 import { NO_GEMINI_KEY } from '@/server/voice-agent/gemini-key';
@@ -26,14 +27,16 @@ async function VoiceAgentPage({
     searchParams: Promise<{ connected?: string | string[] }>;
 }) {
     const [{ agentId }, { connected }] = await Promise.all([params, searchParams]);
-    const [response, usageResponse, appsResponse, keyResponse, memoriesResponse, costsResponse] = await Promise.all([
-        getVoiceAgent(agentId),
-        getVoiceAgentUsage(agentId),
-        listVoiceConnectedApps(),
-        getGeminiKeyStatus(agentId),
-        listVoiceCallerMemories(agentId),
-        getAgentCostTotals(agentId),
-    ]);
+    const [response, usageResponse, appsResponse, keyResponse, memoriesResponse, costsResponse, stackResponse] =
+        await Promise.all([
+            getVoiceAgent(agentId),
+            getVoiceAgentUsage(agentId),
+            listVoiceConnectedApps(),
+            getGeminiKeyStatus(agentId),
+            listVoiceCallerMemories(agentId),
+            getAgentCostTotals(agentId),
+            getAgentStack(agentId),
+        ]);
     if (!response.success || !response.data) {
         return notFound();
     }
@@ -57,6 +60,7 @@ async function VoiceAgentPage({
                     memories,
                     geminiKey: keyResponse.data ?? NO_GEMINI_KEY,
                     costTotals: costsResponse.data?.[0] ?? null,
+                    stack: stackResponse.data?.stack ?? VOICE_DEFAULT_STACK,
                 }}
                 usePageHook={useVoiceAgentEditorPage}
             >

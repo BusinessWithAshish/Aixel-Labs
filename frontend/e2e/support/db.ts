@@ -569,7 +569,7 @@ export class E2eDb {
     /** Sets fields on an agent the editor would otherwise save (prompt, variables, voicemail, analysis, memory). */
     async setVoiceAgentFields(
         agentId: string,
-        fields: Partial<Pick<VoiceAgentDoc, 'prompt' | 'variables' | 'voicemail' | 'analysis' | 'memory'>>,
+        fields: Partial<Pick<VoiceAgentDoc, 'prompt' | 'variables' | 'voicemail' | 'analysis' | 'memory' | 'stack'>>,
     ): Promise<void> {
         await this.voiceAgents.updateOne({ _id: new MongoObjectId(agentId) }, { $set: fields });
     }
