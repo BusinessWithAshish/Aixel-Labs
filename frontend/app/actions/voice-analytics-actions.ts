@@ -16,6 +16,7 @@ import {
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
+import { agentIdMatch } from '@/server/voice-agent/agent-match';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 
@@ -25,6 +26,8 @@ export type VoiceAnalyticsRange = '7' | '30' | '90' | '365' | 'all';
 export type VoiceAnalyticsInput = {
     agentId?: string | null;
     range?: VoiceAnalyticsRange;
+    /** Also count agents that were deleted since (without an agent picked). */
+    includeDeleted?: boolean;
 };
 
 /** A campaign's contacts by where they ended up. */
@@ -73,8 +76,8 @@ export type VoiceAnalytics = {
         calls: number;
         durationSec: number;
         totalUsd: number;
-        geminiUsd: number;
-        providerUsd: number;
+        /** Every `<part>Usd` of `VoiceCallCost` but the total (Gemini, the phone provider, analysis, …), dearest first. */
+        parts: { part: string; usd: number }[];
         /** Some calls' phone part is still minutes × the provider's list rate. */
         estimated: boolean;
     };
@@ -105,12 +108,8 @@ type CallFacets = {
     overTime: { _id: string; answered: number; unanswered: number }[];
     endedBy: { _id: string | null; calls: number }[];
     sentiment: { _id: VoiceCallSentiment; calls: number }[];
-    costByAgent: (Omit<VoiceAgentCost, 'agentId'> & {
-        _id: MongoObjectId;
-        geminiUsd: number;
-        providerUsd: number;
-        estimated: number;
-    })[];
+    costByAgent: (Omit<VoiceAgentCost, 'agentId'> & { _id: MongoObjectId; estimated: number })[];
+    costParts: { _id: string; usd: number }[];
     replies: { _id: number | 'slower'; replies: number; totalMs: number }[];
 };
 
@@ -125,7 +124,7 @@ function daysSince(from: Date): string[] {
     return [...days];
 }
 
-/** Everything the owner's calls, bookings and campaigns add up to, over a range and optionally for one agent. */
+/** Everything the owner's calls, bookings and campaigns add up to over a range: their current agents', every agent's or one agent's. */
 export const getVoiceAnalytics = async (input: VoiceAnalyticsInput = {}): Promise<ALApiResponse<VoiceAnalytics>> => {
     const agentId = input.agentId || null;
     if (agentId) assertValidObjectId(agentId, 'Agent ID');
@@ -136,7 +135,7 @@ export const getVoiceAnalytics = async (input: VoiceAnalyticsInput = {}): Promis
     return runAuthenticatedAction(async function getVoiceAnalytics(userId): Promise<VoiceAnalytics> {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         await ensureVoiceAgentIndexes();
-        const agentMatch = agentId ? { agentId: new MongoObjectId(agentId) } : {};
+        const agentMatch = await agentIdMatch(owner.userId, agentId, !!input.includeDeleted);
         const answered = { $in: ['caller', { $ifNull: ['$turns.role', []] }] };
 
         const callsCol = await getCollection<VoiceCallDoc>(MongoCollections.VOICE_CALLS);
@@ -192,8 +191,6 @@ export const getVoiceAnalytics = async (input: VoiceAnalyticsInput = {}): Promis
                                         calls: { $sum: 1 },
                                         durationSec: { $sum: '$durationSec' },
                                         totalUsd: { $sum: '$cost.totalUsd' },
-                                        geminiUsd: { $sum: '$cost.geminiUsd' },
-                                        providerUsd: { $sum: '$cost.providerUsd' },
                                         estimated: {
                                             $max: {
                                                 $cond: [
@@ -216,6 +213,14 @@ export const getVoiceAnalytics = async (input: VoiceAnalyticsInput = {}): Promis
                                 },
                                 { $set: { agentName: { $ifNull: [{ $arrayElemAt: ['$agent.name', 0] }, null] } } },
                                 { $unset: 'agent' },
+                            ],
+                            costParts: [
+                                { $match: { cost: { $type: 'object' } } },
+                                { $project: { part: { $objectToArray: '$cost' } } },
+                                { $unwind: '$part' },
+                                { $match: { 'part.k': { $regex: /Usd$/, $ne: 'totalUsd' } } },
+                                { $group: { _id: '$part.k', usd: { $sum: '$part.v' } } },
+                                { $sort: { usd: -1 } },
                             ],
                             replies: [
                                 { $unwind: '$gapsMs' },
@@ -291,11 +296,9 @@ export const getVoiceAnalytics = async (input: VoiceAnalyticsInput = {}): Promis
                 calls: sum.calls + row.calls,
                 durationSec: sum.durationSec + row.durationSec,
                 totalUsd: sum.totalUsd + row.totalUsd,
-                geminiUsd: sum.geminiUsd + row.geminiUsd,
-                providerUsd: sum.providerUsd + row.providerUsd,
                 estimated: sum.estimated || row.estimated === 1,
             }),
-            { calls: 0, durationSec: 0, totalUsd: 0, geminiUsd: 0, providerUsd: 0, estimated: false },
+            { calls: 0, durationSec: 0, totalUsd: 0, estimated: false },
         );
 
         const replyCount = facets.replies.reduce((sum, b) => sum + b.replies, 0);
@@ -314,7 +317,7 @@ export const getVoiceAnalytics = async (input: VoiceAnalyticsInput = {}): Promis
                 calls: facets.sentiment.find((row) => row._id === sentiment)?.calls ?? 0,
             })),
             bookings: { booked: status(VoiceBookingStatus.BOOKED), cancelled: status(VoiceBookingStatus.CANCELLED) },
-            cost,
+            cost: { ...cost, parts: facets.costParts.map(({ _id, usd }) => ({ part: _id, usd })) },
             costByAgent: costByAgent.map(({ _id, agentName, calls, durationSec, totalUsd }) => ({
                 agentId: _id.toString(),
                 agentName,
