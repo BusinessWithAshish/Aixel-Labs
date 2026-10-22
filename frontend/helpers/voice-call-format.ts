@@ -74,6 +74,10 @@ export const SENTIMENT_LABELS: Record<VoiceCallSentiment, string> = {
     negative: 'Negative',
 };
 
+export function sentimentVariant(sentiment: VoiceCallSentiment): 'green' | 'yellow' | 'red' {
+    return sentiment === 'positive' ? 'green' : sentiment === 'negative' ? 'red' : 'yellow';
+}
+
 /** A custom analysis field's value in words (null = the call did not say). */
 export function formatFieldValue(value: string | number | boolean | null | undefined): string {
     if (value === null || value === undefined || value === '') return '—';

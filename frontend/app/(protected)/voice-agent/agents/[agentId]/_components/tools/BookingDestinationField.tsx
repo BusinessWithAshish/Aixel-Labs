@@ -1,27 +1,48 @@
 'use client';
 
 import { useEffect } from 'react';
+import Image from 'next/image';
 import { Loader2 } from 'lucide-react';
+import { VoiceCalendarConnectionStatus } from '@aixellabs/backend/db/types';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectSeparator,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { usePage } from '@/contexts/PageStore';
-import { voiceCalendarProviderInfo } from '@/helpers/voice-calendar-providers';
+import { VOICE_CALENDAR_PROVIDERS, voiceCalendarProviderInfo } from '@/helpers/voice-calendar-providers';
 import { CalendarProviderLogo } from '../../../_components/CalendarProviderLogo';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
+import { bookingCalendarLabel } from '../../_utils/prompt-tools';
+import { ConnectedAppsList } from './ConnectedAppsList';
 
 const BUILTIN = 'builtin';
 /** A saved destination whose connection is gone or needs connecting again. */
 const MISSING = 'missing';
+/** "connect:<provider>": leaves for Composio's sign-in page to connect that app. */
+const CONNECT = 'connect:';
+/** CRMs the agent will write to next (not connectable yet). */
+const CRM_LOGOS = ['highlevel', 'hubspot', 'salesforce'];
 
 /**
  * "Where bookings go": the built-in calendar, or one of the owner's connected apps and which
- * calendar (event type) in it. The hours, length and timezone still decide what is offered;
- * the app's free/busy is checked on top.
+ * calendar (event type) in it, or a new app to connect. The hours, length and timezone still
+ * decide what is offered; the app's free/busy is checked on top.
  */
 export function BookingDestinationField() {
     const {
         booking,
         savingBooking,
+        connectedAppsConfigured,
+        connections,
+        connecting,
+        connectApp,
         activeConnections,
         calendars,
         calendarsLoading,
@@ -63,8 +84,10 @@ export function BookingDestinationField() {
                     <Label htmlFor="booking-destination">Where bookings go</Label>
                     <Select
                         value={target}
-                        onValueChange={(v) => void chooseBookingTarget(v)}
-                        disabled={savingBooking || !!calendarsLoading}
+                        onValueChange={(v) =>
+                            void (v.startsWith(CONNECT) ? connectApp(v.slice(CONNECT.length)) : chooseBookingTarget(v))
+                        }
+                        disabled={savingBooking || !!calendarsLoading || !!connecting}
                     >
                         <SelectTrigger
                             id="booking-destination"
@@ -73,7 +96,7 @@ export function BookingDestinationField() {
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value={BUILTIN}>Built-in calendar</SelectItem>
+                            <SelectItem value={BUILTIN}>{bookingCalendarLabel(null)}</SelectItem>
                             {destination && !connection ? (
                                 <SelectItem value={MISSING} disabled>
                                     <CalendarProviderLogo provider={destination.provider} className="size-4" />
@@ -89,6 +112,47 @@ export function BookingDestinationField() {
                                     </span>
                                 </SelectItem>
                             ))}
+                            {connectedAppsConfigured ? (
+                                <>
+                                    <SelectSeparator />
+                                    <SelectGroup>
+                                        <SelectLabel>
+                                            Connect an app (you sign in on Composio&apos;s secure page)
+                                        </SelectLabel>
+                                        {VOICE_CALENDAR_PROVIDERS.map((p) => (
+                                            <SelectItem key={p.provider} value={`${CONNECT}${p.provider}`}>
+                                                <CalendarProviderLogo provider={p.provider} className="size-4" />
+                                                <span className="grid min-w-0">
+                                                    {/* A second account of an app it already has (another calendar owner, say). */}
+                                                    {connections.some(
+                                                        (c) =>
+                                                            c.provider === p.provider &&
+                                                            c.status === VoiceCalendarConnectionStatus.ACTIVE,
+                                                    )
+                                                        ? `Connect another ${p.label} account`
+                                                        : `Connect ${p.label}`}
+                                                    <span className="text-muted-foreground text-xs">{p.blurb}</span>
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                        <SelectItem value="crm" disabled data-testid="connect-crm-soon">
+                                            <span className="flex shrink-0 gap-1">
+                                                {CRM_LOGOS.map((name) => (
+                                                    <Image
+                                                        key={name}
+                                                        src={`/brand-logos/${name}.svg`}
+                                                        alt=""
+                                                        width={16}
+                                                        height={16}
+                                                        className="size-4 object-contain"
+                                                    />
+                                                ))}
+                                            </span>
+                                            Your own CRM: coming soon
+                                        </SelectItem>
+                                    </SelectGroup>
+                                </>
+                            ) : null}
                         </SelectContent>
                     </Select>
                 </div>
@@ -126,6 +190,12 @@ export function BookingDestinationField() {
                     </div>
                 ) : null}
             </div>
+            {connecting ? (
+                <p className="text-muted-foreground flex items-center gap-2 text-xs">
+                    <Loader2 className="size-3 animate-spin" />
+                    Opening {VOICE_CALENDAR_PROVIDERS.find((p) => p.provider === connecting)?.label}…
+                </p>
+            ) : null}
             {calendarsLoading && !destination ? (
                 <p className="text-muted-foreground flex items-center gap-2 text-xs">
                     <Loader2 className="size-3 animate-spin" />
@@ -147,10 +217,11 @@ export function BookingDestinationField() {
                 {destination && info
                     ? `The agent checks your ${info.label} for busy times, books there, and lists each booking in Bookings too.` +
                       (info.targetNoun === 'Event type' ? ' Callers are asked for an email address.' : '')
-                    : activeConnections.length > 0
-                      ? 'Bookings stay in Aixel Labs. Pick a connected app to book into your own calendar instead.'
-                      : 'Bookings stay in Aixel Labs. Connect an app below to book into your own calendar instead.'}
+                    : connectedAppsConfigured
+                      ? `${bookingCalendarLabel(null)}: bookings stay in Aixel Labs. Or pick an app to book into your own calendar.`
+                      : 'Bookings stay in Aixel Labs. Connecting your own calendar is not switched on for this workspace yet.'}
             </p>
+            <ConnectedAppsList />
         </div>
     );
 }

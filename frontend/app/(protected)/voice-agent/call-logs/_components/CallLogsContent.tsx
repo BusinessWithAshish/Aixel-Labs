@@ -4,7 +4,6 @@ import { History } from 'lucide-react';
 import type { CallSuccessFilter } from '@/app/actions/voice-call-actions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { EmptyState } from '@/components/common/EmptyState';
-import { AgentFilter } from '@/components/common/voice-agent/AgentFilter';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePage } from '@/contexts/PageStore';
@@ -14,6 +13,7 @@ import { CallCard } from './CallCard';
 import { CallCostSummary } from './CallCost';
 import { CurrencySelect } from '@/components/common/voice-agent/CurrencySelect';
 
+const ALL_AGENTS = 'all';
 const ALL_OUTCOMES = 'all';
 const OUTCOME_OPTIONS: { value: CallSuccessFilter; label: string }[] = [
     { value: 'yes', label: 'Successful' },
@@ -28,8 +28,6 @@ export function CallLogsContent() {
         agentFilterName,
         successFilter,
         setSuccessFilter,
-        includeDeleted,
-        setIncludeDeleted,
         limit,
         loadError,
         filtering,
@@ -39,39 +37,62 @@ export function CallLogsContent() {
 
     return (
         <>
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
-                <AgentFilter
-                    id="call-logs-agent-filter"
-                    agents={agents}
-                    agentId={agentFilter}
-                    includeDeleted={includeDeleted}
-                    disabled={filtering}
-                    onAgentChange={setAgentFilter}
-                    onIncludeDeletedChange={setIncludeDeleted}
-                />
-                <div className="flex w-full flex-col gap-1.5 sm:w-44">
-                    <Label htmlFor="call-logs-outcome-filter">Outcome</Label>
-                    <Select
-                        value={successFilter ?? ALL_OUTCOMES}
-                        disabled={filtering}
-                        onValueChange={(value) =>
-                            setSuccessFilter(value === ALL_OUTCOMES ? null : (value as CallSuccessFilter))
-                        }
-                    >
-                        <SelectTrigger id="call-logs-outcome-filter" className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ALL_OUTCOMES}>All calls</SelectItem>
-                            {OUTCOME_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <p className="text-muted-foreground text-sm">
+                    {calls.length === limit
+                        ? `Latest ${limit} calls`
+                        : `${calls.length} ${calls.length === 1 ? 'call' : 'calls'}`}
+                    {agentFilterName ? ` with ${agentFilterName}` : ''}
+                    {outcomeLabel ? `, ${outcomeLabel}` : ''}. Open a call for its transcript and recording.
+                </p>
+                <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                    <CurrencySelect className="w-full sm:w-28" />
+                    <div className="flex w-full flex-col gap-1.5 sm:w-48">
+                        <Label htmlFor="call-logs-outcome-filter">Outcome</Label>
+                        <Select
+                            value={successFilter ?? ALL_OUTCOMES}
+                            disabled={filtering}
+                            onValueChange={(value) =>
+                                setSuccessFilter(value === ALL_OUTCOMES ? null : (value as CallSuccessFilter))
+                            }
+                        >
+                            <SelectTrigger id="call-logs-outcome-filter" className="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ALL_OUTCOMES}>All calls</SelectItem>
+                                {OUTCOME_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex w-full flex-col gap-1.5 sm:w-60">
+                        <Label htmlFor="call-logs-agent-filter">Agent</Label>
+                        <Select
+                            value={agentFilter ?? ALL_AGENTS}
+                            disabled={filtering}
+                            onValueChange={(value) => setAgentFilter(value === ALL_AGENTS ? null : value)}
+                        >
+                            <SelectTrigger id="call-logs-agent-filter" className="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ALL_AGENTS}>All agents</SelectItem>
+                                {agentFilter && !agents.some((a) => a.id === agentFilter) ? (
+                                    <SelectItem value={agentFilter}>Deleted agent</SelectItem>
+                                ) : null}
+                                {agents.map((agent) => (
+                                    <SelectItem key={agent.id} value={agent.id}>
+                                        {agent.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
-                <CurrencySelect className="w-full sm:w-28" />
             </div>
 
             <CallCostSummary />
@@ -97,22 +118,13 @@ export function CallLogsContent() {
             ) : null}
 
             {calls.length > 0 ? (
-                <section className={cn('flex flex-col gap-2 transition-opacity', filtering && 'opacity-60')}>
-                    <p className="text-muted-foreground text-sm">
-                        {calls.length === limit
-                            ? `Latest ${limit} calls`
-                            : `${calls.length} ${calls.length === 1 ? 'call' : 'calls'}`}
-                        {agentFilterName ? ` with ${agentFilterName}` : ''}
-                        {outcomeLabel ? `, ${outcomeLabel}` : ''}. Open one for its transcript and recording.
-                    </p>
-                    <ul className="flex flex-col gap-2">
-                        {calls.map((call) => (
-                            <li key={call._id}>
-                                <CallCard call={call} />
-                            </li>
-                        ))}
-                    </ul>
-                </section>
+                <ul className={cn('flex flex-col gap-2 transition-opacity', filtering && 'opacity-60')}>
+                    {calls.map((call) => (
+                        <li key={call._id}>
+                            <CallCard call={call} />
+                        </li>
+                    ))}
+                </ul>
             ) : null}
         </>
     );

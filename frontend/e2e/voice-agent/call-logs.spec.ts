@@ -204,7 +204,7 @@ test.describe('with seeded calls', () => {
         await expect(summary).toContainText('Calls4 · 2:29 talking');
         await expect(summary).toContainText('Cost of 3 priced calls$0.066 est.');
         await expect(summary).toContainText('Average per minute$0.027');
-        await expect(summary).toContainText('Gemini · Phone$0.039 · $0.027');
+        await expect(summary).toContainText('Gemini · phone$0.039 · $0.027');
 
         await openCallLogs(page, `?agent=${salesId}`);
         await expect(summary).toContainText('Calls2 · 1:35 talking');
@@ -247,34 +247,6 @@ test.describe('with seeded calls', () => {
         await page.getByRole('combobox', { name: 'Agent' }).click();
         await page.getByRole('option', { name: 'All agents' }).click();
         await expect(page.getByTestId('call-card')).toHaveCount(4);
-    });
-
-    test('calls of deleted agents show only when asked, with every cost part', async ({ page, db }) => {
-        const [deletedCallId] = await db.insertVoiceCalls(E2E_USER, [
-            call({
-                agentId: new ObjectId(),
-                from: '+13473703925',
-                to: '+14155550142',
-                startedAt: new Date(Date.now() - 3 * MINUTE),
-                endedBy: 'goodbye',
-                cost: cost(0.01, 0.02, { analysisUsd: 0.001, totalUsd: 0.031 }),
-            }),
-        ]);
-        await openCallLogs(page);
-        const cards = page.getByTestId('call-card');
-        await expect(cards).toHaveCount(4);
-        await expect(cards.filter({ hasText: 'Deleted agent' })).toHaveCount(0);
-
-        await page.getByRole('switch', { name: 'Include deleted agents' }).click();
-        await expect(page).toHaveURL(/\?deleted=1$/);
-        await expect(cards).toHaveCount(5);
-        await expect(cards.nth(0)).toContainText('Deleted agent');
-        await expect(page.getByTestId('call-cost-summary')).toContainText('Gemini · Phone · Call analysis');
-
-        await page.goto(`${CALL_LOGS_URL}/${deletedCallId}`);
-        await expect(page.getByTestId('call-cost-breakdown')).toHaveText(
-            'Gemini $0.010 · Telnyx $0.020 (estimate) · Call analysis $0.001',
-        );
     });
 
     test('a call shows its transcript, per-turn gaps, flags and the recording', async ({ page }) => {

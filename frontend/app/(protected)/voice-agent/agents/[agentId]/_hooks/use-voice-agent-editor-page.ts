@@ -171,11 +171,9 @@ export function useVoiceAgentEditorPage({
         setAlternate({ text: current, label: alternate.currentLabel, currentLabel: alternate.label });
     }, [agentForm, alternate]);
 
-    /** Custom variables the prompt and the voicemail message use, in order. */
-    const usedVariables = useMemo(
-        () => customVariableNames(form.prompt, settings.voicemail.message),
-        [form.prompt, settings.voicemail.message],
-    );
+    /** Custom variables the prompt and the voicemail message (calls it places only) use, in order. */
+    const voicemailMessage = form.callType === VoiceAgentCallType.INBOUND ? '' : settings.voicemail.message;
+    const usedVariables = useMemo(() => customVariableNames(form.prompt, voicemailMessage), [form.prompt, voicemailMessage]);
     /**
      * What the prompt's "{{" menu offers, and how the prompt marks each name. Not memoised: the form edits
      * `variables` in place, so its identity does not change when a default value does.

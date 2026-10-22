@@ -11,6 +11,7 @@ import { SUGGESTED_TOOL_WAIT_LINE } from '@/helpers/voice-agent-features';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 
 const LIMITS = VOICE_AGENT_FEATURE_LIMITS;
+const SUBGRID_FIELD = 'sm:row-span-4 sm:grid sm:grid-rows-subgrid';
 
 const TOOL_WAIT_CHOICES = [
     {
@@ -93,12 +94,14 @@ export function SpeechSettings() {
                 />
             </FieldSet>
 
+            {/* Each field spans the same 4 rows (label, description, input, error): inputs line up whatever the description's length. */}
             <div className="grid gap-4 sm:grid-cols-2">
                 <NumberControlledField
                     name="speech.silenceSecs"
                     id="speech-silence-secs"
                     label="Check in after silence (seconds)"
                     description="If the caller says nothing for this long, the agent asks if they are still there. Still nothing, and it says goodbye. 0 = never."
+                    className={SUBGRID_FIELD}
                     classNames={{ description: 'text-xs' }}
                     min={0}
                     max={LIMITS.silenceSecsMax}
@@ -108,6 +111,7 @@ export function SpeechSettings() {
                     id="speech-max-call-minutes"
                     label="Time limit (minutes)"
                     description="The agent wraps up and ends the call at this point. 0 = no limit."
+                    className={SUBGRID_FIELD}
                     classNames={{ description: 'text-xs' }}
                     min={0}
                     max={LIMITS.maxCallMinutesMax}

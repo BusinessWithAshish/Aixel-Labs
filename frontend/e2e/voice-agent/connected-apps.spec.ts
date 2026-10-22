@@ -150,16 +150,17 @@ test('connect Google Calendar: Connect Link, back to the agent booking into it, 
     await openVoiceAgent(page, agentId);
 
     const apps = page.getByTestId('connected-apps');
-    await expect(apps.getByText('Your own calendars and booking apps')).toBeVisible();
-    await expectLogos(page.getByTestId('connect-app-buttons'), ['google-calendar', 'outlook', 'cal-com', 'calendly']);
+    // Nothing connected yet: connecting is offered right in "Where bookings go".
+    await expect(apps).toHaveCount(0);
+    await expect(page.locator('#booking-destination')).toHaveText('Built-in calendar');
+    await page.locator('#booking-destination').click();
+    await expectLogos(page.getByRole('listbox'), ['google-calendar', 'outlook', 'cal-com', 'calendly']);
     // CRMs are announced, not connectable yet.
     const crm = page.getByTestId('connect-crm-soon');
-    await expect(crm).toContainText('Connect your own CRM');
-    await expect(crm).toContainText('Coming soon');
-    await expect(crm.getByRole('button')).toHaveCount(0);
+    await expect(crm).toContainText('Your own CRM: coming soon');
+    await expect(crm).toHaveAttribute('aria-disabled', 'true');
     await expectLogos(crm, ['highlevel', 'hubspot', 'salesforce']);
-    await expect(page.locator('#booking-destination')).toHaveText('Built-in calendar');
-    await apps.getByRole('button', { name: 'Connect Google Calendar', exact: true }).click();
+    await page.getByRole('option', { name: /^Connect Google Calendar/ }).click();
 
     // Composio's page sends the browser back; the callback says what it is doing, checks it and
     // returns to the agent, without ever showing a "not found" page on the way.
@@ -224,14 +225,21 @@ test('connect Google Calendar: Connect Link, back to the agent booking into it, 
     await expect(apps).not.toContainText('quiet-otter');
     await expectLogos(row, ['google-calendar']);
     // Another account of the same app is offered as such.
-    await expect(apps.getByRole('button', { name: 'Connect another Google Calendar account', exact: true })).toBeVisible();
-    await expect(apps.getByRole('button', { name: 'Connect Outlook', exact: true })).toBeVisible();
+    await page.locator('#booking-destination').click();
+    await expect(page.getByRole('option', { name: /^Connect another Google Calendar account/ })).toBeVisible();
+    await expect(page.getByRole('option', { name: /^Connect Outlook/ })).toBeVisible();
+    await page.keyboard.press('Escape');
 
     // The agent booked into the built-in calendar, so it was pointed at the new account's main
     // calendar on the server and saved: nothing for the owner to do.
     await expect(page.locator('#booking-destination')).toHaveText('Google Calendar (ravi@example.com)');
     await expect(page.locator('#booking-calendar')).toHaveText(/Ravi's calendar/);
-    await expect(page.getByTestId('booking-tool').getByText('Unsaved changes')).toHaveCount(0);
+    await expect(page.getByTestId('voice-agent-tools').getByText('Unsaved changes')).toHaveCount(0);
+    // Both booking tools now work on that calendar.
+    await expect(page.getByTestId('booking-tool-row').getByTestId('tool-where')).toHaveText([
+        "Reads: Google Calendar · Ravi's calendar",
+        "Writes: Google Calendar · Ravi's calendar, listed in Bookings",
+    ]);
     expect((await db.getVoiceAgentDoc(agentId)).tools?.booking?.destination).toEqual({
         provider: VoiceCalendarProvider.GOOGLE_CALENDAR,
         connectedAccountId: accountId,
@@ -275,7 +283,7 @@ test('connect Google Calendar: Connect Link, back to the agent booking into it, 
     await expect.poll(async () => (await db.getVoiceAgentDoc(agentId)).tools?.booking?.destination).toBeUndefined();
 
     // A second account of the same app reuses Google's auth config.
-    await apps.getByRole('button', { name: 'Connect another Google Calendar account', exact: true }).click();
+    await pick(page, 'booking-destination', /^Connect another Google Calendar account/);
     await expect(page.getByText('Google Calendar connected as ravi@example.com')).toBeVisible({ timeout: 30_000 });
     expect(composio.find('POST', '/api/v3.1/auth_configs')).toHaveLength(1);
     expect(await callbackSeen()).toMatchObject({ notFound: false });
@@ -296,7 +304,7 @@ test('the callback refuses an account this user did not start, and a refused con
     // The owner closes Composio's consent screen.
     await openVoiceAgent(page, agentId);
     composio.refuseNext = true;
-    await page.getByRole('button', { name: 'Connect Outlook', exact: true }).click();
+    await pick(page, 'booking-destination', /^Connect Outlook/);
     await expect(page.getByTestId('connected-app-callback-error')).toContainText('Outlook was not connected', {
         timeout: 30_000,
     });
@@ -313,7 +321,8 @@ test('the callback refuses an account this user did not start, and a refused con
     await expect(outlook.getByRole('button', { name: 'Try again' })).toBeVisible();
     await expect(outlook.getByRole('button', { name: 'Remove Outlook' })).toBeVisible();
     await page.locator('#booking-destination').click();
-    await expect(page.getByRole('option')).toHaveText(['Built-in calendar']);
+    await expect(page.getByRole('option').first()).toHaveText('Built-in calendar');
+    await expect(page.getByRole('option', { name: /^Outlook/ })).toHaveCount(0);
     await page.keyboard.press('Escape');
 
     // Trying again and succeeding replaces the failed attempt.
@@ -451,7 +460,7 @@ test('Cal.com with several event types: offered on the agent, the owner chooses 
     ];
     const agentId = await agentWithBooking(db);
     await openVoiceAgent(page, agentId);
-    await page.getByRole('button', { name: 'Connect Cal.com', exact: true }).click();
+    await pick(page, 'booking-destination', /^Connect Cal\.com/);
     await expect(page.getByText('Cal.com connected as ravi@example.com')).toBeVisible({ timeout: 30_000 });
 
     // Nothing saved for it: which event type is the owner's call. The agent offers Cal.com, asks for one.
@@ -505,7 +514,7 @@ test('phone width: connected apps and the destination picker fit without sideway
     });
     const agentId = await agentWithBooking(db);
     await openVoiceAgent(page, agentId);
-    await pick(page, 'booking-destination', /Google Calendar/);
+    await pick(page, 'booking-destination', /^Google Calendar/);
     await expect(page.locator('#booking-calendar')).toHaveText(/Ravi's calendar/);
     // A long account name is cut short inside the picker, not pushed past the card.
     const within = await page.locator('#booking-destination').evaluate((el) => {

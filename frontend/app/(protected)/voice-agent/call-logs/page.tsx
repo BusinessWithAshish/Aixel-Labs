@@ -13,15 +13,14 @@ const CALLS_SHOWN = 100;
 async function CallLogsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ agent?: string | string[]; success?: string | string[]; deleted?: string | string[] }>;
+    searchParams: Promise<{ agent?: string | string[]; success?: string | string[] }>;
 }) {
-    const { agent, success, deleted } = await searchParams;
+    const { agent, success } = await searchParams;
     const agentFilter = typeof agent === 'string' && isValidObjectId(agent) ? agent : null;
     const successFilter: CallSuccessFilter | null = success === 'yes' || success === 'no' ? success : null;
-    const includeDeleted = deleted === '1';
 
     const [callsRes, agentsRes] = await Promise.all([
-        listMyCalls({ agentId: agentFilter, success: successFilter, includeDeleted, limit: CALLS_SHOWN }),
+        listMyCalls({ agentId: agentFilter, success: successFilter, limit: CALLS_SHOWN }),
         getVoiceAgentOptions(),
     ]);
 
@@ -33,7 +32,6 @@ async function CallLogsPage({
                     agents: agentsRes.success && agentsRes.data ? agentsRes.data : [],
                     agentFilter,
                     successFilter,
-                    includeDeleted,
                     limit: CALLS_SHOWN,
                     loadError: callsRes.success ? null : (callsRes.error ?? 'Could not load your calls'),
                 }}

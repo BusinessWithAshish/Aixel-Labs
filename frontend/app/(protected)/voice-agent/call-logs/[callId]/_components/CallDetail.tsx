@@ -7,6 +7,7 @@ import { VoiceCallEndReason } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePage } from '@/contexts/PageStore';
+import { endedByLabel } from '@/helpers/voice-call-outcomes';
 import { cn } from '@/lib/utils';
 import type { UseCallDetailPageReturn } from '../_hooks/use-call-detail-page';
 import { formatDuration, formatGap, formatParty } from '@/helpers/voice-call-format';
@@ -15,7 +16,6 @@ import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { CallAnalysisCard, CallerMemoryCard, CallVariablesCard } from './CallInsights';
 import { RecordingPlayer } from './RecordingPlayer';
 import { CallTypeBadge } from '../../_components/CallTypeBadge';
-import { CallEndedBy } from '../../_components/CallEndedBy';
 import { CallCostAmount, CallCostBreakdown, CallCostPerMinute } from '../../_components/CallCost';
 
 function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
@@ -62,7 +62,7 @@ function CallSummary() {
                         <span className="tabular-nums">{formatDuration(call.durationSec)}</span>
                     </SummaryRow>
                     <SummaryRow label="Ended by">
-                        <CallEndedBy endedBy={call.endedBy} />
+                        {endedByLabel(call.endedBy)}
                         {call.endedBy === VoiceCallEndReason.GEMINI_KEY_ERROR ? (
                             <>
                                 {' · '}

@@ -6,6 +6,7 @@ import { CalendarCheck } from 'lucide-react';
 import { VOICE_AGENT_SUB_MODULES, VOICE_BOOKING_LIMITS } from '@aixellabs/backend/db/types';
 import { SettingsSection } from '@/components/common/SettingsSection';
 import { TimezoneSelect } from '@/components/common/voice-agent/TimezoneSelect';
+import { Badge } from '@/components/ui/badge';
 import { Field, FieldDescription, FieldLabel, FieldTitle } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,8 +18,8 @@ import { VOICE_BOOKING_SLOT_OPTIONS } from '@/helpers/voice-agent-defaults';
 import type { BookingFormValues } from '@/helpers/voice-schemas';
 import { minutesLabel, VOICE_WEEKDAY_OPTIONS } from '@/helpers/voice-time';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
-import { SectionSaveBar } from '../SectionSaveBar';
 import { BookingDestinationField } from './BookingDestinationField';
+import { ToolSummary } from './ToolSummary';
 
 const TIME_INPUT = 'h-8 w-0 min-w-0 flex-1 px-2 tabular-nums sm:w-32 sm:flex-none';
 
@@ -78,10 +79,12 @@ function BookingHoursGrid() {
     );
 }
 
-/** Built-in booking: on/off, timezone, hours, appointment length and how far ahead. Saved on its own. */
+/**
+ * Booking: on/off, where bookings go (built-in or a connected app), hours, length, how far ahead, and the
+ * two tools it gives the agent. Saved with the Tools card's Save.
+ */
 export function BookingToolSection() {
-    const { bookingForm, booking, bookingDirty, bookingError, savingBooking, saveBooking } =
-        usePage<UseVoiceAgentEditorPageReturn>();
+    const { bookingForm, booking, promptTools } = usePage<UseVoiceAgentEditorPageReturn>();
     const { control, register } = bookingForm;
 
     const slotOptions: number[] = VOICE_BOOKING_SLOT_OPTIONS.includes(
@@ -95,14 +98,7 @@ export function BookingToolSection() {
             <SettingsSection
                 titleId="booking-tool-title"
                 icon={CalendarCheck}
-                title={
-                    <>
-                        Appointment booking
-                        {bookingDirty ? (
-                            <span className="text-xs font-normal text-amber-600 dark:text-amber-400">Unsaved changes</span>
-                        ) : null}
-                    </>
-                }
+                title="Appointment booking"
                 description={
                     <>
                         The agent checks your free times and books callers in. Bookings appear in{' '}
@@ -200,15 +196,28 @@ export function BookingToolSection() {
                     </div>
                 ) : null}
 
-                <SectionSaveBar
-                    dirty={bookingDirty}
-                    error={bookingError}
-                    saving={savingBooking}
-                    onDiscard={() => bookingForm.reset()}
-                    onSave={saveBooking}
-                    saveLabel="Save booking"
-                    errorTestId="booking-error"
-                />
+                <Field>
+                    <FieldTitle id="booking-tools-label">Tools the agent gets</FieldTitle>
+                    <ul
+                        className="divide-y rounded-md border"
+                        aria-labelledby="booking-tools-label"
+                        data-testid="booking-tools"
+                    >
+                        {promptTools
+                            .filter((tool) => tool.kind === 'booking')
+                            .map((tool) => (
+                                <li key={tool.name} className="flex px-3 py-2" data-testid="booking-tool-row">
+                                    <ToolSummary
+                                        tool={tool}
+                                        badges={tool.on ? null : <Badge variant="secondary">Off</Badge>}
+                                    />
+                                </li>
+                            ))}
+                    </ul>
+                    <FieldDescription className="text-xs">
+                        Both work on the same calendar. Type / in the prompt to name one.
+                    </FieldDescription>
+                </Field>
             </SettingsSection>
         </FormProvider>
     );

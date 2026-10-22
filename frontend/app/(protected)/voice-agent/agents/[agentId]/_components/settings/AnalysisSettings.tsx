@@ -10,8 +10,12 @@ import { Button } from '@/components/ui/button';
 import { FieldDescription, FieldGroup, FieldTitle } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
+import { usePage } from '@/contexts/PageStore';
 import { VOICE_ANALYSIS_FIELD_TYPE_LABELS } from '@/helpers/voice-agent-features';
+import { estimateAnalysisCost, formatMoney } from '@/helpers/voice-call-cost';
 import type { VoiceAgentCallSettingsInput } from '@/helpers/voice-schemas';
+import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 
 const LIMITS = VOICE_AGENT_FEATURE_LIMITS;
 
@@ -104,9 +108,12 @@ function FieldRow({ index, onRemove }: { index: number; onRemove: () => void }) 
     );
 }
 
-/** What a text model works out from each call's transcript, a few seconds after it ends. */
+/** What a text model works out from each call's transcript, a few seconds after it ends, and what that costs. */
 export function AnalysisSettings() {
     const { control, watch } = useFormContext<VoiceAgentCallSettingsInput>();
+    const { geminiKey } = usePage<UseVoiceAgentEditorPageReturn>();
+    const currency = useDisplayCurrency();
+    const free = geminiKey.tier === 'free';
     const fields = useFieldArray({ control, name: 'analysis.fields' });
     const full = fields.fields.length >= LIMITS.maxAnalysisFields;
 
@@ -115,10 +122,15 @@ export function AnalysisSettings() {
             titleId="analysis-title"
             icon={ClipboardList}
             title="Post-call analysis"
-            description="A few seconds after each call, the transcript is read once more on your Gemini key and the results show in Call logs. Calls where nobody spoke are skipped."
+            description="A few seconds after each call, the transcript is read once more and the results show in Call logs. Calls where nobody spoke are skipped."
             className="gap-4"
             data-testid="analysis-settings"
         >
+            <p className="text-muted-foreground text-xs" data-testid="analysis-cost">
+                {free
+                    ? 'Free: it runs on your Gemini key, which is on Google’s free tier.'
+                    : `About ${formatMoney(estimateAnalysisCost(false), currency)} a call on your Gemini key. Each call’s real cost shows in Call logs.`}
+            </p>
             <FieldGroup className="gap-3">
                 {TOGGLES.map((toggle) => (
                     <BooleanControlledField

@@ -6,12 +6,15 @@ import {
 } from '@aixellabs/backend/db/types';
 import { findVariables, type VariableMention } from '@/helpers/voice-agent-features';
 import { voiceCalendarProviderLabel } from '@/helpers/voice-calendar-providers';
+import { urlHost } from './webhook-tool-form';
 
 /** A function the prompt can name: built-in booking or one of the agent's custom tools. */
 export type PromptTool = {
     name: string;
-    /** One line, for the slash menu. */
+    /** One line, for the slash menu and the Tools card. */
     description: string;
+    /** What it reads, writes or calls, for the Tools card. */
+    where: string;
     kind: 'booking' | 'custom';
     /** The agent gets it on its next call. */
     on: boolean;
@@ -23,31 +26,44 @@ export type PromptToolMention = { start: number; end: number; name: string; tool
 /** The slash command being typed: "/" at `start`, then `query`, up to `end`. */
 export type PromptSlashQuery = { start: number; end: number; query: string };
 
+/** The calendar both booking tools work against: "Built-in calendar" or "Google Calendar · Clinic". */
+export function bookingCalendarLabel(destination: VoiceBookingDestination | null): string {
+    if (!destination) return 'Built-in calendar';
+    const app = voiceCalendarProviderLabel(destination.provider);
+    return destination.calendarName ? `${app} · ${destination.calendarName}` : app;
+}
+
 /** Every tool the prompt could name, on or off: booking as it is on screen, custom tools as saved. */
 export function toolsForPrompt(
     booking: { enabled: boolean; destination: VoiceBookingDestination | null },
     webhooks: VoiceAgentWebhookToolView[],
 ): PromptTool[] {
-    const where = booking.destination ? ` in ${voiceCalendarProviderLabel(booking.destination.provider)}` : '';
+    const calendar = bookingCalendarLabel(booking.destination);
     return [
         {
             name: 'check_availability',
-            description: `Finds the free times on a day${where}`,
+            description: 'Finds the free times on a day',
+            where: `Reads: ${calendar}`,
             kind: 'booking',
             on: booking.enabled,
         },
         {
             name: 'book_appointment',
-            description: `Books the caller into a time${where}`,
+            description: 'Books the caller into a time',
+            where: `Writes: ${calendar}, listed in Bookings`,
             kind: 'booking',
             on: booking.enabled,
         },
-        ...webhooks.map((tool): PromptTool => ({
-            name: tool.name,
-            description: tool.description.split('\n')[0],
-            kind: 'custom',
-            on: tool.enabled,
-        })),
+        ...webhooks.map((tool): PromptTool => {
+            const params = tool.parameters.length;
+            return {
+                name: tool.name,
+                description: tool.description.split('\n')[0],
+                where: `Calls: ${urlHost(tool.url)}${params ? ` · ${params} parameter${params === 1 ? '' : 's'}` : ''}`,
+                kind: 'custom',
+                on: tool.enabled,
+            };
+        }),
     ];
 }
 

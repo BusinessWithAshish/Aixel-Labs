@@ -11,11 +11,10 @@ import {
     type ChartConfig,
 } from '@/components/ui/chart';
 import type { VoiceAnalytics } from '@/app/actions/voice-analytics-actions';
-import { TONE_COLORS } from '@/helpers/voice-call-outcomes';
 
 const chartConfig = {
-    answered: { label: 'Answered', color: TONE_COLORS.good },
-    unanswered: { label: 'Not answered', color: TONE_COLORS.fair },
+    answered: { label: 'Answered', color: 'var(--chart-2)' },
+    unanswered: { label: 'Not answered', color: 'var(--chart-4)' },
 } satisfies ChartConfig;
 
 /** "22 Oct" for a day, "Oct 2026" for a month (keys are already on the analytics clock). */

@@ -127,6 +127,18 @@ test('call settings: voicemail message, analysis fields and caller memory are sa
     const card = page.getByTestId('call-settings');
     await card.scrollIntoViewIfNeeded();
 
+    // Save and Discard sit at the top right of the card; nothing to save yet.
+    await expect(card.getByRole('button', { name: 'Save settings' })).toBeDisabled();
+    await expect(card.getByRole('button', { name: 'Discard settings' })).toHaveCount(0);
+    // The analysis runs on the owner's Gemini key: what it should cost a call.
+    await expect(card.getByTestId('analysis-cost')).toHaveText(/^About \S+ a call on your Gemini key\./);
+    // Silence and time limit: the inputs line up even though their descriptions differ in length.
+    const tops = await Promise.all(
+        ['#speech-silence-secs', '#speech-max-call-minutes'].map((id) =>
+            card.locator(id).evaluate((el) => el.getBoundingClientRect().top),
+        ),
+    );
+    expect(Math.abs(tops[0] - tops[1])).toBeLessThan(1);
     // Never set up: hang up on voicemail, summary only, no memory.
     await expect(card.getByRole('radio', { name: /Hang up/ })).toHaveAttribute('aria-checked', 'true');
     await expect(card.getByRole('switch', { name: 'Summary' })).toBeChecked();
@@ -220,6 +232,9 @@ test('the editor lists the callers an agent remembers, and forgets one or everyo
         lastCallAt: new Date(now),
     });
     await openVoiceAgent(page, agentId);
+    // Calls coming in are always answered by the agent: no voicemail section for an inbound agent.
+    await expect(page.getByTestId('speech-settings')).toBeVisible();
+    await expect(page.getByTestId('voicemail-settings')).toHaveCount(0);
 
     const list = page.getByTestId('memory-list');
     await expect(list).toContainText('Remembers 3 callers');

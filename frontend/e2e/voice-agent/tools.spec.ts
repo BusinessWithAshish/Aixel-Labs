@@ -72,8 +72,19 @@ test('booking: turn it on, set hours, save, and it is still there after a reload
     const toggle = card.getByRole('switch', { name: 'Appointment booking' });
     await expect(toggle).toHaveAttribute('aria-checked', 'false');
     await expect(page.getByTestId('booking-settings')).toHaveCount(0);
+    // Save sits at the top right of the card, waiting for a change.
+    await expect(card.getByRole('button', { name: 'Save booking' })).toBeDisabled();
+    // The two tools booking gives the agent, by the names the prompt uses, and the calendar they work on.
+    const bookingTools = card.getByTestId('booking-tool-row');
+    await expect(bookingTools).toHaveCount(2);
+    await expect(bookingTools.nth(0)).toContainText('check_availability');
+    await expect(bookingTools.nth(0)).toContainText('Off');
+    await expect(bookingTools.nth(0).getByTestId('tool-where')).toHaveText('Reads: Built-in calendar');
+    await expect(bookingTools.nth(1)).toContainText('book_appointment');
+    await expect(bookingTools.nth(1).getByTestId('tool-where')).toHaveText('Writes: Built-in calendar, listed in Bookings');
 
     await toggle.click();
+    await expect(bookingTools.nth(0)).not.toContainText('Off');
     // A new agent starts from the browser's zone, weekdays 9 to 5, 30-minute appointments, 30 days ahead.
     await expect(page.locator('#booking-timezone')).toHaveText('Asia/Kolkata');
     await expect(page.locator('#booking-slot')).toHaveText('30 minutes');
@@ -129,7 +140,7 @@ test('booking: turn it on, set hours, save, and it is still there after a reload
     // Turning it off keeps the settings for next time.
     await tools(page).getByRole('switch', { name: 'Appointment booking' }).click();
     await page.getByRole('button', { name: 'Save booking' }).click();
-    await expect(page.getByRole('button', { name: 'Save booking' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save booking' })).toBeDisabled();
     await expect
         .poll(async () => (await db.getVoiceAgentDoc(agentId)).tools?.booking)
         .toMatchObject({ enabled: false, timezone: 'Europe/London', slotMinutes: 45 });
@@ -162,9 +173,10 @@ test('booking: impossible hours and limits are refused in plain words', async ({
     await expect(error).toHaveText('Open at least one day so callers can book');
     await expect(save).toBeDisabled();
 
-    await page.getByRole('button', { name: 'Discard' }).click();
+    await tools(page).getByRole('button', { name: 'Discard', exact: true }).click();
     await expect(page.getByTestId('booking-settings')).toHaveCount(0);
-    await expect(save).toHaveCount(0);
+    await expect(save).toBeDisabled();
+    await expect(error).toHaveCount(0);
     expect((await db.getVoiceAgentDoc(agentId)).tools).toBeUndefined();
 });
 
@@ -221,7 +233,8 @@ test('custom tool: add, check the rules, edit, switch off and delete', async ({ 
     const row = card.getByTestId('custom-tool');
     await expect(row).toHaveCount(1);
     await expect(row).toContainText('check_order');
-    await expect(row.getByTestId('custom-tool-host')).toHaveText('example.com · 2 parameters');
+    await expect(row).toContainText('When the caller asks where their order is.');
+    await expect(row.getByTestId('tool-where')).toHaveText('Calls: example.com · 2 parameters');
 
     let [tool] = (await db.getVoiceAgentDoc(agentId)).tools?.webhooks ?? [];
     expect(tool).toEqual({
@@ -255,7 +268,7 @@ test('custom tool: add, check the rules, edit, switch off and delete', async ({ 
     await edit.getByRole('button', { name: 'Remove parameter 2' }).click();
     await edit.getByRole('button', { name: 'Save tool' }).click();
     await expect(page.getByText('Tool saved')).toBeVisible();
-    await expect(row.getByTestId('custom-tool-host')).toHaveText('orders.example.com · 1 parameter');
+    await expect(row.getByTestId('tool-where')).toHaveText('Calls: orders.example.com · 1 parameter');
     [tool] = (await db.getVoiceAgentDoc(agentId)).tools?.webhooks ?? [];
     expect(tool).toMatchObject({
         id: toolId,
@@ -353,7 +366,12 @@ async function startToolServer(): Promise<{ server: Server; base: string; receiv
         const chunks: Buffer[] = [];
         req.on('data', (chunk: Buffer) => chunks.push(chunk));
         req.on('end', () => {
-            received.push({ method: req.method ?? '', url: req.url ?? '', headers: req.headers, body: Buffer.concat(chunks).toString('utf8') });
+            received.push({
+                method: req.method ?? '',
+                url: req.url ?? '',
+                headers: req.headers,
+                body: Buffer.concat(chunks).toString('utf8'),
+            });
             if (req.url === '/fail') {
                 res.writeHead(500, { 'Content-Type': 'text/plain' }).end('Order system is down');
             } else if (req.url === '/ok') {
@@ -484,7 +502,9 @@ test('the Tools card fits a desktop screen', async ({ page, db }) => {
     await tools(page).screenshot({ path: path.join(SCREENSHOTS, 'tools-desktop.png') });
 
     await tools(page).getByRole('button', { name: 'Edit check_order' }).click();
-    await page.getByRole('dialog', { name: 'Edit check_order' }).screenshot({ path: path.join(SCREENSHOTS, 'tool-dialog-desktop.png') });
+    await page
+        .getByRole('dialog', { name: 'Edit check_order' })
+        .screenshot({ path: path.join(SCREENSHOTS, 'tool-dialog-desktop.png') });
 });
 
 test.describe('on a 390 px phone', () => {

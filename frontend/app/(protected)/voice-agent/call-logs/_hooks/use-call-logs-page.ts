@@ -4,7 +4,7 @@ import { useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
 import type { CallSuccessFilter, VoiceCallListItem } from '@/app/actions/voice-call-actions';
-import { costParts, isCostEstimated } from '@/helpers/voice-call-cost';
+import { isCostEstimated } from '@/helpers/voice-call-cost';
 
 export type CallLogsPageData = {
     calls: VoiceCallListItem[];
@@ -12,8 +12,6 @@ export type CallLogsPageData = {
     agentFilter: string | null;
     /** Calls the analysis judged successful or not (`?success=yes|no`). */
     successFilter: CallSuccessFilter | null;
-    /** Calls of agents deleted since show too (`?deleted=1`). */
-    includeDeleted: boolean;
     limit: number;
     loadError: string | null;
 };
@@ -23,23 +21,18 @@ export function useCallLogsPage(data: CallLogsPageData) {
     const pathname = usePathname();
     const [filtering, startFiltering] = useTransition();
 
-    /** The filters live in the URL (`?agent=&success=&deleted=1`), so a filtered list can be reloaded and shared. */
-    const applyFilters = (next: Partial<{ agent: string | null; success: CallSuccessFilter | null; deleted: boolean }>) => {
-        const { agent, success, deleted } = {
-            agent: data.agentFilter,
-            success: data.successFilter,
-            deleted: data.includeDeleted,
-            ...next,
-        };
+    /** The filters live in the URL (`?agent=&success=`), so a filtered list can be reloaded and shared. */
+    const applyFilters = (agentId: string | null, success: CallSuccessFilter | null) => {
         const params = new URLSearchParams();
-        if (agent) params.set('agent', agent);
+        if (agentId) params.set('agent', agentId);
         if (success) params.set('success', success);
-        if (deleted) params.set('deleted', '1');
         const query = params.toString();
         startFiltering(() => {
             router.push(query ? `${pathname}?${query}` : pathname);
         });
     };
+    const setAgentFilter = (agentId: string | null) => applyFilters(agentId, data.successFilter);
+    const setSuccessFilter = (success: CallSuccessFilter | null) => applyFilters(data.agentFilter, success);
 
     const agentFilterName = data.agentFilter
         ? (data.agents.find((a) => a.id === data.agentFilter)?.name ?? 'Deleted agent')
@@ -52,22 +45,11 @@ export function useCallLogsPage(data: CallLogsPageData) {
             priced: sum.priced + (call.cost ? 1 : 0),
             pricedSec: sum.pricedSec + (call.cost ? call.durationSec : 0),
             totalUsd: sum.totalUsd + (call.cost?.totalUsd ?? 0),
-            parts: call.cost
-                ? costParts(call.cost).reduce(
-                      (parts, { part, usd }) => ({ ...parts, [part]: (parts[part] ?? 0) + usd }),
-                      sum.parts,
-                  )
-                : sum.parts,
+            geminiUsd: sum.geminiUsd + (call.cost?.geminiUsd ?? 0),
+            providerUsd: sum.providerUsd + (call.cost?.providerUsd ?? 0),
             estimated: sum.estimated || (!!call.cost && isCostEstimated(call.cost)),
         }),
-        {
-            durationSec: 0,
-            priced: 0,
-            pricedSec: 0,
-            totalUsd: 0,
-            parts: {} as Record<string, number>,
-            estimated: false,
-        },
+        { durationSec: 0, priced: 0, pricedSec: 0, totalUsd: 0, geminiUsd: 0, providerUsd: 0, estimated: false },
     );
 
     return {
@@ -77,13 +59,11 @@ export function useCallLogsPage(data: CallLogsPageData) {
         agentFilter: data.agentFilter,
         agentFilterName,
         successFilter: data.successFilter,
-        includeDeleted: data.includeDeleted,
-        setSuccessFilter: (success: CallSuccessFilter | null) => applyFilters({ success }),
-        setAgentFilter: (agent: string | null) => applyFilters({ agent }),
-        setIncludeDeleted: (deleted: boolean) => applyFilters({ deleted }),
+        setSuccessFilter,
         limit: data.limit,
         loadError: data.loadError,
         filtering,
+        setAgentFilter,
     };
 }
 

@@ -11,7 +11,6 @@ import {
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
-import { agentIdMatch } from '@/server/voice-agent/agent-match';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
 import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
 import { findCallRecording, withoutCredentials, type CallRecordingResult } from '@/server/voice-agent/recordings';
@@ -26,8 +25,6 @@ export type CallSuccessFilter = 'yes' | 'no';
 export type ListMyCallsInput = {
     agentId?: string | null;
     success?: CallSuccessFilter | null;
-    /** Also calls of agents that were deleted since (without an agent picked). */
-    includeDeleted?: boolean;
     limit?: number;
 };
 
@@ -116,7 +113,7 @@ async function findOwnedCall(owner: VoiceOwnerScope, callId: string): Promise<Vo
     return doc;
 }
 
-/** The caller's calls, newest first: their current agents' (or every agent's), one agent's, by the analysis' verdict. */
+/** The caller's calls, newest first, optionally for one agent and by the analysis' success verdict. */
 export const listMyCalls = async (input: ListMyCallsInput = {}): Promise<ALApiResponse<VoiceCallListItem[]>> => {
     const agentId = input.agentId || null;
     if (agentId) assertValidObjectId(agentId, 'Agent ID');
@@ -130,7 +127,7 @@ export const listMyCalls = async (input: ListMyCallsInput = {}): Promise<ALApiRe
         const calls = await getCollection<VoiceCallDoc>(MongoCollections.VOICE_CALLS);
         const filter = {
             userId: owner.userId,
-            ...(await agentIdMatch(owner.userId, agentId, !!input.includeDeleted)),
+            ...(agentId ? { agentId: new MongoObjectId(agentId) } : {}),
             ...(success !== null ? { 'analysis.successful': success } : {}),
         };
         const docs = await calls.find(filter).sort({ startedAt: -1 }).limit(limit).toArray();

@@ -12,13 +12,15 @@ import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { SettingsSection } from '@/components/common/SettingsSection';
 import { usePage } from '@/contexts/PageStore';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
+import { ToolSummary } from './ToolSummary';
 import { WebhookToolDialog } from './WebhookToolDialog';
-import { urlHost } from '../../_utils/webhook-tool-form';
 
 /** Webhook tools the owner defines: list, on/off, add / edit dialog, delete. Each change saves at once. */
 export function CustomToolsSection() {
-    const { agentId, saved, applySavedAgent } = usePage<UseVoiceAgentEditorPageReturn>();
+    const { agentId, saved, applySavedAgent, promptTools } = usePage<UseVoiceAgentEditorPageReturn>();
     const tools = saved.tools.webhooks;
+    // The prompt's copy of each tool (name, line, URL host), made from the same list in the same order.
+    const summaries = promptTools.filter((t) => t.kind === 'custom');
     const [dialogOpen, setDialogOpen] = useState(false);
     // The tool being edited (null = adding one). Kept while the dialog animates closed.
     const [dialogTool, setDialogTool] = useState<VoiceAgentWebhookToolView | null>(null);
@@ -63,7 +65,7 @@ export function CustomToolsSection() {
             titleId="custom-tools-title"
             icon={Webhook}
             title="Custom tools"
-            description="Let the agent use your own systems mid-call, like looking up an order or checking stock. It sends what it collected to your URL and reads the answer."
+            description="Your own systems the agent can use mid-call, like looking up an order. It sends what it collected to your URL and reads the answer."
             action={
                 <Button type="button" variant="outline" size="sm" onClick={() => openDialog(null)} disabled={atLimit}>
                     <Plus className="size-4" />
@@ -72,14 +74,13 @@ export function CustomToolsSection() {
             }
             data-testid="custom-tools"
         >
-
             {tools.length === 0 ? (
                 <p className="text-muted-foreground rounded-md border border-dashed px-3 py-4 text-center text-sm">
                     No custom tools yet.
                 </p>
             ) : (
                 <ul className="divide-y rounded-md border">
-                    {tools.map((tool) => (
+                    {tools.map((tool, i) => (
                         <li key={tool.id} className="flex items-center gap-3 px-3 py-2.5" data-testid="custom-tool">
                             <Switch
                                 checked={tool.enabled}
@@ -87,23 +88,19 @@ export function CustomToolsSection() {
                                 disabled={toggling === tool.id}
                                 aria-label={`Use ${tool.name}`}
                             />
-                            <div className="grid min-w-0 flex-1 gap-0.5">
-                                <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                                    <span className="truncate font-mono text-sm font-medium">{tool.name}</span>
-                                    {!tool.enabled ? <Badge variant="secondary">Off</Badge> : null}
-                                    {tool.hasSecret ? (
-                                        <span title="Requests are signed" className="text-muted-foreground">
-                                            <KeyRound className="size-3.5" aria-label="Signed" />
-                                        </span>
-                                    ) : null}
-                                </p>
-                                <p className="text-muted-foreground truncate text-xs" data-testid="custom-tool-host">
-                                    {urlHost(tool.url)}
-                                    {tool.parameters.length > 0
-                                        ? ` · ${tool.parameters.length} parameter${tool.parameters.length === 1 ? '' : 's'}`
-                                        : ''}
-                                </p>
-                            </div>
+                            <ToolSummary
+                                tool={summaries[i]}
+                                badges={
+                                    <>
+                                        {!tool.enabled ? <Badge variant="secondary">Off</Badge> : null}
+                                        {tool.hasSecret ? (
+                                            <span title="Requests are signed" className="text-muted-foreground">
+                                                <KeyRound className="size-3.5" aria-label="Signed" />
+                                            </span>
+                                        ) : null}
+                                    </>
+                                }
+                            />
                             <div className="flex shrink-0 items-center">
                                 <Button
                                     type="button"

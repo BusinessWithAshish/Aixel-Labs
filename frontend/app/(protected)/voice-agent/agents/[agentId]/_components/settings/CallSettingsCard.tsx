@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { usePage } from '@/contexts/PageStore';
 import { SUGGESTED_VOICEMAIL_MESSAGE } from '@/helpers/voice-agent-features';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
-import { SectionSaveBar } from '../SectionSaveBar';
+import { CardSaveActions } from '../CardSaveActions';
 import { AnalysisSettings } from './AnalysisSettings';
 import { CallerMemorySettings } from './CallerMemorySettings';
 import { SpeechSettings } from './SpeechSettings';
@@ -26,10 +26,9 @@ const VOICEMAIL_CHOICES = [
     },
 ];
 
-/** On a voicemail: hang up, or leave the owner's message after the beep (outbound calls only). */
+/** On a voicemail: hang up, or leave the owner's message after the beep. Only for calls the agent places. */
 function VoicemailSettings() {
-    const { form, settingsForm, settings } = usePage<UseVoiceAgentEditorPageReturn>();
-    const inbound = form.callType === VoiceAgentCallType.INBOUND;
+    const { settingsForm, settings } = usePage<UseVoiceAgentEditorPageReturn>();
     const max = VOICE_AGENT_FEATURE_LIMITS.voicemailMessageMax;
 
     const choose = (action: VoiceVoicemailAction) => {
@@ -46,11 +45,7 @@ function VoicemailSettings() {
         <SettingsSection
             icon={Voicemail}
             title="Voicemail"
-            description={
-                inbound
-                    ? 'Used when this agent places calls. Calls coming in never reach a voicemail.'
-                    : 'When a call it places reaches an answering machine.'
-            }
+            description="When the person called doesn't pick up and a recording answers."
             data-testid="voicemail-settings"
         >
             <RadioCards
@@ -79,10 +74,15 @@ function VoicemailSettings() {
     );
 }
 
-/** What the agent does in and around a call: how it speaks, on a voicemail, after it (analysis), and from one call to the next (memory). */
+/**
+ * What the agent does in and around a call: how it speaks, on a voicemail (calls it places only: an inbound
+ * agent always answers, so the section is hidden and its saved value kept), after it (analysis), and from
+ * one call to the next (memory).
+ */
 export function CallSettingsCard() {
-    const { settingsForm, settingsDirty, settingsError, savingSettings, saveSettings } =
+    const { form, settingsForm, settingsDirty, settingsError, savingSettings, saveSettings } =
         usePage<UseVoiceAgentEditorPageReturn>();
+    const places = form.callType !== VoiceAgentCallType.INBOUND;
 
     return (
         <Card id="call-settings" className="h-auto min-w-0 scroll-mt-4" data-testid="call-settings">
@@ -94,29 +94,33 @@ export function CallSettingsCard() {
                     ) : null}
                 </CardTitle>
                 <CardDescription>
-                    How the agent speaks, voicemail, what is worked out after each call, and what it remembers about callers.
-                    Changes apply from the next call.
+                    How the agent speaks{places ? ', voicemail' : ''}, what is worked out after each call, and what it
+                    remembers about callers. Changes apply from the next call.
                 </CardDescription>
+                <CardSaveActions
+                    dirty={settingsDirty}
+                    error={settingsError}
+                    saving={savingSettings}
+                    onDiscard={() => settingsForm.reset()}
+                    onSave={saveSettings}
+                    saveLabel="Save settings"
+                    discardLabel="Discard settings"
+                    errorTestId="call-settings-error"
+                />
             </CardHeader>
             <FormProvider {...settingsForm}>
                 <CardContent className="grid gap-5">
                     <SpeechSettings />
                     <Separator />
-                    <VoicemailSettings />
-                    <Separator />
+                    {places ? (
+                        <>
+                            <VoicemailSettings />
+                            <Separator />
+                        </>
+                    ) : null}
                     <AnalysisSettings />
                     <Separator />
                     <CallerMemorySettings />
-                    <SectionSaveBar
-                        dirty={settingsDirty}
-                        error={settingsError}
-                        saving={savingSettings}
-                        onDiscard={() => settingsForm.reset()}
-                        onSave={saveSettings}
-                        saveLabel="Save settings"
-                        discardLabel="Discard settings"
-                        errorTestId="call-settings-error"
-                    />
                 </CardContent>
             </FormProvider>
         </Card>

@@ -15,15 +15,14 @@ const PAGE_TITLE = subModuleLabelMap[VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYT
 async function VoiceAnalyticsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ agent?: string | string[]; range?: string | string[]; deleted?: string | string[] }>;
+    searchParams: Promise<{ agent?: string | string[]; range?: string | string[] }>;
 }) {
-    const { agent, range: rangeParam, deleted } = await searchParams;
+    const { agent, range: rangeParam } = await searchParams;
     const agentFilter = typeof agent === 'string' && isValidObjectId(agent) ? agent : null;
-    const includeDeleted = deleted === '1';
     const range = ANALYTICS_RANGES.find((r) => r.value === rangeParam)?.value ?? DEFAULT_ANALYTICS_RANGE;
 
     const [analyticsRes, agentsRes] = await Promise.all([
-        getVoiceAnalytics({ agentId: agentFilter, range, includeDeleted }),
+        getVoiceAnalytics({ agentId: agentFilter, range }),
         getVoiceAgentOptions(),
     ]);
 
@@ -34,7 +33,6 @@ async function VoiceAnalyticsPage({
                     analytics: analyticsRes.success && analyticsRes.data ? analyticsRes.data : null,
                     agents: agentsRes.success && agentsRes.data ? agentsRes.data : [],
                     agentFilter,
-                    includeDeleted,
                     range,
                     loadError: analyticsRes.success ? null : (analyticsRes.error ?? 'Could not load your analytics'),
                 }}

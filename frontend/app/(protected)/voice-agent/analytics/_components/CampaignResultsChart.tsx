@@ -11,13 +11,12 @@ import {
     type ChartConfig,
 } from '@/components/ui/chart';
 import type { VoiceCampaignResult } from '@/app/actions/voice-analytics-actions';
-import { TONE_COLORS } from '@/helpers/voice-call-outcomes';
 
 const ROW_HEIGHT = 40;
 const chartConfig = {
-    answered: { label: 'Answered', color: TONE_COLORS.good },
-    unreached: { label: 'Not reached', color: TONE_COLORS.fair },
-    failed: { label: 'Failed', color: TONE_COLORS.bad },
+    answered: { label: 'Answered', color: 'var(--chart-2)' },
+    unreached: { label: 'Not reached', color: 'var(--chart-4)' },
+    failed: { label: 'Failed', color: 'var(--chart-1)' },
     waiting: { label: 'Still to call', color: 'var(--chart-3)' },
     skipped: { label: 'Skipped', color: 'var(--muted-foreground)' },
 } satisfies ChartConfig;

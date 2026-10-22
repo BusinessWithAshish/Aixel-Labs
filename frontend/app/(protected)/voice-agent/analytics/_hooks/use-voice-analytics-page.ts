@@ -10,8 +10,6 @@ export type VoiceAnalyticsPageData = {
     analytics: VoiceAnalytics | null;
     agents: VoiceAgentOption[];
     agentFilter: string | null;
-    /** Agents deleted since count too (`?deleted=1`). */
-    includeDeleted: boolean;
     range: VoiceAnalyticsRange;
     loadError: string | null;
 };
@@ -21,17 +19,10 @@ export function useVoiceAnalyticsPage(data: VoiceAnalyticsPageData) {
     const pathname = usePathname();
     const [filtering, startFiltering] = useTransition();
 
-    /** The filters live in the URL (`?agent=&range=&deleted=1`), like Call logs. */
-    const applyFilters = (next: Partial<{ agent: string | null; range: VoiceAnalyticsRange; deleted: boolean }>) => {
-        const { agent, range, deleted } = {
-            agent: data.agentFilter,
-            range: data.range,
-            deleted: data.includeDeleted,
-            ...next,
-        };
+    /** The filters live in the URL (`?agent=&range=`), like Call logs. */
+    const applyFilters = (agentId: string | null, range: VoiceAnalyticsRange) => {
         const params = new URLSearchParams({ range });
-        if (agent) params.set('agent', agent);
-        if (deleted) params.set('deleted', '1');
+        if (agentId) params.set('agent', agentId);
         startFiltering(() => {
             router.push(`${pathname}?${params}`);
         });
@@ -41,14 +32,12 @@ export function useVoiceAnalyticsPage(data: VoiceAnalyticsPageData) {
         analytics: data.analytics,
         agents: data.agents,
         agentFilter: data.agentFilter,
-        includeDeleted: data.includeDeleted,
         range: data.range,
         rangeLabel: ANALYTICS_RANGES.find((r) => r.value === data.range)?.label ?? '',
         loadError: data.loadError,
         filtering,
-        setAgentFilter: (agent: string | null) => applyFilters({ agent }),
-        setRange: (range: VoiceAnalyticsRange) => applyFilters({ range }),
-        setIncludeDeleted: (deleted: boolean) => applyFilters({ deleted }),
+        setAgentFilter: (agentId: string | null) => applyFilters(agentId, data.range),
+        setRange: (range: VoiceAnalyticsRange) => applyFilters(data.agentFilter, range),
     };
 }
 
