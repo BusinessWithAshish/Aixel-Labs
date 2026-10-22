@@ -322,17 +322,16 @@ test('call logs show each call’s summary and verdicts, and filter by success',
     await page.goto(CALL_LOGS_URL);
     await waitForHydration(page, '#header');
 
-    const rows = page.getByTestId('call-row');
-    await expect(rows).toHaveCount(4);
-    await expect(rows.nth(0).getByTestId('call-success')).toHaveText('Successful');
-    await expect(rows.nth(0).getByTestId('call-sentiment')).toHaveText('Positive');
-    await expect(rows.nth(1).getByTestId('call-success')).toHaveText('Not successful');
-    await expect(rows.nth(1)).toContainText('Left a voicemail');
+    const cards = page.getByTestId('call-card');
+    await expect(cards).toHaveCount(4);
+    await expect(cards.nth(0).getByTestId('call-success')).toHaveText('Successful');
+    await expect(cards.nth(0).getByTestId('call-sentiment')).toHaveText('Positive');
+    await expect(cards.nth(1).getByTestId('call-success')).toHaveText('Not successful');
+    await expect(cards.nth(1)).toContainText('Left a voicemail');
     // A failed or missing analysis shows no verdicts.
-    await expect(rows.nth(2).getByTestId('call-success')).toHaveCount(0);
-    await expect(rows.nth(3).getByTestId('call-sentiment')).toHaveCount(0);
-    // The table's summary lines (the phone cards carry their own, hidden at this width).
-    const summaries = page.getByTestId('call-summary').filter({ visible: true });
+    await expect(cards.nth(2).getByTestId('call-success')).toHaveCount(0);
+    await expect(cards.nth(3).getByTestId('call-sentiment')).toHaveCount(0);
+    const summaries = page.getByTestId('call-summary');
     await expect(summaries).toHaveCount(2);
     await expect(summaries.nth(0)).toHaveText('Ravi agreed to a demo on Thursday at 2 pm and asked for pricing by email.');
     await shot(page, 'call-logs-desktop');
@@ -340,29 +339,28 @@ test('call logs show each call’s summary and verdicts, and filter by success',
     await page.getByRole('combobox', { name: 'Outcome' }).click();
     await page.getByRole('option', { name: 'Successful', exact: true }).click();
     await expect(page).toHaveURL(/\?success=yes$/);
-    await expect(rows).toHaveCount(1);
-    await expect(rows.first()).toContainText(CALLER);
+    await expect(cards).toHaveCount(1);
+    await expect(cards.first()).toContainText(CALLER);
 
     await page.getByRole('combobox', { name: 'Outcome' }).click();
     await page.getByRole('option', { name: 'Not successful' }).click();
     await expect(page).toHaveURL(/\?success=no$/);
-    await expect(rows).toHaveCount(1);
-    await expect(rows.first()).toContainText('+14155550188');
+    await expect(cards).toHaveCount(1);
+    await expect(cards.first()).toContainText('+14155550188');
 
     // The outcome filter combines with the agent filter in the URL.
     await page.getByRole('combobox', { name: 'Agent' }).click();
     await page.getByRole('option', { name: 'Sales', exact: true }).click();
     await expect(page).toHaveURL(/\?agent=[0-9a-f]{24}&success=no$/);
-    await expect(rows).toHaveCount(1);
+    await expect(cards).toHaveCount(1);
 
     await page.getByRole('combobox', { name: 'Outcome' }).click();
     await page.getByRole('option', { name: 'All calls' }).click();
     await expect(page).toHaveURL(/\?agent=[0-9a-f]{24}$/);
-    await expect(rows).toHaveCount(4);
+    await expect(cards).toHaveCount(4);
 
-    // Phone: stacked cards carry the summary and badges too.
+    // Phone: the same cards carry the summary and badges too.
     await page.setViewportSize({ width: 390, height: 844 });
-    const cards = page.getByTestId('call-card');
     await expect(cards.first().getByTestId('call-summary')).toBeVisible();
     await expect(cards.first().getByTestId('call-success')).toBeVisible();
     expect(

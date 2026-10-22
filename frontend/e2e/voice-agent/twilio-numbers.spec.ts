@@ -65,9 +65,30 @@ function numberRow(page: Page, phoneNumber: string) {
 
 type Job = 'Answer calls' | 'Make calls' | 'Not used yet';
 
-/** One of the three jobs a number can do ("What this number does"). */
-function jobRadio(page: Page, phoneNumber: string, job: Job) {
-    return numberRow(page, phoneNumber).getByRole('radio', { name: job });
+/** `agent`: pick this one. `preselected`: the agent the dialog must pick by itself for the new job. */
+type JobChoice = { agent?: string; preselected?: string };
+
+/** Opens the number's Change dialog, picks `job` (and its agent) and saves; returns the dialog showing each step's progress. */
+async function saveJob(page: Page, phoneNumber: string, job: Job, { agent, preselected }: JobChoice = {}) {
+    await numberRow(page, phoneNumber).getByRole('button', { name: `Change what ${phoneNumber} does` }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: job }).click();
+    const combobox = job === 'Answer calls' ? 'Agent that answers' : 'Agent that makes the calls';
+    // Soft: switching straight between answering and making calls empties the agent (app bug); still save to check the provider.
+    if (preselected) await expect.soft(dialog.getByRole('combobox', { name: combobox })).toHaveText(preselected);
+    const pick = agent ?? preselected;
+    if (pick) await chooseOption(page, combobox, pick);
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    return dialog;
+}
+
+/** Changes what the number does and waits for every step to finish; `says` is the result the dialog must show. */
+async function changeJob(page: Page, phoneNumber: string, job: Job, { says, ...choice }: JobChoice & { says?: string } = {}) {
+    const dialog = await saveJob(page, phoneNumber, job, choice);
+    await expect(dialog.getByRole('heading', { name: 'All set' })).toBeVisible();
+    if (says) await expect(dialog.getByRole('status')).toContainText(says);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
 }
 
 /** The badge that says what the number does now. */
@@ -75,8 +96,12 @@ function jobBadge(page: Page, phoneNumber: string) {
     return numberRow(page, phoneNumber).getByTestId('number-job');
 }
 
-const answerAgent = (phoneNumber: string) => `Agent that answers for ${phoneNumber}`;
-const callerAgent = (phoneNumber: string) => `Agent that makes the calls for ${phoneNumber}`;
+/** Remove sits in the row's "More" menu; returns the confirm dialog. */
+async function openRemove(page: Page, phoneNumber: string) {
+    await numberRow(page, phoneNumber).getByRole('button', { name: `More for ${phoneNumber}` }).click();
+    await page.getByRole('menuitem', { name: 'Remove' }).click();
+    return page.getByRole('dialog');
+}
 
 async function chooseOption(page: Page, combobox: string, option: string): Promise<void> {
     await page.getByRole('combobox', { name: combobox }).click();
@@ -264,8 +289,9 @@ test('answering calls points the number\'s Voice URL at the engine, saves its we
     const numberId = await seedTwilioNumber(db, WEBHOOK_NUMBER);
     await openPhoneNumbers(page);
 
-    await jobRadio(page, WEBHOOK_NUMBER, 'Answer calls').click();
-    await expect(page.getByText(`After hours now answers every call to ${WEBHOOK_NUMBER}`)).toBeVisible();
+    await changeJob(page, WEBHOOK_NUMBER, 'Answer calls', {
+        says: `When someone calls ${WEBHOOK_NUMBER}, After hours picks up and talks to them.`,
+    });
     await expect(jobBadge(page, WEBHOOK_NUMBER)).toHaveText('Answers calls');
     expect(writeBodies()).toEqual([
         {
@@ -284,17 +310,18 @@ test('answering calls points the number\'s Voice URL at the engine, saves its we
 
     // Another agent while on: nothing changes at Twilio, and the saved webhook is still theirs.
     twilio.clear();
-    await chooseOption(page, answerAgent(WEBHOOK_NUMBER), 'Front desk');
-    await expect(page.getByText(`Front desk now answers every call to ${WEBHOOK_NUMBER}`)).toBeVisible();
+    await changeJob(page, WEBHOOK_NUMBER, 'Answer calls', {
+        agent: 'Front desk',
+        says: `When someone calls ${WEBHOOK_NUMBER}, Front desk picks up and talks to them.`,
+    });
     expect(twilio.requests).toHaveLength(0);
     stored = await storedNumber(db, WEBHOOK_NUMBER);
     expect(stored.inboundAgentId?.toString()).toBe(frontDesk);
     expect(stored.twilio?.previousRouting?.voiceUrl).toBe(TWILIO_CUSTOMER_VOICE_URL);
 
-    await jobRadio(page, WEBHOOK_NUMBER, 'Not used yet').click();
-    await expect(
-        page.getByText(`The AI is off for ${WEBHOOK_NUMBER}. Calls to it ring the way they did before.`),
-    ).toBeVisible();
+    await changeJob(page, WEBHOOK_NUMBER, 'Not used yet', {
+        says: `The AI does nothing with ${WEBHOOK_NUMBER}. Calls to it ring the way they always have.`,
+    });
     await expect(jobBadge(page, WEBHOOK_NUMBER)).toHaveText('Not used yet');
     expect(writeBodies()).toEqual([
         {
@@ -309,14 +336,15 @@ test('answering calls points the number\'s Voice URL at the engine, saves its we
 
     // Making calls changes nothing in the account: the engine dials with the Calls API.
     twilio.clear();
-    await jobRadio(page, WEBHOOK_NUMBER, 'Make calls').click();
+    await changeJob(page, WEBHOOK_NUMBER, 'Make calls', {
+        agent: 'Sales outreach',
+        says: `Sales outreach makes the calls you start from ${WEBHOOK_NUMBER}.`,
+    });
     await expect(jobBadge(page, WEBHOOK_NUMBER)).toHaveText('Makes calls');
-    await chooseOption(page, callerAgent(WEBHOOK_NUMBER), 'Sales outreach');
-    await expect(page.getByText(`Sales outreach now makes the calls from ${WEBHOOK_NUMBER}`)).toBeVisible();
     expect(twilio.requests).toHaveLength(0);
 
     // Back to answering: only the Voice URL moves again, saving the customer's webhook afresh.
-    await jobRadio(page, WEBHOOK_NUMBER, 'Answer calls').click();
+    await changeJob(page, WEBHOOK_NUMBER, 'Answer calls', { preselected: 'After hours' });
     await expect(jobBadge(page, WEBHOOK_NUMBER)).toHaveText('Answers calls');
     expect(writeBodies()).toEqual([
         {
@@ -335,9 +363,9 @@ test('a number on a TwiML app or a SIP trunk is taken off it, and put back on it
     const trunkId = await seedTwilioNumber(db, TRUNK_NUMBER);
     await openPhoneNumbers(page);
 
-    await jobRadio(page, APP_NUMBER, 'Answer calls').click();
+    await changeJob(page, APP_NUMBER, 'Answer calls');
     await expect(jobBadge(page, APP_NUMBER)).toHaveText('Answers calls');
-    await jobRadio(page, TRUNK_NUMBER, 'Answer calls').click();
+    await changeJob(page, TRUNK_NUMBER, 'Answer calls');
     await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Answers calls');
     expect(writeBodies()).toEqual([
         {
@@ -365,9 +393,9 @@ test('a number on a TwiML app or a SIP trunk is taken off it, and put back on it
     });
 
     twilio.clear();
-    await jobRadio(page, APP_NUMBER, 'Not used yet').click();
+    await changeJob(page, APP_NUMBER, 'Not used yet');
     await expect(jobBadge(page, APP_NUMBER)).toHaveText('Not used yet');
-    await jobRadio(page, TRUNK_NUMBER, 'Not used yet').click();
+    await changeJob(page, TRUNK_NUMBER, 'Not used yet');
     await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Not used yet');
     expect(writeBodies()).toEqual([
         {
@@ -392,9 +420,11 @@ test('Twilio refusing to take a number off its trunk is explained, and nothing i
     twilio.refuseTrunkRemoval = true;
     await openPhoneNumbers(page);
 
-    await jobRadio(page, TRUNK_NUMBER, 'Answer calls').click();
-    await expect(page.getByText(`Twilio would not take ${TRUNK_NUMBER} off its SIP trunk`)).toBeVisible();
-    await expect(jobRadio(page, TRUNK_NUMBER, 'Answer calls')).not.toBeChecked();
+    const dialog = await saveJob(page, TRUNK_NUMBER, 'Answer calls');
+    await expect(dialog.getByRole('heading', { name: 'That did not finish' })).toBeVisible();
+    await expect(dialog.getByRole('status')).toContainText(`Twilio would not take ${TRUNK_NUMBER} off its SIP trunk`);
+    await expect(dialog.getByRole('status')).toContainText(`Right now: The AI does nothing with ${TRUNK_NUMBER}.`);
+    await expect(jobBadge(page, TRUNK_NUMBER)).toHaveText('Not used yet');
     const stored = await storedNumber(db, TRUNK_NUMBER);
     expect(stored.inboundAgentId).toBeNull();
     expect(stored.twilio).not.toHaveProperty('previousRouting');
@@ -408,13 +438,13 @@ test('routing the customer changed in the Console since is left alone when the n
     await seedAgents(db);
     await seedTwilioNumber(db, WEBHOOK_NUMBER);
     await openPhoneNumbers(page);
-    await jobRadio(page, WEBHOOK_NUMBER, 'Answer calls').click();
+    await changeJob(page, WEBHOOK_NUMBER, 'Answer calls');
     await expect(jobBadge(page, WEBHOOK_NUMBER)).toHaveText('Answers calls');
 
     const studio = `https://webhooks.twilio.com/v1/Accounts/${FAKE_TWILIO_ACCOUNT_SID}/Flows/FW${'9'.repeat(32)}`;
     fakeNumber(WEBHOOK_NUMBER).voice_url = studio;
     twilio.clear();
-    await jobRadio(page, WEBHOOK_NUMBER, 'Not used yet').click();
+    await changeJob(page, WEBHOOK_NUMBER, 'Not used yet');
     await expect(jobBadge(page, WEBHOOK_NUMBER)).toHaveText('Not used yet');
     expect(twilio.writes()).toHaveLength(0);
     expect(fakeNumber(WEBHOOK_NUMBER).voice_url).toBe(studio);
@@ -425,12 +455,11 @@ test('removing an answering Twilio number puts its voice settings back, then for
     await seedAgents(db);
     await seedTwilioNumber(db, APP_NUMBER);
     await openPhoneNumbers(page);
-    await jobRadio(page, APP_NUMBER, 'Answer calls').click();
+    await changeJob(page, APP_NUMBER, 'Answer calls');
     await expect(jobBadge(page, APP_NUMBER)).toHaveText('Answers calls');
     twilio.clear();
 
-    await numberRow(page, APP_NUMBER).getByRole('button', { name: 'Remove' }).click();
-    const dialog = page.getByRole('dialog');
+    const dialog = await openRemove(page, APP_NUMBER);
     await expect(dialog).toContainText('its Twilio voice settings are put back exactly');
     await dialog.getByRole('button', { name: 'Remove number' }).click();
     await expect(page.getByText('No phone numbers yet')).toBeVisible();
@@ -449,8 +478,7 @@ test('a number whose credentials Twilio no longer accepts can still be removed',
     await seedAgents(db);
     await seedTwilioNumber(db, WEBHOOK_NUMBER, { apiKeySealed: sealForE2e('a-revoked-secret') });
     await openPhoneNumbers(page);
-    await numberRow(page, WEBHOOK_NUMBER).getByRole('button', { name: 'Remove' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Remove number' }).click();
+    await (await openRemove(page, WEBHOOK_NUMBER)).getByRole('button', { name: 'Remove number' }).click();
     await expect(page.getByText('No phone numbers yet')).toBeVisible();
     expect(await db.getVoiceNumbers(E2E_USER)).toHaveLength(0);
 });

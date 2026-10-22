@@ -11,6 +11,7 @@ import {
     DEFAULT_INBOUND_VOICE_AGENT_CALL_NOTES,
     DEFAULT_INBOUND_VOICE_AGENT_PROMPT,
     DEFAULT_VOICE_AGENT_CALL_NOTES,
+    DEFAULT_VOICE_AGENT_NAME,
     DEFAULT_VOICE_AGENT_PROMPT,
     DEFAULT_VOICE_AGENT_VOICE,
 } from '@/helpers/voice-agent-defaults';
@@ -44,13 +45,14 @@ async function createThroughDialog(page: Page, type: RegExp, name: string, voice
     await waitForHydration(page, '[data-testid="new-voice-agent"]');
     await page.getByRole('button', { name: 'New agent' }).click();
     const dialog = page.getByRole('dialog', { name: 'New voice agent' });
-    // Step one: the two big choices, nothing else.
+    // One step: the inbound/outbound switch (inbound picked), name and voice together.
     await expect(dialog.getByRole('radio')).toHaveCount(2);
-    await expect(dialog.getByLabel('Name')).toHaveCount(0);
+    await expect(dialog.getByRole('radio', { name: /^Inbound/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.getByLabel('Name')).toHaveValue(DEFAULT_VOICE_AGENT_NAME);
     await dialog.getByRole('radio', { name: type }).click();
-    // Step two: name and voice.
+    await expect(dialog.getByRole('radio', { name: type })).toHaveAttribute('aria-checked', 'true');
     await dialog.getByLabel('Name').fill(name);
-    await dialog.getByLabel('Voice').click();
+    await dialog.getByRole('combobox', { name: 'Voice' }).click();
     await page.getByRole('option', { name: voice }).click();
     await dialog.getByRole('button', { name: 'Create agent' }).click();
     // The first visit to the editor in a run waits for `next dev` to compile it (well over 15 s
@@ -146,9 +148,14 @@ test('the type can be changed back in the create dialog', async ({ page, db }) =
     await waitForHydration(page, '[data-testid="new-voice-agent"]');
     await page.getByRole('button', { name: 'New agent' }).click();
     const dialog = page.getByRole('dialog', { name: 'New voice agent' });
+    const outbound = dialog.getByRole('radio', { name: /^Outbound/ });
+    await outbound.click();
     await dialog.getByRole('radio', { name: /^Inbound/ }).click();
-    await dialog.getByRole('button', { name: 'Change type' }).click();
-    await dialog.getByRole('radio', { name: /^Outbound/ }).click();
+    await outbound.click();
+    // Clicking the picked side again keeps it picked: the switch never ends up with no type.
+    await outbound.click();
+    await expect(outbound).toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.getByRole('radio', { name: /^Inbound/ })).toHaveAttribute('aria-checked', 'false');
     await dialog.getByRole('button', { name: 'Create agent' }).click();
     await expect(page).toHaveURL(new RegExp(`${VOICE_AGENTS_URL}/[0-9a-f]{24}$`));
     expect((await db.getVoiceAgents(E2E_USER))[0].callType).toBe(VoiceAgentCallType.OUTBOUND);
@@ -310,7 +317,7 @@ test('edits and saves every field', async ({ page, db }) => {
     await expect(save).toBeDisabled();
 
     await page.locator('#agent-name').fill('Maya v2');
-    await page.getByLabel('Voice').click();
+    await page.getByRole('combobox', { name: 'Voice' }).click();
     await page.getByRole('option', { name: /Puck/ }).click();
     await page.locator('#agent-prompt').fill('You are Maya. Be brief.');
     await page.locator('#agent-call-notes').fill('Website: example.com');

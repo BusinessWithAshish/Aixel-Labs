@@ -162,40 +162,40 @@ test.describe('with seeded calls', () => {
 
     test('lists calls newest first with their key facts', async ({ page }) => {
         await openCallLogs(page);
-        const rows = page.getByTestId('call-row');
-        await expect(rows).toHaveCount(4);
+        const cards = page.getByTestId('call-card');
+        await expect(cards).toHaveCount(4);
 
-        await expect(rows.nth(0)).toContainText('Sales');
-        await expect(rows.nth(0)).toContainText('Outbound');
-        await expect(rows.nth(0)).toContainText('+13473703925');
-        await expect(rows.nth(0)).toContainText('+14155550123');
-        await expect(rows.nth(0)).toContainText('1:35');
-        await expect(rows.nth(0)).toContainText('Said goodbye');
-        await expect(rows.nth(0)).toContainText('700 ms');
+        await expect(cards.nth(0)).toContainText('Sales');
+        await expect(cards.nth(0)).toContainText('Outbound');
+        await expect(cards.nth(0)).toContainText('+13473703925');
+        await expect(cards.nth(0)).toContainText('+14155550123');
+        await expect(cards.nth(0)).toContainText('1:35 long');
+        await expect(cards.nth(0)).toContainText('Said goodbye');
+        await expect(cards.nth(0)).toContainText('answers in 700 ms');
 
-        await expect(rows.nth(1)).toContainText('Front desk');
-        await expect(rows.nth(1)).toContainText('Inbound');
-        await expect(rows.nth(1)).toContainText('0:42');
-        await expect(rows.nth(1)).toContainText('Caller hung up');
-        await expect(rows.nth(1)).toContainText('1.8 s');
+        await expect(cards.nth(1)).toContainText('Front desk');
+        await expect(cards.nth(1)).toContainText('Inbound');
+        await expect(cards.nth(1)).toContainText('0:42 long');
+        await expect(cards.nth(1)).toContainText('Caller hung up');
+        await expect(cards.nth(1)).toContainText('answers in 1.8 s');
 
-        await expect(rows.nth(2)).toContainText('No answer');
-        await expect(rows.nth(2)).toContainText('0:00');
+        await expect(cards.nth(2)).toContainText('No answer');
+        await expect(cards.nth(2)).toContainText('0:00 long');
 
-        await expect(rows.nth(3)).toContainText('Playground');
-        await expect(rows.nth(3)).toContainText('Browser');
+        await expect(cards.nth(3)).toContainText('Playground');
+        await expect(cards.nth(3)).toContainText('Browser');
     });
 
     test('shows what each call and each agent cost', async ({ page }) => {
         await openCallLogs(page);
-        const rows = page.getByTestId('call-row');
+        const cards = page.getByTestId('call-card');
         // Total, " est." while the phone part is the list-rate estimate, and per minute of talk.
-        await expect(rows.nth(0).getByTestId('call-cost')).toHaveText('$0.045 est.');
-        await expect(rows.nth(0)).toContainText('$0.028/min');
-        await expect(rows.nth(1).getByTestId('call-cost')).toHaveText('$0.021');
-        await expect(rows.nth(1)).toContainText('$0.030/min');
-        await expect(rows.nth(2)).not.toContainText('$');
-        await expect(rows.nth(3).getByTestId('call-cost')).toHaveText('$0.000');
+        await expect(cards.nth(0).getByTestId('call-cost')).toHaveText('$0.045 est.');
+        await expect(cards.nth(0)).toContainText('$0.028/min');
+        await expect(cards.nth(1).getByTestId('call-cost')).toHaveText('$0.021');
+        await expect(cards.nth(1)).toContainText('$0.030/min');
+        await expect(cards.nth(2)).not.toContainText('$');
+        await expect(cards.nth(3).getByTestId('call-cost')).toHaveText('$0.000');
 
         // Every agent added up: 3 priced calls, 2:29 of talk.
         const summary = page.getByTestId('call-cost-summary');
@@ -219,7 +219,7 @@ test.describe('with seeded calls', () => {
 
     test('costs show in the currency the owner picks, at today’s rate', async ({ page, context }) => {
         await openCallLogs(page);
-        const firstCost = page.getByTestId('call-row').first().getByTestId('call-cost');
+        const firstCost = page.getByTestId('call-card').first().getByTestId('call-cost');
         await expect(firstCost).toHaveText('$0.045 est.');
         await page.getByRole('combobox', { name: 'Currency' }).click();
         await page.getByRole('option', { name: 'INR', exact: true }).click();
@@ -236,12 +236,12 @@ test.describe('with seeded calls', () => {
         await page.getByRole('combobox', { name: 'Agent' }).click();
         await page.getByRole('option', { name: 'Sales', exact: true }).click();
         await expect(page).toHaveURL(new RegExp(`\\?agent=${salesId}$`));
-        await expect(page.getByTestId('call-row')).toHaveCount(2);
-        await expect(page.getByTestId('call-row').filter({ hasText: 'Front desk' })).toHaveCount(0);
+        await expect(page.getByTestId('call-card')).toHaveCount(2);
+        await expect(page.getByTestId('call-card').filter({ hasText: 'Front desk' })).toHaveCount(0);
 
         await page.getByRole('combobox', { name: 'Agent' }).click();
         await page.getByRole('option', { name: 'All agents' }).click();
-        await expect(page.getByTestId('call-row')).toHaveCount(4);
+        await expect(page.getByTestId('call-card')).toHaveCount(4);
     });
 
     test('a call shows its transcript, per-turn gaps, flags and the recording', async ({ page }) => {
@@ -256,7 +256,7 @@ test.describe('with seeded calls', () => {
             },
         ]);
         await openCallLogs(page);
-        await page.getByTestId('call-row').first().click();
+        await page.getByTestId('call-card').first().click();
         await expect(page).toHaveURL(`${CALL_LOGS_URL}/${outboundId}`);
         await expect(page.locator('#header')).toContainText('Call with Sales');
 

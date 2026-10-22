@@ -227,7 +227,7 @@ test.describe('with seeded bookings', () => {
             },
         ]);
         await page.goto(CALL_LOGS_URL);
-        await expect(page.getByTestId('call-row').first().getByTestId('call-booked')).toHaveText('Booked');
+        await expect(page.getByTestId('call-card').first().getByTestId('call-booked')).toHaveText('Booked');
 
         await page.goto(`${CALL_LOGS_URL}/${bookedCall}`);
         await page.getByTestId('tool-call-booking-link').click();

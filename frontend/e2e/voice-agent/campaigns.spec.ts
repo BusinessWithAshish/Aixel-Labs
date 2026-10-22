@@ -19,6 +19,8 @@ import { CALL_LOGS_URL, FAKE_TELNYX_KEY, sealForE2e } from './fake-telephony';
 const CAMPAIGNS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.CAMPAIGNS];
 const NEW_CAMPAIGN_URL = `${CAMPAIGNS_URL}/new`;
 const FROM_NUMBER = '+919484950416';
+/** How the app shows FROM_NUMBER (`formatPhone`). */
+const FROM_NUMBER_SHOWN = '+91 94849 50416';
 
 /** Six rows: three good (different formats), a repeat of row 2, a short number, an empty phone. */
 const CSV = [
@@ -110,7 +112,7 @@ test('reads a CSV: guesses the columns, normalises numbers, reports repeats and 
     await expect(page.getByTestId('csv-invalid')).toHaveText('2');
     const issues = page.getByTestId('campaign-csv-issues');
     await expect(issues.getByRole('listitem')).toHaveText([
-        /Row 4.*\+919876543210 is already on row 2/,
+        /Row 4.*\+91 98765 43210 is already on row 2: called once/,
         /Row 5.*12345: Not a valid number in India/,
         /Row 6.*\(empty\): No phone number/,
     ]);
@@ -118,9 +120,9 @@ test('reads a CSV: guesses the columns, normalises numbers, reports repeats and 
     const preview = page.getByTestId('campaign-csv-preview').getByRole('listitem');
     await expect(preview).toHaveCount(3);
     await expect(preview.nth(0)).toContainText('Asha Rao');
-    await expect(preview.nth(0)).toContainText('+919876543210');
+    await expect(preview.nth(0)).toContainText('+91 98765 43210');
     await expect(preview.nth(2)).toContainText('Farah, Jr.');
-    await expect(preview.nth(2)).toContainText('+919988776655');
+    await expect(preview.nth(2)).toContainText('+91 99887 76655');
     await expect(preview.nth(2)).toContainText('company: Quote "Co"');
 
     // The wrong column: nothing to call, and the wizard says so.
@@ -132,8 +134,8 @@ test('reads a CSV: guesses the columns, normalises numbers, reports repeats and 
 
     // Read as US numbers instead, the national Indian ones are other people's (10 digits): still 3, all +1.
     await pick(page, '#campaign-country', /United States/);
-    await expect(preview.nth(0)).toContainText('+19876543210');
-    await expect(preview.nth(1)).toContainText('+919123456789');
+    await expect(preview.nth(0)).toContainText('+1 987 654 3210');
+    await expect(preview.nth(1)).toContainText('+91 91234 56789');
 
     // A file with no header row of contacts is refused.
     await page.getByRole('button', { name: 'Change file' }).click();
@@ -164,12 +166,13 @@ test('creates a draft: settings and contacts are saved as given', async ({ page,
     await page.getByRole('button', { name: 'Next', exact: true }).click();
 
     const review = page.getByTestId('campaign-review');
-    await expect(review).toContainText('October reminders');
-    await expect(review).toContainText('Reminder caller');
-    await expect(review).toContainText(FROM_NUMBER);
-    await expect(review).toContainText('3 · variables company, city');
-    await expect(review).toContainText('Mon–Sat, 10:00–17:30 Asia/Kolkata');
-    await expect(review).toContainText('Up to 2 more calls on no answer, busy, voicemail, 30 minutes apart');
+    const section = (name: string) => review.getByRole('region', { name, exact: true });
+    await expect(section('3 contacts to call')).toContainText('Each call also gets {{company}}, {{city}}.');
+    await expect(section('October reminders, by Reminder caller')).toContainText(`Calls go out from ${FROM_NUMBER_SHOWN}`);
+    await expect(section('When')).toContainText('Mon–Sat, 10:00–17:30 India Standard Time, 3 calls at a time.');
+    await expect(section('If nobody answers')).toContainText(
+        'Up to 2 more calls on no answer, busy, or voicemail, 30 minutes apart.',
+    );
     await page.getByRole('button', { name: 'Save as draft' }).click();
 
     await expect(page).toHaveURL(new RegExp(`${CAMPAIGNS_URL}/[0-9a-f]{24}$`));
@@ -331,7 +334,7 @@ test.describe('a campaign the engine is running', () => {
         await expect(card).toContainText('Clinic recall');
         await expect(card.getByTestId('campaign-status')).toHaveText('Running');
         await expect(card).toContainText('Reminder caller');
-        await expect(card).toContainText(FROM_NUMBER);
+        await expect(card).toContainText(FROM_NUMBER_SHOWN);
         await expect(card.getByTestId('stat-called')).toContainText('5');
         await expect(card.getByTestId('stat-answered')).toContainText('1');
         await expect(card.getByTestId('stat-booked')).toContainText('1');
