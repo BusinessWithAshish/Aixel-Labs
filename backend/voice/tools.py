@@ -40,11 +40,19 @@ from pymongo.errors import DuplicateKeyError, OperationFailure
 
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.frames.frames import Frame, LLMContextFrame, UserStartedSpeakingFrame, UserStoppedSpeakingFrame
+from pipecat.frames.frames import (
+    Frame,
+    LLMContextFrame,
+    OutputAudioRawFrame,
+    UserStartedSpeakingFrame,
+    UserStoppedSpeakingFrame,
+)
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
 import calendars
+import fillers
 import product
+import speech
 from bot import TurnSafeGeminiLive
 
 BUILTIN = ("check_availability", "book_appointment")
@@ -65,6 +73,10 @@ ALLOW_LOCAL_URLS = os.getenv("TOOLS_ALLOW_LOCAL_URLS") == "1"
 # Gemini asks again for the same thing when the caller speaks while it waits; within this long,
 # the same webhook with the same arguments gets the same answer from one request.
 REUSE_SECS = 20.0
+# The agent's line while a tool works (speech toolWait SAY): cut at this length, and not said again
+# within SAY_AGAIN_SECS (a repeat ask, or the next tool of the same answer).
+LINE_SECS = 8.0
+SAY_AGAIN_SECS = 15.0
 
 FAILED = "That didn't work just now. Tell the caller you couldn't do it right now; don't try again."
 # The owner's booking app (Composio) could not be reached: no times may be offered from guesswork.
@@ -447,6 +459,10 @@ class CallTools:
         self.notify = None  # async (dict) -> None: the playground page hears about each run
         self.flush: ToolFlush | None = None
         self._runs: dict[tuple, list] = {}  # (webhook, arguments) -> [its request, when it finished]
+        self.speech = ctx.get("speech") or speech.DEFAULTS
+        self.llm = None
+        self._line: asyncio.Future | None = None  # the SAY line's audio, made when the call starts
+        self._said_at = float("-inf")
         if self:
             record["tool_calls"] = []
 
@@ -500,11 +516,16 @@ class CallTools:
                                       properties=props, required=required))
         return ToolsSchema(standard_tools=fns)
 
-    def register(self, llm):
+    def register(self, llm, voice: str):
         # Default cancel_on_interruption=True: a synchronous call, declared BLOCKING (and not
         # cancelled by the caller speaking: see ToolsGeminiLive).
         for name in ([*BUILTIN] if self.cal else []) + list(self.webhooks):
             llm.register_function(name, self._handle, timeout_secs=WEBHOOK_TIMEOUT + 4)
+        self.llm = llm
+        if self.speech["toolWait"] == "SAY":
+            # Made now, in her voice on the call's own key, so it is ready by the first tool (~2-5 s).
+            self._line = asyncio.ensure_future(asyncio.to_thread(
+                fillers.get_line, voice, self.speech["toolWaitLine"], self.ctx.get("gemini_key"), LINE_SECS))
 
     def prompt(self) -> str:
         """`# Your tools`: when to use each one. Empty when the agent has none."""
@@ -538,7 +559,7 @@ class CallTools:
         for name, hook in self.webhooks.items():
             what = re.sub(r"\s+", " ", str(hook.get("description") or "")).strip()[:600]
             lines.append(f"- **{name}**: {what} If it fails, tell the caller you couldn't do that right now.")
-        lines.append("- While a tool works, say nothing, or a couple of words at most (\"one moment\").")
+        lines.append(speech.tool_wait_prompt(self.speech))
         return "\n".join(lines)
 
     # --- running one ---
@@ -547,6 +568,7 @@ class CallTools:
         name, args = params.function_name, dict(params.arguments or {})
         t0, after = time.monotonic(), len(self.record["turns"])
         self.record["turn_break"] = True  # what she says after it is its own line in the transcript
+        await self._say_line()
         work = asyncio.ensure_future(self._dispatch(name, args))
         try:
             ok, result, booking_id = await asyncio.shield(work)
@@ -569,6 +591,19 @@ class CallTools:
                 await self.notify({"type": "tool", "name": name, "arguments": entry["arguments"], "result": entry["result"], "ok": ok})
             except Exception as e:
                 logger.warning(f"tools: could not tell the page about {name}: {e}")
+
+    async def _say_line(self):
+        """SAY: her line goes out as the tool starts (the model was told to say nothing itself). Skipped
+        when its audio is not ready yet: the tool is never held up for it. Played ahead of her answer, so
+        a quick tool's answer waits for the line to finish."""
+        line = self._line
+        if not (line and line.done() and not line.cancelled() and not line.exception() and line.result()):
+            return
+        if time.monotonic() - self._said_at < SAY_AGAIN_SECS:
+            return
+        self._said_at = time.monotonic()
+        self.record["turns"].append({"at": time.strftime("%H:%M:%S"), "who": "agent", "text": self.speech["toolWaitLine"]})
+        await self.llm.push_frame(OutputAudioRawFrame(audio=line.result(), sample_rate=fillers.SAMPLE_RATE, num_channels=1))
 
     def _log(self, name, args, ok, result, after, t0, booking_id) -> dict:
         entry = {"name": name, "arguments": args, "result": result[:RESULT_MAX], "ok": bool(ok), "afterTurn": after,

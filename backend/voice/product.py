@@ -385,10 +385,10 @@ def memory_section(memory: dict, tz: ZoneInfo = ZoneInfo("UTC")) -> str:
 
 def _finish_ctx(ctx: dict, agent: dict) -> dict:
     """What every customer call adds: the voice_calls `_id`, chosen now so a booking made
-    during the call can point at it; the agent's tools; and her whole system prompt
+    during the call can point at it; the agent's tools and speech settings; and her whole system prompt
     (the agent's with its `{{variables}}` filled in, what she remembers about the caller,
     then `# Right now` and `# Your tools`, tools.prompt_sections)."""
-    import analysis, campaigns, tools  # import this module: loaded on first use
+    import analysis, campaigns, speech, tools  # import this module: loaded on first use
 
     # The agent's prompt and the owner's own Gemini key, or no call (AgentNoPrompt, GeminiKeyMissing).
     require_prompt(agent)
@@ -403,6 +403,7 @@ def _finish_ctx(ctx: dict, agent: dict) -> dict:
     if ctx["doc"]["direction"] == "OUTBOUND":
         ctx["voicemail"] = voicemail_message(agent, values)
     ctx["analysis"] = analysis.settings(agent)
+    ctx["speech"] = speech.settings(agent, lambda text: render(text, values))
     if phone := memory_phone(ctx):
         ctx["doc"]["callerPhone"] = phone
     ctx["memory_phone"] = phone if agent.get("memory") is True else None

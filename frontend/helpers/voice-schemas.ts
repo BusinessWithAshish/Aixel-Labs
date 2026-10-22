@@ -19,6 +19,8 @@ import {
     type VoiceAgentVoice,
     VoiceCalendarProvider,
     VoiceCampaignRetryOutcome,
+    VoiceReplyWait,
+    VoiceToolWait,
     VoiceVoicemailAction,
     type VoiceWeekday,
 } from '@aixellabs/backend/db/types';
@@ -112,7 +114,7 @@ export const voiceAgentSchema = z.object({
 export type VoiceAgentInput = z.input<typeof voiceAgentSchema>;
 
 // ---------------------------------------------------------------------------
-// Call settings: voicemail, post-call analysis, caller memory
+// Call settings: voicemail, post-call analysis, caller memory, speech
 // ---------------------------------------------------------------------------
 
 const voicemailSchema = z
@@ -210,9 +212,38 @@ const analysisSchema = z
         if (twice) custom(ctx, `There are two fields called ${twice}`, ['fields']);
     });
 
-/** How the agent behaves around a call: on voicemail, after it (analysis), and from one call to the next (memory). */
+const speechSchema = z
+    .object({
+        toolWait: z.nativeEnum(VoiceToolWait, {
+            errorMap: () => ({ message: 'Pick what the agent does while a tool works' }),
+        }),
+        toolWaitLine: z
+            .string()
+            .trim()
+            .max(LIMITS.toolWaitLineMax, `The line is up to ${LIMITS.toolWaitLineMax} characters`),
+        replyWait: z.nativeEnum(VoiceReplyWait, { errorMap: () => ({ message: 'Pick how long the agent waits' }) }),
+        silenceSecs: z
+            .number({ invalid_type_error: 'Give the seconds of silence, or 0 for never' })
+            .int('Whole seconds only')
+            .refine(
+                (secs) => secs === 0 || (secs >= LIMITS.silenceSecsMin && secs <= LIMITS.silenceSecsMax),
+                `Silence is ${LIMITS.silenceSecsMin} to ${LIMITS.silenceSecsMax} seconds, or 0 for never`,
+            ),
+        maxCallMinutes: z
+            .number({ invalid_type_error: 'Give the minutes, or 0 for no limit' })
+            .int('Whole minutes only')
+            .min(0, 'Give the minutes, or 0 for no limit')
+            .max(LIMITS.maxCallMinutesMax, `Calls can be limited to ${LIMITS.maxCallMinutesMax} minutes at most`),
+    })
+    .strict()
+    .refine((speech) => speech.toolWait !== VoiceToolWait.SAY || speech.toolWaitLine.length > 0, {
+        message: 'Write the line to say while a tool works',
+        path: ['toolWaitLine'],
+    });
+
+/** How the agent behaves around a call: on voicemail, after it (analysis), from one call to the next (memory), and how it speaks. */
 export const callSettingsSchema = z
-    .object({ voicemail: voicemailSchema, analysis: analysisSchema, memory: z.boolean() })
+    .object({ voicemail: voicemailSchema, analysis: analysisSchema, memory: z.boolean(), speech: speechSchema })
     .strict();
 
 export type VoiceAgentCallSettingsInput = z.input<typeof callSettingsSchema>;

@@ -38,9 +38,9 @@ export function bookingFormValues(booking: VoiceAgentBookingTool | null, timezon
 
 /** Call settings as the editor holds them: a choice field's answers typed as one comma-separated line. */
 export function callSettingsFormValues(
-    agent: Pick<VoiceAgent, 'voicemail' | 'analysis' | 'memory'>,
+    agent: Pick<VoiceAgent, 'voicemail' | 'analysis' | 'memory' | 'speech'>,
 ): VoiceAgentCallSettingsInput {
-    const { voicemail, analysis, memory } = callSettingsOf(agent);
+    const { voicemail, analysis, memory, speech } = callSettingsOf(agent);
     return {
         voicemail: { ...voicemail },
         analysis: {
@@ -48,5 +48,6 @@ export function callSettingsFormValues(
             fields: analysis.fields.map((field) => ({ ...field, options: (field.options ?? []).join(', ') })),
         },
         memory,
+        speech: { ...speech },
     };
 }

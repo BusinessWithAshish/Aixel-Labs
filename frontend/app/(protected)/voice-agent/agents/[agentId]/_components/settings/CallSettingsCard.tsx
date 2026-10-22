@@ -15,6 +15,7 @@ import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent
 import { SectionSaveBar } from '../SectionSaveBar';
 import { AnalysisSettings } from './AnalysisSettings';
 import { CallerMemorySettings } from './CallerMemorySettings';
+import { SpeechSettings } from './SpeechSettings';
 
 const VOICEMAIL_CHOICES = [
     { value: VoiceVoicemailAction.HANG_UP, title: 'Hang up', description: 'End the call as soon as a recording answers.' },
@@ -78,7 +79,7 @@ function VoicemailSettings() {
     );
 }
 
-/** What the agent does around a call: on a voicemail, after it (analysis), and from one call to the next (memory). */
+/** What the agent does in and around a call: how it speaks, on a voicemail, after it (analysis), and from one call to the next (memory). */
 export function CallSettingsCard() {
     const { settingsForm, settingsDirty, settingsError, savingSettings, saveSettings } =
         usePage<UseVoiceAgentEditorPageReturn>();
@@ -93,12 +94,14 @@ export function CallSettingsCard() {
                     ) : null}
                 </CardTitle>
                 <CardDescription>
-                    Voicemail, what is worked out after each call, and what the agent remembers about callers. Changes apply
-                    from the next call.
+                    How the agent speaks, voicemail, what is worked out after each call, and what it remembers about callers.
+                    Changes apply from the next call.
                 </CardDescription>
             </CardHeader>
             <FormProvider {...settingsForm}>
                 <CardContent className="grid gap-5">
+                    <SpeechSettings />
+                    <Separator />
                     <VoicemailSettings />
                     <Separator />
                     <AnalysisSettings />

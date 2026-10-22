@@ -2,10 +2,13 @@ import {
     VOICE_BUILTIN_VARIABLES,
     type VoiceAgent,
     type VoiceAgentAnalysis,
+    type VoiceAgentSpeech,
     type VoiceAgentVoicemail,
     type VoiceAnalysisFieldType,
     type VoiceBuiltinVariable,
     VoiceCallDirection,
+    VoiceReplyWait,
+    VoiceToolWait,
     VoiceVoicemailAction,
 } from '@aixellabs/backend/db/types';
 
@@ -69,6 +72,18 @@ export const DEFAULT_VOICE_AGENT_ANALYSIS: VoiceAgentAnalysis = {
     fields: [],
 };
 
+/** Speech never set: the model decides what to say while a tool works, normal reply wait, no silence or time limit. */
+export const DEFAULT_VOICE_AGENT_SPEECH: VoiceAgentSpeech = {
+    toolWait: VoiceToolWait.AGENT,
+    toolWaitLine: '',
+    replyWait: VoiceReplyWait.NORMAL,
+    silenceSecs: 0,
+    maxCallMinutes: 0,
+};
+
+/** The line the editor suggests when an owner first picks "say a set line". */
+export const SUGGESTED_TOOL_WAIT_LINE = 'One moment, let me check that for you.';
+
 export const VOICE_ANALYSIS_FIELD_TYPE_LABELS: Record<VoiceAnalysisFieldType, string> = {
     text: 'Text',
     number: 'Number',
@@ -76,16 +91,18 @@ export const VOICE_ANALYSIS_FIELD_TYPE_LABELS: Record<VoiceAnalysisFieldType, st
     choice: 'Choice',
 };
 
-/** An agent's call settings as the editor shows them (never set up: hang up on voicemail, summary only, no memory). */
-export function callSettingsOf(agent: Pick<VoiceAgent, 'voicemail' | 'analysis' | 'memory'>): {
+/** An agent's call settings as the editor shows them (never set up: hang up on voicemail, summary only, no memory, default speech). */
+export function callSettingsOf(agent: Pick<VoiceAgent, 'voicemail' | 'analysis' | 'memory' | 'speech'>): {
     voicemail: VoiceAgentVoicemail;
     analysis: VoiceAgentAnalysis;
     memory: boolean;
+    speech: VoiceAgentSpeech;
 } {
     return {
         voicemail: agent.voicemail ?? DEFAULT_VOICE_AGENT_VOICEMAIL,
         analysis: agent.analysis ?? DEFAULT_VOICE_AGENT_ANALYSIS,
         memory: agent.memory === true,
+        speech: agent.speech ?? DEFAULT_VOICE_AGENT_SPEECH,
     };
 }
 

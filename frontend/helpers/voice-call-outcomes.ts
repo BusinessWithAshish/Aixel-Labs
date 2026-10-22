@@ -20,6 +20,7 @@ const ENDED_BY_LABELS: Record<VoiceCallEndReason, string> = {
     [VoiceCallEndReason.TIMEOUT]: 'Time limit',
     [VoiceCallEndReason.ERROR]: 'Error',
     [VoiceCallEndReason.GEMINI_KEY_ERROR]: 'Gemini key problem',
+    [VoiceCallEndReason.SILENCE]: 'Caller went quiet',
 };
 
 /** Known reasons in words; anything new from the engine is shown as it was written. */

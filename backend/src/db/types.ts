@@ -289,6 +289,8 @@ export type VoiceAgentDoc<Id = ObjectId> = {
   analysis?: VoiceAgentAnalysis | null;
   /** Remember each caller (by phone number) from one of this agent's calls to the next. Absent = off. */
   memory?: boolean;
+  /** How she takes turns and fills waits during a call. Absent = today's defaults (agent decides, NORMAL, both off). */
+  speech?: VoiceAgentSpeech | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -657,10 +659,13 @@ export enum VoiceCallEndReason {
   WRONG_NUMBER = "wrong_number",
   BUSY = "busy",
   FAILED = "failed",
+  /** The agent's time limit (`speech.maxCallMinutes`) was reached. */
   TIMEOUT = "timeout",
   ERROR = "error",
   /** Gemini refused the owner's key; the reason is in `flags` and on their VoiceAccountDoc. */
   GEMINI_KEY_ERROR = "gemini_key_error",
+  /** The caller stayed silent after she checked in (`speech.silenceSecs`). */
+  SILENCE = "silence",
 }
 
 export type VoiceCallTurn = {
@@ -795,7 +800,42 @@ export const VOICE_AGENT_FEATURE_LIMITS = {
   choiceOptionMax: 60,
   /** One caller's memory brief. */
   memoryBriefMax: 600,
+  /** The line said while a tool works (`speech.toolWaitLine`), ~8 s spoken at most. */
+  toolWaitLineMax: 120,
+  /** `speech.silenceSecs`, when on. */
+  silenceSecsMin: 5,
+  silenceSecsMax: 60,
+  /** `speech.maxCallMinutes`, when on. */
+  maxCallMinutesMax: 120,
 } as const;
+
+/** What she does while a tool (booking, a webhook) works. */
+export enum VoiceToolWait {
+  /** The model decides: silence or a couple of words ("one moment"). */
+  AGENT = "AGENT",
+  SILENT = "SILENT",
+  /** `toolWaitLine` is played in her voice as the tool starts. */
+  SAY = "SAY",
+}
+
+/** How long she waits after the caller stops before answering (the engine's turn settings, speech.py). */
+export enum VoiceReplyWait {
+  QUICK = "QUICK",
+  NORMAL = "NORMAL",
+  PATIENT = "PATIENT",
+}
+
+export type VoiceAgentSpeech = {
+  toolWait: VoiceToolWait;
+  /** `SAY` only: said word for word, `{{variables}}` filled in. Up to `toolWaitLineMax` characters. */
+  toolWaitLine: string;
+  replyWait: VoiceReplyWait;
+  /** Seconds of caller silence after she speaks before she checks they are there; once more and she ends the call. 0 = never. */
+  silenceSecs: number;
+  /** She wraps up and ends the call after this many minutes. 0 = no limit. */
+  maxCallMinutes: number;
+};
+
 
 export enum VoiceVoicemailAction {
   HANG_UP = "HANG_UP",

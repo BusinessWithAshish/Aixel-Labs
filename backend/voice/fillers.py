@@ -142,28 +142,33 @@ VOICEMAIL_TEXT = (
 )
 
 
-# A customer agent's own message (its voicemail setting, variables filled in) differs per call,
-# so it is made per call and only the last few are kept, in memory.
+# A customer agent's own lines (its voicemail message, the line said while a tool works, variables
+# filled in) differ per call, so they are made per call and only the last few are kept, in memory.
 _MESSAGES: dict[tuple[str, str], bytes] = {}
 MESSAGES_KEPT = 32
+
+
+def get_line(voice: str, text: str, api_key: str | None = None, max_seconds: float = 30.0) -> bytes | None:
+    """`text` said in this call's own voice (on `api_key`, as get_filler), at most `max_seconds`."""
+    if (voice.lower(), text) in _MESSAGES:
+        return _MESSAGES[(voice.lower(), text)]
+    try:
+        pcm = _generate(voice, text, max_seconds=max_seconds, api_key=api_key)
+    except Exception as e:
+        logger.error(f"could not generate a line for {voice}: {e}")
+        return None
+    while len(_MESSAGES) >= MESSAGES_KEPT:
+        _MESSAGES.pop(next(iter(_MESSAGES)))
+    _MESSAGES[(voice.lower(), text)] = pcm
+    logger.info(f"line for {voice}: {len(pcm) / 2 / SAMPLE_RATE:.1f}s ({len(text)} characters)")
+    return pcm
 
 
 def get_voicemail(voice: str, api_key: str | None = None, text: str = VOICEMAIL_TEXT) -> bytes | None:
     """The voicemail message in this call's own voice (on `api_key`, as get_filler), at most 30 s.
     Ours (VOICEMAIL_TEXT) is generated once per voice and kept on disk; any other text per call."""
     if text != VOICEMAIL_TEXT:
-        if (voice.lower(), text) in _MESSAGES:
-            return _MESSAGES[(voice.lower(), text)]
-        try:
-            pcm = _generate(voice, text, max_seconds=30.0, api_key=api_key)
-        except Exception as e:
-            logger.error(f"could not generate a voicemail message for {voice}: {e}")
-            return None
-        while len(_MESSAGES) >= MESSAGES_KEPT:
-            _MESSAGES.pop(next(iter(_MESSAGES)))
-        _MESSAGES[(voice.lower(), text)] = pcm
-        logger.info(f"voicemail message for {voice}: {len(pcm) / 2 / SAMPLE_RATE:.1f}s ({len(text)} characters)")
-        return pcm
+        return get_line(voice, text, api_key)
     name = f"voicemail-{voice.lower()}.pcm"
     if (pcm := clip(name)) is not None:
         return pcm

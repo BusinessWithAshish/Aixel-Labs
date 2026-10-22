@@ -135,6 +135,7 @@ function mapVoiceAgentDocToVoiceAgent(doc: VoiceAgentDoc): VoiceAgent {
         voicemail: doc.voicemail ?? null,
         analysis: doc.analysis ?? null,
         memory: doc.memory === true,
+        speech: doc.speech ?? null,
         createdAt: doc.createdAt.toISOString(),
         updatedAt: doc.updatedAt.toISOString(),
     };
@@ -305,10 +306,10 @@ export const getPlaygroundSocketUrl = async (agentId: string): Promise<ALApiResp
     });
 
 // ---------------------------------------------------------------------------
-// Call settings: voicemail message, post-call analysis, caller memory. Read by the engine per call.
+// Call settings: voicemail message, post-call analysis, caller memory, speech. Read by the engine per call.
 // ---------------------------------------------------------------------------
 
-/** Saves what the agent does on a voicemail, what is worked out after each call, and whether it remembers callers. */
+/** Saves what the agent does on a voicemail, what is worked out after each call, whether it remembers callers, and how it speaks. */
 export const saveVoiceAgentCallSettings = async (
     agentId: string,
     input: VoiceAgentCallSettingsInput,

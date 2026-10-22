@@ -39,6 +39,7 @@ from loguru import logger
 
 import product  # before bot: it keeps the Mongo settings the process was started with (see there)
 import campaigns
+import speech
 import tools
 import twilio
 import voicelink
@@ -150,6 +151,19 @@ VAD_STOP = 0.2
 # 1.0 without TalkOverGate: there a reply to the first half of a sentence
 # survived the caller resuming and ran over them for up to 6.8 s.
 TURN_STOP = 0.8
+# An agent's reply wait (speech.py): (VAD_STOP, TURN_STOP) per preset; NORMAL is the two above.
+# Measured 2026-10-22 offline (Silero + Smart Turn v3 as set here, 6 min of podcast speech through
+# 8 kHz mu-law; every turn end inside someone's talk is a moment she would start answering):
+#   (vad, turn)   ends/min   decided by Smart Turn   wait after the last word (Smart Turn / timeout)
+#   0.2, 0.5      24.6       87%                     0.19 s / 0.67 s
+#   0.2, 0.8      23.5       89%                     0.19 s / 0.96 s
+#   0.2, 1.2      20.0       96%                     0.19 s / 1.38 s
+#   0.35, 1.2     15.4       96%                     0.35 s / 1.54 s
+#   0.5, 1.2       9.5       97%                     0.51 s / 1.70 s
+# Smart Turn calls ~9 ends in 10 complete the moment the VAD stops, so TURN_STOP alone changes little;
+# VAD_STOP is what makes her patient. QUICK only answers sooner after a trailing-off pause (~1 turn
+# in 8); PATIENT cuts in 60% less often for +0.3 s on every reply. Gemini's ~0.9 s comes on top.
+REPLY_WAIT = {"QUICK": (VAD_STOP, 0.5), "NORMAL": (VAD_STOP, TURN_STOP), "PATIENT": (0.5, 1.2)}
 
 # A phone caller arrives far quieter than a laptop microphone: in the first
 # recorded call the caller peaked at 4302 against the agent's 12664, and short
@@ -472,17 +486,22 @@ async def start_recording(call_control_id: str, api_key: str | None = None):
         logger.error(f"could not start recording: {e}")
 
 
-def build_pipeline_parts(voice: str, prompt: str | None, call_tools: "tools.CallTools | None", gemini_key: str):
+def build_pipeline_parts(voice: str, prompt: str | None, call_tools: "tools.CallTools | None", gemini_key: str,
+                         settings: dict | None = None):
     """The Gemini Live half of the call, tuned for a phone line. `prompt` is a
     customer agent's; without one she runs on prompt.md. `call_tools`: the agent's
     tools (tools.py), offered to the model as functions; none = exactly as before.
     `gemini_key`: a customer call's owner's own key (product.gemini_key_for), ours only
-    on Ashish's line."""
+    on Ashish's line. `settings`: the agent's speech settings (speech.py); none = the defaults."""
+    settings = settings or speech.DEFAULTS
+    vad_stop, turn_stop = REPLY_WAIT[settings["replyWait"]]
     context = LLMContext()
     user_params = LLMUserAggregatorParams(
+        # 0 = off: the idle timer behind speech.CallWatch's silence check-in.
+        user_idle_timeout=settings["silenceSecs"],
         vad_analyzer=SileroVADAnalyzer(
             params=VADParams(
-                stop_secs=VAD_STOP,
+                stop_secs=vad_stop,
                 start_secs=VAD_START,
                 confidence=VAD_CONFIDENCE,
                 min_volume=VAD_MIN_VOLUME,
@@ -493,7 +512,7 @@ def build_pipeline_parts(voice: str, prompt: str | None, call_tools: "tools.Call
             stop=[
                 TurnAnalyzerUserTurnStopStrategy(
                     turn_analyzer=LocalSmartTurnAnalyzerV3(
-                        params=SmartTurnParams(stop_secs=TURN_STOP)
+                        params=SmartTurnParams(stop_secs=turn_stop)
                     )
                 )
             ],
@@ -521,7 +540,7 @@ def build_pipeline_parts(voice: str, prompt: str | None, call_tools: "tools.Call
         **({"tools": call_tools.schema()} if call_tools else {}),
     )
     if call_tools:
-        call_tools.register(llm)
+        call_tools.register(llm, voice)
         call_tools.flush = tools.ToolFlush(context, name="tool_flush")
     pair = LLMContextAggregatorPair(context, realtime_service_mode=True, user_params=user_params)
     return llm, context, pair
@@ -1351,7 +1370,8 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
     call_tools = tools.CallTools(ctx, record) if ctx else None
     # A customer's call runs on its owner's key, never ours (product.gemini_key_for); ours is Ashish's line.
     gemini_key = ctx["gemini_key"] if ctx else os.environ["GEMINI_API_KEY"]
-    llm, context, pair = build_pipeline_parts(voice, ctx["prompt"] if ctx else None, call_tools or None, gemini_key)
+    llm, context, pair = build_pipeline_parts(voice, ctx["prompt"] if ctx else None, call_tools or None, gemini_key,
+                                              ctx and ctx["speech"])
     if ctx:
         async def end_refused():
             if not started.done():
@@ -1365,6 +1385,7 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
     answers = bool(ctx and ctx["doc"]["direction"] == "INBOUND")
     if answers:
         guard.VM_WINDOW = -1.0
+    watch = speech.CallWatch(ctx["speech"] if ctx else speech.DEFAULTS, llm, pair.user(), guard)
     gate = RingGate(line["pickup"], name="ring_gate")
     pipeline = Pipeline(
         [
@@ -1469,6 +1490,7 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
         # is recorded" notice (Ashish, 2026-10-13: it killed the opener), though calls
         # ARE recorded: that is a risk in the US states that need everyone's consent.
         await hold.release([])
+        watch.start()  # the time limit runs from when they can hear her
         if not early:
             await open_with_her_line()
 
@@ -1480,6 +1502,7 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
         if finished:
             return
         finished = True
+        watch.stop()
         LINES.pop(record["call_control_id"], None)
         refused = bool(ctx and ctx.get("gemini_refused"))
         if record["stream_id"] is None:
@@ -1615,12 +1638,13 @@ async def _play_session(websocket: WebSocket, ctx: dict, slot: str):
     )
     # The same model settings and turn taking as her phone calls, so the playground is a fair preview.
     call_tools = tools.CallTools(ctx, record)
-    llm, context, pair = build_pipeline_parts(voice, ctx["prompt"], call_tools or None, ctx["gemini_key"])
+    llm, context, pair = build_pipeline_parts(voice, ctx["prompt"], call_tools or None, ctx["gemini_key"], ctx["speech"])
     end_on_key_error(llm, ctx, record, end=lambda: runner.cancel(),
                      tell=lambda message: llm.push_frame(PlayMessage(message=message)))
     if call_tools:  # the page shows each tool run as it finishes
         call_tools.notify = lambda message: llm.push_frame(PlayMessage(message=message))
     guard = CallGuard(record)  # no callee: nothing said here goes on the do-not-call list
+    watch = speech.CallWatch(ctx["speech"], llm, pair.user(), guard)
     pipeline = Pipeline(
         [
             transport.input(),
@@ -1649,6 +1673,7 @@ async def _play_session(websocket: WebSocket, ctx: dict, slot: str):
         logger.info(f"play: agent {record['agent_id']} ({voice}) connected ({len(ACTIVE)}/{MAX_CALLS} running)")
         context.add_message({"role": "user", "content": ctx["first"]})
         await worker.queue_frames([LLMRunFrame()])
+        watch.start()
 
     finished = False
 
@@ -1657,6 +1682,7 @@ async def _play_session(websocket: WebSocket, ctx: dict, slot: str):
         if finished:
             return
         finished = True
+        watch.stop()
         record["gemini_usage"] = {k: round(v, 1) if isinstance(v, float) else v for k, v in llm.usage.items()}
         gaps = sorted(state.get("gaps", []))
         if gaps:
