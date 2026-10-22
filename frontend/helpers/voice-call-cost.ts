@@ -47,6 +47,27 @@ export function isCostEstimated(cost: Pick<VoiceCallCost, 'provider' | 'provider
     return !!cost.provider && !cost.providerExact;
 }
 
+const COST_PART_LABELS: Record<string, string> = {
+    geminiUsd: 'Gemini',
+    providerUsd: 'Phone',
+    analysisUsd: 'Call analysis',
+    sttUsd: 'Speech to text',
+    llmUsd: 'Language model',
+    ttsUsd: 'Voice',
+};
+
+/** "Gemini", "Phone", "Call analysis"; a part the engine adds later reads as its key without "Usd". */
+export function costPartLabel(part: string): string {
+    return COST_PART_LABELS[part] ?? part.replace(/Usd$/, '');
+}
+
+/** What a call's cost is made of, as kept: every `<part>Usd` amount but the total (the same rule as Analytics). */
+export function costParts(cost: VoiceCallCost): { part: string; usd: number }[] {
+    return Object.entries(cost).flatMap(([part, usd]) =>
+        part !== 'totalUsd' && part.endsWith('Usd') && typeof usd === 'number' ? [{ part, usd }] : [],
+    );
+}
+
 type ProviderRates = { usdPerMinute: Record<string, number | undefined>; extrasUsdPerMinute: number };
 
 /** The countries the list rates cover, in words. */

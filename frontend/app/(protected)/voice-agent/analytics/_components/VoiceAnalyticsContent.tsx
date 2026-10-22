@@ -5,12 +5,13 @@ import type { VoiceAnalyticsRange } from '@/app/actions/voice-analytics-actions'
 import { EmptyState } from '@/components/common/EmptyState';
 import { CurrencySelect } from '@/components/common/voice-agent/CurrencySelect';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AgentFilter } from '@/components/common/voice-agent/AgentFilter';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { usePage } from '@/contexts/PageStore';
-import { formatMoney } from '@/helpers/voice-call-cost';
-import { endedByLabel } from '@/helpers/voice-call-outcomes';
+import { costPartLabel, formatMoney } from '@/helpers/voice-call-cost';
+import { endedByLabel, endedByTone, replyTone, sentimentTone, TONE_COLORS } from '@/helpers/voice-call-outcomes';
 import { formatGap, SENTIMENT_LABELS } from '@/helpers/voice-call-format';
 import { cn } from '@/lib/utils';
 import type { UseVoiceAnalyticsPageReturn } from '../_hooks/use-voice-analytics-page';
@@ -20,22 +21,35 @@ import { BreakdownChart } from './BreakdownChart';
 import { CallsOverTimeChart } from './CallsOverTimeChart';
 import { CampaignResultsChart } from './CampaignResultsChart';
 
-const ALL_AGENTS = 'all';
-const SENTIMENT_COLORS = {
-    positive: 'var(--color-green-500)',
-    neutral: 'var(--color-amber-400)',
-    negative: 'var(--color-red-500)',
-};
-
 export function VoiceAnalyticsContent() {
-    const { analytics, agents, agentFilter, range, rangeLabel, loadError, filtering, setAgentFilter, setRange } =
-        usePage<UseVoiceAnalyticsPageReturn>();
+    const {
+        analytics,
+        agents,
+        agentFilter,
+        includeDeleted,
+        range,
+        rangeLabel,
+        loadError,
+        filtering,
+        setAgentFilter,
+        setIncludeDeleted,
+        setRange,
+    } = usePage<UseVoiceAnalyticsPageReturn>();
     const currency = useDisplayCurrency();
     const money = (usd: number) => formatMoney(usd, currency);
 
     return (
         <>
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
+                <AgentFilter
+                    id="analytics-agent"
+                    agents={agents}
+                    agentId={agentFilter}
+                    includeDeleted={includeDeleted}
+                    disabled={filtering}
+                    onAgentChange={setAgentFilter}
+                    onIncludeDeletedChange={setIncludeDeleted}
+                />
                 <div className="flex flex-col gap-1.5 sm:w-44">
                     <Label htmlFor="analytics-range">Period</Label>
                     <Select
@@ -50,29 +64,6 @@ export function VoiceAnalyticsContent() {
                             {ANALYTICS_RANGES.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
                                     {option.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="flex flex-col gap-1.5 sm:w-60">
-                    <Label htmlFor="analytics-agent">Agent</Label>
-                    <Select
-                        value={agentFilter ?? ALL_AGENTS}
-                        disabled={filtering}
-                        onValueChange={(value) => setAgentFilter(value === ALL_AGENTS ? null : value)}
-                    >
-                        <SelectTrigger id="analytics-agent" className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ALL_AGENTS}>All agents</SelectItem>
-                            {agentFilter && !agents.some((a) => a.id === agentFilter) ? (
-                                <SelectItem value={agentFilter}>Deleted agent</SelectItem>
-                            ) : null}
-                            {agents.map((agent) => (
-                                <SelectItem key={agent.id} value={agent.id}>
-                                    {agent.name}
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -106,7 +97,11 @@ export function VoiceAnalyticsContent() {
                     <BreakdownChart
                         title="How calls ended"
                         description="What ended each call."
-                        rows={analytics.endedBy.map((row) => ({ label: endedByLabel(row.reason), value: row.calls }))}
+                        rows={analytics.endedBy.map((row) => ({
+                            label: endedByLabel(row.reason),
+                            value: row.calls,
+                            color: TONE_COLORS[endedByTone(row.reason)],
+                        }))}
                         empty="No calls."
                     />
                     <BreakdownChart
@@ -115,7 +110,7 @@ export function VoiceAnalyticsContent() {
                         rows={analytics.sentiment.map((row) => ({
                             label: SENTIMENT_LABELS[row.sentiment],
                             value: row.calls,
-                            color: SENTIMENT_COLORS[row.sentiment],
+                            color: TONE_COLORS[sentimentTone(row.sentiment)],
                         }))}
                         empty="Turn on “Sentiment” in an agent’s call analysis to see how callers felt."
                     />
@@ -130,12 +125,13 @@ export function VoiceAnalyticsContent() {
                         empty="No priced calls in this period. Calls are priced since 21 Oct 2026."
                     />
                     <BreakdownChart
-                        title="Gemini and phone"
-                        description="Where the money went. Gemini is free on a free-tier key."
-                        rows={[
-                            { label: 'Gemini', value: analytics.cost.geminiUsd, color: 'var(--chart-3)' },
-                            { label: 'Phone provider', value: analytics.cost.providerUsd, color: 'var(--chart-1)' },
-                        ]}
+                        title="Where the money went"
+                        description="What each part of the calls cost. Gemini is free on a free-tier key."
+                        rows={analytics.cost.parts.map((row, i) => ({
+                            label: costPartLabel(row.part),
+                            value: row.usd,
+                            color: `var(--chart-${(i % 5) + 1})`,
+                        }))}
                         format={money}
                         empty="Nothing spent in this period."
                     />
@@ -148,6 +144,7 @@ export function VoiceAnalyticsContent() {
                                     ? `Over ${formatGap(all[i - 1].upToMs)}`
                                     : `Under ${formatGap(bucket.upToMs)}`,
                             value: bucket.replies,
+                            color: TONE_COLORS[bucket.upToMs === null ? 'bad' : replyTone(bucket.upToMs - 1)],
                         }))}
                         empty="No replies timed in this period."
                     />
