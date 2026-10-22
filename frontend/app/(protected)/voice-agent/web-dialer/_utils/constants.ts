@@ -12,5 +12,3 @@ export const DIALPAD_BUTTONS = [
   { value: "0", label: "0", subLabel: "+" },
   { value: "#", label: "#", subLabel: "" },
 ] as const;
-
-export const FUNCTIONS_URL = "https://api-aixellabs-5684.twil.io";

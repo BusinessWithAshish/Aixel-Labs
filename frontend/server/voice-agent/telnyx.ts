@@ -77,12 +77,13 @@ function describeError(status: number, text: string): string {
     return `Telnyx request failed (HTTP ${status})`;
 }
 
-async function telnyxRequest<T>(
+/** The raw response body: most endpoints answer JSON, a credential's token answers the bare JWT. */
+async function telnyxText(
     apiKey: string,
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     path: string,
     body?: Record<string, unknown>,
-): Promise<T> {
+): Promise<string> {
     let res: Response;
     try {
         res = await fetch(`${telnyxBase()}${path}`, {
@@ -102,13 +103,27 @@ async function telnyxRequest<T>(
 
     const text = await res.text();
     if (!res.ok) throw new TelnyxApiError(describeError(res.status, text), res.status, firstError(text).code);
+    return text;
+}
+
+async function telnyxRequest<T>(
+    apiKey: string,
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    path: string,
+    body?: Record<string, unknown>,
+): Promise<T> {
+    const text = await telnyxText(apiKey, method, path, body);
     return (text ? JSON.parse(text) : {}) as T;
 }
 
-async function listAllPages<T>(apiKey: string, path: string): Promise<T[]> {
+async function listAllPages<T>(apiKey: string, path: string, filters: Record<string, string> = {}): Promise<T[]> {
     const items: T[] = [];
     for (let pageNumber = 1; pageNumber <= MAX_PAGES; pageNumber++) {
-        const query = new URLSearchParams({ 'page[number]': String(pageNumber), 'page[size]': String(PAGE_SIZE) });
+        const query = new URLSearchParams({
+            ...filters,
+            'page[number]': String(pageNumber),
+            'page[size]': String(PAGE_SIZE),
+        });
         const page = await telnyxRequest<TelnyxPage<T>>(apiKey, 'GET', `${path}?${query}`);
         items.push(...page.data);
         const totalPages = page.meta?.total_pages ?? 1;
@@ -211,4 +226,53 @@ export async function listRecordingsForCall(apiKey: string, callControlId: strin
     const query = new URLSearchParams({ 'filter[call_control_id]': callControlId });
     const res = await telnyxRequest<TelnyxPage<TelnyxRecording>>(apiKey, 'GET', `/v2/recordings?${query}`);
     return res.data;
+}
+
+export type TelnyxTelephonyCredential = {
+    id: string;
+    name?: string | null;
+    connection_id?: string | null;
+    expired?: boolean;
+};
+
+/** `GET /v2/credential_connections` — SIP connections that sign in with a username (browser phones). */
+export function listCredentialConnections(apiKey: string): Promise<{ id: string; connection_name: string }[]> {
+    return listAllPages<{ id: string; connection_name: string }>(apiKey, '/v2/credential_connections');
+}
+
+/** `POST /v2/credential_connections` — Telnyx requires a SIP username + password even when only tokens sign in. */
+export async function createCredentialConnection(
+    apiKey: string,
+    input: { connectionName: string; userName: string; password: string; outboundVoiceProfileId: string },
+): Promise<{ id: string }> {
+    const res = await telnyxRequest<TelnyxData<{ id: string }>>(apiKey, 'POST', '/v2/credential_connections', {
+        connection_name: input.connectionName,
+        user_name: input.userName,
+        password: input.password,
+        outbound: { outbound_voice_profile_id: input.outboundVoiceProfileId },
+    });
+    return { id: res.data.id };
+}
+
+/** `GET /v2/telephony_credentials?filter[name]=…` */
+export function listTelephonyCredentials(apiKey: string, name: string): Promise<TelnyxTelephonyCredential[]> {
+    return listAllPages<TelnyxTelephonyCredential>(apiKey, '/v2/telephony_credentials', { 'filter[name]': name });
+}
+
+/** `POST /v2/telephony_credentials` — one SIP identity on a credential connection. */
+export async function createTelephonyCredential(
+    apiKey: string,
+    input: { connectionId: string; name: string },
+): Promise<TelnyxTelephonyCredential> {
+    const res = await telnyxRequest<TelnyxData<TelnyxTelephonyCredential>>(apiKey, 'POST', '/v2/telephony_credentials', {
+        connection_id: input.connectionId,
+        name: input.name,
+    });
+    return res.data;
+}
+
+/** `POST /v2/telephony_credentials/{id}/token` — a JWT the browser SDK signs in with (Telnyx: valid 24 hours). */
+export async function createTelephonyCredentialToken(apiKey: string, credentialId: string): Promise<string> {
+    const text = await telnyxText(apiKey, 'POST', `/v2/telephony_credentials/${encodeURIComponent(credentialId)}/token`);
+    return text.trim();
 }

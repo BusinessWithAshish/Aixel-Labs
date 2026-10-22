@@ -27,7 +27,8 @@ export function PhoneDisplay({
         type="tel"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Enter phone number"
+        placeholder="+14155550123"
+        aria-label="Number to call"
         className="text-xl sm:text-2xl text-center h-12 sm:h-14 border-0 focus-visible:ring-0 bg-transparent"
       />
       {value && (
@@ -35,6 +36,7 @@ export function PhoneDisplay({
           variant="ghost"
           size="icon"
           onClick={onBackspace}
+          aria-label="Delete last digit"
           className="h-8 w-8 rounded-full shrink-0"
         >
           <Delete className="h-4 w-4" />

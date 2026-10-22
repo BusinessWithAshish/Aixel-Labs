@@ -1,6 +1,5 @@
 'use server';
 
-import { headers } from 'next/headers';
 import {
     getCollection,
     MongoCollections,
@@ -38,6 +37,7 @@ import {
     type ProviderCalendar,
 } from '@/server/voice-agent/composio';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
+import { requestOrigin } from '@/server/voice-agent/public-url';
 
 /**
  * Connected apps: the owner's own Google Calendar / Outlook / Cal.com / Calendly, connected
@@ -134,15 +134,6 @@ async function bookIntoConnection(
         { $set: { 'tools.booking.destination': destination, updatedAt: new Date() } },
     );
     return result.modifiedCount === 1 ? destination : null;
-}
-
-/** https://e2e.localhost:3103 etc., from the request (tenant subdomains differ per workspace). */
-async function requestOrigin(): Promise<string> {
-    const h = await headers();
-    const host = h.get('x-forwarded-host') ?? h.get('host');
-    if (!host) throw new Error('Could not work out this site’s address');
-    const proto = h.get('x-forwarded-proto') ?? (/^(localhost|127\.|[^.]+\.localhost)/.test(host) ? 'http' : 'https');
-    return `${proto.split(',')[0].trim()}://${host}`;
 }
 
 export const listVoiceConnectedApps = async (): Promise<ALApiResponse<VoiceConnectedApps>> =>

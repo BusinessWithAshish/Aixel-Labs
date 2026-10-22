@@ -227,12 +227,15 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.13.23
         version: 3.13.23(react-dom@19.2.4)(react@19.2.4)
+      '@telnyx/webrtc':
+        specifier: 2.27.10
+        version: 2.27.10
       '@thumbmarkjs/thumbmarkjs':
         specifier: ^1.10.1
         version: 1.10.1
       '@twilio/voice-sdk':
-        specifier: ^2.15.0
-        version: 2.18.1
+        specifier: ^2.18.5
+        version: 2.18.5
       ai:
         specifier: ^6.0.105
         version: 6.0.140(zod@3.25.76)
@@ -2492,6 +2495,14 @@ packages:
   /@opentelemetry/api@1.9.0:
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
     engines: {node: '>=8.0.0'}
+    dev: false
+
+  /@peermetrics/webrtc-stats@5.9.0:
+    resolution: {integrity: sha512-eQYGGdj+H4MUEuwbccy9bxRV3uAqPM5+Say9PSx/alrtv5ccmKCqGfLbqXrRJ/qThZvjZNBna5K/YnCWoaTQBw==}
+    engines: {node: '>=18'}
+    dependencies:
+      events: 3.3.0
+      uuid: 8.3.2
     dev: false
 
   /@playwright/test@1.63.0:
@@ -5058,6 +5069,15 @@ packages:
     resolution: {integrity: sha512-zSz2Z2HNyLjCplANTDyl3BcdQJc2k1+yyFoKhNRmCr7V7dY8o8q5m8uFTI1/Pg1kL+Hgrz6u3Xo6eFUB7l66cg==}
     dev: false
 
+  /@telnyx/webrtc@2.27.10:
+    resolution: {integrity: sha512-Hw9m1xGkoO6muXsEwVh53seHO+hCaO+w7GLZE8zAA2ESrwRK0H1bBv60fEGBEAiRjHiVicRSDlzQkjCj3iBbHQ==}
+    engines: {node: '>=14.x'}
+    dependencies:
+      '@peermetrics/webrtc-stats': 5.9.0
+      loglevel: 1.9.2
+      uuid: 7.0.3
+    dev: false
+
   /@thumbmarkjs/thumbmarkjs@1.10.1:
     resolution: {integrity: sha512-BH7HP3g+NeIXgcYDxtNjx2wfO5cHaH6DjkoDzi4adYe0fknkQZABtKag+2j75p5p8mGMhl9mq2Ee5m1UosYPUw==}
     dev: false
@@ -5076,8 +5096,8 @@ packages:
     resolution: {integrity: sha512-9TvniWpzU0iy6SYFAcDP+HG+/mNz2yAHSs7+m0DZk86lE+LoTB6J/ZONTPuxXrXWi4tso/DulSHuA0w7nIQtGg==}
     dev: false
 
-  /@twilio/voice-sdk@2.18.1:
-    resolution: {integrity: sha512-4IvFgQOWrnluJrtJ79s1B4CiLbXLG7DKAXJW/uzgEsG9zQP30avs4d98LmtpOFr9ozd1kdKtjhKoqD+RbsY+MA==}
+  /@twilio/voice-sdk@2.18.5:
+    resolution: {integrity: sha512-2/tw1IDAIn7j6yFDOln8p93v3aHIxNIN93JwL98cHIlbkSNeU/Jt9zGM/0TvDpNjo+k88lvAew4jgOjKlc9/KA==}
     engines: {node: '>= 12'}
     dependencies:
       '@twilio/voice-errors': 1.7.0
@@ -10962,8 +10982,20 @@ packages:
       which-typed-array: 1.1.20
     dev: false
 
+  /uuid@7.0.3:
+    resolution: {integrity: sha512-DPSke0pXhTZgoF/d+WSt2QaKMCFSfx7QegxEWT+JOuHF5aWrKEn0G+ztjuJg/gG8/ItK+rbPCD/yNv8yyih6Cg==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+    hasBin: true
+    dev: false
+
   /uuid@8.0.0:
     resolution: {integrity: sha512-jOXGuXZAWdsTH7eZLtyXMqUb9EcWMGZNbL9YcGBJl4MH4nrxHmZJhEHvyLFrkxo+28uLb/NYRcStH48fnD0Vzw==}
+    hasBin: true
+    dev: false
+
+  /uuid@8.3.2:
+    resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
     dev: false
 

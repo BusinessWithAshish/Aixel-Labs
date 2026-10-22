@@ -1,192 +1,161 @@
-import { useEffect, useRef, useState } from "react";
-import axios from "axios";
-import { Device, Call } from "@twilio/voice-sdk";
-import { FUNCTIONS_URL } from "../_utils/constants";
-import { getRawPhoneNumber } from "../_utils/formatters";
+import { useEffect, useRef, useState } from 'react';
+import { listWebPhoneNumbers, startWebPhoneCall, type WebPhoneNumber } from '@/app/actions/voice-web-phone-actions';
+import { numberProviderInfo } from '@/helpers/voice-number-providers';
+import { describeCallEnd, describeMicError, NEEDS_COUNTRY_CODE, toE164 } from '@/helpers/voice-web-phone';
+import { placeBrowserCall, type BrowserCall, type BrowserCallEnd } from '../_utils/browser-call';
 
-/**
- * Return type for the useWebDialerPage hook
- */
-export interface UseWebDialerPageReturn {
-  // State
-  identity: string;
-  status: string;
-  phoneNumber: string;
-  isInCall: boolean;
-  isCallDisabled: boolean;
-  isMuted: boolean;
+/** idle → starting (microphone, sign-in) → ringing → active → idle. */
+export type WebPhonePhase = 'idle' | 'starting' | 'ringing' | 'active';
 
-  // Actions
-  handleDialpadClick: (value: string) => void;
-  handleDialpadLongPress: (value: string) => void;
-  handleBackspace: () => void;
-  handlePhoneNumberChange: (value: string) => void;
-  makeCall: () => Promise<void>;
-  hangup: () => void;
-  toggleMute: () => void;
-}
+export type UseWebDialerPageReturn = {
+    /** null while loading. */
+    numbers: WebPhoneNumber[] | null;
+    numberId: string;
+    setNumberId: (id: string) => void;
+    dialed: string;
+    setDialed: (value: string) => void;
+    /** Keys pressed during the call (sent as tones). */
+    tones: string;
+    phase: WebPhonePhase;
+    /** Seconds since the other side answered. */
+    seconds: number;
+    muted: boolean;
+    error: string | null;
+    pressKey: (key: string) => void;
+    backspace: () => void;
+    call: () => Promise<void>;
+    hangup: () => void;
+    toggleMute: () => void;
+};
 
-/**
- * Custom hook that encapsulates all the business logic for the Web Dialer page
- * 
- * This hook manages:
- * - Twilio device initialization and registration
- * - Token management and refresh
- * - Call state management
- * - Phone number input handling
- * - Call actions (make call, hangup)
- * 
- * @returns {UseWebDialerPageReturn} All state and functions needed by the Web Dialer page
- */
 export function useWebDialerPage(): UseWebDialerPageReturn {
-  const [identity, setIdentity] = useState<string>("");
-  const [status, setStatus] = useState<string>("offline");
-  const [phoneNumber, setPhoneNumber] = useState<string>("");
-  const [isMuted, setIsMuted] = useState<boolean>(false);
+    const [numbers, setNumbers] = useState<WebPhoneNumber[] | null>(null);
+    const [numberId, setNumberId] = useState('');
+    const [dialed, setDialed] = useState('');
+    const [tones, setTones] = useState('');
+    const [phase, setPhase] = useState<WebPhonePhase>('idle');
+    const [answeredAt, setAnsweredAt] = useState<number | null>(null);
+    const [now, setNow] = useState(() => Date.now());
+    const [muted, setMuted] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const callRef = useRef<BrowserCall | null>(null);
+    /** The owner hung up (or left the page): no "why it ended" message, and a call still starting is dropped. */
+    const hungUpRef = useRef(false);
 
-  const deviceRef = useRef<Device | null>(null);
-  const callRef = useRef<Call | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function init() {
-      try {
-        setStatus("fetching-token");
-        const res = await axios.get(`${FUNCTIONS_URL}/token?identity=agent1`);
-        const token = res.data.token || res.data.accessToken;
-        const ident = res.data.identity || "agent1";
-
-        if (!mounted) return;
-        setIdentity(ident);
-
-        const device = new Device(token);
-        deviceRef.current = device;
-
-        device.on("registered", () => setStatus("registered"));
-        device.on("unregistered", () => setStatus("unregistered"));
-        device.on("error", (err) =>
-          setStatus("error: " + (err.message || JSON.stringify(err)))
-        );
-
-        device.on("tokenWillExpire", async () => {
-          try {
-            const r = await axios.get(
-              `${FUNCTIONS_URL}/token?identity=${encodeURIComponent(ident)}`
-            );
-            const newToken = r.data.token || r.data.accessToken;
-            device.updateToken(newToken);
-          } catch (e) {
-            console.error("token refresh failed", e);
-          }
+    useEffect(() => {
+        void listWebPhoneNumbers().then((res) => {
+            if (!res.success) {
+                setError(res.error ?? 'Could not load your numbers');
+                setNumbers([]);
+                return;
+            }
+            const list = res.data ?? [];
+            setNumbers(list);
+            setNumberId(list.find((n) => !n.problem)?.id ?? '');
         });
+        return () => {
+            hungUpRef.current = true;
+            callRef.current?.hangup();
+        };
+    }, []);
 
-        device.on("incoming", (call: Call) => {
-          call.accept();
-          callRef.current = call;
-          setStatus("in-call");
-          call.on("disconnect", () => setStatus("registered"));
-        });
+    useEffect(() => {
+        if (answeredAt === null) return;
+        const timer = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(timer);
+    }, [answeredAt]);
 
-        await device.register();
-      } catch (err) {
-        console.error(err);
-        setStatus("init-error");
-      }
+    const number = numbers?.find((n) => n.id === numberId) ?? null;
+
+    function ended(end: BrowserCallEnd) {
+        callRef.current = null;
+        setPhase('idle');
+        setAnsweredAt(null);
+        setMuted(false);
+        if (!hungUpRef.current && number) {
+            setError(end.error ?? describeCallEnd({ providerLabel: numberProviderInfo(number.provider).label, ...end }));
+        }
     }
 
-    init();
-    return () => {
-      mounted = false;
-      if (deviceRef.current) {
-        deviceRef.current.destroy();
-      }
+    async function call() {
+        const to = toE164(dialed);
+        if (!number || phase !== 'idle') return;
+        if (!to) {
+            setError(NEEDS_COUNTRY_CODE);
+            return;
+        }
+        setError(null);
+        setTones('');
+        hungUpRef.current = false;
+        setPhase('starting');
+        try {
+            // Asked first, so the browser's microphone prompt shows before anything is set up.
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach((track) => track.stop());
+        } catch (micError) {
+            setPhase('idle');
+            setError(describeMicError(micError));
+            return;
+        }
+        try {
+            const res = await startWebPhoneCall(number.id, to);
+            if (!res.success || !res.data) throw new Error(res.error ?? 'Could not start the call');
+            if (hungUpRef.current) {
+                setPhase('idle');
+                return;
+            }
+            const placed = await placeBrowserCall(res.data, to, {
+                onRinging: () => setPhase((p) => (p === 'active' ? p : 'ringing')),
+                onAnswered: () => {
+                    setPhase('active');
+                    setAnsweredAt(Date.now());
+                    setNow(Date.now());
+                },
+                onEnded: ended,
+            });
+            callRef.current = placed;
+            if (hungUpRef.current) placed.hangup();
+        } catch (callError) {
+            setPhase('idle');
+            if (!hungUpRef.current) setError(callError instanceof Error ? callError.message : 'Could not start the call');
+        }
+    }
+
+    /** While the call is still starting, `call` drops it as soon as it can (the phase stays until then). */
+    function hangup() {
+        hungUpRef.current = true;
+        callRef.current?.hangup();
+    }
+
+    function toggleMute() {
+        callRef.current?.setMuted(!muted);
+        setMuted(!muted);
+    }
+
+    function pressKey(key: string) {
+        if (phase === 'idle') {
+            setDialed((prev) => prev + key);
+            return;
+        }
+        callRef.current?.sendDigit(key);
+        setTones((prev) => prev + key);
+    }
+
+    return {
+        numbers,
+        numberId,
+        setNumberId,
+        dialed,
+        setDialed: (value) => setDialed(value.replace(/[^\d+\-() ]/g, '')),
+        tones,
+        phase,
+        seconds: answeredAt === null ? 0 : Math.floor((now - answeredAt) / 1000),
+        muted,
+        error,
+        pressKey,
+        backspace: () => setDialed((prev) => prev.slice(0, -1)),
+        call,
+        hangup,
+        toggleMute,
     };
-  }, []);
-
-  const handleDialpadClick = (value: string) => {
-    setPhoneNumber((prev) => prev + value);
-  };
-
-  const handleDialpadLongPress = (value: string) => {
-    // For button "0", long press adds "+"
-    if (value === "0") {
-      setPhoneNumber((prev) => prev + "+");
-    }
-  };
-
-  const handleBackspace = () => {
-    setPhoneNumber((prev) => prev.slice(0, -1));
-  };
-
-  const handlePhoneNumberChange = (value: string) => {
-    // Allow only digits, +, -, (, ), and spaces
-    const sanitized = value.replace(/[^\d+\-() ]/g, "");
-    setPhoneNumber(sanitized);
-  };
-
-  async function makeCall() {
-    if (!deviceRef.current) {
-      setStatus("device-not-ready");
-      return;
-    }
-
-    const rawNumber = getRawPhoneNumber(phoneNumber);
-    if (!rawNumber) {
-      return;
-    }
-
-    try {
-      setStatus("calling");
-      setIsMuted(false);
-      const call = await deviceRef.current.connect({
-        params: { To: rawNumber },
-      });
-      callRef.current = call;
-      setStatus("in-call");
-      call.on("disconnect", () => {
-        setStatus("registered");
-        setIsMuted(false);
-      });
-    } catch (e) {
-      console.error(e);
-      setStatus("call-error");
-    }
-  }
-
-  function hangup() {
-    if (callRef.current) {
-      callRef.current.disconnect();
-    } else if (deviceRef.current) {
-      deviceRef.current.disconnectAll();
-    }
-    setIsMuted(false);
-  }
-
-  function toggleMute() {
-    if (callRef.current) {
-      const newMutedState = !isMuted;
-      callRef.current.mute(newMutedState);
-      setIsMuted(newMutedState);
-    }
-  }
-
-  const isInCall = status === "in-call" || status === "calling";
-  const isCallDisabled = status !== "registered" || !phoneNumber.trim();
-
-  return {
-    identity,
-    status,
-    phoneNumber,
-    isInCall,
-    isCallDisabled,
-    isMuted,
-    handleDialpadClick,
-    handleDialpadLongPress,
-    handleBackspace,
-    handlePhoneNumberChange,
-    makeCall,
-    hangup,
-    toggleMute,
-  };
 }

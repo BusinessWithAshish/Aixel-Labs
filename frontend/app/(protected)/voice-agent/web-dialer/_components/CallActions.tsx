@@ -32,6 +32,7 @@ export function CallActions({
         <Button
           onClick={onCall}
           disabled={isCallDisabled}
+          aria-label="Call"
           size="lg"
           className={cn(
             "h-14 w-14 sm:h-16 sm:w-16 rounded-full",
@@ -47,6 +48,7 @@ export function CallActions({
         <>
           <Button
             onClick={onToggleMute}
+            aria-label={isMuted ? "Unmute" : "Mute"}
             size="lg"
             className={cn(
               "h-14 w-14 sm:h-16 sm:w-16 rounded-full",
@@ -65,6 +67,7 @@ export function CallActions({
           </Button>
           <Button
             onClick={onHangup}
+            aria-label="Hang up"
             size="lg"
             className={cn(
               "h-14 w-14 sm:h-16 sm:w-16 rounded-full",

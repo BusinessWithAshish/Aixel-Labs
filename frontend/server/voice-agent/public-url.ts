@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { isIP } from 'node:net';
+import { headers } from 'next/headers';
 
 /**
  * Which URLs the server may call for a voice owner: their custom tools' webhooks and the recording
@@ -82,4 +83,13 @@ export function isFetchableLink(link: string): boolean {
     if (!isProduction()) return url.protocol === 'https:' || url.protocol === 'http:';
     const host = bareHostname(url.hostname);
     return url.protocol === 'https:' && !isIP(host) && !isLocalHostname(host) && host.includes('.');
+}
+
+/** https://e2e.localhost:3103 etc., from the request (tenant subdomains differ per workspace). */
+export async function requestOrigin(): Promise<string> {
+    const h = await headers();
+    const host = h.get('x-forwarded-host') ?? h.get('host');
+    if (!host) throw new Error('Could not work out this site’s address');
+    const proto = h.get('x-forwarded-proto') ?? (/^(localhost|127\.|[^.]+\.localhost)/.test(host) ? 'http' : 'https');
+    return `${proto.split(',')[0].trim()}://${host}`;
 }

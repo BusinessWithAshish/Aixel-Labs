@@ -211,3 +211,33 @@ export async function listCallRecordings(auth: TwilioAuth, callSid: string): Pro
 export function recordingMediaUrl(auth: TwilioAuth, recordingSid: string, format: 'mp3' | 'wav'): string {
     return `${twilioBase()}${accountPath(auth, `/Recordings/${encodeURIComponent(recordingSid)}.${format}`)}`;
 }
+
+export type TwilioApplication = {
+    sid: string;
+    friendly_name?: string;
+    voice_url?: string | null;
+};
+
+/** `GET /Accounts/{AC}/Applications.json?FriendlyName=…` — TwiML apps with that name. */
+export async function listApplications(auth: TwilioAuth, friendlyName: string): Promise<TwilioApplication[]> {
+    const query = new URLSearchParams({ FriendlyName: friendlyName });
+    const res = await twilioRequest<{ applications?: TwilioApplication[] }>(
+        auth,
+        'GET',
+        accountPath(auth, `/Applications.json?${query}`),
+    );
+    return res.applications ?? [];
+}
+
+/** `POST /Accounts/{AC}/Applications.json`, or `/Applications/{AP}.json` to change one. Calls Twilio places for it fetch TwiML from `voiceUrl`. */
+export function saveApplication(
+    auth: TwilioAuth,
+    input: { sid?: string; friendlyName: string; voiceUrl: string },
+): Promise<TwilioApplication> {
+    const path = input.sid ? `/Applications/${encodeURIComponent(input.sid)}.json` : '/Applications.json';
+    return twilioRequest<TwilioApplication>(auth, 'POST', accountPath(auth, path), {
+        FriendlyName: input.friendlyName,
+        VoiceUrl: input.voiceUrl,
+        VoiceMethod: 'POST',
+    });
+}
