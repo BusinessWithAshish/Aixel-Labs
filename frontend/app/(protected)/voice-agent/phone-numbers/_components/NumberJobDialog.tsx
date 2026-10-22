@@ -192,6 +192,8 @@ function NumberJobContent({ number }: { number: VoiceNumberListItem }) {
                     />
                     {job !== 'NONE' ? (
                         <SelectControlledField
+                            // A fresh select per job: swapping the options under a mounted one loses the agent chooseJob picked.
+                            key={job}
                             name="agentId"
                             id={`agent-${number._id}`}
                             label={job === VoiceAgentCallType.INBOUND ? 'Agent that answers' : 'Agent that makes the calls'}
@@ -228,7 +230,7 @@ function NumberJobContent({ number }: { number: VoiceNumberListItem }) {
                         <Button type="button" variant="outline" onClick={closeJobDialog}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={dialog.steps.length === 0 || dialog.blockedByKey}>
+                        <Button type="submit" disabled={!dialog.canSave}>
                             Save
                         </Button>
                     </DialogFooter>

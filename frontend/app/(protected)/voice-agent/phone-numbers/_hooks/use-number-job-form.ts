@@ -56,8 +56,11 @@ export function useNumberJobForm(number: VoiceNumberListItem) {
         ...(own && !listed.some((a) => a.id === own) ? [{ value: own, label: agentName(number, agents, own) }] : []),
     ];
 
+    /** Something changes, and the agent (when the job needs one) is one of this job's options. */
+    const canSave = steps.length > 0 && !blockedByKey && (job === 'NONE' || agentOptions.some((o) => o.value === agentId));
+
     const save = form.handleSubmit(async (values) => {
-        if (!number._id || blockedByKey) return;
+        if (!number._id || !canSave) return;
         const plan = planJobChange(number, agents, values.job, values.job === 'NONE' ? null : values.agentId);
         if (plan.length === 0) return;
         const name = agentName(number, agents, values.agentId);
@@ -86,6 +89,7 @@ export function useNumberJobForm(number: VoiceNumberListItem) {
         canAnswer,
         canCall,
         agentOptions,
+        canSave,
         chooseJob,
         save,
         /** Back to the form after a failure; the preview now starts from where the number stands. */
