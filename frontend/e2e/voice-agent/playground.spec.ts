@@ -242,7 +242,8 @@ test('tool events from the engine show as compact rows in the chat', async ({ pa
     const order = await transcript.locator('ol > li').evaluateAll((items) => items.map((li) => li.getAttribute('data-testid')));
     expect(order).toEqual(['transcript-caller', 'transcript-tool', 'transcript-tool', 'transcript-tool', 'transcript-agent']);
 
-    await rows.nth(1).locator('summary').click();
+    // Its title is a link to Bookings: open the details from the row's edge, not the middle.
+    await rows.nth(1).locator('summary').click({ position: { x: 4, y: 4 } });
     await expect(rows.nth(1)).toContainText('"time": "14:00"');
     await expect(rows.nth(1)).toContainText('Booked Saturday 17 October at 2:00 PM.');
 });

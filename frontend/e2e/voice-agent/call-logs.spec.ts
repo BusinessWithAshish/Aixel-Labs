@@ -10,7 +10,7 @@ import {
     type VoiceCallCost,
     type VoiceCallDoc,
 } from '@aixellabs/backend/db/types';
-import { expect, test } from '../support/fixtures';
+import { expect, LOCAL_FETCH, test } from '../support/fixtures';
 import { voiceCallRecordingApiRoute } from '@/config/app-config';
 import { E2E_BASE_URL, E2E_TELNYX_API_BASE, USER_STORAGE_STATE } from '../support/env';
 import { waitForHydration } from '../support/voice-agents';
@@ -301,7 +301,7 @@ test.describe('with seeded calls', () => {
         await expect(page.getByTestId('no-recording')).toContainText('Telnyx has no recording for this call.');
     });
 
-    test('the recording loads, plays, seeks and downloads through the app', async ({ page }) => {
+    test('the recording loads, plays, seeks and downloads through the app', LOCAL_FETCH, async ({ page }) => {
         const wav = makeTestWav(3);
         const fileUrl = telnyx.addRecordingFile('e2e-recorded-call.wav', wav);
         telnyx.recordings.set('v3:e2e-recorded-call', [

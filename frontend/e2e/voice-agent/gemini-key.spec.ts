@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http';
-import type { Page, Response } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
 import { VoiceAgentCallType, VoiceCallChannel, VoiceCallDirection, VoiceGeminiKeyStatus } from '@aixellabs/backend/db/types';
 import type { E2eDb } from '../support/db';
 import { expect, test } from '../support/fixtures';
@@ -200,10 +200,17 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     db,
 }) => {
     const { inbound } = await seedAgentsAndNumber(db);
-    const payloads: Promise<string>[] = [];
-    page.on('response', (response: Response) => {
-        const type = response.headers()['content-type'] ?? '';
-        if (type.includes('text/x-component') || type.includes('text/html')) payloads.push(response.text().catch(() => ''));
+    // Finished requests only: a prefetch cut off by a navigation never delivers its body.
+    const payloads: Promise<string | null>[] = [];
+    page.on('requestfinished', (request: Request) => {
+        payloads.push(
+            (async () => {
+                const response = await request.response();
+                const type = response?.headers()['content-type'] ?? '';
+                if (!type.includes('text/x-component') && !type.includes('text/html')) return null;
+                return response!.text().catch(() => '');
+            })(),
+        );
     });
 
     await openAgents(page);
@@ -275,8 +282,9 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
 
     // Neither the key nor its sealed form is in any page or action payload.
     await openAgents(page);
-    const bodies = [await page.content(), ...(await Promise.all(payloads))].join('\n');
-    expect(payloads.length).toBeGreaterThan(3);
+    const texts = (await Promise.all(payloads)).filter((text) => text !== null);
+    const bodies = [await page.content(), ...texts].join('\n');
+    expect(texts.length).toBeGreaterThan(3);
     expect(bodies).not.toContain(GOOD_KEY);
     expect(bodies).not.toContain(stored?.keySealed as string);
     expect(bodies).not.toContain('keySealed');

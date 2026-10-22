@@ -11,9 +11,12 @@
     "prod": "rm -rf .next && next build && next start --port=3003",
     "e2e:services:up": "docker compose -f e2e/docker-compose.yml up -d --wait",
     "e2e:services:down": "docker compose -f e2e/docker-compose.yml down -v",
-    "e2e": "pnpm e2e:services:up && playwright test --project=chromium",
-    "e2e:ui": "pnpm e2e:services:up && playwright test --project=chromium --ui",
-    "e2e:walkthrough": "pnpm e2e:services:up && playwright test --project=walkthrough"
+    "e2e:build": "bash e2e/build.sh",
+    "e2e": "pnpm e2e:services:up && pnpm e2e:build && playwright test --project=chromium && pnpm e2e:local-fetch",
+    "e2e:local-fetch": "E2E_DEV=1 playwright test --project=chromium --grep @local-fetch",
+    "e2e:dev": "pnpm e2e:services:up && E2E_DEV=1 playwright test --project=chromium",
+    "e2e:ui": "pnpm e2e:services:up && E2E_DEV=1 playwright test --project=chromium --ui",
+    "e2e:walkthrough": "pnpm e2e:services:up && pnpm e2e:build && playwright test --project=walkthrough"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.34",

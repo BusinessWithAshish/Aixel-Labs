@@ -45,8 +45,8 @@ export class E2eDb {
         private readonly db: Db,
     ) {}
 
-    static async connect(): Promise<E2eDb> {
-        const client = new MongoClient(E2E_MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
+    static async connect(dbName = E2E_DB_NAME): Promise<E2eDb> {
+        const client = new MongoClient(E2E_MONGODB_URI, { serverSelectionTimeoutMS: 10_000 });
         try {
             await client.connect();
         } catch (error) {
@@ -55,7 +55,7 @@ export class E2eDb {
                 { cause: error },
             );
         }
-        return new E2eDb(client, client.db(E2E_DB_NAME));
+        return new E2eDb(client, client.db(dbName));
     }
 
     close(): Promise<void> {

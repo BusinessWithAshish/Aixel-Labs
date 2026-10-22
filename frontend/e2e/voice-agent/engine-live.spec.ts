@@ -12,7 +12,7 @@ import { FAKE_MIC_LAUNCH_ARGS, openVoiceAgent } from '../support/voice-agents';
  *   cd backend/voice && MONGODB_URI=mongodb://127.0.0.1:27018 MONGODB_DB_NAME=AixelLabsE2E \
  *     .venv/bin/python phone.py --port 7862
  *   VOICE_E2E_ENGINE=1 E2E_VOICE_ENGINE_SECRET=<the engine's VOICELAB_KEY> E2E_GEMINI_API_KEY=<a real Gemini key> \
- *     VOICE_E2E_CALLER_WAV=<a wav of someone talking> pnpm --filter frontend exec playwright test e2e/voice-agent/engine-live.spec.ts
+ *     VOICE_E2E_CALLER_WAV=<a wav of someone talking> pnpm --filter frontend exec playwright test --workers=1 e2e/voice-agent/engine-live.spec.ts
  */
 test.skip(process.env.VOICE_E2E_ENGINE !== '1', 'needs the real voice engine on the e2e port');
 

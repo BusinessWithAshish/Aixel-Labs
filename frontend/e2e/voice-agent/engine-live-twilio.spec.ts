@@ -24,7 +24,7 @@ import {
  *   cd backend/voice && MONGODB_URI=mongodb://127.0.0.1:27018 MONGODB_DB_NAME=AixelLabsE2E \
  *     TWILIO_API_BASE=http://127.0.0.1:7865 .venv/bin/python phone.py --port 7862
  *   VOICE_E2E_ENGINE=1 E2E_VOICE_ENGINE_SECRET=<the engine's VOICELAB_KEY> E2E_GEMINI_API_KEY=<a real Gemini key> \
- *     pnpm --filter frontend exec playwright test e2e/voice-agent/engine-live-twilio.spec.ts
+ *     pnpm --filter frontend exec playwright test --workers=1 e2e/voice-agent/engine-live-twilio.spec.ts
  */
 test.skip(process.env.VOICE_E2E_ENGINE !== '1', 'needs the real voice engine on the e2e port');
 

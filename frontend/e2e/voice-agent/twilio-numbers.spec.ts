@@ -10,7 +10,7 @@ import {
 } from '@aixellabs/backend/db/types';
 import { voiceCallRecordingApiRoute } from '@/config/app-config';
 import type { E2eDb } from '../support/db';
-import { expect, test } from '../support/fixtures';
+import { expect, LOCAL_FETCH, test } from '../support/fixtures';
 import { E2E_TWILIO_MEDIA_BASE, E2E_VOICE_ENGINE_SECRET, E2E_VOICE_ENGINE_URL, USER_STORAGE_STATE } from '../support/env';
 import { waitForHydration } from '../support/voice-agents';
 import { E2E_ADMIN, E2E_USER } from '../support/users';
@@ -516,7 +516,7 @@ test.describe('call recordings in Twilio', () => {
         ]);
     });
 
-    test('the recording is fetched with the customer credentials, streamed with Range, and downloads by name', async ({
+    test('the recording is fetched with the customer credentials, streamed with Range, and downloads by name', LOCAL_FETCH, async ({
         page,
     }) => {
         const audio = makeTestWav(3);

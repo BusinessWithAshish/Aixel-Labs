@@ -3,7 +3,7 @@ import path from 'node:path';
 import { ObjectId } from 'mongodb';
 import { VoiceAgentCallType, VoiceCallChannel, VoiceCallDirection } from '@aixellabs/backend/db/types';
 import { expect, test } from '../support/fixtures';
-import { E2E_ARTIFACTS_DIR, USER_STORAGE_STATE } from '../support/env';
+import { E2E_ARTIFACTS_DIR, E2E_TELNYX_API_BASE, USER_STORAGE_STATE } from '../support/env';
 import { waitForHydration } from '../support/voice-agents';
 import { E2E_USER } from '../support/users';
 import {
@@ -215,7 +215,7 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
                     id: 'rec-1',
                     status: 'completed',
                     duration_millis: 95_000,
-                    download_urls: { mp3: 'http://127.0.0.1:7863/download/walkthrough.mp3' },
+                    download_urls: { mp3: `${E2E_TELNYX_API_BASE}/download/walkthrough.mp3` },
                 },
             ]);
 

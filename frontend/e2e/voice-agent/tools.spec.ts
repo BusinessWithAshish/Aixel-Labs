@@ -6,7 +6,7 @@ import path from 'node:path';
 import type { Page, Response } from '@playwright/test';
 import { VoiceAgentCallType, type VoiceAgentWebhookTool } from '@aixellabs/backend/db/types';
 import type { E2eDb } from '../support/db';
-import { expect, test } from '../support/fixtures';
+import { expect, LOCAL_FETCH, test } from '../support/fixtures';
 import { E2E_ARTIFACTS_DIR, USER_STORAGE_STATE } from '../support/env';
 import { E2E_USER } from '../support/users';
 import { openVoiceAgent } from '../support/voice-agents';
@@ -370,7 +370,7 @@ async function startToolServer(): Promise<{ server: Server; base: string; receiv
     return { server, base: `http://127.0.0.1:${port}`, received };
 }
 
-test('send test request: posts what the engine would, signed, and shows the answer', async ({ page, db }) => {
+test('send test request: posts what the engine would, signed, and shows the answer', LOCAL_FETCH, async ({ page, db }) => {
     const { server, base, received } = await startToolServer();
     try {
         const agentId = await inboundAgent(db);
