@@ -9,6 +9,8 @@
               once the customer's apps turn `call_cost_in_webhooks` on; until then Telnyx is the estimate.
               VoiceLink publishes no rates (each account has its own): no estimate, its part is left out
               until its call-log API gives the call's own charge, which then fills it in like Twilio's.
+    analysis  the post-call analysis (analysis.py) on the same key: its tokens at the analysis model's list price,
+              0 on a free-tier key. Added once the analysis ran (analysis_cost), absent when it did not run.
 
 Prices excl. tax, with their sources and dates: backend/src/db/voice-call-rates.json, shared with the app
 (`VOICE_CALL_RATES` in types.ts, which also estimates an agent's cost before any call).
@@ -28,6 +30,8 @@ import product
 RATES = json.loads((Path(__file__).resolve().parents[1] / "src/db/voice-call-rates.json").read_text())
 # USD per 1M tokens, paid tier. Thinking bills as text out; Live has no cache price.
 GEMINI_USD_PER_M = RATES["gemini"]["usdPerMillionTokens"]
+# USD per 1M tokens for the post-call analysis's text model.
+ANALYSIS_USD_PER_M = RATES["analysis"]["usdPerMillionTokens"]
 # USD a minute, every part the engine uses (voice, media stream, recording), by provider and direction.
 # shortcut: US rates for every destination but India (Twilio); Telnyx's India rates are not public.
 PROVIDER_USD_PER_MIN = {(name, direction): rate for name, p in RATES["providers"].items()
@@ -61,6 +65,16 @@ def provider_estimate(provider: str, direction: str, to: str | None, duration_se
     if direction == "OUTBOUND" and (to or "").startswith("+91") and (provider, "OUTBOUND_IN") in PROVIDER_USD_PER_MIN:
         key = (provider, "OUTBOUND_IN")
     return minutes(duration_sec) * (PROVIDER_USD_PER_MIN[key] + EXTRAS_USD_PER_MIN[provider])
+
+
+def analysis_cost(cost: dict, usage: dict) -> dict:
+    """The `cost` fields the analysis adds, from its generateContent `usageMetadata`: the prompt in, the answer
+    and thinking out, at list price (0 when the call's Gemini part is free tier), and the total with it."""
+    tokens = {"textIn": usage.get("promptTokenCount", 0),
+              "textOut": usage.get("candidatesTokenCount", 0) + usage.get("thoughtsTokenCount", 0)}
+    usd = 0.0 if cost.get("geminiFreeTier") else sum(n * ANALYSIS_USD_PER_M[k] for k, n in tokens.items()) / 1e6
+    return {"analysisUsd": round(usd, 6), "analysisTokens": tokens,
+            "totalUsd": round(cost["geminiUsd"] + cost["providerUsd"] + usd, 6)}
 
 
 def free_tier(user_id) -> bool:
@@ -150,7 +164,7 @@ async def fill_provider_charge(ctx: dict, doc: dict):
         usd = round(charged + minutes(doc["durationSec"]) * EXTRAS_USD_PER_MIN.get(provider, 0), 6)
         await asyncio.to_thread(product.db().voice_calls.update_one, {"_id": doc["_id"]}, {"$set": {
             "cost.provider": provider, "cost.providerUsd": usd, "cost.providerExact": True,
-            "cost.totalUsd": round(cost["geminiUsd"] + usd, 6)}})
+            "cost.totalUsd": round(cost["geminiUsd"] + cost.get("analysisUsd", 0) + usd, 6)}})
         logger.info(f"cost of call {doc['_id']}: {provider} charged ${charged:.4f}, phone part ${usd}")
     except Exception as e:
         logger.warning(f"cost of call {doc.get('_id')}: could not get {provider}'s charge: {e!r}")

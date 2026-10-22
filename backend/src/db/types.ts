@@ -724,17 +724,20 @@ export type VoiceCallDoc<Id = ObjectId> = {
 
 /**
  * A call's cost in US dollars. The engine writes it when the call ends (`backend/voice/costs.py`):
- * Gemini from the tokens Gemini reported, the phone provider from the minutes at its list rate
- * (`providerExact: false`), replaced by the provider's own charge once it reports one.
+ * Gemini from the tokens Gemini reported, the post-call analysis from its tokens, the phone provider
+ * from the minutes at its list rate (`providerExact: false`), replaced by the provider's own charge once it reports one.
  */
 export type VoiceCallCost = {
-  /** geminiUsd + providerUsd. */
+  /** geminiUsd + analysisUsd + providerUsd. */
   totalUsd: number;
   /** 0 when the owner's key is on Google's free tier (`geminiFreeTier`). */
   geminiUsd: number;
   geminiFreeTier: boolean;
   /** Tokens Gemini reported for the whole call (every turn bills the conversation so far). */
   geminiTokens: { textIn: number; audioIn: number; textOut: number; audioOut: number };
+  /** The post-call analysis on the same key (0 on the free tier). Absent when it did not run, or on older calls. */
+  analysisUsd?: number;
+  analysisTokens?: { textIn: number; textOut: number };
   /** Absent on playground calls, which have no phone provider. */
   provider?: VoiceProvider;
   providerUsd: number;

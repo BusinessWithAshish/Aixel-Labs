@@ -59,6 +59,12 @@ def pricing_tests(user):
        str(india["providerUsd"]))
     vl = costs.call_cost(doc_of(user), USAGE, "VOICELINK")
     ok("VoiceLink: no published rate, its part left out", "provider" not in vl and vl["totalUsd"] == vl["geminiUsd"])
+    a = costs.analysis_cost(paid, {"promptTokenCount": 2000, "candidatesTokenCount": 300, "thoughtsTokenCount": 100})
+    ok("analysis: 2000 in at $0.30/M + 400 out at $2.50/M, added to the total", a["analysisUsd"] == 0.0016
+       and a["analysisTokens"] == {"textIn": 2000, "textOut": 400}
+       and a["totalUsd"] == round(paid["geminiUsd"] + paid["providerUsd"] + 0.0016, 6), str(a))
+    ok("analysis on a free-tier key costs nothing", costs.analysis_cost({**paid, "geminiFreeTier": True},
+       {"promptTokenCount": 2000})["analysisUsd"] == 0)
     ok("a call nobody answered costs no minutes", costs.call_cost(doc_of(user, duration=0), {}, "TELNYX")["totalUsd"] == 0)
 
 
@@ -88,12 +94,13 @@ async def twilio_tests(user):
         ctx = {"provider": "TWILIO", "twilio": {"account_sid": "AC" + "1" * 32, "user": "SKx", "secret": "s"}}
         doc = doc_of(user, direction="OUTBOUND", duration=95, to="+14155550123")
         product._insert(doc, ctx, USAGE)
+        doc["cost"]["analysisUsd"] = 0.001  # the analysis ran first (analysis.after_call)
         await costs.fill_provider_charge(ctx, doc)
         saved = product.db().voice_calls.find_one({"_id": doc["_id"]})["cost"]
         ok("Twilio: asked again until the price was there", len(seen) == 2, str(seen))
         want = round(0.017 + 2 * 0.0069, 6)
         ok("Twilio's charge (plus stream and recording) replaces the estimate", saved["providerExact"] is True
-           and abs(saved["providerUsd"] - want) < 1e-9 and abs(saved["totalUsd"] - (saved["geminiUsd"] + want)) < 1e-6, str(saved))
+           and abs(saved["providerUsd"] - want) < 1e-9 and abs(saved["totalUsd"] - (saved["geminiUsd"] + 0.001 + want)) < 1e-6, str(saved))
 
         # VoiceLink: no estimate; its call-log charge in rupees, on the number's own token, at today's rate.
         number = {"_id": ObjectId(), "userId": user, "tenantId": ObjectId(), "provider": "VOICELINK",

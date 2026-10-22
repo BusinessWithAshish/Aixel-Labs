@@ -12,6 +12,13 @@
     "source": "ai.google.dev/gemini-api/docs/pricing (paid tier; page updated 2026-10-19). The free tier is free of charge.",
     "usdPerMillionTokens": { "textIn": 0.75, "audioIn": 3.0, "textOut": 4.5, "audioOut": 12.0 }
   },
+  "analysis": {
+    "model": "gemini-3.5-flash-lite",
+    "source": "ai.google.dev/gemini-api/docs/pricing as republished by getmaxim.ai and anotherwrapper.com (Google's data of 2026-09), read 2026-10-22. Thinking bills as text out. The free tier is free of charge.",
+    "usdPerMillionTokens": { "textIn": 0.3, "textOut": 2.5 },
+    "estimateSource": "A typical 3-minute call: about 1,000 transcript tokens plus 500 of instructions in; summary, fields and memory note out.",
+    "estimateTokens": { "textIn": 1500, "textOut": 300 }
+  },
   "providers": {
     "TELNYX": {
       "source": "telnyx.com/pricing/call-control (Voice API 0.002, media streaming 0.0035, recording 0.002) + telnyx.com/pricing/elastic-sip (US local in from 0.0032, out from 0.005). Telnyx publishes no India rates.",

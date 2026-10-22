@@ -7,6 +7,7 @@ on (`memory: true`) the same pass also rewrites what the agent remembers about t
 
     voice_calls.analysis      {summary, sentiment, successful, fields: {...}, model, error?}
     voice_calls.memory        the brief after this call, the caller's `current` one (product.load_memory)
+    voice_calls.cost          + analysisUsd / analysisTokens, the pass's own price (costs.analysis_cost)
 
 It runs in the background task that writes the call's document (product.save_call), on the
 call's own Gemini key (the owner's), with structured JSON output. It never delays the call's
@@ -23,9 +24,11 @@ import aiohttp
 from loguru import logger
 from pymongo.errors import DuplicateKeyError
 
+import costs
 import product
 
-MODEL = os.getenv("ANALYSIS_MODEL", "gemini-3.5-flash-lite")
+# shortcut: an ANALYSIS_MODEL override is still priced at the default model's rate (voice-call-rates.json).
+MODEL = os.getenv("ANALYSIS_MODEL", costs.RATES["analysis"]["model"])
 TIMEOUT = 30.0
 SENTIMENTS = ("positive", "neutral", "negative")
 FIELD_TYPES = ("boolean", "text", "number", "choice")
@@ -199,8 +202,9 @@ def parse(raw: str, cfg: dict, memory: bool) -> tuple[dict, str | None]:
     return out, brief
 
 
-async def generate(key: str, body: dict) -> str:
-    """One generateContent call (one retry when Google is busy). The JSON text, or raises."""
+async def generate(key: str, body: dict) -> tuple[str, dict]:
+    """One generateContent call (one retry when Google is busy). The JSON text and the tokens it billed
+    (`usageMetadata`), or raises."""
     url = f"{product.GEMINI_API_BASE}/v1beta/models/{MODEL}:generateContent"
     for attempt in (1, 2):
         async with aiohttp.ClientSession() as session:
@@ -218,16 +222,17 @@ async def generate(key: str, body: dict) -> str:
         out = "".join(p.get("text", "") for p in parts if not p.get("thought"))
         if not out.strip():
             raise RuntimeError(f"Gemini gave no answer ({str(data.get('promptFeedback') or data)[:200]})")
-        return out
+        return out, data.get("usageMetadata") or {}
     raise RuntimeError("unreachable")
 
 
-def _store(ctx: dict, doc: dict, result: dict, brief: str | None):
-    """The analysis on the call, and with a new brief, the caller's memory: it becomes the current one."""
+def _store(ctx: dict, doc: dict, result: dict, brief: str | None, cost: dict):
+    """The analysis (and its `cost.*` fields) on the call, and with a new brief, the caller's memory: it becomes the current one."""
     calls = product.db().voice_calls
     phone = ctx.get("memory_phone")
+    fields = {"analysis": result, **{f"cost.{k}": v for k, v in cost.items()}}
     if not brief or not phone:
-        calls.update_one({"_id": doc["_id"]}, {"$set": {"analysis": result}})
+        calls.update_one({"_id": doc["_id"]}, {"$set": fields})
         return
     previous = ctx.get("memory_used") or {}
     memory = {"brief": brief, "calls": int(previous.get("calls") or 0) + 1,
@@ -235,10 +240,10 @@ def _store(ctx: dict, doc: dict, result: dict, brief: str | None):
     calls.update_many({"userId": doc["userId"], "agentId": doc["agentId"], "callerPhone": phone,
                        "memory.current": True, "_id": {"$ne": doc["_id"]}}, {"$unset": {"memory.current": ""}})
     try:
-        calls.update_one({"_id": doc["_id"]}, {"$set": {"analysis": result, "callerPhone": phone, "memory": memory}})
+        calls.update_one({"_id": doc["_id"]}, {"$set": {**fields, "callerPhone": phone, "memory": memory}})
     except DuplicateKeyError:  # a call with the same caller stored its brief a moment ago: that one stays current
         memory.pop("current")
-        calls.update_one({"_id": doc["_id"]}, {"$set": {"analysis": result, "callerPhone": phone, "memory": memory}})
+        calls.update_one({"_id": doc["_id"]}, {"$set": {**fields, "callerPhone": phone, "memory": memory}})
 
 
 async def after_call(ctx: dict, doc: dict):
@@ -249,15 +254,20 @@ async def after_call(ctx: dict, doc: dict):
         if not wanted(cfg, memory) or not any(t["role"] == "caller" and t["text"].strip() for t in doc.get("turns") or []):
             return
         previous = (ctx.get("memory_used") or {}).get("brief")
+        usage = None  # what Google billed; None when the request itself failed (nothing billed)
         try:
-            raw = await generate(ctx.get("gemini_key") or os.environ["GEMINI_API_KEY"],
-                                 request_body(cfg, memory, doc, ctx.get("agent_name") or "", previous))
+            raw, usage = await generate(ctx.get("gemini_key") or os.environ["GEMINI_API_KEY"],
+                                        request_body(cfg, memory, doc, ctx.get("agent_name") or "", previous))
             result, brief = parse(raw, cfg, memory)
         except Exception as e:
             logger.warning(f"analysis of call {doc['_id']} failed: {e!r}")
             result, brief = {"error": str(e)[:300] or repr(e)}, None
         result["model"] = MODEL
-        await asyncio.to_thread(_store, ctx, doc, result, brief)
+        # On the call's cost when it has one; kept on `doc` too, for fill_provider_charge's total.
+        cost = costs.analysis_cost(doc["cost"], usage) if doc.get("cost") and usage is not None else {}
+        if cost:
+            doc["cost"].update(cost)
+        await asyncio.to_thread(_store, ctx, doc, result, brief, cost)
         logger.info(f"analysis of call {doc['_id']} stored ({'failed' if 'error' in result else 'ok'}"
                     f"{', memory updated' if brief else ''})")
     except Exception as e:

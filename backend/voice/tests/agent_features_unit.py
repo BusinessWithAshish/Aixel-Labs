@@ -200,7 +200,8 @@ class FakeGemini:
         self.requests.append({"path": request.path, "key": request.headers.get("x-goog-api-key"), "body": await request.json()})
         if self.status != 200:
             return web.json_response({"error": {"message": "API key not valid. Please pass a valid API key."}}, status=self.status)
-        return web.json_response({"candidates": [{"content": {"parts": [{"text": json.dumps(self.answer)}]}}]})
+        return web.json_response({"candidates": [{"content": {"parts": [{"text": json.dumps(self.answer)}]}}],
+                                  "usageMetadata": {"promptTokenCount": 1000, "candidatesTokenCount": 150, "thoughtsTokenCount": 50}})
 
     async def start(self):
         app = web.Application()
@@ -228,10 +229,14 @@ async def memory_tests():
         rec = {"voice": "kore", "turns": [{"who": "agent", "text": "Hello, Smile Dental."},
                                          {"who": "caller", "text": "Hi, I'm Ravi, can I come in on Thursday?"}]}
         doc = product.call_doc(first, rec, {})
-        product._insert(doc)
+        product._insert(doc, first, {})
         gem.answer = {"summary": "Ravi asked for Thursday.", "sentiment": "neutral", "memory": "Ravi wants a Thursday slot."}
         await analysis.after_call(first, doc)
         stored = product.db().voice_calls.find_one({"_id": doc["_id"]})
+        cost = stored["cost"]
+        ok("analysis cost on the call: 1000 in at $0.30/M + 200 out (thinking too) at $2.50/M, in the total",
+           cost["analysisTokens"] == {"textIn": 1000, "textOut": 200} and abs(cost["analysisUsd"] - 0.0008) < 1e-9
+           and abs(cost["totalUsd"] - (cost["geminiUsd"] + cost["providerUsd"] + 0.0008)) < 1e-6, str(cost))
         ok("analysis stored on the call", stored["analysis"] == {"summary": "Ravi asked for Thursday.", "sentiment": "neutral",
                                                                   "model": analysis.MODEL}, str(stored.get("analysis")))
         ok("ran on the call's own key, with structured JSON output", gem.requests[-1]["key"] == "AIza-unit-test-key"
@@ -274,6 +279,7 @@ async def memory_tests():
         product._insert(doc3)
         await analysis.after_call(second, doc3)
         failed = product.db().voice_calls.find_one({"_id": doc3["_id"]})["analysis"]
+        ok("a refused request bills nothing: no analysis cost", "analysisUsd" not in (product.db().voice_calls.find_one({"_id": doc3["_id"]}).get("cost") or {}))
         ok("a refused key: the failure is recorded, not raised; memory untouched", "error" in failed and failed["model"] == analysis.MODEL
            and "not a valid API key" in failed["error"] and testdb.memory_of(product.db(), {"userId": user})["calls"] == 2,
            failed.get("error", ""))
