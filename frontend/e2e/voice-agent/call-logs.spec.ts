@@ -83,6 +83,7 @@ test.describe('with seeded calls', () => {
     let inboundId: string;
     let playgroundId: string;
     let salesId: string;
+    let frontDeskId: string;
 
     test.beforeEach(async ({ db }) => {
         telnyx.reset();
@@ -90,7 +91,7 @@ test.describe('with seeded calls', () => {
         await db.resetVoiceAgents(E2E_USER);
         await db.resetVoiceTelephony(E2E_USER);
 
-        const frontDeskId = await db.insertVoiceAgent(E2E_USER, { name: 'Front desk' });
+        frontDeskId = await db.insertVoiceAgent(E2E_USER, { name: 'Front desk' });
         salesId = await db.insertVoiceAgent(E2E_USER, { name: 'Sales' });
         const numberId = await db.insertVoiceNumber(E2E_USER, {
             phoneNumber: '+13473703925',
@@ -199,15 +200,19 @@ test.describe('with seeded calls', () => {
 
         // Every agent added up: 3 priced calls, 2:29 of talk.
         const summary = page.getByTestId('call-cost-summary');
-        await expect(summary).toContainText('Your calls cost$0.066');
+        // Every listed call is counted; the cost is over the ones that have one.
+        await expect(summary).toContainText('Calls4 · 2:29 talking');
+        await expect(summary).toContainText('Cost of 3 priced calls$0.066 est.');
         await expect(summary).toContainText('Average per minute$0.027');
-        await expect(summary).toContainText('3 · 2:29 talking');
-        await expect(summary).toContainText('$0.039 · $0.027 est.');
+        await expect(summary).toContainText('Gemini · phone$0.039 · $0.027');
 
         await openCallLogs(page, `?agent=${salesId}`);
-        await expect(summary).toContainText('Sales’s calls cost$0.045');
+        await expect(summary).toContainText('Calls2 · 1:35 talking');
+        await expect(summary).toContainText('Cost of 1 priced call$0.045 est.');
         await expect(summary).toContainText('Average per minute$0.028');
-        await expect(summary).toContainText('1 · 1:35 talking');
+        // Every listed call priced: the label names the agent.
+        await openCallLogs(page, `?agent=${frontDeskId}`);
+        await expect(summary).toContainText('Front desk’s calls cost$0.021');
 
         await page.goto(`${CALL_LOGS_URL}/${outboundId}`);
         await expect(page.getByTestId('call-cost')).toHaveText('$0.045 est.');

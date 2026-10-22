@@ -4,7 +4,7 @@ End-to-end tests that drive the real Next.js app in Chromium. Nothing here touch
 Atlas, the production Firebase project, or the scraper backend.
 
 ```bash
-pnpm --filter frontend e2e        # services up, build if the app changed, run everything (~6 min)
+pnpm --filter frontend e2e        # services up, build if the app changed, run everything (~6 min, ~8 with a build)
 pnpm --filter frontend exec playwright test e2e/lead-generation/credits.spec.ts   # one spec, needs a build
 pnpm --filter frontend e2e:dev    # everything on `next dev`, one worker: no build, slow (~1 h)
 pnpm --filter frontend e2e:ui     # Playwright's interactive UI, on `next dev`
@@ -15,6 +15,9 @@ pnpm --filter frontend e2e:services:down
 The walkthrough (`walkthrough/*.walkthrough.ts`) saves a desktop and phone screenshot of every
 lead-generation screen and form state to `node_modules/.cache/e2e/walkthrough/`, with a
 `report.json` of console errors, failed requests and horizontal overflow.
+`voice-ui-review.walkthrough.ts` does the same for every voice page and dialog (agents, editor,
+Settings, numbers, call logs, analytics, campaigns, web dialer):
+`pnpm exec playwright test --project=walkthrough e2e/walkthrough/voice-ui-review.walkthrough.ts`.
 
 First time on a machine: `pnpm --filter frontend exec playwright install chromium`.
 Requires Docker.
@@ -26,7 +29,7 @@ Requires Docker.
 | App server | `next dev`, every route compiled on first hit | production build (`next start`) |
 | Workers | 1, all specs share two users | 3, each with its own server, database and fake-API ports |
 | Traces | recorded for every test | recorded only on the retry of a failed test |
-| Full chromium run (VPS, 4 cores) | ~1 h 10 min | ~4.5–6 min, plus ~2 min when the app needs a rebuild |
+| Full chromium run (VPS, 4 cores) | ~1 h 10 min | 4.6–5.7 min, + ~1 min `@local-fetch` pass, + 1.5–2 min build when the app changed |
 
 - **Build.** `pnpm e2e:build` (`e2e/build.sh`) builds into `.next-e2e/`, apart from `next dev`'s
   `.next/`. It is skipped while the app source (frontend minus `e2e/`, plus `backend/src`) is
@@ -99,5 +102,7 @@ test.beforeEach(async ({ db }) => db.resetUser(E2E_USER));
   edit app files during a dev run either: hot reload makes server actions hang.
 - Production servers are never reused: a server left on 3103–3105 (a killed run) fails the next run
   with "port in use". Find it with `ss -ltnp | grep 310` and kill it by PID.
+- After pulling a commit that adds a dependency, run `pnpm install` before `pnpm e2e`: the build
+  fails on a missing module.
 - Production builds inline `NODE_ENV`, so anything the app does only outside production
   (loopback URLs, insecure cookies) behaves as in production here.
