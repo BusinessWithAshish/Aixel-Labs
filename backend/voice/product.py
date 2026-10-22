@@ -162,7 +162,7 @@ def load_number(number_id, direction: str = "INBOUND", agent_id=None) -> tuple[d
 # place that picks a customer call's key; a later "use Aixel Labs credits" option would be
 # decided here (with the app's server/voice-agent/gemini-key.ts).
 
-GEMINI_KEY_MISSING = "No Gemini API key is saved for these agents: add one on the Voice agents page of the app."
+GEMINI_KEY_MISSING = "No Gemini API key is saved for these agents: add one under Voice agent > Settings in the app."
 # Where /calls checks a key (list models). Tests point it at a fake.
 GEMINI_API_BASE = (os.getenv("GEMINI_API_BASE") or "https://generativelanguage.googleapis.com").rstrip("/")
 KEY_OK_SECS = 600  # a key Google accepted is not asked about again for this long

@@ -144,7 +144,7 @@ function testCallFailureMessage(error: unknown, providerLabel: string): string {
     // The call runs on the owner's Gemini key: none saved, or Google refused it.
     if (code === 'gemini_key_missing') return GEMINI_KEY_MISSING_MESSAGE;
     if (code === 'gemini_key_invalid') {
-        return `Google refused your Gemini API key, so the call was not placed${reason ? `: ${reason}` : '.'} Check the key on the Voice agents page.`;
+        return `Google refused your Gemini API key, so the call was not placed${reason ? `: ${reason}` : '.'} Check the key under Voice agent > Settings.`;
     }
 
     switch (status) {
