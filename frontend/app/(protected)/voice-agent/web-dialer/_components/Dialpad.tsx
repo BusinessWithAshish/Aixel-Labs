@@ -12,7 +12,7 @@ export function Dialpad({ onButtonClick, onLongPress, className }: DialpadProps)
   return (
     <div
       className={cn(
-        "grid grid-cols-3 gap-4 sm:gap-6 w-full max-w-sm mx-auto px-4",
+        "grid grid-cols-3 justify-items-center gap-x-6 gap-y-3",
         className
       )}
     >

@@ -67,6 +67,9 @@ export function DialpadButton({ value, label, subLabel, onClick, onLongPress, cl
             onPointerDown={handlePointerDown}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerLeave}
+            // Enter / Space (a click with no pointer behind it)
+            onClick={(e) => e.detail === 0 && onClick(value)}
+            aria-label={label}
             className={cn(
                 'h-16 w-16 sm:h-20 sm:w-20 rounded-full',
                 'flex flex-col items-center justify-center gap-0',

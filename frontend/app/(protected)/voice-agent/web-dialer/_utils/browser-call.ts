@@ -137,6 +137,12 @@ async function twilioCall(
     };
 }
 
+/** Fetches a provider's phone code ahead of the call (the browser keeps it for `placeBrowserCall`). */
+export function preloadBrowserPhone(provider: VoiceProvider) {
+    if (provider === VoiceProvider.TWILIO) void import('@twilio/voice-sdk').catch(() => {});
+    else if (provider === VoiceProvider.TELNYX) void import('@telnyx/webrtc').catch(() => {});
+}
+
 /** Rings `to` from the session's number; resolves once the call is placed. */
 export function placeBrowserCall(session: WebPhoneSession, to: string, events: BrowserCallEvents): Promise<BrowserCall> {
     return session.provider === VoiceProvider.TWILIO ? twilioCall(session, to, events) : telnyxCall(session, to, events);

@@ -1,47 +1,40 @@
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Delete } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Delete } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface PhoneDisplayProps {
-  value: string;
-  onChange: (value: string) => void;
-  onBackspace: () => void;
-  className?: string;
+    value: string;
+    onChange: (value: string) => void;
+    onBackspace: () => void;
+    onEnter: () => void;
 }
 
-export function PhoneDisplay({
-  value,
-  onChange,
-  onBackspace,
-  className,
-}: PhoneDisplayProps) {
-  return (
-    <div
-      className={cn(
-        "relative w-full flex items-center gap-2 px-2 sm:px-4",
-        className
-      )}
-    >
-      <Input
-        type="tel"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="+14155550123"
-        aria-label="Number to call"
-        className="text-xl sm:text-2xl text-center h-12 sm:h-14 border-0 focus-visible:ring-0 bg-transparent"
-      />
-      {value && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onBackspace}
-          aria-label="Delete last digit"
-          className="h-8 w-8 rounded-full shrink-0"
-        >
-          <Delete className="h-4 w-4" />
-        </Button>
-      )}
-    </div>
-  );
+/** The number being dialled: type, paste or use the keypad; Enter calls. */
+export function PhoneDisplay({ value, onChange, onBackspace, onEnter }: PhoneDisplayProps) {
+    return (
+        <div className="relative">
+            <Input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && onEnter()}
+                placeholder="Type or paste a number"
+                aria-label="Number to call"
+                className="h-14 border-0 bg-transparent px-10 text-center text-2xl font-medium tabular-nums shadow-none placeholder:text-base focus-visible:ring-0 sm:text-3xl dark:bg-transparent"
+            />
+            {value ? (
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onBackspace}
+                    aria-label="Delete last digit"
+                    className="absolute top-1/2 right-0 -translate-y-1/2 rounded-full"
+                >
+                    <Delete />
+                </Button>
+            ) : null}
+        </div>
+    );
 }

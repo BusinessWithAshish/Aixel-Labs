@@ -1,85 +1,65 @@
-import { Button } from "@/components/ui/button";
-import { Phone, PhoneOff, Mic, MicOff } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Grid3x3, Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface CallActionsProps {
-  onCall: () => void;
-  onHangup: () => void;
-  onToggleMute: () => void;
-  isCallDisabled: boolean;
-  isInCall: boolean;
-  isMuted: boolean;
-  className?: string;
+    onCall: () => void;
+    onHangup: () => void;
+    onToggleMute: () => void;
+    onToggleKeypad: () => void;
+    isCallDisabled: boolean;
+    isInCall: boolean;
+    isMuted: boolean;
+    isKeypadOpen: boolean;
 }
 
+const ROUND = 'h-14 w-14 rounded-full shadow-sm [&_svg]:size-6';
+
 export function CallActions({
-  onCall,
-  onHangup,
-  onToggleMute,
-  isCallDisabled,
-  isInCall,
-  isMuted,
-  className,
+    onCall,
+    onHangup,
+    onToggleMute,
+    onToggleKeypad,
+    isCallDisabled,
+    isInCall,
+    isMuted,
+    isKeypadOpen,
 }: CallActionsProps) {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-center gap-4 w-full max-w-sm mx-auto px-4",
-        className
-      )}
-    >
-      {!isInCall ? (
-        <Button
-          onClick={onCall}
-          disabled={isCallDisabled}
-          aria-label="Call"
-          size="lg"
-          className={cn(
-            "h-14 w-14 sm:h-16 sm:w-16 rounded-full",
-            "bg-green-600 hover:bg-green-700 text-white",
-            "disabled:opacity-50 disabled:cursor-not-allowed",
-            "flex items-center justify-center",
-            "shadow-lg"
-          )}
-        >
-          <Phone className="h-6 w-6 sm:h-7 sm:w-7" />
-        </Button>
-      ) : (
-        <>
-          <Button
-            onClick={onToggleMute}
-            aria-label={isMuted ? "Unmute" : "Mute"}
-            size="lg"
-            className={cn(
-              "h-14 w-14 sm:h-16 sm:w-16 rounded-full",
-              "flex items-center justify-center",
-              "shadow-lg",
-              isMuted
-                ? "bg-gray-600 hover:bg-gray-700 text-white"
-                : "bg-blue-600 hover:bg-blue-700 text-white"
-            )}
-          >
-            {isMuted ? (
-              <MicOff className="h-6 w-6 sm:h-7 sm:w-7" />
-            ) : (
-              <Mic className="h-6 w-6 sm:h-7 sm:w-7" />
-            )}
-          </Button>
-          <Button
-            onClick={onHangup}
-            aria-label="Hang up"
-            size="lg"
-            className={cn(
-              "h-14 w-14 sm:h-16 sm:w-16 rounded-full",
-              "bg-red-600 hover:bg-red-700 text-white",
-              "flex items-center justify-center",
-              "shadow-lg"
-            )}
-          >
-            <PhoneOff className="h-6 w-6 sm:h-7 sm:w-7" />
-          </Button>
-        </>
-      )}
-    </div>
-  );
+    if (!isInCall) {
+        return (
+            <Button
+                onClick={onCall}
+                disabled={isCallDisabled}
+                aria-label="Call"
+                className={cn(ROUND, 'bg-green-600 text-white hover:bg-green-700')}
+            >
+                <Phone />
+            </Button>
+        );
+    }
+    return (
+        <div className="flex items-center justify-center gap-6">
+            <Button
+                variant={isMuted ? 'default' : 'secondary'}
+                onClick={onToggleMute}
+                aria-label={isMuted ? 'Unmute' : 'Mute'}
+                aria-pressed={isMuted}
+                className={ROUND}
+            >
+                {isMuted ? <MicOff /> : <Mic />}
+            </Button>
+            <Button variant="destructive" onClick={onHangup} aria-label="Hang up" className={ROUND}>
+                <PhoneOff />
+            </Button>
+            <Button
+                variant={isKeypadOpen ? 'default' : 'secondary'}
+                onClick={onToggleKeypad}
+                aria-label="Keypad"
+                aria-pressed={isKeypadOpen}
+                className={ROUND}
+            >
+                <Grid3x3 />
+            </Button>
+        </div>
+    );
 }
