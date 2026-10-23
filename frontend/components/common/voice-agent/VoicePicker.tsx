@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { VoiceOption } from '@/helpers/voice-catalogue';
 import { VOICE_KEY_PROVIDERS } from '@/helpers/voice-stack';
 import { cn } from '@/lib/utils';
-import { SortSelect, type ListSort } from './SortSelect';
+import { ProviderLogo } from './ProviderLogo';
+import { SortButton, type ListSort } from './SortButton';
 
 type VoicePickerProps = {
     id?: string;
@@ -94,12 +95,18 @@ export function VoicePicker({ id, provider, voices, disabled }: VoicePickerProps
                 data-testid="voice-picker-trigger"
             >
                 <span className="truncate">{current?.name ?? 'Pick a voice'}</span>
-                <span className="text-muted-foreground text-xs">{name}</span>
+                <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                    <ProviderLogo provider={provider} className="size-4" />
+                    {name}
+                </span>
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="flex max-h-[90vh] flex-col gap-4 sm:max-w-4xl" data-testid="voice-picker">
                     <DialogHeader>
-                        <DialogTitle>Pick a voice</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            <ProviderLogo provider={provider} />
+                            Pick a voice
+                        </DialogTitle>
                         <DialogDescription>
                             {name}&rsquo;s voices{gemini ? '' : ', with the ones in your own account'}. To speak through
                             another provider, change the model in Agent stack.
@@ -140,7 +147,7 @@ export function VoicePicker({ id, provider, voices, disabled }: VoicePickerProps
                                 className="pl-8"
                             />
                         </div>
-                        <SortSelect value={sort} onChange={setSort} />
+                        <SortButton value={sort} onChange={setSort} />
                     </div>
                     <div className="-mx-1 min-h-40 overflow-y-auto px-1">
                         {shown.length ? (

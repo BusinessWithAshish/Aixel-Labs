@@ -242,8 +242,7 @@ export function useWebDialerPage(data: WebDialerPageData) {
         if (/^[\d*#]$/.test(e.key) || (e.key === '+' && phase === 'idle')) {
             pressKey(e.key);
             setTab('keypad');
-        }
-        else if (e.key === 'Backspace' && phase === 'idle') backspace();
+        } else if (e.key === 'Backspace' && phase === 'idle') backspace();
         else if (e.key === 'Enter' && phase === 'idle' && !target?.closest('button, a')) void call();
         else return;
         e.preventDefault();

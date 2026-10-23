@@ -105,6 +105,19 @@ const GATEWAY_MODELS = [
     gateway('spacexai/grok-tts', 'Grok TTS', 'speech', { speech_input_character_cost: '0.000015' }),
 ];
 
+/** Deepgram's public model list: its Aura voices, each one model's, with a sample. */
+const DEEPGRAM_MODELS = {
+    tts: [
+        ['aura-2-thalia-en', 'aura-2', 'Thalia', ['feminine', 'clear']],
+        ['aura-2-orion-en', 'aura-2', 'Orion', ['masculine', 'calm']],
+        ['aura-asteria-en', 'aura', 'Asteria', ['feminine']],
+    ].map(([id, architecture, name, tags]) => ({
+        canonical_name: id,
+        architecture,
+        metadata: { display_name: name, accent: 'American', sample: `https://example.com/${id}.wav`, tags },
+    })),
+};
+
 function googleError(code: number, status: string, reason: string, message: string) {
     return { error: { code, message, status, details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason }] } };
 }
@@ -125,6 +138,7 @@ class FakeGemini {
                     res.end(JSON.stringify(body));
                 };
                 if (req.url?.startsWith('/providers/gateway/')) return reply(200, { data: GATEWAY_MODELS });
+                if (req.url === '/providers/deepgram/v1/models') return reply(200, DEEPGRAM_MODELS);
                 // The other providers (VOICE_PROVIDER_API_BASE): a key with "Good" in it works.
                 if (req.url?.startsWith('/providers/')) {
                     const auth = String(req.headers.authorization ?? req.headers['xi-api-key'] ?? '');
@@ -136,6 +150,15 @@ class FakeGemini {
                 fake.urls.push(req.url ?? '');
                 if (!req.url?.startsWith('/v1beta/models'))
                     return reply(404, googleError(404, 'NOT_FOUND', '', 'Not found'));
+                // Gemini TTS (a voice sample): 0.1 s of silence, 16-bit PCM at 24 kHz.
+                if (req.url.endsWith(':generateContent') && key.startsWith('AIzaGood')) {
+                    const data = Buffer.alloc(4800).toString('base64');
+                    return reply(200, {
+                        candidates: [
+                            { content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data } }] } },
+                        ],
+                    });
+                }
                 if (key.startsWith('AIzaGood')) return reply(200, { models: GEMINI_MODELS });
                 if (key === DISABLED_KEY) {
                     return reply(
@@ -617,7 +640,13 @@ test('several keys, and each agent its own stack: one voice model or three steps
     await expect(page.getByRole('option', { name: /^Gemini 3\.8 Live · \$0\.02\d\/min$/ })).toBeVisible();
     await expect(page.getByRole('option', { name: /^GPT-Realtime mini · .* · coming soon$/ })).toBeDisabled();
     await page.keyboard.press('Escape');
-    await expect(stack.locator('#stack-realtime-key')).toContainText('Default (Clinic)');
+    // Its key: the provider's keys only (the first is the default), named after the model's provider.
+    await expect(stack.getByText('Gemini API key')).toBeVisible();
+    await expect(stack.getByTestId('stack-realtime')).toContainText('2 saved');
+    await expect(stack.locator('#stack-realtime-key')).toContainText(`Clinic · ending ${SECOND_KEY.slice(-4)}`);
+    await stack.locator('#stack-realtime-key').click();
+    await expect(page.getByRole('option')).toHaveText([/^Clinic · ending/, /^Main · ending/]);
+    await page.keyboard.press('Escape');
     await stack.locator('#stack-realtime-key').click();
     await page.getByRole('option', { name: /^Main/ }).click();
 
@@ -640,8 +669,7 @@ test('several keys, and each agent its own stack: one voice model or three steps
         await expect(page.getByRole('option', { name: left })).toHaveCount(0);
     }
     await page.keyboard.press('Escape');
-    await stack.getByTestId('sort-select').click();
-    await page.getByRole('option', { name: 'Name', exact: true }).click();
+    await page.getByTestId('stack-llm').getByRole('button', { name: 'Sort by name' }).click();
     await stack.locator('#stack-llm-model').click();
     await expect(page.getByRole('option').first()).toContainText('Gemini 3.5 Flash Lite');
     await page.getByRole('option', { name: /^Gemini 3\.5 Flash Lite/ }).click();
@@ -661,7 +689,7 @@ test('several keys, and each agent its own stack: one voice model or three steps
     await expect.poll(async () => (await db.getVoiceAgentDoc(inbound)).stack?.kind).toBe('PIPELINE');
     const pipeline = (await db.getVoiceAgentDoc(inbound)).stack;
     expect(pipeline).toMatchObject({
-        stt: { provider: 'deepgram', model: 'nova-3', keyId: null, price: { usdPerMinute: 0.0058 } },
+        stt: { provider: 'deepgram', model: 'nova-3', keyId: null, price: { usdPerMinute: 0.0048 } },
         llm: { provider: 'gemini', model: 'gemini-3.5-flash-lite', keyId: null },
         tts: { provider: 'cartesia', model: 'sonic-3.6', keyId: null, price: { usdPerMillionChars: 39 } },
     });
@@ -703,6 +731,13 @@ test('the voice picker: Gemini voices on one voice model, the voice step’s pro
     await expect(picker.getByTestId('voice-option')).toHaveCount(30);
     // The agent's own voice (Sulafat) is picked already.
     await expect(page.getByTestId('voice-picker-selection')).toHaveText('Sulafat · Gemini');
+    // Gemini publishes no samples: the app makes one on the owner's key, once.
+    await expect(picker.getByRole('button', { name: 'Play Sulafat' })).toBeVisible();
+    const sample = await page.request.get('/api/voice-agent/voice-sample/gemini/sulafat');
+    expect(sample.status()).toBe(200);
+    expect(sample.headers()['content-type']).toBe('audio/wav');
+    expect((await sample.body()).subarray(0, 4).toString()).toBe('RIFF');
+    expect((await page.request.get('/api/voice-agent/voice-sample/gemini/not-a-voice')).status()).toBe(404);
     await picker.getByLabel('Search voices').fill('excitable');
     await expect(picker.getByTestId('voice-option')).toHaveCount(1);
     await picker.getByRole('button', { name: /^Fenrir/ }).click();
@@ -720,8 +755,7 @@ test('the voice picker: Gemini voices on one voice model, the voice step’s pro
     await stack.locator('#stack-tts-voice').click();
     await expect(picker).toContainText('ElevenLabs’s voices');
     await expect(picker.getByRole('button', { name: 'Play Sarah' })).toBeVisible();
-    await picker.getByTestId('sort-select').click();
-    await page.getByRole('option', { name: 'Name', exact: true }).click();
+    await picker.getByRole('button', { name: 'Sort by name' }).click();
     await expect(picker.getByTestId('voice-option').first()).toContainText('Adam');
     await picker.getByLabel('Gender').click();
     await page.getByRole('option', { name: 'Male', exact: true }).click();
@@ -736,6 +770,17 @@ test('the voice picker: Gemini voices on one voice model, the voice step’s pro
     await expect
         .poll(async () => (await db.getVoiceAgentDoc(agentId)).ttsVoice)
         .toEqual({ provider: 'elevenlabs', voiceId: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice' });
+    // Deepgram Aura: each model's own voices, with Deepgram's samples.
+    await stack.locator('#stack-tts-model').click();
+    await page.getByRole('option', { name: /^Deepgram Aura-2/ }).click();
+    await expect(stack.locator('#stack-tts-voice')).toContainText('Thalia');
+    await stack.locator('#stack-tts-voice').click();
+    await expect(picker.getByTestId('voice-option')).toHaveCount(2);
+    await expect(picker.getByRole('button', { name: 'Play Orion' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await stack.locator('#stack-tts-model').click();
+    await page.getByRole('option', { name: /^ElevenLabs Flash v2\.5/ }).click();
+
     const doc = await db.getVoiceAgentDoc(agentId);
     expect(doc.voice).toBe('fenrir');
     expect(doc.stack).toMatchObject({ kind: 'PIPELINE', tts: { provider: 'elevenlabs', model: 'eleven_flash_v2_5' } });

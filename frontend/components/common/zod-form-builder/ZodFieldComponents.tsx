@@ -478,6 +478,7 @@ export const ZodSelectField = ({
                     <SelectContent>
                         {options.map((option) => (
                             <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                                {option.icon}
                                 {option.label}
                             </SelectItem>
                         ))}

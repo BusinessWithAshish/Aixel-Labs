@@ -22,6 +22,10 @@ export type VoiceKeyProviderInfo = {
     keysUrl: string;
     keysUrlLabel: string;
     placeholder: string;
+    /** The provider's own mark, under public/brand-logos. */
+    logo: string;
+    /** A one-colour mark (drawn black): inverted in dark mode. */
+    mono?: boolean;
 };
 
 export const VOICE_KEY_PROVIDERS: Record<VoiceKeyProvider, VoiceKeyProviderInfo> = {
@@ -30,30 +34,38 @@ export const VOICE_KEY_PROVIDERS: Record<VoiceKeyProvider, VoiceKeyProviderInfo>
         keysUrl: 'https://aistudio.google.com/apikey',
         keysUrlLabel: 'aistudio.google.com/apikey',
         placeholder: 'AIza…',
+        logo: '/brand-logos/gemini.svg',
     },
     [VoiceKeyProvider.OPENAI]: {
         name: 'OpenAI',
         keysUrl: 'https://platform.openai.com/api-keys',
         keysUrlLabel: 'platform.openai.com/api-keys',
         placeholder: 'sk-…',
+        logo: '/brand-logos/openai.svg',
+        mono: true,
     },
     [VoiceKeyProvider.DEEPGRAM]: {
         name: 'Deepgram',
         keysUrl: 'https://console.deepgram.com',
         keysUrlLabel: 'console.deepgram.com',
         placeholder: 'Deepgram API key',
+        logo: '/brand-logos/deepgram.svg',
+        mono: true,
     },
     [VoiceKeyProvider.CARTESIA]: {
         name: 'Cartesia',
         keysUrl: 'https://play.cartesia.ai/keys',
         keysUrlLabel: 'play.cartesia.ai/keys',
         placeholder: 'sk_car_…',
+        logo: '/brand-logos/cartesia.svg',
     },
     [VoiceKeyProvider.ELEVENLABS]: {
         name: 'ElevenLabs',
         keysUrl: 'https://elevenlabs.io/app/settings/api-keys',
         keysUrlLabel: 'elevenlabs.io/app/settings/api-keys',
         placeholder: 'sk_…',
+        logo: '/brand-logos/elevenlabs.svg',
+        mono: true,
     },
 };
 

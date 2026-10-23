@@ -31,6 +31,7 @@ DEFAULT_VOICES = {
     "cartesia": "f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Katie, Cartesia's voice-agent default
     "elevenlabs": "21m00Tcm4TlvDq2ExCQ3",  # Rachel, a premade voice every account has
     "openai": "coral",
+    "deepgram": "aura-2-thalia-en",  # Deepgram's voice is its model: the step's model names only the price
 }
 
 
@@ -126,6 +127,10 @@ def tts_service(part: dict, voice: str):
         from pipecat.services.openai.tts import OpenAITTSService
 
         return OpenAITTSService(api_key=key, settings=OpenAITTSService.Settings(model=model, voice=voice))
+    if provider == "deepgram":
+        from pipecat.services.deepgram.tts import DeepgramTTSService
+
+        return DeepgramTTSService(api_key=key, settings=DeepgramTTSService.Settings(voice=voice))
     if provider == "gemini":
         from pipecat.services.google.tts import GeminiTTSService
 

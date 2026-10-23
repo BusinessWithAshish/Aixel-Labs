@@ -78,7 +78,10 @@ export function BookingCard({ booking, upcoming, viewerTimeZone, onCancel }: Boo
                     </a>
                 ) : null}
                 {booking.external ? (
-                    <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-sm" data-testid="booking-external">
+                    <span
+                        className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-sm"
+                        data-testid="booking-external"
+                    >
                         <CalendarCheck className="size-3.5 shrink-0" />
                         <span className="min-w-0">In {voiceCalendarProviderLabel(booking.external.provider)}</span>
                         {booking.external.meetingUrl && !cancelled ? (

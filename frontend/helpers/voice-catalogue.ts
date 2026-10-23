@@ -19,6 +19,8 @@ export type VoiceOption = VoiceTtsVoice & {
     description?: string;
     /** An mp3 the picker plays. Absent = no sample to play. */
     previewUrl?: string;
+    /** Deepgram: the Aura model the voice belongs to (its voice is its model). Absent = any of the provider's models. */
+    model?: string;
 };
 
 const EL_PREVIEW = 'https://storage.googleapis.com/eleven-public-prod/premade/voices';
@@ -112,8 +114,18 @@ export const BUILT_IN_VOICES: Record<VoiceKeyProvider, VoiceOption[]> = {
     [VoiceKeyProvider.DEEPGRAM]: [],
 };
 
-/** Built-in first, then the owner's own voices that are not built in. */
+/** Built-in first (with the account's sample where it has none), then the owner's own voices that are not built in. */
 export function mergeVoices(builtIn: VoiceOption[], own: VoiceOption[]): VoiceOption[] {
-    const seen = new Set(builtIn.map((v) => v.voiceId));
-    return [...builtIn, ...own.filter((v) => !seen.has(v.voiceId))];
+    const byId = new Map(own.map((v) => [v.voiceId, v]));
+    return [
+        ...builtIn.map((v) => ({ ...v, previewUrl: v.previewUrl ?? byId.get(v.voiceId)?.previewUrl })),
+        ...own.filter((v) => !builtIn.some((b) => b.voiceId === v.voiceId)),
+    ];
 }
+
+/** The app's own sample of a voice that has none to play (OpenAI's, Gemini's), made once on the owner's key. */
+export const voiceSampleUrl = (provider: VoiceKeyProvider, voiceId: string) =>
+    `/api/voice-agent/voice-sample/${provider}/${encodeURIComponent(voiceId)}`;
+
+/** The providers whose voices the app makes its own samples of. */
+export const SAMPLED_PROVIDERS = [VoiceKeyProvider.OPENAI, VoiceKeyProvider.GEMINI];

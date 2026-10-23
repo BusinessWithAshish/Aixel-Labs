@@ -12,6 +12,7 @@ import {
 import { SelectControlledField, StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { RadioCards, type RadioCardOption } from '@/components/wrappers/RadioCards';
+import { ProviderLogo } from '@/components/common/voice-agent/ProviderLogo';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -79,7 +80,10 @@ export function ProviderKeysCard() {
                 ) : null}
                 {providers.map((provider) => (
                     <section key={provider} className="grid gap-2" aria-label={`${VOICE_KEY_PROVIDERS[provider].name} keys`}>
-                        <h3 className="text-sm font-medium">{VOICE_KEY_PROVIDERS[provider].name}</h3>
+                        <h3 className="flex items-center gap-2 text-sm font-medium">
+                            <ProviderLogo provider={provider} className="size-4" />
+                            {VOICE_KEY_PROVIDERS[provider].name}
+                        </h3>
                         <ItemGroup className="gap-2">
                             {page.keys
                                 .filter((key) => key.provider === provider)
@@ -221,7 +225,11 @@ function AddKeyDialog() {
                             name="provider"
                             id="voice-key-provider"
                             label="Provider"
-                            options={VOICE_KEY_PROVIDER_ORDER.map((p) => ({ value: p, label: VOICE_KEY_PROVIDERS[p].name }))}
+                            options={VOICE_KEY_PROVIDER_ORDER.map((p) => ({
+                                value: p,
+                                label: VOICE_KEY_PROVIDERS[p].name,
+                                icon: <ProviderLogo provider={p} className="size-4" />,
+                            }))}
                         />
                         <StringControlledField
                             name="label"

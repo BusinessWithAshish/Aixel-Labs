@@ -35,10 +35,12 @@
     "VOICELINK": "No published rate: each account's plan sets its own inbound_rate, outbound_rate and pulse_seconds (app.voicelink.co.in/documentation/plans and the API context file, read 2026-10-21). The engine takes each call's own charge from GET /api/v1/call-log/details (total_cost, rupees) instead."
   },
   "pipeline": {
-    "readAt": "2026-10-22",
+    "readAt": "2026-10-23",
     "note": "What the engine bills each part of a PIPELINE stack on (costs.pipeline_cost), by model. stt: the whole call's minutes (the stream is open from start to end); llm: tokens in and out (thinking counts as out); tts: characters sent, or minutes of audio made for the token-billed ones (Gemini about 1,500 audio tokens a minute, 25 a second).",
     "stt": {
-      "nova-3": { "usdPerMinute": 0.0058, "source": "deepgram.com/pricing: Nova-3 Multilingual streaming, pay as you go." },
+      "nova-3": { "usdPerMinute": 0.0048, "source": "deepgram.com/pricing (read 2026-10-23): Nova-3 Monolingual streaming, pay as you go (the engine asks for English; Multilingual is $0.0058)." },
+      "nova-2": { "usdPerMinute": 0.0058, "source": "deepgram.com/pricing (read 2026-10-23), FAQ: Nova-2 streaming $0.35 an hour." },
+      "nova-2-phonecall": { "usdPerMinute": 0.0058, "source": "deepgram.com/pricing (read 2026-10-23), FAQ: Nova-2 streaming $0.35 an hour." },
       "gemini-3.5-transcribe-live": { "usdPerMinute": 0.009, "source": "ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22): $0.005/min audio in + $0.004/min text out." },
       "gpt-4o-mini-transcribe": { "usdPerMinute": 0.003, "source": "developers.openai.com/api/docs/pricing" },
       "gpt-4o-transcribe": { "usdPerMinute": 0.006, "source": "developers.openai.com/api/docs/pricing" }
@@ -50,9 +52,16 @@
       "gpt-5.4-nano": { "usdPerMillionTokens": { "in": 0.2, "out": 1.25 }, "source": "developers.openai.com/api/docs/pricing" }
     },
     "tts": {
-      "sonic-3.6": { "usdPerMillionChars": 39, "source": "cartesia.ai/pricing: 1 credit = 1 character, Startup plan $49 for 1.25M credits." },
-      "eleven_flash_v2_5": { "usdPerMillionChars": 40, "source": "elevenlabs.io/pricing/api: $0.04 per 1K characters (Flash / Turbo)." },
-      "eleven_v4_turbo": { "usdPerMillionChars": 40, "source": "elevenlabs.io/pricing/api: $0.04 per 1K characters." },
+      "sonic-3.6": { "usdPerMillionChars": 39, "source": "cartesia.ai/pricing (read 2026-10-23): 1 credit = 1 character, Startup plan $49 for 1.25M credits." },
+      "sonic-3": { "usdPerMillionChars": 39, "source": "cartesia.ai/pricing (read 2026-10-23): 1 credit = 1 character, Startup plan $49 for 1.25M credits." },
+      "sonic-2": { "usdPerMillionChars": 39, "source": "cartesia.ai/pricing (read 2026-10-23): 1 credit = 1 character, Startup plan $49 for 1.25M credits." },
+      "sonic-turbo": { "usdPerMillionChars": 39, "source": "cartesia.ai/pricing (read 2026-10-23): 1 credit = 1 character, Startup plan $49 for 1.25M credits." },
+      "eleven_flash_v2_5": { "usdPerMillionChars": 40, "source": "elevenlabs.io/pricing/api (read 2026-10-23): Flash / Turbo $0.04 per 1K characters." },
+      "eleven_flash_v2": { "usdPerMillionChars": 40, "source": "elevenlabs.io/pricing/api (read 2026-10-23): Flash / Turbo $0.04 per 1K characters." },
+      "eleven_v4_turbo": { "usdPerMillionChars": 40, "source": "elevenlabs.io/pricing/api (read 2026-10-23): v4 Turbo $0.04 per 1K characters." },
+      "eleven_multilingual_v2": { "usdPerMillionChars": 80, "source": "elevenlabs.io/pricing/api (read 2026-10-23): v2 Multilingual $0.08 per 1K characters." },
+      "aura-2": { "usdPerMillionChars": 30, "source": "deepgram.com/pricing (read 2026-10-23): Aura-2 $0.030 per 1K characters, pay as you go." },
+      "aura": { "usdPerMillionChars": 15, "source": "deepgram.com/pricing (read 2026-10-23): Aura-1 $0.0150 per 1K characters, pay as you go." },
       "gpt-4o-mini-tts": { "usdPerAudioMinute": 0.015, "source": "developers.openai.com/api/docs/pricing: $12 per 1M audio tokens out, about $0.015 a minute." },
       "gemini-3.8-flash-tts": { "usdPerAudioMinute": 0.0135, "source": "ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22): $9 per 1M audio tokens out ($18 from 2027-01-01); text in $0.50/M, left out." },
       "gemini-3.8-flash-lite-tts": { "usdPerAudioMinute": 0.009, "source": "ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22): $6 per 1M audio tokens out ($12 from 2027-01-01); text in $0.50/M, left out." }
@@ -89,6 +98,8 @@
     ],
     "stt": [
       {"provider": "deepgram", "model": "nova-3", "name": "Deepgram Nova-3"},
+      {"provider": "deepgram", "model": "nova-2", "name": "Deepgram Nova-2"},
+      {"provider": "deepgram", "model": "nova-2-phonecall", "name": "Deepgram Nova-2 Phone call"},
       {"provider": "gemini", "model": "gemini-3.5-transcribe-live", "name": "Gemini 3.5 Transcribe Live"},
       {"provider": "openai", "model": "gpt-4o-mini-transcribe", "name": "GPT-4o mini Transcribe"},
       {"provider": "openai", "model": "gpt-4o-transcribe", "name": "GPT-4o Transcribe"}
@@ -101,8 +112,15 @@
     ],
     "tts": [
       {"provider": "cartesia", "model": "sonic-3.6", "name": "Cartesia Sonic 3.6"},
+      {"provider": "cartesia", "model": "sonic-3", "name": "Cartesia Sonic 3"},
+      {"provider": "cartesia", "model": "sonic-2", "name": "Cartesia Sonic 2"},
+      {"provider": "cartesia", "model": "sonic-turbo", "name": "Cartesia Sonic Turbo"},
       {"provider": "elevenlabs", "model": "eleven_flash_v2_5", "name": "ElevenLabs Flash v2.5"},
+      {"provider": "elevenlabs", "model": "eleven_flash_v2", "name": "ElevenLabs Flash v2 (English)"},
       {"provider": "elevenlabs", "model": "eleven_v4_turbo", "name": "ElevenLabs v4 Turbo"},
+      {"provider": "elevenlabs", "model": "eleven_multilingual_v2", "name": "ElevenLabs Multilingual v2"},
+      {"provider": "deepgram", "model": "aura-2", "name": "Deepgram Aura-2"},
+      {"provider": "deepgram", "model": "aura", "name": "Deepgram Aura-1"},
       {"provider": "gemini", "model": "gemini-3.8-flash-tts", "name": "Gemini 3.8 Flash TTS"},
       {"provider": "openai", "model": "gpt-4o-mini-tts", "name": "GPT-4o mini TTS"}
     ]

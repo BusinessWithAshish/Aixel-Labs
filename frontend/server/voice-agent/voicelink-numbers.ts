@@ -1,10 +1,6 @@
 import 'server-only';
 
-import {
-    type VoiceLinkNumberState,
-    type VoiceLinkRouting,
-    VoiceProvider,
-} from '@aixellabs/backend/db';
+import { type VoiceLinkNumberState, type VoiceLinkRouting, VoiceProvider } from '@aixellabs/backend/db';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { updateItem } from '@/server/voice-agent/accounts';
 import { numberWebhookUrl, openSecret, voicelinkSocketUrl } from '@/server/voice-agent/engine';

@@ -11,7 +11,14 @@ import {
     type VoiceStackPartName,
     type VoiceStackPrice,
 } from '@aixellabs/backend/db';
-import { BUILT_IN_VOICES, mergeVoices, type VoiceGender, type VoiceOption } from '@/helpers/voice-catalogue';
+import {
+    BUILT_IN_VOICES,
+    mergeVoices,
+    SAMPLED_PROVIDERS,
+    voiceSampleUrl,
+    type VoiceGender,
+    type VoiceOption,
+} from '@/helpers/voice-catalogue';
 import {
     audioTokensPerMinute,
     FALLBACK_CATALOGUE,
@@ -33,12 +40,16 @@ import { ownedStack, providerApiUrl } from '@/server/voice-agent/provider-keys';
  *           own key lists (Gemini `models.list`, OpenAI `/v1/models`) and the engine can run. Calls still
  *           go straight to each provider on the owner's key; the gateway is only read for its list.
  *           Deepgram, Cartesia and ElevenLabs publish no prices by API: voice-call-rates.json `stack`.
- *   voices  the built-in voices plus those in the owner's own Cartesia / ElevenLabs accounts.
+ *   voices  the built-in voices plus those in the owner's own Cartesia / ElevenLabs accounts, Deepgram's Aura
+ *           voices (its public model list, with samples); OpenAI's and Gemini's get the app's own sample
+ *           (`voiceSampleUrl`) when the owner has that key.
  *
  * Any failure falls back (the rates file's models, the built-in voices): the section always has a list.
  */
 
 const TIMEOUT_MS = 5_000;
+/** Public catalogues (the gateway's models, Deepgram's voices) are read once a day. */
+const CATALOGUE_REVALIDATE_SECS = 24 * 60 * 60;
 
 const GENDERS: Record<string, VoiceGender> = {
     female: 'female',
@@ -66,9 +77,17 @@ type CartesiaVoice = {
     accents?: { accent?: string }[];
 };
 
-async function getJson<T>(url: string, headers: HeadersInit): Promise<T | null> {
+/** `revalidateSecs`: a public list, kept that long; else (anything on a key) read every time. */
+async function getJson<T>(url: string, headers: HeadersInit, revalidateSecs?: number): Promise<T | null> {
     try {
-        const res = await fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS), cache: 'no-store' });
+        const res = await fetch(url, {
+            headers,
+            signal: AbortSignal.timeout(TIMEOUT_MS),
+            // Tests point the providers at a fake (VOICE_PROVIDER_API_BASE): read it every time.
+            ...(revalidateSecs && !process.env.VOICE_PROVIDER_API_BASE
+                ? { next: { revalidate: revalidateSecs } }
+                : { cache: 'no-store' as const }),
+        });
         return res.ok ? ((await res.json()) as T) : null;
     } catch {
         return null;
@@ -120,16 +139,51 @@ function openKey(keys: VoiceProviderKeyDoc[], provider: VoiceKeyProvider): strin
     }
 }
 
+type DeepgramVoice = {
+    canonical_name: string;
+    architecture: string;
+    metadata?: { display_name?: string; accent?: string; sample?: string; tags?: string[] };
+};
+
+/** Deepgram's Aura voices (public: its model list needs no key). */
+async function deepgramVoices(): Promise<VoiceOption[]> {
+    const body = await getJson<{ tts?: DeepgramVoice[] }>(
+        providerApiUrl(VoiceKeyProvider.DEEPGRAM, 'https://api.deepgram.com/v1/models'),
+        {},
+        CATALOGUE_REVALIDATE_SECS,
+    );
+    return (body?.tts ?? []).map(({ canonical_name, architecture, metadata: m = {} }) => {
+        const tags = m.tags ?? [];
+        return {
+            provider: VoiceKeyProvider.DEEPGRAM,
+            voiceId: canonical_name,
+            name: m.display_name ?? canonical_name,
+            gender: tags.includes('feminine') ? 'female' : tags.includes('masculine') ? 'male' : undefined,
+            accent: m.accent,
+            description: capital(tags.filter((t) => t !== 'feminine' && t !== 'masculine').join(', ')),
+            previewUrl: m.sample,
+            model: architecture,
+        };
+    });
+}
+
 /** Every voice the picker offers, per provider: the built-in ones, then the owner's own (on their default key). */
 export async function agentVoices(keys: VoiceProviderKeyDoc[]): Promise<Record<VoiceKeyProvider, VoiceOption[]>> {
-    const [elevenlabs, cartesia] = await Promise.all([
+    const [elevenlabs, cartesia, deepgram] = await Promise.all([
         elevenLabsVoices(openKey(keys, VoiceKeyProvider.ELEVENLABS)),
         cartesiaVoices(openKey(keys, VoiceKeyProvider.CARTESIA)),
+        deepgramVoices(),
     ]);
+    const sampled = (provider: VoiceKeyProvider) =>
+        voiceKeyFor(keys, { provider })
+            ? BUILT_IN_VOICES[provider].map((v) => ({ ...v, previewUrl: voiceSampleUrl(provider, v.voiceId) }))
+            : BUILT_IN_VOICES[provider];
     return {
         ...BUILT_IN_VOICES,
+        ...Object.fromEntries(SAMPLED_PROVIDERS.map((p) => [p, sampled(p)])),
         [VoiceKeyProvider.ELEVENLABS]: mergeVoices(BUILT_IN_VOICES.elevenlabs, elevenlabs),
         [VoiceKeyProvider.CARTESIA]: mergeVoices(BUILT_IN_VOICES.cartesia, cartesia),
+        [VoiceKeyProvider.DEEPGRAM]: deepgram,
     };
 }
 
@@ -139,7 +193,6 @@ export async function agentVoices(keys: VoiceProviderKeyDoc[]): Promise<Record<V
 
 /** The gateway's catalogue, read once a day. Tests point `VOICE_CATALOGUE_URL` at a fake (read every time). */
 const CATALOGUE_URL = process.env.VOICE_CATALOGUE_URL || 'https://ai-gateway.vercel.sh/v1/models';
-const CATALOGUE_REVALIDATE_SECS = 24 * 60 * 60;
 
 /** USD per unit, as decimal strings. */
 type GatewayPricing = Partial<

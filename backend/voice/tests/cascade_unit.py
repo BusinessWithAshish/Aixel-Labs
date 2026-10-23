@@ -83,6 +83,10 @@ def voice_tests():
     ok("another provider's voice: no Gemini clips", cascade.clip_voice(ctx, "kore") is None)
     ctx = ctx_of(stack(tts=("elevenlabs", "eleven_flash_v2_5")), tts_voice={"provider": "cartesia", "voiceId": "abc"})
     ok("a picked voice of another provider: that provider's default", cascade.voice_of(ctx) == cascade.DEFAULT_VOICES["elevenlabs"])
+    ctx = ctx_of(stack(tts=("deepgram", "aura-2")), tts_voice={"provider": "deepgram", "voiceId": "aura-2-orion-en"})
+    ok("Deepgram TTS: the picked Aura voice is its model", cascade.voice_of(ctx) == "aura-2-orion-en"
+       and cascade.tts_service({"provider": "deepgram", "model": "aura-2", "key": "k"}, "aura-2-orion-en")._settings.voice == "aura-2-orion-en")
+    ok("Deepgram TTS, nothing picked: Thalia", cascade.voice_of(ctx_of(stack(tts=("deepgram", "aura-2")))) == "aura-2-thalia-en")
     ok("Gemini Live: clips in her voice as before", cascade.clip_voice(None, "kore") == "kore"
        and cascade.clip_voice({"stack": None}, "kore") == "kore")
 
@@ -96,6 +100,8 @@ def build_tests():
         (stack(stt=("openai", "gpt-4o-mini-transcribe"), llm=("openai", "gpt-4.1-mini"), tts=("elevenlabs", "eleven_flash_v2_5")),
          ("OpenAISTTService", "PipelineOpenAILLMService", "ElevenLabsTTSService")),
         (stack(tts=("openai", "gpt-4o-mini-tts")), ("DeepgramSTTService", "PipelineGoogleLLMService", "OpenAITTSService")),
+        (stack(stt=("deepgram", "nova-2-phonecall"), llm=("openai", "gpt-5.4-nano"), tts=("deepgram", "aura-2")),
+         ("DeepgramSTTService", "PipelineOpenAILLMService", "DeepgramTTSService")),
     ]
     for s, want in combos:
         llm, context, pair = phone.build_pipeline_parts("kore", "You are a test.", None, "AIza-test", None, ctx_of(s))
@@ -173,7 +179,7 @@ def cost_tests(user):
     doc = {"_id": ObjectId(), "userId": user, "channel": "PHONE", "direction": "INBOUND", "durationSec": 180, "endedBy": "goodbye"}
     c = costs.call_cost(doc, usage, "TELNYX")
     s = c.get("stack") or {}
-    want = {"stt": 3 * 0.0058, "llm": (20000 * 0.3 + 800 * 2.5) / 1e6, "tts": 1500 * 39 / 1e6}
+    want = {"stt": 3 * 0.0048, "llm": (20000 * 0.3 + 800 * 2.5) / 1e6, "tts": 1500 * 39 / 1e6}
     ok("Deepgram 3 min + Flash-Lite tokens + Cartesia characters", all(abs(s[p]["usd"] - v) < 1e-9 for p, v in want.items()), str(s))
     ok("no Gemini Live tokens; the total is every part", c["geminiUsd"] == 0
        and abs(c["totalUsd"] - (sum(want.values()) + c["providerUsd"])) < 1e-6, str(c))

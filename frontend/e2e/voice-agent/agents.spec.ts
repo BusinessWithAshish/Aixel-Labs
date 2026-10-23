@@ -365,7 +365,7 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
     await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.052');
 
     // A pipeline stack bills its three parts; thinking grows with the prompt (its list rate assumes 1,500
-    // tokens a turn), and so do the tools' tokens: $0.0058 + $0.0029 + $0.039 + booking $0.0024 + Telnyx.
+    // tokens a turn), and so do the tools' tokens: $0.0048 + $0.0029 + $0.039 + booking $0.0024 + Telnyx.
     await db.setVoiceAgentFields(agentId, {
         stack: {
             kind: VoiceStackKind.PIPELINE,
@@ -375,11 +375,11 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
         },
     });
     await openVoiceAgent(page, agentId);
-    await expect(parts).toContainText('Speech to text · Deepgram Nova-3$0.006');
+    await expect(parts).toContainText('Speech to text · Deepgram Nova-3$0.005');
     await expect(parts).toContainText('Thinking (LLM) · Gemini 3.5 Flash Lite, 1,200 tokens a turn$0.003');
     await expect(parts).toContainText('Text to speech · Cartesia Sonic 3.6$0.039');
     await expect(parts).not.toContainText('Gemini 3.8 Live');
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.061');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.060');
     await db.setVoiceAgentFields(agentId, { stack: null });
 
     // A free-tier key pays nothing for Gemini; a priced call gives the real average.

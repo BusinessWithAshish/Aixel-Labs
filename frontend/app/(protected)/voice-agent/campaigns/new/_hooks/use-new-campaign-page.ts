@@ -136,7 +136,14 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
             index,
             header,
             ...columnFill(csv.rows, index),
-            use: index === mapping.phone ? 'phone' : index === mapping.name ? 'name' : keys.has(index) ? 'variable' : 'unused',
+            use:
+                index === mapping.phone
+                    ? 'phone'
+                    : index === mapping.name
+                      ? 'name'
+                      : keys.has(index)
+                        ? 'variable'
+                        : 'unused',
             key: keys.get(index) ?? null,
         }));
     }, [csv, mapping.phone, mapping.name, variables]);
@@ -151,7 +158,10 @@ export function useNewCampaignPage(data: NewCampaignPageData) {
     const countryInfo = campaignCountry(country) ?? CAMPAIGN_COUNTRIES[0];
     const check = useMemo(() => {
         if (!csv || mapping.phone === null) return null;
-        return checkContacts(rowsToContactInputs(csv.rows, { phone: mapping.phone, name: mapping.name }, variables), countryInfo);
+        return checkContacts(
+            rowsToContactInputs(csv.rows, { phone: mapping.phone, name: mapping.name }, variables),
+            countryInfo,
+        );
     }, [csv, mapping.phone, mapping.name, variables, countryInfo]);
 
     const stepProblem = (index: number): string | null => {

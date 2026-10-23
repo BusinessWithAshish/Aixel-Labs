@@ -1,12 +1,11 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import Link from 'next/link';
 import { useFormContext } from 'react-hook-form';
 import { Info } from 'lucide-react';
-import { VOICE_DEFAULT_STACK, VoiceKeyProvider, VoiceStackKind, type VoiceStack } from '@aixellabs/backend/db/types';
+import { VOICE_DEFAULT_STACK, VoiceStackKind, type VoiceStack } from '@aixellabs/backend/db/types';
 import { RadioCards, type RadioCardOption } from '@/components/wrappers/RadioCards';
-import { SortSelect, type ListSort } from '@/components/common/voice-agent/SortSelect';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { usePage } from '@/contexts/PageStore';
@@ -16,7 +15,7 @@ import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { defaultStack, PIPELINE_PARTS, stackUsdPerMinute } from '@/helpers/voice-stack';
 import type { VoiceAgentInput } from '@/helpers/voice-schemas';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
-import { StackStep } from './StackStep';
+import { fitTtsVoice, StackStep } from './StackStep';
 
 /**
  * This agent's stack: one voice model (realtime: it hears and answers out loud), or three steps (speech
@@ -29,7 +28,6 @@ export function AgentStackSection() {
     const stack = (form.watch('stack') ?? VOICE_DEFAULT_STACK) as VoiceStack<string>;
     const currency = useDisplayCurrency();
     const perMin = (usd: number) => `${formatMoney(usd, currency)}/min`;
-    const [sort, setSort] = useState<ListSort>('price');
 
     // Switching back finds the other kind as it was left.
     const other = useRef<Partial<Record<VoiceStackKind, VoiceStack<string>>>>({});
@@ -38,16 +36,7 @@ export function AgentStackSection() {
         other.current[stack.kind] = stack;
         const next = other.current[kind] ?? defaultStack(kind);
         form.setValue('stack', next, { shouldDirty: true });
-        // Three steps speak through their voice step: its provider's first voice until one is picked.
-        const tts = next.kind === VoiceStackKind.PIPELINE ? next.tts.provider : null;
-        const first = tts && tts !== VoiceKeyProvider.GEMINI ? stackOptions.voices[tts]?.[0] : null;
-        if (first && form.getValues('ttsVoice')?.provider !== tts) {
-            form.setValue(
-                'ttsVoice',
-                { provider: first.provider, voiceId: first.voiceId, name: first.name },
-                { shouldDirty: true },
-            );
-        }
+        if (next.kind === VoiceStackKind.PIPELINE) fitTtsVoice(form, stackOptions.voices, next.tts);
     };
 
     const { catalogue } = stackOptions;
@@ -84,11 +73,10 @@ export function AgentStackSection() {
                         .
                     </p>
                 </div>
-                <SortSelect value={sort} onChange={setSort} />
             </div>
             <RadioCards value={stack.kind} onValueChange={setKind} options={options} aria-label="Agent stack" />
             {stack.kind === VoiceStackKind.REALTIME ? (
-                <StackStep part="realtime" stack={stack} sort={sort} />
+                <StackStep part="realtime" stack={stack} />
             ) : (
                 // One after another, a numbered stepper: each step hands its words to the next.
                 <ol className="grid" aria-label="Steps" data-testid="agent-stack-steps">
@@ -102,7 +90,7 @@ export function AgentStackSection() {
                                     </span>
                                     {last ? null : <span className="bg-primary/30 w-px flex-1" />}
                                 </div>
-                                <StackStep part={part} stack={stack} sort={sort} className={last ? undefined : 'mb-3'} />
+                                <StackStep part={part} stack={stack} className={last ? undefined : 'mb-3'} />
                             </li>
                         );
                     })}
