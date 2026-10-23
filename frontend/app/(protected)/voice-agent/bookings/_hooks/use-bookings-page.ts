@@ -52,9 +52,7 @@ export function useBookingsPage(data: BookingsPageData) {
         const updated = res.data;
         const replace = (list: VoiceBookingListItem[]) => list.map((b) => (b._id === updated._id ? updated : b));
         setBookings((prev) => ({ upcoming: replace(prev.upcoming), past: replace(prev.past) }));
-        toast.success(
-            `Cancelled ${target.customerName}’s booking on ${formatSlotIn(target.start, target.end, target.timezone)}`,
-        );
+        toast.success(`Cancelled ${target.customerName}’s booking on ${formatSlotIn(target.start, target.end, target.timezone)}`);
         setCancelTarget(null);
     };
 

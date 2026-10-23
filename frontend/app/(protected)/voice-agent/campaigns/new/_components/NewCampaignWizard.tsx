@@ -73,13 +73,7 @@ function Footer() {
     const last = step === WIZARD_STEPS.length - 1;
     return (
         <CardFooter className="flex flex-col-reverse gap-3 border-t sm:flex-row sm:items-center sm:justify-between">
-            <Button
-                type="button"
-                variant="ghost"
-                onClick={back}
-                disabled={step === 0 || !!submitting}
-                className="w-full sm:w-auto"
-            >
+            <Button type="button" variant="ghost" onClick={back} disabled={step === 0 || !!submitting} className="w-full sm:w-auto">
                 Back
             </Button>
             <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
@@ -134,13 +128,7 @@ export function NewCampaignWizard() {
                 data-testid="campaign-setup-missing"
             >
                 <Button asChild variant="outline" size="sm">
-                    <Link
-                        href={
-                            SubModuleUrls[
-                                needsAgent ? VOICE_AGENT_SUB_MODULES.AGENTS : VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS
-                            ]
-                        }
-                    >
+                    <Link href={SubModuleUrls[needsAgent ? VOICE_AGENT_SUB_MODULES.AGENTS : VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]}>
                         {needsAgent ? 'Open agents' : 'Open phone numbers'}
                     </Link>
                 </Button>

@@ -28,10 +28,8 @@ export function CampaignProgress({ stats, detailed = false, className }: Campaig
             <div className="flex flex-col gap-1.5">
                 <div className="text-muted-foreground flex items-center justify-between text-xs">
                     <span>
-                        <span className="tabular-nums">
-                            {(stats.total - stats.pending - stats.calling).toLocaleString()}
-                        </span>{' '}
-                        of <span className="tabular-nums">{stats.total.toLocaleString()}</span> done
+                        <span className="tabular-nums">{(stats.total - stats.pending - stats.calling).toLocaleString()}</span> of{' '}
+                        <span className="tabular-nums">{stats.total.toLocaleString()}</span> done
                         {stats.calling ? (
                             <>
                                 {' · '}
@@ -57,12 +55,7 @@ export function CampaignProgress({ stats, detailed = false, className }: Campaig
                 />
                 {detailed ? (
                     <>
-                        <Stat
-                            label="Waiting"
-                            value={stats.pending}
-                            testId="pending"
-                            hint="Not called yet, or waiting for a retry"
-                        />
+                        <Stat label="Waiting" value={stats.pending} testId="pending" hint="Not called yet, or waiting for a retry" />
                         <Stat
                             label="Do not call"
                             value={stats.skipped}

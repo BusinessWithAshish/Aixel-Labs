@@ -136,8 +136,15 @@ export function BookingsContent() {
 
             {total > 0 ? (
                 <div className={cn('flex flex-col gap-6 transition-opacity', filtering && 'opacity-60')}>
-                    <BookingSection title="Upcoming" bookings={upcoming} upcoming emptyText="Nothing booked from now on." />
-                    {past.length > 0 ? <BookingSection title="Past" bookings={past} upcoming={false} emptyText="" /> : null}
+                    <BookingSection
+                        title="Upcoming"
+                        bookings={upcoming}
+                        upcoming
+                        emptyText="Nothing booked from now on."
+                    />
+                    {past.length > 0 ? (
+                        <BookingSection title="Past" bookings={past} upcoming={false} emptyText="" />
+                    ) : null}
                 </div>
             ) : null}
 

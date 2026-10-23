@@ -84,11 +84,7 @@ export async function findItemsAnywhere<K extends ListKey>(
     const accounts = await voiceAccountsCollection();
     const docs = await accounts.find(itemFilter(key, match), { projection: { tenantId: 1, userId: 1, [key]: 1 } }).toArray();
     return docs.flatMap((doc) =>
-        ((doc[key] as Lists[K][] | undefined) ?? []).map((item) => ({
-            ...item,
-            tenantId: doc.tenantId,
-            userId: doc.userId,
-        })),
+        ((doc[key] as Lists[K][] | undefined) ?? []).map((item) => ({ ...item, tenantId: doc.tenantId, userId: doc.userId })),
     );
 }
 
@@ -106,7 +102,7 @@ export async function updateItem(
     const $update: UpdateFilter<VoiceAccountDoc> = {
         $set: { ...prefixed(key, { ...update.set, updatedAt: now }), updatedAt: now },
     };
-    if (update.unset?.length) $update.$unset = prefixed(key, Object.fromEntries(update.unset.map((f) => [f, '']))) as never;
+    if (update.unset?.length) $update.$unset = prefixed(key, Object.fromEntries(update.unset.map((f) => [f, ""]))) as never;
     const result = await accounts.updateOne(itemFilter(key, match), $update);
     return result.matchedCount === 1;
 }

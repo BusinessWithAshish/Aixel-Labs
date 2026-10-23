@@ -43,5 +43,7 @@ export async function deleteUserOwnedVoiceData(userIds: MongoObjectId[]): Promis
         }
     }
 
-    await Promise.all(OWNED_VOICE_COLLECTIONS.map(async (name) => (await getCollection(name)).deleteMany(filter)));
+    await Promise.all(
+        OWNED_VOICE_COLLECTIONS.map(async (name) => (await getCollection(name)).deleteMany(filter)),
+    );
 }

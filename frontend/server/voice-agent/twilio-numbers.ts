@@ -1,6 +1,10 @@
 import 'server-only';
 
-import { type TwilioVoiceRouting, type VoiceNumberDoc, VoiceProvider } from '@aixellabs/backend/db';
+import {
+    type TwilioVoiceRouting,
+    type VoiceNumberDoc,
+    VoiceProvider,
+} from '@aixellabs/backend/db';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { updateItem } from '@/server/voice-agent/accounts';
 import { numberWebhookUrl, openSecret } from '@/server/voice-agent/engine';

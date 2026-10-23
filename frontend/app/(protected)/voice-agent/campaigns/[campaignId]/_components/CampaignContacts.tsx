@@ -20,17 +20,13 @@ const CALL_LOGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.CALL_LOGS];
 function ContactRow({ contact }: { contact: VoiceCampaignContactItem }) {
     const status = CONTACT_STATUS[contact.status];
     const dnc = contact.status === VoiceCampaignContactStatus.SKIPPED_DNC;
-    const waitingRetry =
-        contact.status === VoiceCampaignContactStatus.PENDING && contact.attempts > 0 && contact.nextAttemptAt;
+    const waitingRetry = contact.status === VoiceCampaignContactStatus.PENDING && contact.attempts > 0 && contact.nextAttemptAt;
     const outcome = outcomeLabel(contact.lastOutcome);
     const vars = Object.entries(contact.variables);
 
     return (
         <li
-            className={cn(
-                'flex flex-col gap-1.5 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-4',
-                dnc && 'bg-muted/40',
-            )}
+            className={cn('flex flex-col gap-1.5 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-4', dnc && 'bg-muted/40')}
             data-testid="campaign-contact"
             data-status={contact.status}
         >
@@ -41,10 +37,7 @@ function ContactRow({ contact }: { contact: VoiceCampaignContactItem }) {
                 </span>
                 <span className="tabular-nums">{contact.phone}</span>
                 {vars.length ? (
-                    <span
-                        className="text-muted-foreground truncate text-xs"
-                        title={vars.map(([k, v]) => `${k}: ${v}`).join('\n')}
-                    >
+                    <span className="text-muted-foreground truncate text-xs" title={vars.map(([k, v]) => `${k}: ${v}`).join('\n')}>
                         {vars.map(([k, v]) => `${k}: ${v}`).join(' · ')}
                     </span>
                 ) : null}
@@ -114,10 +107,7 @@ export function CampaignContacts() {
                         Contacts
                     </h2>
                     {s.skipped ? (
-                        <p
-                            className="text-muted-foreground flex items-center gap-1.5 text-xs"
-                            data-testid="campaign-dnc-note"
-                        >
+                        <p className="text-muted-foreground flex items-center gap-1.5 text-xs" data-testid="campaign-dnc-note">
                             <ShieldBan className="size-3.5" aria-hidden />
                             {s.skipped} on the do-not-call list: skipped, never dialled.
                         </p>
@@ -155,8 +145,8 @@ export function CampaignContacts() {
             )}
             {matching > contacts.length ? (
                 <p className="text-muted-foreground text-xs">
-                    Showing the first {contacts.length.toLocaleString()} of {matching.toLocaleString()}. Pick a status above
-                    to see the rest.
+                    Showing the first {contacts.length.toLocaleString()} of {matching.toLocaleString()}. Pick a status above to see
+                    the rest.
                 </p>
             ) : null}
         </section>

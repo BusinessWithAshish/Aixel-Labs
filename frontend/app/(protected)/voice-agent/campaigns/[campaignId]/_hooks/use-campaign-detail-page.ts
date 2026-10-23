@@ -29,14 +29,11 @@ export function useCampaignDetailPage(data: VoiceCampaignDetail) {
 
     useEffect(() => setDetail(data), [data]);
 
-    const refresh = useCallback(
-        async (next: VoiceCampaignContactFilter = filterRef.current) => {
-            const res = await getVoiceCampaign(data.campaign.id, next);
-            if (res.success && res.data && filterRef.current === next) setDetail(res.data);
-            return res;
-        },
-        [data.campaign.id],
-    );
+    const refresh = useCallback(async (next: VoiceCampaignContactFilter = filterRef.current) => {
+        const res = await getVoiceCampaign(data.campaign.id, next);
+        if (res.success && res.data && filterRef.current === next) setDetail(res.data);
+        return res;
+    }, [data.campaign.id]);
 
     const { campaign } = detail;
     const live = campaign.status === VoiceCampaignStatus.RUNNING || campaign.stats.calling > 0;

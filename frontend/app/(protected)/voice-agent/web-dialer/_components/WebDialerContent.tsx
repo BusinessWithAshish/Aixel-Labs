@@ -60,8 +60,7 @@ function Keypad() {
                     <p
                         role="alert"
                         data-testid="web-dialer-warning"
-                        className={cn('text-xs', error ? 'text-destructive' : 'text-muted-foreground')}
-                    >
+                        className={cn('text-xs', error ? 'text-destructive' : 'text-muted-foreground')}>
                         {warning}
                     </p>
                 ) : null}
