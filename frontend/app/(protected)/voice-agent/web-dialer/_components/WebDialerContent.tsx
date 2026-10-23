@@ -1,132 +1,154 @@
 'use client';
 
 import Link from 'next/link';
-import { History, PhoneOff } from 'lucide-react';
+import { Clock, Delete, Grid3x3, Phone, PhoneOff } from 'lucide-react';
 import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { usePage } from '@/contexts/PageStore';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { EmptyState } from '@/components/common/EmptyState';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SubModuleUrls } from '@/config/app-config';
 import { formatDuration } from '@/helpers/voice-call-format';
 import { formatMoney } from '@/helpers/voice-call-cost';
 import { countryOfE164 } from '@/helpers/voice-campaign-contacts';
+import { cn } from '@/lib/utils';
+import { ROUND_BUTTON } from '../_utils/constants';
 import { displayNumber } from '../_utils/web-dialer';
 import { Dialpad } from './Dialpad';
-import { PhoneDisplay } from './PhoneDisplay';
-import { CallActions } from './CallActions';
 import { FromNumber } from './FromNumber';
+import { InCallScreen } from './InCallScreen';
+import { PhoneDisplay } from './PhoneDisplay';
+import { PhoneFrame } from './PhoneFrame';
+import { Recents } from './Recents';
 import type { UseWebDialerPageReturn } from '../_hooks/use-web-dialer-page';
 
-const STATUS = { mic: 'Allow the microphone…', starting: 'Connecting…', ringing: 'Ringing…' } as const;
+const TAB_TRIGGER =
+    'h-auto flex-col gap-0.5 rounded-none border-0 py-1.5 text-[0.6875rem] text-muted-foreground shadow-none data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none dark:text-muted-foreground dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-transparent dark:data-[state=active]:text-primary [&_svg:not([class*="size-"])]:size-6';
 
-/** Call from one of your numbers, in the browser. */
+/** The keypad tab: the number, what it costs, the keys, Call. */
+function Keypad() {
+    const page = usePage<UseWebDialerPageReturn>();
+    const { number, dialed, to, usdPerMinute, finished, error } = page;
+    const currency = useDisplayCurrency();
+
+    const country = to ? countryOfE164(to) : null;
+    const hint =
+        finished && !error
+            ? `Call ended${finished.seconds ? ` · ${formatDuration(finished.seconds)}` : ''}${finished.usd !== null ? ` · about ${formatMoney(finished.usd, currency)}` : ''}`
+            : !dialed
+              ? null
+              : !to
+                ? 'Start with the country code, like +1 or +91'
+                : [country?.name, usdPerMinute !== null && `about ${formatMoney(usdPerMinute, currency)} a minute`]
+                      .filter(Boolean)
+                      .join(' · ');
+    const warning =
+        error ??
+        (page.micBlocked
+            ? 'Your browser blocks the microphone here. Allow it from the icon at the left of the address bar.'
+            : null);
+
+    return (
+        <div className="flex flex-1 flex-col items-center gap-3 px-4 pt-2 pb-3">
+            <div className="w-full space-y-0.5 text-center">
+                <PhoneDisplay value={displayNumber(dialed)} onChange={page.setDialed} onEnter={page.call} />
+                <p className="text-muted-foreground min-h-5 text-sm" data-testid="web-dialer-hint">
+                    {hint}
+                </p>
+                {warning ? (
+                    <p
+                        role="alert"
+                        data-testid="web-dialer-warning"
+                        className={cn('text-xs', error ? 'text-destructive' : 'text-muted-foreground')}>
+                        {warning}
+                    </p>
+                ) : null}
+            </div>
+
+            <div className="mt-auto flex flex-col items-center gap-3.5">
+                <Dialpad onButtonClick={page.pressKey} onLongPress={() => page.pressKey('+')} />
+                <div className="grid grid-cols-3 items-center justify-items-center gap-x-6">
+                    <span />
+                    <Button
+                        onClick={page.call}
+                        disabled={!number || !!number.problem || !dialed.trim()}
+                        aria-label="Call"
+                        className={cn(ROUND_BUTTON, 'bg-green-500 text-white hover:bg-green-600')}
+                    >
+                        <Phone className="fill-current" />
+                    </Button>
+                    {dialed ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={page.backspace}
+                            aria-label="Delete last digit"
+                            className="text-muted-foreground size-12 rounded-full [&_svg:not([class*='size-'])]:size-6"
+                        >
+                            <Delete />
+                        </Button>
+                    ) : null}
+                </div>
+                <p className="text-muted-foreground text-xs">Long-press 0 for +</p>
+            </div>
+        </div>
+    );
+}
+
+/** Call from one of your numbers, in the browser, on an iPhone-like phone. */
 export function WebDialerContent() {
     const page = usePage<UseWebDialerPageReturn>();
-    const { numbers, number, dialed, to, usdPerMinute, recents, phase, finished, error } = page;
-    const currency = useDisplayCurrency();
-    const inCall = phase !== 'idle';
+    const inCall = page.phase !== 'idle';
 
-    if (numbers.length === 0) {
+    if (page.numbers.length === 0) {
         return (
-            <EmptyState
-                className="mx-auto w-full max-w-md flex-none"
-                icon={<PhoneOff />}
-                title="No phone number yet"
-                description={error ?? 'Calls go out from one of your numbers. Connect one first.'}
-            >
-                <Button asChild>
-                    <Link href={SubModuleUrls[VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]}>Connect a number</Link>
-                </Button>
-            </EmptyState>
+            <PhoneFrame>
+                <EmptyState
+                    className="flex-1 border-0"
+                    icon={<PhoneOff />}
+                    title="No phone number yet"
+                    description={page.error ?? 'Calls go out from one of your numbers. Connect one first.'}
+                >
+                    <Button asChild>
+                        <Link href={SubModuleUrls[VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]}>Connect a number</Link>
+                    </Button>
+                </EmptyState>
+            </PhoneFrame>
         );
     }
 
-    const country = to ? countryOfE164(to) : null;
-    const hint = !dialed
-        ? null
-        : !to
-          ? 'Start with the country code, like +1 or +91'
-          : [country?.name, usdPerMinute !== null && `about ${formatMoney(usdPerMinute, currency)} a minute`]
-                .filter(Boolean)
-                .join(' · ');
-
     return (
-        <Card className="mx-auto h-auto w-full max-w-sm gap-0 py-0">
-            <CardHeader className="border-b py-4 [.border-b]:pb-4">
-                <FromNumber />
-            </CardHeader>
-            <CardContent className="flex flex-col items-center gap-5 px-4 py-6">
-                {inCall ? (
-                    <div className="space-y-1 text-center">
-                        <p className="text-2xl font-medium tabular-nums sm:text-3xl">{displayNumber(dialed)}</p>
-                        <p className="text-muted-foreground text-sm tabular-nums" aria-live="polite">
-                            {phase === 'active' ? formatDuration(page.seconds) : STATUS[phase]}
-                            {page.tones ? ` · ${page.tones}` : ''}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="w-full space-y-1 text-center">
-                        <PhoneDisplay
-                            value={displayNumber(dialed)}
-                            onChange={page.setDialed}
-                            onBackspace={page.backspace}
-                            onEnter={page.call}
-                        />
-                        <p className="text-muted-foreground min-h-5 text-sm" data-testid="web-dialer-hint">
-                            {finished && !error
-                                ? `Call ended${finished.seconds ? ` · ${formatDuration(finished.seconds)}` : ''}${finished.usd !== null ? ` · about ${formatMoney(finished.usd, currency)}` : ''}`
-                                : hint}
-                        </p>
-                    </div>
-                )}
-
-                {error ? (
-                    <Alert variant="destructive">
-                        <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                ) : !inCall && page.micBlocked ? (
-                    <Alert>
-                        <AlertDescription>
-                            Your browser blocks the microphone here. Allow it from the icon at the left of the address bar.
-                        </AlertDescription>
-                    </Alert>
-                ) : null}
-
-                {!inCall && !dialed && recents.length > 0 ? (
-                    <div className="flex flex-wrap justify-center gap-2" aria-label="Recent numbers">
-                        {recents.map((n) => (
-                            <Button
-                                key={n}
-                                variant="outline"
-                                size="sm"
-                                className="rounded-full tabular-nums"
-                                onClick={() => page.setDialed(n)}
-                            >
-                                <History />
-                                {displayNumber(n)}
-                            </Button>
-                        ))}
-                    </div>
-                ) : null}
-
-                {!inCall || page.keypadOpen ? (
-                    <Dialpad onButtonClick={page.pressKey} onLongPress={() => !inCall && page.pressKey('+')} />
-                ) : null}
-
-                <CallActions
-                    onCall={page.call}
-                    onHangup={page.hangup}
-                    onToggleMute={page.toggleMute}
-                    onToggleKeypad={page.toggleKeypad}
-                    isCallDisabled={!number || !!number.problem || !dialed.trim()}
-                    isInCall={inCall}
-                    isMuted={page.muted}
-                    isKeypadOpen={page.keypadOpen}
-                />
-            </CardContent>
-        </Card>
+        <PhoneFrame classNames={{ screen: cn(inCall && 'dark') }}>
+            {inCall ? (
+                <InCallScreen />
+            ) : (
+                <>
+                    <FromNumber />
+                    <Tabs
+                        value={page.tab}
+                        onValueChange={(tab) => page.setTab(tab as typeof page.tab)}
+                        className="min-h-0 flex-1 gap-0"
+                    >
+                        <TabsContent value="keypad" className="flex flex-col">
+                            <Keypad />
+                        </TabsContent>
+                        <TabsContent value="recents" className="overflow-y-auto">
+                            <Recents />
+                        </TabsContent>
+                        <TabsList className="bg-background h-auto w-full rounded-none border-t p-0 pt-1">
+                            <TabsTrigger value="keypad" className={TAB_TRIGGER}>
+                                <Grid3x3 />
+                                Keypad
+                            </TabsTrigger>
+                            <TabsTrigger value="recents" className={TAB_TRIGGER}>
+                                <Clock />
+                                Recents
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </>
+            )}
+        </PhoneFrame>
     );
 }

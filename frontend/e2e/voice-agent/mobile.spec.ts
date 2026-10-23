@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { ObjectId } from 'mongodb';
 import type { Page } from '@playwright/test';
+import { encryptOverrides } from 'flags';
 import {
     VOICE_AGENT_SUB_MODULES,
     VoiceAgentCallType,
@@ -11,8 +12,9 @@ import {
     VoiceProvider,
 } from '@aixellabs/backend/db/types';
 import { SubModuleUrls } from '@/config/app-config';
+import { FeatureFlagKey } from '@/flags';
 import { expect, test } from '../support/fixtures';
-import { E2E_ARTIFACTS_DIR, USER_STORAGE_STATE } from '../support/env';
+import { E2E_ARTIFACTS_DIR, E2E_BASE_URL, E2E_FLAGS_SECRET, USER_STORAGE_STATE } from '../support/env';
 import {
     FAKE_MIC_LAUNCH_ARGS,
     FakePlaygroundEngine,
@@ -37,6 +39,7 @@ import {
  * scroll container, or an open dialog). Screenshots land in node_modules/.cache/e2e/voice-agent-screens.
  */
 const BOOKINGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS];
+const WEB_DIALER_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.WEB_DIALER];
 const VIEWPORTS = {
     phone: { width: 390, height: 844 },
     desktop: { width: 1440, height: 900 },
@@ -95,7 +98,7 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
     test.describe(viewportName, () => {
         test.use({ viewport });
 
-        test(`every voice-agent page fits ${viewport.width} px without sideways scrolling`, async ({ page, db }) => {
+        test(`every voice-agent page fits ${viewport.width} px without sideways scrolling`, async ({ page, db, context }) => {
             test.setTimeout(4 * 60_000);
             telnyx.reset();
             await db.resetUser(E2E_USER);
@@ -319,11 +322,34 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await open(BOOKINGS_URL);
             await check('bookings-empty');
 
+            // Web dialer (behind a flag): the phone, its recents, the in-call screen (the microphone prompt
+            // never answers, so no call is placed), and with no number.
+            const flags = await encryptOverrides({ [FeatureFlagKey.VOICE_WEB_DIALER]: true }, E2E_FLAGS_SECRET);
+            await context.addCookies([{ name: 'vercel-flag-overrides', value: flags, url: E2E_BASE_URL }]);
+            await page.addInitScript(() => {
+                navigator.mediaDevices.getUserMedia = () => new Promise(() => {});
+                window.localStorage.setItem('web-dialer-recent', JSON.stringify(['+447700900123', '+919876543210']));
+            });
+            await open(WEB_DIALER_URL);
+            await page.locator('input[aria-label="Number to call"]').fill('+12025550188');
+            await check('web-dialer');
+            await page.getByRole('tab', { name: 'Recents' }).click();
+            await check('web-dialer-recents');
+            await page.getByRole('button', { name: /\+44 77009 00123/ }).click();
+            await page.getByRole('button', { name: 'Call', exact: true }).click();
+            await expect(page.getByRole('button', { name: 'Hang up' })).toBeVisible();
+            await check('web-dialer-in-call');
+            await page.getByRole('button', { name: 'Keypad' }).click();
+            await check('web-dialer-in-call-keypad');
+
             // A first-time user's Phone numbers page: one way in, the Connect a number menu.
             await db.resetVoiceTelephony(E2E_USER);
             await open(PHONE_NUMBERS_URL);
             await expect(page.getByRole('button', { name: 'Connect a number' })).toBeVisible();
             await check('phone-numbers-empty');
+            await open(WEB_DIALER_URL);
+            await expect(page.getByText('No phone number yet')).toBeVisible();
+            await check('web-dialer-empty');
 
             expect(problems).toEqual([]);
         });

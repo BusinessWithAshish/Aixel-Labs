@@ -1,6 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useRef, useCallback, useEffect } from 'react';
+import { LONG_PRESS_MS, ROUND_BUTTON } from '../_utils/constants';
 
 type DialpadButtonProps = {
     value: string;
@@ -8,82 +9,53 @@ type DialpadButtonProps = {
     subLabel?: string;
     onClick: (value: string) => void;
     onLongPress?: (value: string) => void;
-    className?: string;
 };
 
-export function DialpadButton({ value, label, subLabel, onClick, onLongPress, className }: DialpadButtonProps) {
-    const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const isPressedRef = useRef(false);
-    const longPressTriggeredRef = useRef(false);
+/** An iOS keypad key: the digit with its letters underneath. Held, it fires `onLongPress` instead of `onClick`. */
+export function DialpadButton({ value, label, subLabel, onClick, onLongPress }: DialpadButtonProps) {
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const longPressedRef = useRef(false);
 
-    useEffect(() => {
-        return () => {
-            if (pressTimerRef.current) {
-                clearTimeout(pressTimerRef.current);
-            }
-        };
-    }, []);
-
-    const handlePointerDown = useCallback(() => {
-        isPressedRef.current = true;
-        longPressTriggeredRef.current = false;
-
-        if (onLongPress) {
-            pressTimerRef.current = setTimeout(() => {
-                if (isPressedRef.current) {
-                    longPressTriggeredRef.current = true;
-                    onLongPress(value);
-                }
-            }, 500); // 500ms for long press
-        }
-    }, [onLongPress, value]);
-
-    const handlePointerUp = useCallback(() => {
-        isPressedRef.current = false;
-
-        if (pressTimerRef.current) {
-            clearTimeout(pressTimerRef.current);
-            pressTimerRef.current = null;
-        }
-
-        // Only trigger onClick if long press was not triggered
-        if (!longPressTriggeredRef.current) {
-            onClick(value);
-        }
-    }, [onClick, value]);
-
-    const handlePointerLeave = useCallback(() => {
-        isPressedRef.current = false;
-
-        if (pressTimerRef.current) {
-            clearTimeout(pressTimerRef.current);
-            pressTimerRef.current = null;
-        }
-    }, []);
+    const cancel = () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = null;
+    };
+    useEffect(() => cancel, []);
 
     return (
         <Button
-            variant="ghost"
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerLeave}
+            variant="secondary"
+            onPointerDown={() => {
+                longPressedRef.current = false;
+                if (!onLongPress) return;
+                timerRef.current = setTimeout(() => {
+                    timerRef.current = null;
+                    longPressedRef.current = true;
+                    onLongPress(value);
+                }, LONG_PRESS_MS);
+            }}
+            onPointerUp={() => {
+                cancel();
+                if (!longPressedRef.current) onClick(value);
+            }}
+            onPointerLeave={cancel}
+            onPointerCancel={cancel}
+            // A held finger would open the browser's menu.
+            onContextMenu={(e) => e.preventDefault()}
             // Enter / Space (a click with no pointer behind it)
             onClick={(e) => e.detail === 0 && onClick(value)}
             aria-label={label}
             className={cn(
-                'h-16 w-16 sm:h-20 sm:w-20 rounded-full',
-                'flex flex-col items-center justify-center gap-0',
-                'hover:bg-accent transition-colors',
-                'border border-border/50',
-                'focus-visible:ring-2 focus-visible:ring-ring',
-                'select-none touch-none',
-                className,
+                ROUND_BUTTON,
+                'bg-muted hover:bg-muted active:bg-muted-foreground/30 flex flex-col gap-0 transition-colors select-none touch-none',
             )}
         >
-            <span className="text-2xl sm:text-3xl font-medium leading-none">{label}</span>
-            {subLabel && (
-                <span className="text-[10px] sm:text-xs text-muted-foreground font-light leading-none mt-1">{subLabel}</span>
-            )}
+            <span className="text-3xl leading-none font-normal">{label}</span>
+            {subLabel ? (
+                <span className="text-muted-foreground mt-0.5 text-[0.625rem] leading-none font-semibold tracking-[0.18em]">
+                    {subLabel}
+                </span>
+            ) : null}
         </Button>
     );
 }

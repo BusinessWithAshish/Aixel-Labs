@@ -1,40 +1,24 @@
-import { Delete } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 
 interface PhoneDisplayProps {
     value: string;
     onChange: (value: string) => void;
-    onBackspace: () => void;
     onEnter: () => void;
 }
 
-/** The number being dialled: type, paste or use the keypad; Enter calls. */
-export function PhoneDisplay({ value, onChange, onBackspace, onEnter }: PhoneDisplayProps) {
+/** The number being dialled: type, paste or use the keypad; Enter calls. No on-screen keyboard: the keypad is it. */
+export function PhoneDisplay({ value, onChange, onEnter }: PhoneDisplayProps) {
     return (
-        <div className="relative">
-            <Input
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && onEnter()}
-                placeholder="Type or paste a number"
-                aria-label="Number to call"
-                className="h-14 border-0 bg-transparent px-10 text-center text-2xl font-medium tabular-nums shadow-none placeholder:text-base focus-visible:ring-0 sm:text-3xl dark:bg-transparent"
-            />
-            {value ? (
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onBackspace}
-                    aria-label="Delete last digit"
-                    className="absolute top-1/2 right-0 -translate-y-1/2 rounded-full"
-                >
-                    <Delete />
-                </Button>
-            ) : null}
-        </div>
+        <Input
+            type="tel"
+            inputMode="none"
+            autoComplete="tel"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && onEnter()}
+            placeholder="Type or paste a number"
+            aria-label="Number to call"
+            className="h-14 border-0 bg-transparent px-2 text-center text-3xl font-normal md:text-3xl tabular-nums shadow-none placeholder:text-base focus-visible:ring-0 dark:bg-transparent"
+        />
     );
 }

@@ -16,6 +16,9 @@ export type WebDialerPageData = {
 /** idle → mic (the browser asks) → starting (sign-in) → ringing → active → idle. */
 export type WebPhonePhase = 'idle' | 'mic' | 'starting' | 'ringing' | 'active';
 
+/** The phone's bottom tabs. */
+export type WebDialerTab = 'keypad' | 'recents';
+
 /** The last call, shown once it ends. */
 export type FinishedCall = { to: string; seconds: number; usd: number | null };
 
@@ -50,6 +53,7 @@ export function useWebDialerPage(data: WebDialerPageData) {
     const usable = numbers.filter((n) => !n.problem);
     const [numberId, setNumberIdState] = useState(usable[0]?.id ?? '');
     const [dialed, setDialedState] = useState('');
+    const [tab, setTab] = useState<WebDialerTab>('keypad');
     const [recents, setRecents] = useState<string[]>([]);
     const [tones, setTones] = useState('');
     const [keypadOpen, setKeypadOpen] = useState(false);
@@ -65,6 +69,8 @@ export function useWebDialerPage(data: WebDialerPageData) {
     const hungUpRef = useRef(false);
     /** The browser's sign-in for a number, asked for as soon as a number is being dialled so Call starts at once. */
     const sessionRef = useRef<{ numberId: string; at: number; session: Promise<WebPhoneSession> } | null>(null);
+    /** The page-wide key handler, swapped each render so it sees the current state. */
+    const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
 
     const number = numbers.find((n) => n.id === numberId) ?? null;
     const to = toE164(dialed);
@@ -90,7 +96,10 @@ export function useWebDialerPage(data: WebDialerPageData) {
                 s.addEventListener('change', onChange);
             })
             .catch(() => {});
+        const onKey = (e: KeyboardEvent) => keyRef.current(e);
+        window.addEventListener('keydown', onKey);
         return () => {
+            window.removeEventListener('keydown', onKey);
             status?.removeEventListener('change', onChange);
             hungUpRef.current = true;
             callRef.current?.hangup();
@@ -224,6 +233,22 @@ export function useWebDialerPage(data: WebDialerPageData) {
         setTones((prev) => prev + key);
     }
 
+    const backspace = () => editDialed((prev) => prev.trimEnd().slice(0, -1));
+
+    // Typing works anywhere on the page, not only in the number box (which handles its own keys).
+    keyRef.current = (e) => {
+        const target = e.target instanceof Element ? e.target : null;
+        if (e.metaKey || e.ctrlKey || e.altKey || target?.closest('input, textarea, [role="listbox"]')) return;
+        if (/^[\d*#]$/.test(e.key) || (e.key === '+' && phase === 'idle')) {
+            pressKey(e.key);
+            setTab('keypad');
+        }
+        else if (e.key === 'Backspace' && phase === 'idle') backspace();
+        else if (e.key === 'Enter' && phase === 'idle' && !target?.closest('button, a')) void call();
+        else return;
+        e.preventDefault();
+    };
+
     function setNumberId(id: string) {
         setNumberIdState(id);
         store(LAST_NUMBER_KEY, id);
@@ -240,6 +265,13 @@ export function useWebDialerPage(data: WebDialerPageData) {
         /** The chosen number's list rate a minute to `to`, or null when its provider publishes none. */
         usdPerMinute,
         recents,
+        /** Puts a recent number on the keypad, ready to call. */
+        redial: (value: string) => {
+            editDialed(() => value);
+            setTab('keypad');
+        },
+        tab,
+        setTab,
         tones,
         keypadOpen,
         toggleKeypad: () => setKeypadOpen((open) => !open),
@@ -251,7 +283,7 @@ export function useWebDialerPage(data: WebDialerPageData) {
         finished,
         error,
         pressKey,
-        backspace: () => editDialed((prev) => prev.trimEnd().slice(0, -1)),
+        backspace,
         call,
         hangup,
         toggleMute,

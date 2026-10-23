@@ -1,31 +1,25 @@
-import { DIALPAD_BUTTONS } from "../_utils/constants";
-import { DialpadButton } from "./DialpadButton";
-import { cn } from "@/lib/utils";
+import { DIALPAD_BUTTONS } from '../_utils/constants';
+import { DialpadButton } from './DialpadButton';
 
 type DialpadProps = {
-  onButtonClick: (value: string) => void;
-  onLongPress?: (value: string) => void;
-  className?: string;
+    onButtonClick: (value: string) => void;
+    /** Holding 0 (types "+"); left out during a call. */
+    onLongPress?: (value: string) => void;
 };
 
-export function Dialpad({ onButtonClick, onLongPress, className }: DialpadProps) {
-  return (
-    <div
-      className={cn(
-        "grid grid-cols-3 justify-items-center gap-x-6 gap-y-3",
-        className
-      )}
-    >
-      {DIALPAD_BUTTONS.map((button) => (
-        <DialpadButton
-          key={button.value}
-          value={button.value}
-          label={button.label}
-          subLabel={button.subLabel}
-          onClick={onButtonClick}
-          onLongPress={button.value === "0" ? onLongPress : undefined}
-        />
-      ))}
-    </div>
-  );
+export function Dialpad({ onButtonClick, onLongPress }: DialpadProps) {
+    return (
+        <div className="grid grid-cols-3 justify-items-center gap-x-6 gap-y-3.5">
+            {DIALPAD_BUTTONS.map((button) => (
+                <DialpadButton
+                    key={button.value}
+                    value={button.value}
+                    label={button.label}
+                    subLabel={button.subLabel}
+                    onClick={onButtonClick}
+                    onLongPress={button.value === '0' ? onLongPress : undefined}
+                />
+            ))}
+        </div>
+    );
 }

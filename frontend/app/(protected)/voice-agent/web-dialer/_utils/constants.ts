@@ -12,3 +12,9 @@ export const DIALPAD_BUTTONS = [
   { value: "0", label: "0", subLabel: "+" },
   { value: "#", label: "#", subLabel: "" },
 ] as const;
+
+/** How long 0 is held to type "+". */
+export const LONG_PRESS_MS = 500;
+
+/** The phone's round buttons: keypad keys, call, hang up, the in-call controls. */
+export const ROUND_BUTTON = "size-[4.5rem] rounded-full [&_svg:not([class*='size-'])]:size-7";
