@@ -42,13 +42,14 @@ function seedNumber(db: E2eDb, phoneNumber: string): Promise<string> {
     });
 }
 
-async function createThroughDialog(page: Page, type: RegExp, name: string, voice: RegExp): Promise<void> {
+async function createThroughDialog(page: Page, type: RegExp, name: string): Promise<void> {
     await page.goto(VOICE_AGENTS_URL);
     await waitForHydration(page, '[data-testid="new-voice-agent"]');
     await page.getByRole('button', { name: 'New agent' }).click();
     const dialog = page.getByRole('dialog', { name: 'New voice agent' });
-    // One step: the call type dropdown (inbound picked), name and voice together.
-    const callType = dialog.getByRole('combobox', { name: 'Call type' });
+    // One step: the agent type dropdown (inbound picked) and a name; the voice is set on the agent's page.
+    const callType = dialog.getByRole('combobox', { name: 'Agent type' });
+    await expect(dialog.getByTestId('voice-picker-trigger')).toHaveCount(0);
     await expect(callType).toHaveText('Inbound');
     await expect(dialog.getByLabel('Name')).toHaveValue(DEFAULT_VOICE_AGENT_NAME);
     await callType.click();
@@ -56,7 +57,6 @@ async function createThroughDialog(page: Page, type: RegExp, name: string, voice
     await expect(page.getByRole('option', { name: /^Outbound/ })).toContainText('Makes calls from your number');
     await page.getByRole('option', { name: type }).click();
     await dialog.getByLabel('Name').fill(name);
-    await pickVoice(page, voice);
     await dialog.getByRole('button', { name: 'Create agent' }).click();
     // The first visit to the editor in a run waits for `next dev` to compile it (well over 15 s
     // in a full suite run), so allow for that here rather than in every test.
@@ -83,12 +83,17 @@ function templatesDialog(page: Page) {
 test('a new outbound agent starts with an empty prompt: a template is read in full, then used', async ({ page, db }) => {
     await page.goto(VOICE_AGENTS_URL);
     await expect(page.getByText('No voice agents yet')).toBeVisible();
-    await createThroughDialog(page, /^Outbound/, 'Sales caller', /Kore/);
+    await createThroughDialog(page, /^Outbound/, 'Sales caller');
 
     await expect(page.getByTestId('voice-agent-call-type').first()).toHaveText('Outbound · makes calls');
     const [agent] = await db.getVoiceAgents(E2E_USER);
     const user = await db.getUser(E2E_USER);
-    expect(agent).toMatchObject({ name: 'Sales caller', callType: VoiceAgentCallType.OUTBOUND, voice: 'kore', prompt: '' });
+    expect(agent).toMatchObject({
+        name: 'Sales caller',
+        callType: VoiceAgentCallType.OUTBOUND,
+        voice: DEFAULT_VOICE_AGENT_VOICE,
+        prompt: '',
+    });
     expect(agent).not.toHaveProperty('callNotes');
     expect(agent.userId.equals(user._id)).toBe(true);
     expect(agent.tenantId.equals(user.tenantId)).toBe(true);
@@ -129,9 +134,12 @@ test('a new outbound agent starts with an empty prompt: a template is read in fu
 });
 
 test('templates are grouped by call type; switching to one keeps your own prompt one click away', async ({ page, db }) => {
-    await createThroughDialog(page, /^Inbound/, 'Front desk', /Puck/);
+    await createThroughDialog(page, /^Inbound/, 'Front desk');
     await expect(page.getByTestId('voice-agent-call-type').first()).toHaveText('Inbound · answers calls');
-    expect((await db.getVoiceAgents(E2E_USER))[0]).toMatchObject({ callType: VoiceAgentCallType.INBOUND, voice: 'puck' });
+    expect((await db.getVoiceAgents(E2E_USER))[0]).toMatchObject({
+        callType: VoiceAgentCallType.INBOUND,
+        voice: DEFAULT_VOICE_AGENT_VOICE,
+    });
 
     // Every template ends with the facts the owner fills in; none relies on call notes. The new ones
     // stay well under the tested cold call's length.
@@ -154,6 +162,11 @@ test('templates are grouped by call type; switching to one keeps your own prompt
     await dialog.getByRole('button', { name: 'Use Receptionist' }).click();
     await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_INBOUND_VOICE_AGENT_PROMPT);
     await expect(page.getByTestId('prompt-alternate')).toHaveCount(0); // nothing of the owner's was replaced
+    // The prompt says where it came from, read off the text: one edit makes it the owner's own.
+    const source = page.getByTestId('prompt-source');
+    await expect(source).toHaveText('Template: Receptionist');
+    await page.locator('#agent-prompt').fill(`${DEFAULT_INBOUND_VOICE_AGENT_PROMPT} Be brief.`);
+    await expect(source).toHaveText('Custom prompt');
 
     // Own words, then a template over them: both stay one click apart.
     await page.locator('#agent-prompt').fill('You are the front desk at Sunrise Dental.');
@@ -167,8 +180,10 @@ test('templates are grouped by call type; switching to one keeps your own prompt
     await expect(alternate).toContainText('Showing Restaurant reservations');
     await alternate.getByRole('button', { name: 'Switch to your prompt' }).click();
     await expect(page.locator('#agent-prompt')).toHaveValue('You are the front desk at Sunrise Dental.');
+    await expect(source).toHaveText('Custom prompt');
     await alternate.getByRole('button', { name: 'Switch to Restaurant reservations' }).click();
     await expect(page.locator('#agent-prompt')).toHaveValue(restaurant.prompt);
+    await expect(source).toHaveText('Template: Restaurant reservations');
 
     // The list says plainly when an agent has no prompt yet.
     await page.getByRole('button', { name: 'Discard' }).click();
@@ -184,7 +199,7 @@ test('the type can be changed back in the create dialog', async ({ page, db }) =
     await waitForHydration(page, '[data-testid="new-voice-agent"]');
     await page.getByRole('button', { name: 'New agent' }).click();
     const dialog = page.getByRole('dialog', { name: 'New voice agent' });
-    const callType = dialog.getByRole('combobox', { name: 'Call type' });
+    const callType = dialog.getByRole('combobox', { name: 'Agent type' });
     for (const type of ['Outbound', 'Inbound', 'Outbound']) {
         await callType.click();
         await page.getByRole('option', { name: new RegExp(`^${type}`) }).click();
@@ -217,7 +232,7 @@ test('changing the type keeps the prompt; with numbers linked, saving asks what 
     await expect(page.getByTestId('prompt-templates')).toHaveCount(0);
 
     // The editor uses the same dropdown as the create dialog.
-    const callType = page.getByRole('combobox', { name: 'Call type' });
+    const callType = page.getByRole('combobox', { name: 'Agent type' });
     await callType.click();
     await page.getByRole('option', { name: /^Inbound/ }).click();
     await expect(callType).toHaveText('Inbound');
@@ -225,7 +240,8 @@ test('changing the type keeps the prompt; with numbers linked, saving asks what 
     await expect(page.getByTestId('call-type-note')).toContainText('does not rewrite the prompt');
     await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_VOICE_AGENT_PROMPT);
     // Numbers follow the saved type, so they wait for the save.
-    await expect(page.getByTestId('agent-numbers-change')).toBeDisabled();
+    await expect(page.getByTestId('agent-numbers-trigger')).toBeDisabled();
+    await expect(page.getByTestId('agent-numbers')).toContainText('Save the new agent type first.');
 
     // No number yet: it just saves.
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -241,7 +257,7 @@ test('changing the type keeps the prompt; with numbers linked, saving asks what 
     await callType.click();
     await page.getByRole('option', { name: /^Outbound/ }).click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    const ask = page.getByRole('dialog', { name: 'Make it outbound?' });
+    const ask = page.getByRole('dialog', { name: 'Make it an outbound agent?' });
     await expect(ask).toContainText('It is on +15550100021');
     await expect(ask.getByRole('button', { name: 'Switch it' })).toBeVisible();
     await expect(ask.getByRole('button', { name: 'Unlink' })).toBeVisible();
@@ -279,17 +295,28 @@ test('the agent card shows its numbers and its Gemini key, and opens a picker of
         '/voice-agent/settings#gemini-key',
     );
 
-    await numbers.getByTestId('agent-numbers-change').click();
-    const picker = page.getByRole('dialog', { name: 'Numbers it answers' });
-    await expect(picker.getByRole('checkbox')).toHaveCount(3);
-    await expect(picker.getByRole('checkbox', { name: /\+15550100001/ })).toBeChecked();
-    await expect(picker.getByRole('checkbox', { name: /\+15550100003/ })).not.toBeChecked();
-    await expect(picker).toContainText('now answers with Other');
-    await picker.getByRole('button', { name: 'Cancel' }).click();
+    // The dropdown lists every number with its provider, ticks this agent's, and says what the others do.
+    await numbers.getByRole('combobox', { name: 'Phone numbers' }).click();
+    const options = page.getByTestId('agent-numbers-options').getByRole('option');
+    await expect(options).toHaveCount(3);
+    await expect(options.filter({ hasText: '+15550100001' })).toHaveAttribute('data-linked', 'true');
+    await expect(options.filter({ hasText: '+15550100003' })).toHaveAttribute('data-linked', 'false');
+    await expect(options.filter({ hasText: '+15550100003' })).toContainText('now answers with Other');
+    await expect(options.first().getByTestId('number-provider-logo-TELNYX')).toBeVisible();
+    await page.keyboard.press('Escape');
 
     const unusedId = await db.insertVoiceAgent(E2E_USER, { name: 'Unused' });
     await openVoiceAgent(page, unusedId);
     await expect(page.getByTestId('agent-numbers')).toContainText('No number yet: pick the ones it calls from.');
+
+    // No number at all: the dropdown points to Phone numbers to connect one.
+    await db.resetVoiceTelephony(E2E_USER);
+    await openVoiceAgent(page, unusedId);
+    await page.getByRole('combobox', { name: 'Phone numbers' }).click();
+    await expect(page.getByRole('link', { name: 'Connect one on Phone numbers' })).toHaveAttribute(
+        'href',
+        '/voice-agent/phone-numbers',
+    );
 });
 
 test('the cost card is a bill: the voice stack, the prompt, each tool and the phone, then the real average', async ({

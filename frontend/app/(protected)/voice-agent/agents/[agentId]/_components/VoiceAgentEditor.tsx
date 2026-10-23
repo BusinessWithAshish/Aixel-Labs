@@ -8,11 +8,12 @@ import { VOICE_AGENT_LIMITS, VoiceAgentCallType } from '@aixellabs/backend/db/ty
 import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
-import { VOICE_AGENT_CALL_TYPES } from '@/helpers/voice-agent-defaults';
+import { VOICE_AGENT_CALL_TYPES, VOICE_AGENT_PROMPT_TEMPLATES } from '@/helpers/voice-agent-defaults';
 import { VoiceAgentCallTypeBadge } from '../../_components/VoiceAgentCallTypeBadge';
 import { VoiceAgentCallTypeSelect } from '../../_components/VoiceAgentCallTypeSelect';
 import { VoicePicker } from '@/components/common/voice-agent/VoicePicker';
@@ -20,6 +21,7 @@ import { AgentKeyPicker } from '../../_components/AgentKeyPicker';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import type { PromptTool } from '../_utils/prompt-tools';
 import { AgentNumbersField } from './AgentNumbersField';
+import { AgentTestCallButton } from './AgentTestCallButton';
 import { PromptField } from './PromptField';
 import { PromptTemplates } from './PromptTemplates';
 import { CallSettingsCard } from './settings/CallSettingsCard';
@@ -42,7 +44,7 @@ function openVariables() {
     target?.querySelector<HTMLInputElement>('input[value=""]')?.focus({ preventScroll: true });
 }
 
-/** The agent itself (name, call type, voice, key, numbers, prompt), with its tools and call settings in cards underneath. */
+/** The agent itself (name, agent type, voice, key, numbers, prompt), with its tools and call settings in cards underneath. */
 export function VoiceAgentEditor() {
     const {
         saved,
@@ -107,6 +109,7 @@ export function VoiceAgentEditor() {
                                         Discard
                                     </Button>
                                 ) : null}
+                                <AgentTestCallButton />
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -139,7 +142,7 @@ export function VoiceAgentEditor() {
                                     name="callType"
                                     render={({ field }) => (
                                         <Field>
-                                            <FieldLabel htmlFor="agent-call-type">Call type</FieldLabel>
+                                            <FieldLabel htmlFor="agent-call-type">Agent type</FieldLabel>
                                             <VoiceAgentCallTypeSelect
                                                 id="agent-call-type"
                                                 value={field.value}
@@ -165,10 +168,20 @@ export function VoiceAgentEditor() {
                                 name="prompt"
                                 render={({ field, fieldState }) => {
                                     const empty = !field.value.trim();
+                                    const template = VOICE_AGENT_PROMPT_TEMPLATES.find(
+                                        (t) => t.prompt.trim() === field.value.trim(),
+                                    );
                                     return (
                                         <Field>
                                             <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
-                                                <FieldLabel htmlFor="agent-prompt">Prompt</FieldLabel>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <FieldLabel htmlFor="agent-prompt">Prompt</FieldLabel>
+                                                    {empty ? null : (
+                                                        <Badge variant="outline" data-testid="prompt-source">
+                                                            {template ? `Template: ${template.title}` : 'Custom prompt'}
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                                 {empty ? null : (
                                                     <PromptTemplates
                                                         callType={form.callType}
@@ -236,7 +249,7 @@ export function VoiceAgentEditor() {
                 <Dialog open={typeChangeOpen} onOpenChange={setTypeChangeOpen}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Make it {newType}?</DialogTitle>
+                            <DialogTitle>Make it an {newType} agent?</DialogTitle>
                             <DialogDescription>
                                 It is on {numbers.map((n) => n.phoneNumber).join(', ')}. Should{' '}
                                 {numbers.length === 1 ? 'that number' : 'those numbers'}{' '}

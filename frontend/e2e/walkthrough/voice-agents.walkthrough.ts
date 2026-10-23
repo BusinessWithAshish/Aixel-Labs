@@ -59,7 +59,7 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await page.getByTestId('new-voice-agent').click();
             await expect(page.getByRole('dialog')).toBeVisible();
             await capture('create-dialog-type', false);
-            await page.getByRole('dialog').getByRole('combobox', { name: 'Call type' }).click();
+            await page.getByRole('dialog').getByRole('combobox', { name: 'Agent type' }).click();
             await page.getByRole('option', { name: /^Inbound/ }).click();
             await expect(page.getByRole('dialog').getByLabel('Name')).toBeVisible();
             await capture('create-dialog-details', false);

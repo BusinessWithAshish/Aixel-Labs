@@ -412,7 +412,7 @@ test('the agent page starts a test call with that agent, from a number that uses
     const answering = await seedNumber(db, SECOND_NUMBER, { inboundAgentId: new ObjectId(frontDesk) });
     await openVoiceAgent(page, frontDesk);
 
-    await page.getByTestId('agent-numbers').getByRole('button', { name: 'Test call' }).click();
+    await page.getByRole('button', { name: 'Test call' }).click();
     const dialog = page.getByRole('dialog', { name: 'Test call' });
     // The agent is fixed; the number it answers on is picked first.
     await expect(dialog.getByRole('combobox', { name: 'Agent that calls' })).toHaveCount(0);

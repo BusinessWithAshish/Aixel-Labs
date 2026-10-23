@@ -235,7 +235,7 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await check('agents');
             await page.getByRole('button', { name: 'New agent' }).click();
             const create = page.getByRole('dialog', { name: 'New voice agent' });
-            await create.getByRole('combobox', { name: 'Call type' }).click();
+            await create.getByRole('combobox', { name: 'Agent type' }).click();
             await check('create-agent-type');
             await page.getByRole('option', { name: /^Inbound/ }).click();
             await expect(create.getByLabel('Name')).toBeVisible();

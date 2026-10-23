@@ -7,16 +7,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { type VoiceAgent, VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import { createVoiceAgent } from '@/app/actions/voice-agent-actions';
-import { DEFAULT_VOICE_AGENT_NAME, DEFAULT_VOICE_AGENT_VOICE } from '@/helpers/voice-agent-defaults';
+import { DEFAULT_VOICE_AGENT_NAME } from '@/helpers/voice-agent-defaults';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
 import { voiceAgentSchema } from '@/helpers/voice-schemas';
 
-/** What the create dialog asks for; the rest starts from the call type's defaults. */
-const newAgentSchema = voiceAgentSchema.pick({ callType: true, name: true, voice: true, ttsVoice: true });
+/** What the create dialog asks for; the rest (voice included) starts from the server's defaults. */
+const newAgentSchema = voiceAgentSchema.pick({ callType: true, name: true });
 const NEW_AGENT = {
     callType: VoiceAgentCallType.INBOUND,
     name: DEFAULT_VOICE_AGENT_NAME,
-    voice: DEFAULT_VOICE_AGENT_VOICE,
 };
 
 export function useVoiceAgentsPage({ agents }: { agents: VoiceAgent[] }) {

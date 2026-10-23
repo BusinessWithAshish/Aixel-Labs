@@ -40,17 +40,19 @@ export async function openRemove(page: Page, phoneNumber: string) {
 export const LINK_UI_PENDING: string | null = null;
 
 /**
- * Ticks or unticks the number in the agent editor's number picker and saves. Throws with the error
- * the page shows (it stays visible) when the provider or the app refuses.
+ * Picks or unpicks the number in the agent editor's numbers dropdown (each pick saves at once). Throws
+ * with the error the page shows (it stays visible) when the provider or the app refuses.
  */
 async function setLinked(page: Page, agentId: string, phoneNumber: string, linked: boolean): Promise<void> {
     await openVoiceAgent(page, agentId);
-    await page.getByTestId('agent-numbers-change').click();
-    const dialog = page.getByRole('dialog', { name: /^Numbers it (answers|calls from)$/ });
-    await dialog.getByRole('checkbox', { name: new RegExp(phoneNumber.replace('+', '\\+')) }).setChecked(linked);
-    await dialog.getByRole('button', { name: 'Save' }).click();
+    await page.getByTestId('agent-numbers-trigger').click();
+    const option = page.getByTestId('agent-numbers-options').getByRole('option').filter({ hasText: phoneNumber });
+    const done = option.and(page.locator(`[data-linked="${linked}"]`));
+    await option.waitFor();
+    if (await done.count()) return;
+    await option.click();
     const failed = page.locator('[data-sonner-toast][data-type="error"]');
-    await Promise.race([dialog.waitFor({ state: 'hidden' }), failed.first().waitFor({ state: 'visible' })]);
+    await Promise.race([done.waitFor(), failed.first().waitFor({ state: 'visible' })]);
     if (await failed.count()) throw new Error(await failed.first().innerText());
 }
 

@@ -10,15 +10,14 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
 import type { UseVoiceAgentsPageReturn } from '../_hooks/use-voice-agents-page';
 import { VoiceAgentCallTypeSelect } from './VoiceAgentCallTypeSelect';
-import { VoicePicker } from '@/components/common/voice-agent/VoicePicker';
 
-/** Inbound or outbound, a name and a voice; the prompt comes next, on the agent's page. */
+/** Inbound or outbound, and a name; the prompt and voice come next, on the agent's page. */
 export function CreateVoiceAgentDialog() {
     const { createOpen, onCreateOpenChange, createForm, creating, createAgent } = usePage<UseVoiceAgentsPageReturn>();
 
     return (
         <Dialog open={createOpen} onOpenChange={onCreateOpenChange}>
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent>
                 <FormProvider {...createForm}>
                     <form onSubmit={createAgent} className="grid gap-4">
                         <DialogHeader>
@@ -32,7 +31,7 @@ export function CreateVoiceAgentDialog() {
                             name="callType"
                             render={({ field }) => (
                                 <Field>
-                                    <FieldLabel htmlFor="new-agent-call-type">Call type</FieldLabel>
+                                    <FieldLabel htmlFor="new-agent-call-type">Agent type</FieldLabel>
                                     <VoiceAgentCallTypeSelect
                                         id="new-agent-call-type"
                                         value={field.value}
@@ -51,10 +50,6 @@ export function CreateVoiceAgentDialog() {
                             classNames={{ description: 'text-xs' }}
                             inputProps={{ maxLength: VOICE_AGENT_LIMITS.nameMax, autoFocus: true }}
                         />
-                        <Field>
-                            <FieldLabel htmlFor="new-agent-voice">Voice</FieldLabel>
-                            <VoicePicker id="new-agent-voice" disabled={creating} />
-                        </Field>
                         <DialogFooter>
                             <Button
                                 type="button"
