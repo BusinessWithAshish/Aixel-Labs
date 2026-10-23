@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { toast } from 'sonner';
 import { CheckIcon, ChevronsUpDownIcon, Loader2 } from 'lucide-react';
 import { VoiceAgentCallType } from '@aixellabs/backend/db/types';
-import { listMyNumbers, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
+import type { VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 import { NumberProviderLogo } from '@/components/common/voice-agent/NumberProviderLogo';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -24,44 +23,22 @@ function numberJob(number: VoiceNumberListItem): string | null {
 }
 
 /**
- * The numbers this agent works on, picked from the owner's numbers in a dropdown: an inbound agent's
- * numbers answer calls with it, an outbound agent's place calls with it. Each pick links or unlinks at
- * once; a number does one job, so picking one takes it off another.
+ * The numbers this agent works on, picked from the owner's numbers (loaded with the page, refreshed after
+ * each change) in a dropdown: an inbound agent's numbers answer calls with it, an outbound agent's place
+ * calls with it. Each pick links or unlinks at once; a number does one job, so picking one takes it off another.
  */
 export function AgentNumbersField() {
-    const { saved, form, usage, numbers, linking, linkNumbers } = usePage<UseVoiceAgentEditorPageReturn>();
+    const { saved, form, usage, ownedNumbers, numbers, linking, linkNumbers } = usePage<UseVoiceAgentEditorPageReturn>();
     const inbound = saved.callType === VoiceAgentCallType.INBOUND;
     const stray = linkedNumbers(usage, inbound ? VoiceAgentCallType.OUTBOUND : VoiceAgentCallType.INBOUND);
     const typePending = form.callType !== saved.callType;
 
-    const [all, setAll] = useState<VoiceNumberListItem[] | null>(null);
     const [open, setOpen] = useState(false);
-
-    /** The owner's numbers, fetched on each open and after each change so what the others do stays current. */
-    const load = async () => {
-        const response = await listMyNumbers();
-        if (!response.success || !response.data) {
-            toast.error(response.error ?? 'Could not load your numbers');
-            setOpen(false);
-            return;
-        }
-        setAll(response.data);
-    };
-
-    const toggle = async (id: string) => {
-        if (await linkNumbers([id], !numbers.some((n) => n.id === id))) await load();
-    };
 
     return (
         <Field data-testid="agent-numbers">
             <FieldLabel htmlFor="agent-numbers">Phone numbers</FieldLabel>
-            <Popover
-                open={open}
-                onOpenChange={(next) => {
-                    setOpen(next);
-                    if (next) void load();
-                }}
-            >
+            <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
                     <Button
                         id="agent-numbers"
@@ -95,49 +72,45 @@ export function AgentNumbersField() {
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-(--radix-popover-trigger-width) min-w-72 p-0" align="start">
-                    {all ? (
-                        <Command>
-                            {all.length > 5 ? <CommandInput placeholder="Search numbers" /> : null}
-                            <CommandList className="max-h-72" data-testid="agent-numbers-options">
-                                <CommandEmpty>
-                                    {all.length ? (
-                                        'No number found.'
-                                    ) : (
-                                        <>
-                                            No numbers yet.{' '}
-                                            <Link href={VOICE_PHONE_NUMBERS_URL} className="underline underline-offset-4">
-                                                Connect one on Phone numbers
-                                            </Link>
-                                        </>
-                                    )}
-                                </CommandEmpty>
-                                {all.map((n) => {
-                                    const mine = numbers.some((x) => x.id === n._id);
-                                    const job = mine ? null : numberJob(n);
-                                    return (
-                                        <CommandItem
-                                            key={n._id}
-                                            value={n.phoneNumber}
-                                            disabled={linking}
-                                            data-linked={mine}
-                                            onSelect={() => void toggle(n._id)}
-                                        >
-                                            <CheckIcon className={cn('size-4', mine ? 'opacity-100' : 'opacity-0')} />
-                                            <NumberProviderLogo provider={n.provider} className="size-4" />
-                                            <span className="grid min-w-0">
-                                                <span className="tabular-nums">{n.phoneNumber}</span>
-                                                {job ? (
-                                                    <span className="text-muted-foreground truncate text-xs">now {job}</span>
-                                                ) : null}
-                                            </span>
-                                        </CommandItem>
-                                    );
-                                })}
-                            </CommandList>
-                        </Command>
-                    ) : (
-                        <Loader2 className="text-muted-foreground mx-auto my-4 size-4 animate-spin" />
-                    )}
+                    <Command>
+                        {ownedNumbers.length > 5 ? <CommandInput placeholder="Search numbers" /> : null}
+                        <CommandList className="max-h-72" data-testid="agent-numbers-options">
+                            <CommandEmpty>
+                                {ownedNumbers.length ? (
+                                    'No number found.'
+                                ) : (
+                                    <>
+                                        No numbers yet.{' '}
+                                        <Link href={VOICE_PHONE_NUMBERS_URL} className="underline underline-offset-4">
+                                            Connect one on Phone numbers
+                                        </Link>
+                                    </>
+                                )}
+                            </CommandEmpty>
+                            {ownedNumbers.map((n) => {
+                                const mine = numbers.some((x) => x.id === n._id);
+                                const job = mine ? null : numberJob(n);
+                                return (
+                                    <CommandItem
+                                        key={n._id}
+                                        value={n.phoneNumber}
+                                        disabled={linking}
+                                        data-linked={mine}
+                                        onSelect={() => void linkNumbers([n._id], !mine)}
+                                    >
+                                        <CheckIcon className={cn('size-4', mine ? 'opacity-100' : 'opacity-0')} />
+                                        <NumberProviderLogo provider={n.provider} className="size-4" />
+                                        <span className="grid min-w-0">
+                                            <span className="tabular-nums">{n.phoneNumber}</span>
+                                            {job ? (
+                                                <span className="text-muted-foreground truncate text-xs">now {job}</span>
+                                            ) : null}
+                                        </span>
+                                    </CommandItem>
+                                );
+                            })}
+                        </CommandList>
+                    </Command>
                 </PopoverContent>
             </Popover>
             <FieldDescription className="text-xs">

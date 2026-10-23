@@ -7,6 +7,7 @@ import { listVoiceConnectedApps, type VoiceConnectedApps } from '@/app/actions/v
 import { listVoiceCallerMemories, type VoiceCallerMemoryList } from '@/app/actions/voice-caller-memory-actions';
 import { getAgentStackOptions, getGeminiKeyStatus, type VoiceAgentStackOptions } from '@/app/actions/voice-settings-actions';
 import { getAgentCostTotals } from '@/app/actions/voice-call-actions';
+import { listMyNumbers } from '@/app/actions/voice-number-actions';
 import { isValidObjectId } from '@/helpers/object-id';
 import { NO_GEMINI_KEY } from '@/server/voice-agent/gemini-key';
 import { BUILT_IN_VOICES } from '@/helpers/voice-catalogue';
@@ -29,16 +30,25 @@ async function VoiceAgentPage({
     searchParams: Promise<{ connected?: string | string[] }>;
 }) {
     const [{ agentId }, { connected }] = await Promise.all([params, searchParams]);
-    const [response, usageResponse, appsResponse, keyResponse, memoriesResponse, costsResponse, stackOptionsResponse] =
-        await Promise.all([
-            getVoiceAgent(agentId),
-            getVoiceAgentUsage(agentId),
-            listVoiceConnectedApps(),
-            getGeminiKeyStatus(agentId),
-            listVoiceCallerMemories(agentId),
-            getAgentCostTotals(agentId),
-            getAgentStackOptions(),
-        ]);
+    const [
+        response,
+        usageResponse,
+        numbersResponse,
+        appsResponse,
+        keyResponse,
+        memoriesResponse,
+        costsResponse,
+        stackOptionsResponse,
+    ] = await Promise.all([
+        getVoiceAgent(agentId),
+        getVoiceAgentUsage(agentId),
+        listMyNumbers(),
+        listVoiceConnectedApps(),
+        getGeminiKeyStatus(agentId),
+        listVoiceCallerMemories(agentId),
+        getAgentCostTotals(agentId),
+        getAgentStackOptions(),
+    ]);
     if (!response.success || !response.data) {
         return notFound();
     }
@@ -57,6 +67,8 @@ async function VoiceAgentPage({
                 data={{
                     agent: response.data,
                     usage,
+                    // Empty when the owner was not granted Phone numbers: the dropdown then offers to connect one.
+                    ownedNumbers: numbersResponse.data ?? [],
                     connectedApps,
                     justConnected,
                     memories,

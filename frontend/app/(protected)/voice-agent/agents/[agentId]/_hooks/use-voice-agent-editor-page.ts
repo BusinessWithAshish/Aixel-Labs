@@ -31,7 +31,7 @@ import {
 } from '@/app/actions/voice-agent-actions';
 import type { VoiceAgentCostTotals } from '@/app/actions/voice-call-actions';
 import type { VoiceAgentStackOptions } from '@/app/actions/voice-settings-actions';
-import { setNumberAgent, unlinkAgentNumber } from '@/app/actions/voice-number-actions';
+import { setNumberAgent, unlinkAgentNumber, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 import { estimateAgentCost } from '@/helpers/voice-call-cost';
 import {
     disconnectVoiceApp,
@@ -69,6 +69,8 @@ export type VoiceAgentEditorData = {
     agent: VoiceAgent;
     /** Numbers using the agent, as of the last server render (refreshed after a save). */
     usage: VoiceAgentUsage;
+    /** All the owner's numbers, for the numbers dropdown and the test call (refreshed with `usage`). */
+    ownedNumbers: VoiceNumberListItem[];
     /** The owner's connected booking apps (shared by all their agents). */
     connectedApps: VoiceConnectedApps;
     /** A connection the owner just came back from (Composio's callback), to say so and offer it. */
@@ -103,6 +105,7 @@ export function linkedNumbers(usage: VoiceAgentUsage, callType: VoiceAgentCallTy
 export function useVoiceAgentEditorPage({
     agent: initialAgent,
     usage,
+    ownedNumbers,
     connectedApps,
     justConnected,
     memories: initialMemories,
@@ -631,6 +634,7 @@ export function useVoiceAgentEditorPage({
         costTotals,
         saved,
         usage,
+        ownedNumbers,
         agentForm,
         form,
         applyTemplate,
