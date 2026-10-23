@@ -16,8 +16,6 @@ import { usePage } from '@/contexts/PageStore';
 import { VOICE_AGENT_CALL_TYPES, VOICE_AGENT_PROMPT_TEMPLATES } from '@/helpers/voice-agent-defaults';
 import { VoiceAgentCallTypeBadge } from '../../_components/VoiceAgentCallTypeBadge';
 import { VoiceAgentCallTypeSelect } from '../../_components/VoiceAgentCallTypeSelect';
-import { VoicePicker } from '@/components/common/voice-agent/VoicePicker';
-import { AgentKeyPicker } from '../../_components/AgentKeyPicker';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import type { PromptTool } from '../_utils/prompt-tools';
 import { AgentNumbersField } from './AgentNumbersField';
@@ -25,6 +23,7 @@ import { AgentTestCallButton } from './AgentTestCallButton';
 import { PromptField } from './PromptField';
 import { PromptTemplates } from './PromptTemplates';
 import { CallSettingsCard } from './settings/CallSettingsCard';
+import { AgentStackSection } from './stack/AgentStackSection';
 import { VOICE_AGENT_TOOLS_ID, VoiceAgentToolsCard } from './tools/VoiceAgentToolsCard';
 import { VariableDefaults } from './VariableDefaults';
 
@@ -44,13 +43,12 @@ function openVariables() {
     target?.querySelector<HTMLInputElement>('input[value=""]')?.focus({ preventScroll: true });
 }
 
-/** The agent itself (name, agent type, voice, key, numbers, prompt), with its tools and call settings in cards underneath. */
+/** The agent itself (name, agent type, stack, numbers, prompt), with its tools and call settings in cards underneath. */
 export function VoiceAgentEditor() {
     const {
         saved,
         usage,
         agentForm,
-        geminiKey,
         form,
         applyTemplate,
         alternate,
@@ -154,12 +152,9 @@ export function VoiceAgentEditor() {
                                         </Field>
                                     )}
                                 />
-                                <Field>
-                                    <FieldLabel htmlFor="agent-voice">Voice</FieldLabel>
-                                    <VoicePicker id="agent-voice" agentId={saved._id} />
-                                </Field>
-                                <AgentKeyPicker agentId={saved._id!} view={geminiKey} />
                             </div>
+
+                            <AgentStackSection />
 
                             <AgentNumbersField />
 

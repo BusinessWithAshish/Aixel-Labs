@@ -4,115 +4,29 @@ import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { z } from 'zod';
-import {
-    VOICE_DEFAULT_STACK,
-    VoiceKeyProvider,
-    VoiceStackKind,
-    type VoiceGeminiKeyTier,
-    type VoiceProviderKey,
-    type VoiceStack,
-    type VoiceStackPartName,
-} from '@aixellabs/backend/db/types';
+import { VoiceKeyProvider, type VoiceGeminiKeyTier, type VoiceProviderKey } from '@aixellabs/backend/db/types';
 import {
     addVoiceKey,
     makeDefaultVoiceKey,
     recheckVoiceKey,
     removeVoiceKey,
-    saveVoiceStack,
     setGeminiKeyTier,
-    type VoiceStackSettings,
 } from '@/app/actions/voice-settings-actions';
 import { voiceKeyInputSchema, type VoiceKeyInput } from '@/helpers/voice-schemas';
-import { defaultStackPart, PIPELINE_PARTS, stackModel, VOICE_KEY_PROVIDERS } from '@/helpers/voice-stack';
+import { VOICE_KEY_PROVIDERS } from '@/helpers/voice-stack';
 
 /** How often the open page asks each provider about its keys again. The checks are free. */
 const KEY_PING_MS = 10 * 60_000;
 
-/** A Select item cannot have the empty value: this one means "the provider's default key". */
-export const DEFAULT_KEY = 'default';
-
-const partForm = z.object({ model: z.string().min(1, 'Pick a model'), keyId: z.string() });
-const stackFormSchema = z.object({
-    kind: z.nativeEnum(VoiceStackKind),
-    realtime: partForm,
-    stt: partForm,
-    llm: partForm,
-    tts: partForm,
-});
-export type StackFormValues = z.infer<typeof stackFormSchema>;
-
-/** Every part filled in, so switching stacks keeps a sensible pick for the other one. */
-function stackFormValues(stack: VoiceStack<string> | null): StackFormValues {
-    const s = stack ?? (VOICE_DEFAULT_STACK as VoiceStack<string>);
-    const part = (name: VoiceStackPartName) => {
-        const saved =
-            s.kind === VoiceStackKind.REALTIME ? (name === 'realtime' ? s : null) : name === 'realtime' ? null : s[name];
-        const { model, keyId } = saved ?? defaultStackPart(name);
-        return { model, keyId: keyId ?? DEFAULT_KEY };
-    };
-    return { kind: s.kind, realtime: part('realtime'), stt: part('stt'), llm: part('llm'), tts: part('tts') };
-}
-
-function toStack(values: StackFormValues): VoiceStack<string> {
-    const part = (name: VoiceStackPartName) => {
-        const { model, keyId } = values[name];
-        return {
-            provider: stackModel(name, model)?.provider ?? VoiceKeyProvider.GEMINI,
-            model,
-            keyId: keyId === DEFAULT_KEY ? null : keyId,
-        };
-    };
-    if (values.kind === VoiceStackKind.REALTIME) return { kind: values.kind, ...part('realtime') };
-    return { kind: values.kind, stt: part('stt'), llm: part('llm'), tts: part('tts') };
-}
-
-export type VoiceSettingsPageData = VoiceStackSettings;
+export type VoiceSettingsPageData = { keys: VoiceProviderKey[] };
 
 /**
- * Voice settings: the stack the agents run on (Save / Discard), and the owner's API keys: add
- * (checked with the provider first), make default, Gemini tier, check now (and every 10 minutes while
- * the page is open), remove.
+ * Voice settings: the owner's API keys (several per provider): add (checked with the provider first),
+ * make default, Gemini tier, check now (and every 10 minutes while the page is open), remove. Each agent
+ * picks its models and which of these keys they run on, in its own Agent stack section.
  */
-export function useVoiceSettingsPage({ keys: initialKeys, stack }: VoiceSettingsPageData) {
+export function useVoiceSettingsPage({ keys: initialKeys }: VoiceSettingsPageData) {
     const [keys, setKeys] = useState(initialKeys);
-
-    // --- Stack ---
-    const stackForm = useForm<StackFormValues>({
-        resolver: zodResolver(stackFormSchema),
-        defaultValues: stackFormValues(stack),
-    });
-    const saveStack = stackForm.handleSubmit(async (values) => {
-        const res = await saveVoiceStack(toStack(values));
-        if (!res.success || !res.data) {
-            toast.error(res.error ?? 'Could not save the stack');
-            return;
-        }
-        stackForm.reset(stackFormValues(res.data));
-        toast.success('Saved. New calls use this stack.');
-    });
-    const discardStack = () => stackForm.reset();
-
-    // A model from another provider cannot run on the key picked before: back to that provider's default.
-    useEffect(() => {
-        const sub = stackForm.watch((form, { name }) => {
-            const part = name?.endsWith('.model') ? (name.split('.')[0] as VoiceStackPartName) : null;
-            if (!part || !form[part]) return;
-            const provider = stackModel(part, form[part].model ?? '')?.provider;
-            const keyId = form[part].keyId;
-            if (keyId !== DEFAULT_KEY && !keys.some((k) => k._id === keyId && k.provider === provider)) {
-                stackForm.setValue(`${part}.keyId`, DEFAULT_KEY, { shouldDirty: true });
-            }
-        });
-        return () => sub.unsubscribe();
-    }, [stackForm, keys]);
-
-    /** Providers the picked stack needs a key for and has none. */
-    const values = stackForm.watch();
-    const parts: VoiceStackPartName[] = values.kind === VoiceStackKind.REALTIME ? ['realtime'] : [...PIPELINE_PARTS];
-    const missingKeys = [
-        ...new Set(parts.map((part) => stackModel(part, values[part].model)?.provider).filter((p) => p !== undefined)),
-    ].filter((provider) => !keys.some((key) => key.provider === provider));
 
     // --- Keys ---
     const [addOpen, setAddOpen] = useState(false);
@@ -215,12 +129,6 @@ export function useVoiceSettingsPage({ keys: initialKeys, stack }: VoiceSettings
 
     return {
         keys,
-        stackForm,
-        saveStack,
-        discardStack,
-        savingStack: stackForm.formState.isSubmitting,
-        stackDirty: stackForm.formState.isDirty,
-        missingKeys,
         addOpen,
         openAdd,
         onAddOpenChange,

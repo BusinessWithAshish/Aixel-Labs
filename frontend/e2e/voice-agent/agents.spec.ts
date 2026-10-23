@@ -64,7 +64,7 @@ async function createThroughDialog(page: Page, type: RegExp, name: string): Prom
     await expect(page.locator('#agent-name')).toHaveValue(name);
 }
 
-/** Picks a voice in the voice picker (the agent editor's, or the new-agent dialog's). */
+/** Picks a voice in the agent's voice picker (one voice model: Gemini's voices). */
 async function pickVoice(page: Page, voice: RegExp) {
     await page.getByTestId('voice-picker-trigger').click();
     const picker = page.getByTestId('voice-picker');
@@ -94,6 +94,7 @@ test('a new outbound agent starts with an empty prompt: a template is read in fu
         voice: DEFAULT_VOICE_AGENT_VOICE,
         prompt: '',
     });
+    expect(agent.stack ?? null).toBeNull(); // no stack yet: Gemini Live, in that voice
     expect(agent).not.toHaveProperty('callNotes');
     expect(agent.userId.equals(user._id)).toBe(true);
     expect(agent.tenantId.equals(user.tenantId)).toBe(true);
@@ -290,10 +291,10 @@ test('the agent card shows its numbers and its Gemini key, and opens a picker of
     await expect(numbers.getByTestId('agent-numbers-stray')).toContainText('+15550100002 still calls with it');
     await expect(numbers.getByTestId('agent-numbers-stray').getByRole('button', { name: 'Unlink' })).toBeVisible();
     await expect(page.getByTestId('gemini-key-line').first()).toContainText('Runs on your Gemini key ending');
-    await expect(page.getByRole('link', { name: 'Manage keys' })).toHaveAttribute(
-        'href',
-        '/voice-agent/settings#gemini-key',
-    );
+    // Its stack (one voice model by default), with the way to its keys in Settings.
+    const stack = page.getByTestId('agent-stack');
+    await expect(stack.locator('#stack-realtime-model')).toContainText('Gemini 3.8 Live');
+    await expect(stack.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/voice-agent/settings#gemini-key');
 
     // The dropdown lists every number with its provider, ticks this agent's, and says what the others do.
     await numbers.getByRole('combobox', { name: 'Phone numbers' }).click();
@@ -335,12 +336,12 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
     await openVoiceAgent(page, agentId);
     const card = page.getByTestId('agent-cost-estimate');
     const parts = card.getByTestId('agent-cost-parts');
-    // Gemini $0.0224 + prompt $0.0124 + Telnyx in $0.0107 = $0.045 a minute, $0.136 for 3 minutes.
-    await expect(parts).toContainText('Gemini 3.8 Live · talk time$0.022');
+    // Gemini $0.0225 (1,500 audio tokens a minute each way) + prompt $0.0124 + Telnyx in $0.0107 = $0.046 a minute, $0.137 for 3 minutes.
+    await expect(parts).toContainText('Gemini 3.8 Live · talk time$0.023');
     await expect(parts).toContainText('Prompt · 1,200 tokens, read every turn$0.012');
     await expect(parts).toContainText('Telnyx · list rate$0.011');
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.045');
-    await expect(parts).toContainText('A 3-minute call$0.136');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.046');
+    await expect(parts).toContainText('A 3-minute call$0.137');
     await expect(card.getByTestId('agent-cost-real')).toHaveText('No calls yet to compare with.');
 
     // A longer prompt, before saving: 6,000 characters = 2,100 tokens a turn, $0.055 a minute.
@@ -366,7 +367,7 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
     });
     await openVoiceAgent(page, agentId);
     await expect(parts).toContainText('Speech to text · Deepgram Nova-3$0.006');
-    await expect(parts).toContainText('Thinking (LLM) · Gemini 3.5 Flash-Lite, 1,200 tokens a turn$0.003');
+    await expect(parts).toContainText('Thinking (LLM) · Gemini 3.5 Flash Lite, 1,200 tokens a turn$0.003');
     await expect(parts).toContainText('Text to speech · Cartesia Sonic 3.6$0.039');
     await expect(parts).not.toContainText('Gemini 3.8 Live');
     await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.061');

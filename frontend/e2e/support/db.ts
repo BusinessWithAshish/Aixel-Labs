@@ -519,14 +519,10 @@ export class E2eDb {
     // -----------------------------------------------------------------------
 
     /**
-     * Replaces the user's keys and stack: each key a Gemini key unless it says, OK, `fields` on top. Returns
-     * their ids, in order (the first of a provider is its default).
+     * Replaces the user's keys: each key a Gemini key unless it says, OK, `fields` on top. Returns their ids,
+     * in order (the first of a provider is its default).
      */
-    async setVoiceKeys(
-        user: E2eUser,
-        keys: Partial<VoiceProviderKeyDoc>[],
-        stack: VoiceAccountDoc['stack'] = null,
-    ): Promise<string[]> {
+    async setVoiceKeys(user: E2eUser, keys: Partial<VoiceProviderKeyDoc>[]): Promise<string[]> {
         const { userId } = await this.voiceAccount(user);
         const now = new Date();
         const docs: VoiceProviderKeyDoc[] = keys.map((fields, i) => ({
@@ -543,7 +539,7 @@ export class E2eDb {
         }));
         await this.voiceAccounts.updateOne(
             { userId },
-            { $set: { keys: docs, stack, updatedAt: now }, $unset: { gemini: '' } },
+            { $set: { keys: docs, updatedAt: now }, $unset: { gemini: '', stack: '' } },
         );
         return docs.map((d) => d._id.toString());
     }

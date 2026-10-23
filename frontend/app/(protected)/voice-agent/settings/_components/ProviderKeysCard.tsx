@@ -58,7 +58,8 @@ export function ProviderKeysCard() {
                 <CardTitle>API keys</CardTitle>
                 <CardDescription>
                     Every call runs on your own keys and is billed to your accounts with each provider. The first key of a
-                    provider is its default.
+                    provider is its default. Each agent picks its models and which key each runs on, under Agent stack on the
+                    agent&rsquo;s page.
                 </CardDescription>
                 <CardAction>
                     <Button type="button" size="sm" onClick={() => page.openAdd()}>
@@ -69,7 +70,7 @@ export function ProviderKeysCard() {
             </CardHeader>
             <CardContent className="grid gap-4">
                 {!hasGemini ? (
-                    <Alert data-testid="voice-keys-no-gemini">
+                    <Alert variant="warning" data-testid="voice-keys-no-gemini">
                         <KeyRound className="size-4" aria-hidden />
                         <AlertDescription>
                             Your agents cannot take or make calls until you add your own Gemini key.

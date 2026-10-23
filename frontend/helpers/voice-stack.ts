@@ -1,15 +1,19 @@
 import {
+    VOICE_CALL_RATES,
     VOICE_STACK_MODELS,
     VoiceKeyProvider,
     VoiceStackKind,
     type VoiceStack,
+    type VoiceStackCatalogue,
     type VoiceStackModel,
     type VoiceStackPartName,
+    type VoiceStackPrice,
 } from '@aixellabs/backend/db/types';
 
 /**
- * The voice stack in words (Settings, the agent's key line, the voice picker). Models and their rates
- * are `VOICE_STACK_MODELS` (voice-call-rates.json); this adds names and where to get each key.
+ * The voice stack in words and numbers (the agent's stack section, the cost bill, the voice picker).
+ * Models and prices come from the catalogue (`stackCatalogue`, server/voice-agent/voice-catalogue.ts);
+ * `FALLBACK_CATALOGUE` is voice-call-rates.json's list for when it cannot be read.
  */
 
 export type VoiceKeyProviderInfo = {
@@ -64,11 +68,83 @@ export const VOICE_STACK_PART_LABELS: Record<VoiceStackPartName, { title: string
 
 export const PIPELINE_PARTS = ['stt', 'llm', 'tts'] as const;
 
-export function stackModel(part: VoiceStackPartName, model: string): VoiceStackModel | null {
-    return VOICE_STACK_MODELS[part].find((m) => m.model === model) ?? null;
+const ESTIMATE = VOICE_CALL_RATES.estimate;
+
+/** Audio tokens a minute of speech is billed as, on `provider`. */
+export const audioTokensPerMinute = (provider: VoiceKeyProvider) =>
+    provider === VoiceKeyProvider.OPENAI ? ESTIMATE.audioTokensPerMinute.openai : ESTIMATE.audioTokensPerMinute.gemini;
+
+/** What a list price comes to per call-minute, on the estimate's typical minute (voice-call-rates.json `estimate.perMinuteSource`). */
+export function usdPerMinuteOf(price: VoiceStackPrice, provider: VoiceKeyProvider): number {
+    if ('usdPerMinute' in price) return price.usdPerMinute;
+    if ('usdPerMillionChars' in price) return (price.usdPerMillionChars * ESTIMATE.ttsCharsPerMinute) / 1e6;
+    if ('usdPerAudioMinute' in price) return price.usdPerAudioMinute;
+    const t = price.usdPerMillionTokens;
+    if ('in' in t)
+        return ((ESTIMATE.llmTokensPerTurn * t.in + ESTIMATE.llmOutTokensPerTurn * t.out) * ESTIMATE.turnsPerMinute) / 1e6;
+    if (provider === VoiceKeyProvider.OPENAI)
+        return (
+            (ESTIMATE.audioTokensPerMinute.openaiRealtimeIn * t.audioIn +
+                ESTIMATE.audioTokensPerMinute.openaiRealtimeOut * t.audioOut) /
+            1e6
+        );
+    return (audioTokensPerMinute(provider) * (t.audioIn + t.audioOut)) / 1e6;
 }
 
-/** A part's default: its first model, on that provider's default key. */
+/** voice-call-rates.json's price of a fallback model (`pipeline`, realtime Gemini's `gemini`). */
+function ratesFilePrice(part: VoiceStackPartName, model: string): VoiceStackPrice | null {
+    if (part === 'realtime') return { usdPerMillionTokens: VOICE_CALL_RATES.gemini.usdPerMillionTokens };
+    const rate = (VOICE_CALL_RATES.pipeline[part] as Record<string, VoiceStackPrice & { source?: string }>)[model];
+    return rate ? (Object.fromEntries(Object.entries(rate).filter(([k]) => k !== 'source')) as VoiceStackPrice) : null;
+}
+
+/** Gemini's speech-to-text and text-to-speech are cut off on a free-tier key after a few sentences a minute. */
+export const needsPaidKey = (part: VoiceStackPartName, provider: VoiceKeyProvider) =>
+    provider === VoiceKeyProvider.GEMINI && (part === 'stt' || part === 'tts');
+
+/** A catalogue model, priced. */
+export function stackModelOf(
+    part: VoiceStackPartName,
+    m: Pick<VoiceStackModel, 'provider' | 'model' | 'name'>,
+    price: VoiceStackPrice,
+    soon = false,
+): VoiceStackModel {
+    return {
+        ...m,
+        price,
+        usdPerMinute: usdPerMinuteOf(price, m.provider),
+        ...(soon ? { soon } : {}),
+        ...(needsPaidKey(part, m.provider) ? { paidKeyOnly: true } : {}),
+    };
+}
+
+const byPrice = (a: VoiceStackModel, b: VoiceStackModel) => a.usdPerMinute - b.usdPerMinute || a.name.localeCompare(b.name);
+
+/** The rates file's models of each part, priced and cheapest first. */
+export const FALLBACK_CATALOGUE = Object.fromEntries(
+    (['realtime', ...PIPELINE_PARTS] as VoiceStackPartName[]).map((part) => [
+        part,
+        VOICE_STACK_MODELS[part]
+            .flatMap((m) => {
+                const price = ratesFilePrice(part, m.model);
+                return price ? [stackModelOf(part, m, price)] : [];
+            })
+            .sort(byPrice),
+    ]),
+) as VoiceStackCatalogue;
+
+/** Cheapest first (ties by name). */
+export const sortByPrice = (models: VoiceStackModel[]) => [...models].sort(byPrice);
+
+export function stackModel(
+    part: VoiceStackPartName,
+    model: string,
+    catalogue: VoiceStackCatalogue = FALLBACK_CATALOGUE,
+): VoiceStackModel | null {
+    return catalogue[part].find((m) => m.model === model) ?? FALLBACK_CATALOGUE[part].find((m) => m.model === model) ?? null;
+}
+
+/** A part's default: the rates file's first model, on that provider's default key. */
 export function defaultStackPart(part: VoiceStackPartName) {
     const { provider, model } = VOICE_STACK_MODELS[part][0];
     return { provider, model, keyId: null };
@@ -80,17 +156,17 @@ export function defaultStack(kind: VoiceStackKind): VoiceStack<string> {
     return { kind, stt: defaultStackPart('stt'), llm: defaultStackPart('llm'), tts: defaultStackPart('tts') };
 }
 
-/** The providers a stack needs a key for. */
-export function stackProviders(stack: VoiceStack<unknown>): VoiceKeyProvider[] {
-    const parts = stack.kind === VoiceStackKind.REALTIME ? [stack] : [stack.stt, stack.llm, stack.tts];
-    return [...new Set(parts.map((p) => p.provider))];
+/** The parts of a stack, by name. */
+export function stackParts<P>(stack: VoiceStack<P>) {
+    return stack.kind === VoiceStackKind.REALTIME
+        ? [{ name: 'realtime' as VoiceStackPartName, part: stack }]
+        : PIPELINE_PARTS.map((name) => ({ name: name as VoiceStackPartName, part: stack[name] }));
 }
 
 /** List price of a whole stack per call-minute, from its parts' rates. */
-export function stackUsdPerMinute(stack: VoiceStack<unknown>): number {
-    if (stack.kind === VoiceStackKind.REALTIME) return stackModel('realtime', stack.model)?.usdPerMinute ?? 0;
-    return PIPELINE_PARTS.reduce((sum, part) => sum + (stackModel(part, stack[part].model)?.usdPerMinute ?? 0), 0);
+export function stackUsdPerMinute(stack: VoiceStack<unknown>, catalogue?: VoiceStackCatalogue): number {
+    return stackParts(stack).reduce(
+        (sum, { name, part }) => sum + (stackModel(name, part.model, catalogue)?.usdPerMinute ?? 0),
+        0,
+    );
 }
-
-/** The text-to-speech providers a pipeline voice may come from (those with a TTS model). */
-export const TTS_PROVIDERS = [...new Set(VOICE_STACK_MODELS.tts.map((m) => m.provider))];

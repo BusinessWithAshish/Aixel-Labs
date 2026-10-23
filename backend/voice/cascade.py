@@ -37,14 +37,14 @@ DEFAULT_VOICES = {
 PARTS = ("stt", "llm", "tts")
 
 
-def resolve(user_id, agent: dict) -> dict | None:
-    """ctx["stack"] of a customer call: its stack (product.stack_for) when it is a PIPELINE, each part with
-    its opened `key` (product.key_for). None = REALTIME, today's Gemini Live path.
-    Raises ProviderKeyMissing when a part has no key."""
-    account = product.db().voice_accounts.find_one({"userId": product.oid(user_id)}, {"keys": 1, "stack": 1}) or {}
-    stack = product.stack_for(agent, account)
+def resolve(user_id, agent: dict) -> dict:
+    """ctx["stack"] of a customer call: its stack (product.stack_for). REALTIME: Gemini Live's `model` and the
+    `price` the app saved with it (its key is product.gemini_key_for's). PIPELINE: each part with its opened
+    `key` (product.key_for) and `price`. Raises ProviderKeyMissing when a part has no key."""
+    stack = product.stack_for(agent)
     if stack.get("kind") != "PIPELINE":
-        return None
+        return {"kind": "REALTIME", "model": stack.get("model"), "price": stack.get("price")}
+    account = product.db().voice_accounts.find_one({"userId": product.oid(user_id)}, {"keys": 1}) or {}
     out = {"kind": "PIPELINE"}
     for name in PARTS:
         part = stack[name]
@@ -52,7 +52,7 @@ def resolve(user_id, agent: dict) -> dict | None:
         if not key:
             raise ProviderKeyMissing(f"no {part['provider']} API key is saved", part["provider"])
         out[name] = {"provider": part["provider"], "model": part["model"], "key": product.open_secret(key["keySealed"]),
-                     "sealed": key["keySealed"]}
+                     "sealed": key["keySealed"], "price": part.get("price")}
     return out
 
 
@@ -67,6 +67,11 @@ class ProviderKeyMissing(product.CallRefused):
 
 def is_pipeline(ctx: dict | None) -> bool:
     return bool(ctx and (ctx.get("stack") or {}).get("kind") == "PIPELINE")
+
+
+def live_model(ctx: dict | None, default: str) -> str:
+    """The Gemini Live model of a REALTIME call: its stack's, else `default` (Ashish's line, the browser test page)."""
+    return ((ctx or {}).get("stack") or {}).get("model") or default
 
 
 def voice_of(ctx: dict) -> str:
@@ -172,7 +177,8 @@ class Meter(FrameProcessor):
         self._gemini_llm = stack["llm"]["provider"] == "gemini"
         self.usage = {
             "stack": "PIPELINE",
-            "parts": {p: {"provider": stack[p]["provider"], "model": stack[p]["model"]} for p in ("stt", "llm", "tts")},
+            "parts": {p: {"provider": stack[p]["provider"], "model": stack[p]["model"], "price": stack[p].get("price")}
+                      for p in ("stt", "llm", "tts")},
             "llm_in": 0, "llm_out": 0, "tts_chars": 0, "tts_secs": 0.0,
         }
 

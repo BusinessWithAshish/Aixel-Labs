@@ -42,9 +42,13 @@ def resolve_tests(user):
     print("\n== which stack and keys a call gets ==")
     g1, g2, dg, ca = key("gemini", "AIza-one"), key("gemini", "AIza-two"), key("deepgram", "dg-1234"), key("cartesia", "sk_car_9")
     testdb.set_account(product.db(), {"userId": user, "tenantId": ObjectId(), "keys": [g1, g2, dg, ca]})
-    ok("no stack anywhere: Gemini Live (None)", cascade.resolve(user, {}) is None)
-    product.db().voice_accounts.update_one({"userId": user}, {"$set": {"stack": {"kind": "REALTIME", "provider": "gemini", "model": "gemini-3.8-live"}}})
-    ok("the owner's REALTIME stack: Gemini Live", cascade.resolve(user, {}) is None)
+    ok("no stack: Gemini Live on its default model", cascade.resolve(user, {}) == {"kind": "REALTIME", "model": "gemini-3.8-live", "price": None})
+    live = {"kind": "REALTIME", "provider": "gemini", "model": "gemini-3.8-live-extended-thinking", "price": {"usdPerMillionTokens": {"audioIn": 2}}}
+    s = cascade.resolve(user, {"stack": live})
+    ok("the agent's REALTIME stack: its model and saved price, not a pipeline",
+       s["model"] == live["model"] and s["price"] == live["price"] and not cascade.is_pipeline({"stack": s}), str(s))
+    ok("Gemini Live runs the stack's model; none (Ashish's line) = the default",
+       cascade.live_model({"stack": s}, "gemini-3.8-live") == live["model"] and cascade.live_model(None, "x") == "x")
     s = cascade.resolve(user, {"stack": stack(llm=("gemini", "gemini-3.5-flash-lite"))})
     ok("the agent's PIPELINE stack wins, each part with its provider's first key opened",
        s and s["stt"]["key"] == "dg-1234" and s["llm"]["key"] == "AIza-one" and s["tts"]["key"] == "sk_car_9"
@@ -53,8 +57,9 @@ def resolve_tests(user):
     ok("a part's keyId picks that key", s["llm"]["key"] == "AIza-two")
     s = cascade.resolve(user, {"stack": stack(ids={"llm": ObjectId()})})
     ok("a keyId the owner no longer has: the provider's first key", s["llm"]["key"] == "AIza-one")
-    product.db().voice_accounts.update_one({"userId": user}, {"$set": {"stack": stack()}})
-    ok("no agent stack: the owner's PIPELINE stack", (cascade.resolve(user, {}) or {}).get("kind") == "PIPELINE")
+    priced = stack()
+    priced["tts"]["price"] = {"usdPerMillionChars": 50}
+    ok("each part carries the price saved with it", cascade.resolve(user, {"stack": priced})["tts"]["price"] == {"usdPerMillionChars": 50})
     try:
         cascade.resolve(user, {"stack": stack(tts=("elevenlabs", "eleven_flash_v2_5"))})
         ok("no ElevenLabs key: refused", False)
@@ -182,6 +187,10 @@ def cost_tests(user):
     usage["parts"]["llm"] = {"provider": "openai", "model": "gpt-9"}
     s = costs.call_cost(doc, usage, None)["stack"]
     ok("a model with no rate: 0 and marked unpriced", s["llm"]["usd"] == 0 and s["llm"]["priced"] is False)
+    usage["parts"]["llm"] = {"provider": "openai", "model": "gpt-9", "price": {"usdPerMillionTokens": {"in": 1, "out": 10}}}
+    s = costs.call_cost(doc, usage, None)["stack"]
+    ok("the price saved with the stack bills a model the rates file does not know, and is not copied into the record",
+       abs(s["llm"]["usd"] - (20000 * 1 + 800 * 10) / 1e6) < 1e-12 and s["llm"]["priced"] and "price" not in s["llm"], str(s["llm"]))
     a = costs.analysis_cost({**c}, {"promptTokenCount": 1000})
     ok("the analysis adds to a total that keeps the stack", abs(a["totalUsd"] - (c["totalUsd"] + 0.0003)) < 1e-9, str(a))
 

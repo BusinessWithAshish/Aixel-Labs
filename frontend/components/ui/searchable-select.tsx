@@ -13,6 +13,8 @@ export type OptionType = {
     label: string;
     description?: string;
     icon?: ReactNode;
+    /** Shown but cannot be picked (plain selects). */
+    disabled?: boolean;
 };
 
 type SearchableSelectProps = {

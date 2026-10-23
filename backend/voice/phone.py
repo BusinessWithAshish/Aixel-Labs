@@ -538,7 +538,7 @@ def build_pipeline_parts(voice: str, prompt: str | None, call_tools: "tools.Call
         # audio from before the confirmation; the auto-size gave only 0.2 s.
         user_audio_preroll_secs=0.6,
         settings=GeminiLiveLLMService.Settings(
-            model=os.getenv("GEMINI_LIVE_MODEL", GEMINI_LIVE_MODEL_DEFAULT),
+            model=cascade.live_model(ctx, os.getenv("GEMINI_LIVE_MODEL", GEMINI_LIVE_MODEL_DEFAULT)),
             voice=voice.capitalize(),
             # Gemini's own voice detection misreads 8 kHz phone audio, so the
             # local Silero analyser above decides when a turn ends instead.

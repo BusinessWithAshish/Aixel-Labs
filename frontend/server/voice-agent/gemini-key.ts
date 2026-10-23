@@ -29,7 +29,7 @@ export const GEMINI_KEY_MISSING_MESSAGE =
 
 const CHECK_TIMEOUT_MS = 10_000;
 
-function geminiApiBase(): string {
+export function geminiApiBase(): string {
     return (process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
 }
 
@@ -114,12 +114,12 @@ export const NO_GEMINI_KEY: VoiceGeminiKeyView = {
     tier: null,
 };
 
-/** The Gemini key a stack runs on (`voiceKeyFor`): the agent's own stack when given, else the owner's. */
+/** The Gemini key a stack runs on (`voiceKeyFor`): the agent's stack when given, else the owner's default Gemini key. */
 export function toGeminiKeyView(
-    account: Pick<VoiceAccountDoc, 'keys' | 'stack'> | null,
+    account: Pick<VoiceAccountDoc, 'keys'> | null,
     agent?: Pick<VoiceAgentDoc, 'stack'> | null,
 ): VoiceGeminiKeyView {
-    const stack = voiceStackFor(agent, account);
+    const stack = voiceStackFor(agent);
     const part = stack.kind === VoiceStackKind.REALTIME ? stack : stack.llm;
     const key = voiceKeyFor(account?.keys, {
         provider: VoiceKeyProvider.GEMINI,
@@ -138,7 +138,7 @@ export function toGeminiKeyView(
     };
 }
 
-/** Keys and stack without the sealed keys (the other lists are not needed). */
+/** Keys without the sealed keys (the other lists are not needed). */
 const NO_SEALED = { 'keys.keySealed': 0, numbers: 0, calendars: 0 } as const;
 
 /** What the Gemini key the owner's agents (or one agent) run on looks like to the UI (never the key). */

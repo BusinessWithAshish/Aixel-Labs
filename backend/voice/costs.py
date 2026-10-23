@@ -12,7 +12,9 @@
     analysis  the post-call analysis (analysis.py) on the same key: its tokens at the analysis model's list price,
               0 on a free-tier key. Added once the analysis ran (analysis_cost), absent when it did not run.
     stack     a PIPELINE call (cascade.py) instead of Gemini Live: each part (stt, llm, tts) at its model's list
-              rate (voice-call-rates.json `pipeline`), on what cascade.Meter counted; gemini is then 0.
+              price (the one the app saved with the agent's stack, else voice-call-rates.json `pipeline`), on what
+              cascade.Meter counted; gemini is then 0. A REALTIME call's tokens are priced the same way: the
+              stack's saved price, else `gemini`.
 
 Prices excl. tax, with their sources and dates: backend/src/db/voice-call-rates.json, shared with the app
 (`VOICE_CALL_RATES` in types.ts, which also estimates an agent's cost before any call).
@@ -89,11 +91,13 @@ def free_tier(user_id, sealed: str | None = None) -> bool:
     return key.get("tier") == "free"
 
 
-def call_cost(doc: dict, usage: dict, provider: str | None, sealed: str | None = None) -> dict:
-    """The `cost` of a finished call's voice_calls document. Reads the key's tier: run it off the event loop."""
+def call_cost(doc: dict, usage: dict, provider: str | None, sealed: str | None = None, price: dict | None = None) -> dict:
+    """The `cost` of a finished call's voice_calls document. `price`: the REALTIME stack's saved price (None =
+    the rates file's). Reads the key's tier: run it off the event loop."""
     tokens = gemini_tokens(usage)
     free = free_tier(doc["userId"], sealed)
-    gemini = 0.0 if free else sum(n * GEMINI_USD_PER_M[kind] for kind, n in tokens.items()) / 1e6
+    rates = (price or {}).get("usdPerMillionTokens") or GEMINI_USD_PER_M
+    gemini = 0.0 if free else sum(n * rates.get(kind, GEMINI_USD_PER_M[kind]) for kind, n in tokens.items()) / 1e6
     cost = {"geminiUsd": round(gemini, 6), "geminiFreeTier": free, "geminiTokens": tokens,
             "providerUsd": 0.0, "providerExact": False}
     if doc["channel"] == "PHONE" and (provider, doc["direction"]) in PROVIDER_USD_PER_MIN:
@@ -113,13 +117,13 @@ def total(cost: dict) -> float:
 
 def pipeline_cost(usage: dict, duration_sec: int, gemini_free: bool) -> dict:
     """`cost.stack` of a PIPELINE call, from cascade.Meter's usage: each part's model, what it was billed on and
-    its USD at list price. A model with no rate (not in voice-call-rates.json `pipeline`) costs 0 and says so."""
-    parts = usage["parts"]
+    its USD at list price. A model with no price (none saved, none in voice-call-rates.json `pipeline`) costs 0 and says so."""
+    parts = {p: {k: v for k, v in part.items() if k != "price"} for p, part in usage["parts"].items()}
     out = {}
     for part, billed in (("stt", {"minutes": round(max(duration_sec, 0) / 60, 3)}),
                          ("llm", {"tokensIn": usage.get("llm_in", 0), "tokensOut": usage.get("llm_out", 0)}),
                          ("tts", {"chars": usage.get("tts_chars", 0), "audioMinutes": round(usage.get("tts_secs", 0) / 60, 3)})):
-        rate = STACK_RATES[part].get(parts[part]["model"])
+        rate = usage["parts"][part].get("price") or STACK_RATES[part].get(parts[part]["model"])
         usd = 0.0
         if rate and not (gemini_free and parts[part]["provider"] == "gemini"):
             if "usdPerMinute" in rate:

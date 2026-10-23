@@ -47,6 +47,9 @@ def pricing_tests(user):
     ok("Telnyx in, 95 s = 2 billed minutes at $0.0107", abs(paid["providerUsd"] - 0.0214) < 1e-9 and paid["provider"] == "TELNYX"
        and paid["providerExact"] is False, str(paid))
     ok("total is the sum", paid["totalUsd"] == round(paid["geminiUsd"] + paid["providerUsd"], 6))
+    double = {"usdPerMillionTokens": {k: 2 * v for k, v in costs.GEMINI_USD_PER_M.items()}}
+    ok("a REALTIME stack's saved price bills its tokens", abs(costs.call_cost(doc_of(user), USAGE, "TELNYX", None, double)["geminiUsd"]
+                                                            - 2 * paid["geminiUsd"]) < 1e-6)
 
     product.db().voice_accounts.update_one({"userId": user}, {"$set": {"keys": [
         {"_id": ObjectId(), "provider": "gemini", "keySealed": "s1", "tier": "free"},
@@ -125,7 +128,7 @@ async def twilio_tests(user):
 
 
 def key_tests():
-    """Which Gemini key a call runs on (product.gemini_key_for): the agent's stack, the owner's, the default."""
+    """Which Gemini key a call runs on (product.gemini_key_for): the agent's stack, else the owner's first Gemini key."""
     user, first, second, other = ObjectId(), ObjectId(), ObjectId(), ObjectId()
     sealed = {name: product.seal_secret(f"AIza-{name}") for name in ("first", "second", "cartesia")}
     keys = [{"_id": other, "provider": "cartesia", "keySealed": sealed["cartesia"]},
@@ -138,7 +141,7 @@ def key_tests():
         ok("the agent's own key", product.gemini_key_for(user, realtime(second))[0] == "AIza-second")
         ok("a removed key: back to the first", product.gemini_key_for(user, realtime(ObjectId()))[0] == "AIza-first")
         product.db().voice_accounts.update_one({"userId": user}, {"$set": realtime(second)})
-        ok("the owner's stack names a key", product.gemini_key_for(user, {"stack": None})[0] == "AIza-second")
+        ok("an owner-level stack is not read any more", product.gemini_key_for(user, {"stack": None})[0] == "AIza-first")
         pipeline = {"kind": "PIPELINE", "stt": {"provider": "deepgram", "model": "nova-3"},
                     "llm": {"provider": "gemini", "model": "gemini-3.5-flash-lite", "keyId": first},
                     "tts": {"provider": "cartesia", "model": "sonic-3.6", "keyId": other}}

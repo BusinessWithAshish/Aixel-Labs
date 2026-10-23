@@ -1,49 +1,32 @@
 'use server';
 
 import {
-    getCollection,
-    MongoCollections,
     MongoObjectId,
     VOICE_AGENT_SUB_MODULES,
     VOICE_KEY_LIMITS,
     VoiceKeyProvider,
     VoiceKeyStatus,
-    VoiceStackKind,
-    voiceStackFor,
-    type VoiceAgentDoc,
     type VoiceGeminiKeyTier,
     type VoiceGeminiKeyView,
     type VoiceProviderKey,
     type VoiceProviderKeyDoc,
-    type VoiceStack,
+    type VoiceStackCatalogue,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { requireUserObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
-import { parseOrThrow, voiceKeyInputSchema, voiceStackSchema, type VoiceKeyInput } from '@/helpers/voice-schemas';
+import { parseOrThrow, voiceKeyInputSchema, type VoiceKeyInput } from '@/helpers/voice-schemas';
 import { openSecret, sealSecret } from '@/server/voice-agent/engine';
 import { loadGeminiKeyView, VoiceKeyError } from '@/server/voice-agent/gemini-key';
-import {
-    checkProviderKey,
-    ownedStack,
-    stackView,
-    toProviderKeyView,
-    toProviderKeyViews,
-} from '@/server/voice-agent/provider-keys';
+import { checkProviderKey, toProviderKeyView, toProviderKeyViews } from '@/server/voice-agent/provider-keys';
 import type { VoiceOption } from '@/helpers/voice-catalogue';
-import { ownVoices } from '@/server/voice-agent/voice-catalogue';
+import { agentVoices, stackCatalogue } from '@/server/voice-agent/voice-catalogue';
 import { ensureVoiceAccount, voiceAccountsCollection } from '@/server/voice-agent/accounts';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.SETTINGS;
 
-/** Keys and stack without the sealed keys (the other lists are not needed). */
+/** Keys without the sealed keys (the other lists are not needed). */
 const NO_SEALED = { 'keys.keySealed': 0, numbers: 0, calendars: 0 } as const;
-
-export type VoiceStackSettings = {
-    keys: VoiceProviderKey[];
-    /** Null = never picked: VOICE_DEFAULT_STACK. */
-    stack: VoiceStack<string> | null;
-};
 
 function assertTier(tier: VoiceGeminiKeyTier): VoiceGeminiKeyTier {
     if (tier !== 'free' && tier !== 'paid') throw new Error('Pick the free tier or the paid tier');
@@ -69,12 +52,12 @@ export const getGeminiKeyStatus = async (agentId?: string): Promise<ALApiRespons
         return loadGeminiKeyView(requireUserObjectId(userId), agentId ? toObjectId(agentId, 'Agent ID') : undefined);
     });
 
-/** Every key the owner saved and the stack their agents run on. */
-export const getVoiceStackSettings = async (): Promise<ALApiResponse<VoiceStackSettings>> =>
-    runAuthenticatedAction(async function getVoiceStackSettings(userId) {
+/** Every key the owner saved, oldest first. */
+export const getVoiceKeys = async (): Promise<ALApiResponse<VoiceProviderKey[]>> =>
+    runAuthenticatedAction(async function getVoiceKeys(userId) {
         const accounts = await voiceAccountsCollection();
         const doc = await accounts.findOne({ userId: requireUserObjectId(userId) }, { projection: NO_SEALED });
-        return { keys: toProviderKeyViews(doc), stack: doc?.stack ? stackView(doc.stack) : null };
+        return toProviderKeyViews(doc);
     });
 
 /**
@@ -198,100 +181,26 @@ export const removeVoiceKey = async (keyId: string): Promise<ALApiResponse<Voice
         return toProviderKeyViews(doc);
     });
 
-/** Saves the stack the owner's agents run on (agents with their own stack keep it). */
-export const saveVoiceStack = async (input: unknown): Promise<ALApiResponse<VoiceStack<string>>> =>
-    runAuthenticatedAction(async function saveVoiceStack(userId) {
-        const owner = await requireVoiceOwner(userId, SUB_MODULE);
-        const parsed = parseOrThrow(voiceStackSchema, input, 'Check the stack');
-        await ensureVoiceAccount(owner);
-        const accounts = await voiceAccountsCollection();
-        const doc = await accounts.findOne({ userId: owner.userId }, { projection: NO_SEALED });
-        const stack = ownedStack(parsed, doc?.keys ?? []);
-        await accounts.updateOne({ userId: owner.userId }, { $set: { stack, updatedAt: new Date() } });
-        return stackView(stack);
-    });
-
 // ---------------------------------------------------------------------------
-// One agent's stack and key, and the voices it may speak in
+// What an agent's stack section offers
 // ---------------------------------------------------------------------------
 
-export type VoiceAgentStackChoice = {
-    /** The agent's own stack; null = it runs on the owner's. */
-    own: VoiceStack<string> | null;
-    /** What its calls run on (`voiceStackFor`). */
-    stack: VoiceStack<string>;
-    /** The owner's Gemini keys, default first. */
-    geminiKeys: VoiceProviderKey[];
+export type VoiceAgentStackOptions = {
+    /** The owner's keys, oldest first (each provider's first is its default). */
+    keys: VoiceProviderKey[];
+    /** The models each part may use, cheapest first, with their prices. */
+    catalogue: VoiceStackCatalogue;
+    /** Every voice the picker offers, per provider. */
+    voices: Record<VoiceKeyProvider, VoiceOption[]>;
 };
 
-async function agentStackChoice(userId: MongoObjectId, agentId?: string) {
-    const accounts = await voiceAccountsCollection();
-    const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
-    const [doc, agent] = await Promise.all([
-        accounts.findOne({ userId }, { projection: NO_SEALED }),
-        agentId ? agents.findOne({ _id: toObjectId(agentId, 'Agent ID'), userId }, { projection: { stack: 1 } }) : null,
-    ]);
-    if (agentId && !agent) throw new Error('Agent not found');
-    const view: VoiceAgentStackChoice = {
-        own: agent?.stack ? stackView(agent.stack) : null,
-        stack: stackView(voiceStackFor(agent, doc)),
-        geminiKeys: toProviderKeyViews(doc).filter((key) => key.provider === VoiceKeyProvider.GEMINI),
-    };
-    return { doc, agent, view };
-}
-
-/** The stack an agent runs on (or, with no `agentId`, a new agent would), and the Gemini keys it may pick. */
-export const getAgentStack = async (agentId?: string): Promise<ALApiResponse<VoiceAgentStackChoice>> =>
-    runAuthenticatedAction(async function getAgentStack(userId) {
-        const owner = await requireVoiceOwner(userId, VOICE_AGENT_SUB_MODULES.AGENTS);
-        return (await agentStackChoice(owner.userId, agentId)).view;
-    });
-
-/**
- * Picks the Gemini key one agent runs on (null = the owner's default). The agent gets its own stack:
- * the one it runs on now, with that key.
- */
-export const setAgentGeminiKey = async (
-    agentId: string,
-    keyId: string | null,
-): Promise<ALApiResponse<VoiceAgentStackChoice>> =>
-    runAuthenticatedAction(async function setAgentGeminiKey(userId) {
-        const owner = await requireVoiceOwner(userId, VOICE_AGENT_SUB_MODULES.AGENTS);
-        const { doc, agent } = await agentStackChoice(owner.userId, agentId);
-        const current = stackView(voiceStackFor(agent, doc));
-        const gemini = { keyId };
-        const next: VoiceStack<string | null> =
-            current.kind === VoiceStackKind.REALTIME
-                ? { ...current, ...gemini }
-                : current.llm.provider === VoiceKeyProvider.GEMINI
-                  ? { ...current, llm: { ...current.llm, ...gemini } }
-                  : current;
-        if (next === current) throw new Error('This agent does not run on Gemini');
-        const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
-        await agents.updateOne(
-            { _id: agent!._id, userId: owner.userId },
-            { $set: { stack: ownedStack(next, doc?.keys ?? []), updatedAt: new Date() } },
-        );
-        return (await agentStackChoice(owner.userId, agentId)).view;
-    });
-
-/** Puts an agent back on the owner's stack and keys. */
-export const clearAgentStack = async (agentId: string): Promise<ALApiResponse<VoiceAgentStackChoice>> =>
-    runAuthenticatedAction(async function clearAgentStack(userId) {
-        const owner = await requireVoiceOwner(userId, VOICE_AGENT_SUB_MODULES.AGENTS);
-        const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
-        await agents.updateOne(
-            { _id: toObjectId(agentId, 'Agent ID'), userId: owner.userId },
-            { $set: { stack: null, updatedAt: new Date() } },
-        );
-        return (await agentStackChoice(owner.userId, agentId)).view;
-    });
-
-/** The voices in the owner's own Cartesia and ElevenLabs accounts, on top of the picker's built-in ones. */
-export const getVoiceCatalogue = async (): Promise<ALApiResponse<Partial<Record<VoiceKeyProvider, VoiceOption[]>>>> =>
-    runAuthenticatedAction(async function getVoiceCatalogue(userId) {
+/** The keys, models and voices an agent's stack can use, loaded with the page (the keys stay on the server). */
+export const getAgentStackOptions = async (): Promise<ALApiResponse<VoiceAgentStackOptions>> =>
+    runAuthenticatedAction(async function getAgentStackOptions(userId) {
         const owner = await requireVoiceOwner(userId, VOICE_AGENT_SUB_MODULES.AGENTS);
         const accounts = await voiceAccountsCollection();
         const doc = await accounts.findOne({ userId: owner.userId }, { projection: { keys: 1 } });
-        return ownVoices(doc?.keys ?? []);
+        const keys = doc?.keys ?? [];
+        const [catalogue, voices] = await Promise.all([stackCatalogue(keys), agentVoices(keys)]);
+        return { keys: toProviderKeyViews(doc), catalogue, voices };
     });

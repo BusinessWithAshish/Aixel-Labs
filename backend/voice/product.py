@@ -200,9 +200,9 @@ def require_prompt(agent: dict):
 DEFAULT_STACK = {"kind": "REALTIME", "provider": "gemini", "model": "gemini-3.8-live"}
 
 
-def stack_for(agent: dict | None, account: dict | None) -> dict:
-    """The stack a call runs on: the agent's own, else the owner's, else DEFAULT_STACK."""
-    return (agent or {}).get("stack") or (account or {}).get("stack") or DEFAULT_STACK
+def stack_for(agent: dict | None) -> dict:
+    """The stack a call runs on: the agent's own, else DEFAULT_STACK."""
+    return (agent or {}).get("stack") or DEFAULT_STACK
 
 
 def key_for(keys: list | None, provider: str, key_id=None) -> dict | None:
@@ -213,8 +213,8 @@ def key_for(keys: list | None, provider: str, key_id=None) -> dict | None:
 
 def gemini_key_for(user_id, agent: dict | None = None) -> tuple[str, str]:
     """(key, sealed) of the Gemini key the agent's stack runs on. Raises GeminiKeyMissing."""
-    doc = db().voice_accounts.find_one({"userId": oid(user_id)}, {"keys": 1, "stack": 1})
-    stack = stack_for(agent, doc)
+    doc = db().voice_accounts.find_one({"userId": oid(user_id)}, {"keys": 1})
+    stack = stack_for(agent)
     part = stack if stack.get("kind") == "REALTIME" else stack.get("llm") or {}
     key = key_for((doc or {}).get("keys"), "gemini", part.get("keyId") if part.get("provider") == "gemini" else None)
     if not key or not key.get("keySealed"):
@@ -409,7 +409,7 @@ def _finish_ctx(ctx: dict, agent: dict) -> dict:
     # The agent's prompt and the owner's own Gemini key, or no call (AgentNoPrompt, GeminiKeyMissing).
     require_prompt(agent)
     ctx["gemini_key"], ctx["gemini_sealed"] = gemini_key_for(ctx["doc"]["userId"], agent)
-    # A PIPELINE stack (cascade.py): its parts and keys, or no call (ProviderKeyMissing). None = Gemini Live.
+    # Its stack (cascade.py): Gemini Live's model, or a PIPELINE's parts and keys (else ProviderKeyMissing: no call).
     ctx["stack"], ctx["tts_voice"] = cascade.resolve(ctx["doc"]["userId"], agent), agent.get("ttsVoice")
     campaigns.tag(ctx)  # a campaign's call: its contact's variables (ctx["variables"]) and links
     if "variables" not in ctx and (held := _take_call_variables(ctx["doc"])) is not None:
@@ -540,7 +540,8 @@ def _insert(doc: dict, ctx: dict | None = None, usage: dict | None = None):
         import costs  # imports this module: loaded on first use
 
         try:
-            doc["cost"] = costs.call_cost(doc, usage or {}, ctx.get("provider"), ctx.get("gemini_sealed"))
+            doc["cost"] = costs.call_cost(doc, usage or {}, ctx.get("provider"), ctx.get("gemini_sealed"),
+                                          (ctx.get("stack") or {}).get("price"))
         except Exception as e:  # the call is written without one
             logger.error(f"could not work out the call's cost: {e!r}")
     try:

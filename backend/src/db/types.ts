@@ -289,7 +289,7 @@ export type VoiceAgentDoc<Id = ObjectId> = {
   memory?: boolean;
   /** How she takes turns and fills waits during a call. Absent = today's defaults (agent decides, NORMAL, both off). */
   speech?: VoiceAgentSpeech | null;
-  /** This agent's own stack (models and keys). Absent / null = the owner's (`VoiceAccountDoc.stack`); see `voiceStackFor`. */
+  /** What its calls hear, think and speak with (models, keys, prices). Absent / null = VOICE_DEFAULT_STACK; see `voiceStackFor`. */
   stack?: VoiceStack<Id> | null;
   /** The voice it speaks in on a PIPELINE stack. A REALTIME stack speaks in `voice` (Gemini Live's own voices). Absent = none picked yet. */
   ttsVoice?: VoiceTtsVoice | null;
@@ -948,8 +948,8 @@ export type VoiceCallerMemory = {
 // ---------------------------------------------------------------------------
 // Voice accounts: one voice_accounts doc per owner (the user who owns the agents and numbers;
 // every voice doc is scoped by `userId`, so the owner is the user, not the tenant). It holds what
-// the owner connected: their provider API keys, their default voice stack, their booking apps and
-// their phone numbers.
+// the owner connected: their provider API keys, their booking apps and their phone numbers. Each agent
+// picks its own stack (`VoiceAgentDoc.stack`) and which of these keys each part runs on.
 //
 // Customers bring their own keys: every call their agents take or place (Telnyx, Twilio, VoiceLink,
 // playground) runs on them, never on Aixel Labs' keys. No key for a provider the stack uses = no calls.
@@ -1019,13 +1019,26 @@ export enum VoiceStackKind {
   PIPELINE = "PIPELINE",
 }
 
+/**
+ * A model's list price in the unit its provider bills (the shapes of voice-call-rates.json `pipeline`
+ * and `gemini`, which the engine's costs.py multiplies by what it metered).
+ */
+export type VoiceStackPrice =
+  | { usdPerMinute: number }
+  | { usdPerMillionTokens: { in: number; out: number } }
+  | { usdPerMillionTokens: { textIn: number; audioIn: number; textOut: number; audioOut: number } }
+  | { usdPerMillionChars: number }
+  | { usdPerAudioMinute: number };
+
 /** One model of a stack, on one of the owner's keys of the same provider. */
 export type VoiceStackPart<Id = ObjectId> = {
   provider: VoiceKeyProvider;
-  /** The provider's model id, one of `VOICE_STACK_MODELS` for this part. */
+  /** The provider's model id, one of the catalogue's for this part (frontend/server/voice-agent/voice-catalogue.ts). */
   model: string;
   /** One of the owner's keys of `provider` (VoiceProviderKeyDoc._id). Absent / null / not found = that provider's default key, the first one in `keys`. */
   keyId?: Id | null;
+  /** The model's list price when the agent was saved, set by the app from the catalogue; the engine bills on it. Absent = voice-call-rates.json's. */
+  price?: VoiceStackPrice | null;
 };
 
 export type VoiceStack<Id = ObjectId> =
@@ -1034,31 +1047,38 @@ export type VoiceStack<Id = ObjectId> =
 
 export type VoiceStackPartName = "realtime" | "stt" | "llm" | "tts";
 
-/** A model a stack part may use, with its list price per call-minute. */
+/** A model a stack part may use, with its list price and what that comes to per call-minute. */
 export type VoiceStackModel = {
   provider: VoiceKeyProvider;
   model: string;
   name: string;
+  price: VoiceStackPrice;
   usdPerMinute: number;
-  source: string;
+  /** Listed but the engine cannot run it yet ("coming soon"). */
+  soon?: boolean;
+  /** Gemini speech models: a free-tier key is cut off after a few sentences a minute. */
+  paidKeyOnly?: boolean;
 };
 
-/** The models each part of a stack offers (`stack` in voice-call-rates.json, which the engine reads too): first = default. */
-export const VOICE_STACK_MODELS = voiceCallRates.stack as unknown as Record<VoiceStackPartName, VoiceStackModel[]>;
+/** The models each part offers, cheapest first (the catalogue). */
+export type VoiceStackCatalogue = Record<VoiceStackPartName, VoiceStackModel[]>;
 
-/** The stack of an owner who never picked one: what every agent ran on before stacks existed. */
+/** The fallback models of each part (voice-call-rates.json `stack`, priced there): first = default. */
+export const VOICE_STACK_MODELS = voiceCallRates.stack as unknown as Record<
+  VoiceStackPartName,
+  Pick<VoiceStackModel, "provider" | "model" | "name">[]
+>;
+
+/** The stack of an agent that never picked one: what every agent ran on before stacks existed. */
 export const VOICE_DEFAULT_STACK: VoiceStack<never> = {
   kind: VoiceStackKind.REALTIME,
   provider: VoiceKeyProvider.GEMINI,
   model: voiceCallRates.gemini.model,
 };
 
-/** The stack a call runs on: the agent's own, else the owner's, else VOICE_DEFAULT_STACK. The engine does the same (product.stack_for). */
-export function voiceStackFor<Id>(
-  agent: { stack?: VoiceStack<Id> | null } | null | undefined,
-  account: { stack?: VoiceStack<Id> | null } | null | undefined,
-): VoiceStack<Id> {
-  return agent?.stack ?? account?.stack ?? VOICE_DEFAULT_STACK;
+/** The stack a call runs on: the agent's own, else VOICE_DEFAULT_STACK. The engine does the same (product.stack_for). */
+export function voiceStackFor<Id>(agent: { stack?: VoiceStack<Id> | null } | null | undefined): VoiceStack<Id> {
+  return agent?.stack ?? VOICE_DEFAULT_STACK;
 }
 
 /**
@@ -1097,8 +1117,6 @@ export type VoiceAccountDoc<Id = ObjectId> = {
   gemini?: Omit<VoiceProviderKeyDoc<Id>, "_id" | "provider" | "label"> | null;
   /** API keys, up to `VOICE_KEY_LIMITS.maxPerOwner`, oldest first: the first key of a provider is its default. Absent = none. */
   keys?: VoiceProviderKeyDoc<Id>[];
-  /** What the owner's agents run on unless an agent has its own (`VoiceAgentDoc.stack`). Absent / null = VOICE_DEFAULT_STACK. */
-  stack?: VoiceStack<Id> | null;
   /** Connected booking apps. Absent = none. */
   calendars?: VoiceCalendarConnectionDoc<Id>[];
   /** Phone numbers, up to `VOICE_NUMBER_LIMITS.maxPerOwner`. Absent = none. */

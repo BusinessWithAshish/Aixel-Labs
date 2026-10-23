@@ -1,8 +1,9 @@
-import { VOICE_WEEKDAYS, type VoiceAgent, type VoiceAgentBookingTool } from '@aixellabs/backend/db/types';
+import { VOICE_WEEKDAYS, VoiceStackKind, type VoiceAgent, type VoiceAgentBookingTool } from '@aixellabs/backend/db/types';
 import { DEFAULT_VOICE_BOOKING_HOURS, defaultVoiceBookingTool } from '@/helpers/voice-agent-defaults';
 import { callSettingsOf } from '@/helpers/voice-agent-features';
 import type { BookingFormValues, VoiceAgentCallSettingsInput, VoiceAgentInput } from '@/helpers/voice-schemas';
 import { FALLBACK_TIMEZONE } from '@/helpers/voice-time';
+import { defaultStack } from '@/helpers/voice-stack';
 
 /** What each editor card's form starts from: the saved agent, in the shape the form edits. */
 
@@ -12,6 +13,7 @@ export function agentFormValues(agent: VoiceAgent): VoiceAgentInput {
         callType: agent.callType,
         voice: agent.voice,
         ttsVoice: agent.ttsVoice ?? null,
+        stack: agent.stack ?? defaultStack(VoiceStackKind.REALTIME),
         prompt: agent.prompt,
         variables: { ...(agent.variables ?? {}) },
     };

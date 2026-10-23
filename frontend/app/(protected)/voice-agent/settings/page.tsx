@@ -1,21 +1,19 @@
 import PageLayout from '@/components/common/PageLayout';
 import { withPageHandler } from '@/components/hocs/with-page-handler';
 import { PageProvider } from '@/contexts/PageStore';
-import { getVoiceStackSettings } from '@/app/actions/voice-settings-actions';
+import { getVoiceKeys } from '@/app/actions/voice-settings-actions';
 import { useVoiceSettingsPage } from './_hooks/use-voice-settings-page';
 import { ProviderKeysCard } from './_components/ProviderKeysCard';
-import { VoiceStackCard } from './_components/VoiceStackCard';
 
 const PAGE_TITLE = 'Voice settings';
 
-/** Settings shared by all of the owner's agents: the stack they run on and the API keys behind it. */
+/** The owner's API keys, shared by all their agents (each agent picks its models and keys in its Agent stack). */
 async function VoiceSettingsPage() {
-    const response = await getVoiceStackSettings();
+    const response = await getVoiceKeys();
 
     return (
         <PageLayout title={PAGE_TITLE} className="flex max-w-3xl flex-col gap-4 p-1">
-            <PageProvider data={response.data ?? { keys: [], stack: null }} usePageHook={useVoiceSettingsPage}>
-                <VoiceStackCard />
+            <PageProvider data={{ keys: response.data ?? [] }} usePageHook={useVoiceSettingsPage}>
                 <ProviderKeysCard />
             </PageProvider>
         </PageLayout>

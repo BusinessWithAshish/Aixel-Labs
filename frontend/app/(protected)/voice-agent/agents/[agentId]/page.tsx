@@ -1,15 +1,16 @@
 import { notFound } from 'next/navigation';
-import { VOICE_DEFAULT_STACK } from '@aixellabs/backend/db/types';
 import PageLayout from '@/components/common/PageLayout';
 import { withPageHandler } from '@/components/hocs/with-page-handler';
 import { PageProvider } from '@/contexts/PageStore';
 import { getVoiceAgent, getVoiceAgentUsage, type VoiceAgentUsage } from '@/app/actions/voice-agent-actions';
 import { listVoiceConnectedApps, type VoiceConnectedApps } from '@/app/actions/voice-calendar-actions';
 import { listVoiceCallerMemories, type VoiceCallerMemoryList } from '@/app/actions/voice-caller-memory-actions';
-import { getAgentStack, getGeminiKeyStatus } from '@/app/actions/voice-settings-actions';
+import { getAgentStackOptions, getGeminiKeyStatus, type VoiceAgentStackOptions } from '@/app/actions/voice-settings-actions';
 import { getAgentCostTotals } from '@/app/actions/voice-call-actions';
 import { isValidObjectId } from '@/helpers/object-id';
 import { NO_GEMINI_KEY } from '@/server/voice-agent/gemini-key';
+import { BUILT_IN_VOICES } from '@/helpers/voice-catalogue';
+import { FALLBACK_CATALOGUE } from '@/helpers/voice-stack';
 import { useVoiceAgentEditorPage } from './_hooks/use-voice-agent-editor-page';
 import { VoiceAgentEditor } from './_components/VoiceAgentEditor';
 import { VoiceAgentCostEstimate } from './_components/VoiceAgentCostEstimate';
@@ -18,6 +19,7 @@ import { VoicePlayground } from './_components/VoicePlayground';
 const NO_USAGE: VoiceAgentUsage = { inbound: [], outbound: [] };
 const NO_APPS: VoiceConnectedApps = { configured: false, connections: [] };
 const NO_MEMORIES: VoiceCallerMemoryList = { memories: [], total: 0 };
+const NO_STACK_OPTIONS: VoiceAgentStackOptions = { keys: [], catalogue: FALLBACK_CATALOGUE, voices: BUILT_IN_VOICES };
 
 async function VoiceAgentPage({
     params,
@@ -27,7 +29,7 @@ async function VoiceAgentPage({
     searchParams: Promise<{ connected?: string | string[] }>;
 }) {
     const [{ agentId }, { connected }] = await Promise.all([params, searchParams]);
-    const [response, usageResponse, appsResponse, keyResponse, memoriesResponse, costsResponse, stackResponse] =
+    const [response, usageResponse, appsResponse, keyResponse, memoriesResponse, costsResponse, stackOptionsResponse] =
         await Promise.all([
             getVoiceAgent(agentId),
             getVoiceAgentUsage(agentId),
@@ -35,7 +37,7 @@ async function VoiceAgentPage({
             getGeminiKeyStatus(agentId),
             listVoiceCallerMemories(agentId),
             getAgentCostTotals(agentId),
-            getAgentStack(agentId),
+            getAgentStackOptions(),
         ]);
     if (!response.success || !response.data) {
         return notFound();
@@ -60,7 +62,7 @@ async function VoiceAgentPage({
                     memories,
                     geminiKey: keyResponse.data ?? NO_GEMINI_KEY,
                     costTotals: costsResponse.data?.[0] ?? null,
-                    stack: stackResponse.data?.stack ?? VOICE_DEFAULT_STACK,
+                    stackOptions: stackOptionsResponse.data ?? NO_STACK_OPTIONS,
                 }}
                 usePageHook={useVoiceAgentEditorPage}
             >

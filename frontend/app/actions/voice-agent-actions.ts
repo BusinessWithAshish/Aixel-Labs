@@ -46,8 +46,9 @@ import {
 import { openSecret, playgroundSocketUrl, sealSecret } from '@/server/voice-agent/engine';
 import { assertGeminiKeySet } from '@/server/voice-agent/gemini-key';
 import { stackView } from '@/server/voice-agent/provider-keys';
+import { pricedStack } from '@/server/voice-agent/voice-catalogue';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
-import { listItems, updateItem } from '@/server/voice-agent/accounts';
+import { listItems, updateItem, voiceAccountsCollection } from '@/server/voice-agent/accounts';
 import { assertUsableDestination } from '@/server/voice-agent/calendar-connections';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 import { parseWebhookUrl } from '@/server/voice-agent/public-url';
@@ -201,7 +202,8 @@ export const createVoiceAgent = async (input: CreateVoiceAgentInput): Promise<AL
     runAuthenticatedAction(async function createVoiceAgent(userId) {
         const { userId: uid, tenantId } = await agentOwner(userId);
         const fields = parseOrThrow(
-            voiceAgentSchema.omit({ prompt: true }),
+            // No stack yet: VOICE_DEFAULT_STACK (Gemini Live), which speaks in `voice`.
+            voiceAgentSchema.omit({ prompt: true, stack: true }),
             {
                 name: input.name ?? DEFAULT_VOICE_AGENT_NAME,
                 callType: input.callType,
@@ -223,12 +225,14 @@ export const updateVoiceAgent = async (agentId: string, input: VoiceAgentInput):
     runAuthenticatedAction(async function updateVoiceAgent(userId) {
         const { userId: uid } = await agentOwner(userId);
         const id = toObjectId(agentId, 'Agent ID');
-        const fields = parseOrThrow(voiceAgentSchema, input, 'Invalid agent');
+        const { stack, ...fields } = parseOrThrow(voiceAgentSchema, input, 'Invalid agent');
+        const accounts = await voiceAccountsCollection();
+        const keys = stack ? ((await accounts.findOne({ userId: uid }, { projection: { keys: 1 } }))?.keys ?? []) : [];
 
         const agents = await agentsCollection();
         const doc = await agents.findOneAndUpdate(
             { _id: id, userId: uid },
-            { $set: { ...fields, updatedAt: new Date() } },
+            { $set: { ...fields, stack: stack ? await pricedStack(stack, keys) : null, updatedAt: new Date() } },
             { returnDocument: 'after' },
         );
         if (!doc) throw new Error('Agent not found');

@@ -15,6 +15,10 @@ import {
     type VoiceCallerMemory,
     type VoiceGeminiKeyView,
     type VoiceStack,
+    VOICE_DEFAULT_STACK,
+    voiceKeyFor,
+    VoiceKeyProvider,
+    VoiceStackKind,
 } from '@aixellabs/backend/db/types';
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
 import {
@@ -25,6 +29,7 @@ import {
     type VoiceAgentUsage,
 } from '@/app/actions/voice-agent-actions';
 import type { VoiceAgentCostTotals } from '@/app/actions/voice-call-actions';
+import type { VoiceAgentStackOptions } from '@/app/actions/voice-settings-actions';
 import { setNumberAgent, unlinkAgentNumber } from '@/app/actions/voice-number-actions';
 import { estimateAgentCost } from '@/helpers/voice-call-cost';
 import {
@@ -73,8 +78,8 @@ export type VoiceAgentEditorData = {
     geminiKey: VoiceGeminiKeyView;
     /** What its calls have really cost so far (null: none priced yet). */
     costTotals: VoiceAgentCostTotals | null;
-    /** What its calls run on: its own stack, else the owner's. */
-    stack: VoiceStack<string>;
+    /** The keys, models and voices its stack can use. */
+    stackOptions: VoiceAgentStackOptions;
 };
 
 /** A calendar (or event type) on a connected app, as the destination picker lists it. */
@@ -102,7 +107,7 @@ export function useVoiceAgentEditorPage({
     memories: initialMemories,
     geminiKey,
     costTotals,
-    stack,
+    stackOptions,
 }: VoiceAgentEditorData) {
     const router = useRouter();
     const agentId = initialAgent._id ?? '';
@@ -556,13 +561,16 @@ export function useVoiceAgentEditorPage({
         router.refresh();
     }, [agentId, linkNumbers, router, usage.inbound]);
 
-    // What a minute should cost, as the prompt and booking on screen stand, on the numbers it is on.
+    // What a minute should cost, as the stack, prompt and booking on screen stand, on the numbers it is on.
+    const stack = (form.stack ?? VOICE_DEFAULT_STACK) as VoiceStack<string>;
+    const thinker = stack.kind === VoiceStackKind.REALTIME ? stack : stack.llm;
     const costEstimate = estimateAgentCost({
         promptChars: form.prompt.length,
-        freeTier: geminiKey.tier === 'free',
+        freeTier: thinker.provider === VoiceKeyProvider.GEMINI && voiceKeyFor(stackOptions.keys, thinker)?.tier === 'free',
         callType: form.callType,
         providers: numbers.map((n) => n.provider),
         stack,
+        catalogue: stackOptions.catalogue,
         tools: [
             ...(booking.enabled ? [{ kind: 'booking' as const }] : []),
             ...saved.tools.webhooks
@@ -578,6 +586,7 @@ export function useVoiceAgentEditorPage({
     return {
         agentId,
         geminiKey,
+        stackOptions,
         costEstimate,
         costTotals,
         saved,

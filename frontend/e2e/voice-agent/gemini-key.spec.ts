@@ -4,7 +4,6 @@ import {
     VoiceAgentCallType,
     VoiceCallChannel,
     VoiceCallDirection,
-    VoiceKeyProvider,
     VoiceKeyStatus,
     VoiceStackKind,
 } from '@aixellabs/backend/db/types';
@@ -35,6 +34,77 @@ const SECOND_KEY = 'AIzaGoodSecondE2eKey0123456789abcdQrSt';
 const CARTESIA_KEY = 'sk_car_GoodE2eCartesiaKey0123456789';
 const NUMBER = '+13473700001';
 
+/** Google's model list for a good key: what the agent's stack may pick from it (not gemini-2.5-flash). */
+const GEMINI_MODELS = [
+    ['gemini-3.8-live', 'bidiGenerateContent'],
+    ['gemini-3.5-transcribe-live', 'bidiGenerateContent'],
+    ['gemini-3.5-flash-lite', 'generateContent'],
+    ['gemini-3.8-flash-tts', 'generateContent'],
+].map(([id, method]) => ({ name: `models/${id}`, supportedGenerationMethods: [method] }));
+
+/** Enough of the Vercel AI Gateway's /v1/models: priced, and some the stack leaves out (gateway-only, Responses-only, websocket STT, another provider, one the key does not list). */
+const gateway = (id: string, name: string, type: string, pricing: Record<string, string>, tags: string[] = []) => ({
+    id,
+    name,
+    owned_by: id.split('/')[0],
+    type,
+    tags,
+    pricing,
+});
+const GATEWAY_MODELS = [
+    gateway('google/gemini-3.8-live', 'Gemini 3.8 Live', 'realtime', {
+        input: '0.00000075',
+        output: '0.0000045',
+        audio_input_token_cost: '0.000003',
+        audio_output_token_cost: '0.000012',
+    }),
+    gateway('openai/gpt-realtime-mini', 'GPT-Realtime mini', 'realtime', {
+        input: '0.0000006',
+        output: '0.0000024',
+        audio_input_token_cost: '0.00001',
+        audio_output_token_cost: '0.00002',
+    }),
+    gateway(
+        'google/gemini-3.5-transcribe-live',
+        'Gemini 3.5 Transcribe Live',
+        'transcription',
+        { transcription_duration_cost_per_second: '0.00015' },
+        ['websocket-transcription'],
+    ),
+    gateway('openai/gpt-4o-mini-transcribe', 'GPT-4o mini Transcribe', 'transcription', {
+        audio_input_token_cost: '0.00000125',
+    }),
+    gateway(
+        'openai/gpt-realtime-whisper',
+        'GPT Realtime Whisper',
+        'transcription',
+        { transcription_duration_cost_per_second: '0.0003' },
+        ['websocket-transcription'],
+    ),
+    gateway(
+        'google/gemini-3.5-flash-lite',
+        'Gemini 3.5 Flash Lite',
+        'language',
+        { input: '0.0000003', output: '0.0000025' },
+        ['tool-use'],
+    ),
+    gateway(
+        'google/gemini-3.5-flash-lite-batch',
+        'Gemini 3.5 Flash Lite Batch',
+        'language',
+        { input: '0.00000015', output: '0.00000125' },
+        ['tool-use'],
+    ),
+    gateway('google/gemini-2.5-flash', 'Gemini 2.5 Flash', 'language', { input: '0.0000003', output: '0.0000025' }, [
+        'tool-use',
+    ]),
+    gateway('openai/gpt-5.4-nano', 'GPT 5.4 Nano', 'language', { input: '0.0000002', output: '0.00000125' }, ['tool-use']),
+    gateway('openai/gpt-5.5-pro', 'GPT-5.5 Pro', 'language', { input: '0.00003', output: '0.00018' }, ['tool-use']),
+    gateway('google/gemini-3.8-flash-tts', 'Gemini 3.8 Flash TTS', 'speech', { audio_output_token_cost: '0.000009' }),
+    gateway('openai/tts-1', 'TTS-1', 'speech', { speech_input_character_cost: '0.000015' }),
+    gateway('spacexai/grok-tts', 'Grok TTS', 'speech', { speech_input_character_cost: '0.000015' }),
+];
+
 function googleError(code: number, status: string, reason: string, message: string) {
     return { error: { code, message, status, details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason }] } };
 }
@@ -54,6 +124,7 @@ class FakeGemini {
                     res.writeHead(status, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(body));
                 };
+                if (req.url?.startsWith('/providers/gateway/')) return reply(200, { data: GATEWAY_MODELS });
                 // The other providers (VOICE_PROVIDER_API_BASE): a key with "Good" in it works.
                 if (req.url?.startsWith('/providers/')) {
                     const auth = String(req.headers.authorization ?? req.headers['xi-api-key'] ?? '');
@@ -65,7 +136,7 @@ class FakeGemini {
                 fake.urls.push(req.url ?? '');
                 if (!req.url?.startsWith('/v1beta/models'))
                     return reply(404, googleError(404, 'NOT_FOUND', '', 'Not found'));
-                if (key.startsWith('AIzaGood')) return reply(200, { models: [{ name: 'models/gemini-3.8-live' }] });
+                if (key.startsWith('AIzaGood')) return reply(200, { models: GEMINI_MODELS });
                 if (key === DISABLED_KEY) {
                     return reply(
                         403,
@@ -183,9 +254,14 @@ test('without a key: the card says so, and the playground, answering, making cal
         GEMINI_KEY_URL,
     );
 
+    // The agent's stack says its step has no key, with the way to Settings.
+    await openVoiceAgent(page, inbound);
+    await expect(page.getByTestId('agent-stack').getByRole('radio', { name: /^One voice model/ })).toBeChecked();
+    await expect(page.getByTestId('stack-realtime-no-key')).toContainText('No Gemini key yet');
+    await expect(page.getByTestId('stack-realtime-no-key').getByRole('link')).toHaveAttribute('href', GEMINI_KEY_URL);
+
     await openSettings(page);
-    await expect(page.getByTestId('voice-stack-card').getByRole('radio', { name: /^One voice model/ })).toBeChecked();
-    await expect(page.getByTestId('voice-stack-missing-keys')).toContainText('Calls need a key for Gemini');
+    await expect(page.getByTestId('voice-stack-card')).toHaveCount(0);
     await expect(card(page).getByTestId('voice-key')).toHaveCount(0);
     await expect(card(page)).toContainText('Your agents cannot take or make calls until you add your own Gemini key.');
     await expect(card(page).getByRole('button', { name: 'Add key' })).toBeVisible();
@@ -302,7 +378,13 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     await expect(keyStatus(page)).toHaveText('Working');
     await expect(card(page).getByTestId('voice-key')).toContainText(`Ending in ${GOOD_KEY.slice(-4)}`);
     await expect(card(page).getByTestId('voice-key')).toContainText('Default');
-    expect(gemini.keys).toEqual([INVALID_KEY, DISABLED_KEY, QUOTA_KEY, GOOD_KEY]);
+    // The key checks (the agent page also lists the key's models for its stack).
+    expect(gemini.keys.filter((_, i) => gemini.urls[i] === '/v1beta/models?pageSize=1')).toEqual([
+        INVALID_KEY,
+        DISABLED_KEY,
+        QUOTA_KEY,
+        GOOD_KEY,
+    ]);
 
     const [stored] = await storedKeys(db);
     expect(stored).toMatchObject({
@@ -330,7 +412,7 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     await openVoiceAgent(page, inbound);
     await expect(page.getByRole('button', { name: 'Start call' })).toBeEnabled();
     await expect(page.getByTestId('gemini-key-notice')).toHaveCount(0);
-    await expect(page.getByTestId('gemini-key-line')).toHaveCount(2); // the editor and the playground
+    await expect(page.getByTestId('gemini-key-line')).toHaveCount(1); // the playground; the editor's stack names its key
     // Every place an agent shows says which key it runs on.
     await expect(page.getByTestId('gemini-key-line').first()).toHaveText(
         `Runs on your Gemini key ending ${GOOD_KEY.slice(-4)} · paid tier`,
@@ -479,7 +561,7 @@ test('the settings page fits a phone screen', async ({ page }) => {
     expect(Math.max(...(await sideways()))).toBeLessThanOrEqual(1);
 });
 
-test('several keys and the stack: a second Gemini key, the default, a pipeline stack (beta), an agent’s own key', async ({
+test('several keys, and each agent its own stack: one voice model or three steps, each step’s model, key and price', async ({
     page,
     db,
 }) => {
@@ -525,61 +607,92 @@ test('several keys and the stack: a second Gemini key, the default, a pipeline s
         ['cartesia', 'Voices'],
     ]);
     const [clinicId, mainId] = keys.map((k) => k._id.toString());
+    await expect(page.getByTestId('voice-stack-card')).toHaveCount(0); // the stack is each agent's now
 
-    // The pipeline stack: each step's model, and which keys it still needs.
-    const stack = page.getByTestId('voice-stack-card');
-    await stack.getByRole('radio', { name: /^Pick each step/ }).click();
-    await expect(stack).toContainText('Beta');
-    await expect(stack.locator('#stack-stt-model')).toContainText('Deepgram Nova-3');
-    await expect(page.getByTestId('voice-stack-missing-keys')).toContainText('Calls need a key for Deepgram.');
-    await stack.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByText('Saved. New calls use this stack.')).toBeVisible();
-    await expect
-        .poll(async () => (await db.getVoiceAccount(E2E_USER))?.stack)
-        .toMatchObject({
-            kind: 'PIPELINE',
-            stt: { provider: 'deepgram', model: 'nova-3', keyId: null },
-            llm: { provider: 'gemini', model: 'gemini-3.5-flash-lite', keyId: null },
-            tts: { provider: 'cartesia', model: 'sonic-3.6', keyId: null },
-        });
-
-    // Back to one model, on the "Main" key.
-    await stack.getByRole('radio', { name: /^One voice model/ }).click();
+    // One voice model: the live models the Gemini key lists, priced from the catalogue; OpenAI's is coming soon.
+    await openVoiceAgent(page, inbound);
+    const stack = page.getByTestId('agent-stack');
+    await expect(stack.getByRole('radio', { name: /^One voice model/ })).toBeChecked();
+    await stack.locator('#stack-realtime-model').click();
+    await expect(page.getByRole('option', { name: /^Gemini 3\.8 Live · \$0\.02\d\/min$/ })).toBeVisible();
+    await expect(page.getByRole('option', { name: /^GPT-Realtime mini · .* · coming soon$/ })).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await expect(stack.locator('#stack-realtime-key')).toContainText('Default (Clinic)');
     await stack.locator('#stack-realtime-key').click();
     await page.getByRole('option', { name: /^Main/ }).click();
-    await stack.getByRole('button', { name: 'Save' }).click();
-    await expect.poll(async () => (await db.getVoiceAccount(E2E_USER))?.stack?.kind).toBe('REALTIME');
-    const saved = (await db.getVoiceAccount(E2E_USER))?.stack;
+
+    // Three steps (beta): each step's model and key; a step whose provider has no key says so.
+    await stack.getByRole('radio', { name: /^Three steps/ }).click();
+    await expect(page.getByTestId('agent-stack-beta')).toContainText('in beta');
+    await expect(stack.locator('#stack-stt-model')).toContainText('Deepgram Nova-3');
+    await expect(page.getByTestId('stack-stt-no-key')).toContainText('No Deepgram key yet');
+    await expect(page.getByTestId('stack-tts-no-key')).toHaveCount(0);
+    // Text models: those the key lists and the engine can run, cheapest first, or by name.
+    await stack.locator('#stack-llm-model').click();
+    await expect(page.getByRole('option').first()).toContainText('GPT 5.4 Nano');
+    for (const left of [/^Gemini 2\.5 Flash ·/, /Batch/, /GPT-5\.5 Pro/, /^Gemini 3\.8 Flash ·/]) {
+        await expect(page.getByRole('option', { name: left })).toHaveCount(0);
+    }
+    await page.keyboard.press('Escape');
+    await stack.getByLabel('By name').click();
+    await stack.locator('#stack-llm-model').click();
+    await expect(page.getByRole('option').first()).toContainText('Gemini 3.5 Flash Lite');
+    await page.getByRole('option', { name: /^Gemini 3\.5 Flash Lite/ }).click();
+    await stack.locator('#stack-stt-model').click();
+    await expect(page.getByRole('option', { name: /GPT Realtime Whisper/ })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    // Gemini's own voice step needs a paid-tier key.
+    await stack.locator('#stack-tts-model').click();
+    await page.getByRole('option', { name: /^Gemini 3\.8 Flash TTS/ }).click();
+    await expect(page.getByTestId('stack-tts-paid-only')).toContainText('about 4 sentences a minute');
+    await stack.locator('#stack-tts-model').click();
+    await page.getByRole('option', { name: /^Cartesia Sonic 3\.6/ }).click();
+    await expect(page.getByTestId('stack-tts-paid-only')).toHaveCount(0);
+
+    // Saved with the agent, each part with the price it bills on; the cost box prices these three steps.
+    await page.getByRole('button', { name: 'Save', exact: true }).first().click();
+    await expect.poll(async () => (await db.getVoiceAgentDoc(inbound)).stack?.kind).toBe('PIPELINE');
+    const pipeline = (await db.getVoiceAgentDoc(inbound)).stack;
+    expect(pipeline).toMatchObject({
+        stt: { provider: 'deepgram', model: 'nova-3', keyId: null, price: { usdPerMinute: 0.0058 } },
+        llm: { provider: 'gemini', model: 'gemini-3.5-flash-lite', keyId: null },
+        tts: { provider: 'cartesia', model: 'sonic-3.6', keyId: null, price: { usdPerMillionChars: 39 } },
+    });
+    const llmPrice = pipeline?.kind === VoiceStackKind.PIPELINE ? pipeline.llm.price : null;
+    expect(llmPrice && 'usdPerMillionTokens' in llmPrice ? llmPrice.usdPerMillionTokens : null).toEqual({
+        in: expect.closeTo(0.3, 9),
+        out: expect.closeTo(2.5, 9),
+    });
+    const parts = page.getByTestId('agent-cost-parts');
+    await expect(parts).toContainText('Speech to text · Deepgram Nova-3');
+    await expect(parts).toContainText('Thinking (LLM) · Gemini 3.5 Flash Lite');
+    await expect(parts).toContainText('Text to speech · Cartesia Sonic 3.6');
+
+    // Back to one voice model: the key picked for it before is still picked; saved on that key.
+    await stack.getByRole('radio', { name: /^One voice model/ }).click();
+    await expect(stack.locator('#stack-realtime-key')).toContainText('Main');
+    await page.getByRole('button', { name: 'Save', exact: true }).first().click();
+    await expect.poll(async () => (await db.getVoiceAgentDoc(inbound)).stack?.kind).toBe('REALTIME');
+    const saved = (await db.getVoiceAgentDoc(inbound)).stack;
     expect(saved).toMatchObject({ kind: 'REALTIME', provider: 'gemini', model: 'gemini-3.8-live' });
     expect(String(saved && 'keyId' in saved ? saved.keyId : '')).toBe(mainId);
-
-    // An agent runs on the owner's stack until it picks its own key.
-    await openVoiceAgent(page, inbound);
+    expect(saved && 'price' in saved && saved.price && 'usdPerMillionTokens' in saved.price).toBe(true);
     await expect(page.getByTestId('gemini-key-line').first()).toContainText(`ending ${GOOD_KEY.slice(-4)}`);
-    await page.getByTestId('agent-key-select').click();
-    await page.getByRole('option', { name: /^Clinic/ }).click();
-    await expect(page.getByText('Key saved for this agent')).toBeVisible();
-    await expect(page.getByTestId('gemini-key-line').first()).toContainText(`ending ${SECOND_KEY.slice(-4)}`);
-    const agentStack = (await db.getVoiceAgentDoc(inbound)).stack;
-    expect(agentStack).toMatchObject({ kind: 'REALTIME', provider: 'gemini' });
-    expect(String(agentStack && 'keyId' in agentStack ? agentStack.keyId : '')).toBe(clinicId);
-
-    await page.getByRole('button', { name: 'Use Settings' }).click();
-    await expect(page.getByText('Back on the stack and key from Settings')).toBeVisible();
-    expect((await db.getVoiceAgentDoc(inbound)).stack).toBeNull();
+    expect(clinicId).not.toBe(mainId);
 });
 
-test('the voice picker: Gemini Live voices on the one-model stack, text-to-speech voices on a pipeline', async ({
+test('the voice picker: Gemini voices on one voice model, the voice step’s provider’s voices on three steps', async ({
     page,
     db,
 }) => {
     await db.setVoiceGeminiKey(E2E_USER, GOOD_KEY);
     const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Maya' });
     await openVoiceAgent(page, agentId);
-
-    await page.getByTestId('voice-picker-trigger').click();
+    const stack = page.getByTestId('agent-stack');
     const picker = page.getByTestId('voice-picker');
-    await expect(picker).toContainText('This agent speaks in Gemini Live’s own voices.');
+
+    await stack.locator('#stack-realtime-voice').click();
+    await expect(picker).toContainText('Gemini’s voices');
     await expect(picker.getByTestId('voice-option')).toHaveCount(30);
     // The agent's own voice (Sulafat) is picked already.
     await expect(page.getByTestId('voice-picker-selection')).toHaveText('Sulafat · Gemini');
@@ -588,38 +701,34 @@ test('the voice picker: Gemini Live voices on the one-model stack, text-to-speec
     await picker.getByRole('button', { name: /^Fenrir/ }).click();
     await expect(page.getByTestId('voice-picker-selection')).toHaveText('Fenrir · Gemini');
     await picker.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByTestId('voice-picker-trigger')).toContainText('Fenrir');
-    await page.getByRole('button', { name: 'Save' }).first().click();
+    await expect(stack.locator('#stack-realtime-voice')).toContainText('Fenrir');
+    await page.getByRole('button', { name: 'Save', exact: true }).first().click();
     await expect.poll(async () => (await db.getVoiceAgentDoc(agentId)).voice).toBe('fenrir');
 
-    // Text-to-speech voices need the pipeline stack: shown to listen to, not to pick.
-    await page.getByTestId('voice-picker-trigger').click();
-    await picker.getByRole('tab', { name: 'Text-to-speech voices' }).click();
-    await picker.getByRole('radio', { name: /ElevenLabs/ }).click();
-    await expect(picker).toContainText('These voices need the "Pick each step" stack (beta)');
+    // Three steps speaking through ElevenLabs: its first voice until another is picked, then its voices to pick.
+    await stack.getByRole('radio', { name: /^Three steps/ }).click();
+    await stack.locator('#stack-tts-model').click();
+    await page.getByRole('option', { name: /^ElevenLabs Flash v2\.5/ }).click();
+    await expect(stack.locator('#stack-tts-voice')).toContainText('Sarah');
+    await stack.locator('#stack-tts-voice').click();
+    await expect(picker).toContainText('ElevenLabs’s voices');
     await expect(picker.getByRole('button', { name: 'Play Sarah' })).toBeVisible();
-    await expect(picker.getByRole('button', { name: /^Sarah/ })).toBeDisabled();
+    await picker.getByLabel('By name').click();
+    await expect(picker.getByTestId('voice-option').first()).toContainText('Adam');
     await picker.getByLabel('Gender').click();
     await page.getByRole('option', { name: 'Male', exact: true }).click();
     await expect(picker.getByTestId('voice-option').filter({ hasText: 'Sarah' })).toHaveCount(0);
-    await page.keyboard.press('Escape');
-
-    // On a pipeline speaking through ElevenLabs, its voices are the ones to pick.
-    await db.setVoiceKeys(E2E_USER, [{ keySealed: sealForE2e(GOOD_KEY), last4: 'WxYz' }], {
-        kind: VoiceStackKind.PIPELINE,
-        stt: { provider: VoiceKeyProvider.DEEPGRAM, model: 'nova-3' },
-        llm: { provider: VoiceKeyProvider.GEMINI, model: 'gemini-3.5-flash-lite' },
-        tts: { provider: VoiceKeyProvider.ELEVENLABS, model: 'eleven_flash_v2_5' },
-    });
-    await openVoiceAgent(page, agentId);
-    await page.getByTestId('voice-picker-trigger').click();
-    await expect(picker).toContainText('This agent speaks through ElevenLabs.');
+    await page.getByRole('option', { name: 'Male', exact: true }).waitFor({ state: 'hidden' });
+    await picker.getByLabel('Gender').click();
+    await page.getByRole('option', { name: 'Any gender' }).click();
     await picker.getByRole('button', { name: /^Alice/ }).click();
     await picker.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByTestId('voice-picker-trigger')).toContainText('Alice');
-    await page.getByRole('button', { name: 'Save' }).first().click();
+    await expect(stack.locator('#stack-tts-voice')).toContainText('Alice');
+    await page.getByRole('button', { name: 'Save', exact: true }).first().click();
     await expect
         .poll(async () => (await db.getVoiceAgentDoc(agentId)).ttsVoice)
         .toEqual({ provider: 'elevenlabs', voiceId: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice' });
-    expect((await db.getVoiceAgentDoc(agentId)).voice).toBe('fenrir');
+    const doc = await db.getVoiceAgentDoc(agentId);
+    expect(doc.voice).toBe('fenrir');
+    expect(doc.stack).toMatchObject({ kind: 'PIPELINE', tts: { provider: 'elevenlabs', model: 'eleven_flash_v2_5' } });
 });

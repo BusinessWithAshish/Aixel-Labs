@@ -4,6 +4,7 @@ import {
     VoiceKeyProvider,
     VoiceStackKind,
     type VoiceStack,
+    type VoiceStackCatalogue,
     type VoiceStackPartName,
     type VoiceAgentCallType,
     type VoiceCallCost,
@@ -140,6 +141,8 @@ export function estimateAgentCost(input: {
     tools?: CostTool[];
     /** What its calls run on. Absent: the default (Gemini Live). */
     stack?: VoiceStack<unknown>;
+    /** Where the stack's models are priced. Absent: voice-call-rates.json's models. */
+    catalogue?: VoiceStackCatalogue;
 }): AgentCostEstimate {
     const model = VOICE_CALL_RATES.estimate;
     const per = model.tools;
@@ -154,8 +157,8 @@ export function estimateAgentCost(input: {
 
     const tokens = (chars: number) => Math.ceil(chars / model.charsPerToken);
     const promptTokens = tokens(input.promptChars) + model.engineTokens;
-    const name = (part: VoiceStackPartName, id: string) => stackModel(part, id)?.name ?? id;
-    const rate = (part: VoiceStackPartName, id: string) => stackModel(part, id)?.usdPerMinute ?? 0;
+    const name = (part: VoiceStackPartName, id: string) => stackModel(part, id, input.catalogue)?.name ?? id;
+    const rate = (part: VoiceStackPartName, id: string) => stackModel(part, id, input.catalogue)?.usdPerMinute ?? 0;
 
     // What one prompt token read every turn costs a minute, on the model that reads it.
     let thinker: VoiceKeyProvider;
@@ -163,7 +166,13 @@ export function estimateAgentCost(input: {
     let lines: AgentCostLine[];
     if (stack.kind === VoiceStackKind.REALTIME) {
         thinker = stack.provider;
-        tokenUsdPerMinute = paid(thinker) * model.geminiUsdPerPromptTokenMinute;
+        // Measured on Gemini 3.8 Live; another live model reads its prompt at its own text-in price.
+        const price = stackModel('realtime', stack.model, input.catalogue)?.price;
+        const textIn =
+            price && 'usdPerMillionTokens' in price && 'textIn' in price.usdPerMillionTokens
+                ? price.usdPerMillionTokens.textIn
+                : usdPerMillionTokens.textIn;
+        tokenUsdPerMinute = (paid(thinker) * model.geminiUsdPerPromptTokenMinute * textIn) / usdPerMillionTokens.textIn;
         lines = [
             {
                 label: name('realtime', stack.model),

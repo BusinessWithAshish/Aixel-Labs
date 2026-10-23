@@ -112,6 +112,8 @@ export function e2eServerEnv(worker: number): Record<string, string> {
         GEMINI_API_BASE: geminiApiBase(worker),
         // The other providers' key checks and voice lists, on the same fake (`/providers/{provider}/…`).
         VOICE_PROVIDER_API_BASE: `${geminiApiBase(worker)}/providers`,
+        // The model catalogue (Vercel AI Gateway's /v1/models), on the same fake; unreachable = the rates file's models.
+        VOICE_CATALOGUE_URL: `${geminiApiBase(worker)}/providers/gateway/v1/models`,
         FLAGS_SECRET: E2E_FLAGS_SECRET,
         FIREBASE_AUTH_EMULATOR_HOST: E2E_AUTH_EMULATOR_HOST,
         FIREBASE_ADMIN_PROJECT_ID: E2E_FIREBASE_PROJECT_ID,

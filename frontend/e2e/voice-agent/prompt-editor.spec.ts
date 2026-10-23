@@ -86,7 +86,8 @@ test('marks tools the agent has, and warns about ones it does not', async ({ pag
     await expect(problems.nth(0)).toContainText(`check_availability, book_appointment: ${BOOKING_OFF}.`);
     await expect(prompt(page)).toHaveAttribute('aria-describedby', 'agent-prompt-help agent-prompt-problems');
 
-    // Hovering a warning explains it.
+    // Hovering a warning explains it (the prompt sits below the agent's stack: scroll to it first).
+    await prompt(page).scrollIntoViewIfNeeded();
     const box = await mark(page, 'book_appointment').boundingBox();
     if (!box) throw new Error('book_appointment is not on screen');
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

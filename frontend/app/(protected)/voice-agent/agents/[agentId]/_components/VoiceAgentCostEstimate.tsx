@@ -17,8 +17,9 @@ const CALL_LOGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.CALL_LOGS];
 const count = (n: number) => n.toLocaleString('en-US');
 
 /**
- * What a minute with this agent should cost the owner, as a bill before any call: Gemini's talk time,
- * the prompt, each tool that is on, and the phone. Below it, once calls exist, what they really cost.
+ * What a minute with this agent should cost the owner, as a bill before any call, on exactly its stack:
+ * one voice model's talk time and prompt, or the three steps (the text model's share grown with the
+ * prompt), then each tool that is on, and the phone. Below it, once calls exist, what they really cost.
  */
 export function VoiceAgentCostEstimate() {
     const { agentId, costEstimate: estimate, costTotals } = usePage<UseVoiceAgentEditorPageReturn>();
@@ -43,7 +44,7 @@ export function VoiceAgentCostEstimate() {
     ];
 
     return (
-        <Card className="h-auto min-w-0 gap-3" data-testid="agent-cost-estimate">
+        <Card className="border-primary/20 bg-primary/5 h-auto min-w-0 gap-3" data-testid="agent-cost-estimate">
             <CardHeader>
                 <CardTitle>Cost per minute</CardTitle>
                 <CardDescription>An estimate from list prices.</CardDescription>
@@ -60,9 +61,9 @@ export function VoiceAgentCostEstimate() {
                             </dd>
                         </div>
                     ))}
-                    <dt className="border-t pt-1.5 font-medium">A minute</dt>
+                    <dt className="bg-primary/10 text-primary mt-1 rounded-l-md py-1.5 pl-2 font-medium">A minute</dt>
                     <dd
-                        className="border-t pt-1.5 text-right font-semibold tabular-nums"
+                        className="bg-primary/10 text-primary mt-1 rounded-r-md py-1.5 pr-2 text-right text-base font-semibold tabular-nums"
                         data-testid="agent-cost-per-minute"
                     >
                         {money(estimate.usdPerMinute)}
