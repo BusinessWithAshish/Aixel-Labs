@@ -41,8 +41,8 @@ import { ownedStack, providerApiUrl } from '@/server/voice-agent/provider-keys';
  *           go straight to each provider on the owner's key; the gateway is only read for its list.
  *           Deepgram, Cartesia and ElevenLabs publish no prices by API: voice-call-rates.json `stack`.
  *   voices  the built-in voices plus those in the owner's own Cartesia / ElevenLabs accounts, Deepgram's Aura
- *           voices (its public model list, with samples); OpenAI's and Gemini's get the app's own sample
- *           (`voiceSampleUrl`) when the owner has that key.
+ *           voices (its public model list, with samples); OpenAI's and Gemini's play the samples shipped with
+ *           the app, and the few without one get the app's own (`voiceSampleUrl`) when the owner has that key.
  *
  * Any failure falls back (the rates file's models, the built-in voices): the section always has a list.
  */
@@ -176,7 +176,10 @@ export async function agentVoices(keys: VoiceProviderKeyDoc[]): Promise<Record<V
     ]);
     const sampled = (provider: VoiceKeyProvider) =>
         voiceKeyFor(keys, { provider })
-            ? BUILT_IN_VOICES[provider].map((v) => ({ ...v, previewUrl: voiceSampleUrl(provider, v.voiceId) }))
+            ? BUILT_IN_VOICES[provider].map((v) => ({
+                  ...v,
+                  previewUrl: v.previewUrl ?? voiceSampleUrl(provider, v.voiceId),
+              }))
             : BUILT_IN_VOICES[provider];
     return {
         ...BUILT_IN_VOICES,

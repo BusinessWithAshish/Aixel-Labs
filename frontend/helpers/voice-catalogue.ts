@@ -51,10 +51,19 @@ const cartesia = (voiceId: string, name: string, gender: VoiceGender, accent: st
     description,
 });
 
-const openai = (voiceId: string): VoiceOption => ({
+/**
+ * Samples shipped with the app (public/voice-samples), for providers that publish none to link to: OpenAI's
+ * from its docs (cdn.openai.com/API/docs/audio, loudness-normalised; none for Ballad and Verse), Gemini's made
+ * on 2026-10-23 on a free-tier key, one sentence each, with Gemini 3.8 Flash TTS, 3.8 Flash Lite TTS and 3.1
+ * Flash TTS (free requests are 10 a day per model).
+ */
+const sample = (provider: VoiceKeyProvider, voiceId: string) => `/voice-samples/${provider}/${voiceId}.mp3`;
+
+const openai = (voiceId: string, sampled = true): VoiceOption => ({
     provider: VoiceKeyProvider.OPENAI,
     voiceId,
     name: voiceId.charAt(0).toUpperCase() + voiceId.slice(1),
+    ...(sampled ? { previewUrl: sample(VoiceKeyProvider.OPENAI, voiceId) } : {}),
 });
 
 export const GEMINI_VOICE_OPTIONS: VoiceOption[] = (Object.keys(VOICE_AGENT_VOICES) as VoiceAgentVoice[]).map((voice) => ({
@@ -62,6 +71,7 @@ export const GEMINI_VOICE_OPTIONS: VoiceOption[] = (Object.keys(VOICE_AGENT_VOIC
     voiceId: voice,
     name: voiceAgentVoiceName(voice),
     description: VOICE_AGENT_VOICES[voice],
+    previewUrl: sample(VoiceKeyProvider.GEMINI, voice),
 }));
 
 export const BUILT_IN_VOICES: Record<VoiceKeyProvider, VoiceOption[]> = {
@@ -101,7 +111,7 @@ export const BUILT_IN_VOICES: Record<VoiceKeyProvider, VoiceOption[]> = {
     [VoiceKeyProvider.OPENAI]: [
         openai('alloy'),
         openai('ash'),
-        openai('ballad'),
+        openai('ballad', false),
         openai('coral'),
         openai('echo'),
         openai('fable'),
@@ -109,7 +119,7 @@ export const BUILT_IN_VOICES: Record<VoiceKeyProvider, VoiceOption[]> = {
         openai('onyx'),
         openai('sage'),
         openai('shimmer'),
-        openai('verse'),
+        openai('verse', false),
     ],
     [VoiceKeyProvider.DEEPGRAM]: [],
 };
@@ -123,7 +133,7 @@ export function mergeVoices(builtIn: VoiceOption[], own: VoiceOption[]): VoiceOp
     ];
 }
 
-/** The app's own sample of a voice that has none to play (OpenAI's, Gemini's), made once on the owner's key. */
+/** The app's own sample of a built-in voice with none shipped (OpenAI's Ballad, Verse), made once on the owner's key. */
 export const voiceSampleUrl = (provider: VoiceKeyProvider, voiceId: string) =>
     `/api/voice-agent/voice-sample/${provider}/${encodeURIComponent(voiceId)}`;
 

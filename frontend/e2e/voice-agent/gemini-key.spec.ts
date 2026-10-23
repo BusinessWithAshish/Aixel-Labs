@@ -150,15 +150,6 @@ class FakeGemini {
                 fake.urls.push(req.url ?? '');
                 if (!req.url?.startsWith('/v1beta/models'))
                     return reply(404, googleError(404, 'NOT_FOUND', '', 'Not found'));
-                // Gemini TTS (a voice sample): 0.1 s of silence, 16-bit PCM at 24 kHz.
-                if (req.url.endsWith(':generateContent') && key.startsWith('AIzaGood')) {
-                    const data = Buffer.alloc(4800).toString('base64');
-                    return reply(200, {
-                        candidates: [
-                            { content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data } }] } },
-                        ],
-                    });
-                }
                 if (key.startsWith('AIzaGood')) return reply(200, { models: GEMINI_MODELS });
                 if (key === DISABLED_KEY) {
                     return reply(
@@ -731,13 +722,20 @@ test('the voice picker: Gemini voices on one voice model, the voice step’s pro
     await expect(picker.getByTestId('voice-option')).toHaveCount(30);
     // The agent's own voice (Sulafat) is picked already.
     await expect(page.getByTestId('voice-picker-selection')).toHaveText('Sulafat · Gemini');
-    // Gemini publishes no samples: the app makes one on the owner's key, once.
-    await expect(picker.getByRole('button', { name: 'Play Sulafat' })).toBeVisible();
-    const sample = await page.request.get('/api/voice-agent/voice-sample/gemini/sulafat');
+    // Gemini publishes no samples: every one of its voices plays the sample shipped with the app.
+    await expect(picker.getByRole('button', { name: /^Play / })).toHaveCount(30);
+    const sample = await page.request.get('/voice-samples/gemini/sulafat.mp3');
     expect(sample.status()).toBe(200);
-    expect(sample.headers()['content-type']).toBe('audio/wav');
-    expect((await sample.body()).subarray(0, 4).toString()).toBe('RIFF');
+    expect(sample.headers()['content-type']).toBe('audio/mpeg');
+    // The on-demand sample is only for built-in voices with none shipped.
+    expect((await page.request.get('/api/voice-agent/voice-sample/gemini/sulafat')).status()).toBe(404);
     expect((await page.request.get('/api/voice-agent/voice-sample/gemini/not-a-voice')).status()).toBe(404);
+    // A sample that will not load says so on its card.
+    await page.route('**/voice-samples/gemini/kore.mp3', (route) => route.fulfill({ status: 503 }));
+    await picker.getByRole('button', { name: 'Play Kore' }).click();
+    await expect(picker.getByTestId('voice-sample-failed')).toHaveText(
+        'Sample unavailable right now, try again in a minute.',
+    );
     await picker.getByLabel('Search voices').fill('excitable');
     await expect(picker.getByTestId('voice-option')).toHaveCount(1);
     await picker.getByRole('button', { name: /^Fenrir/ }).click();

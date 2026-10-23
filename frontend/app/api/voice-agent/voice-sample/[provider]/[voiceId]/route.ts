@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getActionErrorMessage, requireUserObjectId } from '@/helpers/server-action-helpers';
 import { getAppSession } from '@/server/auth';
-import { voiceSample } from '@/server/voice-agent/voice-samples';
+import { SampleUnavailable, voiceSample } from '@/server/voice-agent/voice-samples';
 
-/** A built-in OpenAI or Gemini voice saying one sentence, for the voice picker's play button (`voiceSampleUrl`). */
+/** A built-in voice with no shipped sample saying one sentence, for the voice picker's play button (`voiceSampleUrl`). */
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -27,6 +27,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pro
             },
         });
     } catch (error) {
-        return json(502, getActionErrorMessage(error, 'Could not make the sample'));
+        if (error instanceof SampleUnavailable) return json(error.status, error.message);
+        return json(503, getActionErrorMessage(error, 'Sample unavailable right now, try again in a minute.'));
     }
 }

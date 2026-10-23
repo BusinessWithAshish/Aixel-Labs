@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { Check, Pause, Play, Search } from 'lucide-react';
+import { Check, CircleAlert, Loader2, Pause, Play, Search } from 'lucide-react';
 import { VoiceKeyProvider, type VoiceAgentVoice, type VoiceTtsVoice } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -202,17 +202,34 @@ function VoiceGrid({
     const [playing, setPlaying] = useState<string | null>(null);
     useEffect(() => () => audio.current?.pause(), []);
 
+    const [loading, setLoading] = useState<string | null>(null);
+    const [failed, setFailed] = useState<string | null>(null);
+
     const toggle = (voice: VoiceOption) => {
         audio.current?.pause();
-        if (playing === voice.voiceId || !voice.previewUrl) {
+        setFailed(null);
+        if (playing === voice.voiceId || loading === voice.voiceId || !voice.previewUrl) {
             setPlaying(null);
+            setLoading(null);
             return;
         }
         const el = new Audio(voice.previewUrl);
-        el.onended = () => setPlaying(null);
+        const mine = (run: () => void) => () => audio.current === el && run();
+        const fail = mine(() => {
+            setLoading(null);
+            setPlaying(null);
+            setFailed(voice.voiceId);
+        });
+        el.onplaying = mine(() => {
+            setLoading(null);
+            setPlaying(voice.voiceId);
+        });
+        el.onended = mine(() => setPlaying(null));
+        el.onerror = fail;
         audio.current = el;
-        setPlaying(voice.voiceId);
-        void el.play().catch(() => setPlaying(null));
+        setPlaying(null);
+        setLoading(voice.voiceId);
+        void el.play().catch((error: unknown) => (error as Error)?.name !== 'AbortError' && fail());
     };
 
     return (
@@ -247,6 +264,15 @@ function VoiceGrid({
                             {voice.description ? (
                                 <span className="text-muted-foreground truncate text-xs">{voice.description}</span>
                             ) : null}
+                            {failed === voice.voiceId ? (
+                                <span
+                                    className="text-xs text-amber-700 dark:text-amber-400"
+                                    role="status"
+                                    data-testid="voice-sample-failed"
+                                >
+                                    Sample unavailable right now, try again in a minute.
+                                </span>
+                            ) : null}
                         </button>
                         {voice.previewUrl ? (
                             <Button
@@ -255,9 +281,22 @@ function VoiceGrid({
                                 variant="outline"
                                 className="size-8 shrink-0"
                                 onClick={() => toggle(voice)}
-                                aria-label={playing === voice.voiceId ? `Stop ${voice.name}` : `Play ${voice.name}`}
+                                aria-label={
+                                    playing === voice.voiceId || loading === voice.voiceId
+                                        ? `Stop ${voice.name}`
+                                        : `Play ${voice.name}`
+                                }
+                                aria-busy={loading === voice.voiceId}
                             >
-                                {playing === voice.voiceId ? <Pause className="size-4" /> : <Play className="size-4" />}
+                                {loading === voice.voiceId ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : playing === voice.voiceId ? (
+                                    <Pause className="size-4" />
+                                ) : failed === voice.voiceId ? (
+                                    <CircleAlert className="size-4 text-amber-600 dark:text-amber-400" />
+                                ) : (
+                                    <Play className="size-4" />
+                                )}
                             </Button>
                         ) : (
                             <Badge variant="outline" className="shrink-0 text-[10px]">

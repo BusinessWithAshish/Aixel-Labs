@@ -7,10 +7,10 @@ import { voiceAccountsCollection } from '@/server/voice-agent/accounts';
 import { openSecret } from '@/server/voice-agent/engine';
 import { geminiApiBase } from '@/server/voice-agent/gemini-key';
 import { providerApiUrl } from '@/server/voice-agent/provider-keys';
-import { assertRateLimit } from '@/server/rate-limit';
+import { checkRateLimit } from '@/server/rate-limit';
 
 /**
- * Samples of the voices whose providers publish none (OpenAI's, Gemini's): one short sentence, made on the
+ * Samples of the built-in voices with none shipped (helpers/voice-catalogue.ts): one short sentence, made on the
  * owner's own key with the provider's cheapest text-to-speech model the first time anyone plays it, then kept
  * (here per server, and by the CDN: a stock voice sounds the same for everyone).
  */
@@ -20,6 +20,13 @@ const TIMEOUT_MS = 20_000;
 const MAX_CACHED = 200;
 
 export type VoiceSample = { audio: Blob; contentType: string };
+
+/** The provider would not make it now (busy, rate-limited, refused the key): the picker says try again soon. */
+export class SampleUnavailable extends Error {
+    constructor(readonly status: 429 | 503) {
+        super('Sample unavailable right now, try again in a minute.');
+    }
+}
 
 const cache = new Map<string, VoiceSample>();
 
@@ -49,7 +56,7 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
         cache: 'no-store',
         signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!res.ok) throw new Error(`The provider could not make the sample (HTTP ${res.status})`);
+    if (!res.ok) throw new SampleUnavailable(res.status === 429 ? 429 : 503);
     return res;
 }
 
@@ -80,14 +87,18 @@ async function synthesize(provider: VoiceKeyProvider, voiceId: string, key: stri
     const body = (await res.json()) as { candidates?: { content?: { parts?: Part[] } }[] };
     const audio = body.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
     if (!audio?.data) throw new Error('The provider sent no audio for the sample');
+    const bytes = Buffer.from(audio.data, 'base64');
+    // Newer Gemini TTS models answer with a WAV file; older ones with raw PCM.
+    if (audio.mimeType === 'audio/wav')
+        return { audio: new Blob([new Uint8Array(bytes)], { type: 'audio/wav' }), contentType: 'audio/wav' };
     const rate = Number(/rate=(\d+)/.exec(audio.mimeType ?? '')?.[1] ?? 24000);
-    return { audio: wav(Buffer.from(audio.data, 'base64'), rate), contentType: 'audio/wav' };
+    return { audio: wav(bytes, rate), contentType: 'audio/wav' };
 }
 
 /** A sample of one of `provider`'s built-in voices; null when it is not one, or the owner has no key for it. */
 export async function voiceSample(userId: MongoObjectId, provider: string, voiceId: string): Promise<VoiceSample | null> {
     const sampled = SAMPLED_PROVIDERS.find((p) => p === provider);
-    if (!sampled || !BUILT_IN_VOICES[sampled].some((v) => v.voiceId === voiceId)) return null;
+    if (!sampled || !BUILT_IN_VOICES[sampled].some((v) => v.voiceId === voiceId && !v.previewUrl)) return null;
     const id = `${sampled}:${voiceId}`;
     const kept = cache.get(id);
     if (kept) return kept;
@@ -96,7 +107,7 @@ export async function voiceSample(userId: MongoObjectId, provider: string, voice
     const doc = await accounts.findOne({ userId }, { projection: { keys: 1 } });
     const key = voiceKeyFor(doc?.keys, { provider: sampled });
     if (!key) return null;
-    assertRateLimit(`voice-check:${userId}`, 30); // a new sample spends the owner's credits
+    if (!checkRateLimit(`voice-check:${userId}`, 30).allowed) throw new SampleUnavailable(429); // a new sample spends the owner's credits
     const sample = await synthesize(sampled, voiceId, openSecret(key.keySealed));
     if (cache.size >= MAX_CACHED) cache.delete(cache.keys().next().value!);
     cache.set(id, sample);
