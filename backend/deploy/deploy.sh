@@ -35,6 +35,9 @@ set -euo pipefail
 BACKEND="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$(dirname "$BACKEND")"
 RELEASES="$BACKEND/releases"
+# The units run the main checkout's releases/: a worktree's copy would build and switch slots nobody runs.
+[[ "$(git -C "$REPO" rev-parse --path-format=absolute --git-dir)" == "$(git -C "$REPO" rev-parse --path-format=absolute --git-common-dir)" ]] \
+  || { echo "deploy.sh: run it from the main checkout ($(git -C "$REPO" rev-parse --path-format=absolute --git-common-dir | xargs dirname)), not a worktree" >&2; exit 1; }
 KEEP=3
 HEALTH_TIMEOUT=120
 NODE=/home/ubuntu/.local/bin/node # the units' node (ExecStart)
