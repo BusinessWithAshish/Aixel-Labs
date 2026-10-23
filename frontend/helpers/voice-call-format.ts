@@ -40,7 +40,12 @@ export function formatGap(ms: number | null): string {
 
 export function formatParty(value: string | undefined, fallback: string): string {
     if (!value) return fallback;
-    return value.replace(/^sip:/, '');
+    return isSipParty(value) ? 'Softphone' : value;
+}
+
+/** A SIP URI on a phone call: the owner testing from their softphone. */
+export function isSipParty(value: string | undefined): boolean {
+    return !!value?.startsWith('sip:');
 }
 
 /** The engine can log one utterance as several same-role fragments; show them as one bubble. */

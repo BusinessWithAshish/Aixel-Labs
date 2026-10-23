@@ -90,13 +90,13 @@ export function rateCountry(phone: string): keyof typeof RATE_COUNTRY_NAME | nul
 
 /**
  * A provider's list rate a minute, or null when it publishes none. `phone` is where the call goes
- * (a call out) or the number called (a call in); without one, the US rate. The engine prices calls
+ * (a call out) or the number called (a call in); without one, the US rate; a softphone's `sip:` its SIP rate. The engine prices calls
  * the same way (backend/voice/costs.py).
  */
 export function providerUsdPerMinute(provider: VoiceProvider, callType: VoiceAgentCallType, phone?: string): number | null {
     const rates = (VOICE_CALL_RATES.providers as Record<string, ProviderRates | undefined>)[provider];
     const country = phone ? rateCountry(phone) : 'US';
-    const key = country === 'US' ? callType : country === 'IN' ? `${callType}_IN` : null;
+    const key = phone?.startsWith('sip:') ? 'SIP' : country === 'US' ? callType : country === 'IN' ? `${callType}_IN` : null;
     const rate = rates && key ? rates.usdPerMinute[key] : undefined;
     return rate === undefined ? null : rate + (rates?.extrasUsdPerMinute ?? 0);
 }

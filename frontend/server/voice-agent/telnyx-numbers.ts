@@ -25,7 +25,7 @@ export async function listTelnyxAccountNumbers(apiKey: string): Promise<Provider
     return numbers.map((n) => ({ providerNumberId: n.id, phoneNumber: n.phone_number, status: n.status }));
 }
 
-function appLabel(doc: OwnedNumberDoc): string {
+export function appLabel(doc: Pick<OwnedNumberDoc, 'phoneNumber'>): string {
     return `Aixel Labs voice agent ${doc.phoneNumber}`;
 }
 

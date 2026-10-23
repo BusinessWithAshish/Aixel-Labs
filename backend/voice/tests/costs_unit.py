@@ -47,6 +47,10 @@ def pricing_tests(user):
     ok("Telnyx in, 95 s = 2 billed minutes at $0.0107", abs(paid["providerUsd"] - 0.0214) < 1e-9 and paid["provider"] == "TELNYX"
        and paid["providerExact"] is False, str(paid))
     ok("total is the sum", paid["totalUsd"] == round(paid["geminiUsd"] + paid["providerUsd"], 6))
+    for direction, party in (("INBOUND", "from"), ("OUTBOUND", "to")):
+        sip = costs.call_cost({**doc_of(user, direction=direction), party: "sip:aixelsoft01@sip.telnyx.com"}, USAGE, "TELNYX")
+        ok(f"softphone {direction.lower()}: Telnyx's SIP rate, no phone-network leg (2 x $0.0075)",
+           abs(sip["providerUsd"] - 0.015) < 1e-9, str(sip["providerUsd"]))
     double = {"usdPerMillionTokens": {k: 2 * v for k, v in costs.GEMINI_USD_PER_M.items()}}
     ok("a REALTIME stack's saved price bills its tokens", abs(costs.call_cost(doc_of(user), USAGE, "TELNYX", None, double)["geminiUsd"]
                                                             - 2 * paid["geminiUsd"]) < 1e-6)

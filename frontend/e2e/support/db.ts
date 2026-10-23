@@ -276,11 +276,11 @@ export class E2eDb {
         return this.db.collection<VoiceCallDoc>(MongoCollections.VOICE_CALLS);
     }
 
-    /** Removes the user's numbers and call logs. */
+    /** Removes the user's numbers, softphone and call logs. */
     async resetVoiceTelephony(user: E2eUser): Promise<void> {
         const { _id: userId } = await this.getUser(user);
         await Promise.all([
-            this.voiceAccounts.updateOne({ userId }, { $unset: { numbers: '' } }),
+            this.voiceAccounts.updateOne({ userId }, { $unset: { numbers: '', softphone: '' } }),
             this.voiceCalls.deleteMany({ userId }),
         ]);
     }

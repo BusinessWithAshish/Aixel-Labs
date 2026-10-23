@@ -7,7 +7,7 @@ import { SubModuleUrls } from '@/config/app-config';
 import { replyTone, TONE_TEXT } from '@/helpers/voice-call-outcomes';
 import { formatShortDateTime } from '@/helpers/voice-time';
 import { callBookedSomething } from '@/helpers/voice-tool-calls';
-import { formatDuration, formatGap, formatParty, median } from '@/helpers/voice-call-format';
+import { formatDuration, formatGap, formatParty, isSipParty, median } from '@/helpers/voice-call-format';
 import { CallCostAmount, CallCostPerMinute } from './CallCost';
 import { CallEndedBy } from './CallEndedBy';
 import { CallOutcomeBadges } from './CallOutcomeBadges';
@@ -48,6 +48,9 @@ export function CallCard({ call }: { call: VoiceCallListItem }) {
                             {call.agentName ?? 'Deleted agent'}
                         </span>
                         <CallTypeBadge channel={call.channel} direction={call.direction} />
+                        {isSipParty(call.from) || isSipParty(call.to) ? (
+                            <Badge variant="outline">Softphone test</Badge>
+                        ) : null}
                     </div>
                     <div className="text-muted-foreground flex flex-wrap gap-x-2 text-xs">
                         <Parties call={call} />

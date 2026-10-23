@@ -49,7 +49,8 @@ export function webPhoneProblem(doc: Pick<OwnedNumberDoc, 'provider' | 'twilio'>
     return null;
 }
 
-async function ensureTelnyxConnection(key: string): Promise<string> {
+/** The account's "Aixel Labs web phone" credential connection, created on first need. The softphone signs in with its SIP login. */
+export async function ensureTelnyxConnection(key: string): Promise<string> {
     const connections = await listCredentialConnections(key);
     const ours = connections.find((c) => c.connection_name === WEB_PHONE_LABEL);
     if (ours) return ours.id;

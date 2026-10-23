@@ -19,6 +19,7 @@ import { VoiceAgentCallTypeSelect } from '../../_components/VoiceAgentCallTypeSe
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import type { PromptTool } from '../_utils/prompt-tools';
 import { AgentNumbersField } from './AgentNumbersField';
+import { AgentSoftphoneButton } from './AgentSoftphoneButton';
 import { AgentTestCallButton } from './AgentTestCallButton';
 import { PromptField } from './PromptField';
 import { PromptTemplates } from './PromptTemplates';
@@ -108,6 +109,7 @@ export function VoiceAgentEditor() {
                                     </Button>
                                 ) : null}
                                 <AgentTestCallButton />
+                                <AgentSoftphoneButton />
                                 <Button
                                     type="button"
                                     variant="outline"

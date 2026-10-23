@@ -1073,7 +1073,8 @@ def make_app() -> FastAPI:
 
         `agentId` picks which of the owner's agents makes the call; without it, the
         number's outbound agent does. `variables` ({name: value}) fill the agent's
-        `{{variables}}` on this call (product.call_variables)."""
+        `{{variables}}` on this call (product.call_variables). `to` is E.164, or the owner's
+        softphone `sip:<user>@sip.telnyx.com` (Telnyx numbers only; no voicemail detection on it)."""
         if not product.bearer_ok(request.headers.get("authorization")):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         if draining():  # the other slot takes it: the app (or a campaign) tries again
@@ -1086,6 +1087,9 @@ def make_app() -> FastAPI:
             return JSONResponse({"error": "the body must be a JSON object"}, status_code=400)
         number_id, to = str(body.get("numberId") or ""), normalize_number(body.get("to"))
         agent_id = str(body.get("agentId") or "") or None
+        # The owner's softphone (sip:<user>@sip.telnyx.com): a Telnyx number rings it like a phone.
+        softphone = SOFTPHONE_URI.fullmatch(str(body.get("to") or ""))
+        to = softphone.group(0) if softphone else to
         if not to:
             return JSONResponse({"error": "to is not a phone number"}, status_code=400)
         variables = body.get("variables") or {}
@@ -1123,6 +1127,8 @@ def make_app() -> FastAPI:
                                 status_code=409)
         if variables:  # picked up when the call's stream arrives (product._finish_ctx)
             product.hold_call_variables(number_id, to, variables)
+        if softphone and (number.get("provider") or "TELNYX") != "TELNYX":
+            return JSONResponse({"error": "only a Telnyx number can call a softphone"}, status_code=400)
         if number.get("provider") == "VOICELINK":
             return await place_voicelink_call(number, agent, to)
         if number.get("provider") == "TWILIO":
@@ -1400,7 +1406,7 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
     # Someone calling a customer's business expects it to answer: she speaks first, and
     # nobody's answering machine calls in, so a caller who talks at length is never taken for one.
     answers = bool(ctx and ctx["doc"]["direction"] == "INBOUND")
-    if answers:
+    if answers or str(callee or "").startswith("sip:"):  # a softphone has no answering machine either
         guard.VM_WINDOW = -1.0
     watch = speech.CallWatch(ctx["speech"] if ctx else speech.DEFAULTS, llm, pair.user(), guard)
     gate = RingGate(line["pickup"], name="ring_gate")
@@ -1735,6 +1741,8 @@ async def _play_session(websocket: WebSocket, ctx: dict, slot: str):
 # The phone provider refused or could not be reached. Not 502: Cloudflare, in front of this
 # server, swaps an origin's 502 for its own HTML error page, and the app loses the reason.
 PROVIDER_FAILED = 424
+# A SIP login on Telnyx (a credential connection's user name, 4-32 letters and digits).
+SOFTPHONE_URI = re.compile(r"sip:[A-Za-z0-9]{4,32}@sip\.telnyx\.com")
 
 
 def telnyx_reason(status: int, text: str) -> str:
@@ -1746,6 +1754,9 @@ def telnyx_reason(status: int, text: str) -> str:
         detail = ""
     if not detail:
         return f"HTTP {status}"
+    if re.search(r"\bD61\b", detail):  # "portal level doesn't allow this type of calls D61": a trial account
+        return ("your Telnyx account level does not allow this call (a trial account only calls its verified number);"
+                " upgrade the account in the Telnyx portal")
     return re.sub(r"\s+D\d+\.?$", "", detail.split(". ")[0]).strip()
 
 

@@ -468,7 +468,7 @@ def phone_call(number: dict, agent: dict, direction: str, other: str | None) -> 
     return _finish_ctx({
         **extra,
         # A booking's phone when the caller gives none: theirs on a call in, the callee's on one we place.
-        "customer_phone": other or None,
+        "customer_phone": other if normalize_number(other) else None,  # a softphone (sip:…) has no phone number
         "voice": (agent.get("voice") or "").lower(),
         "provider": provider,
         "api_key": api_key,

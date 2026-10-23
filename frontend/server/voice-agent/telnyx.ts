@@ -276,3 +276,63 @@ export async function createTelephonyCredentialToken(apiKey: string, credentialI
     const text = await telnyxText(apiKey, 'POST', `/v2/telephony_credentials/${encodeURIComponent(credentialId)}/token`);
     return text.trim();
 }
+
+/** `GET /v2/credential_connections/{id}` — its SIP username (Telnyx masks the password). */
+export async function getCredentialConnection(apiKey: string, id: string): Promise<{ id: string; user_name: string }> {
+    const res = await telnyxRequest<TelnyxData<{ id: string; user_name: string }>>(
+        apiKey,
+        'GET',
+        `/v2/credential_connections/${encodeURIComponent(id)}`,
+    );
+    return res.data;
+}
+
+/**
+ * `PATCH /v2/credential_connections/{id}` — a new SIP password, and who may ring `sip:<user_name>@sip.telnyx.com`:
+ * "internal" = calls from the account's own connections only, "disabled" = nobody.
+ */
+export async function updateCredentialConnection(
+    apiKey: string,
+    id: string,
+    input: { password: string; sipUriCalling: 'internal' | 'disabled' },
+): Promise<void> {
+    await telnyxRequest<unknown>(apiKey, 'PATCH', `/v2/credential_connections/${encodeURIComponent(id)}`, {
+        password: input.password,
+        sip_uri_calling_preference: input.sipUriCalling,
+    });
+}
+
+/**
+ * `PATCH /v2/texml_applications/{id}` with a SIP subdomain that only the account's own connections may call.
+ * Telnyx requires `friendly_name` and `voice_url` on every update.
+ */
+export async function setTexmlSipSubdomain(
+    apiKey: string,
+    id: string,
+    input: { friendlyName: string; voiceUrl: string; sipSubdomain: string },
+): Promise<void> {
+    await telnyxRequest<unknown>(apiKey, 'PATCH', `/v2/texml_applications/${encodeURIComponent(id)}`, {
+        friendly_name: input.friendlyName,
+        voice_url: input.voiceUrl,
+        inbound: { sip_subdomain: input.sipSubdomain, sip_subdomain_receive_settings: 'only_my_connections' },
+    });
+}
+
+/**
+ * `GET /v2/sip_registration_status` for a credential connection's SIP username: true while a softphone is signed
+ * in. Telnyx answers 404 when it has never seen one sign in.
+ */
+export async function isSipRegistered(apiKey: string, userName: string): Promise<boolean> {
+    const query = new URLSearchParams({ credential_type: 'sip_credential_connection', username: userName });
+    try {
+        const res = await telnyxRequest<{ registered?: boolean; data?: { registered?: boolean } }>(
+            apiKey,
+            'GET',
+            `/v2/sip_registration_status?${query}`,
+        );
+        return (res.data?.registered ?? res.registered) === true;
+    } catch (error) {
+        if (error instanceof TelnyxApiError && error.status === 404) return false;
+        throw error;
+    }
+}

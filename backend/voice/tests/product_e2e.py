@@ -249,6 +249,13 @@ async def test_calls(port, number, no_agent, no_cc):
         f.write(json.dumps({"number": "+15559990001", "reason": "test", "quote": "product_e2e", "stream_id": "test"}) + "\n")
     st, body = await ahttp("POST", url, {"numberId": str(number["_id"]), "to": "+1 555 999 0001"}, auth)
     ok("suppressed number -> 409, nothing sent to Telnyx", st == 409 and not SEEN, f"HTTP {st} {body}")
+    st, body = await ahttp("POST", url, {"numberId": str(number["_id"]), "to": "sip:aixelsoft01@sip.telnyx.com"}, auth)
+    sent = [s for s in SEEN if s["path"] == "/v2/calls"]
+    ok("the owner's softphone (sip:<user>@sip.telnyx.com) is dialled as it is", st == 200 and len(sent) == 1
+       and sent[0]["body"]["to"] == "sip:aixelsoft01@sip.telnyx.com", f"HTTP {st} {body}")
+    st, body = await ahttp("POST", url, {"numberId": str(number["_id"]), "to": "sip:someone@example.com"}, auth)
+    ok("any other SIP URI -> 400", st == 400, f"HTTP {st} {body}")
+    SEEN.clear()
 
     st, body = await ahttp("POST", url, {"numberId": str(number["_id"]), "to": "+15559990000"}, auth)
     ok("good request -> 200 {ok, callId}", st == 200 and json.loads(body).get("ok") and json.loads(body)["callId"].startswith("v3:fake-"), body)

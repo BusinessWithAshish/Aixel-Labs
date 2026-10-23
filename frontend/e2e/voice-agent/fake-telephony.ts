@@ -115,6 +115,10 @@ export class FakeTelnyx extends FakeHttpServer {
     outboundVoiceProfiles: { id: string; name: string }[] = [];
     readonly texmlApps = new Map<string, JsonValue>();
     readonly callControlApps = new Map<string, JsonValue>();
+    /** Credential connections (SIP logins), by id, with the password Telnyx would hold. */
+    readonly credentialConnections = new Map<string, JsonValue>();
+    /** SIP usernames a softphone is signed in with now (`GET /v2/sip_registration_status`). */
+    readonly registered = new Set<string>();
     /** call_control_id -> recordings Telnyx would list for it. */
     readonly recordings = new Map<string, JsonValue[]>();
     /**
@@ -154,6 +158,8 @@ export class FakeTelnyx extends FakeHttpServer {
         this.outboundVoiceProfiles = [{ id: '1911630617284445511', name: 'Default' }];
         this.texmlApps.clear();
         this.callControlApps.clear();
+        this.credentialConnections.clear();
+        this.registered.clear();
         this.recordings.clear();
         this.files.clear();
         this.refuseNullConnection = false;
@@ -164,6 +170,13 @@ export class FakeTelnyx extends FakeHttpServer {
     addCustomerCallControlApp(name: string): string {
         const id = this.newId();
         this.callControlApps.set(id, { id, record_type: 'call_control_application', application_name: name });
+        return id;
+    }
+
+    /** A TeXML app already in the account (as `ensureTexmlApp` leaves it); returns its id. */
+    addTexmlApp(fields: JsonValue): string {
+        const id = this.newId();
+        this.texmlApps.set(id, { id, record_type: 'texml_application', ...fields });
         return id;
     }
 
@@ -273,7 +286,57 @@ export class FakeTelnyx extends FakeHttpServer {
             send(res, 201, { data: app });
             return;
         }
+        if (req.method === 'GET' && req.path === '/v2/credential_connections') {
+            send(res, 200, page([...this.credentialConnections.values()].map((c) => ({ ...c, password: '********' }))));
+            return;
+        }
+        if (req.method === 'POST' && req.path === '/v2/credential_connections') {
+            const connection = { id: this.newId(), record_type: 'credential_connection', ...req.body, created_at: now };
+            this.credentialConnections.set(String(connection.id), connection);
+            send(res, 201, { data: connection });
+            return;
+        }
+        const connectionMatch = /^\/v2\/credential_connections\/([^/]+)$/.exec(req.path);
+        const connection = connectionMatch ? this.credentialConnections.get(connectionMatch[1]) : undefined;
+        if (connectionMatch && !connection)
+            return send(res, 404, { errors: [{ code: '10005', title: 'Resource not found' }] });
+        if (req.method === 'GET' && connection) {
+            send(res, 200, { data: { ...connection, password: '********' } });
+            return;
+        }
+        if (req.method === 'PATCH' && connection) {
+            Object.assign(connection, req.body);
+            send(res, 200, { data: { ...connection, password: '********' } });
+            return;
+        }
+        if (req.method === 'GET' && req.path === '/v2/sip_registration_status') {
+            const userName = req.query.username ?? '';
+            if (![...this.credentialConnections.values()].some((c) => c.user_name === userName)) {
+                return send(res, 404, { errors: [{ code: '10005', title: 'Resource not found' }] });
+            }
+            const registered = this.registered.has(userName);
+            send(res, 200, {
+                credential_type: 'sip_credential_connection',
+                credential_username: userName,
+                registered,
+                sip_registration_status: registered ? 'registered' : 'trying',
+            });
+            return;
+        }
         const appMatch = /^\/v2\/(texml_applications|call_control_applications)\/([^/]+)$/.exec(req.path);
+        if (req.method === 'PATCH' && appMatch?.[1] === 'texml_applications') {
+            const app = this.texmlApps.get(appMatch[2]);
+            if (!app) return send(res, 404, { errors: [{ code: '10005', title: 'Resource not found' }] });
+            // Telnyx requires both on every update.
+            if (!req.body?.friendly_name || !req.body?.voice_url) {
+                return send(res, 422, {
+                    errors: [{ code: '10015', title: 'Invalid value', detail: 'friendly_name and voice_url are required' }],
+                });
+            }
+            Object.assign(app, req.body);
+            send(res, 200, { data: app });
+            return;
+        }
         if (req.method === 'DELETE' && appMatch) {
             const apps = appMatch[1] === 'texml_applications' ? this.texmlApps : this.callControlApps;
             const app = apps.get(appMatch[2]);
@@ -573,7 +636,11 @@ function sendBytes(req: RecordedRequest, res: ServerResponse, file: Buffer, type
         res.end();
         return;
     }
-    res.writeHead(206, { ...headers, 'Content-Range': `bytes ${start}-${end}/${file.length}`, 'Content-Length': String(end - start + 1) });
+    res.writeHead(206, {
+        ...headers,
+        'Content-Range': `bytes ${start}-${end}/${file.length}`,
+        'Content-Length': String(end - start + 1),
+    });
     res.end(file.subarray(start, end + 1));
 }
 
@@ -655,7 +722,9 @@ export class FakeTwilio extends FakeHttpServer {
     /** A completed recording of `callSid`, its audio served through the redirect. */
     addRecording(callSid: string, bytes: Buffer, seconds: number): string {
         const sid = `RE${callSid.slice(2, 34).padEnd(32, '0')}`;
-        this.recordings.set(callSid, [{ sid, call_sid: callSid, status: 'completed', duration: String(seconds), channels: 2 }]);
+        this.recordings.set(callSid, [
+            { sid, call_sid: callSid, status: 'completed', duration: String(seconds), channels: 2 },
+        ]);
         this.media.files.set(`/media/${sid}.mp3`, bytes);
         return sid;
     }
@@ -692,7 +761,9 @@ export class FakeTwilio extends FakeHttpServer {
                 incoming_phone_numbers: rows.map((n) => ({ ...n, account_sid: FAKE_TWILIO_ACCOUNT_SID, status: 'in-use' })),
                 page,
                 page_size: this.pageSize,
-                next_page_uri: more ? `${prefix}/IncomingPhoneNumbers.json?PageSize=${this.pageSize}&Page=${page + 1}&PageToken=PAe2e` : null,
+                next_page_uri: more
+                    ? `${prefix}/IncomingPhoneNumbers.json?PageSize=${this.pageSize}&Page=${page + 1}&PageToken=PAe2e`
+                    : null,
             });
         }
         const numberMatch = /^\/IncomingPhoneNumbers\/(PN\w+)\.json$/.exec(rest);
@@ -717,7 +788,12 @@ export class FakeTwilio extends FakeHttpServer {
         }
         // What the engine asks of the account during a call: start the recording, hang up.
         if (req.method === 'POST' && callRecordings) {
-            return send(res, 201, { sid: `RE${callRecordings[1].slice(2)}`, call_sid: callRecordings[1], status: 'in-progress', channels: 2 });
+            return send(res, 201, {
+                sid: `RE${callRecordings[1].slice(2)}`,
+                call_sid: callRecordings[1],
+                status: 'in-progress',
+                channels: 2,
+            });
         }
         const call = /^\/Calls\/(CA\w+)\.json$/.exec(rest);
         if (req.method === 'POST' && call) {
@@ -727,7 +803,9 @@ export class FakeTwilio extends FakeHttpServer {
         if (req.method === 'GET' && media) {
             const known = [...this.recordings.values()].flat().some((r) => r.sid === media[1]);
             if (!known) return this.error(res, 404, 20404, 'The requested resource was not found');
-            res.writeHead(302, { Location: `${E2E_TWILIO_MEDIA_BASE}/media/${media[1]}.mp3?Expires=9999999999&Signature=e2e` });
+            res.writeHead(302, {
+                Location: `${E2E_TWILIO_MEDIA_BASE}/media/${media[1]}.mp3?Expires=9999999999&Signature=e2e`,
+            });
             res.end();
             return;
         }

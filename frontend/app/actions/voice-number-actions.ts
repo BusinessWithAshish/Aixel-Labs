@@ -32,6 +32,13 @@ import {
 } from '@/server/voice-agent/accounts';
 import { providerOf, type OwnedNumberDoc, type ProviderAccountNumber } from '@/server/voice-agent/number-provider';
 import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
+import {
+    getSoftphone,
+    inSoftphoneAccount,
+    removeSoftphone,
+    SOFTPHONE_TARGET,
+    softphoneUri,
+} from '@/server/voice-agent/softphone';
 import { listTelnyxAccountNumbers, telnyxNumbers } from '@/server/voice-agent/telnyx-numbers';
 import type { TwilioAuth } from '@/server/voice-agent/twilio';
 import { listTwilioAccountNumbers, twilioNumberProblem, twilioNumbers } from '@/server/voice-agent/twilio-numbers';
@@ -520,6 +527,8 @@ export const removeNumber = async (numberId: string): Promise<ALApiResponse<{ re
     return runAuthenticatedAction(async function removeNumber(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const doc = await findOwnedNumber(owner, numberId);
+        // The softphone signs in through this number's key: it goes with it.
+        if ((await getSoftphone(owner.userId))?.numberId.equals(doc._id)) await removeSoftphone(owner.userId, doc);
         await providerOf(doc).release(doc);
 
         await pullItems('numbers', owner.userId, { _id: doc._id });
@@ -544,13 +553,24 @@ function testCallVariables(input: unknown): Record<string, string> {
     return Object.fromEntries(entries);
 }
 
+/** The owner's softphone, as `doc` can ring it: a Telnyx number in the softphone's own Telnyx account. */
+async function softphoneTarget(owner: VoiceOwnerScope, doc: OwnedNumberDoc): Promise<string> {
+    const softphone = await getSoftphone(owner.userId);
+    if (!softphone) throw new Error('Set up your softphone first');
+    const home = await findItem('numbers', { _id: softphone.numberId }, owner.userId);
+    if (!home || !inSoftphoneAccount(doc, home)) {
+        throw new Error(`${doc.phoneNumber} cannot call your softphone: it is not in the same Telnyx account.`);
+    }
+    return softphoneUri(softphone.userName);
+}
+
 /**
  * Asks the voice engine to call `to` from this number with `agentId` (either kind: an inbound agent
  * rings the owner and talks as if they had called in, booking tool and all), or with the number's
  * own agent when none is given. The provider gets ready first (Telnyx: the Call Control app;
  * VoiceLink: the number must be set to make calls). Needs the owner's Gemini API key; the engine
  * refuses too when it is missing or Google refuses it. `variables` fill the agent's `{{variables}}`
- * on this call (empty ones fall back to the agent's defaults).
+ * on this call (empty ones fall back to the agent's defaults). `to` = SOFTPHONE_TARGET rings the owner's softphone.
  */
 export const placeTestCall = async (
     numberId: string,
@@ -566,8 +586,13 @@ export const placeTestCall = async (
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         assertRateLimit(`voice-call:${owner.userId}`, 10);
         const doc = await findOwnedNumber(owner, numberId);
-        const target = typeof to === 'string' ? to.replace(/[\s()-]/g, '') : '';
-        if (!E164_PATTERN.test(target)) {
+        const target =
+            to === SOFTPHONE_TARGET
+                ? await softphoneTarget(owner, doc)
+                : typeof to === 'string'
+                  ? to.replace(/[\s()-]/g, '')
+                  : '';
+        if (to !== SOFTPHONE_TARGET && !E164_PATTERN.test(target)) {
             const example = doc.provider === VoiceProvider.VOICELINK ? '+919876543210' : '+14155550123';
             throw new Error(`Enter the number in international format, e.g. ${example}`);
         }

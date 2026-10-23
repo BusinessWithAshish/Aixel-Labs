@@ -619,6 +619,11 @@ export type VoiceNumberDoc<Id = ObjectId> = {
   outboundAgentId?: Id | null;
   /** The Telnyx connection the number was on before AI answering; restored when it is turned off or removed. */
   previousConnectionId?: string | null;
+  /**
+   * Telnyx: the SIP subdomain set on the number's TeXML app, so the owner's softphone reaches its inbound agent at
+   * `sip:<anything>@<sipSubdomain>.sip.telnyx.com` (receive settings "only_my_connections": nobody else can).
+   */
+  sipSubdomain?: string | null;
   /** VoiceLink numbers only. */
   voicelink?: VoiceLinkNumberState;
   /** Twilio numbers only. */
@@ -1146,6 +1151,23 @@ export type VoiceTtsVoice = {
   name: string;
 };
 
+/**
+ * The owner's softphone line (Zoiper, Linphone…), for testing agents over the internet: no phone network, so no
+ * country limits. Telnyx only: the SIP login of the "Aixel Labs web phone" credential connection in their account
+ * (the web dialer's browser logins are telephony credentials on the same connection). Its password is never stored:
+ * it is shown once, when set up or reset.
+ */
+export type VoiceSoftphoneDoc<Id = ObjectId> = {
+  provider: VoiceProvider.TELNYX;
+  /** The number it was set up with: its Telnyx account is the softphone's (its key opens the connection). */
+  numberId: Id;
+  connectionId: string;
+  /** Signs in at `sip.telnyx.com`; calls to `sip:<userName>@sip.telnyx.com` ring it (from the owner's account only). */
+  userName: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 /** Numbers one owner may connect; keeps their VoiceAccountDoc far below MongoDB's 16 MB. */
 export const VOICE_NUMBER_LIMITS = {
   maxPerOwner: 500,
@@ -1164,6 +1186,8 @@ export type VoiceAccountDoc<Id = ObjectId> = {
   calendars?: VoiceCalendarConnectionDoc<Id>[];
   /** Phone numbers, up to `VOICE_NUMBER_LIMITS.maxPerOwner`. Absent = none. */
   numbers?: VoiceNumberDoc<Id>[];
+  /** Absent or null = none set up. */
+  softphone?: VoiceSoftphoneDoc<Id> | null;
   createdAt: Date;
   updatedAt: Date;
 };

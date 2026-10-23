@@ -21,8 +21,8 @@
   },
   "providers": {
     "TELNYX": {
-      "source": "telnyx.com/pricing/call-control (Voice API 0.002, media streaming 0.0035, recording 0.002) + telnyx.com/pricing/elastic-sip (US local in from 0.0032, out from 0.005). Telnyx publishes no India rates (/pricing/elastic-sip/in and /pricing/call-control/in list none, checked 2026-10-22): calls to India show without Telnyx's charge.",
-      "usdPerMinute": { "INBOUND": 0.0107, "OUTBOUND": 0.0125 },
+      "source": "telnyx.com/pricing/call-control (Voice API 0.002, media streaming 0.0035, recording 0.002) + telnyx.com/pricing/elastic-sip (US local in from 0.0032, out from 0.005). Telnyx publishes no India rates (/pricing/elastic-sip/in and /pricing/call-control/in list none, checked 2026-10-22): calls to India show without Telnyx's charge. SIP (a softphone test, either way): the same without the phone-network leg, 0.0075.",
+      "usdPerMinute": { "INBOUND": 0.0107, "OUTBOUND": 0.0125, "SIP": 0.0075 },
       "extrasUsdPerMinute": 0
     },
     "TWILIO": {
