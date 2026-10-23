@@ -344,6 +344,15 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
     await expect(parts).toContainText('A 3-minute call$0.137');
     await expect(card.getByTestId('agent-cost-real')).toHaveText('No calls yet to compare with.');
 
+    // The calculator: 10 calls a day of 3 minutes at $0.04556 = $1.37 a day, $41.00 a month; then 100 calls.
+    const calculator = card.getByTestId('agent-cost-calculator');
+    await expect(calculator.getByLabel('Minutes a call')).toHaveValue('3');
+    await expect(calculator.getByTestId('agent-cost-per-day')).toHaveText('$1.37');
+    await expect(calculator.getByTestId('agent-cost-per-month')).toHaveText('$41.00');
+    await calculator.getByLabel('Calls a day').fill('100');
+    await expect(calculator.getByTestId('agent-cost-per-day')).toHaveText('$13.67');
+    await expect(calculator.getByTestId('agent-cost-per-month')).toHaveText('$410.04');
+
     // A longer prompt, before saving: 6,000 characters = 2,100 tokens a turn, $0.055 a minute.
     await page.locator('#agent-prompt').fill('y'.repeat(6000));
     await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.055');

@@ -10,6 +10,7 @@ import { costPerMinute, formatMoney } from '@/helpers/voice-call-cost';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { cn } from '@/lib/utils';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
+import { CostCalculator } from './CostCalculator';
 
 const CALL_LOGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.CALL_LOGS];
 
@@ -61,7 +62,9 @@ export function VoiceAgentCostEstimate() {
                             </dd>
                         </div>
                     ))}
-                    <dt className="bg-primary/10 text-primary mt-1 rounded-l-md py-1.5 pl-2 font-medium">A minute</dt>
+                    <dt className="bg-primary/10 text-primary -mr-3 mt-1 rounded-l-md py-1.5 pr-3 pl-2 font-medium">
+                        A minute
+                    </dt>
                     <dd
                         className="bg-primary/10 text-primary mt-1 rounded-r-md py-1.5 pr-2 text-right text-base font-semibold tabular-nums"
                         data-testid="agent-cost-per-minute"
@@ -71,6 +74,11 @@ export function VoiceAgentCostEstimate() {
                     <dt className="text-muted-foreground">A {estimate.typicalCallMinutes}-minute call</dt>
                     <dd className="text-right tabular-nums">{money(estimate.usdPerMinute * estimate.typicalCallMinutes)}</dd>
                 </dl>
+                <CostCalculator
+                    usdPerMinute={estimate.usdPerMinute}
+                    defaultMinutes={estimate.typicalCallMinutes}
+                    money={money}
+                />
                 <p className="text-muted-foreground text-xs" data-testid="agent-cost-real">
                     {costTotals && real !== null ? (
                         <>

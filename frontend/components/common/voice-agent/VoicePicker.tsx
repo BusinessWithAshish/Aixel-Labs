@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { VoiceOption } from '@/helpers/voice-catalogue';
 import { VOICE_KEY_PROVIDERS } from '@/helpers/voice-stack';
 import { cn } from '@/lib/utils';
-import { SortToggle, type ListSort } from './SortToggle';
+import { SortSelect, type ListSort } from './SortSelect';
 
 type VoicePickerProps = {
     id?: string;
@@ -140,7 +140,7 @@ export function VoicePicker({ id, provider, voices, disabled }: VoicePickerProps
                                 className="pl-8"
                             />
                         </div>
-                        <SortToggle value={sort} onChange={setSort} />
+                        <SortSelect value={sort} onChange={setSort} />
                     </div>
                     <div className="-mx-1 min-h-40 overflow-y-auto px-1">
                         {shown.length ? (

@@ -624,6 +624,12 @@ test('several keys, and each agent its own stack: one voice model or three steps
     // Three steps (beta): each step's model and key; a step whose provider has no key says so.
     await stack.getByRole('radio', { name: /^Three steps/ }).click();
     await expect(page.getByTestId('agent-stack-beta')).toContainText('in beta');
+    // One below the other, numbered.
+    await expect(page.getByTestId('agent-stack-steps').getByRole('listitem')).toHaveText([
+        /^1Speech to text/,
+        /^2Thinking/,
+        /^3Text to speech/,
+    ]);
     await expect(stack.locator('#stack-stt-model')).toContainText('Deepgram Nova-3');
     await expect(page.getByTestId('stack-stt-no-key')).toContainText('No Deepgram key yet');
     await expect(page.getByTestId('stack-tts-no-key')).toHaveCount(0);
@@ -634,7 +640,8 @@ test('several keys, and each agent its own stack: one voice model or three steps
         await expect(page.getByRole('option', { name: left })).toHaveCount(0);
     }
     await page.keyboard.press('Escape');
-    await stack.getByLabel('By name').click();
+    await stack.getByTestId('sort-select').click();
+    await page.getByRole('option', { name: 'Name', exact: true }).click();
     await stack.locator('#stack-llm-model').click();
     await expect(page.getByRole('option').first()).toContainText('Gemini 3.5 Flash Lite');
     await page.getByRole('option', { name: /^Gemini 3\.5 Flash Lite/ }).click();
@@ -713,7 +720,8 @@ test('the voice picker: Gemini voices on one voice model, the voice step’s pro
     await stack.locator('#stack-tts-voice').click();
     await expect(picker).toContainText('ElevenLabs’s voices');
     await expect(picker.getByRole('button', { name: 'Play Sarah' })).toBeVisible();
-    await picker.getByLabel('By name').click();
+    await picker.getByTestId('sort-select').click();
+    await page.getByRole('option', { name: 'Name', exact: true }).click();
     await expect(picker.getByTestId('voice-option').first()).toContainText('Adam');
     await picker.getByLabel('Gender').click();
     await page.getByRole('option', { name: 'Male', exact: true }).click();

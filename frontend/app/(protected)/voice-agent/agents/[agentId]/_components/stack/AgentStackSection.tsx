@@ -3,10 +3,10 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useFormContext } from 'react-hook-form';
-import { ArrowRight, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { VOICE_DEFAULT_STACK, VoiceKeyProvider, VoiceStackKind, type VoiceStack } from '@aixellabs/backend/db/types';
 import { RadioCards, type RadioCardOption } from '@/components/wrappers/RadioCards';
-import { SortToggle, type ListSort } from '@/components/common/voice-agent/SortToggle';
+import { SortSelect, type ListSort } from '@/components/common/voice-agent/SortSelect';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { usePage } from '@/contexts/PageStore';
@@ -84,27 +84,28 @@ export function AgentStackSection() {
                         .
                     </p>
                 </div>
-                <SortToggle value={sort} onChange={setSort} />
+                <SortSelect value={sort} onChange={setSort} />
             </div>
             <RadioCards value={stack.kind} onValueChange={setKind} options={options} aria-label="Agent stack" />
             {stack.kind === VoiceStackKind.REALTIME ? (
                 <StackStep part="realtime" stack={stack} sort={sort} />
             ) : (
-                <ol
-                    className="grid items-stretch gap-3 2xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
-                    aria-label="Steps"
-                >
-                    {PIPELINE_PARTS.map((part, i) => (
-                        <li key={part} className="contents">
-                            {i ? (
-                                <ArrowRight
-                                    className="text-muted-foreground hidden size-4 self-center 2xl:block"
-                                    aria-hidden
-                                />
-                            ) : null}
-                            <StackStep part={part} step={i + 1} stack={stack} sort={sort} />
-                        </li>
-                    ))}
+                // One after another, a numbered stepper: each step hands its words to the next.
+                <ol className="grid" aria-label="Steps" data-testid="agent-stack-steps">
+                    {PIPELINE_PARTS.map((part, i) => {
+                        const last = i === PIPELINE_PARTS.length - 1;
+                        return (
+                            <li key={part} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-3">
+                                <div className="flex flex-col items-center" aria-hidden>
+                                    <span className="bg-primary text-primary-foreground mt-3 grid size-6 shrink-0 place-items-center rounded-full text-xs font-medium">
+                                        {i + 1}
+                                    </span>
+                                    {last ? null : <span className="bg-primary/30 w-px flex-1" />}
+                                </div>
+                                <StackStep part={part} stack={stack} sort={sort} className={last ? undefined : 'mb-3'} />
+                            </li>
+                        );
+                    })}
                 </ol>
             )}
             {stack.kind === VoiceStackKind.PIPELINE ? (

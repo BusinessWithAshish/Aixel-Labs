@@ -12,7 +12,7 @@ import {
 } from '@aixellabs/backend/db/types';
 import { ZodSelectField } from '@/components/common/zod-form-builder/ZodFieldComponents';
 import { VoicePicker } from '@/components/common/voice-agent/VoicePicker';
-import type { ListSort } from '@/components/common/voice-agent/SortToggle';
+import type { ListSort } from '@/components/common/voice-agent/SortSelect';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
@@ -21,6 +21,7 @@ import { formatMoney } from '@/helpers/voice-call-cost';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { stackModel, VOICE_KEY_PROVIDERS, VOICE_STACK_PART_LABELS } from '@/helpers/voice-stack';
 import type { VoiceAgentInput } from '@/helpers/voice-schemas';
+import { cn } from '@/lib/utils';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 
 /** A Select item cannot have the empty value: this one means "the provider's default key". */
@@ -28,14 +29,13 @@ const DEFAULT_KEY = 'default';
 
 type StackStepProps = {
     part: VoiceStackPartName;
-    /** Its number in a three-step stack. */
-    step?: number;
+    className?: string;
     stack: VoiceStack<string>;
     sort: ListSort;
 };
 
 /** One box of the stack: the model (with its price a minute), the key it runs on and, where it speaks, its voice. */
-export function StackStep({ part, step, stack, sort }: StackStepProps) {
+export function StackStep({ part, stack, sort, className }: StackStepProps) {
     const { stackOptions } = usePage<UseVoiceAgentEditorPageReturn>();
     const { catalogue, keys: allKeys, voices } = stackOptions;
     const form = useFormContext<VoiceAgentInput>();
@@ -96,17 +96,10 @@ export function StackStep({ part, step, stack, sort }: StackStepProps) {
     const speaks = part === 'realtime' || part === 'tts';
 
     return (
-        <div className="bg-muted/40 grid min-w-0 content-start gap-3 rounded-lg border p-3" data-testid={id}>
-            <div className="flex items-start gap-2">
-                {step ? (
-                    <span className="bg-primary text-primary-foreground grid size-5 shrink-0 place-items-center rounded-full text-xs font-medium">
-                        {step}
-                    </span>
-                ) : null}
-                <div className="grid gap-0.5">
-                    <p className="text-sm leading-5 font-medium">{label.title}</p>
-                    <p className="text-muted-foreground text-xs">{label.description}</p>
-                </div>
+        <div className={cn('grid min-w-0 content-start gap-3 rounded-lg border p-3', className)} data-testid={id}>
+            <div className="grid gap-0.5">
+                <p className="text-sm leading-5 font-medium">{label.title}</p>
+                <p className="text-muted-foreground text-xs">{label.description}</p>
             </div>
             <ZodSelectField
                 name={`${id}-model`}
