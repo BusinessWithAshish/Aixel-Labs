@@ -16,10 +16,10 @@ import { listRecordingsForCall } from '@/server/voice-agent/telnyx';
 import { listCallRecordings, recordingMediaUrl, twilioAuthorization } from '@/server/voice-agent/twilio';
 import { twilioAuthOf } from '@/server/voice-agent/twilio-numbers';
 
+/** What the page may see: the audio itself streams through the recording route, so no provider link. */
 export type CallRecordingResult =
     | {
           available: true;
-          url: string;
           format: 'mp3' | 'wav';
           durationSec: number | null;
           /** Whose account keeps the recording. */
@@ -28,10 +28,12 @@ export type CallRecordingResult =
     | { available: false; reason: string };
 
 /**
- * What the recording route needs on top of what the page may see: the `Authorization` header the
- * provider wants for the audio (Twilio's media URLs need the account's credentials). Server only.
+ * What the recording route needs on top of what the page may see: the provider's link (Telnyx's
+ * expires in minutes) and the `Authorization` header it wants (Twilio's media URLs need the account's credentials). Server only.
  */
-export type CallRecordingSource = CallRecordingResult & { authorization?: string };
+export type CallRecordingSource =
+    | (Extract<CallRecordingResult, { available: true }> & { url: string; authorization?: string })
+    | Extract<CallRecordingResult, { available: false }>;
 
 function recordingFormat(url: string): 'mp3' | 'wav' {
     try {
@@ -41,11 +43,11 @@ function recordingFormat(url: string): 'mp3' | 'wav' {
     }
 }
 
-/** The page's view of a source: never the credentials. */
+/** The page's view of a source: never the link or the credentials. */
 export function withoutCredentials(source: CallRecordingSource): CallRecordingResult {
     if (!source.available) return { available: false, reason: source.reason };
-    const { url, format, durationSec, storedBy } = source;
-    return { available: true, url, format, durationSec, storedBy };
+    const { format, durationSec, storedBy } = source;
+    return { available: true, format, durationSec, storedBy };
 }
 
 async function twilioRecording(number: VoiceNumberDoc, callSid: string): Promise<CallRecordingSource> {

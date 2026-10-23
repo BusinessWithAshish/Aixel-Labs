@@ -783,10 +783,12 @@ export type VoiceCallToolCall = {
   bookingId?: string | null;
 };
 
-export type VoiceCall = Omit<VoiceCallDoc<string>, "startedAt" | "endedAt" | "memoryUsed"> & {
+export type VoiceCall = Omit<VoiceCallDoc<string>, "startedAt" | "endedAt" | "memoryUsed" | "recordingUrl"> & {
   startedAt: string;
   endedAt: string;
   memoryUsed?: { brief: string; lastCallAt: string } | null;
+  /** The provider handed a recording link over (the link itself stays on the server). */
+  hasRecording: boolean;
 };
 
 // ---------------------------------------------------------------------------

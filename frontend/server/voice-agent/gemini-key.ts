@@ -13,7 +13,7 @@ import {
     type VoiceAgentDoc,
     type VoiceGeminiKeyView,
 } from '@aixellabs/backend/db';
-import { voiceAccountsCollection } from '@/server/voice-agent/accounts';
+import { NO_SEALED, voiceAccountsCollection } from '@/server/voice-agent/accounts';
 
 /**
  * Each owner runs their agents on their own Gemini API keys (`VoiceAccountDoc.keys`, sealed); an agent
@@ -137,9 +137,6 @@ export function toGeminiKeyView(
         tier: key.tier ?? 'paid',
     };
 }
-
-/** Keys without the sealed keys (the other lists are not needed). */
-const NO_SEALED = { 'keys.keySealed': 0, numbers: 0, calendars: 0 } as const;
 
 /** What the Gemini key the owner's agents (or one agent) run on looks like to the UI (never the key). */
 export async function loadGeminiKeyView(userId: MongoObjectId, agentId?: MongoObjectId): Promise<VoiceGeminiKeyView> {

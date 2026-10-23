@@ -522,6 +522,8 @@ test('a VoiceLink call plays the recording link VoiceLink sent, and says plainly
     await expect(page.getByLabel('Call recording')).toHaveAttribute('src', voiceCallRecordingApiRoute(recordedId));
     await expect(page.getByText('Download WAV')).toBeVisible();
     await expect(page.getByText('Stored in your VoiceLink account')).toBeVisible();
+    // The provider's link stays on the server (page HTML, RSC payload and the recording action alike).
+    expect(await page.content()).not.toContain(recordingUrl);
 
     await page.goto(`${CALL_LOGS_URL}/${pendingId}`);
     await expect(page.getByTestId('no-recording')).toContainText('VoiceLink has not sent the recording for this call yet');

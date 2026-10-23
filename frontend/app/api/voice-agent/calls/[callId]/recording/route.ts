@@ -4,6 +4,7 @@ import { getCall } from '@/app/actions/voice-call-actions';
 import { getActionErrorMessage } from '@/helpers/server-action-helpers';
 import { isValidObjectId } from '@/helpers/object-id';
 import { getAppSession } from '@/server/auth';
+import { isFetchableLink } from '@/server/voice-agent/public-url';
 import { findOwnedCallRecording, type CallRecordingSource } from '@/server/voice-agent/recordings';
 
 /**
@@ -56,23 +57,6 @@ function slug(text: string): string {
             .replace(/[\s_-]+/g, '-')
             .slice(0, 40) || 'agent'
     );
-}
-
-/**
- * Links come from the provider (Telnyx's or Twilio's API, or VoiceLink's webhook via the engine). Outside
- * tests only public https hosts are fetched, so a crafted link cannot point the server inward.
- */
-function isFetchableLink(link: string): boolean {
-    let url: URL;
-    try {
-        url = new URL(link);
-    } catch {
-        return false;
-    }
-    if (process.env.NODE_ENV !== 'production') return url.protocol === 'https:' || url.protocol === 'http:';
-    const host = url.hostname.toLowerCase();
-    const ipLiteral = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':') || host.startsWith('[');
-    return url.protocol === 'https:' && !ipLiteral && host !== 'localhost' && !host.endsWith('.localhost') && host.includes('.');
 }
 
 async function resolveSource(userId: string, callId: string): Promise<RecordingSource | NextResponse> {

@@ -24,6 +24,9 @@ export type Owned<T> = T & { tenantId: MongoObjectId; userId: MongoObjectId };
 
 export type VoiceAccountOwner = { tenantId: MongoObjectId; userId: MongoObjectId };
 
+/** Keys without the sealed keys (the other lists are not needed). */
+export const NO_SEALED = { 'keys.keySealed': 0, numbers: 0, calendars: 0 } as const;
+
 export async function voiceAccountsCollection() {
     await ensureVoiceAgentIndexes();
     return getCollection<VoiceAccountDoc>(MongoCollections.VOICE_ACCOUNTS);

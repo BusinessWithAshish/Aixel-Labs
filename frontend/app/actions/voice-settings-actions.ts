@@ -15,18 +15,16 @@ import {
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { requireUserObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { parseOrThrow, voiceKeyInputSchema, type VoiceKeyInput } from '@/helpers/voice-schemas';
+import { assertRateLimit } from '@/server/rate-limit';
 import { openSecret, sealSecret } from '@/server/voice-agent/engine';
 import { loadGeminiKeyView, VoiceKeyError } from '@/server/voice-agent/gemini-key';
 import { checkProviderKey, toProviderKeyView, toProviderKeyViews } from '@/server/voice-agent/provider-keys';
 import type { VoiceOption } from '@/helpers/voice-catalogue';
 import { agentVoices, stackCatalogue } from '@/server/voice-agent/voice-catalogue';
-import { ensureVoiceAccount, voiceAccountsCollection } from '@/server/voice-agent/accounts';
+import { ensureVoiceAccount, NO_SEALED, voiceAccountsCollection } from '@/server/voice-agent/accounts';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.SETTINGS;
-
-/** Keys without the sealed keys (the other lists are not needed). */
-const NO_SEALED = { 'keys.keySealed': 0, numbers: 0, calendars: 0 } as const;
 
 function assertTier(tier: VoiceGeminiKeyTier): VoiceGeminiKeyTier {
     if (tier !== 'free' && tier !== 'paid') throw new Error('Pick the free tier or the paid tier');
@@ -67,6 +65,7 @@ export const getVoiceKeys = async (): Promise<ALApiResponse<VoiceProviderKey[]>>
 export const addVoiceKey = async (input: VoiceKeyInput): Promise<ALApiResponse<VoiceProviderKey[]>> =>
     runAuthenticatedAction(async function addVoiceKey(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        assertRateLimit(`voice-check:${owner.userId}`, 30);
         const { provider, label, apiKey, tier } = parseOrThrow(voiceKeyInputSchema, input, 'Check the key');
         await checkProviderKey(provider, apiKey);
 
@@ -102,6 +101,7 @@ export const addVoiceKey = async (input: VoiceKeyInput): Promise<ALApiResponse<V
 export const recheckVoiceKey = async (keyId: string): Promise<ALApiResponse<VoiceProviderKey>> =>
     runAuthenticatedAction(async function recheckVoiceKey(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        assertRateLimit(`voice-check:${owner.userId}`, 30);
         const key = await findOwnedKey(owner.userId, keyId);
 
         let status = VoiceKeyStatus.OK;

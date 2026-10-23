@@ -43,6 +43,7 @@ import {
     webhookTestSchema,
     webhookToolSchema,
 } from '@/helpers/voice-schemas';
+import { assertRateLimit } from '@/server/rate-limit';
 import { openSecret, playgroundSocketUrl, sealSecret } from '@/server/voice-agent/engine';
 import { assertGeminiKeySet } from '@/server/voice-agent/gemini-key';
 import { stackView } from '@/server/voice-agent/provider-keys';
@@ -489,6 +490,7 @@ export const sendVoiceAgentWebhookTest = async (
 ): Promise<ALApiResponse<VoiceWebhookTestResult>> =>
     runAuthenticatedAction(async function sendVoiceAgentWebhookTest(userId) {
         const { userId: uid } = await agentOwner(userId);
+        assertRateLimit(`voice-check:${uid}`, 30);
         const tool = parseOrThrow(webhookTestSchema, input?.tool, 'Check the tool');
         const url = parseWebhookUrl(tool.url);
         const doc = await findOwnedAgent(uid, agentId);

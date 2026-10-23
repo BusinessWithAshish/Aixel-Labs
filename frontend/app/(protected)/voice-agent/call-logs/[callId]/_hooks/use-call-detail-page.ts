@@ -19,7 +19,7 @@ export type CallDetailData = {
 
 export function useCallDetailPage({ call, memory: initialMemory }: CallDetailData) {
     // A VoiceLink call carries its recording link; a Telnyx or Twilio call is looked up by its call id.
-    const hasProviderCall = !!call.recordingUrl || (!!call.providerCallId && !!call.numberId);
+    const hasProviderCall = call.hasRecording || (!!call.providerCallId && !!call.numberId);
     const [recording, setRecording] = useState<RecordingState>(
         hasProviderCall
             ? { status: 'loading' }

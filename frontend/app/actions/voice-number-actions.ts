@@ -19,6 +19,7 @@ import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key
 import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
 import { isBuiltinVariable } from '@/helpers/voice-agent-features';
 import { engineFetch, sealSecret } from '@/server/voice-agent/engine';
+import { assertRateLimit } from '@/server/rate-limit';
 import { assertGeminiKeySet, GEMINI_KEY_MISSING_MESSAGE } from '@/server/voice-agent/gemini-key';
 import {
     countNumbers,
@@ -341,6 +342,7 @@ async function importNumbers(owner: VoiceOwnerScope, input: ImportInput): Promis
 export const connectTelnyx = async (apiKey: string): Promise<ALApiResponse<AccountNumber[]>> =>
     runAuthenticatedAction(async function connectTelnyx(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        assertRateLimit(`voice-check:${owner.userId}`, 30);
         const key = assertApiKey(apiKey);
         return withImportState(owner, VoiceProvider.TELNYX, await listTelnyxAccountNumbers(key));
     });
@@ -366,6 +368,7 @@ export const importTelnyxNumbers = async (
 export const connectVoiceLink = async (credentials: VoiceLinkCredentials): Promise<ALApiResponse<AccountNumber[]>> =>
     runAuthenticatedAction(async function connectVoiceLink(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        assertRateLimit(`voice-check:${owner.userId}`, 30);
         const auth = assertVoiceLinkCredentials(credentials);
         return withImportState(owner, VoiceProvider.VOICELINK, await listVoiceLinkAccountNumbers(auth));
     });
@@ -395,6 +398,7 @@ export const importVoiceLinkNumbers = async (
 export const connectTwilio = async (credentials: TwilioCredentials): Promise<ALApiResponse<AccountNumber[]>> =>
     runAuthenticatedAction(async function connectTwilio(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        assertRateLimit(`voice-check:${owner.userId}`, 30);
         const auth = assertTwilioCredentials(credentials);
         const numbers = await withImportState(owner, VoiceProvider.TWILIO, await listTwilioAccountNumbers(auth));
         return numbers.map((n) => ({ ...n, cannotImport: twilioNumberProblem(n) }));
@@ -560,6 +564,7 @@ export const placeTestCall = async (
 
     return runAuthenticatedAction(async function placeTestCall(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        assertRateLimit(`voice-call:${owner.userId}`, 10);
         const doc = await findOwnedNumber(owner, numberId);
         const target = typeof to === 'string' ? to.replace(/[\s()-]/g, '') : '';
         if (!E164_PATTERN.test(target)) {

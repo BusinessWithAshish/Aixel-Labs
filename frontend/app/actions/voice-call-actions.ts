@@ -69,7 +69,7 @@ function mapVoiceCallDoc(doc: VoiceCallDoc, agentName: string | null): VoiceCall
         turns: (doc.turns ?? []).map(({ role, text }) => ({ role, text })),
         gapsMs: doc.gapsMs ?? [],
         providerCallId: doc.providerCallId,
-        recordingUrl: doc.recordingUrl ?? null,
+        hasRecording: !!doc.recordingUrl,
         toolCalls: (doc.toolCalls ?? []).map((tool) => ({
             name: tool.name,
             arguments: tool.arguments ?? {},
