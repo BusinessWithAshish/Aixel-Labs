@@ -142,6 +142,18 @@ test('call settings: who speaks first, personality, voicemail message, analysis 
         ),
     );
     expect(Math.abs(tops[0] - tops[1])).toBeLessThan(1);
+    // Each says its range, and the schema holds it.
+    await expect(card).toContainText('5–60 seconds, or 0 for never.');
+    await expect(card).toContainText('1–120 minutes, or 0 for no limit.');
+    await card.locator('#speech-silence-secs').fill('3');
+    await expect(card.getByTestId('call-settings-error')).toHaveText('Silence is 5 to 60 seconds, or 0 for never');
+    await card.locator('#speech-silence-secs').fill('0');
+    await card.locator('#speech-max-call-minutes').fill('121');
+    await expect(card.getByTestId('call-settings-error')).toHaveText(
+        'The time limit is 1 to 120 minutes, or 0 for no limit',
+    );
+    await card.locator('#speech-max-call-minutes').fill('0');
+    await expect(card.getByTestId('call-settings-error')).toHaveCount(0);
     // Never set up: an outbound agent waits for the callee's hello; personality as the prompt says.
     const firstSpeaker = card.getByTestId('first-speaker');
     await expect(firstSpeaker).toContainText('When the person this agent calls picks up.');

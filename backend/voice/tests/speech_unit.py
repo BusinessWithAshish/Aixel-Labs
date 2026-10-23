@@ -198,7 +198,7 @@ def style_tests():
     s = speech.settings({"speech": {"tone": "WARM", "pace": "RELAXED", "replyLength": "BRIEF"}})
     text = speech.style_prompt(s)
     ok("tone, pace and length each add their line", text.startswith("# Your style") and "warm and caring" in text
-       and "Speak slowly" in text and "one or two sentences" in text, text)
+       and "relaxed, unhurried pace" in text and "one or two sentences" in text, text)
     ok("only what is set is said", speech.style_prompt({**speech.DEFAULTS, "pace": "BRISK"}).count("\n- ") == 1)
     ok("a line for every choice the app offers but its default",
        set(speech.TONES) | {"DEFAULT"} == {"DEFAULT", "WARM", "FRIENDLY", "PROFESSIONAL", "FORMAL", "ENERGETIC"}

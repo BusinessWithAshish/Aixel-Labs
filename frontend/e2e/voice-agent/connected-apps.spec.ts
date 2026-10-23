@@ -168,10 +168,13 @@ test('connect Google Calendar: Connect Link, back to the agent booking into it, 
     await expect(crm).toHaveAttribute('aria-disabled', 'true');
     await expectLogos(crm, ['highlevel', 'hubspot', 'salesforce']);
     await page.getByRole('option', { name: 'Google Calendar' }).click();
-    // Only Google's part shows: its connect button; the built-in calendar's fields are tucked away.
+    // Only Google's part shows: its connect button. The booking hours stay, as the window Google is booked within.
     const google = page.getByTestId('booking-app-GOOGLE_CALENDAR');
     await expect(google).toContainText('Until Google Calendar is connected, bookings go to Built-in calendar.');
-    await expect(page.getByTestId('booking-settings')).toHaveCount(0);
+    await expect(page.getByTestId('booking-window')).toContainText(
+        'Nothing outside them can be booked, whatever Google Calendar shows as free.',
+    );
+    await expect(page.getByTestId('booking-settings')).toBeVisible();
     await google.getByRole('button', { name: 'Connect Google Calendar' }).click();
 
     // Composio's page sends the browser back; the callback says what it is doing, checks it and

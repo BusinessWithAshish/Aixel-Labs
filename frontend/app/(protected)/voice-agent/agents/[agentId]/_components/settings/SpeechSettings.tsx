@@ -151,7 +151,7 @@ export function SpeechSettings() {
                     name="speech.silenceSecs"
                     id="speech-silence-secs"
                     label="Check in after silence (seconds)"
-                    description="If the caller says nothing for this long, the agent asks if they are still there. Still nothing, and it says goodbye. 0 = never."
+                    description={`${LIMITS.silenceSecsMin}–${LIMITS.silenceSecsMax} seconds, or 0 for never. If the caller says nothing for this long, the agent asks if they are still there. Still nothing, and it says goodbye.`}
                     className={SUBGRID_FIELD}
                     classNames={{ description: 'text-xs' }}
                     min={0}
@@ -161,7 +161,7 @@ export function SpeechSettings() {
                     name="speech.maxCallMinutes"
                     id="speech-max-call-minutes"
                     label="Time limit (minutes)"
-                    description="The agent wraps up and ends the call at this point. 0 = no limit."
+                    description={`${LIMITS.maxCallMinutesMin}–${LIMITS.maxCallMinutesMax} minutes, or 0 for no limit. The agent wraps up and ends the call at this point.`}
                     className={SUBGRID_FIELD}
                     classNames={{ description: 'text-xs' }}
                     min={0}

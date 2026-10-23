@@ -31,7 +31,7 @@ export function PersonalitySettings() {
             titleId="personality-title"
             icon={Smile}
             title="Personality"
-            description="How the agent comes across. Added to its instructions on every call, on top of your prompt."
+            description="How the agent comes across, whichever models it runs on. Added to its instructions on every call, on top of your prompt."
             data-testid="personality-settings"
         >
             <div className="grid gap-4 sm:grid-cols-3">
@@ -40,7 +40,6 @@ export function PersonalitySettings() {
                     name="speech.pace"
                     id="speech-pace"
                     label="Speaking pace"
-                    description="Gemini Live voices follow it; a separate text-to-speech voice keeps its own pace."
                     options={PACES}
                     classNames={FIELD}
                 />

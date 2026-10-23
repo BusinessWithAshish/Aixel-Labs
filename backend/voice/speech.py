@@ -22,6 +22,8 @@ DEFAULTS = {"toolWait": "AGENT", "toolWaitLine": "", "replyWait": "NORMAL", "sil
             "firstSpeaker": "AGENT", "tone": "DEFAULT", "pace": "NORMAL", "replyLength": "NORMAL"}
 
 # `# Your style`: one line per personality setting that isn't its default (VoiceTone, VoicePace, VoiceReplyLength).
+# Part of her prompt, so both stacks follow it: Gemini Live by how it speaks, a PIPELINE stack's text model by
+# how it writes for its text-to-speech voice (short sentences and full stops slow it down).
 TONES = {
     "WARM": "warm and caring: sound glad to help, and show you understand how the caller feels.",
     "FRIENDLY": "friendly and relaxed, like a helpful neighbour; light, everyday words.",
@@ -30,8 +32,9 @@ TONES = {
     "ENERGETIC": "upbeat and energetic: lively and enthusiastic, without rushing the caller.",
 }
 PACES = {
-    "RELAXED": "Speak slowly and calmly, with short pauses between sentences.",
-    "BRISK": "Speak at a brisk, quick pace, without sounding rushed.",
+    "RELAXED": "Take a relaxed, unhurried pace: speak calmly in short sentences, pause between ideas, and give the "
+               "caller time to answer.",
+    "BRISK": "Keep a brisk pace: get to the point quickly and keep the call moving, without sounding rushed.",
 }
 LENGTHS = {
     "BRIEF": "Keep every reply short: one or two sentences, then let the caller talk. Give details only when asked.",

@@ -1,7 +1,7 @@
 'use client';
 
 import { Controller, useFormContext } from 'react-hook-form';
-import { VOICE_BOOKING_LIMITS, VOICE_WEEKDAYS } from '@aixellabs/backend/db/types';
+import { VOICE_BOOKING_LIMITS } from '@aixellabs/backend/db/types';
 import { TimezoneSelect } from '@/components/common/voice-agent/TimezoneSelect';
 import { Field, FieldDescription, FieldLabel, FieldTitle } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -147,16 +147,4 @@ export function BookingCalendarFields() {
             </Field>
         </div>
     );
-}
-
-/** "Mon-Fri 09:00-17:00, 30 min, up to 14 days ahead (Asia/Kolkata)": the offered times in one line. */
-export function bookingTimesSummary(booking: BookingFormValues): string {
-    const open = VOICE_WEEKDAYS.filter((day) => booking.days[day].open);
-    const days = open.length
-        ? open.map(
-              (day) =>
-                  `${VOICE_WEEKDAY_OPTIONS.find((d) => d.key === day)?.label.slice(0, 3)} ${booking.days[day].from}-${booking.days[day].to}`,
-          )
-        : ['no open days'];
-    return `${minutesLabel(booking.slotMinutes)} appointments, up to ${booking.maxDaysAhead} days ahead (${booking.timezone}): ${days.join(', ')}`;
 }

@@ -236,8 +236,10 @@ const speechSchema = z
         maxCallMinutes: z
             .number({ invalid_type_error: 'Give the minutes, or 0 for no limit' })
             .int('Whole minutes only')
-            .min(0, 'Give the minutes, or 0 for no limit')
-            .max(LIMITS.maxCallMinutesMax, `Calls can be limited to ${LIMITS.maxCallMinutesMax} minutes at most`),
+            .refine(
+                (mins) => mins === 0 || (mins >= LIMITS.maxCallMinutesMin && mins <= LIMITS.maxCallMinutesMax),
+                `The time limit is ${LIMITS.maxCallMinutesMin} to ${LIMITS.maxCallMinutesMax} minutes, or 0 for no limit`,
+            ),
         /** Null = the call type's default (an inbound agent greets, an outbound one waits for "hello?"). */
         firstSpeaker: z.nativeEnum(VoiceFirstSpeaker, { errorMap: () => ({ message: 'Pick who speaks first' }) }).nullable(),
         tone: z.nativeEnum(VoiceTone, { errorMap: () => ({ message: 'Pick a tone' }) }),

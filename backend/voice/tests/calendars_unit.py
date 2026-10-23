@@ -427,6 +427,41 @@ async def call_tests(fake: FakeComposio):
         print(f"  (deleted {n} test bookings)")
 
 
+async def window_tests(fake: FakeComposio):
+    print("\n== the owner's booking hours bound every app (no Sunday 2 am, nothing past days ahead) ==")
+    db = product.db()
+    tenant, user, agent_id = ObjectId(), ObjectId(), ObjectId()
+    d = next(day_ahead(i) for i in range(2, 9) if day_ahead(i).weekday() < 6)  # an open day
+    closed = next(d + timedelta(days=i) for i in range(1, 8) if (d + timedelta(days=i)).weekday() == 6)  # a Sunday
+    weekdays = {k: {"open": "09:00", "close": "17:00"} for k in ("mon", "tue", "wed", "thu", "fri", "sat")}
+    try:
+        for provider in ("GOOGLE_CALENDAR", "OUTLOOK", "CAL_COM", "CALENDLY"):
+            account = f"ca_win_{provider.lower()}"
+            # The app itself would take anything: nothing busy, or (Cal.com, Calendly) every hour of every day offered.
+            every_hour = {at(day, h) for day in (d, closed) for h in range(24)}
+            fake.account(account, str(user), provider, starts=every_hour if provider in ("CAL_COM", "CALENDLY") else ())
+            bk = {**booking(provider, account, "1234"), "hours": weekdays, "maxDaysAhead": 10}
+            t = tools.CallTools(ctx(agent_id, tenant, user, bk), {"turns": []}, prefetch=False)
+            r = await t.check_availability({"date": d.isoformat()})
+            times = r[1].split("free at ")[-1]  # "09:00 to 16:30 every 30 minutes." or "09:00, 10:00, ... and 16:00."
+            ok(f"{provider}: only times inside the hours are offered", r[0] and times.startswith("09:00")
+               and not any(f"{h:02d}:" in times for h in (*range(0, 9), *range(17, 24))) and "16:" in times, r[1])
+            r = await t.check_availability({"date": closed.isoformat()})
+            ok(f"{provider}: a closed day is closed, whatever the app says", r[0] and r[1].startswith(f"Closed on Sunday"), r[1])
+            n = len(fake.events(account))
+            ok_, text, _ = await t.book_appointment({"date": d.isoformat(), "time": "02:00", "name": "Night owl", "email": "n@example.com"})
+            ok(f"{provider}: 2 am is refused before the app is asked", not ok_ and "is not a start time we offer" in text
+               and len(fake.events(account)) == n, text)
+            ok_, text, _ = await t.book_appointment({"date": closed.isoformat(), "time": "10:00", "name": "Sunday", "email": "s@example.com"})
+            ok(f"{provider}: a closed day is refused", not ok_ and "Closed" in text and len(fake.events(account)) == n, text)
+            far = d + timedelta(days=30)
+            ok_, text, _ = await t.book_appointment({"date": far.isoformat(), "time": "10:00", "name": "Later", "email": "l@example.com"})
+            ok(f"{provider}: past the days ahead is refused", not ok_ and len(fake.events(account)) == n, text)
+            await close_sessions()
+    finally:
+        db.voice_bookings.delete_many({"agentId": agent_id})
+
+
 async def latency_tests(fake: FakeComposio):
     print("\n== our own overhead per tool call (fake answers at once) ==")
     tenant, user, agent_id = ObjectId(), ObjectId(), ObjectId()
@@ -464,6 +499,7 @@ async def main():
         await provider_tests(fake)
         await session_tests(fake)
         await call_tests(fake)
+        await window_tests(fake)
         await latency_tests(fake)
         ok("nothing anywhere used Composio's legacy direct execution (/tools/execute)",
            not [r for r in fake.requests if r["kind"] == "legacy"] and fake.calls())

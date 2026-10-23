@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Image from 'next/image';
-import { ChevronRight, Info, Loader2, Plug, TriangleAlert } from 'lucide-react';
+import { Info, Loader2, Plug, TriangleAlert } from 'lucide-react';
 import { type VoiceCalendarProvider } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePage } from '@/contexts/PageStore';
@@ -14,7 +13,7 @@ import { VOICE_CALENDAR_PROVIDERS, voiceCalendarProviderInfo } from '@/helpers/v
 import { CalendarProviderLogo } from '../../../_components/CalendarProviderLogo';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 import { bookingCalendarLabel } from '../../_utils/prompt-tools';
-import { BookingCalendarFields, bookingTimesSummary } from './BookingCalendarFields';
+import { BookingCalendarFields } from './BookingCalendarFields';
 import { ConnectedAppsList } from './ConnectedAppsList';
 
 const BUILTIN = 'builtin';
@@ -111,9 +110,9 @@ function AppTarget({ provider }: { provider: VoiceCalendarProvider }) {
 }
 
 /**
- * "Where bookings go": the built-in calendar (its hours, length and timezone below), or one of the owner's
- * booking apps, which shows only that app: connect it, or its connected account and calendar. With an app the
- * owner's hours still bound what is offered (the app's free/busy is checked on top), so they stay one click away.
+ * "Where bookings go": the built-in calendar, or one of the owner's booking apps, which shows only that app:
+ * connect it, or its connected account and calendar. Under it, always, the booking hours: the window every
+ * destination is booked within (the engine's Calendar; an app's busy times are taken out of it).
  */
 export function BookingDestinationField() {
     const {
@@ -128,7 +127,6 @@ export function BookingDestinationField() {
         calendarsLoading,
         calendarsError,
     } = usePage<UseVoiceAgentEditorPageReturn>();
-    const [timesOpen, setTimesOpen] = useState(false);
 
     const destination = booking.destination;
     const app = bookingApp === BUILTIN ? null : voiceCalendarProviderInfo(bookingApp);
@@ -181,12 +179,7 @@ export function BookingDestinationField() {
             </div>
 
             {!app ? (
-                <>
-                    <p className="text-muted-foreground text-xs">
-                        Bookings stay in Aixel Labs. Callers are offered these times, minus the ones already booked.
-                    </p>
-                    <BookingCalendarFields />
-                </>
+                <p className="text-muted-foreground text-xs">Bookings stay in Aixel Labs and are listed in Bookings.</p>
             ) : (
                 <div className="grid gap-3" data-testid={`booking-app-${app.provider}`}>
                     {lost ? (
@@ -270,20 +263,26 @@ export function BookingDestinationField() {
                             Connect another {app.label} account
                         </Button>
                     ) : null}
-                    <Collapsible open={timesOpen} onOpenChange={setTimesOpen} className="grid gap-3">
-                        <CollapsibleTrigger className="group/times text-muted-foreground hover:text-foreground flex items-start gap-1.5 text-left text-xs">
-                            <ChevronRight className="mt-px size-3.5 shrink-0 transition-transform group-data-[state=open]/times:rotate-90" />
-                            <span>
-                                Times the agent offers, within your {app.label}&apos;s free time:{' '}
-                                {bookingTimesSummary(booking)}
-                            </span>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                            <BookingCalendarFields />
-                        </CollapsibleContent>
-                    </Collapsible>
                 </div>
             )}
+
+            <section
+                className="grid gap-3 border-t pt-4"
+                aria-labelledby="booking-window-title"
+                data-testid="booking-window"
+            >
+                <div className="grid gap-1">
+                    <h4 id="booking-window-title" className="text-sm font-medium">
+                        Booking hours
+                    </h4>
+                    <p className="text-muted-foreground text-xs">
+                        {app
+                            ? `The agent only offers and books times inside these hours, then takes out what is busy in your ${app.label}. Nothing outside them can be booked, whatever ${app.label} shows as free.`
+                            : 'The agent only offers and books times inside these hours, minus the ones already booked.'}
+                    </p>
+                </div>
+                <BookingCalendarFields />
+            </section>
         </div>
     );
 }

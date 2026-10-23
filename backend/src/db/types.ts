@@ -828,6 +828,7 @@ export const VOICE_AGENT_FEATURE_LIMITS = {
   silenceSecsMin: 5,
   silenceSecsMax: 60,
   /** `speech.maxCallMinutes`, when on. */
+  maxCallMinutesMin: 1,
   maxCallMinutesMax: 120,
 } as const;
 
@@ -867,7 +868,7 @@ export enum VoiceTone {
   ENERGETIC = "ENERGETIC",
 }
 
-/** How fast she talks. Followed by Gemini Live's voices; a PIPELINE stack's text-to-speech keeps its own pace. */
+/** How fast she talks. An instruction in her prompt, so every stack follows it (a PIPELINE stack through how its text model writes). */
 export enum VoicePace {
   RELAXED = "RELAXED",
   NORMAL = "NORMAL",
