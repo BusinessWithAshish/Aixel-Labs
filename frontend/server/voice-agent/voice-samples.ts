@@ -7,6 +7,7 @@ import { voiceAccountsCollection } from '@/server/voice-agent/accounts';
 import { openSecret } from '@/server/voice-agent/engine';
 import { geminiApiBase } from '@/server/voice-agent/gemini-key';
 import { providerApiUrl } from '@/server/voice-agent/provider-keys';
+import { assertRateLimit } from '@/server/rate-limit';
 
 /**
  * Samples of the voices whose providers publish none (OpenAI's, Gemini's): one short sentence, made on the
@@ -95,6 +96,7 @@ export async function voiceSample(userId: MongoObjectId, provider: string, voice
     const doc = await accounts.findOne({ userId }, { projection: { keys: 1 } });
     const key = voiceKeyFor(doc?.keys, { provider: sampled });
     if (!key) return null;
+    assertRateLimit(`voice-check:${userId}`, 30); // a new sample spends the owner's credits
     const sample = await synthesize(sampled, voiceId, openSecret(key.keySealed));
     if (cache.size >= MAX_CACHED) cache.delete(cache.keys().next().value!);
     cache.set(id, sample);
