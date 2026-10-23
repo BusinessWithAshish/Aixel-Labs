@@ -30,7 +30,6 @@ import { usePage } from '@/contexts/PageStore';
 import { RadioCards } from '@/components/wrappers/RadioCards';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
-import { TELNYX_GUIDE_STEP, TWILIO_GUIDE_STEP, VOICELINK_GUIDE_STEP } from '../_utils/setup-guides';
 
 const FORM_ID = 'connect-number-form';
 
@@ -96,37 +95,20 @@ const NO_NUMBERS: Record<VoiceProvider, string> = {
         'This VoiceLink account has no phone numbers. Ask VoiceLink (or your reseller) to assign one, then connect again.',
 };
 
-function GuideLink({ onClick }: { onClick: () => void }) {
-    return (
-        <button
-            type="button"
-            className="text-primary text-xs font-medium underline-offset-4 hover:underline"
-            onClick={onClick}
-        >
-            How do I get this?
-        </button>
-    );
-}
-
 type CredentialFieldProps = {
     name: keyof Credentials;
     id: string;
     label: React.ReactNode;
     hint?: React.ReactNode;
-    /** Opens the provider's setup guide at the step that explains this field. */
-    onGuide?: () => void;
     secret?: boolean;
 } & Pick<React.ComponentProps<'input'>, 'placeholder' | 'inputMode'>;
 
-/** One credential: label (with the guide link when there is one), the input, a hint on where to find it. */
-function CredentialField({ name, id, label, hint, onGuide, secret, ...inputProps }: CredentialFieldProps) {
+/** One credential: label, the input, a hint on where to find it. */
+function CredentialField({ name, id, label, hint, secret, ...inputProps }: CredentialFieldProps) {
     const { register } = useFormContext<Credentials>();
     return (
         <Field>
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <FieldLabel htmlFor={id}>{label}</FieldLabel>
-                {onGuide ? <GuideLink onClick={onGuide} /> : null}
-            </div>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
             <Input
                 id={id}
                 type={secret ? 'password' : 'text'}
@@ -159,7 +141,6 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
     const isTwilio = provider === VoiceProvider.TWILIO;
     const { label } = numberProviderInfo(provider);
     const words = CREDENTIAL_WORDS[provider];
-    const guide = (step: string | null) => () => openSetupGuide(provider, step);
 
     /** Back to the key / token step. */
     const resetCredentials = () => {
@@ -234,7 +215,13 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
                         ? `Choose the numbers to add from ${label}. Nothing changes in ${label} until an agent uses a number.`
                         : `We use your own ${label} account for calls. Your ${words.secret} ${isTwilio ? 'are' : 'is'} encrypted before ${isTwilio ? 'they are' : 'it is'} stored and never shown again.`}
                 </DialogDescription>
-                <Button type="button" variant="link" size="sm" className="h-auto w-fit p-0" onClick={guide(null)}>
+                <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-auto w-fit p-0"
+                    onClick={() => openSetupGuide(provider, null)}
+                >
                     <BookOpen className="size-3.5" aria-hidden />
                     {label} setup guide
                 </Button>
@@ -273,7 +260,6 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
                                             id="twilio-api-key-sid"
                                             label="API key SID"
                                             placeholder="SK…"
-                                            onGuide={guide(TWILIO_GUIDE_STEP.API_KEY)}
                                         />
                                         <CredentialField
                                             name="secret"
@@ -289,7 +275,6 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
                                         id="twilio-secret"
                                         label="Auth Token"
                                         secret
-                                        onGuide={guide(TWILIO_GUIDE_STEP.ACCOUNT_SID)}
                                         hint="Next to the Account SID on the Console home page. An API key is safer: you can delete it without changing anything else."
                                     />
                                 )}
@@ -301,7 +286,6 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
                                     id="voicelink-api-token"
                                     label="VoiceLink API token"
                                     secret
-                                    onGuide={guide(VOICELINK_GUIDE_STEP.API_TOKEN)}
                                     hint="In your VoiceLink panel (app.voicelink.co.in), open the API section and create a token."
                                 />
                                 <CredentialField
@@ -333,7 +317,6 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
                                 label="Telnyx API key"
                                 secret
                                 placeholder="KEY0…"
-                                onGuide={guide(TELNYX_GUIDE_STEP.API_KEY)}
                                 hint="In the Telnyx portal: click your initials at the top right, then API keys."
                             />
                         )}

@@ -1,12 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { VoiceProvider } from '@aixellabs/backend/db/types';
-import {
-    setupGuideFor,
-    TELNYX_GUIDE_STEP,
-    TWILIO_GUIDE_STEP,
-    VOICELINK_GUIDE_STEP,
-    type SetupGuide,
-} from '@/app/(protected)/voice-agent/phone-numbers/_utils/setup-guides';
+import { setupGuideFor, type SetupGuide } from '@/app/(protected)/voice-agent/phone-numbers/_utils/setup-guides';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { expect, test } from '../support/fixtures';
 import { USER_STORAGE_STATE } from '../support/env';
@@ -111,23 +105,23 @@ test('arrow keys move between steps, the dots jump to one, and reopening starts 
     await expectStep(page, guide, 0);
 });
 
-const KEY_STEPS = [
-    { provider: VoiceProvider.TELNYX, field: 'Telnyx API key', step: TELNYX_GUIDE_STEP.API_KEY },
-    { provider: VoiceProvider.TWILIO, field: 'API key SID', step: TWILIO_GUIDE_STEP.API_KEY },
-    { provider: VoiceProvider.VOICELINK, field: 'VoiceLink API token', step: VOICELINK_GUIDE_STEP.API_TOKEN },
+const KEY_FIELDS = [
+    { provider: VoiceProvider.TELNYX, field: 'Telnyx API key' },
+    { provider: VoiceProvider.TWILIO, field: 'API key SID' },
+    { provider: VoiceProvider.VOICELINK, field: 'VoiceLink API token' },
 ];
 
-for (const { provider, field, step } of KEY_STEPS) {
-    test(`"How do I get this?" in the ${label(provider)} connect dialog opens its guide at that step`, async ({ page }) => {
+for (const { provider, field } of KEY_FIELDS) {
+    test(`the ${label(provider)} connect dialog's setup guide link keeps what was typed`, async ({ page }) => {
         const guide = setupGuideFor(provider);
         await openPhoneNumbers(page);
         const connect = await openConnect(page, label(provider));
         await connect.getByLabel(field).fill('typed-before-opening-the-guide');
+        await expect(connect.getByRole('button', { name: 'How do I get this?' })).toHaveCount(0);
 
-        await connect.getByRole('button', { name: 'How do I get this?' }).first().click();
-        const index = guide.steps.findIndex((s) => s.id === step);
-        await expectStep(page, guide, index);
-        await expectImageLoaded(page, guide, index);
+        await connect.getByRole('button', { name: `${label(provider)} setup guide` }).click();
+        await expectStep(page, guide, 0);
+        await expectImageLoaded(page, guide, 0);
 
         // Closing the guide returns to the connect dialog with what was typed.
         await page.keyboard.press('Escape');
