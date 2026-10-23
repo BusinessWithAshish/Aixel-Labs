@@ -1,9 +1,9 @@
 'use client';
 
 import { VOICE_CAMPAIGN_LIMITS } from '@aixellabs/backend/db/types';
+import { PhoneNumberControlledField } from '@/components/common/voice-agent/PhoneNumberSelect';
 import { SelectControlledField, StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { usePage } from '@/contexts/PageStore';
-import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import type { UseNewCampaignPageReturn } from '../_hooks/use-new-campaign-page';
 
 export function StepDetails() {
@@ -28,17 +28,12 @@ export function StepDetails() {
                 classNames={{ description: 'text-xs' }}
                 options={agents.map((agent) => ({ value: agent.id, label: agent.name }))}
             />
-            <SelectControlledField
+            <PhoneNumberControlledField
                 name="numberId"
                 id="campaign-number"
                 label="Call from"
-                placeholder="Pick one of your numbers"
                 description="Every call shows this number to the person called."
-                classNames={{ description: 'text-xs' }}
-                options={numbers.map((number) => ({
-                    value: number.id,
-                    label: `${number.phoneNumber} · ${numberProviderInfo(number.provider).label}`,
-                }))}
+                numbers={numbers}
             />
         </div>
     );

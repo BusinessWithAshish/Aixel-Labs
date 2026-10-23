@@ -455,15 +455,10 @@ test.describe('linking from the agent editor', () => {
         const trunkId = await seedTwilioNumber(db, TRUNK_NUMBER);
 
         await linkNumber(page, afterHours, APP_NUMBER);
-        await linkNumber(page, afterHours, TRUNK_NUMBER);
         expect(writeBodies()).toEqual([
             {
                 path: `/IncomingPhoneNumbers/${sidOf(102)}.json`,
                 body: { VoiceUrl: engineVoiceUrl(appId), VoiceMethod: 'POST', VoiceApplicationSid: '' },
-            },
-            {
-                path: `/IncomingPhoneNumbers/${sidOf(103)}.json`,
-                body: { VoiceUrl: engineVoiceUrl(trunkId), VoiceMethod: 'POST', TrunkSid: '' },
             },
         ]);
         expect((await storedNumber(db, APP_NUMBER)).twilio?.previousRouting).toEqual({
@@ -472,6 +467,21 @@ test.describe('linking from the agent editor', () => {
             voiceApplicationSid: TWILIO_CUSTOMER_APP_SID,
             trunkSid: '',
         });
+
+        // One number per agent: picking the trunk number links it, then puts the app number back on its app.
+        twilio.clear();
+        await linkNumber(page, afterHours, TRUNK_NUMBER);
+        expect(writeBodies()).toEqual([
+            {
+                path: `/IncomingPhoneNumbers/${sidOf(103)}.json`,
+                body: { VoiceUrl: engineVoiceUrl(trunkId), VoiceMethod: 'POST', TrunkSid: '' },
+            },
+            {
+                path: `/IncomingPhoneNumbers/${sidOf(102)}.json`,
+                body: { VoiceUrl: '', VoiceMethod: 'POST', VoiceApplicationSid: TWILIO_CUSTOMER_APP_SID },
+            },
+        ]);
+        expect(fakeNumber(APP_NUMBER)).toEqual({ ...originalOf(APP_NUMBER), voice_url: '' });
         expect((await storedNumber(db, TRUNK_NUMBER)).twilio?.previousRouting).toEqual({
             voiceUrl: '',
             voiceMethod: 'POST',
@@ -479,10 +489,7 @@ test.describe('linking from the agent editor', () => {
             trunkSid: TWILIO_CUSTOMER_TRUNK_SID,
         });
 
-        twilio.clear();
-        await unlinkNumber(page, afterHours, APP_NUMBER);
         await unlinkNumber(page, afterHours, TRUNK_NUMBER);
-        expect(fakeNumber(APP_NUMBER)).toEqual({ ...originalOf(APP_NUMBER), voice_url: '' });
         expect(fakeNumber(TRUNK_NUMBER)).toEqual({ ...originalOf(TRUNK_NUMBER), voice_url: '' });
     });
 

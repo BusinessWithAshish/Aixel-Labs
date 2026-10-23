@@ -18,6 +18,7 @@ import {
     VOICE_AGENT_PROMPT_TEMPLATES,
 } from '@/helpers/voice-agent-defaults';
 import type { Page } from '@playwright/test';
+import { formatPhone } from '@/helpers/voice-campaign-contacts';
 import { expect, test } from '../support/fixtures';
 import { E2E_GEMINI_API_KEY, USER_STORAGE_STATE } from '../support/env';
 import type { E2eDb } from '../support/db';
@@ -241,7 +242,6 @@ test('changing the type keeps the prompt; with numbers linked, saving asks what 
     await expect(page.getByTestId('call-type-note')).toContainText('does not rewrite the prompt');
     await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_VOICE_AGENT_PROMPT);
     // Numbers follow the saved type, so they wait for the save.
-    await expect(page.getByTestId('agent-numbers-trigger')).toBeDisabled();
     await expect(page.getByTestId('agent-numbers')).toContainText('Save the new agent type first.');
 
     // No number yet: it just saves.
@@ -285,8 +285,11 @@ test('the agent card shows its numbers and its Gemini key, and opens a picker of
     await openVoiceAgent(page, agentId);
     await expect(page.getByTestId('voice-agent-used-on')).toHaveCount(0); // the separate card is gone
     const numbers = page.getByTestId('agent-numbers');
-    await expect(numbers.getByTestId('agent-numbers-list')).toHaveText('+15550100001');
-    await expect(numbers).toContainText('Calls to these numbers are answered by this agent.');
+    // One number per agent: the picked one shows its logo, provider and number.
+    const select = numbers.getByRole('combobox', { name: 'Phone number' });
+    await expect(select).toHaveText(`Telnyx · ${formatPhone('+15550100001')}`);
+    await expect(select.getByTestId('number-provider-logo-TELNYX')).toBeVisible();
+    await expect(numbers).toContainText('Calls to this number are answered by this agent.');
     // A number left calling with it from before it was inbound is pointed out, with a way out.
     await expect(numbers.getByTestId('agent-numbers-stray')).toContainText('+15550100002 still calls with it');
     await expect(numbers.getByTestId('agent-numbers-stray').getByRole('button', { name: 'Unlink' })).toBeVisible();
@@ -296,28 +299,36 @@ test('the agent card shows its numbers and its Gemini key, and opens a picker of
     await expect(stack.locator('#stack-realtime-model')).toContainText('Gemini 3.8 Live');
     await expect(stack.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/voice-agent/settings#gemini-key');
 
-    // The dropdown lists every number with its provider, ticks this agent's, and says what the others do.
-    await numbers.getByRole('combobox', { name: 'Phone numbers' }).click();
-    const options = page.getByTestId('agent-numbers-options').getByRole('option');
-    await expect(options).toHaveCount(3);
-    await expect(options.filter({ hasText: '+15550100001' })).toHaveAttribute('data-linked', 'true');
-    await expect(options.filter({ hasText: '+15550100003' })).toHaveAttribute('data-linked', 'false');
-    await expect(options.filter({ hasText: '+15550100003' })).toContainText('now answers with Other');
-    await expect(options.first().getByTestId('number-provider-logo-TELNYX')).toBeVisible();
+    // The dropdown lists "No number" and every number, marks this agent's, and says what the others do.
+    let actions = 0;
+    page.on('request', (req) => {
+        if (req.method() === 'POST' && req.headers()['next-action']) actions += 1;
+    });
+    await select.click();
+    const options = page.getByRole('option');
+    await expect(options).toHaveCount(4);
+    await expect(options.first()).toHaveText('No number');
+    const mine = options.filter({ hasText: formatPhone('+15550100001') });
+    await expect(mine).toHaveAttribute('data-state', 'checked');
+    await expect(options.filter({ hasText: formatPhone('+15550100003') })).toContainText('Answers with Other');
+    await expect(options.filter({ hasText: formatPhone('+15550100003') })).toContainText('Telnyx');
+    // Picking the current number again, or clicking its label, changes and reloads nothing.
+    await mine.click();
+    await numbers.getByText('Phone number', { exact: true }).click();
     await page.keyboard.press('Escape');
+    await expect(select).toBeEnabled();
+    expect(actions).toBe(0);
 
     const unusedId = await db.insertVoiceAgent(E2E_USER, { name: 'Unused' });
     await openVoiceAgent(page, unusedId);
-    await expect(page.getByTestId('agent-numbers')).toContainText('No number yet: pick the ones it calls from.');
+    await expect(page.getByTestId('agent-numbers')).toContainText('No number yet: pick the one it calls from.');
 
-    // No number at all: the dropdown points to Phone numbers to connect one.
+    // No number at all: Phone numbers, to connect one.
     await db.resetVoiceTelephony(E2E_USER);
     await openVoiceAgent(page, unusedId);
-    await page.getByRole('combobox', { name: 'Phone numbers' }).click();
-    await expect(page.getByRole('link', { name: 'Connect one on Phone numbers' })).toHaveAttribute(
-        'href',
-        '/voice-agent/phone-numbers',
-    );
+    await expect(
+        page.getByTestId('agent-numbers-empty').getByRole('link', { name: 'Connect one on Phone numbers' }),
+    ).toHaveAttribute('href', '/voice-agent/phone-numbers');
 });
 
 test('the cost card is a bill: the voice stack, the prompt, each tool and the phone, then the real average', async ({

@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import type { Page } from '@playwright/test';
 import { Modules, VOICE_AGENT_SUB_MODULES, VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
+import { formatPhone } from '@/helpers/voice-campaign-contacts';
 import type { E2eDb } from '../support/db';
 import { expect, test } from '../support/fixtures';
 import { E2E_GEMINI_API_KEY, E2E_VOICE_ENGINE_SECRET, E2E_VOICE_ENGINE_URL, USER_STORAGE_STATE } from '../support/env';
@@ -416,7 +417,7 @@ test('the agent page starts a test call with that agent, from a number that uses
     const dialog = page.getByRole('dialog', { name: 'Test call' });
     // The agent is fixed; the number it answers on is picked first.
     await expect(dialog.getByRole('combobox', { name: 'Agent that calls' })).toHaveCount(0);
-    await expect(dialog.getByRole('combobox', { name: 'Calls from' })).toHaveText(`${SECOND_NUMBER} (Telnyx)`);
+    await expect(dialog.getByRole('combobox', { name: 'Calls from' })).toHaveText(`Telnyx · ${formatPhone(SECOND_NUMBER)}`);
     await expect(dialog).toContainText(`Front desk rings your phone from ${SECOND_NUMBER}`);
 
     await dialog.getByLabel('Your phone number').fill('+14155550123');

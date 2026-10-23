@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label';
 import { SubModuleUrls } from '@/config/app-config';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
+import { PhoneNumberControlledField } from '@/components/common/voice-agent/PhoneNumberSelect';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { estimateAgentCost, formatMoney, RATE_COUNTRY_NAME, rateCountry } from '@/helpers/voice-call-cost';
 
@@ -228,14 +229,11 @@ export function TestCallDialog({ open, onOpenChange, numbers, agents, geminiKey,
                         <FormProvider {...form}>
                             <form id="test-call-form" onSubmit={submit} className="flex flex-col gap-4" noValidate>
                                 {callable.length > 1 ? (
-                                    <SelectControlledField
+                                    <PhoneNumberControlledField
                                         name="numberId"
                                         id="test-call-number"
                                         label="Calls from"
-                                        options={callable.map((n) => ({
-                                            value: n._id ?? '',
-                                            label: `${n.phoneNumber} (${numberProviderInfo(n.provider).label})`,
-                                        }))}
+                                        numbers={callable.map((n) => ({ ...n, id: n._id ?? '' }))}
                                     />
                                 ) : null}
                                 {agents.length > 1 ? (

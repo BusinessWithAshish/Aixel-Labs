@@ -97,7 +97,7 @@ test('reads a CSV: guesses the columns, normalises numbers, reports repeats and 
     await page.locator('#campaign-agent').click();
     await expect(page.getByRole('option')).toHaveText(['Reminder caller']);
     await page.keyboard.press('Escape');
-    await expect(page.locator('#campaign-number')).toContainText(FROM_NUMBER);
+    await expect(page.locator('#campaign-number')).toContainText(`Telnyx · ${FROM_NUMBER_SHOWN}`);
     await page.getByRole('button', { name: 'Next', exact: true }).click();
 
     await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();

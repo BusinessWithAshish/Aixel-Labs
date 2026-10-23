@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { formatPhone } from '@/helpers/voice-campaign-contacts';
 import { expect } from '../support/fixtures';
 import { openVoiceAgent, waitForHydration } from '../support/voice-agents';
 import { PHONE_NUMBERS_URL } from './fake-telephony';
@@ -40,19 +41,26 @@ export async function openRemove(page: Page, phoneNumber: string) {
 export const LINK_UI_PENDING: string | null = null;
 
 /**
- * Picks or unpicks the number in the agent editor's numbers dropdown (each pick saves at once). Throws
- * with the error the page shows (it stays visible) when the provider or the app refuses.
+ * Picks the number in the agent editor's number dropdown, or "No number" to let it go (a pick saves at
+ * once). Throws with the error the page shows (it stays visible) when the provider or the app refuses.
  */
 async function setLinked(page: Page, agentId: string, phoneNumber: string, linked: boolean): Promise<void> {
     await openVoiceAgent(page, agentId);
-    await page.getByTestId('agent-numbers-trigger').click();
-    const option = page.getByTestId('agent-numbers-options').getByRole('option').filter({ hasText: phoneNumber });
-    const done = option.and(page.locator(`[data-linked="${linked}"]`));
-    await option.waitFor();
-    if (await done.count()) return;
-    await option.click();
+    const select = page.getByTestId('agent-numbers-select');
+    const shown = formatPhone(phoneNumber);
+    // Radix fills in the picked number's text only once the page has hydrated.
+    await expect(select).toHaveText(/\S/);
+    if ((await select.innerText()).includes(shown) === linked) return;
+    await select.click();
+    // The picker can show the pick before the server has it: wait for the link action to answer first.
+    const answered = page.waitForResponse((r) => r.request().method() === 'POST' && !!r.request().headers()['next-action']);
+    await page.getByRole('option', { name: linked ? shown : 'No number' }).click();
     const failed = page.locator('[data-sonner-toast][data-type="error"]');
-    await Promise.race([done.waitFor(), failed.first().waitFor({ state: 'visible' })]);
+    const done = linked ? select.filter({ hasText: shown }) : select.filter({ hasNotText: shown });
+    await Promise.race([
+        answered.then(() => done.and(page.locator(':enabled')).waitFor()),
+        failed.first().waitFor({ state: 'visible' }),
+    ]);
     if (await failed.count()) throw new Error(await failed.first().innerText());
 }
 

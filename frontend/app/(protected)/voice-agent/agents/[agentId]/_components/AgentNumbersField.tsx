@@ -1,31 +1,27 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { CheckIcon, ChevronsUpDownIcon, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import type { VoiceNumberListItem } from '@/app/actions/voice-number-actions';
-import { NumberProviderLogo } from '@/components/common/voice-agent/NumberProviderLogo';
+import { PhoneNumberSelect } from '@/components/common/voice-agent/PhoneNumberSelect';
 import { Button } from '@/components/ui/button';
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { usePage } from '@/contexts/PageStore';
 import { VOICE_PHONE_NUMBERS_URL } from '@/helpers/voice-routes';
-import { cn } from '@/lib/utils';
 import { linkedNumbers, type UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 
-/** What a number does now, in a few words ("answers with Front desk"), or null when it does nothing. */
+/** What a number does now, in a few words ("Answers with Front desk"), or null when it does nothing. */
 function numberJob(number: VoiceNumberListItem): string | null {
-    if (number.inboundAgentName) return `answers with ${number.inboundAgentName}`;
-    if (number.outboundAgentName) return `calls with ${number.outboundAgentName}`;
+    if (number.inboundAgentName) return `Answers with ${number.inboundAgentName}`;
+    if (number.outboundAgentName) return `Calls with ${number.outboundAgentName}`;
     return null;
 }
 
 /**
- * The numbers this agent works on, picked from the owner's numbers (loaded with the page, refreshed after
- * each change) in a dropdown: an inbound agent's numbers answer calls with it, an outbound agent's place
- * calls with it. Each pick links or unlinks at once; a number does one job, so picking one takes it off another.
+ * The number this agent works on, one of the owner's (loaded with the page, refreshed after a change): an
+ * inbound agent's number answers calls with it, an outbound agent's places calls with it. A pick links it at
+ * once and lets any other go; a number does one job, so picking one takes it off another.
  */
 export function AgentNumbersField() {
     const { saved, form, usage, ownedNumbers, numbers, linking, linkNumbers } = usePage<UseVoiceAgentEditorPageReturn>();
@@ -33,96 +29,58 @@ export function AgentNumbersField() {
     const stray = linkedNumbers(usage, inbound ? VoiceAgentCallType.OUTBOUND : VoiceAgentCallType.INBOUND);
     const typePending = form.callType !== saved.callType;
 
-    const [open, setOpen] = useState(false);
+    // shortcut: the UI keeps one number per agent; one linked before then shows the first and a pick keeps only it.
+    const pick = async (id: string | null) => {
+        if (id && !(await linkNumbers([id], true))) return;
+        await linkNumbers(
+            numbers.map((n) => n.id).filter((n) => n !== id),
+            false,
+        );
+    };
 
     return (
         <Field data-testid="agent-numbers">
-            <FieldLabel htmlFor="agent-numbers">Phone numbers</FieldLabel>
-            <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                    <Button
-                        id="agent-numbers"
-                        type="button"
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={open}
-                        disabled={typePending}
-                        className="h-auto min-h-9 w-full justify-between font-normal"
-                        data-testid="agent-numbers-trigger"
-                    >
-                        {numbers.length > 0 ? (
-                            <span className="flex flex-wrap gap-x-3 gap-y-1" data-testid="agent-numbers-list">
-                                {numbers.map((n) => (
-                                    <span key={n.id} className="flex items-center gap-1.5 tabular-nums">
-                                        <NumberProviderLogo provider={n.provider} className="size-4" />
-                                        {n.phoneNumber}
-                                    </span>
-                                ))}
-                            </span>
-                        ) : (
-                            <span className="text-muted-foreground">
-                                {inbound ? 'Pick the numbers it answers' : 'Pick the numbers it calls from'}
-                            </span>
-                        )}
-                        {linking ? (
-                            <Loader2 className="size-4 shrink-0 animate-spin" />
-                        ) : (
-                            <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" />
-                        )}
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-(--radix-popover-trigger-width) min-w-72 p-0" align="start">
-                    <Command>
-                        {ownedNumbers.length > 5 ? <CommandInput placeholder="Search numbers" /> : null}
-                        <CommandList className="max-h-72" data-testid="agent-numbers-options">
-                            <CommandEmpty>
-                                {ownedNumbers.length ? (
-                                    'No number found.'
-                                ) : (
-                                    <>
-                                        No numbers yet.{' '}
-                                        <Link href={VOICE_PHONE_NUMBERS_URL} className="underline underline-offset-4">
-                                            Connect one on Phone numbers
-                                        </Link>
-                                    </>
-                                )}
-                            </CommandEmpty>
-                            {ownedNumbers.map((n) => {
-                                const mine = numbers.some((x) => x.id === n._id);
-                                const job = mine ? null : numberJob(n);
-                                return (
-                                    <CommandItem
-                                        key={n._id}
-                                        value={n.phoneNumber}
-                                        disabled={linking}
-                                        data-linked={mine}
-                                        onSelect={() => void linkNumbers([n._id], !mine)}
-                                    >
-                                        <CheckIcon className={cn('size-4', mine ? 'opacity-100' : 'opacity-0')} />
-                                        <NumberProviderLogo provider={n.provider} className="size-4" />
-                                        <span className="grid min-w-0">
-                                            <span className="tabular-nums">{n.phoneNumber}</span>
-                                            {job ? (
-                                                <span className="text-muted-foreground truncate text-xs">now {job}</span>
-                                            ) : null}
-                                        </span>
-                                    </CommandItem>
-                                );
-                            })}
-                        </CommandList>
-                    </Command>
-                </PopoverContent>
-            </Popover>
+            <FieldLabel htmlFor="agent-numbers">
+                Phone number
+                {linking ? <Loader2 className="text-muted-foreground size-3.5 animate-spin" /> : null}
+            </FieldLabel>
+            {ownedNumbers.length > 0 ? (
+                <PhoneNumberSelect
+                    id="agent-numbers"
+                    data-testid="agent-numbers-select"
+                    numbers={ownedNumbers.map((n) => {
+                        const mine = numbers.some((x) => x.id === n._id);
+                        return {
+                            id: n._id,
+                            phoneNumber: n.phoneNumber,
+                            provider: n.provider,
+                            detail: mine ? null : numberJob(n),
+                        };
+                    })}
+                    value={numbers[0]?.id ?? null}
+                    onChange={(id) => void pick(id)}
+                    placeholder={inbound ? 'Pick the number it answers' : 'Pick the number it calls from'}
+                    noneLabel="No number"
+                    disabled={typePending || linking}
+                />
+            ) : (
+                <p className="text-muted-foreground text-sm" data-testid="agent-numbers-empty">
+                    No numbers yet.{' '}
+                    <Link href={VOICE_PHONE_NUMBERS_URL} className="text-primary underline-offset-4 hover:underline">
+                        Connect one on Phone numbers
+                    </Link>
+                </p>
+            )}
             <FieldDescription className="text-xs">
                 {typePending
                     ? 'Save the new agent type first.'
                     : numbers.length > 0
                       ? inbound
-                          ? 'Calls to these numbers are answered by this agent.'
-                          : 'This agent calls from these numbers.'
+                          ? 'Calls to this number are answered by this agent.'
+                          : 'This agent calls from this number.'
                       : inbound
-                        ? 'No number yet: pick the ones it answers.'
-                        : 'No number yet: pick the ones it calls from.'}
+                        ? 'No number yet: pick the one it answers.'
+                        : 'No number yet: pick the one it calls from.'}
             </FieldDescription>
             {stray.length > 0 ? (
                 <p className="text-xs text-amber-700 dark:text-amber-400" data-testid="agent-numbers-stray">
