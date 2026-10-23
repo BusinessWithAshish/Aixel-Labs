@@ -16,7 +16,7 @@ import { openVoiceAgent } from '../support/voice-agents';
 test.use({ storageState: USER_STORAGE_STATE, timezoneId: 'Asia/Kolkata' });
 
 const SCREENSHOTS = path.join(E2E_ARTIFACTS_DIR, 'prompt-editor');
-const BOOKING_OFF = 'Appointment booking is off — turn it on in Tools';
+const BOOKING_OFF = 'This tool is off — turn it on in Tools';
 
 test.beforeEach(async ({ db }) => {
     await db.resetUser(E2E_USER);
@@ -95,9 +95,9 @@ test('marks tools the agent has, and warns about ones it does not', async ({ pag
     await page.mouse.move(0, 0);
     await expect(page.getByRole('tooltip')).toHaveCount(0);
 
-    // "Go to Tools" lands on the booking switch; turning it on clears the warning before any save.
+    // "Go to Tools" lands on check_availability's switch; turning it on clears both warnings before any save.
     await problems.nth(0).getByRole('button', { name: 'Go to Tools' }).click();
-    const toggle = page.getByTestId('voice-agent-tools').getByRole('switch', { name: 'Appointment booking' });
+    const toggle = page.getByTestId('voice-agent-tools').getByRole('switch', { name: 'Use check_availability' });
     await expect(toggle).toBeFocused();
     await expect(toggle).toBeInViewport();
     await toggle.click();

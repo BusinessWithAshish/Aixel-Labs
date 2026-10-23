@@ -4,10 +4,15 @@ import {
     type VoiceAgentAnalysis,
     type VoiceAgentSpeech,
     type VoiceAgentVoicemail,
+    VoiceAgentCallType,
     type VoiceAnalysisFieldType,
     type VoiceBuiltinVariable,
     VoiceCallDirection,
+    VoiceFirstSpeaker,
+    VoicePace,
+    VoiceReplyLength,
     VoiceReplyWait,
+    VoiceTone,
     VoiceToolWait,
     VoiceVoicemailAction,
 } from '@aixellabs/backend/db/types';
@@ -73,13 +78,22 @@ export const DEFAULT_VOICE_AGENT_ANALYSIS: VoiceAgentAnalysis = {
 };
 
 /** Speech never set: the model decides what to say while a tool works, normal reply wait, no silence or time limit. */
-export const DEFAULT_VOICE_AGENT_SPEECH: VoiceAgentSpeech = {
+export const DEFAULT_VOICE_AGENT_SPEECH: Required<VoiceAgentSpeech> = {
     toolWait: VoiceToolWait.AGENT,
     toolWaitLine: '',
     replyWait: VoiceReplyWait.NORMAL,
     silenceSecs: 0,
     maxCallMinutes: 0,
+    firstSpeaker: null,
+    tone: VoiceTone.DEFAULT,
+    pace: VoicePace.NORMAL,
+    replyLength: VoiceReplyLength.NORMAL,
 };
+
+/** Who speaks first when the agent leaves it to its call type (the engine's speech.settings). */
+export function defaultFirstSpeaker(callType: VoiceAgentCallType): VoiceFirstSpeaker {
+    return callType === VoiceAgentCallType.OUTBOUND ? VoiceFirstSpeaker.CALLER : VoiceFirstSpeaker.AGENT;
+}
 
 /** The line the editor suggests when an owner first picks "say a set line". */
 export const SUGGESTED_TOOL_WAIT_LINE = 'One moment, let me check that for you.';
@@ -96,13 +110,14 @@ export function callSettingsOf(agent: Pick<VoiceAgent, 'voicemail' | 'analysis' 
     voicemail: VoiceAgentVoicemail;
     analysis: VoiceAgentAnalysis;
     memory: boolean;
-    speech: VoiceAgentSpeech;
+    speech: Required<VoiceAgentSpeech>;
 } {
     return {
         voicemail: agent.voicemail ?? DEFAULT_VOICE_AGENT_VOICEMAIL,
         analysis: agent.analysis ?? DEFAULT_VOICE_AGENT_ANALYSIS,
         memory: agent.memory === true,
-        speech: agent.speech ?? DEFAULT_VOICE_AGENT_SPEECH,
+        // Saved before a setting existed: that setting's default.
+        speech: { ...DEFAULT_VOICE_AGENT_SPEECH, ...agent.speech },
     };
 }
 

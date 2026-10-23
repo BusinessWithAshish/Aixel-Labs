@@ -15,6 +15,7 @@ import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent
 import { CardSaveActions } from '../CardSaveActions';
 import { AnalysisSettings } from './AnalysisSettings';
 import { CallerMemorySettings } from './CallerMemorySettings';
+import { PersonalitySettings } from './PersonalitySettings';
 import { SpeechSettings } from './SpeechSettings';
 
 const VOICEMAIL_CHOICES = [
@@ -75,7 +76,7 @@ function VoicemailSettings() {
 }
 
 /**
- * What the agent does in and around a call: how it speaks, on a voicemail (calls it places only: an inbound
+ * What the agent does in and around a call: how it speaks and comes across, on a voicemail (calls it places only: an inbound
  * agent always answers, so the section is hidden and its saved value kept), after it (analysis), and from
  * one call to the next (memory).
  */
@@ -94,8 +95,8 @@ export function CallSettingsCard() {
                     ) : null}
                 </CardTitle>
                 <CardDescription>
-                    How the agent speaks{places ? ', voicemail' : ''}, what is worked out after each call, and what it
-                    remembers about callers. Changes apply from the next call.
+                    Who speaks first, how the agent speaks and comes across{places ? ', voicemail' : ''}, what is worked out
+                    after each call, and what it remembers about callers. Changes apply from the next call.
                 </CardDescription>
                 <CardSaveActions
                     dirty={settingsDirty}
@@ -111,6 +112,8 @@ export function CallSettingsCard() {
             <FormProvider {...settingsForm}>
                 <CardContent className="grid gap-5">
                     <SpeechSettings />
+                    <Separator />
+                    <PersonalitySettings />
                     <Separator />
                     {places ? (
                         <>

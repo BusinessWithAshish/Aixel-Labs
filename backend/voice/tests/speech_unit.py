@@ -52,13 +52,20 @@ def settings_tests():
     good = {"toolWait": "SAY", "toolWaitLine": "  One   moment,\n {{name}}  ", "replyWait": "PATIENT", "silenceSecs": 20, "maxCallMinutes": 15}
     s = speech.settings({"speech": good}, lambda t: t.replace("{{name}}", "Ravi"))
     ok("valid values kept; the line's variables filled in and its spaces squeezed",
-       s == {"toolWait": "SAY", "toolWaitLine": "One moment, Ravi", "replyWait": "PATIENT", "silenceSecs": 20, "maxCallMinutes": 15}, str(s))
-    bad = speech.settings({"speech": {"toolWait": "SING", "replyWait": "SLOW", "silenceSecs": 3, "maxCallMinutes": 500}})
+       s == {**speech.DEFAULTS, "toolWait": "SAY", "toolWaitLine": "One moment, Ravi", "replyWait": "PATIENT", "silenceSecs": 20,
+             "maxCallMinutes": 15}, str(s))
+    bad = speech.settings({"speech": {"toolWait": "SING", "replyWait": "SLOW", "silenceSecs": 3, "maxCallMinutes": 500,
+                                      "firstSpeaker": "NOBODY", "tone": "GRUMPY", "pace": "LUDICROUS", "replyLength": "ESSAY"}})
     ok("unknown choices and out-of-range numbers fall back to the defaults", bad == speech.DEFAULTS, str(bad))
     odd = speech.settings({"speech": {"silenceSecs": 20.5, "maxCallMinutes": True}})
     ok("a fraction or a boolean is not a number of seconds/minutes", odd["silenceSecs"] == 0 and odd["maxCallMinutes"] == 0, str(odd))
     ok("SAY with no line (or one that fills in empty) is the agent deciding",
        speech.settings({"speech": {"toolWait": "SAY", "toolWaitLine": "{{x}}"}}, lambda t: "")["toolWait"] == "AGENT")
+    first = lambda call_type, chosen=None: speech.settings({"callType": call_type, "speech": {"firstSpeaker": chosen}})["firstSpeaker"]
+    ok("who speaks first, unset: an inbound agent greets, an outbound one waits for the hello",
+       (first("INBOUND"), first("OUTBOUND"), first(None)) == ("AGENT", "CALLER", "AGENT"))
+    ok("...and the owner's choice wins either way",
+       (first("INBOUND", "CALLER"), first("OUTBOUND", "AGENT")) == ("CALLER", "AGENT"))
     ok("the line is cut at its limit", len(speech.settings({"speech": {"toolWait": "SAY", "toolWaitLine": "a" * 500}})["toolWaitLine"]) == speech.LINE_MAX)
 
 
@@ -185,6 +192,19 @@ async def watch_tests():
     ok("a limit starts a timer when the line is live, and the call's end stops it", started and on.timer is None)
 
 
+def style_tests():
+    print("\n== personality: # Your style ==")
+    ok("all defaults: no section, so her prompt is as it was", speech.style_prompt(speech.DEFAULTS) == "")
+    s = speech.settings({"speech": {"tone": "WARM", "pace": "RELAXED", "replyLength": "BRIEF"}})
+    text = speech.style_prompt(s)
+    ok("tone, pace and length each add their line", text.startswith("# Your style") and "warm and caring" in text
+       and "Speak slowly" in text and "one or two sentences" in text, text)
+    ok("only what is set is said", speech.style_prompt({**speech.DEFAULTS, "pace": "BRISK"}).count("\n- ") == 1)
+    ok("a line for every choice the app offers but its default",
+       set(speech.TONES) | {"DEFAULT"} == {"DEFAULT", "WARM", "FRIENDLY", "PROFESSIONAL", "FORMAL", "ENERGETIC"}
+       and set(speech.PACES) | {"NORMAL"} == {"RELAXED", "NORMAL", "BRISK"} and set(speech.LENGTHS) | {"NORMAL"} == {"BRIEF", "NORMAL"})
+
+
 async def product_tests():
     print("\n== a call reads them from the agent ==")
     tenant, user = ObjectId(), ObjectId()
@@ -194,8 +214,13 @@ async def product_tests():
                  "callNotes": "", "speech": {"toolWait": "SAY", "toolWaitLine": "{{agent_name}} here, one moment.", "replyWait": "QUICK",
                                              "silenceSecs": 10, "maxCallMinutes": 5}}
         ctx = await asyncio.to_thread(product.play_call, agent)
-        ok("play_call: speech checked, variables filled in", ctx["speech"] == {"toolWait": "SAY", "toolWaitLine": "Priya here, one moment.",
+        ok("play_call: speech checked, variables filled in", ctx["speech"] == {**speech.DEFAULTS, "toolWait": "SAY", "toolWaitLine": "Priya here, one moment.",
                                                                                "replyWait": "QUICK", "silenceSecs": 10, "maxCallMinutes": 5}, str(ctx["speech"]))
+        ok("no personality set: no # Your style in her prompt", "# Your style" not in ctx["prompt"])
+        styled = await asyncio.to_thread(product.play_call, {**agent, "speech": {**agent["speech"], "tone": "FORMAL", "replyLength": "BRIEF"}})
+        ok("personality set: # Your style after her own prompt, before # Right now",
+           styled["prompt"].index("You are Priya.") < styled["prompt"].index("# Your style") < styled["prompt"].index("# Right now")
+           and "formal" in styled["prompt"], styled["prompt"][:400])
         bare = await asyncio.to_thread(product.play_call, {**agent, "speech": None})
         ok("an agent that never set them: the defaults", bare["speech"] == speech.DEFAULTS)
     finally:
@@ -205,6 +230,7 @@ async def product_tests():
 async def main():
     settings_tests()
     prompt_tests()
+    style_tests()
     await tool_line_tests()
     pipeline_tests()
     await watch_tests()

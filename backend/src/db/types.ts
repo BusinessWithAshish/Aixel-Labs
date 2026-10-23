@@ -287,7 +287,7 @@ export type VoiceAgentDoc<Id = ObjectId> = {
   analysis?: VoiceAgentAnalysis | null;
   /** Remember each caller (by phone number) from one of this agent's calls to the next. Absent = off. */
   memory?: boolean;
-  /** How she takes turns and fills waits during a call. Absent = today's defaults (agent decides, NORMAL, both off). */
+  /** How she takes turns, fills waits and sounds during a call. Absent = today's defaults (agent decides, NORMAL, both off). */
   speech?: VoiceAgentSpeech | null;
   /** What its calls hear, think and speak with (models, keys, prices). Absent / null = VOICE_DEFAULT_STACK; see `voiceStackFor`. */
   stack?: VoiceStack<Id> | null;
@@ -331,6 +331,8 @@ export type VoiceAgentBookingTool = {
   hours: VoiceBookingHours;
   /** How far ahead a caller can book. 1..90. */
   maxDaysAhead: number;
+  /** book_appointment, beside check_availability. Absent = on; off = she tells callers free times but books nothing. */
+  bookAppointment?: boolean;
   /**
    * Where bookings go. Absent / null = the built-in calendar (voice_bookings only). Otherwise the
    * owner's own booking app through Composio: the engine checks its free/busy (on top of the hours,
@@ -845,6 +847,39 @@ export enum VoiceReplyWait {
   PATIENT = "PATIENT",
 }
 
+/**
+ * Who speaks first once the line is open. Absent / null = the call type's default: an inbound agent greets
+ * as it picks up (AGENT), an outbound one waits for the callee's "hello?" (CALLER). CALLER waits up to 3 s of
+ * nobody speaking, then she starts (phone.RingGate); in the playground she waits for you to speak.
+ */
+export enum VoiceFirstSpeaker {
+  AGENT = "AGENT",
+  CALLER = "CALLER",
+}
+
+/** Her tone (`# Your style` in her prompt). DEFAULT = whatever the prompt says. */
+export enum VoiceTone {
+  DEFAULT = "DEFAULT",
+  WARM = "WARM",
+  FRIENDLY = "FRIENDLY",
+  PROFESSIONAL = "PROFESSIONAL",
+  FORMAL = "FORMAL",
+  ENERGETIC = "ENERGETIC",
+}
+
+/** How fast she talks. Followed by Gemini Live's voices; a PIPELINE stack's text-to-speech keeps its own pace. */
+export enum VoicePace {
+  RELAXED = "RELAXED",
+  NORMAL = "NORMAL",
+  BRISK = "BRISK",
+}
+
+/** How long her replies are. */
+export enum VoiceReplyLength {
+  BRIEF = "BRIEF",
+  NORMAL = "NORMAL",
+}
+
 export type VoiceAgentSpeech = {
   toolWait: VoiceToolWait;
   /** `SAY` only: said word for word, `{{variables}}` filled in. Up to `toolWaitLineMax` characters. */
@@ -854,6 +889,11 @@ export type VoiceAgentSpeech = {
   silenceSecs: number;
   /** She wraps up and ends the call after this many minutes. 0 = no limit. */
   maxCallMinutes: number;
+  firstSpeaker?: VoiceFirstSpeaker | null;
+  /** Personality. Absent = DEFAULT / NORMAL / NORMAL (nothing added to her prompt). */
+  tone?: VoiceTone;
+  pace?: VoicePace;
+  replyLength?: VoiceReplyLength;
 };
 
 

@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import { Unplug } from 'lucide-react';
-import { VoiceCalendarConnectionStatus, type VoiceCalendarConnection } from '@aixellabs/backend/db/types';
+import {
+    VoiceCalendarConnectionStatus,
+    type VoiceCalendarConnection,
+    type VoiceCalendarProvider,
+} from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
@@ -12,12 +16,19 @@ import { CalendarProviderLogo } from '../../../_components/CalendarProviderLogo'
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 
 /**
- * The owner's own booking apps, connected through Composio (they sign in on Composio's page; we never
- * see their password or tokens). Shared by all their agents; connecting is under "Where bookings go".
+ * The owner's accounts on one booking app, connected through Composio (they sign in on Composio's page; we
+ * never see their password or tokens). Shared by all their agents; connecting is under "Where bookings go".
  */
-export function ConnectedAppsList() {
-    const { connectedAppsConfigured, connections, connecting, connectApp, disconnecting, disconnectApp } =
-        usePage<UseVoiceAgentEditorPageReturn>();
+export function ConnectedAppsList({ provider }: { provider: VoiceCalendarProvider }) {
+    const {
+        connectedAppsConfigured,
+        connections: all,
+        connecting,
+        connectApp,
+        disconnecting,
+        disconnectApp,
+    } = usePage<UseVoiceAgentEditorPageReturn>();
+    const connections = all.filter((c) => c.provider === provider);
     const [toRemove, setToRemove] = useState<VoiceCalendarConnection | null>(null);
 
     if (connections.length === 0) return null;
@@ -33,8 +44,8 @@ export function ConnectedAppsList() {
 
     return (
         <div className="grid gap-2" data-testid="connected-apps">
-            <p className="text-muted-foreground text-xs">Your connected apps, shared by all your agents</p>
-            <ul className="divide-y rounded-md border" data-testid="connected-apps-list">
+            <p className="text-muted-foreground text-xs">Your connected accounts, shared by all your agents</p>
+            <ul className="bg-background divide-y rounded-md border" data-testid="connected-apps-list">
                 {connections.map((c) => {
                     const info = voiceCalendarProviderInfo(c.provider);
                     const active = isActive(c);

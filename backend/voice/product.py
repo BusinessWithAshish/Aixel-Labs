@@ -403,7 +403,7 @@ def _finish_ctx(ctx: dict, agent: dict) -> dict:
     """What every customer call adds: the voice_calls `_id`, chosen now so a booking made
     during the call can point at it; the agent's tools and speech settings; and her whole system prompt
     (the agent's with its `{{variables}}` filled in, what she remembers about the caller,
-    then `# Right now` and `# Your tools`, tools.prompt_sections)."""
+    `# Your style` (speech.style_prompt), then `# Right now` and `# Your tools`, tools.prompt_sections)."""
     import analysis, campaigns, cascade, speech, tools  # import this module: loaded on first use
 
     # The agent's prompt and the owner's own Gemini key, or no call (AgentNoPrompt, GeminiKeyMissing).
@@ -436,6 +436,8 @@ def _finish_ctx(ctx: dict, agent: dict) -> dict:
             ctx["memory_used"] = memory
             ctx["doc"]["memoryUsed"] = {"brief": memory["brief"], "lastCallAt": memory["lastCallAt"]}
             parts.append(memory_section(memory, business_zone(agent)[1]))
+    if style := speech.style_prompt(ctx["speech"]):
+        parts.append(style)
     parts.append(tools.prompt_sections(ctx))
     ctx["prompt"] = "\n\n".join(parts)
     return ctx

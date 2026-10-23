@@ -21,7 +21,11 @@ import {
     VoiceCalendarProvider,
     VoiceCampaignRetryOutcome,
     VoiceKeyProvider,
+    VoiceFirstSpeaker,
+    VoicePace,
+    VoiceReplyLength,
     VoiceReplyWait,
+    VoiceTone,
     VoiceStackKind,
     VoiceToolWait,
     VoiceVoicemailAction,
@@ -234,6 +238,11 @@ const speechSchema = z
             .int('Whole minutes only')
             .min(0, 'Give the minutes, or 0 for no limit')
             .max(LIMITS.maxCallMinutesMax, `Calls can be limited to ${LIMITS.maxCallMinutesMax} minutes at most`),
+        /** Null = the call type's default (an inbound agent greets, an outbound one waits for "hello?"). */
+        firstSpeaker: z.nativeEnum(VoiceFirstSpeaker, { errorMap: () => ({ message: 'Pick who speaks first' }) }).nullable(),
+        tone: z.nativeEnum(VoiceTone, { errorMap: () => ({ message: 'Pick a tone' }) }),
+        pace: z.nativeEnum(VoicePace, { errorMap: () => ({ message: 'Pick a speaking pace' }) }),
+        replyLength: z.nativeEnum(VoiceReplyLength, { errorMap: () => ({ message: 'Pick a reply length' }) }),
     })
     .strict()
     .refine((speech) => speech.toolWait !== VoiceToolWait.SAY || speech.toolWaitLine.length > 0, {
@@ -260,7 +269,9 @@ const weekdayLabel = (day: VoiceWeekday) => VOICE_WEEKDAY_OPTIONS.find((d) => d.
 const DAYS_AHEAD_RANGE = `Callers can book from ${VOICE_BOOKING_LIMITS.maxDaysAheadMin} to ${VOICE_BOOKING_LIMITS.maxDaysAheadMax} days ahead`;
 
 const bookingRules = {
+    /** check_availability on; book_appointment needs it too. */
     enabled: z.boolean(),
+    bookAppointment: z.boolean(),
     timezone: z.string().trim().min(1, 'Pick a timezone').refine(isIanaTimezone, 'Pick a timezone from the list'),
     slotMinutes: z
         .number({ invalid_type_error: 'Pick an appointment length' })

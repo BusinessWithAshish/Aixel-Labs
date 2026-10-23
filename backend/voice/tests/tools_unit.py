@@ -113,6 +113,13 @@ def prompt_tests():
     ok("webhook parameters -> schema", hs.properties == {"order_id": {"type": "string", "description": "The order number"}, "rush": {"type": "boolean", "description": "Rush it"}}
        and hs.required == ["order_id"], f"{hs.properties} {hs.required}")
     ok("no tools -> CallTools is falsy, no schema, no record field", not tools.CallTools(bare, rec := {"turns": []}) and tools.CallTools(bare, rec).schema() is None and "tool_calls" not in rec)
+    look = {**full, "tools": {"booking": {**BOOKING, "bookAppointment": False}}}
+    ct = tools.CallTools(look, {"turns": []})
+    s = tools.prompt_sections(look, now)
+    ok("book_appointment off: check_availability alone, in the schema and registered",
+       [f.name for f in ct.schema().standard_tools] == ["check_availability"] == ct.builtins())
+    ok("...she is told to give free times and take a message, never to book", "You can't book appointments yourself" in s
+       and "book_appointment" not in s and "check_availability returned it" in s, s)
     off = {"tools": {"booking": {**BOOKING, "enabled": False}, "webhooks": [{**hook, "enabled": False}]}, "doc": {"agentId": ObjectId()}}
     ok("everything disabled = no tools", not tools.CallTools(off, {"turns": []}))
 
@@ -203,6 +210,9 @@ async def booking_tests():
     tenant, user, agent_id = ObjectId(), ObjectId(), ObjectId()
     try:
         a = tools.CallTools(call_ctx(agent_id, tenant, user), {"turns": []})
+        looks = tools.CallTools({**call_ctx(agent_id, tenant, user), "tools": {"booking": {**BOOKING, "bookAppointment": False}}}, {"turns": []})
+        r = await looks._dispatch("book_appointment", {"date": "2026-10-17", "time": "10:00", "name": "A"})
+        ok("book_appointment off: one she makes up anyway is refused", not r[0] and "no tool called" in r[1], r[1])
         r = await a.check_availability({"date": "2026-10-17"}, now=EVENING)
         ok("check_availability: Saturday, speakable", r == (True, "Saturday 17 October (Asia/Kolkata): free at 10:00 to 13:30 every 30 minutes.", None), r[1])
         r = await a.check_availability({"date": "2026-10-17", "after": "12:00"}, now=EVENING)

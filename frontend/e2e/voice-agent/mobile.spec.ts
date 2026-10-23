@@ -18,6 +18,7 @@ import { E2E_ARTIFACTS_DIR, E2E_BASE_URL, E2E_FLAGS_SECRET, USER_STORAGE_STATE }
 import {
     FAKE_MIC_LAUNCH_ARGS,
     FakePlaygroundEngine,
+    openVoiceTool,
     VOICE_AGENTS_URL,
     voiceAgentUrl,
     waitForHydration,
@@ -271,6 +272,17 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await page.getByTestId('voice-playground').scrollIntoViewIfNeeded();
             await check('agent-playground-live');
             await page.getByRole('button', { name: 'End call' }).click();
+
+            // The Tools list with a booking tool open on an app, and the call settings' first speaker and personality.
+            await openVoiceTool(page, 'check_availability');
+            await page.locator('#booking-destination').click();
+            await page.getByRole('option', { name: 'Google Calendar' }).click();
+            await page.getByTestId('voice-agent-tools').scrollIntoViewIfNeeded();
+            await check('agent-tools-booking');
+            await page.getByTestId('first-speaker').scrollIntoViewIfNeeded();
+            await check('agent-call-settings-speech');
+            await page.getByTestId('personality-settings').scrollIntoViewIfNeeded();
+            await check('agent-call-settings-personality');
 
             // Phone numbers: the list, the provider menu, the connect dialog and its guide carousel.
             await open(PHONE_NUMBERS_URL);

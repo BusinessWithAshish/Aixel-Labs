@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowDown, AudioLines, Info, Loader2, Mic, Phone, PhoneOff, Timer } from 'lucide-react';
+import { VoiceFirstSpeaker } from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { ToolCallRow } from '@/components/common/voice-agent/ToolCallRow';
 import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
 import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
+import { defaultFirstSpeaker } from '@/helpers/voice-agent-features';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { GeminiKeyLine } from '../../_components/GeminiKeyLine';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
@@ -176,7 +178,12 @@ export function VoicePlayground({ className }: { className?: string }) {
                     )}
                 </div>
 
-                <Transcript agentName={saved.name} items={timeline} live={status === 'live'} />
+                <Transcript
+                    agentName={saved.name}
+                    items={timeline}
+                    live={status === 'live'}
+                    waits={(saved.speech?.firstSpeaker ?? defaultFirstSpeaker(saved.callType)) === VoiceFirstSpeaker.CALLER}
+                />
 
                 {status === 'ended' && endedReason ? (
                     <p className="text-muted-foreground text-sm" data-testid="playground-ended">
@@ -203,6 +210,8 @@ export function VoicePlayground({ className }: { className?: string }) {
 
 type TranscriptProps = {
     agentName: string;
+    /** It waits for the caller to speak first (its saved who-speaks-first). */
+    waits: boolean;
     items: PlaygroundTimelineItem[];
     live: boolean;
 };
@@ -210,7 +219,7 @@ type TranscriptProps = {
 /** How close to the bottom (px) still counts as "following the conversation". */
 const STICK_THRESHOLD_PX = 48;
 
-function Transcript({ agentName, items, live }: TranscriptProps) {
+function Transcript({ agentName, items, live, waits }: TranscriptProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     /** Follow new lines unless the user scrolled up to read; scrolling back down resumes. */
     const stickRef = useRef(true);
@@ -255,8 +264,12 @@ function Transcript({ agentName, items, live }: TranscriptProps) {
                 {items.length === 0 ? (
                     <p className="text-muted-foreground flex h-full items-center justify-center px-6 text-center text-sm">
                         {live
-                            ? `${agentName} speaks first. Answer like the business owner would.`
-                            : `Press Start call and ${agentName} says hello. What you both say shows up here.`}
+                            ? waits
+                                ? `${agentName} waits for you to speak first. Say hello.`
+                                : `${agentName} speaks first. Answer like the business owner would.`
+                            : waits
+                              ? `Press Start call and say hello: ${agentName} waits for you. What you both say shows up here.`
+                              : `Press Start call and ${agentName} says hello. What you both say shows up here.`}
                     </p>
                 ) : (
                     <ol className="flex flex-col gap-2">

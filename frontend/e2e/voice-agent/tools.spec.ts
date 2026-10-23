@@ -9,11 +9,12 @@ import type { E2eDb } from '../support/db';
 import { expect, LOCAL_FETCH, test } from '../support/fixtures';
 import { E2E_ARTIFACTS_DIR, USER_STORAGE_STATE } from '../support/env';
 import { E2E_USER } from '../support/users';
-import { openVoiceAgent } from '../support/voice-agents';
+import { openVoiceAgent, openVoiceTool } from '../support/voice-agents';
 import { sealForE2e } from './fake-telephony';
 
 /**
- * The agent editor's Tools card: built-in appointment booking and custom webhook tools.
+ * The agent editor's Tools card: one list of tools (the built-in booking tools, then custom webhook tools), each
+ * opened for its settings.
  * Test requests go to a throwaway HTTP server on 127.0.0.1 started by the spec.
  */
 test.use({ storageState: USER_STORAGE_STATE, timezoneId: 'Asia/Kolkata' });
@@ -67,31 +68,39 @@ test('booking: turn it on, set hours, save, and it is still there after a reload
     await openVoiceAgent(page, agentId);
 
     const card = tools(page);
-    await expect(card.getByText('The agent checks your free times and books callers in.')).toBeVisible();
-    await expect(card.getByRole('link', { name: 'Bookings' })).toHaveAttribute('href', '/voice-agent/bookings');
-    const toggle = card.getByRole('switch', { name: 'Appointment booking' });
-    await expect(toggle).toHaveAttribute('aria-checked', 'false');
-    await expect(page.getByTestId('booking-settings')).toHaveCount(0);
-    // Save sits at the top right of the card, waiting for a change.
-    await expect(card.getByRole('button', { name: 'Save booking' })).toBeDisabled();
-    // The two tools booking gives the agent, by the names the prompt uses, and the calendar they work on.
+    await expect(card.getByText('Things the agent can do during a call.')).toBeVisible();
+    // The list: the two built-in booking tools first, by the names the prompt uses, then "Add tool".
     const bookingTools = card.getByTestId('booking-tool-row');
     await expect(bookingTools).toHaveCount(2);
     await expect(bookingTools.nth(0)).toContainText('check_availability');
-    await expect(bookingTools.nth(0)).toContainText('Off');
+    await expect(bookingTools.nth(0)).toContainText('Built-in');
     await expect(bookingTools.nth(0).getByTestId('tool-where')).toHaveText('Reads: Built-in calendar');
     await expect(bookingTools.nth(1)).toContainText('book_appointment');
     await expect(bookingTools.nth(1).getByTestId('tool-where')).toHaveText('Writes: Built-in calendar, listed in Bookings');
+    await expect(card.getByRole('button', { name: 'Add tool' })).toBeVisible();
+    const check = card.getByRole('switch', { name: 'Use check_availability' });
+    const book = card.getByRole('switch', { name: 'Use book_appointment' });
+    await expect(check).toHaveAttribute('aria-checked', 'false');
+    await expect(book).toHaveAttribute('aria-checked', 'false');
+    // Settings show only when a tool is opened. Save sits at the top right of the card, waiting for a change.
+    await expect(page.getByTestId('booking-settings')).toHaveCount(0);
+    await expect(card.getByRole('button', { name: 'Save tools' })).toBeDisabled();
 
-    await toggle.click();
-    await expect(bookingTools.nth(0)).not.toContainText('Off');
-    // A new agent starts from the browser's zone, weekdays 9 to 5, 30-minute appointments, 30 days ahead.
+    // book_appointment books only times check_availability found: turning it on turns both on.
+    await book.click();
+    await expect(check).toHaveAttribute('aria-checked', 'true');
+    await expect(book).toHaveAttribute('aria-checked', 'true');
+    await expect(card.getByText('Unsaved changes')).toBeVisible();
+
+    const row = await openVoiceTool(page, 'check_availability');
+    // A new agent books into the built-in calendar from the browser's zone, weekdays 9 to 5, 30-minute
+    // appointments, 30 days ahead.
+    await expect(row.locator('#booking-destination')).toHaveText('Built-in calendar');
     await expect(page.locator('#booking-timezone')).toHaveText('Asia/Kolkata');
     await expect(page.locator('#booking-slot')).toHaveText('30 minutes');
     await expect(page.locator('#booking-days-ahead')).toHaveValue('30');
     await expect(page.getByRole('switch', { name: 'Open on Monday' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByRole('switch', { name: 'Open on Sunday' })).toHaveAttribute('aria-checked', 'false');
-    await expect(card.getByText('Unsaved changes')).toBeVisible();
 
     await page.locator('#booking-timezone').click();
     await page.getByPlaceholder('Search a city or region').fill('london');
@@ -107,13 +116,20 @@ test('booking: turn it on, set hours, save, and it is still there after a reload
     await page.getByLabel('Saturday closes at').fill('14:00');
     await expect(page.getByTestId('booking-day-mon')).toContainText('Closed');
 
-    await page.getByRole('button', { name: 'Save booking' }).click();
+    // Opening book_appointment shows the same calendar (one tool open at a time) and where bookings are listed.
+    const bookRow = await openVoiceTool(page, 'book_appointment');
+    await expect(row.locator('#booking-destination')).toHaveCount(0);
+    await expect(bookRow.locator('#booking-slot')).toHaveText('45 minutes');
+    await expect(bookRow.getByRole('link', { name: 'Bookings' })).toHaveAttribute('href', '/voice-agent/bookings');
+
+    await card.getByRole('button', { name: 'Save tools' }).click();
     await expect(page.getByText('Booking settings saved')).toBeVisible();
     await expect(card.getByText('Unsaved changes')).toHaveCount(0);
 
     const stored = await db.getVoiceAgentDoc(agentId);
     expect(stored.tools?.booking).toEqual({
         enabled: true,
+        bookAppointment: true,
         timezone: 'Europe/London',
         slotMinutes: 45,
         maxDaysAhead: 14,
@@ -128,7 +144,11 @@ test('booking: turn it on, set hours, save, and it is still there after a reload
     expect(stored.tools?.webhooks ?? []).toEqual([]);
 
     await openVoiceAgent(page, agentId);
-    await expect(tools(page).getByRole('switch', { name: 'Appointment booking' })).toHaveAttribute('aria-checked', 'true');
+    await expect(tools(page).getByRole('switch', { name: 'Use check_availability' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+    );
+    await openVoiceTool(page, 'check_availability');
     await expect(page.locator('#booking-timezone')).toHaveText('Europe/London');
     await expect(page.locator('#booking-slot')).toHaveText('45 minutes');
     await expect(page.locator('#booking-days-ahead')).toHaveValue('14');
@@ -137,10 +157,19 @@ test('booking: turn it on, set hours, save, and it is still there after a reload
     await expect(page.getByLabel('Friday closes at')).toHaveValue('16:00');
     await expect(tools(page).getByText('Unsaved changes')).toHaveCount(0);
 
-    // Turning it off keeps the settings for next time.
-    await tools(page).getByRole('switch', { name: 'Appointment booking' }).click();
-    await page.getByRole('button', { name: 'Save booking' }).click();
-    await expect(page.getByRole('button', { name: 'Save booking' })).toBeDisabled();
+    // book_appointment off on its own: the agent gives free times and takes a message.
+    await tools(page).getByRole('switch', { name: 'Use book_appointment' }).click();
+    const off = await openVoiceTool(page, 'book_appointment');
+    await expect(off).toContainText('takes a message instead of booking');
+    await page.getByRole('button', { name: 'Save tools' }).click();
+    await expect
+        .poll(async () => (await db.getVoiceAgentDoc(agentId)).tools?.booking)
+        .toMatchObject({ enabled: true, bookAppointment: false });
+
+    // Turning check_availability off keeps the settings for next time.
+    await tools(page).getByRole('switch', { name: 'Use check_availability' }).click();
+    await page.getByRole('button', { name: 'Save tools' }).click();
+    await expect(page.getByRole('button', { name: 'Save tools' })).toBeDisabled();
     await expect
         .poll(async () => (await db.getVoiceAgentDoc(agentId)).tools?.booking)
         .toMatchObject({ enabled: false, timezone: 'Europe/London', slotMinutes: 45 });
@@ -149,8 +178,9 @@ test('booking: turn it on, set hours, save, and it is still there after a reload
 test('booking: impossible hours and limits are refused in plain words', async ({ page, db }) => {
     const agentId = await inboundAgent(db);
     await openVoiceAgent(page, agentId);
-    await tools(page).getByRole('switch', { name: 'Appointment booking' }).click();
-    const save = page.getByRole('button', { name: 'Save booking' });
+    await tools(page).getByRole('switch', { name: 'Use check_availability' }).click();
+    await openVoiceTool(page, 'check_availability');
+    const save = page.getByRole('button', { name: 'Save tools' });
     const error = page.getByTestId('booking-error');
 
     await page.getByLabel('Tuesday closes at').fill('08:00');
@@ -174,7 +204,11 @@ test('booking: impossible hours and limits are refused in plain words', async ({
     await expect(save).toBeDisabled();
 
     await tools(page).getByRole('button', { name: 'Discard', exact: true }).click();
-    await expect(page.getByTestId('booking-settings')).toHaveCount(0);
+    await expect(tools(page).getByRole('switch', { name: 'Use check_availability' })).toHaveAttribute(
+        'aria-checked',
+        'false',
+    );
+    await expect(page.getByRole('switch', { name: 'Open on Monday' })).toHaveAttribute('aria-checked', 'true');
     await expect(save).toBeDisabled();
     await expect(error).toHaveCount(0);
     expect((await db.getVoiceAgentDoc(agentId)).tools).toBeUndefined();
@@ -188,7 +222,7 @@ test('custom tool: add, check the rules, edit, switch off and delete', async ({ 
     const agentId = await inboundAgent(db);
     await openVoiceAgent(page, agentId);
     const card = tools(page);
-    await expect(card.getByText('No custom tools yet.')).toBeVisible();
+    await expect(card.getByTestId('custom-tool')).toHaveCount(0);
 
     await card.getByRole('button', { name: 'Add tool' }).click();
     const dialog = page.getByRole('dialog', { name: 'Add a custom tool' });
@@ -258,7 +292,10 @@ test('custom tool: add, check the rules, edit, switch off and delete', async ({ 
     await expect(error).toHaveText('This agent already has a tool called check_order');
     await dialog.getByRole('button', { name: 'Cancel' }).click();
 
-    // Edit.
+    // Opened: what it sends where. Edit.
+    await openVoiceTool(page, 'check_order');
+    await expect(row).toContainText('https://example.com/hooks/order');
+    await expect(row).toContainText('order_id (Text), express (Yes / no, optional)');
     await row.getByRole('button', { name: 'Edit check_order' }).click();
     const edit = page.getByRole('dialog', { name: 'Edit check_order' });
     await expect(edit.getByLabel('Parameter 1 name')).toHaveValue('order_id');
@@ -280,7 +317,6 @@ test('custom tool: add, check the rules, edit, switch off and delete', async ({ 
     // Off, and still off after a reload.
     await row.getByRole('switch', { name: 'Use check_order' }).click();
     await expect(page.getByText('check_order is off')).toBeVisible();
-    await expect(row.getByText('Off', { exact: true })).toBeVisible();
     expect((await db.getVoiceAgentDoc(agentId)).tools?.webhooks?.[0].enabled).toBe(false);
     await openVoiceAgent(page, agentId);
     await expect(tools(page).getByRole('switch', { name: 'Use check_order' })).toHaveAttribute('aria-checked', 'false');
@@ -289,11 +325,12 @@ test('custom tool: add, check the rules, edit, switch off and delete', async ({ 
     expect((await db.getVoiceAgentDoc(agentId)).tools?.webhooks?.[0].enabled).toBe(true);
 
     // Delete, after a confirmation.
+    await openVoiceTool(page, 'check_order');
     await tools(page).getByRole('button', { name: 'Delete check_order' }).click();
     const confirm = page.getByRole('dialog', { name: 'Delete check_order?' });
     await confirm.getByRole('button', { name: 'Delete tool' }).click();
     await expect(page.getByText('check_order deleted')).toBeVisible();
-    await expect(tools(page).getByText('No custom tools yet.')).toBeVisible();
+    await expect(tools(page).getByTestId('custom-tool')).toHaveCount(0);
     expect((await db.getVoiceAgentDoc(agentId)).tools?.webhooks).toEqual([]);
 });
 
@@ -324,6 +361,7 @@ test('custom tool: the signing secret is sealed and never reaches the browser', 
 
     // A fresh server render of the page.
     await openVoiceAgent(page, agentId);
+    await openVoiceTool(page, 'create_lead');
     await tools(page).getByRole('button', { name: 'Edit create_lead' }).click();
     const edit = page.getByRole('dialog', { name: 'Edit create_lead' });
     await expect(edit.getByTestId('tool-secret-set')).toHaveText('Secret set');
@@ -397,6 +435,7 @@ test('send test request: posts what the engine would, signed, and shows the answ
             webhooks: [webhookTool({ url: `${base}/ok`, secretSealed: sealForE2e(FAKE_SECRET) })],
         });
         await openVoiceAgent(page, agentId);
+        await openVoiceTool(page, 'check_order');
         await tools(page).getByRole('button', { name: 'Edit check_order' }).click();
         const dialog = page.getByRole('dialog', { name: 'Edit check_order' });
 
@@ -500,7 +539,10 @@ test('the Tools card fits a desktop screen', async ({ page, db }) => {
     expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
     mkdirSync(SCREENSHOTS, { recursive: true });
     await tools(page).screenshot({ path: path.join(SCREENSHOTS, 'tools-desktop.png') });
+    await openVoiceTool(page, 'check_availability');
+    await tools(page).screenshot({ path: path.join(SCREENSHOTS, 'tools-desktop-booking.png') });
 
+    await openVoiceTool(page, 'check_order');
     await tools(page).getByRole('button', { name: 'Edit check_order' }).click();
     await page
         .getByRole('dialog', { name: 'Edit check_order' })
@@ -516,6 +558,7 @@ test.describe('on a 390 px phone', () => {
         const card = tools(page);
         await card.scrollIntoViewIfNeeded();
         await expect(card.getByTestId('custom-tool')).toHaveCount(2);
+        await openVoiceTool(page, 'check_availability');
         expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
 
         // The card itself fits the screen (the page clips overflow, so check the box, not just scrollWidth).
@@ -530,7 +573,7 @@ test.describe('on a 390 px phone', () => {
             expect(box && cardBox && box.x + box.width <= cardBox.x + cardBox.width).toBe(true);
         }
         // Edit and delete stay reachable on a long name.
-        const longRow = card.getByTestId('custom-tool').nth(1);
+        const longRow = await openVoiceTool(page, 'create_lead_in_crm_with_a_long_name');
         await longRow.scrollIntoViewIfNeeded();
         const deleteBox = await longRow
             .getByRole('button', { name: 'Delete create_lead_in_crm_with_a_long_name' })
@@ -543,6 +586,7 @@ test.describe('on a 390 px phone', () => {
         await page.mouse.wheel(0, -80);
         await page.screenshot({ path: path.join(SCREENSHOTS, 'tools-390-top.png') });
 
+        await openVoiceTool(page, 'check_order');
         await card.getByRole('button', { name: 'Edit check_order' }).click();
         const dialog = page.getByRole('dialog', { name: 'Edit check_order' });
         await expect(dialog.getByLabel('Parameter 3 name')).toHaveValue('express');

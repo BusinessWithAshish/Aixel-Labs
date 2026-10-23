@@ -51,7 +51,7 @@ test('with no bookings, says how they appear and links to the agents', async ({ 
     await openBookings(page);
     const empty = page.getByTestId('bookings-empty');
     await expect(empty).toContainText('No bookings yet');
-    await expect(empty).toContainText('Turn on Appointment booking in an agent’s Tools');
+    await expect(empty).toContainText('Turn on the booking tools in an agent’s Tools');
     await empty.getByRole('link', { name: 'Open agents' }).click();
     await expect(page).toHaveURL(VOICE_AGENTS_URL);
 });

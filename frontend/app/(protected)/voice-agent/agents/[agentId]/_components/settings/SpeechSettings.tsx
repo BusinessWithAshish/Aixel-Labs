@@ -1,13 +1,19 @@
 'use client';
 
 import { AudioLines } from 'lucide-react';
-import { VOICE_AGENT_FEATURE_LIMITS, VoiceReplyWait, VoiceToolWait } from '@aixellabs/backend/db/types';
+import {
+    VOICE_AGENT_FEATURE_LIMITS,
+    VoiceAgentCallType,
+    VoiceFirstSpeaker,
+    VoiceReplyWait,
+    VoiceToolWait,
+} from '@aixellabs/backend/db/types';
 import { NumberControlledField, StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { SettingsSection } from '@/components/common/SettingsSection';
 import { RadioCards } from '@/components/wrappers/RadioCards';
 import { FieldDescription, FieldLegend, FieldSet } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
-import { SUGGESTED_TOOL_WAIT_LINE } from '@/helpers/voice-agent-features';
+import { defaultFirstSpeaker, SUGGESTED_TOOL_WAIT_LINE } from '@/helpers/voice-agent-features';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 
 const LIMITS = VOICE_AGENT_FEATURE_LIMITS;
@@ -33,9 +39,37 @@ const REPLY_WAIT_CHOICES = [
     },
 ];
 
-/** Turn taking and waits during a call: what she does while a tool works, how soon she answers, silence, time limit. */
+/** Who speaks first, by call type (phone.serve in the engine: RingGate waits for a "hello?", 3 s at most). Default first. */
+const FIRST_SPEAKER_CHOICES = {
+    [VoiceAgentCallType.INBOUND]: [
+        {
+            value: VoiceFirstSpeaker.AGENT,
+            title: 'Agent greets the caller',
+            description: 'Says its opening line as it picks up, as callers expect from a business.',
+        },
+        {
+            value: VoiceFirstSpeaker.CALLER,
+            title: 'Wait for the caller',
+            description: 'Picks up quietly and greets them after their “hello?” (or 3 seconds of silence).',
+        },
+    ],
+    [VoiceAgentCallType.OUTBOUND]: [
+        {
+            value: VoiceFirstSpeaker.CALLER,
+            title: 'Wait for their “hello?”',
+            description: 'Once they pick up, waits for them to answer (up to 3 seconds), then says its opening line.',
+        },
+        {
+            value: VoiceFirstSpeaker.AGENT,
+            title: 'Speak as soon as they pick up',
+            description: 'Starts its opening line the moment the call connects; their “hello?” may overlap it.',
+        },
+    ],
+};
+
+/** Turn taking and waits during a call: who speaks first,: what she does while a tool works, how soon she answers, silence, time limit. */
 export function SpeechSettings() {
-    const { settingsForm, settings } = usePage<UseVoiceAgentEditorPageReturn>();
+    const { form, settingsForm, settings } = usePage<UseVoiceAgentEditorPageReturn>();
     const dirty = { shouldDirty: true, shouldValidate: true };
 
     const chooseToolWait = (toolWait: VoiceToolWait) => {
@@ -55,6 +89,23 @@ export function SpeechSettings() {
             className="gap-4"
             data-testid="speech-settings"
         >
+            <FieldSet data-testid="first-speaker">
+                <FieldLegend variant="label">Who speaks first</FieldLegend>
+                <FieldDescription className="text-xs">
+                    {form.callType === VoiceAgentCallType.INBOUND
+                        ? 'When someone calls this agent’s number.'
+                        : 'When the person this agent calls picks up.'}{' '}
+                    In the playground, waiting means it says nothing until you speak.
+                </FieldDescription>
+                <RadioCards
+                    value={settings.speech.firstSpeaker ?? defaultFirstSpeaker(form.callType)}
+                    onValueChange={(firstSpeaker) => settingsForm.setValue('speech.firstSpeaker', firstSpeaker, dirty)}
+                    options={FIRST_SPEAKER_CHOICES[form.callType]}
+                    aria-label="Who speaks first"
+                    className="sm:grid-cols-2"
+                />
+            </FieldSet>
+
             <FieldSet>
                 <FieldLegend variant="label">While a tool works</FieldLegend>
                 <FieldDescription className="text-xs">

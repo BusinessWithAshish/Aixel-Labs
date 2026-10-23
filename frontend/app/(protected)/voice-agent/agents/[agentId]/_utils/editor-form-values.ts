@@ -25,6 +25,7 @@ export function bookingFormValues(booking: VoiceAgentBookingTool | null, timezon
     const fallback = DEFAULT_VOICE_BOOKING_HOURS.mon ?? { open: '09:00', close: '17:00' };
     return {
         enabled: source.enabled,
+        bookAppointment: source.bookAppointment !== false,
         timezone: source.timezone,
         slotMinutes: source.slotMinutes,
         maxDaysAhead: source.maxDaysAhead,

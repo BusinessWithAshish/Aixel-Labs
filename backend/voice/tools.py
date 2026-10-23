@@ -449,6 +449,8 @@ class CallTools:
         tools = ctx.get("tools") or {}
         booking = tools.get("booking")
         self.cal = Calendar(booking) if isinstance(booking, dict) and booking.get("enabled") else None
+        # book_appointment can be off on its own: she then tells callers free times and books nothing.
+        self.books = bool(self.cal and booking.get("bookAppointment") is not False)
         # The owner's booking app (None = the built-in calendar), and what it said about free times.
         self.dest = (calendars.provider_for(booking.get("destination"), (ctx.get("doc") or {}).get("userId"))
                      if self.cal else None)
@@ -470,6 +472,10 @@ class CallTools:
     def __bool__(self):
         return bool(self.cal or self.webhooks)
 
+    def builtins(self) -> list[str]:
+        """The booking functions she gets: both, check_availability alone, or none."""
+        return [*BUILTIN] if self.books else ["check_availability"] if self.cal else []
+
     # --- what the model sees ---
 
     def schema(self) -> ToolsSchema | None:
@@ -487,6 +493,7 @@ class CallTools:
                 },
                 required=["date"],
             ))
+        if self.books:
             fns.append(FunctionSchema(
                 name="book_appointment",
                 description=("Book one appointment at a start time check_availability returned. Only once the caller "
@@ -520,7 +527,7 @@ class CallTools:
     def register(self, llm, voice: str):
         # Default cancel_on_interruption=True: a synchronous call, declared BLOCKING (and not
         # cancelled by the caller speaking: see ToolsGeminiLive).
-        for name in ([*BUILTIN] if self.cal else []) + list(self.webhooks):
+        for name in self.builtins() + list(self.webhooks):
             llm.register_function(name, self._handle, timeout_secs=WEBHOOK_TIMEOUT + 4)
         self.llm = llm
         if self.speech["toolWait"] == "SAY" and not getattr(llm, "speaks_text", False):
@@ -540,18 +547,22 @@ class CallTools:
                 f"- **Appointments** ({self.cal.step} minutes each; open {self.cal.hours_words()}; times are "
                 f"{self.cal.tzname}; up to {self.cal.max_days} days ahead). Use check_availability for the day the "
                 "caller wants before you offer or agree to any time, and never say a time is free unless "
-                "check_availability returned it. Before booking, ask for the caller's name"
-                + (" (their number is already on file; take another only if they offer it)" if phone else "")
-                + ". Then use book_appointment, and never say it is booked unless book_appointment answered \"Booked\". "
-                "If it says the time is taken, offer the free times it gives. Don't promise a text, email or "
-                "reminder about it" + (", except the calendar invite book_appointment says it sent." if self.dest else "."),
+                "check_availability returned it. "
+                + ("Before booking, ask for the caller's name"
+                   + (" (their number is already on file; take another only if they offer it)" if phone else "")
+                   + ". Then use book_appointment, and never say it is booked unless book_appointment answered \"Booked\". "
+                   "If it says the time is taken, offer the free times it gives. Don't promise a text, email or "
+                   "reminder about it" + (", except the calendar invite book_appointment says it sent." if self.dest else ".")
+                   if self.books else
+                   "You can't book appointments yourself: tell the caller which times are free and offer to take a "
+                   "message (name, number, the time they want) so the business can confirm it."),
                 "- Say days and times the way the caller would (\"Saturday at 2 pm\"), never \"14:00\" or "
                 "\"2026-10-18\". Work out \"tomorrow\" or \"next Saturday\" from # Right now.",
             ]
-            if self.dest and self.dest.needs_email:
+            if self.dest and self.books and self.dest.needs_email:
                 lines.append("- The booking also needs the caller's email address: ask for it, spell it back letter by "
                              "letter and pass it as email.")
-            elif self.dest:
+            elif self.dest and self.books:
                 lines.append("- If the caller wants a calendar invite, take their email address, spell it back, and "
                              "pass it as email; otherwise leave it out.")
             if self.dest:
@@ -623,7 +634,7 @@ class CallTools:
         try:
             if name == "check_availability" and self.cal:
                 return await self.check_availability(args)
-            if name == "book_appointment" and self.cal:
+            if name == "book_appointment" and self.books:
                 return await self.book_appointment(args)
             if name in self.webhooks:
                 return await self.call_webhook(self.webhooks[name], args)

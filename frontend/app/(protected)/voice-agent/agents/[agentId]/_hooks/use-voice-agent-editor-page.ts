@@ -12,6 +12,7 @@ import {
     type VoiceBookingDestination,
     type VoiceCalendarConnection,
     VoiceCalendarConnectionStatus,
+    type VoiceCalendarProvider,
     type VoiceCallerMemory,
     type VoiceGeminiKeyView,
     type VoiceStack,
@@ -210,8 +211,16 @@ export function useVoiceAgentEditorPage({
 
     /** Tools the prompt can name: booking as it is on screen, custom tools as saved. */
     const promptTools = useMemo(
-        () => toolsForPrompt({ enabled: booking.enabled, destination: booking.destination ?? null }, saved.tools.webhooks),
-        [booking.enabled, booking.destination, saved.tools.webhooks],
+        () =>
+            toolsForPrompt(
+                {
+                    enabled: booking.enabled,
+                    bookAppointment: booking.bookAppointment,
+                    destination: booking.destination ?? null,
+                },
+                saved.tools.webhooks,
+            ),
+        [booking.enabled, booking.bookAppointment, booking.destination, saved.tools.webhooks],
     );
 
     /**
@@ -410,6 +419,27 @@ export function useVoiceAgentEditorPage({
         [activeConnections, loadCalendars, setBookingDestination],
     );
 
+    // An app picked under "Where bookings go" that is not connected yet (bookings stay where they were until it is).
+    const [pickedApp, setPickedApp] = useState<VoiceCalendarProvider | null>(null);
+    /** What "Where bookings go" shows: an app just picked, else where bookings go now. */
+    const bookingApp: VoiceCalendarProvider | 'builtin' = pickedApp ?? booking.destination?.provider ?? 'builtin';
+
+    /** "builtin" or a provider: its first connected account books (the owner can switch accounts), else it waits to be connected. */
+    const chooseBookingApp = useCallback(
+        async (app: VoiceCalendarProvider | 'builtin') => {
+            setPickedApp(app === 'builtin' ? null : app);
+            const connection = activeConnections.find((c) => c.provider === app);
+            if (app === 'builtin' || connection) await chooseBookingTarget(connection?._id ?? 'builtin');
+        },
+        [activeConnections, chooseBookingTarget],
+    );
+
+    const discardBooking = useCallback(() => {
+        setPickedApp(null);
+        setCalendarsError(null);
+        bookingForm.reset();
+    }, [bookingForm]);
+
     const chooseBookingCalendar = useCallback(
         (calendarId: string) => {
             const current = booking.destination;
@@ -457,14 +487,26 @@ export function useVoiceAgentEditorPage({
     const isDirty = agentDirty || bookingDirty || settingsDirty;
     const isValid = !agentError && (!bookingDirty || !bookingError) && (!settingsDirty || !settingsError);
 
-    /** Sends the owner to Composio's Connect Link; they come back to the callback page. */
+    const save = useCallback(
+        async (): Promise<boolean> => (await saveAgent()) && (await saveBooking()) && saveSettings(),
+        [saveAgent, saveBooking, saveSettings],
+    );
+
+    /**
+     * Sends the owner to Composio's Connect Link; they come back to the callback page, which points this agent's
+     * booking at the new account. Connecting leaves the page, so the booking tools are switched on and everything
+     * unsaved is saved first (the callback needs saved booking settings to point at the account).
+     */
     const connectApp = useCallback(
         async (provider: string) => {
-            if (isDirty) {
-                toast.error('Save or discard your changes first: connecting an app leaves this page');
-                return;
+            if (!bookingForm.getValues('enabled')) {
+                bookingForm.setValue('enabled', true, { shouldDirty: true, shouldValidate: true });
             }
             setConnecting(provider);
+            if (!(await save())) {
+                setConnecting(null);
+                return;
+            }
             const response = await startVoiceAppConnection(provider, agentId);
             if (!response.success || !response.data) {
                 setConnecting(null);
@@ -473,7 +515,7 @@ export function useVoiceAgentEditorPage({
             }
             window.location.assign(response.data.redirectUrl);
         },
-        [agentId, isDirty],
+        [agentId, bookingForm, save],
     );
 
     const disconnectApp = useCallback(
@@ -494,7 +536,10 @@ export function useVoiceAgentEditorPage({
             if (defaultValues && bookedThere(defaultValues.destination as VoiceBookingDestination | null)) {
                 bookingForm.reset({ ...(defaultValues as BookingFormValues), destination: null }, { keepDirtyValues: true });
             }
-            if (bookedThere(bookingForm.getValues('destination'))) setBookingDestination(null);
+            if (bookedThere(bookingForm.getValues('destination'))) {
+                setPickedApp(null);
+                setBookingDestination(null);
+            }
             toast.success(
                 `${voiceCalendarProviderLabel(connection.provider)} disconnected` +
                     (response.data.agentsReset
@@ -528,11 +573,6 @@ export function useVoiceAgentEditorPage({
         // Once, on mount.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const save = useCallback(
-        async (): Promise<boolean> => (await saveAgent()) && (await saveBooking()) && saveSettings(),
-        [saveAgent, saveBooking, saveSettings],
-    );
 
     const onDeleteOpenChange = useCallback(
         (open: boolean) => {
@@ -619,10 +659,14 @@ export function useVoiceAgentEditorPage({
         forgetEveryone,
         bookingForm,
         booking,
+        bookingApp,
+        chooseBookingApp,
+        discardBooking,
         bookingDirty,
         bookingError,
         savingBooking,
         saveBooking,
+        justConnected,
         connectedAppsConfigured: connectedApps.configured,
         connections,
         activeConnections,

@@ -1502,8 +1502,9 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
                 asyncio.create_task(twilio.start_recording(ctx["twilio"], record["call_control_id"]))
         elif not is_test and not vl:
             asyncio.create_task(start_recording(record["call_control_id"], ctx["api_key"] if ctx else None))
-        # A person says "hello?" when they pick up. She waits for it.
-        if answers:
+        # A person says "hello?" when they pick up. She waits for it, unless she speaks first (her
+        # agent's firstSpeaker: by default an inbound agent greets, an outbound one waits).
+        if (ctx["speech"]["firstSpeaker"] == "AGENT") if ctx else answers:
             gate.go.set()
         await gate.go.wait()
         guard.heard_before(gate.heard)
@@ -1635,7 +1636,7 @@ async def play(websocket: WebSocket, ctx: dict):
 
 
 async def _play_session(websocket: WebSocket, ctx: dict, slot: str):
-    """One playground session: the customer's agent, in the browser, speaking first."""
+    """One playground session: the customer's agent, in the browser, speaking first unless it waits for the caller."""
     voice = ctx["voice"] if ctx["voice"] in VOICES else DEFAULT_VOICE
     ctx["opened_at"] = ctx["live_at"] = product.now()
     state: dict = {}
@@ -1698,8 +1699,10 @@ async def _play_session(websocket: WebSocket, ctx: dict, slot: str):
     @transport.event_handler("on_client_connected")
     async def on_connected(transport, client):
         logger.info(f"play: agent {record['agent_id']} ({voice}) connected ({len(ACTIVE)}/{MAX_CALLS} running)")
-        context.add_message({"role": "user", "content": ctx["first"]})
-        await worker.queue_frames([LLMRunFrame()])
+        # Waiting for the caller (firstSpeaker CALLER): she says nothing until they speak, then answers.
+        if ctx["speech"]["firstSpeaker"] == "AGENT":
+            context.add_message({"role": "user", "content": ctx["first"]})
+            await worker.queue_frames([LLMRunFrame()])
         watch.start()
 
     finished = False

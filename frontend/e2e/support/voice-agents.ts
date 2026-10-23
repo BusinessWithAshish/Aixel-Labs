@@ -1,4 +1,4 @@
-import { expect, type Page, type WebSocketRoute } from '@playwright/test';
+import { expect, type Locator, type Page, type WebSocketRoute } from '@playwright/test';
 import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { SubModuleUrls } from '@/config/app-config';
 import { E2E_VOICE_ENGINE_URL } from './env';
@@ -21,6 +21,15 @@ export async function waitForHydration(page: Page, selector: string): Promise<vo
 export async function openVoiceAgent(page: Page, agentId: string): Promise<void> {
     await page.goto(voiceAgentUrl(agentId));
     await waitForHydration(page, '#agent-prompt');
+}
+
+/** Opens one tool's settings in the editor's Tools list (one is open at a time) and returns its row. */
+export async function openVoiceTool(page: Page, name: string): Promise<Locator> {
+    const row = page.getByTestId('voice-agent-tools').locator(`li[data-tool="${name}"]`);
+    const trigger = row.locator('[data-slot="collapsible-trigger"]').first();
+    if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    return row;
 }
 
 /** Chromium flags for a fake microphone (a looping test tone) with the permission already granted. */

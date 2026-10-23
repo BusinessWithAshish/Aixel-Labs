@@ -35,7 +35,7 @@ export function bookingCalendarLabel(destination: VoiceBookingDestination | null
 
 /** Every tool the prompt could name, on or off: booking as it is on screen, custom tools as saved. */
 export function toolsForPrompt(
-    booking: { enabled: boolean; destination: VoiceBookingDestination | null },
+    booking: { enabled: boolean; bookAppointment: boolean; destination: VoiceBookingDestination | null },
     webhooks: VoiceAgentWebhookToolView[],
 ): PromptTool[] {
     const calendar = bookingCalendarLabel(booking.destination);
@@ -52,7 +52,8 @@ export function toolsForPrompt(
             description: 'Books the caller into a time',
             where: `Writes: ${calendar}, listed in Bookings`,
             kind: 'booking',
-            on: booking.enabled,
+            // It books only times check_availability found.
+            on: booking.enabled && booking.bookAppointment,
         },
         ...webhooks.map((tool): PromptTool => {
             const params = tool.parameters.length;
@@ -100,10 +101,7 @@ export function findToolMentions(text: string, tools: PromptTool[]): PromptToolM
 /** Why a mention will not work on a call, or null when it will. */
 export function mentionProblem({ tool }: PromptToolMention): string | null {
     if (!tool) return 'No tool by this name — add it in Tools, or fix the name';
-    if (tool.on) return null;
-    return tool.kind === 'booking'
-        ? 'Appointment booking is off — turn it on in Tools'
-        : 'This tool is off — turn it on in Tools';
+    return tool.on ? null : 'This tool is off — turn it on in Tools';
 }
 
 /** The "/query" the caret is in, when the "/" starts a word (not inside a link, a path or "and/or"). */

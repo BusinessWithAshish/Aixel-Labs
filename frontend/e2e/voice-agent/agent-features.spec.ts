@@ -121,7 +121,10 @@ test('the prompt marks {{variables}}, offers them after "{{", and saves default 
     expect(saved.prompt).toContain('Call {{agent_name}} {{');
 });
 
-test('call settings: voicemail message, analysis fields and caller memory are saved together', async ({ page, db }) => {
+test('call settings: who speaks first, personality, voicemail message, analysis fields and caller memory are saved together', async ({
+    page,
+    db,
+}) => {
     const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Sales', prompt: 'You call for {{company}}.' });
     await openVoiceAgent(page, agentId);
     const card = page.getByTestId('call-settings');
@@ -139,6 +142,18 @@ test('call settings: voicemail message, analysis fields and caller memory are sa
         ),
     );
     expect(Math.abs(tops[0] - tops[1])).toBeLessThan(1);
+    // Never set up: an outbound agent waits for the callee's hello; personality as the prompt says.
+    const firstSpeaker = card.getByTestId('first-speaker');
+    await expect(firstSpeaker).toContainText('When the person this agent calls picks up.');
+    await expect(firstSpeaker.getByRole('radio', { name: /Wait for their/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(card.locator('#speech-tone')).toHaveText('As the prompt says');
+    await expect(card.locator('#speech-pace')).toHaveText('Normal');
+    await expect(card.locator('#speech-reply-length')).toHaveText('Normal');
+    await firstSpeaker.getByRole('radio', { name: /Speak as soon as they pick up/ }).click();
+    await card.locator('#speech-tone').click();
+    await page.getByRole('option', { name: 'Warm' }).click();
+    await card.locator('#speech-reply-length').click();
+    await page.getByRole('option', { name: /^Brief/ }).click();
     // Never set up: hang up on voicemail, summary only, no memory.
     await expect(card.getByRole('radio', { name: /Hang up/ })).toHaveAttribute('aria-checked', 'true');
     await expect(card.getByRole('switch', { name: 'Summary' })).toBeChecked();
@@ -200,12 +215,15 @@ test('call settings: voicemail message, analysis fields and caller memory are sa
         ],
     });
     expect(saved.memory).toBe(true);
+    expect(saved.speech).toMatchObject({ firstSpeaker: 'AGENT', tone: 'WARM', pace: 'NORMAL', replyLength: 'BRIEF' });
 
     // It loads back as saved.
     await openVoiceAgent(page, agentId);
     await expect(page.getByTestId('analysis-field')).toHaveCount(2);
     await expect(page.getByLabel('Field 2 answers')).toHaveValue('High, Medium, Low');
     await expect(page.getByRole('switch', { name: 'Remember callers' })).toBeChecked();
+    await expect(page.getByRole('radio', { name: /Speak as soon as they pick up/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#speech-tone')).toHaveText('Warm');
 });
 
 test('the editor lists the callers an agent remembers, and forgets one or everyone', async ({ page, db }) => {
@@ -235,6 +253,14 @@ test('the editor lists the callers an agent remembers, and forgets one or everyo
     // Calls coming in are always answered by the agent: no voicemail section for an inbound agent.
     await expect(page.getByTestId('speech-settings')).toBeVisible();
     await expect(page.getByTestId('voicemail-settings')).toHaveCount(0);
+    // An inbound agent greets as it picks up unless told to wait for the caller.
+    const firstSpeaker = page.getByTestId('first-speaker');
+    await expect(firstSpeaker).toContainText('When someone calls this agent’s number.');
+    await expect(firstSpeaker.getByRole('radio', { name: /Agent greets the caller/ })).toHaveAttribute(
+        'aria-checked',
+        'true',
+    );
+    await expect(firstSpeaker.getByRole('radio', { name: /Wait for the caller/ })).toHaveAttribute('aria-checked', 'false');
 
     const list = page.getByTestId('memory-list');
     await expect(list).toContainText('Remembers 3 callers');

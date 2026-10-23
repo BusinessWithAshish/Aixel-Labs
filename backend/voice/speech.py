@@ -1,6 +1,7 @@
 """An agent's speech settings (`VoiceAgentSpeech` in the backend's src/db/types.ts), read per call like
 its tools: what she does while a tool works, how long she waits after the caller stops before answering
-(phone.REPLY_WAIT), what happens when the caller goes quiet, and the call's time limit.
+(phone.REPLY_WAIT), what happens when the caller goes quiet, the call's time limit, who speaks first
+(phone.serve / _play_session), and her personality (`# Your style` in her prompt).
 
 A missing or broken setting is today's behaviour, so an agent that never saved them runs as before.
 """
@@ -16,7 +17,25 @@ REPLY_WAITS = ("QUICK", "NORMAL", "PATIENT")
 LINE_MAX = 120
 SILENCE_SECS = (5, 60)
 MAX_MINUTES = 120
-DEFAULTS = {"toolWait": "AGENT", "toolWaitLine": "", "replyWait": "NORMAL", "silenceSecs": 0, "maxCallMinutes": 0}
+FIRST_SPEAKERS = ("AGENT", "CALLER")
+DEFAULTS = {"toolWait": "AGENT", "toolWaitLine": "", "replyWait": "NORMAL", "silenceSecs": 0, "maxCallMinutes": 0,
+            "firstSpeaker": "AGENT", "tone": "DEFAULT", "pace": "NORMAL", "replyLength": "NORMAL"}
+
+# `# Your style`: one line per personality setting that isn't its default (VoiceTone, VoicePace, VoiceReplyLength).
+TONES = {
+    "WARM": "warm and caring: sound glad to help, and show you understand how the caller feels.",
+    "FRIENDLY": "friendly and relaxed, like a helpful neighbour; light, everyday words.",
+    "PROFESSIONAL": "professional: polite, clear and to the point, without being cold.",
+    "FORMAL": "formal: courteous and respectful, no slang, no jokes; address the caller politely.",
+    "ENERGETIC": "upbeat and energetic: lively and enthusiastic, without rushing the caller.",
+}
+PACES = {
+    "RELAXED": "Speak slowly and calmly, with short pauses between sentences.",
+    "BRISK": "Speak at a brisk, quick pace, without sounding rushed.",
+}
+LENGTHS = {
+    "BRIEF": "Keep every reply short: one or two sentences, then let the caller talk. Give details only when asked.",
+}
 
 # What she is told, as a user turn, when the caller goes quiet or time is up. Never in the transcript.
 CHECK_IN = ("(The caller has said nothing for {secs} seconds.) In a few words, check whether they are still there. "
@@ -52,7 +71,21 @@ def settings(agent: dict, fill=lambda text: text) -> dict:
         "replyWait": raw.get("replyWait") if raw.get("replyWait") in REPLY_WAITS else "NORMAL",
         "silenceSecs": _whole(raw.get("silenceSecs"), *SILENCE_SECS),
         "maxCallMinutes": _whole(raw.get("maxCallMinutes"), 1, MAX_MINUTES),
+        # Unset: an outbound agent waits for the callee's hello, any other greets as the line opens.
+        "firstSpeaker": raw.get("firstSpeaker") if raw.get("firstSpeaker") in FIRST_SPEAKERS
+        else "CALLER" if agent.get("callType") == "OUTBOUND" else "AGENT",
+        "tone": raw.get("tone") if raw.get("tone") in TONES else "DEFAULT",
+        "pace": raw.get("pace") if raw.get("pace") in PACES else "NORMAL",
+        "replyLength": raw.get("replyLength") if raw.get("replyLength") in LENGTHS else "NORMAL",
     }
+
+
+def style_prompt(s: dict) -> str:
+    """`# Your style`, from her personality settings; empty when all are their defaults."""
+    lines = [*([f"- Your tone is {TONES[s['tone']]}"] if s.get("tone") in TONES else []),
+             *([f"- {PACES[s['pace']]}"] if s.get("pace") in PACES else []),
+             *([f"- {LENGTHS[s['replyLength']]}"] if s.get("replyLength") in LENGTHS else [])]
+    return "\n".join(["# Your style", "", *lines]) if lines else ""
 
 
 def tool_wait_prompt(s: dict) -> str:

@@ -121,8 +121,8 @@ export function BookingsContent() {
                     title="No bookings yet"
                     description={
                         agentFilter
-                            ? 'This agent has not booked anything yet. Turn on Appointment booking in its Tools, and every time a caller books a slot it shows up here.'
-                            : 'Turn on Appointment booking in an agent’s Tools and set your opening hours. When a caller picks a time, the agent books it and it shows up here.'
+                            ? 'This agent has not booked anything yet. Turn on its booking tools (check_availability, book_appointment), and every time a caller books a slot it shows up here.'
+                            : 'Turn on the booking tools in an agent’s Tools and set your opening hours. When a caller picks a time, the agent books it and it shows up here.'
                     }
                     data-testid="bookings-empty"
                 >
