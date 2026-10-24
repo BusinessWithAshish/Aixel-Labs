@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronsUpDown, Plus, UploadCloud } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter } from '@/hooks/use-progress-router';
 
 import {
     DropdownMenu,
@@ -44,7 +44,7 @@ export function TenantSwitcher({
     currentTenant: Tenant | null;
 }) {
     const { isMobile } = useSidebar();
-    const router = useRouter();
+    const router = useProgressRouter();
 
     if (!currentTenant) {
         return (

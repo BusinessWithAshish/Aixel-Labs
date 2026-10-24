@@ -2,7 +2,7 @@
 
 import { createUserLeadListFromLeadIds, deleteUserLeads } from '@/app/actions/user-lead-actions';
 import type { Lead, LeadSource } from '@aixellabs/backend/db/types';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter } from '@/hooks/use-progress-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useLeadsFilterPanel } from './use-leads-filter-panel';
@@ -32,7 +32,7 @@ export type AllLeadsPageData = {
 };
 
 export const useAllLeadsPage = ({ listId, leads, listSources }: AllLeadsPageData) => {
-    const router = useRouter();
+    const router = useProgressRouter();
     const [searchQuery, setSearchQuery] = useState('');
     const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
     const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());

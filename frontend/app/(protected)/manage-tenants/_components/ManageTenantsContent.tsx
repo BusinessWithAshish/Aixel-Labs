@@ -10,14 +10,14 @@ import type { Tenant } from '@aixellabs/backend/db/types';
 import { usePage } from '@/contexts/PageStore';
 import { toast } from 'sonner';
 import type { UseManageTenantsPageReturn } from '@/app/(protected)/manage-tenants/_hooks/use-manage-tenants-page';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter } from '@/hooks/use-progress-router';
 import { Input } from '@/components/ui/input';
 import { MANAGE_TENANTS_PREFIX } from '@/config/app-config';
 
 export function ManageTenantsContent() {
     const { isCreateDialogOpen, setIsCreateDialogOpen, tenants, editingTenant, setEditingTenant } =
         usePage<UseManageTenantsPageReturn>();
-    const router = useRouter();
+    const router = useProgressRouter();
 
     const dontAllowClick = (tenant: Tenant) => {
         return !!tenant.redirect_url;

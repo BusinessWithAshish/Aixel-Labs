@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter } from '@/hooks/use-progress-router';
 import { toast } from 'sonner';
 import type { VoiceCalendarProvider } from '@aixellabs/backend/db/types';
 import { confirmVoiceAppConnection } from '@/app/actions/voice-calendar-actions';
@@ -29,7 +29,7 @@ export function useConnectedAppCallbackPage({
     agentId,
     provider,
 }: ConnectedAppCallbackData) {
-    const router = useRouter();
+    const router = useProgressRouter();
     const appLabel = provider ? voiceCalendarProviderLabel(provider) : 'your app';
     const back = agentId ? voiceAgentUrl(agentId) : VOICE_AGENTS_URL;
     const [error, setError] = useState<string | null>(

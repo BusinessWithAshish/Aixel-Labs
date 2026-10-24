@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter } from '@/hooks/use-progress-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -19,7 +19,7 @@ const NEW_AGENT = {
 };
 
 export function useVoiceAgentsPage({ agents }: { agents: VoiceAgent[] }) {
-    const router = useRouter();
+    const router = useProgressRouter();
     const [createOpen, setCreateOpen] = useState(false);
     const createForm = useForm({ resolver: zodResolver(newAgentSchema), defaultValues: NEW_AGENT, mode: 'onChange' });
     /** Set once the agent exists, while the browser goes to it. */

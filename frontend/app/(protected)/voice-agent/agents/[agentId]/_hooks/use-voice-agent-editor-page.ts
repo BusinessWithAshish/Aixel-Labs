@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter } from '@/hooks/use-progress-router';
 import { type FieldValues, useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -114,7 +114,7 @@ export function useVoiceAgentEditorPage({
     costTotals,
     stackOptions,
 }: VoiceAgentEditorData) {
-    const router = useRouter();
+    const router = useProgressRouter();
     const agentId = initialAgent._id ?? '';
     const [saved, setSaved] = useState<VoiceAgent>(initialAgent);
     const [deleteOpen, setDeleteOpen] = useState(false);
