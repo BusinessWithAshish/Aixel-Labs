@@ -193,6 +193,20 @@ export function stackParts<P>(stack: VoiceStack<P>) {
         : PIPELINE_PARTS.map((name) => ({ name: name as VoiceStackPartName, part: stack[name] }));
 }
 
+/** The providers a stack runs on, once each, in its order (with the key its first part of that provider names). */
+export function stackProviders<P>(stack: VoiceStack<P>) {
+    const seen = new Map<VoiceKeyProvider, P | null | undefined>();
+    for (const { part } of stackParts(stack)) if (!seen.has(part.provider)) seen.set(part.provider, part.keyId);
+    return [...seen].map(([provider, keyId]) => ({ provider, keyId }));
+}
+
+/** Providers named for people: "Gemini", "Deepgram + Gemini + Cartesia". */
+export const providersLabel = (providers: VoiceKeyProvider[]) =>
+    providers.map((p) => VOICE_KEY_PROVIDERS[p].name).join(' + ');
+
+/** Why every call needs a Gemini key, whatever its stack (product.gemini_key_for: the post-call summary). */
+export const GEMINI_ALWAYS = 'the summary after every call runs on Gemini';
+
 /** The cheapest a minute of a stack of `kind` can be, models alone: its cheapest model of each part that runs. */
 export function fromUsdPerMinute(kind: VoiceStackKind, catalogue: VoiceStackCatalogue = FALLBACK_CATALOGUE): number {
     const parts: VoiceStackPartName[] = kind === VoiceStackKind.REALTIME ? ['realtime'] : [...PIPELINE_PARTS];

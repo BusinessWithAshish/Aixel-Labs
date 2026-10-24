@@ -65,7 +65,7 @@ def resolve_tests(user):
         ok("no ElevenLabs key: refused", False)
     except product.CallRefused as e:
         ok("no ElevenLabs key: refused, in words the owner can act on", e.code == "provider_key_missing"
-           and "elevenlabs" in e.words and "Settings" in e.words, e.words)
+           and "No ElevenLabs API key" in e.words and "Settings" in e.words, e.words)
 
 
 def ctx_of(s, voice="kore", tts_voice=None):

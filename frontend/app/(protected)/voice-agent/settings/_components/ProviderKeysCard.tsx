@@ -13,6 +13,7 @@ import { SelectControlledField, StringControlledField } from '@/components/commo
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { RadioCards, type RadioCardOption } from '@/components/wrappers/RadioCards';
 import { ProviderLogo } from '@/components/common/voice-agent/ProviderLogo';
+import { GEMINI_ALWAYS } from '@/helpers/voice-stack';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,7 +75,8 @@ export function ProviderKeysCard() {
                     <Alert variant="warning" data-testid="voice-keys-no-gemini">
                         <KeyRound className="size-4" aria-hidden />
                         <AlertDescription>
-                            Your agents cannot take or make calls until you add your own Gemini key.
+                            Your agents cannot take or make calls until you add a Gemini API key: {GEMINI_ALWAYS}, whatever
+                            else they use.
                         </AlertDescription>
                     </Alert>
                 ) : null}

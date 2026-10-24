@@ -216,7 +216,7 @@ test('start, pause, resume and cancel', async ({ page, db }) => {
     await openDetail(page, campaignId);
     await expect(page.getByTestId('campaign-state')).toHaveText('Draft: nobody is called until you start it.');
     await page.getByRole('button', { name: 'Start' }).click();
-    await expect(page.getByText(/Add your Gemini API key first/)).toBeVisible();
+    await expect(page.getByText(/No Gemini API key: voice model needs one/)).toBeVisible();
     expect(await status()).toBe(VoiceCampaignStatus.DRAFT);
 
     await db.setCampaignGeminiKey(E2E_USER, sealForE2e('AIza-e2e-fake-gemini-key'));

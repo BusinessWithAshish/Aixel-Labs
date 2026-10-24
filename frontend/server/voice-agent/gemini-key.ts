@@ -14,6 +14,7 @@ import {
     type VoiceGeminiKeyView,
 } from '@aixellabs/backend/db';
 import { NO_SEALED, voiceAccountsCollection } from '@/server/voice-agent/accounts';
+import { GEMINI_ALWAYS } from '@/helpers/voice-stack';
 
 /**
  * Each owner runs their agents on their own Gemini API keys (`VoiceAccountDoc.keys`, sealed); an agent
@@ -25,7 +26,7 @@ import { NO_SEALED, voiceAccountsCollection } from '@/server/voice-agent/account
  */
 
 export const GEMINI_KEY_MISSING_MESSAGE =
-    'Add your Gemini API key first, under Voice agent > Settings. Your agents run on your own key.';
+    `Add a Gemini API key under Voice agent > Settings: ${GEMINI_ALWAYS}.`;
 
 const CHECK_TIMEOUT_MS = 10_000;
 

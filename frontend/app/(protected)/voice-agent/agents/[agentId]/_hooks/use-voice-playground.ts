@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { GEMINI_ALWAYS } from '@/helpers/voice-stack';
 import { z } from 'zod';
 import { getPlaygroundSocketUrl } from '@/app/actions/voice-agent-actions';
 import { PlaygroundMic, PlaygroundSpeaker } from '../_utils/playground-audio';
@@ -68,7 +69,7 @@ function joinTranscript(previous: string, next: string): string {
 /** The engine's `error` event in plain words. */
 function describeEngineError(code: string, message: string | null | undefined): string {
     if (code === 'gemini_key_missing')
-        return 'Add your Gemini API key first. Your agents run on your own Google Gemini key.';
+        return `Add a Gemini API key in Settings: ${GEMINI_ALWAYS}.`;
     if (code === 'gemini_key_invalid') return `Google refused your Gemini API key${message ? `: ${message}` : '.'}`;
     return message || 'The voice engine could not start the call.';
 }

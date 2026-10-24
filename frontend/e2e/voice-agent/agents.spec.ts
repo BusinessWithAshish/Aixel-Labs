@@ -294,7 +294,7 @@ test('the agent card shows its numbers and its Gemini key, and opens a picker of
     // A number left calling with it from before it was inbound is pointed out, with a way out.
     await expect(numbers.getByTestId('agent-numbers-stray')).toContainText('+15550100002 still calls with it');
     await expect(numbers.getByTestId('agent-numbers-stray').getByRole('button', { name: 'Unlink' })).toBeVisible();
-    await expect(page.getByTestId('gemini-key-line').first()).toContainText('Runs on your Gemini key ending');
+    await expect(page.getByTestId('stack-keys-line').first()).toContainText('Runs on your Gemini key ending');
     // Its stack (one voice model by default), with the way to its keys in Settings.
     const stack = page.getByTestId('agent-stack');
     await expect(stack.locator('#stack-realtime-model')).toContainText('Gemini 3.8 Live');

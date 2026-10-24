@@ -17,7 +17,7 @@ import { DisabledReason } from '@/components/wrappers/DisabledReason';
 import { blockerText } from '@/helpers/voice-call-readiness';
 import { defaultFirstSpeaker } from '@/helpers/voice-agent-features';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
-import { GeminiKeyLine } from '../../_components/GeminiKeyLine';
+import { StackKeysLine } from '../../_components/StackKeysLine';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import {
     median,
@@ -63,7 +63,7 @@ function speedWord(ms: number): string {
 
 /** Calls run on the owner's keys and the agent's saved prompt: none while anything blocks them (`callBlockers`). */
 export function VoicePlayground({ className }: { className?: string }) {
-    const { agentId, geminiKey, saved, isDirty, isValid, saving, save, callBlockers } =
+    const { agentId, geminiKey, saved, isDirty, isValid, saving, save, callBlockers, stack, stackOptions } =
         usePage<UseVoiceAgentEditorPageReturn>();
     const blocked = callBlockers.length > 0;
     const { status, error, keyError, endedReason, timeline, gaps, level, agentSpeaking, start, end } = useVoicePlayground({
@@ -80,7 +80,7 @@ export function VoicePlayground({ className }: { className?: string }) {
             <CardHeader>
                 <CardTitle>Playground</CardTitle>
                 <CardDescription>
-                    <GeminiKeyLine view={geminiKey} link />
+                    <StackKeysLine stack={stack} keys={stackOptions.keys} link />
                 </CardDescription>
                 <CardAction>
                     <Badge variant={badge.variant} data-testid="playground-status">

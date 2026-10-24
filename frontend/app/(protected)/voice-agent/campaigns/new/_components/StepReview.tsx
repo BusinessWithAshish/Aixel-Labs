@@ -42,7 +42,7 @@ function CostEstimate() {
             </p>
             <p className="text-muted-foreground text-xs">
                 Calls nobody picks up cost little, so most campaigns land near the low end.
-                {geminiFreeTier ? ' Your Gemini key is on the free tier, so only the phone minutes cost.' : ''}
+                {geminiFreeTier ? ' Its Gemini key is on the free tier, so the Gemini parts cost nothing.' : ''}
                 {estimate.providers[0]?.usdPerMinute === null
                     ? ` ${provider} publishes no rate, so its own charge is not included.`
                     : ''}{' '}

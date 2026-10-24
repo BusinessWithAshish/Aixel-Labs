@@ -645,6 +645,7 @@ export function useVoiceAgentEditorPage({
         agentId,
         geminiKey,
         stackOptions,
+        stack,
         callBlockers,
         phoneBlockers,
         costEstimate,

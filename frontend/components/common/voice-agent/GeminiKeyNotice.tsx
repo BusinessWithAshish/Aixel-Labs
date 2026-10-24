@@ -4,6 +4,7 @@ import { VoiceKeyStatus, type VoiceGeminiKeyView } from '@aixellabs/backend/db/t
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
+import { GEMINI_ALWAYS } from '@/helpers/voice-stack';
 
 type GeminiKeyNoticeProps = {
     view: VoiceGeminiKeyView;
@@ -13,7 +14,8 @@ type GeminiKeyNoticeProps = {
 };
 
 /**
- * Says why something that runs a call is blocked (no key) or may fail (Google refused the key),
+ * Says why something that runs a call is blocked (no Gemini key, which every call needs) or may fail (Google
+ * refused it),
  * with a link to the key in voice settings. Renders nothing while the key is fine.
  */
 export function GeminiKeyNotice({ view, action, className }: GeminiKeyNoticeProps) {
@@ -25,7 +27,7 @@ export function GeminiKeyNotice({ view, action, className }: GeminiKeyNoticeProp
                 <p>
                     {view.set
                         ? `Google refused your Gemini API key${view.statusMessage ? `: ${view.statusMessage}` : '.'}`
-                        : `Your agents need your Gemini API key to ${action}.`}{' '}
+                        : `Your agents need a Gemini API key to ${action}: ${GEMINI_ALWAYS}.`}{' '}
                     <Link className="text-primary font-medium underline-offset-4 hover:underline" href={GEMINI_KEY_URL}>
                         {view.set ? 'Check it in Settings' : 'Add it in Settings'}
                     </Link>
