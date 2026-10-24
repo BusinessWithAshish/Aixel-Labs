@@ -2,6 +2,7 @@ import {
     VoiceCallChannel,
     VoiceCallDirection,
     type VoiceCallSentiment,
+    VoiceCallTest,
     type VoiceCallTurn,
 } from '@aixellabs/backend/db/types';
 
@@ -38,9 +39,26 @@ export function formatGap(ms: number | null): string {
     return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
 }
 
-export function formatParty(value: string | undefined, fallback: string): string {
+const TEST_LABEL: Record<VoiceCallTest, string> = {
+    [VoiceCallTest.BROWSER]: 'Browser test',
+    [VoiceCallTest.SOFTPHONE]: 'Softphone test',
+    [VoiceCallTest.REHEARSAL]: 'Outbound rehearsal',
+};
+const TEST_PARTY: Record<VoiceCallTest, string> = {
+    [VoiceCallTest.BROWSER]: 'Browser',
+    [VoiceCallTest.SOFTPHONE]: 'Softphone',
+    [VoiceCallTest.REHEARSAL]: 'You',
+};
+
+/** One side of a phone call. On a test over the internet the SIP side (an address, "…@…") is named, not shown. */
+export function formatParty(value: string | undefined, fallback: string, test?: VoiceCallTest | null): string {
     if (!value) return fallback;
-    return internetTestOf({ from: value })?.party ?? value;
+    return test && value.includes('@') ? TEST_PARTY[test] : value;
+}
+
+/** The call log's tag for the owner's tests over the internet ("Browser test"…), else null. */
+export function callTestLabel(call: { test?: VoiceCallTest | null }): string | null {
+    return call.test ? TEST_LABEL[call.test] : null;
 }
 
 /** What the browser adds to an agent's SIP user, so Call logs tell its calls from the softphone's. */
@@ -53,22 +71,6 @@ const BROWSER_SUFFIX = '-browser';
  */
 export function agentSipAddress(user: string, host: string, via: 'browser' | 'softphone', tls = false): string {
     return `sip:${user}${via === 'browser' ? BROWSER_SUFFIX : ''}@${host}${tls ? ';transport=tls' : ''}`;
-}
-
-/**
- * The owner testing over the internet, when a party is a SIP URI: who they were (`party`) and the call log's tag.
- * A browser is a telephony credential (Telnyx names them "gencred…") or dialled the agent's browser address; a
- * rehearsal's address carries `-rehearse-` (the agent ran the call as if it had called them).
- */
-export function internetTestOf(call: {
-    from?: string;
-    to?: string;
-}): { party: 'Browser' | 'Softphone'; label: 'Browser test' | 'Softphone test' | 'Outbound rehearsal' } | null {
-    const sip = [call.from, call.to].find((party) => party?.startsWith('sip:'));
-    if (!sip) return null;
-    const user = sip.slice(4).split('@')[0];
-    const party = user.startsWith('gencred') || user.endsWith(BROWSER_SUFFIX) ? 'Browser' : 'Softphone';
-    return { party, label: user.includes('-rehearse-') ? 'Outbound rehearsal' : `${party} test` };
 }
 
 /** The engine can log one utterance as several same-role fragments; show them as one bubble. */

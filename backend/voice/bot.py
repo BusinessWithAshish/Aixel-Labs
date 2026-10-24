@@ -775,11 +775,14 @@ SUPPRESSED = HERE / "suppressed.jsonl"
 def normalize_number(number) -> str | None:
     """+<digits>, or None for anything that is not a real phone number.
 
-    A softphone test dials sip:maya@..., which has no callee to protect.
+    A softphone test dials sip:maya@..., which has no callee to protect. Telnyx also hands SIP callers over
+    without the "sip:" (gencred7ifNMv...@sip.telnyx.com.au, aixelf4a2b32690a7837d@sip.telnyx.com): an
+    address with an "@" or letters is never a phone number, whatever digits it holds.
     """
-    if not number or str(number).strip().lower().startswith("sip:"):
+    text = str(number or "").strip().lower().removeprefix("tel:")
+    if not text or "@" in text or re.search(r"[a-z]", text):
         return None
-    digits = re.sub(r"\D", "", str(number))
+    digits = re.sub(r"\D", "", text)
     return "+" + digits if len(digits) >= 7 else None
 
 

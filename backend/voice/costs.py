@@ -66,10 +66,11 @@ def minutes(duration_sec: int) -> int:
     return math.ceil(max(duration_sec, 0) / 60)
 
 
-def provider_estimate(provider: str, direction: str, to: str | None, duration_sec: int) -> float:
-    """`to`: the other party (who we called, or who called in); a softphone's sip:… has no phone-network leg."""
+def provider_estimate(provider: str, direction: str, to: str | None, duration_sec: int, sip: bool = False) -> float:
+    """`to`: the other party (who we called, or who called in). `sip`: an internet test (a softphone, the browser,
+    a rehearsal; product.test_kind), which has no phone-network leg."""
     key = (provider, direction)
-    if (to or "").startswith("sip:") and (provider, "SIP") in PROVIDER_USD_PER_MIN:
+    if (sip or (to or "").startswith("sip:")) and (provider, "SIP") in PROVIDER_USD_PER_MIN:
         key = (provider, "SIP")
     elif direction == "OUTBOUND" and (to or "").startswith("+91") and (provider, "OUTBOUND_IN") in PROVIDER_USD_PER_MIN:
         key = (provider, "OUTBOUND_IN")
@@ -107,7 +108,7 @@ def call_cost(doc: dict, usage: dict, provider: str | None, sealed: str | None =
         cost["provider"] = provider
         cost["providerUsd"] = round(provider_estimate(provider, doc["direction"],
                                                         doc.get("from" if doc["direction"] == "INBOUND" else "to"),
-                                                        doc["durationSec"]), 6)
+                                                        doc["durationSec"], bool(doc.get("test"))), 6)
     if usage.get("stack") == "PIPELINE":
         # shortcut: a Gemini part is free when the call's Gemini key is; per-part keys' tiers are not read.
         cost["stack"] = pipeline_cost(usage, doc["durationSec"], free)

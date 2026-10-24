@@ -7,7 +7,7 @@ import { SubModuleUrls } from '@/config/app-config';
 import { replyTone, TONE_TEXT } from '@/helpers/voice-call-outcomes';
 import { formatShortDateTime } from '@/helpers/voice-time';
 import { callBookedSomething } from '@/helpers/voice-tool-calls';
-import { formatDuration, formatGap, formatParty, internetTestOf, median } from '@/helpers/voice-call-format';
+import { formatDuration, formatGap, callTestLabel, formatParty, median } from '@/helpers/voice-call-format';
 import { CallCostAmount, CallCostPerMinute } from './CallCost';
 import { CallEndedBy } from './CallEndedBy';
 import { CallOutcomeBadges } from './CallOutcomeBadges';
@@ -20,9 +20,9 @@ function Parties({ call }: { call: VoiceCallListItem }) {
     if (!call.from && !call.to) return <span>Browser</span>;
     return (
         <span className="inline-flex items-center gap-1 tabular-nums">
-            {formatParty(call.from, 'Unknown')}
+            {formatParty(call.from, 'Unknown', call.test)}
             <ArrowRight className="size-3 shrink-0" aria-label="to" />
-            {formatParty(call.to, 'Unknown')}
+            {formatParty(call.to, 'Unknown', call.test)}
         </span>
     );
 }
@@ -33,7 +33,7 @@ function Parties({ call }: { call: VoiceCallListItem }) {
  */
 export function CallCard({ call }: { call: VoiceCallListItem }) {
     const summary = call.analysis?.summary;
-    const test = internetTestOf(call);
+    const test = callTestLabel(call);
     const gap = median(call.gapsMs);
 
     return (
@@ -49,7 +49,7 @@ export function CallCard({ call }: { call: VoiceCallListItem }) {
                             {call.agentName ?? 'Deleted agent'}
                         </span>
                         <CallTypeBadge channel={call.channel} direction={call.direction} />
-                        {test ? <Badge variant="outline">{test.label}</Badge> : null}
+                        {test ? <Badge variant="outline">{test}</Badge> : null}
                     </div>
                     <div className="text-muted-foreground flex flex-wrap gap-x-2 text-xs">
                         <Parties call={call} />

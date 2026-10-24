@@ -10,6 +10,7 @@ import {
     type VoiceAnalysisFieldType,
     type VoiceBuiltinVariable,
     VoiceCallDirection,
+    type VoiceCallTest,
     VoiceFirstSpeaker,
     VoicePace,
     VoiceReplyLength,
@@ -124,14 +125,21 @@ export function callSettingsOf(agent: Pick<VoiceAgent, 'voicemail' | 'analysis' 
 }
 
 /** The number a call's caller memory is kept under (the engine's `normalize_number`): the other person, as +digits. */
-export function memoryPhoneOf(call: { direction: VoiceCallDirection; from?: string; to?: string }): string | null {
+export function memoryPhoneOf(call: {
+    direction: VoiceCallDirection;
+    from?: string;
+    to?: string;
+    test?: VoiceCallTest | null;
+}): string | null {
+    if (call.test) return null;
     const other =
         call.direction === VoiceCallDirection.INBOUND
             ? call.from
             : call.direction === VoiceCallDirection.OUTBOUND
               ? call.to
               : undefined;
-    if (!other || other.trim().toLowerCase().startsWith('sip:')) return null;
+    // A SIP address (with or without "sip:") is never a phone number, whatever digits it holds.
+    if (!other || other.includes('@') || /[a-z]/i.test(other.trim().replace(/^tel:/i, ''))) return null;
     const digits = other.replace(/\D/g, '');
     return digits.length >= 7 ? `+${digits}` : null;
 }

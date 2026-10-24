@@ -79,10 +79,11 @@ export const getCallerMemoryForCall = async (callId: string): Promise<ALApiRespo
         const calls = await callsCollection();
         const call = await calls.findOne(
             { _id: toObjectId(callId, 'Call ID'), userId: owner.userId },
-            { projection: { agentId: 1, direction: 1, from: 1, to: 1, callerPhone: 1 } },
+            { projection: { agentId: 1, direction: 1, from: 1, to: 1, callerPhone: 1, test: 1 } },
         );
         if (!call) throw new Error('Call not found');
-        const phone = call.callerPhone ?? memoryPhoneOf(call);
+        // A test over the internet has no caller to remember (older docs may still carry digits from a SIP address).
+        const phone = call.test ? null : (call.callerPhone ?? memoryPhoneOf(call));
         if (!phone) return null;
         const doc = await calls.findOne({ userId: owner.userId, agentId: call.agentId, callerPhone: phone, ...CURRENT });
         return doc ? mapMemory(doc as MemoryCall) : null;

@@ -224,6 +224,16 @@ async def memory_tests():
                   "apiKeySealed": product.seal_secret("KEY_FAKE")}
         first = product.phone_call(number, agent, "INBOUND", "+1 (555) 777-0000")
         ok("memory key: the caller's number, normalized", first["memory_phone"] == "+15557770000")
+        ok("a phone caller is no test", "test" not in first["doc"])
+        # Telnyx hands SIP callers over without "sip:" (2026-10-24): their digits are no phone number.
+        for caller, kind in (("gencred7ifNMv79714229@sip.telnyx.com.au", "BROWSER"),
+                             ("aixelf4a2b32690a7837d@sip.telnyx.com", "SOFTPHONE"),
+                             ("sip:maya-browser@aixel0a1b2c3d4e5f.sip.telnyx.com", "BROWSER"),
+                             ("maya-rehearse-0123456789abcdef01234567@aixel0a1b2c3d4e5f.sip.telnyx.com", "REHEARSAL")):
+            sip = product.phone_call(number, agent, "INBOUND", caller)
+            ok(f"SIP caller {caller[:24]}…: no caller phone, no memory, test {kind}",
+               sip["memory_phone"] is None and sip["customer_phone"] is None and "callerPhone" not in sip["doc"]
+               and sip["doc"].get("test") == kind, str(sip["doc"].get("test")))
         ok("first call: nothing remembered yet", "What you remember" not in first["prompt"] and "memoryUsed" not in first["doc"])
         first["live_at"] = product.now()
         rec = {"voice": "kore", "turns": [{"who": "agent", "text": "Hello, Smile Dental."},

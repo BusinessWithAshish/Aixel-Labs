@@ -60,6 +60,7 @@ function mapVoiceCallDoc(doc: VoiceCallDoc, agentName: string | null): VoiceCall
         direction: doc.direction,
         from: doc.from,
         to: doc.to,
+        test: doc.test ?? null,
         voice: doc.voice,
         startedAt: doc.startedAt.toISOString(),
         endedAt: doc.endedAt.toISOString(),

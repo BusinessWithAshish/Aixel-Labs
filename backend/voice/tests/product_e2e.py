@@ -232,7 +232,8 @@ async def test_texml(port, number):
     await asyncio.sleep(2)
     doc = latest_call(numberId=number["_id"], direction="INBOUND", startedAt={"$gte": t_start})
     ok("a call to the number's SIP address is logged from that address, no caller phone",
-       doc is not None and doc["from"] == address and not doc.get("callerPhone"), str(doc and doc.get("from")))
+       doc is not None and doc["from"] == address and not doc.get("callerPhone") and doc.get("test") == "BROWSER",
+       str(doc and (doc.get("from"), doc.get("test"))))
 
 
 # --- outbound rehearsal (the owner dials <agent>-rehearse-<token> on a number's SIP subdomain) ----------
@@ -255,7 +256,7 @@ async def test_rehearsal(port, agent, number):
     doc = latest_call(numberId=number["_id"], startedAt={"$gte": t_start})
     ok("runs as the agent's OUTBOUND call to the address, with the variables filled in",
        doc is not None and doc["direction"] == "OUTBOUND" and doc["to"] == address.split(";")[0]
-       and doc["from"] == number["phoneNumber"] and doc.get("variables") == {"name": "Ana"},
+       and doc["from"] == number["phoneNumber"] and doc.get("variables") == {"name": "Ana"} and doc.get("test") == "REHEARSAL",
        str(doc and {k: doc.get(k) for k in ("direction", "from", "to", "variables", "endedBy")}))
     ok("the rehearsal is spent", (db.voice_accounts.find_one({"userId": agent["userId"]}) or {}).get("rehearsal") is None)
     q = urllib.parse.urlencode({"n": nid, "sig": product.sign("number", nid), "Direction": "inbound",
