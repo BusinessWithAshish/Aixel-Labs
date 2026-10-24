@@ -459,7 +459,8 @@ class TurnSafeGeminiLive(GeminiLiveLLMService):
     # (all audio kept) and goes out the moment the new session is ready.
     # Measured 2026-10-17 (booking agent, scripted calls): Gemini cost -57%, reply gap
     # unchanged, 84 rotations of 0.3-0.45 s, none failed.
-    ROTATE = True
+    # Off since 2026-10-24 (Ashish): a fresh session per reply changed her voice and clipped lines on real calls.
+    ROTATE = False
     ROTATE_MAX_WAIT = 5.0  # a held turn waits this long at most for the new session
     # Thinking: None = the model's default (3.8-live thinks ~50-150 tokens a reply, billed
     # as text out; it rejects thinking_level). 0 = off: -7% on a booking call, same reply
