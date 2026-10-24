@@ -23,11 +23,7 @@ import {
 } from '@aixellabs/backend/db/types';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { requireUserObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
-import {
-    DEFAULT_VOICE_AGENT_NAME,
-    DEFAULT_VOICE_AGENT_VOICE,
-    VOICE_AGENT_NO_PROMPT_MESSAGE,
-} from '@/helpers/voice-agent-defaults';
+import { DEFAULT_VOICE_AGENT_NAME, DEFAULT_VOICE_AGENT_VOICE } from '@/helpers/voice-agent-defaults';
 import { customVariableNames } from '@/helpers/voice-agent-features';
 import {
     bookingToolSchema,
@@ -45,7 +41,7 @@ import {
 } from '@/helpers/voice-schemas';
 import { assertRateLimit } from '@/server/rate-limit';
 import { openSecret, playgroundSocketUrl, sealSecret } from '@/server/voice-agent/engine';
-import { assertGeminiKeySet } from '@/server/voice-agent/gemini-key';
+import { assertCallReady } from '@/server/voice-agent/call-readiness';
 import { stackView } from '@/server/voice-agent/provider-keys';
 import { pricedStack } from '@/server/voice-agent/voice-catalogue';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
@@ -297,17 +293,13 @@ export const deleteVoiceAgent = async (agentId: string): Promise<ALApiResponse<{
 /**
  * A signed `wss://…/play` URL for talking to the agent's saved version in the browser.
  * The token lives 120 s, so fetch it right before opening the socket. The call runs on the
- * owner's own Gemini key, so there is no URL without one, nor for an agent with no saved prompt.
+ * owner's own keys, so there is no URL while anything blocks its calls (`assertCallReady`).
  */
 export const getPlaygroundSocketUrl = async (agentId: string): Promise<ALApiResponse<{ url: string }>> =>
     runAuthenticatedAction(async function getPlaygroundSocketUrl(userId) {
         const { userId: uid } = await agentOwner(userId);
         const id = toObjectId(agentId, 'Agent ID');
-        const agents = await agentsCollection();
-        const agent = await agents.findOne({ _id: id, userId: uid }, { projection: { prompt: 1 } });
-        if (!agent) throw new Error('Agent not found');
-        if (!agent.prompt?.trim()) throw new Error(VOICE_AGENT_NO_PROMPT_MESSAGE);
-        await assertGeminiKeySet(uid);
+        await assertCallReady(uid, id);
         return { url: playgroundSocketUrl(id.toString(), uid.toString()) };
     });
 

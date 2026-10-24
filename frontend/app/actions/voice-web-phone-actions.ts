@@ -17,6 +17,8 @@ import { requestOrigin } from '@/server/voice-agent/public-url';
 import { startWebPhoneSession, webPhoneProblem, type WebPhoneSession } from '@/server/voice-agent/web-phone';
 import { agentSipAddress } from '@/helpers/voice-call-format';
 import { ensureSipHost, sipUserFor } from '@/server/voice-agent/softphone';
+import { agentCallBlockers } from '@/server/voice-agent/call-readiness';
+import { blockerText } from '@/helpers/voice-call-readiness';
 
 /** A number as the Web dialer offers it. */
 export type WebPhoneNumber = {
@@ -28,7 +30,15 @@ export type WebPhoneNumber = {
 };
 
 /** An agent the Web dialer can call: it answers a Telnyx number, reached over SIP like a call to that number. */
-export type WebPhoneAgent = { id: string; name: string; numberId: string; phoneNumber: string; address: string };
+export type WebPhoneAgent = {
+    id: string;
+    name: string;
+    numberId: string;
+    phoneNumber: string;
+    address: string;
+    /** Why a call to it would be refused (`voiceCallBlockers`), else null. */
+    blocked: string | null;
+};
 
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.WEB_DIALER;
 
@@ -75,16 +85,14 @@ export const listWebPhoneAgents = async (): Promise<ALApiResponse<WebPhoneAgent[
             (n) => n.provider === VoiceProvider.TELNYX && n.inboundAgentId && n.texmlAppId,
         );
         const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
-        const names = new Map(
-            (
-                await agents
-                    .find(
-                        { userId: owner.userId, _id: { $in: numbers.map((n) => n.inboundAgentId!) } },
-                        { projection: { name: 1 } },
-                    )
-                    .toArray()
-            ).map((a) => [String(a._id), a.name]),
-        );
+        const docs = await agents
+            .find(
+                { userId: owner.userId, _id: { $in: numbers.map((n) => n.inboundAgentId!) } },
+                { projection: { name: 1, prompt: 1, stack: 1 } },
+            )
+            .toArray();
+        const names = new Map(docs.map((a) => [String(a._id), a.name]));
+        const blockers = await agentCallBlockers(owner.userId, docs);
         const hosts = await Promise.all(numbers.map(ensureSipHost));
         return numbers.flatMap((n, i) => {
             const name = names.get(String(n.inboundAgentId));
@@ -97,6 +105,7 @@ export const listWebPhoneAgents = async (): Promise<ALApiResponse<WebPhoneAgent[
                           numberId: n._id.toString(),
                           phoneNumber: n.phoneNumber,
                           address: agentSipAddress(sipUserFor(name), host, 'browser'),
+                          blocked: blockerText(blockers.get(String(n.inboundAgentId)) ?? []) || null,
                       },
                   ]
                 : [];

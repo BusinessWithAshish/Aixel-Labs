@@ -11,8 +11,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import { ToolCallRow } from '@/components/common/voice-agent/ToolCallRow';
+import { CallBlockers } from '@/components/common/voice-agent/CallBlockers';
 import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
-import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
+import { DisabledReason } from '@/components/wrappers/DisabledReason';
+import { blockerText } from '@/helpers/voice-call-readiness';
 import { defaultFirstSpeaker } from '@/helpers/voice-agent-features';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
 import { GeminiKeyLine } from '../../_components/GeminiKeyLine';
@@ -59,10 +61,11 @@ function speedWord(ms: number): string {
     return 'slow';
 }
 
-/** Calls run on the owner's Gemini key (no call without one) and the agent's saved prompt (none without one). */
+/** Calls run on the owner's keys and the agent's saved prompt: none while anything blocks them (`callBlockers`). */
 export function VoicePlayground({ className }: { className?: string }) {
-    const { agentId, geminiKey, saved, form, isDirty, isValid, saving, save } = usePage<UseVoiceAgentEditorPageReturn>();
-    const noPrompt = !form.prompt.trim();
+    const { agentId, geminiKey, saved, isDirty, isValid, saving, save, callBlockers } =
+        usePage<UseVoiceAgentEditorPageReturn>();
+    const blocked = callBlockers.length > 0;
     const { status, error, keyError, endedReason, timeline, gaps, level, agentSpeaking, start, end } = useVoicePlayground({
         agentId,
         beforeStart: save,
@@ -87,15 +90,8 @@ export function VoicePlayground({ className }: { className?: string }) {
             </CardHeader>
 
             <CardContent className="grid gap-4">
-                <GeminiKeyNotice view={geminiKey} action="talk to your agents" />
-                {noPrompt && !busy ? (
-                    <p
-                        className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
-                        data-testid="playground-no-prompt"
-                    >
-                        {VOICE_AGENT_NO_PROMPT_MESSAGE}
-                    </p>
-                ) : null}
+                {busy ? null : <CallBlockers blockers={callBlockers} />}
+                {geminiKey.set ? <GeminiKeyNotice view={geminiKey} action="talk to your agents" /> : null}
                 <div className="flex flex-wrap items-center gap-3">
                     {busy ? (
                         <Button variant="destructive" onClick={end}>
@@ -103,13 +99,12 @@ export function VoicePlayground({ className }: { className?: string }) {
                             End call
                         </Button>
                     ) : (
-                        <Button
-                            onClick={() => void start()}
-                            disabled={!geminiKey.set || noPrompt || saving || (isDirty && !isValid)}
-                        >
-                            <Phone className="size-4" />
-                            {isDirty ? 'Save and start call' : 'Start call'}
-                        </Button>
+                        <DisabledReason reason={blocked ? blockerText(callBlockers) : null}>
+                            <Button onClick={() => void start()} disabled={blocked || saving || (isDirty && !isValid)}>
+                                <Phone className="size-4" />
+                                {isDirty ? 'Save and start call' : 'Start call'}
+                            </Button>
+                        </DisabledReason>
                     )}
                     {status === 'connecting' ? (
                         <span className="text-muted-foreground flex items-center gap-1.5 text-sm">

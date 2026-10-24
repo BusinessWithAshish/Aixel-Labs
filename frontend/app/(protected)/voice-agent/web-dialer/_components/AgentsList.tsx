@@ -24,7 +24,9 @@ export function AgentsList() {
                             <button
                                 type="button"
                                 onClick={() => void callAgent(agent)}
-                                className="hover:bg-muted/60 focus-visible:bg-muted/60 flex w-full items-center gap-3 px-4 py-2.5 text-left outline-none"
+                                disabled={!!agent.blocked}
+                                title={agent.blocked ?? undefined}
+                                className="hover:bg-muted/60 focus-visible:bg-muted/60 flex w-full items-center gap-3 px-4 py-2.5 text-left outline-none disabled:cursor-not-allowed disabled:hover:bg-transparent"
                             >
                                 <Bot className="text-muted-foreground size-5 shrink-0" aria-hidden />
                                 <span className="flex min-w-0 flex-1 flex-col">
@@ -32,8 +34,18 @@ export function AgentsList() {
                                     <span className="text-muted-foreground text-xs tabular-nums">
                                         Answers {formatPhone(agent.phoneNumber)}
                                     </span>
+                                    {agent.blocked ? (
+                                        <span
+                                            className="text-xs text-amber-700 dark:text-amber-400"
+                                            data-testid="agent-blocked"
+                                        >
+                                            {agent.blocked}
+                                        </span>
+                                    ) : null}
                                 </span>
-                                <Phone className="text-primary size-4" aria-label={`Call ${agent.name}`} />
+                                {agent.blocked ? null : (
+                                    <Phone className="text-primary size-4" aria-label={`Call ${agent.name}`} />
+                                )}
                             </button>
                         </li>
                     ))}

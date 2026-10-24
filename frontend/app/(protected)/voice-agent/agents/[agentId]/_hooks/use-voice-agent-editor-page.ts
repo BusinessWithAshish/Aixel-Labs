@@ -33,6 +33,7 @@ import type { VoiceAgentCostTotals } from '@/app/actions/voice-call-actions';
 import type { VoiceAgentStackOptions } from '@/app/actions/voice-settings-actions';
 import { setNumberAgent, unlinkAgentNumber, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 import { estimateAgentCost } from '@/helpers/voice-call-cost';
+import { voiceCallBlockers } from '@/helpers/voice-call-readiness';
 import {
     disconnectVoiceApp,
     listVoiceAppCalendars,
@@ -606,6 +607,8 @@ export function useVoiceAgentEditorPage({
 
     // What a minute should cost, as the stack, prompt and booking on screen stand, on the numbers it is on.
     const stack = (form.stack ?? VOICE_DEFAULT_STACK) as VoiceStack<string>;
+    // What stops its calls, as the form stands (the playground saves it first; the actions check the saved agent).
+    const callBlockers = voiceCallBlockers({ prompt: form.prompt, stack, keys: stackOptions.keys });
     const thinker = stack.kind === VoiceStackKind.REALTIME ? stack : stack.llm;
     const costEstimate = estimateAgentCost({
         promptChars: form.prompt.length,
@@ -630,6 +633,7 @@ export function useVoiceAgentEditorPage({
         agentId,
         geminiKey,
         stackOptions,
+        callBlockers,
         costEstimate,
         costTotals,
         saved,

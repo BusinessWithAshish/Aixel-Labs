@@ -118,9 +118,9 @@ test('will not start without a prompt, on the page or on the server', async ({ p
     const engine = await FakePlaygroundEngine.install(page);
     const blank = await db.insertVoiceAgent(E2E_USER, { name: 'Blank', prompt: '' });
     await openVoiceAgent(page, blank);
-    await expect(page.getByTestId('playground-no-prompt')).toHaveText(
-        'This agent has no prompt yet, so it would not know what to say. Pick a template or write a prompt first.',
-    );
+    const blockers = page.getByTestId('voice-playground').getByTestId('call-blockers');
+    await expect(blockers).toContainText('This agent has no prompt yet, so it would not know what to say.');
+    await expect(blockers.getByRole('link', { name: 'Write a prompt →' })).toHaveAttribute('href', '#agent-prompt');
     await expect(page.getByRole('button', { name: 'Start call' })).toBeDisabled();
 
     // Emptied after the page loaded: the server refuses before any socket opens.

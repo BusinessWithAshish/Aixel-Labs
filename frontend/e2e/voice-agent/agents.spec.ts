@@ -24,6 +24,7 @@ import { E2E_GEMINI_API_KEY, USER_STORAGE_STATE } from '../support/env';
 import type { E2eDb } from '../support/db';
 import { E2E_ADMIN, E2E_USER } from '../support/users';
 import { openVoiceAgent, VOICE_AGENTS_URL, voiceAgentUrl, waitForHydration } from '../support/voice-agents';
+import { sealForE2e } from './fake-telephony';
 
 test.use({ storageState: USER_STORAGE_STATE });
 
@@ -106,7 +107,7 @@ test('a new outbound agent starts with an empty prompt: a template is read in fu
     await expect(page.locator('#agent-prompt')).toHaveValue('');
     await expect(page.getByTestId('prompt-empty')).toContainText('cannot be saved or talked to');
     const playground = page.getByTestId('voice-playground');
-    await expect(playground.getByTestId('playground-no-prompt')).toContainText('This agent has no prompt yet');
+    await expect(playground.getByTestId('call-blockers')).toContainText('This agent has no prompt yet');
     await expect(playground.getByRole('button', { name: 'Start call' })).toBeDisabled();
     const cards = page.getByTestId('prompt-templates').getByRole('button').filter({ hasNotText: 'All templates' });
     const outbound = VOICE_AGENT_PROMPT_TEMPLATES.filter((t) => t.callType === VoiceAgentCallType.OUTBOUND);
@@ -126,7 +127,7 @@ test('a new outbound agent starts with an empty prompt: a template is read in fu
     await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_VOICE_AGENT_PROMPT);
     await expect(page.getByLabel('{{website}}')).toHaveValue('none found');
     await expect(page.getByTestId('prompt-templates')).toHaveCount(0);
-    await expect(playground.getByTestId('playground-no-prompt')).toHaveCount(0);
+    await expect(playground.getByTestId('call-blockers')).toHaveCount(0);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Agent saved')).toBeVisible();
     expect((await db.getVoiceAgents(E2E_USER))[0]).toMatchObject({
@@ -426,6 +427,54 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
         'Real so far: $0.030 a minute over 1 call (phone part partly estimated).',
     );
     await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY); // the seeded paid key, for the specs after this one
+});
+
+test('a stack step with no key: the card and the playground say why, and every way to call stays off until the key is added', async ({
+    page,
+    db,
+}) => {
+    await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
+    const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Maya outbound', callType: VoiceAgentCallType.OUTBOUND });
+    await db.setVoiceAgentFields(agentId, {
+        stack: {
+            kind: VoiceStackKind.PIPELINE,
+            stt: { provider: VoiceKeyProvider.DEEPGRAM, model: 'nova-3' },
+            llm: { provider: VoiceKeyProvider.GEMINI, model: 'gemini-3.5-flash-lite' },
+            tts: { provider: VoiceKeyProvider.DEEPGRAM, model: 'aura' },
+        },
+    });
+    await openVoiceAgent(page, agentId);
+
+    const blockers = page.getByTestId('call-blockers');
+    await expect(blockers).toHaveCount(2); // the agent card and the playground
+    await expect(blockers.first()).toHaveText(/No Deepgram API key: speech to text and text to speech need one\./);
+    await expect(blockers.first().getByRole('link', { name: 'Add a Deepgram API key in Settings →' })).toHaveAttribute(
+        'href',
+        '/voice-agent/settings#gemini-key',
+    );
+    await expect(page.getByRole('button', { name: 'Test call' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Start call/ })).toBeDisabled();
+    const reasons = page.getByTestId('disabled-reason');
+    await expect(reasons).toHaveCount(3); // Test call, the browser / softphone test, Start call
+    await reasons.first().focus();
+    await expect(page.getByRole('tooltip')).toContainText('No Deepgram API key');
+
+    // With a Deepgram key every way to call turns on.
+    await db.setVoiceKeys(E2E_USER, [
+        { keySealed: sealForE2e(E2E_GEMINI_API_KEY), last4: E2E_GEMINI_API_KEY.slice(-4), label: 'Main' },
+        {
+            provider: VoiceKeyProvider.DEEPGRAM,
+            keySealed: sealForE2e('dg-e2e-key-0123456789'),
+            last4: '6789',
+            label: 'Deepgram',
+        },
+    ]);
+    await page.reload();
+    await expect(page.locator('#agent-name')).toHaveValue('Maya outbound');
+    await expect(blockers).toHaveCount(0);
+    await expect(reasons).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Test call' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /Start call/ })).toBeEnabled();
 });
 
 test('edits and saves every field', async ({ page, db }) => {

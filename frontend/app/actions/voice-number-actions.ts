@@ -21,6 +21,7 @@ import { isBuiltinVariable } from '@/helpers/voice-agent-features';
 import { engineFetch, sealSecret } from '@/server/voice-agent/engine';
 import { assertRateLimit } from '@/server/rate-limit';
 import { assertGeminiKeySet, GEMINI_KEY_MISSING_MESSAGE } from '@/server/voice-agent/gemini-key';
+import { assertCallReady } from '@/server/voice-agent/call-readiness';
 import {
     countNumbers,
     findItem,
@@ -612,7 +613,7 @@ export const placeTestCall = async (
         } else {
             throw new Error('Choose the agent that calls');
         }
-        await assertGeminiKeySet(owner.userId);
+        await assertCallReady(owner.userId, toObjectId(callerAgentId, 'Agent ID'));
         const provider = providerOf(doc);
         await provider.prepareCall(doc);
 

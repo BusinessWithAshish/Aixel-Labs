@@ -282,11 +282,12 @@ test('without a key: the card says so, and the playground, answering, making cal
 
     await openVoiceAgent(page, inbound);
     const playground = page.getByTestId('voice-playground');
-    await expect(playground.getByTestId('gemini-key-notice')).toContainText(
-        'Your agents need your Gemini API key to talk to your agents.',
-    );
+    await expect(playground.getByTestId('call-blockers')).toContainText('No Gemini API key: voice model needs one.');
     await expect(playground.getByRole('button', { name: 'Start call' })).toBeDisabled();
-    await expect(playground.getByRole('link', { name: 'Add it in Settings' })).toHaveAttribute('href', GEMINI_KEY_URL);
+    await expect(playground.getByRole('link', { name: 'Add a Gemini API key in Settings →' })).toHaveAttribute(
+        'href',
+        GEMINI_KEY_URL,
+    );
 
     await openPhoneNumbers(page);
     await expect(page.getByTestId('gemini-key-notice')).toContainText(
@@ -326,7 +327,7 @@ test('the server refuses too: a key removed after the page loaded blocks test ca
     await testCall.getByLabel('Your phone number').fill('+14155550123');
     await testCall.getByRole('button', { name: 'Call me now' }).click();
     await expect(testCall.getByRole('alert').last()).toContainText(
-        'Add your Gemini API key first, under Voice agent > Settings.',
+        'No Gemini API key: voice model needs one. Add a Gemini API key in Settings.',
     );
     await page.keyboard.press('Escape');
 
@@ -335,7 +336,7 @@ test('the server refuses too: a key removed after the page loaded blocks test ca
     await openVoiceAgent(page, inbound);
     await db.setVoiceGeminiKey(E2E_USER, null);
     await page.getByRole('button', { name: 'Start call' }).click();
-    await expect(page.getByRole('alert').filter({ hasText: 'Add your Gemini API key first' })).toBeVisible();
+    await expect(page.getByRole('alert').filter({ hasText: 'No Gemini API key: voice model needs one.' })).toBeVisible();
     expect(engine.connected).toBe(false);
 });
 
