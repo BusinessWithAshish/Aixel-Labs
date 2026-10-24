@@ -727,7 +727,8 @@ def make_app() -> FastAPI:
         dialled = str(params.get("To") or params.get("to") or "").split(";")[0]
         if rehearsal := product.REHEARSAL_USER.search(dialled.split("@")[0]):
             return await rehearsal_texml(number_id, rehearsal.group(1), dialled)
-        if dialled.startswith("sip:") and not str(caller or "").startswith("sip:"):
+        # Telnyx may leave "sip:" off both: a SIP address is anything with an "@".
+        if "@" in dialled and "@" not in str(caller or ""):
             # The number's SIP address (the owner's softphone or browser test): the call log keeps what was dialled.
             caller = dialled
         unavailable = Response(content=UNAVAILABLE_XML, media_type="application/xml")
@@ -777,7 +778,6 @@ def make_app() -> FastAPI:
             logger.warning(f"texml: rehearsal of agent {agent['_id']}: {e}")
             await asyncio.to_thread(product.save_refused, number, agent, "OUTBOUND", dialled, e)
             return unavailable
-        ctx["rehearsal"] = True
         voice = ctx["voice"] if ctx["voice"] in VOICES else DEFAULT_VOICE
         logger.info(f"texml: outbound rehearsal of agent {agent['_id']} from {number.get('phoneNumber')} ({voice})")
         stream_token = make_token(*stream_parts(voice, None, False, False, number_id))
@@ -1569,7 +1569,7 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
     # nobody's answering machine calls in, so a caller who talks at length is never taken for one.
     answers = bool(ctx and ctx["doc"]["direction"] == "INBOUND")
     # A softphone, a browser or a rehearsal has no answering machine either.
-    if answers or str(callee or "").startswith("sip:") or (ctx and ctx.get("rehearsal")):
+    if answers or str(callee or "").startswith("sip:") or (ctx and ctx["doc"].get("test")):
         guard.VM_WINDOW = -1.0
     watch = speech.CallWatch(ctx["speech"] if ctx else speech.DEFAULTS, llm, pair.user(), guard)
     gate = RingGate(line["pickup"], name="ring_gate")

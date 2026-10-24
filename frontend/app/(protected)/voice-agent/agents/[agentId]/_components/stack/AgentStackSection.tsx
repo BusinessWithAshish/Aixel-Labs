@@ -12,7 +12,13 @@ import { usePage } from '@/contexts/PageStore';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { formatMoney } from '@/helpers/voice-call-cost';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
-import { defaultStack, PIPELINE_PARTS, stackUsdPerMinute } from '@/helpers/voice-stack';
+import {
+    conversationUsdPerMinute,
+    defaultStack,
+    PIPELINE_PARTS,
+    stackModel,
+    stackUsdPerMinute,
+} from '@/helpers/voice-stack';
 import type { VoiceAgentInput } from '@/helpers/voice-schemas';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 import { fitTtsVoice, StackStep } from './StackStep';
@@ -40,7 +46,16 @@ export function AgentStackSection() {
     };
 
     const { catalogue } = stackOptions;
-    const cheapest = (kind: VoiceStackKind) => stackUsdPerMinute(defaultStack(kind), catalogue);
+    // A live model's from-price includes re-reading the conversation, as its bill does.
+    const cheapest = (kind: VoiceStackKind) => {
+        const stack = defaultStack(kind);
+        return (
+            stackUsdPerMinute(stack, catalogue) +
+            (stack.kind === VoiceStackKind.REALTIME
+                ? conversationUsdPerMinute(stackModel('realtime', stack.model, catalogue))
+                : 0)
+        );
+    };
     const options: RadioCardOption<VoiceStackKind>[] = [
         {
             value: VoiceStackKind.REALTIME,

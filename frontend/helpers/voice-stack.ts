@@ -103,6 +103,19 @@ export function usdPerMinuteOf(price: VoiceStackPrice, provider: VoiceKeyProvide
     return (audioTokensPerMinute(provider) * (t.audioIn + t.audioOut)) / 1e6;
 }
 
+/**
+ * What a live model's re-reading of the conversation so far adds a minute on a typical call (measured on Gemini
+ * Live, `estimate.source`), on another live model at its own audio-in price. It grows as the call goes on.
+ */
+export function conversationUsdPerMinute(model: Pick<VoiceStackModel, 'price'> | null): number {
+    const price = model?.price;
+    const audioIn =
+        price && 'usdPerMillionTokens' in price && 'audioIn' in price.usdPerMillionTokens
+            ? price.usdPerMillionTokens.audioIn
+            : VOICE_CALL_RATES.gemini.usdPerMillionTokens.audioIn;
+    return (ESTIMATE.geminiConversationUsdPerMinute * audioIn) / VOICE_CALL_RATES.gemini.usdPerMillionTokens.audioIn;
+}
+
 /** voice-call-rates.json's price of a fallback model (`pipeline`, realtime Gemini's `gemini`). */
 function ratesFilePrice(part: VoiceStackPartName, model: string): VoiceStackPrice | null {
     if (part === 'realtime') return { usdPerMillionTokens: VOICE_CALL_RATES.gemini.usdPerMillionTokens };

@@ -73,9 +73,9 @@
     }
   },
   "estimate": {
-    "source": "backend/voice/research/gemini-cost-2026-10-17.md: with session rotation, a booking agent (about 1,200 prompt tokens a turn, engine sections included) costs $0.0348 a talk-minute and a 5,479-token prompt $0.079.",
-    "geminiUsdPerMinute": 0.0224,
-    "geminiUsdPerPromptTokenMinute": 0.0000103,
+    "source": "backend/voice/research/gemini-cost-2026-10-17.md, without session rotation (off since 2026-10-24): a booking agent (about 1,200 prompt tokens a turn, engine sections included) costs about $0.066 a talk-minute and a 5,479-token prompt $0.098 (Rs 6.1-6.4 and 9.2-9.4). Fitted to those two: $0.057 a minute plus $0.0000075 per prompt token; the $0.057 is the talk time (1,500 audio tokens a minute each way) and the conversation so far, which Gemini Live re-reads every turn. That part grows with the call: a 10-minute booking call comes to about Rs 19 a minute.",
+    "geminiConversationUsdPerMinute": 0.0345,
+    "geminiUsdPerPromptTokenMinute": 0.0000075,
     "engineTokens": 600,
     "charsPerToken": 4,
     "typicalCallMinutes": 3,

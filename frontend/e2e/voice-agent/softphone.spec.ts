@@ -7,6 +7,7 @@ import {
     VoiceAgentCallType,
     VoiceCallChannel,
     VoiceCallDirection,
+    VoiceCallTest,
 } from '@aixellabs/backend/db/types';
 import { SubModuleUrls } from '@/config/app-config';
 import { FeatureFlagKey } from '@/flags';
@@ -296,37 +297,47 @@ test('outbound rehearsal on Linphone: the address to dial, over TLS', async ({ p
     );
 });
 
-test('call logs: browser and softphone tests say so', async ({ page, db }) => {
+test('call logs: browser, softphone and rehearsal tests say so, with no phone number for the SIP side', async ({
+    page,
+    db,
+}) => {
     const agentId = new ObjectId(await db.insertVoiceAgent(E2E_USER, { name: 'Front Desk' }));
     const now = new Date();
-    const call = (from: string, startedAt: Date) => ({
-        agentId,
-        channel: VoiceCallChannel.PHONE,
-        direction: VoiceCallDirection.INBOUND,
-        from,
-        to: NUMBER,
-        voice: 'sulafat',
-        startedAt,
-        endedAt: startedAt,
-        durationSec: 30,
-        endedBy: 'caller_hung_up',
-        flags: [],
-        turns: [],
-        gapsMs: [],
-    });
+    const call = (from: string, test: VoiceCallTest, minutesAgo: number) => {
+        const startedAt = new Date(now.getTime() - minutesAgo * 60_000);
+        return {
+            agentId,
+            channel: VoiceCallChannel.PHONE,
+            direction: VoiceCallDirection.INBOUND,
+            from,
+            to: NUMBER,
+            test,
+            voice: 'sulafat',
+            startedAt,
+            endedAt: startedAt,
+            durationSec: 30,
+            endedBy: 'caller_hung_up',
+            flags: [],
+            turns: [],
+            gapsMs: [],
+        };
+    };
     await db.insertVoiceCalls(E2E_USER, [
-        call('sip:aixel0123abcd@sip.telnyx.com', now),
-        call('sip:frontdesk-browser@aixel0a1b2c3d4e5f.sip.telnyx.com', new Date(now.getTime() - 60_000)),
+        call('aixelf4a2b32690a7837d@sip.telnyx.com', VoiceCallTest.SOFTPHONE, 0),
+        // As Telnyx sends a browser caller: no "sip:", a foreign domain, digits in the user.
+        call('gencred7ifNMv79714229@sip.telnyx.com.au', VoiceCallTest.BROWSER, 1),
         {
-            ...call(NUMBER, new Date(now.getTime() - 120_000)),
+            ...call(NUMBER, VoiceCallTest.REHEARSAL, 2),
             direction: VoiceCallDirection.OUTBOUND,
-            to: 'sip:caller-rehearse-0123456789abcdef01234567-browser@aixel0a1b2c3d4e5f.sip.telnyx.com',
+            to: 'caller-rehearse-0123456789abcdef01234567-browser@aixel0a1b2c3d4e5f.sip.telnyx.com',
         },
     ]);
     await page.goto(CALL_LOGS_URL);
     const cards = page.getByTestId('call-card');
     await expect(cards.nth(0)).toContainText('Softphone test');
     await expect(cards.nth(1)).toContainText('Browser test');
+    await expect(cards.nth(1)).toContainText('Browser');
     await expect(cards.nth(2)).toContainText('Outbound rehearsal');
-    await expect(cards.nth(0)).not.toContainText('aixel0123abcd');
+    await expect(cards.nth(2)).toContainText('You');
+    for (const leak of ['aixelf4a2b', '79714229', 'gencred', 'rehearse-']) await expect(page.getByText(leak)).toHaveCount(0);
 });

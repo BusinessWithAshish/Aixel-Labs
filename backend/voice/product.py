@@ -283,6 +283,18 @@ async def check_gemini_key(key: str) -> tuple[str, str, str] | None:
 REHEARSAL_USER = re.compile(r"-rehearse-([0-9a-f]{24})(?:-browser)?$")
 
 
+def test_kind(other: str | None) -> str | None:
+    """`voice_calls.test` (VoiceCallTest): the owner testing over the internet when the other party is a SIP address
+    (with or without "sip:"): REHEARSAL (they dialled an agent's rehearsal address), BROWSER (a telephony
+    credential, "gencred…", or the browser's own address), else SOFTPHONE. None for a phone number."""
+    if not other or "@" not in other:
+        return None
+    user = other.strip().removeprefix("sip:").split("@")[0]
+    if REHEARSAL_USER.search(user):
+        return "REHEARSAL"
+    return "BROWSER" if user.startswith("gencred") or user.endswith("-browser") else "SOFTPHONE"
+
+
 def take_rehearsal(user_id, token: str) -> dict | None:
     """The owner's pending rehearsal for this token, once and before it expires: {agentId, numberId, variables}."""
     digest = hashlib.sha256(token.encode()).hexdigest()
@@ -302,6 +314,7 @@ def save_refused(number: dict, agent: dict, direction: str, other: str | None, r
         "from": other if direction == "INBOUND" else ours, "to": ours if direction == "INBOUND" else other,
         "voice": (agent.get("voice") or "").lower(), "startedAt": at, "endedAt": at, "durationSec": 0,
         "endedBy": refused.ended_by, "flags": [{"flag": refused.flag, "quote": refused.words}], "turns": [], "gapsMs": [],
+        **({"test": test_kind(other)} if test_kind(other) else {}),
     })
 
 
@@ -512,6 +525,7 @@ def phone_call(number: dict, agent: dict, direction: str, other: str | None) -> 
             "direction": direction,
             "from": other if direction == "INBOUND" else ours,
             "to": ours if direction == "INBOUND" else other,
+            **({"test": test_kind(other)} if test_kind(other) else {}),
         },
     }, agent)
 

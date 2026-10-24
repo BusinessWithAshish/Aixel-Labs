@@ -18,7 +18,7 @@ import { VoiceAgentCallTypeBadge } from '../../_components/VoiceAgentCallTypeBad
 import { VoiceAgentCallTypeSelect } from '../../_components/VoiceAgentCallTypeSelect';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import type { PromptTool } from '../_utils/prompt-tools';
-import { AgentNumbersField } from './AgentNumbersField';
+import { AgentNumbersField, slotHolder } from './AgentNumbersField';
 import { CallBlockers } from '@/components/common/voice-agent/CallBlockers';
 import { AgentTestButton } from './AgentTestButton';
 import { AgentTestCallButton } from './AgentTestCallButton';
@@ -62,6 +62,7 @@ export function VoiceAgentEditor() {
         saving,
         saveAgent,
         numbers,
+        ownedNumbers,
         typeChangeOpen,
         setTypeChangeOpen,
         deleteOpen,
@@ -73,6 +74,11 @@ export function VoiceAgentEditor() {
 
     const onNumbers = usage.inbound.length + usage.outbound.length > 0;
     const newType = VOICE_AGENT_CALL_TYPES[form.callType].label.toLowerCase();
+    // Its numbers whose slot for the new type is another agent's: switching them takes it over.
+    const takenSlots = ownedNumbers.flatMap((n) => {
+        const holder = numbers.some((x) => x.id === n._id) ? slotHolder(n, form.callType) : null;
+        return holder && holder.id !== saved._id ? [{ phoneNumber: n.phoneNumber, holder: holder.name }] : [];
+    });
 
     const onSubmit = (event: FormEvent) => {
         event.preventDefault();
@@ -257,6 +263,13 @@ export function VoiceAgentEditor() {
                                     ? 'answer calls with it instead of placing them'
                                     : 'place calls with it instead of answering them'}
                                 , or let it go?
+                                {takenSlots.map((t) => (
+                                    <span key={t.phoneNumber} className="mt-2 block">
+                                        {t.phoneNumber} already{' '}
+                                        {form.callType === VoiceAgentCallType.INBOUND ? 'answers with' : 'calls out with'}{' '}
+                                        {t.holder}: switching it takes that over.
+                                    </span>
+                                ))}
                             </DialogDescription>
                         </DialogHeader>
                         <DialogFooter>

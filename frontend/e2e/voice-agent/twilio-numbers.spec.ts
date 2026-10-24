@@ -436,7 +436,7 @@ test.describe('linking from the agent editor', () => {
         await linkNumber(page, sales, WEBHOOK_NUMBER);
         expect(twilio.requests).toHaveLength(0);
 
-        // An inbound agent again: only the Voice URL moves, saving the customer's webhook afresh.
+        // An inbound agent too: only the Voice URL moves, saving the customer's webhook afresh; Sales outreach keeps calling out.
         await linkNumber(page, afterHours, WEBHOOK_NUMBER);
         expect(writeBodies()).toEqual([
             {
@@ -445,7 +445,7 @@ test.describe('linking from the agent editor', () => {
             },
         ]);
         stored = await storedNumber(db, WEBHOOK_NUMBER);
-        expect(stored.outboundAgentId).toBeNull();
+        expect(stored.outboundAgentId?.toString()).toBe(sales);
         expect(stored.twilio?.previousRouting?.voiceUrl).toBe(TWILIO_CUSTOMER_VOICE_URL);
     });
 

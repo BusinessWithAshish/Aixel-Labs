@@ -51,10 +51,10 @@ function CallSummary() {
                     {isPhone ? (
                         <>
                             <SummaryRow label="From">
-                                <span className="tabular-nums">{formatParty(call.from, 'Unknown')}</span>
+                                <span className="tabular-nums">{formatParty(call.from, 'Unknown', call.test)}</span>
                             </SummaryRow>
                             <SummaryRow label="To">
-                                <span className="tabular-nums">{formatParty(call.to, 'Unknown')}</span>
+                                <span className="tabular-nums">{formatParty(call.to, 'Unknown', call.test)}</span>
                             </SummaryRow>
                         </>
                     ) : null}

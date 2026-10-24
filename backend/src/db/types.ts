@@ -680,6 +680,19 @@ export enum VoiceCallChannel {
   PLAYGROUND = "PLAYGROUND",
 }
 
+/**
+ * The owner testing an agent over the internet rather than a phone network (`voice_calls.test`, set by the engine:
+ * product.test_kind). The SIP party of such a call is an address, never a phone number: no `callerPhone`.
+ */
+export enum VoiceCallTest {
+  /** The browser (WebRTC): it dialled the agent, or the agent dialled it. */
+  BROWSER = "BROWSER",
+  /** A softphone (Linphone) signed in to the owner's Telnyx account. */
+  SOFTPHONE = "SOFTPHONE",
+  /** The owner dialled an outbound agent's rehearsal address: the agent ran it as its outbound call. */
+  REHEARSAL = "REHEARSAL",
+}
+
 export enum VoiceCallDirection {
   INBOUND = "INBOUND",
   OUTBOUND = "OUTBOUND",
@@ -729,6 +742,8 @@ export type VoiceCallDoc<Id = ObjectId> = {
   /** E.164 or SIP URI; absent on playground calls. */
   from?: string;
   to?: string;
+  /** Set on the owner's tests over the internet (browser, softphone, rehearsal). Absent = a real phone call. */
+  test?: VoiceCallTest | null;
   voice: string;
   startedAt: Date;
   endedAt: Date;

@@ -74,6 +74,11 @@ export function VoiceAgentCostEstimate() {
                     <dt className="text-muted-foreground">A {estimate.typicalCallMinutes}-minute call</dt>
                     <dd className="text-right tabular-nums">{money(estimate.usdPerMinute * estimate.typicalCallMinutes)}</dd>
                 </dl>
+                {estimate.growsWithLength ? (
+                    <p className="text-muted-foreground text-xs" data-testid="agent-cost-grows">
+                        Longer calls cost more a minute: a live voice model re-reads the whole conversation every turn.
+                    </p>
+                ) : null}
                 <CostCalculator
                     usdPerMinute={estimate.usdPerMinute}
                     defaultMinutes={estimate.typicalCallMinutes}

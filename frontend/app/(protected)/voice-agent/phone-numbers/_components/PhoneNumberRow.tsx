@@ -69,14 +69,12 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
     let status: { attention: boolean; text: ReactNode } | null = null;
     if (uses.length === 0) {
         // Not linked: the line above says it all.
-    } else if (uses.length > 1) {
-        status = { attention: true, text: 'A number now does one job. Link it again from the agent that keeps it.' };
     } else if (mismatched) {
         status = {
             attention: true,
             text: `${mismatched.name} is now an agent that ${mismatched.callType === VoiceAgentCallType.INBOUND ? 'makes' : 'answers'} calls. Link the number again from it.`,
         };
-    } else if (!agentOf(uses[0])) {
+    } else if (!uses.every(agentOf)) {
         status = { attention: true, text: 'Its agent was deleted.' };
     } else if (!hasGeminiKey) {
         status = {

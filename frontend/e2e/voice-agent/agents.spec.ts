@@ -337,7 +337,7 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
     db,
 }) => {
     await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
-    // 2,400 characters = 600 tokens, plus the engine's own 600: 1,200 × $0.0000103 = $0.012 a minute.
+    // 2,400 characters = 600 tokens, plus the engine's own 600: 1,200 × $0.0000075 = $0.009 a minute.
     const agentId = await db.insertVoiceAgent(E2E_USER, {
         name: 'Maya',
         callType: VoiceAgentCallType.INBOUND,
@@ -348,33 +348,36 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
     await openVoiceAgent(page, agentId);
     const card = page.getByTestId('agent-cost-estimate');
     const parts = card.getByTestId('agent-cost-parts');
-    // Gemini $0.0225 (1,500 audio tokens a minute each way) + prompt $0.0124 + Telnyx in $0.0107 = $0.046 a minute, $0.137 for 3 minutes.
+    // Gemini $0.0225 (1,500 audio tokens a minute each way) + the conversation re-read $0.0345 (no session
+    // rotation) + prompt $0.009 + Telnyx in $0.0107 = $0.077 a minute, $0.230 for 3 minutes.
     await expect(parts).toContainText('Gemini 3.8 Live · talk time$0.023');
-    await expect(parts).toContainText('Prompt · 1,200 tokens, read every turn$0.012');
+    await expect(parts).toContainText('Conversation so far · re-read every turn$0.035');
+    await expect(parts).toContainText('Prompt · 1,200 tokens, read every turn$0.009');
     await expect(parts).toContainText('Telnyx · list rate$0.011');
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.046');
-    await expect(parts).toContainText('A 3-minute call$0.137');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.077');
+    await expect(parts).toContainText('A 3-minute call$0.230');
+    await expect(card.getByTestId('agent-cost-grows')).toContainText('Longer calls cost more a minute');
     await expect(card.getByTestId('agent-cost-real')).toHaveText('No calls yet to compare with.');
 
-    // The calculator: 10 calls a day of 3 minutes at $0.04556 = $1.37 a day, $41.00 a month; then 100 calls.
+    // The calculator: 10 calls a day of 3 minutes at $0.0767 = $2.30 a day, $69.03 a month; then 100 calls.
     const calculator = card.getByTestId('agent-cost-calculator');
     await expect(calculator.getByLabel('Minutes a call')).toHaveValue('3');
-    await expect(calculator.getByTestId('agent-cost-per-day')).toHaveText('$1.37');
-    await expect(calculator.getByTestId('agent-cost-per-month')).toHaveText('$41.00');
+    await expect(calculator.getByTestId('agent-cost-per-day')).toHaveText('$2.30');
+    await expect(calculator.getByTestId('agent-cost-per-month')).toHaveText('$69.03');
     await calculator.getByLabel('Calls a day').fill('100');
-    await expect(calculator.getByTestId('agent-cost-per-day')).toHaveText('$13.67');
-    await expect(calculator.getByTestId('agent-cost-per-month')).toHaveText('$410.04');
+    await expect(calculator.getByTestId('agent-cost-per-day')).toHaveText('$23.01');
+    await expect(calculator.getByTestId('agent-cost-per-month')).toHaveText('$690.30');
 
-    // A longer prompt, before saving: 6,000 characters = 2,100 tokens a turn, $0.055 a minute.
+    // A longer prompt, before saving: 6,000 characters = 2,100 tokens a turn, $0.083 a minute.
     await page.locator('#agent-prompt').fill('y'.repeat(6000));
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.055');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.083');
     await page.locator('#agent-prompt').fill('x'.repeat(2400)); // back as saved, so leaving asks nothing
 
-    // Booking adds its 525 tokens a turn and two uses a call: $0.006 a minute.
+    // Booking adds its 525 tokens a turn and two uses a call: $0.005 a minute.
     await db.setVoiceAgentTools(agentId, { booking: { ...defaultVoiceBookingTool('UTC'), enabled: true }, webhooks: [] });
     await openVoiceAgent(page, agentId);
-    await expect(parts).toContainText('Booking · 525 tokens a turn, ~2 uses a call$0.006');
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.052');
+    await expect(parts).toContainText('Booking · 525 tokens a turn, ~2 uses a call$0.005');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.082');
 
     // A pipeline stack bills its three parts; thinking grows with the prompt (its list rate assumes 1,500
     // tokens a turn), and so do the tools' tokens: $0.0048 + $0.0029 + $0.039 + booking $0.0024 + Telnyx.
