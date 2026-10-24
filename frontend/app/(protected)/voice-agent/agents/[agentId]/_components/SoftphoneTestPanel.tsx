@@ -5,8 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { toast } from 'sonner';
-import { Copy, Info, RefreshCw } from 'lucide-react';
+import { Info, RefreshCw } from 'lucide-react';
 import { VOICE_AGENT_SUB_MODULES, VoiceProvider } from '@aixellabs/backend/db/types';
 import { placeTestCall } from '@/app/actions/voice-number-actions';
 import {
@@ -25,44 +24,14 @@ import { SubModuleUrls } from '@/config/app-config';
 import { agentSipAddress } from '@/helpers/voice-call-format';
 import { LINPHONE_GUIDE } from '../_utils/linphone-guide';
 import type { AgentTestPanelProps } from './AgentTestDialog';
+import { CopyRow } from './CopyRow';
+import { RehearsalForm } from './RehearsalForm';
 import { NoTelnyxNumber } from './BrowserTestPanel';
 
 /** What placeTestCall takes as `to` to ring the softphone (SOFTPHONE_TARGET on the server). */
 const SOFTPHONE_TARGET = 'softphone';
 
 const numberSchema = z.object({ numberId: z.string().min(1, 'Choose a number') });
-
-async function copy(value: string, what: string) {
-    try {
-        await navigator.clipboard.writeText(value);
-        toast.success(`${what} copied`);
-    } catch {
-        toast.error(`Could not copy the ${what.toLowerCase()}`);
-    }
-}
-
-function CopyRow({ label, value, testId }: { label: string; value: string; testId?: string }) {
-    return (
-        <div className="bg-background flex min-w-0 items-center justify-between gap-2 rounded-md border px-3 py-2">
-            <div className="flex min-w-0 flex-col">
-                <span className="text-muted-foreground text-xs">{label}</span>
-                <span className="font-mono text-sm break-all" data-testid={testId}>
-                    {value}
-                </span>
-            </div>
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="shrink-0"
-                aria-label={`Copy ${label.toLowerCase()}`}
-                onClick={() => void copy(value, label)}
-            >
-                <Copy className="size-4" />
-            </Button>
-        </div>
-    );
-}
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
     return (
@@ -289,7 +258,7 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                                     <Info className="size-4" />
                                     <AlertDescription>
                                         Telnyx allows this call once your account is upgraded: a trial account only calls its
-                                        verified number.
+                                        verified number. On a trial, rehearse it by calling in below.
                                     </AlertDescription>
                                 </Alert>
                                 <Button
@@ -307,6 +276,14 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                     ) : (
                         <p className="text-sm">No Telnyx number in this account can place the call yet.</p>
                     )}
+                    <RehearsalForm
+                        view={view}
+                        agentId={agentId}
+                        agentName={agentName}
+                        numbers={callFrom}
+                        via="softphone"
+                        refused={!!error?.includes('trial account')}
+                    />
                 </Section>
             )}
 

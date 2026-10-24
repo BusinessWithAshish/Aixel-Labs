@@ -1193,6 +1193,18 @@ export type VoiceAccountDoc<Id = ObjectId> = {
   numbers?: VoiceNumberDoc<Id>[];
   /** Absent or null = none set up. */
   softphone?: VoiceSoftphoneDoc<Id> | null;
+  /**
+   * The owner's pending outbound rehearsal: they dial `sip:<agent>-rehearse-<token>@<a number's SIP subdomain>` and
+   * `agentId` runs the call as if it had called them from `numberId`, with these `variables`. The engine takes it
+   * once (then null); the token (24 hex) is kept only as its SHA-256. Latest one wins.
+   */
+  rehearsal?: {
+    tokenHash: string;
+    agentId: Id;
+    numberId: Id;
+    variables: Record<string, string>;
+    expiresAt: Date;
+  } | null;
   createdAt: Date;
   updatedAt: Date;
 };

@@ -11,7 +11,7 @@ Uses one Gemini Live session at a time. Nothing reaches the real Telnyx: the fak
 on :8799 records what the server sent it.
 """
 import asyncio, audioop, hashlib, json, os, sys, time, urllib.parse, urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parents[1]
@@ -235,6 +235,35 @@ async def test_texml(port, number):
        doc is not None and doc["from"] == address and not doc.get("callerPhone"), str(doc and doc.get("from")))
 
 
+# --- outbound rehearsal (the owner dials <agent>-rehearse-<token> on a number's SIP subdomain) ----------
+
+async def test_rehearsal(port, agent, number):
+    print("\n== outbound rehearsal ==")
+    nid, token = str(number["_id"]), os.urandom(12).hex()
+    address = f"sip:testreceptionist-rehearse-{token}-browser@aixel0a1b2c3d4e5f.sip.telnyx.com"
+    db.voice_accounts.update_one({"userId": agent["userId"]}, {"$set": {"rehearsal": {
+        "tokenHash": hashlib.sha256(token.encode()).hexdigest(), "agentId": agent["_id"], "numberId": number["_id"],
+        "variables": {"name": "Ana"}, "expiresAt": datetime.now(timezone.utc) + timedelta(minutes=10)}}})
+    db.voice_agents.update_one({"_id": agent["_id"]}, {"$set": {"callType": "OUTBOUND"}})  # it waits for "hello?"
+    t_start = datetime.now(timezone.utc).replace(microsecond=0)
+    r = await scripted.run(str(port), "human_pickup", texml=True, number=nid, caller="+15550001111", to=address)
+    db.voice_agents.update_one({"_id": agent["_id"]}, {"$unset": {"callType": ""}})
+    await asyncio.sleep(2)
+    first = r["first_sound"]
+    ok("an outbound agent waits for the caller's hello before its opening line", first is not None and first > 1.0,
+       f"first sound {first:.2f} s after the stream opened" if first is not None else "no audio")
+    doc = latest_call(numberId=number["_id"], startedAt={"$gte": t_start})
+    ok("runs as the agent's OUTBOUND call to the address, with the variables filled in",
+       doc is not None and doc["direction"] == "OUTBOUND" and doc["to"] == address.split(";")[0]
+       and doc["from"] == number["phoneNumber"] and doc.get("variables") == {"name": "Ana"},
+       str(doc and {k: doc.get(k) for k in ("direction", "from", "to", "variables", "endedBy")}))
+    ok("the rehearsal is spent", (db.voice_accounts.find_one({"userId": agent["userId"]}) or {}).get("rehearsal") is None)
+    q = urllib.parse.urlencode({"n": nid, "sig": product.sign("number", nid), "Direction": "inbound",
+                                "From": "+15550001111", "To": address})
+    st, body = await ahttp("GET", f"http://127.0.0.1:{port}/texml?{q}")
+    ok("dialled again: hung up", st == 200 and "<Hangup/>" in body, body[:120])
+
+
 # --- POST /calls ---------------------------------------------------------------------------------
 
 async def test_calls(port, number, no_agent, no_cc):
@@ -307,7 +336,7 @@ async def test_calls(port, number, no_agent, no_cc):
 async def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 7861
     testdb.engine_on(port, DBNAME)
-    which = sys.argv[2:] or ["play", "texml", "calls"]
+    which = sys.argv[2:] or ["play", "texml", "calls", "rehearsal"]
     fake = await fake_telnyx()
     agent, number, no_agent, no_cc = fixtures()
     print(f"fixtures in {DBNAME}: agent {agent['_id']} user {agent['userId']} number {number['_id']}")
@@ -315,6 +344,7 @@ async def main():
         if "play" in which: await test_play(port, agent)
         if "texml" in which: await test_texml(port, number)
         if "calls" in which: await test_calls(port, number, no_agent, no_cc)
+        if "rehearsal" in which: await test_rehearsal(port, agent, number)
     finally:
         await fake.cleanup()
         dnc = HERE / "suppressed.jsonl"   # take back the fake number the /calls test listed

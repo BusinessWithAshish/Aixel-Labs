@@ -1,5 +1,7 @@
 import {
+    VOICE_AGENT_FEATURE_LIMITS,
     VOICE_BUILTIN_VARIABLES,
+    VOICE_VARIABLE_NAME_PATTERN,
     type VoiceAgent,
     type VoiceAgentAnalysis,
     type VoiceAgentSpeech,
@@ -132,4 +134,21 @@ export function memoryPhoneOf(call: { direction: VoiceCallDirection; from?: stri
     if (!other || other.trim().toLowerCase().startsWith('sip:')) return null;
     const digits = other.replace(/\D/g, '');
     return digits.length >= 7 ? `+${digits}` : null;
+}
+
+/** A call's own variables (a test call's, a rehearsal's): well-formed names, values trimmed and capped, empty ones left to the agent's defaults. */
+export function cleanCallVariables(input: unknown): Record<string, string> {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+    const entries = Object.entries(input as Record<string, unknown>)
+        .filter(
+            ([name, value]) =>
+                VOICE_VARIABLE_NAME_PATTERN.test(name) && !isBuiltinVariable(name) && typeof value === 'string',
+        )
+        .map(
+            ([name, value]) =>
+                [name, (value as string).trim().slice(0, VOICE_AGENT_FEATURE_LIMITS.maxVariableLength)] as const,
+        )
+        .filter(([, value]) => value);
+    if (entries.length > VOICE_AGENT_FEATURE_LIMITS.maxVariables) throw new Error('Too many variables for one call');
+    return Object.fromEntries(entries);
 }

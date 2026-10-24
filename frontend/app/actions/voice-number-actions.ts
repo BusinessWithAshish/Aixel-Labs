@@ -13,11 +13,10 @@ import {
     type VoiceNumberDoc,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
-import { VOICE_AGENT_FEATURE_LIMITS, VOICE_VARIABLE_NAME_PATTERN } from '@aixellabs/backend/db/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key';
 import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
-import { isBuiltinVariable } from '@/helpers/voice-agent-features';
+import { cleanCallVariables } from '@/helpers/voice-agent-features';
 import { engineFetch, sealSecret } from '@/server/voice-agent/engine';
 import { assertRateLimit } from '@/server/rate-limit';
 import { assertGeminiKeySet, GEMINI_KEY_MISSING_MESSAGE } from '@/server/voice-agent/gemini-key';
@@ -539,23 +538,6 @@ export const removeNumber = async (numberId: string): Promise<ALApiResponse<{ re
     });
 };
 
-/** A test call's variables: well-formed names, values trimmed and capped, empty ones left to the agent's defaults. */
-function testCallVariables(input: unknown): Record<string, string> {
-    if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
-    const entries = Object.entries(input as Record<string, unknown>)
-        .filter(
-            ([name, value]) =>
-                VOICE_VARIABLE_NAME_PATTERN.test(name) && !isBuiltinVariable(name) && typeof value === 'string',
-        )
-        .map(
-            ([name, value]) =>
-                [name, (value as string).trim().slice(0, VOICE_AGENT_FEATURE_LIMITS.maxVariableLength)] as const,
-        )
-        .filter(([, value]) => value);
-    if (entries.length > VOICE_AGENT_FEATURE_LIMITS.maxVariables) throw new Error('Too many variables for one call');
-    return Object.fromEntries(entries);
-}
-
 /** The owner's softphone, as `doc` can ring it: a Telnyx number in the softphone's own Telnyx account. */
 async function softphoneTarget(owner: VoiceOwnerScope, doc: OwnedNumberDoc): Promise<string> {
     const softphone = await getSoftphone(owner.userId);
@@ -584,7 +566,7 @@ export const placeTestCall = async (
 ): Promise<ALApiResponse<PlaceTestCallResult>> => {
     assertValidObjectId(numberId, 'Number ID');
     if (agentId !== null) assertValidObjectId(agentId, 'Agent ID');
-    const callVariables = testCallVariables(variables);
+    const callVariables = cleanCallVariables(variables);
 
     return runAuthenticatedAction(async function placeTestCall(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);

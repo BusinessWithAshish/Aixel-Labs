@@ -13,6 +13,7 @@ import { SubModuleUrls } from '@/config/app-config';
 import { agentSipAddress, formatDuration } from '@/helpers/voice-call-format';
 import { useBrowserTestCall, type BrowserTestPhase } from '../_hooks/use-browser-test-call';
 import type { AgentTestPanelProps } from './AgentTestDialog';
+import { RehearsalForm } from './RehearsalForm';
 
 const numberSchema = z.object({ numberId: z.string().min(1, 'Choose a number') });
 
@@ -106,39 +107,52 @@ export function BrowserTestPanel({ view, agentId, agentName, inbound }: AgentTes
     }
 
     return (
-        <FormProvider {...form}>
-            <form onSubmit={start} className="flex flex-col gap-3" noValidate>
-                {numbers.length > 1 ? (
-                    <PhoneNumberControlledField
-                        name="numberId"
-                        id="browser-test-number"
-                        label={inbound ? 'Call it on' : 'Calls you from'}
-                        numbers={numbers.map((n) => ({ ...n, provider: VoiceProvider.TELNYX }))}
-                    />
-                ) : null}
-                <p className="text-muted-foreground text-sm">
-                    Uses your microphone and speakers, with nothing to install. It works on any network, including mobile
-                    hotspots that block internet calling.
-                </p>
-                {inbound ? null : (
-                    <Alert variant="info">
-                        <Info className="size-4" />
-                        <AlertDescription>
-                            Telnyx lets an agent call this browser once your account is upgraded: a trial account only calls
-                            its verified number.
-                        </AlertDescription>
-                    </Alert>
-                )}
-                {test.error ? (
-                    <p className="text-destructive text-sm" role="alert">
-                        {test.error}
+        <div className="flex flex-col gap-4">
+            <FormProvider {...form}>
+                <form onSubmit={start} className="flex flex-col gap-3" noValidate>
+                    {numbers.length > 1 ? (
+                        <PhoneNumberControlledField
+                            name="numberId"
+                            id="browser-test-number"
+                            label={inbound ? 'Call it on' : 'Calls you from'}
+                            numbers={numbers.map((n) => ({ ...n, provider: VoiceProvider.TELNYX }))}
+                        />
+                    ) : null}
+                    <p className="text-muted-foreground text-sm">
+                        Uses your microphone and speakers, with nothing to install. It works on any network, including mobile
+                        hotspots that block internet calling.
                     </p>
-                ) : null}
-                <Button type="submit" className="self-start">
-                    <Phone className="size-4" />
-                    {inbound ? `Call ${agentName}` : 'Call me here'}
-                </Button>
-            </form>
-        </FormProvider>
+                    {inbound ? null : (
+                        <Alert variant="info">
+                            <Info className="size-4" />
+                            <AlertDescription>
+                                Telnyx lets an agent call this browser once your account is upgraded: a trial account only
+                                calls its verified number. On a trial, rehearse it by calling in below.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    {test.error ? (
+                        <p className="text-destructive text-sm" role="alert">
+                            {test.error}
+                        </p>
+                    ) : null}
+                    <Button type="submit" className="self-start">
+                        <Phone className="size-4" />
+                        {inbound ? `Call ${agentName}` : 'Call me here'}
+                    </Button>
+                </form>
+            </FormProvider>
+            {inbound ? null : (
+                <RehearsalForm
+                    view={view}
+                    agentId={agentId}
+                    agentName={agentName}
+                    numbers={view.callFrom}
+                    via="browser"
+                    onDial={(numberId, address) => void test.callAgent(numberId, address)}
+                    refused={!!test.error?.includes('trial account')}
+                />
+            )}
+        </div>
     );
 }

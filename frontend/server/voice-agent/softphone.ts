@@ -12,7 +12,7 @@ import {
     TelnyxApiError,
     updateCredentialConnection,
 } from '@/server/voice-agent/telnyx';
-import { appLabel } from '@/server/voice-agent/telnyx-numbers';
+import { appLabel, ensureTexmlApp } from '@/server/voice-agent/telnyx-numbers';
 import { ensureTelnyxConnection, ensureTelnyxCredential } from '@/server/voice-agent/web-phone';
 
 /**
@@ -181,4 +181,40 @@ export async function browserUri(number: OwnedNumberDoc): Promise<string> {
     // Calls from the account's own connections only (the agent's), on connections made before this was set.
     await updateCredentialConnection(key, connectionId, {});
     return softphoneUri(credential.sip_username);
+}
+
+/** How long a rehearsal's address works (it is also spent by its first call). */
+const REHEARSAL_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * An outbound rehearsal: the owner dials the returned SIP user on the returned host and `agentId` runs the call as
+ * if it had called them from `number` (engine: rehearsal_texml), with `variables`. Works on a trial account (the
+ * call comes IN). The host is a SIP subdomain in `number`'s Telnyx account: a number there whose AI answers, else a
+ * TeXML app made for `number` itself (its calls keep ringing where they did). Latest one wins.
+ */
+export async function issueRehearsal(
+    number: OwnedNumberDoc,
+    accountNumbers: OwnedNumberDoc[],
+    agent: { _id: MongoObjectId; name: string },
+    variables: Record<string, string>,
+): Promise<{ user: string; host: string; expiresAt: Date }> {
+    if (number.provider !== VoiceProvider.TELNYX) throw new Error('Rehearsals work with Telnyx numbers for now.');
+    const answering = [number, ...accountNumbers].find((n) => n.texmlAppId && inSoftphoneAccount(n, number));
+    const host = answering
+        ? await ensureSipHost(answering)
+        : await ensureSipHost({ ...number, texmlAppId: await ensureTexmlApp(number, openSecret(number.apiKeySealed)) });
+    if (!host) throw new Error('Could not give this number a SIP address. Try again.');
+    const token = randomBytes(12).toString('hex');
+    const expiresAt = new Date(Date.now() + REHEARSAL_TTL_MS);
+    const accounts = await voiceAccountsCollection();
+    await accounts.updateOne(
+        { userId: number.userId },
+        {
+            $set: {
+                rehearsal: { tokenHash: hashToken(token), agentId: agent._id, numberId: number._id, variables, expiresAt },
+                updatedAt: new Date(),
+            },
+        },
+    );
+    return { user: `${sipUserFor(agent.name)}-rehearse-${token}`, host, expiresAt };
 }

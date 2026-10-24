@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { ObjectId } from 'mongodb';
 import type { Page } from '@playwright/test';
 import { encryptOverrides } from 'flags';
@@ -44,6 +44,7 @@ test.afterAll(async () => {
 test.beforeEach(async ({ db, context }) => {
     telnyx.reset();
     engine.clear();
+    engine.refuseSipCalls = false;
     await db.resetUser(E2E_USER);
     await db.resetVoiceAgents(E2E_USER);
     await db.resetVoiceTelephony(E2E_USER);
@@ -66,7 +67,12 @@ async function inboundAgent(db: E2eDb) {
 }
 
 async function outboundAgent(db: E2eDb) {
-    const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Caller', callType: VoiceAgentCallType.OUTBOUND });
+    const agentId = await db.insertVoiceAgent(E2E_USER, {
+        name: 'Caller',
+        callType: VoiceAgentCallType.OUTBOUND,
+        prompt: 'You call {{name}} about their order.',
+    });
+    await db.setVoiceAgentFields(agentId, { variables: { name: 'Sam' } });
     const numberId = await db.insertVoiceNumber(E2E_USER, {
         phoneNumber: NUMBER,
         providerNumberId: '1293384261075731499',
@@ -242,6 +248,54 @@ test('web dialer: the Agents tab calls an agent like a customer would', async ({
     await expect(page.getByRole('tab', { name: 'Agents' })).toBeVisible();
 });
 
+test('outbound rehearsal in this browser: the owner dials in, the agent runs it as its outbound call', async ({
+    page,
+    db,
+}) => {
+    const { agentId, numberId } = await outboundAgent(db);
+    engine.refuseSipCalls = true; // a trial account
+    const dialog = await openTest(page, agentId, 'Have Caller call me');
+    await dialog.getByRole('button', { name: 'Call me here' }).click();
+    await expect(dialog.getByText(/account level does not allow this call/)).toBeVisible();
+    const rehearsal = dialog.getByTestId('rehearsal').first();
+    await expect(rehearsal).toContainText('Your Telnyx account cannot place this call yet');
+
+    await rehearsal.getByLabel('{{name}}').fill('Ana');
+    await expect(rehearsal.getByLabel('{{name}}')).toHaveAttribute('placeholder', 'Sam');
+    await rehearsal.getByRole('button', { name: 'Rehearse: call Caller here' }).click();
+    await expect(dialog.getByRole('status')).toHaveText('Ringing…');
+    const [call] = await page.evaluate(() => (window as unknown as FakeRtcWindow).e2eNewCalls);
+    const match = /^sip:caller-rehearse-([0-9a-f]{24})-browser@(aixel[0-9a-f]{12})\.sip\.telnyx\.com$/.exec(
+        call.destinationNumber,
+    );
+    expect(match, call.destinationNumber).not.toBeNull();
+
+    // The number only places calls: it got a TeXML app (and SIP subdomain) of its own, its routing untouched.
+    expect(telnyx.texmlApps.size).toBe(1);
+    expect(subdomainOf([...telnyx.texmlApps.keys()][0])).toBe(match![2]);
+    expect(telnyx.find('PATCH', /^\/v2\/phone_numbers\//)).toHaveLength(0);
+    // What the engine takes once: the agent, the number it "calls from", the values; the token only as its hash.
+    const account = await db.getVoiceAccount(E2E_USER);
+    expect(account?.rehearsal).toMatchObject({
+        tokenHash: createHash('sha256').update(match![1]).digest('hex'),
+        variables: { name: 'Ana' },
+    });
+    expect(String(account?.rehearsal?.agentId)).toBe(agentId);
+    expect(String(account?.rehearsal?.numberId)).toBe(numberId);
+});
+
+test('outbound rehearsal on Linphone: the address to dial, over TLS', async ({ page, db }) => {
+    const { agentId } = await outboundAgent(db);
+    const dialog = await openTest(page, agentId, 'Have Caller call me');
+    await dialog.getByRole('tab', { name: 'On your softphone' }).click();
+    await dialog.getByRole('button', { name: 'Set up Linphone' }).click();
+    const rehearsal = dialog.getByTestId('rehearsal').last();
+    await rehearsal.getByRole('button', { name: 'Get the address to dial' }).click();
+    await expect(rehearsal.getByTestId('rehearsal-address')).toHaveText(
+        /^sip:caller-rehearse-[0-9a-f]{24}@aixel[0-9a-f]{12}\.sip\.telnyx\.com;transport=tls$/,
+    );
+});
+
 test('call logs: browser and softphone tests say so', async ({ page, db }) => {
     const agentId = new ObjectId(await db.insertVoiceAgent(E2E_USER, { name: 'Front Desk' }));
     const now = new Date();
@@ -263,10 +317,16 @@ test('call logs: browser and softphone tests say so', async ({ page, db }) => {
     await db.insertVoiceCalls(E2E_USER, [
         call('sip:aixel0123abcd@sip.telnyx.com', now),
         call('sip:frontdesk-browser@aixel0a1b2c3d4e5f.sip.telnyx.com', new Date(now.getTime() - 60_000)),
+        {
+            ...call(NUMBER, new Date(now.getTime() - 120_000)),
+            direction: VoiceCallDirection.OUTBOUND,
+            to: 'sip:caller-rehearse-0123456789abcdef01234567-browser@aixel0a1b2c3d4e5f.sip.telnyx.com',
+        },
     ]);
     await page.goto(CALL_LOGS_URL);
     const cards = page.getByTestId('call-card');
     await expect(cards.nth(0)).toContainText('Softphone test');
     await expect(cards.nth(1)).toContainText('Browser test');
+    await expect(cards.nth(2)).toContainText('Outbound rehearsal');
     await expect(cards.nth(0)).not.toContainText('aixel0123abcd');
 });

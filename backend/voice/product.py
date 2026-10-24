@@ -265,6 +265,21 @@ async def check_gemini_key(key: str) -> tuple[str, str, str] | None:
     return (*problem, text[:300]) if problem else None
 
 
+# An outbound rehearsal (voice_accounts.rehearsal, set by the app): the owner dials the SIP user
+# `<agent>-rehearse-<token>` on one of their numbers' SIP subdomains, and that agent runs the call as if it had
+# called them. The token is 24 hex characters; the app keeps only its SHA-256.
+REHEARSAL_USER = re.compile(r"-rehearse-([0-9a-f]{24})(?:-browser)?$")
+
+
+def take_rehearsal(user_id, token: str) -> dict | None:
+    """The owner's pending rehearsal for this token, once and before it expires: {agentId, numberId, variables}."""
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    doc = db().voice_accounts.find_one_and_update(
+        {"userId": user_id, "rehearsal.tokenHash": digest, "rehearsal.expiresAt": {"$gt": now()}},
+        {"$set": {"rehearsal": None}}, projection={"rehearsal": 1})
+    return (doc or {}).get("rehearsal")
+
+
 def save_refused(number: dict, agent: dict, direction: str, other: str | None, refused: CallRefused):
     """A call on a customer's number that was refused (CallRefused): a record with no audio
     (endedBy gemini_key_error, or error for no prompt), so the owner sees who called and why nobody answered."""

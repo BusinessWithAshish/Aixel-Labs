@@ -90,8 +90,11 @@ async function releaseCallControlApp(doc: OwnedNumberDoc, key: string): Promise<
     if (app?.application_name === CALL_CONTROL_APP_LABEL) await deleteCallControlApplication(key, app.id);
 }
 
-/** The TeXML app (calls in) in the customer's Telnyx account, created on first need. Saved as soon as it exists. */
-async function ensureTexmlApp(doc: OwnedNumberDoc, key: string): Promise<string> {
+/**
+ * The TeXML app (calls in) in the customer's Telnyx account, created on first need. Saved as soon as it exists. It
+ * does not move the number: its calls keep ringing wherever they did until `routeCallsToAi`.
+ */
+export async function ensureTexmlApp(doc: OwnedNumberDoc, key: string): Promise<string> {
     if (doc.texmlAppId) return doc.texmlAppId;
     const app = await createTexmlApplication(key, {
         friendlyName: appLabel(doc),

@@ -33,6 +33,7 @@ function Parties({ call }: { call: VoiceCallListItem }) {
  */
 export function CallCard({ call }: { call: VoiceCallListItem }) {
     const summary = call.analysis?.summary;
+    const test = internetTestOf(call);
     const gap = median(call.gapsMs);
 
     return (
@@ -48,7 +49,7 @@ export function CallCard({ call }: { call: VoiceCallListItem }) {
                             {call.agentName ?? 'Deleted agent'}
                         </span>
                         <CallTypeBadge channel={call.channel} direction={call.direction} />
-                        {internetTestOf(call) ? <Badge variant="outline">{internetTestOf(call)} test</Badge> : null}
+                        {test ? <Badge variant="outline">{test.label}</Badge> : null}
                     </div>
                     <div className="text-muted-foreground flex flex-wrap gap-x-2 text-xs">
                         <Parties call={call} />

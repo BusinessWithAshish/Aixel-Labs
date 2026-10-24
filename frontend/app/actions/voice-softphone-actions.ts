@@ -12,6 +12,10 @@ import QRCode from 'qrcode';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { assertRateLimit } from '@/server/rate-limit';
 import { findItem, listItems } from '@/server/voice-agent/accounts';
+import { assertGeminiKeySet } from '@/server/voice-agent/gemini-key';
+import { cleanCallVariables, customVariableNames } from '@/helpers/voice-agent-features';
+import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
+import type { VoiceAgentVariableOption } from '@/app/actions/voice-agent-actions';
 import type { OwnedNumberDoc } from '@/server/voice-agent/number-provider';
 import { requestOrigin } from '@/server/voice-agent/public-url';
 import { startWebPhoneSession, type WebPhoneSession } from '@/server/voice-agent/web-phone';
@@ -19,6 +23,7 @@ import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/ow
 import {
     ensureSipHost,
     getSoftphone,
+    issueRehearsal,
     inSoftphoneAccount,
     issueSoftphoneLogin,
     removeSoftphone,
@@ -49,7 +54,12 @@ export type SoftphoneView = {
     dialIn: (SoftphoneNumber & { user: string; host: string; softphone: boolean })[];
     /** Telnyx numbers this agent can ring you from, its own first. `softphone`: can ring the softphone. */
     callFrom: (SoftphoneNumber & { softphone: boolean })[];
+    /** The agent's own `{{variables}}` with their defaults, for a rehearsal to fill in. */
+    variables: VoiceAgentVariableOption[];
 };
+
+/** Where to dial for an outbound rehearsal (`agentSipAddress(user, host, …)`): once, before `expiresAt`. */
+export type RehearsalAddress = { user: string; host: string; expiresAt: string };
 
 /** What setting up or resetting returns: the only time the password is shown, with Linphone's one-time setup link. */
 export type SoftphoneLogin = {
@@ -81,7 +91,7 @@ export const getSoftphoneView = async (agentId: string): Promise<ALApiResponse<S
         const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
         const agent = await agents.findOne(
             { _id: toObjectId(agentId, 'Agent ID'), userId: owner.userId },
-            { projection: { name: 1 } },
+            { projection: { name: 1, prompt: 1, variables: 1, 'voicemail.message': 1 } },
         );
         if (!agent?._id) throw new Error('Agent not found');
 
@@ -105,6 +115,10 @@ export const getSoftphoneView = async (agentId: string): Promise<ALApiResponse<S
                 hosts[i] ? [{ ...numberOf(n), user: sipUserFor(agent.name), host: hosts[i], softphone: reaches(n) }] : [],
             ),
             callFrom: [...telnyx].sort((a, b) => own(a) - own(b)).map((n) => ({ ...numberOf(n), softphone: reaches(n) })),
+            variables: customVariableNames(agent.prompt ?? '', agent.voicemail?.message ?? '').map((name) => ({
+                name,
+                value: agent.variables?.[name] ?? '',
+            })),
         };
     });
 };
@@ -161,3 +175,34 @@ export const removeSoftphoneLogin = async (): Promise<ALApiResponse<{ removed: t
         await removeSoftphone(owner.userId, number);
         return { removed: true as const };
     });
+
+/**
+ * An outbound rehearsal, for accounts that cannot place the call (a Telnyx trial): the owner dials the address and
+ * the agent runs the call as if it had called them from `numberId`, with these `{{variables}}`. Counts as a test call.
+ */
+export const startRehearsal = async (
+    agentId: string,
+    numberId: string,
+    variables: Record<string, string> = {},
+): Promise<ALApiResponse<RehearsalAddress>> => {
+    assertValidObjectId(agentId, 'Agent ID');
+    assertValidObjectId(numberId, 'Number ID');
+    const callVariables = cleanCallVariables(variables);
+    return runAuthenticatedAction(async function startRehearsal(userId) {
+        const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        assertRateLimit(`voice-call:${owner.userId}`, 10);
+        const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
+        const agent = await agents.findOne(
+            { _id: toObjectId(agentId, 'Agent ID'), userId: owner.userId },
+            { projection: { name: 1, prompt: 1 } },
+        );
+        if (!agent?._id) throw new Error('Agent not found');
+        if (!agent.prompt?.trim()) throw new Error(VOICE_AGENT_NO_PROMPT_MESSAGE);
+        const numbers = await listItems('numbers', owner.userId);
+        const number = numbers.find((n) => n._id.equals(toObjectId(numberId, 'Number ID')));
+        if (!number) throw new Error('Number not found');
+        await assertGeminiKeySet(owner.userId);
+        const rehearsal = await issueRehearsal(number, numbers, agent, callVariables);
+        return { ...rehearsal, expiresAt: rehearsal.expiresAt.toISOString() };
+    });
+};

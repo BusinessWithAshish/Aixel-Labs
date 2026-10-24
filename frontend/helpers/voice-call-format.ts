@@ -40,7 +40,7 @@ export function formatGap(ms: number | null): string {
 
 export function formatParty(value: string | undefined, fallback: string): string {
     if (!value) return fallback;
-    return internetTestOf({ from: value }) ?? value;
+    return internetTestOf({ from: value })?.party ?? value;
 }
 
 /** What the browser adds to an agent's SIP user, so Call logs tell its calls from the softphone's. */
@@ -56,14 +56,19 @@ export function agentSipAddress(user: string, host: string, via: 'browser' | 'so
 }
 
 /**
- * The owner testing over the internet: "Browser" or "Softphone" when a party is a SIP URI, else null. A browser is
- * a telephony credential (Telnyx names them "gencred…") or dialled the agent's browser address.
+ * The owner testing over the internet, when a party is a SIP URI: who they were (`party`) and the call log's tag.
+ * A browser is a telephony credential (Telnyx names them "gencred…") or dialled the agent's browser address; a
+ * rehearsal's address carries `-rehearse-` (the agent ran the call as if it had called them).
  */
-export function internetTestOf(call: { from?: string; to?: string }): 'Browser' | 'Softphone' | null {
+export function internetTestOf(call: {
+    from?: string;
+    to?: string;
+}): { party: 'Browser' | 'Softphone'; label: 'Browser test' | 'Softphone test' | 'Outbound rehearsal' } | null {
     const sip = [call.from, call.to].find((party) => party?.startsWith('sip:'));
     if (!sip) return null;
     const user = sip.slice(4).split('@')[0];
-    return user.startsWith('gencred') || user.endsWith(BROWSER_SUFFIX) ? 'Browser' : 'Softphone';
+    const party = user.startsWith('gencred') || user.endsWith(BROWSER_SUFFIX) ? 'Browser' : 'Softphone';
+    return { party, label: user.includes('-rehearse-') ? 'Outbound rehearsal' : `${party} test` };
 }
 
 /** The engine can log one utterance as several same-role fragments; show them as one bubble. */

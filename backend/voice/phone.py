@@ -723,7 +723,9 @@ def make_app() -> FastAPI:
             logger.warning(f"texml: number {number_id} {'has no inbound agent' if number else 'not found'}, hanging up")
             return hang_up
         caller = params.get("From") or params.get("from")
-        dialled = str(params.get("To") or params.get("to") or "")
+        dialled = str(params.get("To") or params.get("to") or "").split(";")[0]
+        if rehearsal := product.REHEARSAL_USER.search(dialled.split("@")[0]):
+            return await rehearsal_texml(number_id, rehearsal.group(1), dialled)
         if dialled.startswith("sip:") and not str(caller or "").startswith("sip:"):
             # The number's SIP address (the owner's softphone or browser test): the call log keeps what was dialled.
             caller = dialled
@@ -745,6 +747,43 @@ def make_app() -> FastAPI:
         if not await prepare_line(token, voice, callee, False, ctx):
             return unavailable
         return Response(content=texml_for(voice, callee, token=token, number_id=number_id), media_type="application/xml")
+
+    async def rehearsal_texml(host_number_id: str, token: str, dialled: str) -> Response:
+        """An outbound rehearsal: the owner dialled `<agent>-rehearse-<token>` on one of their numbers' SIP
+        subdomains, so that agent runs the call as OUTBOUND from the number the app named: its outbound opening
+        (it waits for "hello?" unless it speaks first), the variables the owner filled in, no voicemail detection."""
+        hang_up = Response(
+            content='<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>', media_type="application/xml"
+        )
+        unavailable = Response(content=UNAVAILABLE_XML, media_type="application/xml")
+        try:
+            host = await asyncio.to_thread(product.find_number, host_number_id)
+            plan = host and await asyncio.to_thread(product.take_rehearsal, host["userId"], token)
+            number, agent = (await asyncio.to_thread(product.load_number, plan["numberId"], "OUTBOUND", plan["agentId"])
+                             if plan else (None, None))
+        except Exception as e:
+            logger.error(f"texml: rehearsal on number {host_number_id}: {e}")
+            return hang_up
+        if not number or not agent or number["userId"] != host["userId"]:
+            logger.warning(f"texml: rehearsal on number {host_number_id}: unknown, spent or expired, hanging up")
+            return hang_up
+        number_id = str(number["_id"])
+        if plan.get("variables"):  # picked up by product._finish_ctx, as a test call's are
+            product.hold_call_variables(number_id, dialled, plan["variables"])
+        try:
+            ctx = await asyncio.to_thread(product.phone_call, number, agent, "OUTBOUND", dialled)
+        except product.CallRefused as e:
+            logger.warning(f"texml: rehearsal of agent {agent['_id']}: {e}")
+            await asyncio.to_thread(product.save_refused, number, agent, "OUTBOUND", dialled, e)
+            return unavailable
+        ctx["rehearsal"] = True
+        voice = ctx["voice"] if ctx["voice"] in VOICES else DEFAULT_VOICE
+        logger.info(f"texml: outbound rehearsal of agent {agent['_id']} from {number.get('phoneNumber')} ({voice})")
+        stream_token = make_token(*stream_parts(voice, None, False, False, number_id))
+        if not await prepare_line(stream_token, voice, None, False, ctx):
+            return unavailable
+        return Response(content=texml_for(voice, None, token=stream_token, number_id=number_id),
+                        media_type="application/xml")
 
     @app.post("/telnyx-events")
     async def telnyx_events(request: Request):
@@ -1410,7 +1449,8 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
     # Someone calling a customer's business expects it to answer: she speaks first, and
     # nobody's answering machine calls in, so a caller who talks at length is never taken for one.
     answers = bool(ctx and ctx["doc"]["direction"] == "INBOUND")
-    if answers or str(callee or "").startswith("sip:"):  # a softphone has no answering machine either
+    # A softphone, a browser or a rehearsal has no answering machine either.
+    if answers or str(callee or "").startswith("sip:") or (ctx and ctx.get("rehearsal")):
         guard.VM_WINDOW = -1.0
     watch = speech.CallWatch(ctx["speech"] if ctx else speech.DEFAULTS, llm, pair.user(), guard)
     gate = RingGate(line["pickup"], name="ring_gate")

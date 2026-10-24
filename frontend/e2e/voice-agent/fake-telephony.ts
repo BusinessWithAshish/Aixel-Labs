@@ -945,6 +945,9 @@ export const ENGINE_TWILIO_TRIAL_NUMBER = '+15550000503';
 
 /** Stands in for the voice engine's `POST /calls` on `E2E_VOICE_ENGINE_URL`. */
 export class FakeVoiceEngine extends FakeHttpServer {
+    /** Answer a SIP destination (softphone, browser) the way a Telnyx trial account is refused (D61). */
+    refuseSipCalls = false;
+
     static async start(): Promise<FakeVoiceEngine> {
         const fake = new FakeVoiceEngine();
         await fake.start(E2E_VOICE_ENGINE_URL);
@@ -955,6 +958,11 @@ export class FakeVoiceEngine extends FakeHttpServer {
         if (req.authorization !== `Bearer ${E2E_VOICE_ENGINE_SECRET}`) return send(res, 401, { error: 'unauthorized' });
         if (req.method === 'POST' && req.path === '/calls') {
             const to = req.body?.to;
+            if (this.refuseSipCalls && String(to).startsWith('sip:')) {
+                return send(res, 424, {
+                    error: 'Telnyx refused the call: your Telnyx account level does not allow this call (a trial account only calls its verified number); upgrade the account in the Telnyx portal',
+                });
+            }
             if (to === ENGINE_DNC_NUMBER) return send(res, 409, { error: `${to} is on the do-not-call list` });
             if (to === ENGINE_UNVERIFIED_NUMBER) {
                 return send(res, 424, {
