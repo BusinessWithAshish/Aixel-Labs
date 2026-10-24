@@ -1,21 +1,19 @@
 'use client';
 
 import { ChartColumn } from 'lucide-react';
-import type { VoiceAnalyticsRange } from '@/app/actions/voice-analytics-actions';
 import { EmptyState } from '@/components/common/EmptyState';
 import { CurrencySelect } from '@/components/common/voice-agent/CurrencySelect';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AgentFilter } from '@/components/common/voice-agent/AgentFilter';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FilterSelect, FilterToolbar } from '@/components/common/FilterToolbar';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { usePage } from '@/contexts/PageStore';
 import { costPartLabel, formatMoney } from '@/helpers/voice-call-cost';
 import { endedByLabel, endedByTone, replyTone, sentimentTone, TONE_COLORS } from '@/helpers/voice-call-outcomes';
 import { formatGap, SENTIMENT_LABELS } from '@/helpers/voice-call-format';
+import { CALL_RANGES, type VoiceCallRange } from '@/helpers/voice-call-ranges';
 import { cn } from '@/lib/utils';
 import type { UseVoiceAnalyticsPageReturn } from '../_hooks/use-voice-analytics-page';
-import { ANALYTICS_RANGES } from '../_utils/analytics-ranges';
 import { AnalyticsStats } from './AnalyticsStats';
 import { BreakdownChart } from './BreakdownChart';
 import { CallsOverTimeChart } from './CallsOverTimeChart';
@@ -34,13 +32,15 @@ export function VoiceAnalyticsContent() {
         setAgentFilter,
         setIncludeDeleted,
         setRange,
+        filtersSet,
+        clearFilters,
     } = usePage<UseVoiceAnalyticsPageReturn>();
     const currency = useDisplayCurrency();
     const money = (usd: number) => formatMoney(usd, currency);
 
     return (
         <>
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
+            <FilterToolbar label="Filter analytics" onClear={filtersSet ? clearFilters : null}>
                 <AgentFilter
                     id="analytics-agent"
                     agents={agents}
@@ -50,27 +50,15 @@ export function VoiceAnalyticsContent() {
                     onAgentChange={setAgentFilter}
                     onIncludeDeletedChange={setIncludeDeleted}
                 />
-                <div className="flex flex-col gap-1.5 sm:w-44">
-                    <Label htmlFor="analytics-range">Period</Label>
-                    <Select
-                        value={range}
-                        disabled={filtering}
-                        onValueChange={(value) => setRange(value as VoiceAnalyticsRange)}
-                    >
-                        <SelectTrigger id="analytics-range" className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {ANALYTICS_RANGES.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <CurrencySelect className="sm:w-28" />
-            </div>
+                <FilterSelect
+                    label="Period"
+                    value={range}
+                    options={CALL_RANGES}
+                    disabled={filtering}
+                    onChange={(value) => setRange(value as VoiceCallRange)}
+                />
+                <CurrencySelect />
+            </FilterToolbar>
 
             {loadError ? (
                 <Alert variant="destructive">

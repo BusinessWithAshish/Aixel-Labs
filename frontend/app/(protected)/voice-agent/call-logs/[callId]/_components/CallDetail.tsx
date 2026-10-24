@@ -48,7 +48,7 @@ function CallSummary() {
                 <dl className="grid grid-cols-2 gap-3">
                     <SummaryRow label="Agent">{call.agentName ?? 'Deleted agent'}</SummaryRow>
                     <SummaryRow label="Voice">{call.voice}</SummaryRow>
-                    {isPhone ? (
+                    {isPhone && !call.test ? (
                         <>
                             <SummaryRow label="From">
                                 <span className="tabular-nums">{formatParty(call.from, 'Unknown', call.test)}</span>
@@ -166,7 +166,12 @@ function Transcript() {
                 {turns.length === 0 && toolsByTurn.size === 0 ? (
                     <p className="text-muted-foreground text-sm">Nobody spoke on this call.</p>
                 ) : (
-                    <ol className="flex flex-col gap-3" aria-label="Transcript">
+                    // Scrolls inside the card, so a long call does not stretch the page past the summary column.
+                    <ol
+                        className="flex max-h-[65dvh] flex-col gap-3 overflow-y-auto overscroll-contain pr-1 lg:max-h-[calc(100dvh-12rem)]"
+                        aria-label="Transcript"
+                        tabIndex={0}
+                    >
                         <ToolRuns at={-1} />
                         {turns.map((turn, index) => {
                             const isAgent = turn.role === 'agent';

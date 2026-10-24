@@ -3,8 +3,8 @@
 import { useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
-import type { VoiceAnalytics, VoiceAnalyticsRange } from '@/app/actions/voice-analytics-actions';
-import { ANALYTICS_RANGES } from '../_utils/analytics-ranges';
+import type { VoiceAnalytics } from '@/app/actions/voice-analytics-actions';
+import { CALL_RANGES, DEFAULT_ANALYTICS_RANGE, type VoiceCallRange } from '@/helpers/voice-call-ranges';
 
 export type VoiceAnalyticsPageData = {
     analytics: VoiceAnalytics | null;
@@ -12,7 +12,7 @@ export type VoiceAnalyticsPageData = {
     agentFilter: string | null;
     /** Agents deleted since count too (`?deleted=1`). */
     includeDeleted: boolean;
-    range: VoiceAnalyticsRange;
+    range: VoiceCallRange;
     loadError: string | null;
 };
 
@@ -22,7 +22,7 @@ export function useVoiceAnalyticsPage(data: VoiceAnalyticsPageData) {
     const [filtering, startFiltering] = useTransition();
 
     /** The filters live in the URL (`?agent=&range=&deleted=1`), like Call logs. */
-    const applyFilters = (next: Partial<{ agent: string | null; range: VoiceAnalyticsRange; deleted: boolean }>) => {
+    const applyFilters = (next: Partial<{ agent: string | null; range: VoiceCallRange; deleted: boolean }>) => {
         const { agent, range, deleted } = {
             agent: data.agentFilter,
             range: data.range,
@@ -43,12 +43,14 @@ export function useVoiceAnalyticsPage(data: VoiceAnalyticsPageData) {
         agentFilter: data.agentFilter,
         includeDeleted: data.includeDeleted,
         range: data.range,
-        rangeLabel: ANALYTICS_RANGES.find((r) => r.value === data.range)?.label ?? '',
+        rangeLabel: CALL_RANGES.find((r) => r.value === data.range)?.label ?? '',
         loadError: data.loadError,
         filtering,
         setAgentFilter: (agent: string | null) => applyFilters({ agent }),
-        setRange: (range: VoiceAnalyticsRange) => applyFilters({ range }),
+        setRange: (range: VoiceCallRange) => applyFilters({ range }),
         setIncludeDeleted: (deleted: boolean) => applyFilters({ deleted }),
+        filtersSet: !!data.agentFilter || data.includeDeleted || data.range !== DEFAULT_ANALYTICS_RANGE,
+        clearFilters: () => applyFilters({ agent: null, deleted: false, range: DEFAULT_ANALYTICS_RANGE }),
     };
 }
 

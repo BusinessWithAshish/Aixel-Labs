@@ -16,7 +16,9 @@ import { cn } from '@/lib/utils';
 
 const CALL_LOGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.CALL_LOGS];
 
+/** Who called whom; nothing on a test call, whose tag says it all. */
 function Parties({ call }: { call: VoiceCallListItem }) {
+    if (call.test) return null;
     if (!call.from && !call.to) return <span>Browser</span>;
     return (
         <span className="inline-flex items-center gap-1 tabular-nums">

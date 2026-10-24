@@ -5,12 +5,15 @@ import {
     MongoCollections,
     MongoObjectId,
     VOICE_AGENT_SUB_MODULES,
+    VoiceCallChannel,
+    VoiceCallDirection,
     type VoiceAgentDoc,
     type VoiceCall,
     type VoiceCallDoc,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
+import { parseCallRange, rangeStart, type VoiceCallRange } from '@/helpers/voice-call-ranges';
 import { agentIdMatch } from '@/server/voice-agent/agent-match';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
 import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
@@ -23,11 +26,18 @@ export type VoiceCallListItem = VoiceCall & {
 /** Calls whose analysis judged them successful ('yes') or not ('no'); unanalysed calls match neither. */
 export type CallSuccessFilter = 'yes' | 'no';
 
+/** Real calls in or out, playground sessions, or the owner's tests over the internet (`VoiceCallDoc.test`). */
+export type CallKindFilter = 'inbound' | 'outbound' | 'playground' | 'test';
+
 export type ListMyCallsInput = {
     agentId?: string | null;
     success?: CallSuccessFilter | null;
     /** Also calls of agents that were deleted since (without an agent picked). */
     includeDeleted?: boolean;
+    kind?: CallKindFilter | null;
+    range?: VoiceCallRange | null;
+    /** Words in the summary or transcript, or digits of either number. */
+    search?: string | null;
     limit?: number;
 };
 
@@ -44,6 +54,23 @@ export type VoiceAgentCostTotals = {
 };
 
 export type { CallRecordingResult } from '@/server/voice-agent/recordings';
+
+const KIND_MATCH: Record<CallKindFilter, object> = {
+    inbound: { direction: VoiceCallDirection.INBOUND, test: null },
+    outbound: { direction: VoiceCallDirection.OUTBOUND, test: null },
+    playground: { channel: VoiceCallChannel.PLAYGROUND },
+    test: { test: { $type: 'string' } },
+};
+const SEARCH_MAX = 100;
+
+/** Calls whose numbers (digits only, for a phone-like query), summary or transcript contain the query. */
+function searchMatch(search: string) {
+    const phoneLike = /^[\d\s()+-]+$/.test(search);
+    const digits = search.replace(/\D/g, '');
+    if (phoneLike && digits) return { $or: [{ from: { $regex: digits } }, { to: { $regex: digits } }] };
+    const text = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+    return { $or: [{ from: text }, { to: text }, { 'analysis.summary': text }, { 'turns.text': text }] };
+}
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -117,11 +144,16 @@ async function findOwnedCall(owner: VoiceOwnerScope, callId: string): Promise<Vo
     return doc;
 }
 
-/** The caller's calls, newest first: their current agents' (or every agent's), one agent's, by the analysis' verdict. */
+/** The caller's calls, newest first: their current agents' (or every agent's) or one agent's, narrowed by the filters. */
 export const listMyCalls = async (input: ListMyCallsInput = {}): Promise<ALApiResponse<VoiceCallListItem[]>> => {
     const agentId = input.agentId || null;
     if (agentId) assertValidObjectId(agentId, 'Agent ID');
     const success = input.success === 'yes' ? true : input.success === 'no' ? false : null;
+    const kind = input.kind && Object.hasOwn(KIND_MATCH, input.kind) ? input.kind : null;
+    const from = rangeStart(parseCallRange(input.range) ?? 'all');
+    const search = String(input.search ?? '')
+        .trim()
+        .slice(0, SEARCH_MAX);
     const requested = Number(input.limit ?? DEFAULT_LIMIT);
     const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), MAX_LIMIT) : DEFAULT_LIMIT;
 
@@ -133,6 +165,9 @@ export const listMyCalls = async (input: ListMyCallsInput = {}): Promise<ALApiRe
             userId: owner.userId,
             ...(await agentIdMatch(owner.userId, agentId, !!input.includeDeleted)),
             ...(success !== null ? { 'analysis.successful': success } : {}),
+            ...(kind ? KIND_MATCH[kind] : {}),
+            ...(from ? { startedAt: { $gte: from } } : {}),
+            ...(search ? searchMatch(search) : {}),
         };
         const docs = await calls.find(filter).sort({ startedAt: -1 }).limit(limit).toArray();
         const names = await agentNamesById(docs.map((doc) => doc.agentId));
