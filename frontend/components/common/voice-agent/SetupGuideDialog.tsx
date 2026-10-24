@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { setupGuideStepIndex, type SetupGuide } from '@/helpers/voice-setup-guides';
+import { CopyRow } from './CopyRow';
 
 type SetupGuideDialogProps = {
     guide: SetupGuide;
@@ -123,9 +124,12 @@ export function SetupGuideDialog({ guide, open, onOpenChange, initialStepId }: S
                             {index + 1}. {step.title}
                         </h3>
                         {step.body.map((paragraph) => (
-                            <p key={paragraph} className="text-muted-foreground text-sm">
+                            <p key={paragraph} className="text-sm">
                                 {paragraph}
                             </p>
+                        ))}
+                        {step.values?.map((v) => (
+                            <CopyRow key={v.label} label={v.label} value={v.value} />
                         ))}
                         {step.link ? (
                             <a

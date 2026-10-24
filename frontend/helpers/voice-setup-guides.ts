@@ -18,6 +18,8 @@ export type SetupGuideStep = {
     image?: SetupGuideImage;
     /** A page in the provider's own portal, opened in a new tab. */
     link?: { href: string; label: string };
+    /** Values to type or paste in this step, each with a copy button (a username, a SIP address). */
+    values?: { label: string; value: string }[];
 };
 
 export type SetupGuide = {

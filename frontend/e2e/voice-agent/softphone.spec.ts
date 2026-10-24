@@ -157,6 +157,22 @@ test('inbound, from a softphone: set up, dial the SIP address, reset and remove'
     // Linphone's one-time setup link (and its QR code): the whole account as Linphone XML, once, never cached.
     await expect(dialog.getByTestId('linphone-qr')).toBeVisible();
     const link = await dialog.getByTestId('linphone-setup-link').innerText();
+
+    // The illustrated guides: path A (the setup link) and path B (by hand), values ready to copy.
+    await dialog.getByRole('button', { name: 'Show me where' }).click();
+    const linkGuide = page.getByRole('dialog', { name: 'Set up Linphone with your setup link' });
+    await linkGuide.getByRole('button', { name: 'Go to step 3: Paste your setup link, then Confirm' }).click();
+    await expect(linkGuide.getByRole('img', { name: /Download a remote configuration dialog/ })).toBeVisible();
+    await expect(linkGuide.getByText(link, { exact: true })).toBeVisible();
+    await linkGuide.getByRole('button', { name: 'Close' }).click();
+    await dialog.getByRole('button', { name: 'Step-by-step guide' }).click();
+    const manual = page.getByRole('dialog', { name: 'Set up Linphone by hand' });
+    await manual.getByRole('button', { name: 'Go to step 4: Fill in the account' }).click();
+    await expect(manual.getByRole('img', { name: /Third-party SIP account form/ })).toBeVisible();
+    for (const value of [userName, password, 'sip.telnyx.com', '<sip:sip.telnyx.com;transport=tls>']) {
+        await expect(manual.getByText(value, { exact: true }).first()).toBeVisible();
+    }
+    await manual.getByRole('button', { name: 'Close' }).click();
     expect(link).toMatch(/\/api\/voice-agent\/softphone\/provision\/[A-Za-z0-9_-]{43}$/);
     const first = await page.request.get(link);
     expect(first.status()).toBe(200);

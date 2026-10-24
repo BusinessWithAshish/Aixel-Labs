@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -22,9 +22,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SubModuleUrls } from '@/config/app-config';
 import { agentSipAddress } from '@/helpers/voice-call-format';
-import { LINPHONE_GUIDE } from '../_utils/linphone-guide';
+import { linphoneLinkGuide, linphoneManualGuide } from '../_utils/linphone-guide';
 import type { AgentTestPanelProps } from './AgentTestDialog';
-import { CopyRow } from './CopyRow';
+import { CopyRow } from '@/components/common/voice-agent/CopyRow';
 import { RehearsalForm } from './RehearsalForm';
 import { NoTelnyxNumber } from './BrowserTestPanel';
 
@@ -43,7 +43,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** Linphone's one-time setup link and its QR code: Linphone fetches the whole account (TLS, proxy, no IPv6/video). */
-function SetupLink({ login }: { login: SoftphoneLogin }) {
+function SetupLink({ login, onShowMe }: { login: SoftphoneLogin; onShowMe: () => void }) {
     return (
         <Alert variant="info" data-testid="linphone-setup">
             <Info className="size-4" />
@@ -54,8 +54,11 @@ function SetupLink({ login }: { login: SoftphoneLogin }) {
                         Install <strong>Linphone</strong> (free: iPhone, Android, Mac, Windows, Linux) and open it.
                     </li>
                     <li>
-                        On a phone, choose <strong>Scan QR code</strong> and scan this code. On a computer, choose{' '}
-                        <strong>Fetch remote configuration</strong> and paste the link.
+                        On a computer, click <strong>Remote provisioning</strong>, paste the link and Confirm. On a phone,
+                        choose <strong>Scan QR code</strong> and scan this code.{' '}
+                        <Button type="button" variant="link" className="h-auto p-0" onClick={onShowMe}>
+                            Show me where
+                        </Button>
                     </li>
                     <li>Linphone signs in by itself, over TLS, so it works on networks that block internet calling.</li>
                 </ol>
@@ -85,7 +88,13 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
     const [error, setError] = useState<string | null>(null);
     /** The login right after it was set: the password and setup link are not shown again. */
     const [issued, setIssued] = useState<SoftphoneLogin | null>(null);
-    const [guideOpen, setGuideOpen] = useState(false);
+    const [guideOpen, setGuideOpen] = useState<'link' | 'manual' | null>(null);
+    // Stable objects: the guide dialog starts over at step 1 when its guide changes.
+    const linkGuide = useMemo(() => linphoneLinkGuide(issued?.setupLink ?? null), [issued]);
+    const manualGuide = useMemo(
+        () => linphoneManualGuide({ userName: view.login?.userName ?? '', password: issued?.password ?? null }),
+        [view.login?.userName, issued],
+    );
     const [removeOpen, setRemoveOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [calling, setCalling] = useState<string | null>(null);
@@ -137,7 +146,13 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
             {error}
         </p>
     ) : null;
-    const guide = <SetupGuideDialog guide={LINPHONE_GUIDE} open={guideOpen} onOpenChange={setGuideOpen} />;
+    const guide = (
+        <SetupGuideDialog
+            guide={guideOpen === 'link' ? linkGuide : manualGuide}
+            open={guideOpen !== null}
+            onOpenChange={(open) => !open && setGuideOpen(null)}
+        />
+    );
 
     if (!login) {
         return (
@@ -182,7 +197,7 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                     </Button>
                 </div>
                 {issued ? (
-                    <SetupLink login={issued} />
+                    <SetupLink login={issued} onShowMe={() => setGuideOpen('link')} />
                 ) : (
                     <Alert variant="info">
                         <Info className="size-4" />
@@ -196,7 +211,7 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                     <p className="text-sm">
                         Or by hand: username, {issued ? 'password, ' : ''}domain <strong>sip.telnyx.com</strong>, transport{' '}
                         <strong>TLS</strong>.{' '}
-                        <Button type="button" variant="link" className="h-auto p-0" onClick={() => setGuideOpen(true)}>
+                        <Button type="button" variant="link" className="h-auto p-0" onClick={() => setGuideOpen('manual')}>
                             Step-by-step guide
                         </Button>
                     </p>
