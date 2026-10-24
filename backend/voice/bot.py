@@ -466,6 +466,14 @@ class TurnSafeGeminiLive(GeminiLiveLLMService):
     # as text out; it rejects thinking_level). 0 = off: -7% on a booking call, same reply
     # gap, bookings still right (2026-10-17) -- but never run through tests/sim.py.
     THINKING_BUDGET: int | None = None
+    # A Gemini server error mid-call (1011 "Internal error encountered", 2026-10-23: she went silent mid-sentence and
+    # the caller redialled). Pipecat reconnects resuming the session; when that reconnect fails too, or the error
+    # comes again, the next try is a fresh session seeded with the conversation as text (as rotation does), up to
+    # FRESH_TRIES of them. Once she is back she says the line cut out and carries on: no dead air.
+    FRESH_TRIES = 2
+    RECOVERED_NOTE = ("(The line dropped for a moment: anything said since your last reply was lost.) In a few words, "
+                      "say the line cut out for a second, then carry on: finish your point, or ask them to say it again. "
+                      "Don't mention this note.")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -488,19 +496,45 @@ class TurnSafeGeminiLive(GeminiLiveLLMService):
         # None: Pipecat's own handling (Ashish's line).
         self.on_key_error = None
         self._key_refused = False
+        self._recovering: float | None = None  # when a mid-call connection error began, until she is back
+        self._fresh_tries = 0
 
     async def _connection_task_handler(self, config):
-        # A refused key fails the connect itself, outside Pipecat's receive loop.
+        # A refused key, or a reconnect that fails, fails the connect itself: outside Pipecat's receive loop.
         try:
             await super()._connection_task_handler(config)
         except Exception as e:
-            if not await self._refused(e):
+            if await self._refused(e):
+                return
+            if self._recovering is None or self._disconnecting or self._fresh_tries >= self.FRESH_TRIES:
                 raise
+            self._fresh_tries += 1
+            logger.warning(f"[gemini] reconnecting failed ({e}): fresh session {self._fresh_tries}/{self.FRESH_TRIES}, "
+                           "seeded with the conversation as text")
+            self._session_resumption_handle = None
+            await asyncio.sleep(0.3 * self._fresh_tries)
+            await self._reconnect()
 
     async def _handle_connection_error(self, error):
         if await self._refused(error):
             return False
+        if self._recovering is not None:
+            # Again before she was back, or just after: resuming that session is not working.
+            self._session_resumption_handle = None
+        else:
+            self._recovering = time.monotonic()
+        logger.warning(f"[gemini] connection lost mid-call ({error}): reconnecting"
+                       + (" with session resumption" if self._session_resumption_handle else ", fresh session"))
         return await super()._handle_connection_error(error)
+
+    async def _handle_session_ready(self, session):
+        await super()._handle_session_ready(session)
+        if self._recovering is None:
+            return
+        took, self._recovering, self._fresh_tries = time.monotonic() - self._recovering, None, 0
+        self.usage["recoveries"] = self.usage.get("recoveries", 0) + 1
+        logger.info(f"[gemini] back after {took:.1f} s: she says the line cut out and carries on")
+        await self.queue_frame(LLMMessagesAppendFrame([{"role": "user", "content": self.RECOVERED_NOTE}]))
 
     async def _refused(self, error) -> bool:
         """True when Gemini refused the key and on_key_error has dealt with it."""
@@ -851,21 +885,30 @@ STOP_PATTERNS = [
         ),
     ),
 ]
+# Ending a call on the caller's words: only slurs and threats end it at once. An insult aimed at her
+# ("you idiot", "fuck off") counts 1, and she first asks calmly for respect (# House rules): a second one ends
+# the call. Swearing about something else ("this is bullshit") and telling her to be quiet ("shut up",
+# 2026-10-23: said to interrupt her, it ended the call) count nothing: she stops and listens.
 HARD_ABUSE = re.compile(
-    r"\bf+u+c+k+\w*|\bshit\w*|\bbullshit|\bbitch\w*|\basshole|\bbastard|\bpiss off|\bgo to hell"
-    r"|\bscrew you|\bshut up|\bcunt|\bdamn you|\bmotherf\w+",
+    r"\bcunt\w*|\bmotherf\w+|\bbitch\w*|\bwhore\w*|\bslut\w*|\bretard\w*|\bfaggot\w*|\bnigg\w+"
+    r"|\b(i'?ll|i will|i'?m going to|i'?m gonna|gonna)\s+(kill|hurt|find|beat|shoot|stab)\s+you|\bkill yourself",
     re.I,
 )
-# An insult aimed at her ("you stupid robot", "you idiot") is as final as a curse;
-# the same word about something else ("that's a stupid question") is not.
+# An insult aimed at her ("you stupid robot", "you idiot", "fuck off"); the same word about something else
+# ("that's a stupid question") is not one.
 DIRECTED_ABUSE = re.compile(
     r"\byou( people| guys| lot| all)?('re| are)?\s+(a |an |such a |so |really |just a |nothing but a )?"
-    r"(stupid|idiot\w*|moron\w*|useless|dumb|pathetic|worthless|imbecile|scum\w*|liar|joke)\b",
+    r"(stupid|idiot\w*|moron\w*|useless|dumb|pathetic|worthless|imbecile|scum\w*|liar|joke|asshole|bastard)\b"
+    r"|\bf+u+c+k+\s+(you|off)\b|\bpiss off|\bgo to hell|\bscrew you|\bdamn you",
     re.I,
 )
-SOFT_ABUSE = re.compile(
-    r"\b(idiot|stupid|moron|useless|dumb|imbecile|scumbag|garbage|pathetic|loser|jerk)\b", re.I
-)
+
+
+def abuse_score(text: str) -> int:
+    """2 for a slur or a threat (the call ends), 1 for an insult aimed at her (two end it), else 0."""
+    return 2 if HARD_ABUSE.search(text) else 1 if DIRECTED_ABUSE.search(text) else 0
+
+
 # She says goodbye: the call is over a moment later.
 GOODBYE = re.compile(
     r"\b(good ?bye|bye( now| for now)?|take care|have a (good|great|nice|lovely) (one|day|evening|afternoon|night|week|weekend)"
@@ -1207,8 +1250,7 @@ class CallGuard:
         self._look_for_machine(text)
         if self.forced:
             return
-        score = (2 if (HARD_ABUSE.search(text) or DIRECTED_ABUSE.search(text)) else 0) + (1 if SOFT_ABUSE.search(text) else 0)
-        if score:
+        if score := abuse_score(text):
             self.abuse += score
             if self.abuse >= 2:
                 self.trigger("abuse", text)

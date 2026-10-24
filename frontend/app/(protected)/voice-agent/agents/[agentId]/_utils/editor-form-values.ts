@@ -25,7 +25,9 @@ export function bookingFormValues(booking: VoiceAgentBookingTool | null, timezon
     const fallback = DEFAULT_VOICE_BOOKING_HOURS.mon ?? { open: '09:00', close: '17:00' };
     return {
         enabled: source.enabled,
-        bookAppointment: source.bookAppointment !== false,
+        // Saved before it had its own switch: on only where booking was on (as the engine reads it). Otherwise off
+        // until its own switch is turned on: turning check_availability on never brings it along.
+        bookAppointment: booking?.bookAppointment ?? booking?.enabled ?? false,
         timezone: source.timezone,
         slotMinutes: source.slotMinutes,
         maxDaysAhead: source.maxDaysAhead,

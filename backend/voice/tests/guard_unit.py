@@ -6,7 +6,7 @@ def flag(t):
     for f, rx in bot.STOP_PATTERNS:
         if rx.search(bot.plain(t)): return f
     return None
-def abuse(t): return (2 if (bot.HARD_ABUSE.search(t) or bot.DIRECTED_ABUSE.search(t)) else 0) + (1 if bot.SOFT_ABUSE.search(t) else 0)
+def abuse(t): return bot.abuse_score(t)
 POS = {
  "dnc": ["Don\u2019t ever call this number again.", "I said don\u2019t call here again.", "Take me off your list.", "Don't ever call this number again.", "I said do not call me.", "Remove my number.", "Delete my number.",
          "Stop calling me.", "Never call here again.", "Don't call me again.", "Please don't contact me anymore.", "Take my number off the list",
@@ -28,13 +28,29 @@ for want, phrases in POS.items():
 for p in NEG:
     got = flag(p)
     if got: bad += 1; print(f"  FALSE ALARM {got}: {p!r}")
-ABUSE_YES = ["You stupid robot, who programmed you?", "you idiot", "You're useless.", "you are a moron", "You people are idiots", "Go to hell. Nobody wants your garbage.", "This is bullshit", "fuck off", "You stupid robot, who programmed you?|Say something smart for once, you useless machine.", "shut up"]
-ABUSE_NO = ["That is a stupid question, but okay.", "Is this stupid thing recording?", "I'm not an idiot.", "Why would I trust a useless website?", "My website is useless without bookings.", "What the hell is this?", "I'm in the middle of something!", "That's a stupid question, but okay, what time?", "Who programmed you?", "It's a pain, honestly.", "Is this a scam?"]
+# Ends the call: a slur or a threat at once, or a second insult aimed at her ("|" joins one caller's turns).
+ABUSE_YES = ["You stupid robot, who programmed you?|Say something smart for once, you useless machine.", "you idiot|you are a moron",
+             "fuck off|Go to hell.", "You people are idiots|You're useless.", "You stupid cunt", "I'll find you and hurt you.",
+             "I'm gonna kill you", "shut up|you idiot|screw you"]
+# Never ends it: telling her to be quiet (said to interrupt her), swearing at the situation, one insult (she asks
+# for respect first), and words that only sound rude.
+ABUSE_NO = ["shut up", "Shut up.", "Stop talking.", "Be quiet!", "Listen to me.", "Shut up and listen to me.", "Shut up|stop talking|be quiet",
+            "This is bullshit", "What the fuck is this?", "you idiot", "fuck off", "Go to hell. Nobody wants your garbage.",
+            "That is a stupid question, but okay.", "Is this stupid thing recording?", "I'm not an idiot.", "Why would I trust a useless website?",
+            "My website is useless without bookings.", "What the hell is this?", "I'm in the middle of something!",
+            "That's a stupid question, but okay, what time?", "Who programmed you?", "It's a pain, honestly.", "Is this a scam?",
+            "I could kill for a coffee.", "Scunthorpe is where we are."]
 for p in ABUSE_YES:
     s = sum(abuse(x) for x in p.split("|"))
     if s < 2: bad += 1; print(f"  ABUSE MISS (score {s}): {p!r}")
 for p in ABUSE_NO:
-    if abuse(p) >= 2: bad += 1; print(f"  ABUSE FALSE ALARM: {p!r}")
+    if sum(abuse(x) for x in p.split("|")) >= 2: bad += 1; print(f"  ABUSE FALSE ALARM: {p!r}")
+# On a call: "shut up" leaves it running; one insult too; the second insult ends it as abuse.
+g3 = bot.CallGuard({"stream_id": "t3", "turns": []})
+g3.on_caller_text("Shut up."); g3.on_caller_text("Shut up and listen to me.")
+assert not g3.forced, g3.reason
+g3.on_caller_text("you idiot"); assert not g3.forced
+g3.on_caller_text("fuck off"); assert g3.forced and g3.reason == "abuse", (g3.forced, g3.reason)
 GB_YES = ["I\u2019m so sorry for your loss; I\u2019ll let you go.", "I\u2019ll pass that on \u2014 take care.", "I'm sorry for your loss. I'll let you go.", "Stay safe, I'll leave you to it.", "Take care.", "Thursday at two, then. Someone will send the details across — take care.", "Have a good one.", "Stay safe, I'll let you go.", "Mind how you go.", "Goodbye.", "Bye now.", "Talk then.", "All the best.", "Passing that on. Have a good one."]
 GB_NO = ["Want me to let you go?", "Should I let you get back to it?", "What time do you close?", "That's all I've got on that.", "Take care of the shop first. What time do you close?", "I'm just the calling assistant.", "Stay safe on the road — and what time would suit you?", "Someone will send the details across."]
 for p in GB_YES:

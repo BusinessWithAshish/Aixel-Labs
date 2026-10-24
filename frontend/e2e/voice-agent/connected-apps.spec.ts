@@ -320,10 +320,11 @@ test('a new agent connects Google Calendar straight away: its unsaved tools are 
     await expect(page.locator('#booking-calendar')).toHaveText(/Ravi's calendar/);
     await expect(page.getByRole('switch', { name: 'Use check_availability' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByTestId('voice-agent-tools').getByText('Unsaved changes')).toHaveCount(0);
-    // Saved before leaving (tools switched on, the edit kept), then pointed at the account on the way back.
+    // Saved before leaving (check_availability switched on, book_appointment left to its own switch, the edit
+    // kept), then pointed at the account on the way back.
     expect((await db.getVoiceAgentDoc(agentId)).tools?.booking).toMatchObject({
         enabled: true,
-        bookAppointment: true,
+        bookAppointment: false,
         maxDaysAhead: 21,
         destination: { provider: VoiceCalendarProvider.GOOGLE_CALENDAR, calendarId: 'primary' },
     });

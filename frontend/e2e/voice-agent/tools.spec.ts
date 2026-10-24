@@ -175,6 +175,49 @@ test('booking: turn it on, set hours, save, and it is still there after a reload
         .toMatchObject({ enabled: false, timezone: 'Europe/London', slotMinutes: 45 });
 });
 
+test('booking: each built-in tool has its own switch', async ({ page, db }) => {
+    const agentId = await inboundAgent(db);
+    await openVoiceAgent(page, agentId);
+    const card = tools(page);
+    const check = card.getByRole('switch', { name: 'Use check_availability' });
+    const book = card.getByRole('switch', { name: 'Use book_appointment' });
+
+    // check_availability on alone: book_appointment stays off.
+    await check.click();
+    await expect(check).toHaveAttribute('aria-checked', 'true');
+    await expect(book).toHaveAttribute('aria-checked', 'false');
+    // Off on its own, with check_availability left on.
+    await book.click();
+    await expect(book).toHaveAttribute('aria-checked', 'true');
+    await book.click();
+    await expect(book).toHaveAttribute('aria-checked', 'false');
+    await expect(check).toHaveAttribute('aria-checked', 'true');
+    // book_appointment needs check_availability: turning check_availability off turns it off, with a note...
+    await book.click();
+    await check.click();
+    await expect(check).toHaveAttribute('aria-checked', 'false');
+    await expect(book).toHaveAttribute('aria-checked', 'false');
+    await expect(page.getByText('book_appointment is off too: it books only times check_availability finds.')).toBeVisible();
+    // ...and turning book_appointment on turns check_availability on.
+    await book.click();
+    await expect(check).toHaveAttribute('aria-checked', 'true');
+    await expect(book).toHaveAttribute('aria-checked', 'true');
+
+    await check.click();
+    await check.click();
+    await card.getByRole('button', { name: 'Save tools' }).click();
+    await expect(page.getByText('Booking settings saved')).toBeVisible();
+    await expect
+        .poll(async () => (await db.getVoiceAgentDoc(agentId)).tools?.booking)
+        .toMatchObject({ enabled: true, bookAppointment: false });
+    await openVoiceAgent(page, agentId);
+    await expect(tools(page).getByRole('switch', { name: 'Use check_availability' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+    );
+    await expect(tools(page).getByRole('switch', { name: 'Use book_appointment' })).toHaveAttribute('aria-checked', 'false');
+});
+
 test('booking: impossible hours and limits are refused in plain words', async ({ page, db }) => {
     const agentId = await inboundAgent(db);
     await openVoiceAgent(page, agentId);

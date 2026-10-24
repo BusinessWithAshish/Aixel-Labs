@@ -87,6 +87,8 @@ function mapVoiceAgentTools(tools: VoiceAgentTools | null | undefined): VoiceAge
         booking: booking
             ? {
                   enabled: booking.enabled,
+                  // Absent on agents saved before it had its own switch (the form reads that as `enabled`).
+                  ...(booking.bookAppointment === undefined ? {} : { bookAppointment: booking.bookAppointment }),
                   timezone: booking.timezone,
                   slotMinutes: booking.slotMinutes,
                   maxDaysAhead: booking.maxDaysAhead,

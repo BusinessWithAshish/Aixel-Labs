@@ -503,7 +503,7 @@ export function useVoiceAgentEditorPage({
 
     /**
      * Sends the owner to Composio's Connect Link; they come back to the callback page, which points this agent's
-     * booking at the new account. Connecting leaves the page, so the booking tools are switched on and everything
+     * booking at the new account. Connecting leaves the page, so check_availability is switched on and everything
      * unsaved is saved first (the callback needs saved booking settings to point at the account).
      */
     const connectApp = useCallback(

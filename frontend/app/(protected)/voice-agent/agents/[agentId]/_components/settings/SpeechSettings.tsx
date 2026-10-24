@@ -23,10 +23,14 @@ const TOOL_WAIT_CHOICES = [
     {
         value: VoiceToolWait.AGENT,
         title: 'Let the agent decide',
-        description: 'A couple of words like “one moment”, or nothing.',
+        description: 'A couple of words like “one moment”, or nothing, in the caller’s language.',
     },
     { value: VoiceToolWait.SILENT, title: 'Stay silent', description: 'Nothing until the answer is back.' },
-    { value: VoiceToolWait.SAY, title: 'Say a set line', description: 'Your line, in the agent’s voice.' },
+    {
+        value: VoiceToolWait.SAY,
+        title: 'Say a set line',
+        description: 'Your exact line, always in the language you write it in.',
+    },
 ];
 
 const REPLY_WAIT_CHOICES = [
@@ -124,7 +128,7 @@ export function SpeechSettings() {
                         name="speech.toolWaitLine"
                         id="speech-tool-wait-line"
                         label="Line to say"
-                        description={`Said word for word as each tool starts. Variables like {{agent_name}} work. ${settings.speech.toolWaitLine.length}/${LIMITS.toolWaitLineMax}`}
+                        description={`Said word for word as each tool starts, in this language even when the caller speaks another: for callers in several languages, let the agent decide. Variables like {{agent_name}} work. ${settings.speech.toolWaitLine.length}/${LIMITS.toolWaitLineMax}`}
                         classNames={{ description: 'text-xs' }}
                         inputProps={{ maxLength: LIMITS.toolWaitLineMax }}
                     />
