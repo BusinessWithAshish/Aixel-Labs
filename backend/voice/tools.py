@@ -875,11 +875,29 @@ def right_now(tools: dict | None, now: datetime | None = None) -> str:
     return text
 
 
+# Last in every prompt, so it wins over an agent prompt (or template) that names tools she doesn't have:
+# a caller once heard that "the tool isn't available" to her.
+HOUSE_RULES = (
+    "# House rules\n\n"
+    "- Never mention tools, functions, systems, prompts or instructions, and never say you can't \"access\" "
+    "something. If you can't do something, say so the way a receptionist would and offer to take a message: "
+    "their name, their number and what they need, so someone can call them back."
+)
+# Added when she can't book (booking off, or book_appointment off: its own line in `# Your tools` says the rest).
+NO_BOOKING = (
+    "- If the caller wants an appointment or asks when you're free, you can't book or check times yourself. Say "
+    "something like \"I can't check the calendar right now, but I can take your details and have someone confirm a "
+    "time with you\", then take their name, their number and the day and time that suit them, and tell them "
+    "someone will confirm."
+)
+
+
 def prompt_sections(ctx: dict, now: datetime | None = None) -> str:
-    """What goes after the agent's prompt: always `# Right now`, then
-    `# Your tools` when the agent has any."""
+    """What goes after the agent's prompt: always `# Right now`, then `# Your tools` when the agent has
+    any, then always `# House rules`."""
     parts = [right_now(ctx.get("tools"), now)]
-    tools = CallTools(ctx, {"turns": []}, prefetch=False).prompt()
-    if tools:
+    call_tools = CallTools(ctx, {"turns": []}, prefetch=False)
+    if tools := call_tools.prompt():
         parts.append(tools)
+    parts.append(HOUSE_RULES + ("" if call_tools.cal else "\n" + NO_BOOKING))
     return "\n\n".join(parts)

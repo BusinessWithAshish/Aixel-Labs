@@ -95,7 +95,12 @@ def prompt_tests():
     ok("# Right now in UTC when booking is off", tools.right_now({"booking": {**BOOKING, "enabled": False}}, now).endswith("Friday 16 October 2026, 2:10 PM (UTC)"))
     bare = {"tools": {}, "doc": {"agentId": ObjectId()}}
     s = tools.prompt_sections(bare, now)
-    ok("no tools: only # Right now", s.startswith("# Right now") and "# Your tools" not in s, s)
+    ok("no tools: # Right now and the house rules, no # Your tools", s.startswith("# Right now") and "# Your tools" not in s
+       and s.endswith(tools.HOUSE_RULES + "\n" + tools.NO_BOOKING), s)
+    ok("the house rules: never mention tools, functions, systems or prompts; offer a message instead",
+       all(w in tools.HOUSE_RULES for w in ("Never mention tools, functions, systems, prompts", "can't \"access\"", "take a message")))
+    ok("booking off: a scheduling request gets the receptionist's fallback (details taken, someone confirms)",
+       all(w in tools.NO_BOOKING for w in ("I can't check the calendar right now", "their name, their number", "someone will confirm")))
     hook = {"id": "a1", "name": "order_status", "description": "Look up an order by its number.", "enabled": True,
             "url": "https://example.com/hook", "parameters": [{"name": "order_id", "type": "string", "description": "The order number", "required": True},
                                                             {"name": "rush", "type": "boolean", "description": "Rush it", "required": False}]}
@@ -103,6 +108,8 @@ def prompt_tests():
                                                        {**hook, "id": "a3", "name": "book_appointment"}, {**hook, "id": "a5", "name": "end_call"}, {**hook, "id": "a4"}]},
             "doc": {"agentId": ObjectId()}, "customer_phone": "+15557770000"}
     s = tools.prompt_sections(full, now)
+    ok("booking on: the house rules come last, without the no-booking fallback",
+       s.index("# Your tools") < s.index("# House rules") and s.endswith(tools.HOUSE_RULES), s[-300:])
     ok("# Your tools after # Right now, with booking rules and the webhook", s.index("# Right now") < s.index("# Your tools")
        and "never say a time is free unless check_availability" in s and "ask for the caller's name" in s and "order_status" in s
        and "Mon-Fri 09:00-17:00" in s and "already on file" in s, s)
@@ -118,6 +125,8 @@ def prompt_tests():
     s = tools.prompt_sections(look, now)
     ok("book_appointment off: check_availability alone, in the schema and registered",
        [f.name for f in ct.schema().standard_tools] == ["check_availability"] == ct.builtins())
+    ok("book_appointment off: its own line covers it, so the house rules carry no second fallback",
+       s.endswith(tools.HOUSE_RULES) and tools.NO_BOOKING not in s)
     ok("...she is told to give free times and take a message, never to book", "You can't book appointments yourself" in s
        and "book_appointment" not in s and "check_availability returned it" in s, s)
     off = {"tools": {"booking": {**BOOKING, "enabled": False}, "webhooks": [{**hook, "enabled": False}]}, "doc": {"agentId": ObjectId()}}
@@ -149,7 +158,16 @@ def product_tests():
        p.startswith("You are Priya.") and "Note." not in p and p.index("# Right now") < p.index("# Your tools"), p[:120])
     plain = {**agent, "tools": None}
     pc = product.play_call(plain)
-    ok("an agent without tools: prompt + # Right now only", "# Right now" in pc["prompt"] and "# Your tools" not in pc["prompt"] and pc["tools"] == {})
+    ok("an agent without tools: prompt, # Right now and the house rules", "# Right now" in pc["prompt"] and "# Your tools" not in pc["prompt"]
+       and pc["prompt"].endswith(tools.HOUSE_RULES + "\n" + tools.NO_BOOKING) and pc["tools"] == {})
+    # A template that names the booking tools, on an agent whose booking is off (Maya, 2026-10-23): on a phone
+    # call and in the playground, whatever the stack (both run on ctx["prompt"]), the last word is the house rules.
+    maya = {**agent, "callType": "INBOUND", "prompt": "You are Maya. Use check_availability, then book_appointment.",
+            "tools": {"booking": {**BOOKING, "enabled": False}}}
+    for c in (product.phone_call(number, maya, "INBOUND", "+15557770000"), product.play_call(maya)):
+        ok(f"{c['doc']['channel']}: booking off under a prompt that names it: the no-booking fallback ends her prompt",
+           c["prompt"].startswith("You are Maya.") and "# Your tools" not in c["prompt"]
+           and c["prompt"].endswith(tools.HOUSE_RULES + "\n" + tools.NO_BOOKING))
     ok("every call runs on the owner's own Gemini key", inbound["gemini_key"] == outbound["gemini_key"] == play["gemini_key"] == "AIza-unit-test-key")
     try:
         product.play_call({**agent, "userId": ObjectId()})
