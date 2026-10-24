@@ -70,8 +70,9 @@ export function PhoneNumberSelect({
     return (
         <Select
             value={value ?? ''}
-            // Radix calls this only for a different pick, so choosing the current number does nothing.
-            onValueChange={(next) => onChange(next === NONE ? null : next)}
+            // Radix calls this only for a different pick, so choosing the current number does nothing. Inside a
+            // form its hidden native select also reports '' when the value changes from outside: no item has it.
+            onValueChange={(next) => next && onChange(next === NONE ? null : next)}
             disabled={disabled}
         >
             <SelectTrigger

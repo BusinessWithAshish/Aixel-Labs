@@ -222,7 +222,7 @@ test('each row says which agent uses the number and how, links to it, and has no
 
 test('numbers set up before the agent decided the job say what to fix', async ({ page, db }) => {
     const { frontDesk, sales } = await seedAgents(db);
-    // Two jobs at once, and an outbound agent answering calls.
+    // Both slots set (fine), and an outbound agent answering calls.
     await seedNumber(db, FIRST_NUMBER, { inboundAgentId: new ObjectId(frontDesk), outboundAgentId: new ObjectId(sales) });
     await seedNumber(db, SECOND_NUMBER, { inboundAgentId: new ObjectId(sales) });
     await openPhoneNumbers(page);
@@ -230,7 +230,7 @@ test('numbers set up before the agent decided the job say what to fix', async ({
     const both = numberRow(page, FIRST_NUMBER).getByTestId('number-use');
     await expect(both).toContainText(answers('Front desk'));
     await expect(both).toContainText(places('Sales outreach'));
-    await expect(both).toContainText('A number now does one job. Link it again from the agent that keeps it.');
+    await expect(both).not.toContainText('Link it again');
 
     const swapped = numberRow(page, SECOND_NUMBER).getByTestId('number-use');
     await expect(swapped).toContainText(answers('Sales outreach'));
@@ -568,25 +568,49 @@ test.describe('linking from the agent editor', () => {
         ]);
     });
 
-    test('a number does one job: linking an outbound agent to an answering number puts its connection back first', async ({
+    test('a number answers with one agent and calls out for another; taking a slot from an agent asks first', async ({
         page,
         db,
     }) => {
-        const { afterHours, followUps } = await seedAgents(db);
+        const { afterHours, sales, followUps } = await seedAgents(db);
         await seedNumber(db);
         await linkNumber(page, afterHours, FIRST_NUMBER);
+        const answering = telnyx.numbers[0].connection_id;
         telnyx.clear();
 
+        // The outbound agent only adds the Call Control app: the number keeps answering with After hours.
+        await linkNumber(page, sales, FIRST_NUMBER);
+        expect(telnyxWrites().map((r) => `${r.method} ${r.path}`)).toEqual(['POST /v2/call_control_applications']);
+        expect(telnyx.numbers[0].connection_id).toBe(answering);
+        let [stored] = await db.getVoiceNumbers(E2E_USER);
+        expect(stored.inboundAgentId?.toString()).toBe(afterHours);
+        expect(stored.outboundAgentId?.toString()).toBe(sales);
+        await openPhoneNumbers(page);
+        const uses = numberRow(page, FIRST_NUMBER).getByTestId('number-use');
+        await expect(uses).toContainText(answers('After hours'));
+        await expect(uses).toContainText(places('Sales outreach'));
+
+        // Follow-ups wants the outbound slot: the picker says what the number does, and asks before taking it.
+        await openVoiceAgent(page, followUps);
+        const select = page.getByTestId('agent-numbers-select');
+        await expect(select).toHaveText(/\S/);
+        await select.click();
+        const option = page.getByRole('option', { name: formatPhone(FIRST_NUMBER) });
+        await expect(option).toContainText('Answers with After hours · Calls out with Sales outreach');
+        await option.click();
+        const ask = page.getByRole('dialog', { name: `Use ${FIRST_NUMBER} for Follow-ups?` });
+        await expect(ask).toContainText(`${FIRST_NUMBER} already calls out with Sales outreach.`);
+        await expect(ask).toContainText('Sales outreach will have no number to call from.');
+        await ask.getByRole('button', { name: 'Cancel' }).click();
+        [stored] = await db.getVoiceNumbers(E2E_USER);
+        expect(stored.outboundAgentId?.toString()).toBe(sales);
+
+        telnyx.clear();
         await linkNumber(page, followUps, FIRST_NUMBER);
-        expect(telnyxWrites().map((r) => `${r.method} ${r.path}`)).toEqual([
-            `PATCH /v2/phone_numbers/${FIRST_NUMBER_ID}`,
-            'POST /v2/call_control_applications',
-        ]);
-        expect(telnyx.numbers[0].connection_id).toBe(CUSTOMER_CONNECTION_ID);
-        const [stored] = await db.getVoiceNumbers(E2E_USER);
-        expect(stored.inboundAgentId).toBeNull();
-        expect(stored.previousConnectionId).toBeNull();
+        [stored] = await db.getVoiceNumbers(E2E_USER);
+        expect(stored.inboundAgentId?.toString()).toBe(afterHours);
         expect(stored.outboundAgentId?.toString()).toBe(followUps);
+        expect(telnyxWrites()).toHaveLength(0);
     });
 
     test('removing an answering number restores its connection, then deletes both apps', async ({ page, db }) => {

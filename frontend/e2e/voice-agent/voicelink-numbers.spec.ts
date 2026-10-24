@@ -319,7 +319,7 @@ test.describe('linking from the agent editor', () => {
         expect((await storedNumber(db)).voicelink?.previousRouting).toEqual(TRUNK_RULE_SAVED);
     });
 
-    test('an outbound agent takes only the outbound half; an inbound one swaps the halves, and unlinking restores the rule', async ({
+    test('an outbound agent takes only the outbound half; an inbound one adds the inbound half, and unlinking restores the rule', async ({
         page,
         db,
     }) => {
@@ -327,15 +327,16 @@ test.describe('linking from the agent editor', () => {
         await seedVoiceLinkNumber(db, TRUNK_NUMBER, TRUNK_DID_ID);
         await linkNumber(page, followUps, TRUNK_NUMBER);
         const [bot] = [...voicelink.bots.values()];
-        expect(writeLines()).toEqual(['POST /v1/websocket-bot/create', `POST /v1/call-routing/update/${TRUNK_RULE_ID}`]);
-        expect(voicelink.writes()[1].body).toEqual({
+        const outboundOurs = {
             for_inbound_call: 2,
             for_outbound_call: 3,
             status: 1,
             inbound_sip_trunk_id: TRUNK,
             outbound_websocket_bot_id: bot.id,
-        });
-        // Another agent for the same job changes nothing at VoiceLink.
+        };
+        expect(writeLines()).toEqual(['POST /v1/websocket-bot/create', `POST /v1/call-routing/update/${TRUNK_RULE_ID}`]);
+        expect(voicelink.writes()[1].body).toEqual(outboundOurs);
+        // Another agent taking the outbound slot changes nothing at VoiceLink.
         voicelink.clear();
         await linkNumber(page, sales, TRUNK_NUMBER);
         expect(voicelink.writes()).toHaveLength(0);
@@ -343,35 +344,31 @@ test.describe('linking from the agent editor', () => {
         expect(stored.outboundAgentId?.toString()).toBe(sales);
         expect(stored.voicelink?.previousRouting).toEqual(TRUNK_RULE_SAVED);
 
-        // Answering instead: the outbound half goes back to the trunk first, then the inbound half is ours.
+        // Answering too: the inbound half is ours as well, and Sales outreach keeps calling out.
         voicelink.clear();
         await linkNumber(page, afterHours, TRUNK_NUMBER);
         expect(voicelink.writes().map((r) => r.body)).toEqual([
             {
-                for_inbound_call: 2,
-                for_outbound_call: 2,
-                status: 1,
-                inbound_sip_trunk_id: TRUNK,
-                outbound_sip_trunk_id: TRUNK,
-            },
-            {
                 for_inbound_call: 3,
-                for_outbound_call: 2,
+                for_outbound_call: 3,
                 status: 1,
                 inbound_websocket_bot_id: bot.id,
-                outbound_sip_trunk_id: TRUNK,
+                outbound_websocket_bot_id: bot.id,
             },
         ]);
         stored = await storedNumber(db);
-        expect(stored.outboundAgentId).toBeNull();
-        expect(stored.voicelink?.previousRouting).toEqual(TRUNK_RULE_SAVED);
+        expect(stored.inboundAgentId?.toString()).toBe(afterHours);
+        expect(stored.outboundAgentId?.toString()).toBe(sales);
 
-        // Unlinked: the rule is the customer's again.
+        // Unlinked one at a time: the inbound half goes back to the trunk, then the whole rule is the customer's again.
         voicelink.clear();
         await unlinkNumber(page, afterHours, TRUNK_NUMBER);
+        expect(voicelink.writes().map((r) => r.body)).toEqual([outboundOurs]);
+        await unlinkNumber(page, sales, TRUNK_NUMBER);
         expect(voicelink.routings.get(TRUNK_DID_ID)).toEqual(originalTrunkRule);
         stored = await storedNumber(db);
         expect(stored.inboundAgentId).toBeNull();
+        expect(stored.outboundAgentId).toBeNull();
         expect(stored.voicelink).not.toHaveProperty('previousRouting');
     });
 

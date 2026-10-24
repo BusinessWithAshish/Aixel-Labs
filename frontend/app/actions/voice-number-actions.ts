@@ -446,48 +446,56 @@ export const listMyNumbers = async (): Promise<ALApiResponse<VoiceNumberListItem
     });
 
 /**
- * Gives the number to `agent` (null: to none). The agent's type is the number's job: an inbound agent
- * answers its calls, an outbound one places calls from it. A number does one job at a time, so the
- * job it stops doing is undone in the provider account first and saved at once (Telnyx: back on its
- * own connection; Twilio: its voice settings put back exactly; VoiceLink: that half of the DID's
- * routing put back), then the new one is set up (Telnyx: our TeXML app, or the Call Control app;
- * Twilio: its Voice URL; VoiceLink: that half on our bot). Another agent of the same type changes no routing.
+ * A number has a slot per direction: an inbound agent answers its calls, an outbound one places calls
+ * from it, and both can be set at once. Linking puts the agent in the slot of its own type (replacing the
+ * agent there, with no routing change) and, after a type change, takes it out of the other one. Routing
+ * is set up when a slot fills (Telnyx: our TeXML app, or the Call Control app; Twilio: its Voice URL;
+ * VoiceLink: that half on our bot) and undone when it empties (Telnyx: back on its own connection; Twilio:
+ * its voice settings put back exactly; VoiceLink: that half of the DID's routing put back).
  */
-async function linkAgent(
-    owner: VoiceOwnerScope,
-    doc: OwnedNumberDoc,
-    agent: OwnedAgent | null,
-): Promise<VoiceNumberListItem> {
-    const provider = providerOf(doc);
-    const callType = agent?.callType ?? null;
-    const save = (fields: Pick<VoiceNumberDoc, 'inboundAgentId' | 'outboundAgentId'>) => {
-        Object.assign(doc, fields);
-        return updateItem('numbers', { _id: doc._id }, { set: fields });
-    };
+function saveSlots(doc: OwnedNumberDoc, fields: Partial<Pick<VoiceNumberDoc, 'inboundAgentId' | 'outboundAgentId'>>) {
+    Object.assign(doc, fields);
+    return updateItem('numbers', { _id: doc._id }, { set: fields });
+}
 
-    if (doc.inboundAgentId && callType !== VoiceAgentCallType.INBOUND) {
+/** Empties the slots `agentId` holds (null: every slot), undoing their routing. */
+async function clearSlots(doc: OwnedNumberDoc, agentId: string | null): Promise<void> {
+    const provider = providerOf(doc);
+    const holds = (id: MongoObjectId | null | undefined) => !!id && (agentId === null || id.toString() === agentId);
+    if (holds(doc.inboundAgentId)) {
         await provider.stopAnswering(doc);
-        await save({ inboundAgentId: null });
+        await saveSlots(doc, { inboundAgentId: null });
     }
-    if (doc.outboundAgentId && callType !== VoiceAgentCallType.OUTBOUND) {
+    if (holds(doc.outboundAgentId)) {
         await provider.stopPlacingCalls(doc);
-        await save({ outboundAgentId: null });
+        await saveSlots(doc, { outboundAgentId: null });
     }
-    if (agent && callType === VoiceAgentCallType.INBOUND) {
+}
+
+async function linkAgent(owner: VoiceOwnerScope, doc: OwnedNumberDoc, agent: OwnedAgent): Promise<VoiceNumberListItem> {
+    const provider = providerOf(doc);
+    const id = agent._id.toString();
+    if (agent.callType === VoiceAgentCallType.INBOUND) {
+        if (doc.outboundAgentId?.toString() === id) {
+            await provider.stopPlacingCalls(doc);
+            await saveSlots(doc, { outboundAgentId: null });
+        }
         if (!doc.inboundAgentId) await provider.startAnswering(doc);
-        await save({ inboundAgentId: agent._id });
-    }
-    if (agent && callType === VoiceAgentCallType.OUTBOUND) {
+        await saveSlots(doc, { inboundAgentId: agent._id });
+    } else {
+        if (doc.inboundAgentId?.toString() === id) {
+            await provider.stopAnswering(doc);
+            await saveSlots(doc, { inboundAgentId: null });
+        }
         if (!doc.outboundAgentId) await provider.startPlacingCalls(doc);
-        await save({ outboundAgentId: agent._id });
+        await saveSlots(doc, { outboundAgentId: agent._id });
     }
     return listItemFor(owner, doc._id);
 }
 
 /**
- * Links the number to `agentId`, or unlinks it from any agent (null). The job comes from the agent's
- * own type (see `linkAgent`), so the two can never disagree. Linking needs the owner's Gemini API
- * key; unlinking never does.
+ * Links the number to `agentId` in the slot of the agent's own type (see `linkAgent`), or empties both
+ * slots (null). Linking needs the owner's Gemini API key; unlinking never does.
  */
 export const setNumberAgent = async (
     numberId: string,
@@ -499,13 +507,17 @@ export const setNumberAgent = async (
     return runAuthenticatedAction(async function setNumberAgent(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const doc = await findOwnedNumber(owner, numberId);
-        const agent = agentId ? await findOwnedAgent(owner, agentId) : null;
-        if (agent) await assertGeminiKeySet(owner.userId);
+        if (!agentId) {
+            await clearSlots(doc, null);
+            return listItemFor(owner, doc._id);
+        }
+        const agent = await findOwnedAgent(owner, agentId);
+        await assertGeminiKeySet(owner.userId);
         return linkAgent(owner, doc, agent);
     });
 };
 
-/** Unlinks the number from this agent. Nothing changes when the number is no longer this agent's. */
+/** Unlinks the number from this agent; another agent in the other slot keeps it. */
 export const unlinkAgentNumber = async (agentId: string, numberId: string): Promise<ALApiResponse<VoiceNumberListItem>> => {
     assertValidObjectId(agentId, 'Agent ID');
     assertValidObjectId(numberId, 'Number ID');
@@ -513,8 +525,8 @@ export const unlinkAgentNumber = async (agentId: string, numberId: string): Prom
     return runAuthenticatedAction(async function unlinkAgentNumber(userId) {
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         const doc = await findOwnedNumber(owner, numberId);
-        const linked = [doc.inboundAgentId, doc.outboundAgentId].some((id) => id?.toString() === agentId);
-        return linked ? linkAgent(owner, doc, null) : listItemFor(owner, doc._id);
+        await clearSlots(doc, agentId);
+        return listItemFor(owner, doc._id);
     });
 };
 

@@ -277,9 +277,14 @@ export function useVoiceAgentEditorPage({
                 const response = await (link ? setNumberAgent(id, agentId) : unlinkAgentNumber(agentId, id)).catch(
                     (e: Error) => ({ success: false as const, error: e.message }),
                 );
-                if (!response.success) {
+                // A link the server reports done must show this agent on the number, or the owner hears why not.
+                const holds = (n?: VoiceNumberListItem) => !!n && [n.inboundAgentId, n.outboundAgentId].includes(agentId);
+                if (!response.success || (link && !holds(response.data))) {
                     failed++;
-                    toast.error(response.error ?? 'Could not change the number');
+                    toast.error(
+                        (!response.success && response.error) ||
+                            (link ? 'The number was not linked. Try again.' : 'Could not change the number'),
+                    );
                 }
             }
             setLinking(false);

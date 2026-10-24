@@ -42,7 +42,8 @@ export const LINK_UI_PENDING: string | null = null;
 
 /**
  * Picks the number in the agent editor's number dropdown, or "No number" to let it go (a pick saves at
- * once). Throws with the error the page shows (it stays visible) when the provider or the app refuses.
+ * once; taking the slot from another agent is confirmed). Throws with the error the page shows (it stays
+ * visible) when the provider or the app refuses.
  */
 async function setLinked(page: Page, agentId: string, phoneNumber: string, linked: boolean): Promise<void> {
     await openVoiceAgent(page, agentId);
@@ -55,6 +56,9 @@ async function setLinked(page: Page, agentId: string, phoneNumber: string, linke
     // The picker can show the pick before the server has it: wait for the link action to answer first.
     const answered = page.waitForResponse((r) => r.request().method() === 'POST' && !!r.request().headers()['next-action']);
     await page.getByRole('option', { name: linked ? shown : 'No number' }).click();
+    const takeover = page.getByRole('dialog', { name: /^Use / });
+    await Promise.race([answered, takeover.waitFor()]);
+    if (await takeover.isVisible()) await takeover.getByRole('button', { name: 'Use it' }).click();
     const failed = page.locator('[data-sonner-toast][data-type="error"]');
     const done = linked ? select.filter({ hasText: shown }) : select.filter({ hasNotText: shown });
     await Promise.race([
