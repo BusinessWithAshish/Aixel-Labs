@@ -35,17 +35,21 @@ function Control({ label, pressed, onClick, children }: ControlProps) {
 /** iOS's in-call screen (the phone turns dark while it lasts): who, how long, mute, keypad for tones, hang up. */
 export function InCallScreen() {
     const page = usePage<UseWebDialerPageReturn>();
-    const { phase, number, keypadOpen } = page;
+    const { phase, number, keypadOpen, agentCall } = page;
 
     return (
         <div className="flex flex-1 flex-col items-center gap-6 px-4 pt-10 pb-8 sm:pt-14">
             <div className="space-y-1.5 text-center">
-                <p className="text-3xl font-normal tabular-nums">{displayNumber(page.dialed)}</p>
+                <p className="text-3xl font-normal tabular-nums">{agentCall?.name ?? displayNumber(page.dialed)}</p>
                 <p className="text-muted-foreground text-base tabular-nums" aria-live="polite">
                     {phase === 'active' ? formatDuration(page.seconds) : STATUS[phase as keyof typeof STATUS]}
                     {page.tones ? ` · ${page.tones}` : ''}
                 </p>
-                {number ? <p className="text-muted-foreground text-xs">from {formatPhone(number.phoneNumber)}</p> : null}
+                {agentCall ? (
+                    <p className="text-muted-foreground text-xs">as if you called {formatPhone(agentCall.phoneNumber)}</p>
+                ) : number ? (
+                    <p className="text-muted-foreground text-xs">from {formatPhone(number.phoneNumber)}</p>
+                ) : null}
             </div>
 
             <div className="mt-auto flex flex-col items-center gap-6">

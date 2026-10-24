@@ -106,7 +106,7 @@ def number_sig(number):   # a customer number's webhooks are signed, like the ap
     return hmac.new(os.environ["VOICELAB_KEY"].encode(), f"number|{number}".encode(), hashlib.sha256).hexdigest()[:32]
 
 async def run(port, name, callee=None, save=None, inbound=False, ring=0.0, texml=False, number=None, url=None, events=None,
-              caller="+15557770000"):
+              caller="+15557770000", to="+15550001111"):
     """`number`: with --texml, a call coming in to that customer number. `url` / `events`: a stream URL and
     webhook as the server handed them to Telnyx (a call placed through POST /calls), for --ring."""
     lines = SCEN[name]
@@ -125,7 +125,7 @@ async def run(port, name, callee=None, save=None, inbound=False, ring=0.0, texml
     voice = "sulafat"
     if texml:   # the way Telnyx does it: fetch the TeXML first, then open the stream it names
         import re
-        tq = (f"n={number}&sig={number_sig(number)}&Direction=inbound&From={urllib.parse.quote(caller)}&To=%2B15550001111" if number
+        tq = (f"n={number}&sig={number_sig(number)}&Direction=inbound&From={urllib.parse.quote(caller)}&To={urllib.parse.quote(to)}" if number
               else "To=sip:sulafat@aixellabs.sip.telnyx.com")
         xml = urllib.request.urlopen(f"http://127.0.0.1:{port}/texml?{tq}", timeout=10).read().decode()
         m = re.search(r'url="wss://[^/]+/telnyx\?voice=(\w+)&amp;([^"]+)"', xml)

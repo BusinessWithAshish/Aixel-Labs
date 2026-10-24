@@ -33,6 +33,8 @@ import {
 import { providerOf, type OwnedNumberDoc, type ProviderAccountNumber } from '@/server/voice-agent/number-provider';
 import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
 import {
+    BROWSER_TARGET,
+    browserUri,
     getSoftphone,
     inSoftphoneAccount,
     removeSoftphone,
@@ -570,7 +572,8 @@ async function softphoneTarget(owner: VoiceOwnerScope, doc: OwnedNumberDoc): Pro
  * own agent when none is given. The provider gets ready first (Telnyx: the Call Control app;
  * VoiceLink: the number must be set to make calls). Needs the owner's Gemini API key; the engine
  * refuses too when it is missing or Google refuses it. `variables` fill the agent's `{{variables}}`
- * on this call (empty ones fall back to the agent's defaults). `to` = SOFTPHONE_TARGET rings the owner's softphone.
+ * on this call (empty ones fall back to the agent's defaults). `to` = SOFTPHONE_TARGET rings the owner's softphone,
+ * BROWSER_TARGET the browser signed in with this number's telephony credential.
  */
 export const placeTestCall = async (
     numberId: string,
@@ -586,13 +589,16 @@ export const placeTestCall = async (
         const owner = await requireVoiceOwner(userId, SUB_MODULE);
         assertRateLimit(`voice-call:${owner.userId}`, 10);
         const doc = await findOwnedNumber(owner, numberId);
+        const sip = to === SOFTPHONE_TARGET || to === BROWSER_TARGET;
         const target =
             to === SOFTPHONE_TARGET
                 ? await softphoneTarget(owner, doc)
-                : typeof to === 'string'
-                  ? to.replace(/[\s()-]/g, '')
-                  : '';
-        if (to !== SOFTPHONE_TARGET && !E164_PATTERN.test(target)) {
+                : to === BROWSER_TARGET
+                  ? await browserUri(doc)
+                  : typeof to === 'string'
+                    ? to.replace(/[\s()-]/g, '')
+                    : '';
+        if (!sip && !E164_PATTERN.test(target)) {
             const example = doc.provider === VoiceProvider.VOICELINK ? '+919876543210' : '+14155550123';
             throw new Error(`Enter the number in international format, e.g. ${example}`);
         }

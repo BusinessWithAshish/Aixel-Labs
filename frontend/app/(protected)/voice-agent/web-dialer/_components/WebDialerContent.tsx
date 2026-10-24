@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock, Delete, Grid3x3, Phone, PhoneOff } from 'lucide-react';
+import { Bot, Clock, Delete, Grid3x3, Phone, PhoneOff } from 'lucide-react';
 import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { usePage } from '@/contexts/PageStore';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
@@ -15,6 +15,7 @@ import { countryOfE164 } from '@/helpers/voice-campaign-contacts';
 import { cn } from '@/lib/utils';
 import { ROUND_BUTTON } from '../_utils/constants';
 import { displayNumber } from '../_utils/web-dialer';
+import { AgentsList } from './AgentsList';
 import { Dialpad } from './Dialpad';
 import { FromNumber } from './FromNumber';
 import { InCallScreen } from './InCallScreen';
@@ -60,7 +61,8 @@ function Keypad() {
                     <p
                         role="alert"
                         data-testid="web-dialer-warning"
-                        className={cn('text-xs', error ? 'text-destructive' : 'text-muted-foreground')}>
+                        className={cn('text-xs', error ? 'text-destructive' : 'text-muted-foreground')}
+                    >
                         {warning}
                     </p>
                 ) : null}
@@ -133,6 +135,9 @@ export function WebDialerContent() {
                         <TabsContent value="keypad" className="flex flex-col">
                             <Keypad />
                         </TabsContent>
+                        <TabsContent value="agents" className="overflow-y-auto">
+                            <AgentsList />
+                        </TabsContent>
                         <TabsContent value="recents" className="overflow-y-auto">
                             <Recents />
                         </TabsContent>
@@ -140,6 +145,10 @@ export function WebDialerContent() {
                             <TabsTrigger value="keypad" className={TAB_TRIGGER}>
                                 <Grid3x3 />
                                 Keypad
+                            </TabsTrigger>
+                            <TabsTrigger value="agents" className={TAB_TRIGGER}>
+                                <Bot />
+                                Agents
                             </TabsTrigger>
                             <TabsTrigger value="recents" className={TAB_TRIGGER}>
                                 <Clock />

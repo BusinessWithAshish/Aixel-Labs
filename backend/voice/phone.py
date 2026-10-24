@@ -723,6 +723,10 @@ def make_app() -> FastAPI:
             logger.warning(f"texml: number {number_id} {'has no inbound agent' if number else 'not found'}, hanging up")
             return hang_up
         caller = params.get("From") or params.get("from")
+        dialled = str(params.get("To") or params.get("to") or "")
+        if dialled.startswith("sip:") and not str(caller or "").startswith("sip:"):
+            # The number's SIP address (the owner's softphone or browser test): the call log keeps what was dialled.
+            caller = dialled
         unavailable = Response(content=UNAVAILABLE_XML, media_type="application/xml")
         try:
             ctx = await asyncio.to_thread(product.phone_call, number, agent, "INBOUND", caller)
@@ -1074,7 +1078,7 @@ def make_app() -> FastAPI:
         `agentId` picks which of the owner's agents makes the call; without it, the
         number's outbound agent does. `variables` ({name: value}) fill the agent's
         `{{variables}}` on this call (product.call_variables). `to` is E.164, or the owner's
-        softphone `sip:<user>@sip.telnyx.com` (Telnyx numbers only; no voicemail detection on it)."""
+        softphone or browser phone `sip:<user>@sip.telnyx.com` (Telnyx numbers only; no voicemail detection)."""
         if not product.bearer_ok(request.headers.get("authorization")):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         if draining():  # the other slot takes it: the app (or a campaign) tries again
@@ -1742,7 +1746,9 @@ async def _play_session(websocket: WebSocket, ctx: dict, slot: str):
 # server, swaps an origin's 502 for its own HTML error page, and the app loses the reason.
 PROVIDER_FAILED = 424
 # A SIP login on Telnyx (a credential connection's user name, 4-32 letters and digits).
-SOFTPHONE_URI = re.compile(r"sip:[A-Za-z0-9]{4,32}@sip\.telnyx\.com")
+# A SIP login on Telnyx: a credential connection's user name (a softphone, 4-32 letters and digits) or a
+# telephony credential's "gencred…" (the browser phone, longer).
+SOFTPHONE_URI = re.compile(r"sip:[A-Za-z0-9]{4,64}@sip\.telnyx\.com")
 
 
 def telnyx_reason(status: int, text: str) -> str:

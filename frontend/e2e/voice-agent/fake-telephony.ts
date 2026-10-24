@@ -117,6 +117,8 @@ export class FakeTelnyx extends FakeHttpServer {
     readonly callControlApps = new Map<string, JsonValue>();
     /** Credential connections (SIP logins), by id, with the password Telnyx would hold. */
     readonly credentialConnections = new Map<string, JsonValue>();
+    /** Telephony credentials (the browser phone's SIP identities), by id. */
+    readonly telephonyCredentials = new Map<string, JsonValue>();
     /** SIP usernames a softphone is signed in with now (`GET /v2/sip_registration_status`). */
     readonly registered = new Set<string>();
     /** call_control_id -> recordings Telnyx would list for it. */
@@ -159,6 +161,7 @@ export class FakeTelnyx extends FakeHttpServer {
         this.texmlApps.clear();
         this.callControlApps.clear();
         this.credentialConnections.clear();
+        this.telephonyCredentials.clear();
         this.registered.clear();
         this.recordings.clear();
         this.files.clear();
@@ -307,6 +310,23 @@ export class FakeTelnyx extends FakeHttpServer {
         if (req.method === 'PATCH' && connection) {
             Object.assign(connection, req.body);
             send(res, 200, { data: { ...connection, password: '********' } });
+            return;
+        }
+        if (req.method === 'GET' && req.path === '/v2/telephony_credentials') {
+            const name = req.query['filter[name]'];
+            send(res, 200, page([...this.telephonyCredentials.values()].filter((c) => !name || c.name === name)));
+            return;
+        }
+        if (req.method === 'POST' && req.path === '/v2/telephony_credentials') {
+            const id = this.newId();
+            const credential = { id, record_type: 'credential', ...req.body, sip_username: `gencred${id}`, expired: false };
+            this.telephonyCredentials.set(id, credential);
+            send(res, 201, { data: credential });
+            return;
+        }
+        if (req.method === 'POST' && /^\/v2\/telephony_credentials\/[^/]+\/token$/.test(req.path)) {
+            res.writeHead(201, { 'Content-Type': 'text/plain' });
+            res.end('e2e.fake.login-token');
             return;
         }
         if (req.method === 'GET' && req.path === '/v2/sip_registration_status') {

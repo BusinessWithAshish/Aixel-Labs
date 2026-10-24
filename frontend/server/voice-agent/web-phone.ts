@@ -12,6 +12,7 @@ import {
     listCredentialConnections,
     listOutboundVoiceProfiles,
     listTelephonyCredentials,
+    type TelnyxTelephonyCredential,
 } from '@/server/voice-agent/telnyx';
 import { listApplications, saveApplication } from '@/server/voice-agent/twilio';
 import { twilioAuthOf } from '@/server/voice-agent/twilio-numbers';
@@ -70,7 +71,10 @@ export async function ensureTelnyxConnection(key: string): Promise<string> {
     return created.id;
 }
 
-async function telnyxSession(doc: OwnedNumberDoc): Promise<WebPhoneSession> {
+/** The browser's SIP identity for a Telnyx number (one telephony credential per number), created on first need. */
+export async function ensureTelnyxCredential(
+    doc: OwnedNumberDoc,
+): Promise<{ key: string; connectionId: string; credential: TelnyxTelephonyCredential }> {
     const key = openSecret(doc.apiKeySealed);
     const connectionId = await ensureTelnyxConnection(key);
     const name = `${WEB_PHONE_LABEL} ${doc.phoneNumber}`;
@@ -81,6 +85,11 @@ async function telnyxSession(doc: OwnedNumberDoc): Promise<WebPhoneSession> {
         credential = await createTelephonyCredential(key, { connectionId, name });
         await new Promise((resolve) => setTimeout(resolve, NEW_CREDENTIAL_DELAY_MS));
     }
+    return { key, connectionId, credential };
+}
+
+async function telnyxSession(doc: OwnedNumberDoc): Promise<WebPhoneSession> {
+    const { key, credential } = await ensureTelnyxCredential(doc);
     const loginToken = await createTelephonyCredentialToken(key, credential.id);
     return { provider: VoiceProvider.TELNYX, loginToken, callerNumber: doc.phoneNumber };
 }

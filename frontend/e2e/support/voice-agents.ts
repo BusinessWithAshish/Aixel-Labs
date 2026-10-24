@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, type WebSocketRoute } from '@playwright/test';
+import { expect, type BrowserContext, type Locator, type Page, type WebSocketRoute } from '@playwright/test';
 import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { SubModuleUrls } from '@/config/app-config';
 import { E2E_VOICE_ENGINE_URL } from './env';
@@ -106,4 +106,84 @@ export class FakePlaygroundEngine {
         const bytes = this.audioFrames.filter((f) => f.at > from && f.at <= to).reduce((sum, f) => sum + f.bytes, 0);
         return (bytes * 1000) / (to - from);
     }
+}
+
+/** What the stand-in browser phone saw: `newCall` options, and the call on the line now. */
+export type FakeRtcWindow = {
+    e2eNewCalls: { destinationNumber: string; callerNumber?: string }[];
+    /** Rings this browser, as Telnyx does when an agent dials its SIP URI. */
+    e2eRing: () => void;
+    /** Moves the call on the line to a state ("active", "hangup"…), as the far end does. */
+    e2eSetState: (state: string) => void;
+};
+
+/**
+ * Stands in for `@telnyx/webrtc` (`window.__e2eTelnyxRTC`, see helpers/voice-browser-call.ts) and grants the
+ * microphone: nothing leaves the page. Signs in at once; calls placed ring; `e2eRing` rings this browser.
+ */
+export async function installFakeTelnyxRtc(context: BrowserContext): Promise<void> {
+    await context.addInitScript(() => {
+        type Handler = (payload?: unknown) => void;
+        const w = window as unknown as Record<string, unknown>;
+        let current: FakeCall | null = null;
+        class FakeCall {
+            id = String(Math.random());
+            state = 'new';
+            constructor(
+                private client: FakeTelnyxRTC,
+                readonly direction: string,
+            ) {}
+            emit(state: string) {
+                this.state = state;
+                this.client.fire('telnyx.notification', { type: 'callUpdate', call: this });
+            }
+            answer() {
+                this.emit('active');
+                return Promise.resolve();
+            }
+            hangup() {
+                this.emit('hangup');
+            }
+            muteAudio() {}
+            unmuteAudio() {}
+            dtmf() {}
+        }
+        class FakeTelnyxRTC {
+            handlers: Record<string, Handler[]> = {};
+            remoteElement: unknown = null;
+            on(event: string, handler: Handler) {
+                (this.handlers[event] ??= []).push(handler);
+                return this;
+            }
+            fire(event: string, payload?: unknown) {
+                (this.handlers[event] ?? []).forEach((h) => h(payload));
+            }
+            connect() {
+                w.e2eClient = this;
+                setTimeout(() => this.fire('telnyx.ready'), 0);
+                return Promise.resolve();
+            }
+            disconnect() {
+                return Promise.resolve();
+            }
+            newCall(options: { destinationNumber: string; callerNumber?: string }) {
+                (w.e2eNewCalls as unknown[]).push({
+                    destinationNumber: options.destinationNumber,
+                    callerNumber: options.callerNumber,
+                });
+                current = new FakeCall(this, 'outbound');
+                const call = current;
+                setTimeout(() => call.emit('ringing'), 0);
+                return call;
+            }
+        }
+        w.e2eNewCalls = [];
+        w.__e2eTelnyxRTC = FakeTelnyxRTC;
+        w.e2eRing = () => {
+            current = new FakeCall(w.e2eClient as FakeTelnyxRTC, 'inbound');
+            current.emit('ringing');
+        };
+        w.e2eSetState = (state: string) => current?.emit(state);
+        navigator.mediaDevices.getUserMedia = () => Promise.resolve(new MediaStream());
+    });
 }

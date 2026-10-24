@@ -12,6 +12,8 @@ import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpe
 import { assertRateLimit } from '@/server/rate-limit';
 import { findItem, listItems } from '@/server/voice-agent/accounts';
 import type { OwnedNumberDoc } from '@/server/voice-agent/number-provider';
+import { requestOrigin } from '@/server/voice-agent/public-url';
+import { startWebPhoneSession, type WebPhoneSession } from '@/server/voice-agent/web-phone';
 import { requireVoiceOwner, type VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
 import {
     ensureSipHost,
@@ -26,7 +28,7 @@ import {
 
 type SoftphoneNumber = { id: string; phoneNumber: string };
 
-/** The softphone panel of one agent. */
+/** The test panel of one agent: over the browser, or a softphone. */
 export type SoftphoneView = {
     /** Null until set up. */
     login: {
@@ -39,10 +41,13 @@ export type SoftphoneView = {
     } | null;
     /** Telnyx numbers it can be set up with. */
     telnyxNumbers: SoftphoneNumber[];
-    /** SIP addresses that reach this agent like a call to the number (it answers them, in the softphone's account). */
-    dialIn: (SoftphoneNumber & { address: string })[];
-    /** Numbers this agent can ring the softphone from (in the softphone's account), its own first. */
-    callFrom: SoftphoneNumber[];
+    /**
+     * Telnyx numbers this agent answers, with what reaches it like a call to the number (`agentSipAddress`).
+     * `softphone`: in the softphone's account, so the softphone may dial it too.
+     */
+    dialIn: (SoftphoneNumber & { user: string; host: string; softphone: boolean })[];
+    /** Telnyx numbers this agent can ring you from, its own first. `softphone`: can ring the softphone. */
+    callFrom: (SoftphoneNumber & { softphone: boolean })[];
 };
 
 /** What setting up or resetting returns: the only time the password is shown. */
@@ -52,7 +57,7 @@ const SUB_MODULE = VOICE_AGENT_SUB_MODULES.AGENTS;
 
 async function softphoneOwner(userId: string): Promise<VoiceOwnerScope> {
     const owner = await requireVoiceOwner(userId, SUB_MODULE);
-    // Each change and each look at the registration is a call to the owner's Telnyx account.
+    // Each change, sign-in and look at the registration is a call to the owner's Telnyx account.
     assertRateLimit(`voice-softphone:${owner.userId}`, 20);
     return owner;
 }
@@ -73,22 +78,35 @@ export const getSoftphoneView = async (agentId: string): Promise<ALApiResponse<S
         const telnyx = (await listItems('numbers', owner.userId)).filter((n) => n.provider === VoiceProvider.TELNYX);
         const softphone = await getSoftphone(owner.userId);
         const home = softphone ? telnyx.find((n) => n._id.equals(softphone.numberId)) : undefined;
-        const view: SoftphoneView = { login: null, telnyxNumbers: telnyx.map(numberOf), dialIn: [], callFrom: [] };
-        if (!softphone || !home) return view;
-
-        const reachable = telnyx.filter((n) => inSoftphoneAccount(n, home));
-        const answering = reachable.filter((n) => n.inboundAgentId?.equals(agent._id));
+        const reaches = (n: OwnedNumberDoc) => !!home && inSoftphoneAccount(n, home);
+        const answering = telnyx.filter((n) => n.inboundAgentId?.equals(agent._id) && n.texmlAppId);
         const [registered, hosts] = await Promise.all([
-            softphoneRegistered(softphone, home),
+            softphone && home ? softphoneRegistered(softphone, home) : null,
             Promise.all(answering.map(ensureSipHost)),
         ]);
-        view.login = { userName: softphone.userName, domain: SOFTPHONE_DOMAIN, phoneNumber: home.phoneNumber, registered };
-        view.dialIn = answering.flatMap((n, i) =>
-            hosts[i] ? [{ ...numberOf(n), address: `sip:${sipUserFor(agent.name)}@${hosts[i]}` }] : [],
-        );
         const own = (n: OwnedNumberDoc) => (n.outboundAgentId?.equals(agent._id) ? 0 : 1);
-        view.callFrom = [...reachable].sort((a, b) => own(a) - own(b)).map(numberOf);
-        return view;
+        return {
+            login:
+                softphone && home
+                    ? { userName: softphone.userName, domain: SOFTPHONE_DOMAIN, phoneNumber: home.phoneNumber, registered }
+                    : null,
+            telnyxNumbers: telnyx.map(numberOf),
+            dialIn: answering.flatMap((n, i) =>
+                hosts[i] ? [{ ...numberOf(n), user: sipUserFor(agent.name), host: hosts[i], softphone: reaches(n) }] : [],
+            ),
+            callFrom: [...telnyx].sort((a, b) => own(a) - own(b)).map((n) => ({ ...numberOf(n), softphone: reaches(n) })),
+        };
+    });
+};
+
+/** The browser's sign-in on a Telnyx number (its telephony credential), to call the agent or be called by it. */
+export const getBrowserTestSession = async (numberId: string): Promise<ALApiResponse<WebPhoneSession>> => {
+    assertValidObjectId(numberId, 'Number ID');
+    return runAuthenticatedAction(async function getBrowserTestSession(userId) {
+        const owner = await softphoneOwner(userId);
+        const number = await findItem('numbers', { _id: toObjectId(numberId, 'Number ID') }, owner.userId);
+        if (number?.provider !== VoiceProvider.TELNYX) throw new Error('Number not found');
+        return startWebPhoneSession(number, await requestOrigin());
     });
 };
 

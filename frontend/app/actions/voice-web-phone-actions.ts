@@ -1,6 +1,12 @@
 'use server';
 
-import { VOICE_AGENT_SUB_MODULES, type VoiceProvider } from '@aixellabs/backend/db';
+import {
+    getCollection,
+    MongoCollections,
+    VOICE_AGENT_SUB_MODULES,
+    VoiceProvider,
+    type VoiceAgentDoc,
+} from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { getHiddenSubModules } from '@/flags';
 import { runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
@@ -9,6 +15,8 @@ import { findItem, listItems } from '@/server/voice-agent/accounts';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 import { requestOrigin } from '@/server/voice-agent/public-url';
 import { startWebPhoneSession, webPhoneProblem, type WebPhoneSession } from '@/server/voice-agent/web-phone';
+import { agentSipAddress } from '@/helpers/voice-call-format';
+import { ensureSipHost, sipUserFor } from '@/server/voice-agent/softphone';
 
 /** A number as the Web dialer offers it. */
 export type WebPhoneNumber = {
@@ -18,6 +26,9 @@ export type WebPhoneNumber = {
     /** Why it cannot call from the browser, else null. */
     problem: string | null;
 };
+
+/** An agent the Web dialer can call: it answers a Telnyx number, reached over SIP like a call to that number. */
+export type WebPhoneAgent = { id: string; name: string; numberId: string; phoneNumber: string; address: string };
 
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.WEB_DIALER;
 
@@ -51,4 +62,43 @@ export const getWebPhoneSession = async (numberId: string): Promise<ALApiRespons
         const doc = await findItem('numbers', { _id: toObjectId(numberId, 'Number') }, owner.userId);
         if (!doc) throw new Error('Number not found');
         return startWebPhoneSession(doc, await requestOrigin());
+    });
+
+/**
+ * The owner's agents that answer a Telnyx number, with the SIP address the browser dials to reach each one (only
+ * the owner's own Telnyx account may call it). Sets the number's SIP subdomain on first need.
+ */
+export const listWebPhoneAgents = async (): Promise<ALApiResponse<WebPhoneAgent[]>> =>
+    runAuthenticatedAction(async function listWebPhoneAgents(userId) {
+        const owner = await requireWebDialer(userId);
+        const numbers = (await listItems('numbers', owner.userId)).filter(
+            (n) => n.provider === VoiceProvider.TELNYX && n.inboundAgentId && n.texmlAppId,
+        );
+        const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
+        const names = new Map(
+            (
+                await agents
+                    .find(
+                        { userId: owner.userId, _id: { $in: numbers.map((n) => n.inboundAgentId!) } },
+                        { projection: { name: 1 } },
+                    )
+                    .toArray()
+            ).map((a) => [String(a._id), a.name]),
+        );
+        const hosts = await Promise.all(numbers.map(ensureSipHost));
+        return numbers.flatMap((n, i) => {
+            const name = names.get(String(n.inboundAgentId));
+            const host = hosts[i];
+            return name && host
+                ? [
+                      {
+                          id: String(n.inboundAgentId),
+                          name,
+                          numberId: n._id.toString(),
+                          phoneNumber: n.phoneNumber,
+                          address: agentSipAddress(sipUserFor(name), host, 'browser'),
+                      },
+                  ]
+                : [];
+        });
     });

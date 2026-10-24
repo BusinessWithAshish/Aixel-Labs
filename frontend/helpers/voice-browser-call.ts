@@ -23,14 +23,18 @@ export type BrowserCall = {
     sendDigit: (digit: string) => void;
 };
 
-/** The SDKs touch `window` when loaded, so they are only imported when a call starts. */
-async function telnyxCall(
-    session: Extract<WebPhoneSession, { provider: VoiceProvider.TELNYX }>,
-    to: string,
-    events: BrowserCallEvents,
-): Promise<BrowserCall> {
-    const { TelnyxRTC } = await import('@telnyx/webrtc');
-    const client = new TelnyxRTC({ login_token: session.loginToken });
+type TelnyxSession = Extract<WebPhoneSession, { provider: VoiceProvider.TELNYX }>;
+
+/** The SDKs touch `window` when loaded, so they are only imported when a call starts. E2E specs stand one in. */
+async function telnyxClient(session: TelnyxSession) {
+    const fake = (window as { __e2eTelnyxRTC?: typeof import('@telnyx/webrtc').TelnyxRTC }).__e2eTelnyxRTC;
+    const TelnyxRTC = fake ?? (await import('@telnyx/webrtc')).TelnyxRTC;
+    return new TelnyxRTC({ login_token: session.loginToken });
+}
+
+/** `to` is a phone number (E.164) or a SIP URI (an agent's test address); only a phone number gets the caller ID. */
+async function telnyxCall(session: TelnyxSession, to: string, events: BrowserCallEvents): Promise<BrowserCall> {
+    const client = await telnyxClient(session);
     const remoteAudio = new Audio();
     remoteAudio.autoplay = true;
     let answered = false;
@@ -58,7 +62,7 @@ async function telnyxCall(
             started = true;
             const call = client.newCall({
                 destinationNumber: to,
-                callerNumber: session.callerNumber,
+                ...(to.startsWith('sip:') ? {} : { callerNumber: session.callerNumber }),
                 audio: true,
                 video: false,
                 remoteElement: remoteAudio,
@@ -134,6 +138,78 @@ async function twilioCall(
         hangup: () => call.disconnect(),
         setMuted: (muted) => call.mute(muted),
         sendDigit: (digit) => call.sendDigits(digit),
+    };
+}
+
+/** The call ringing this browser, until it is answered or declined. */
+export type IncomingBrowserCall = { answer: () => void; decline: () => void };
+
+/**
+ * Signs the browser in and waits for one call. Resolves once Telnyx is ready to ring it (only then may the agent
+ * dial); `onIncoming` hands over Answer / Decline, the rest is as for a call placed here.
+ */
+export async function waitForBrowserCall(
+    session: WebPhoneSession,
+    events: BrowserCallEvents & { onIncoming: (call: IncomingBrowserCall) => void },
+): Promise<BrowserCall> {
+    if (session.provider !== VoiceProvider.TELNYX) throw new Error('Only a Telnyx number can ring this browser for now.');
+    const client = await telnyxClient(session);
+    const remoteAudio = new Audio();
+    remoteAudio.autoplay = true;
+    client.remoteElement = remoteAudio;
+    type SdkCall = {
+        id: string;
+        state: string;
+        direction?: string;
+        sipCode?: number;
+        cause?: string;
+        answer: () => Promise<void>;
+        hangup: () => void;
+        muteAudio: () => void;
+        unmuteAudio: () => void;
+        dtmf: (digit: string) => void;
+    };
+    let current: SdkCall | null = null;
+    let answered = false;
+    let ended = false;
+    const finish = (end: Omit<BrowserCallEnd, 'answered'>) => {
+        if (ended) return;
+        ended = true;
+        remoteAudio.srcObject = null;
+        void client.disconnect();
+        events.onEnded({ answered, ...end });
+    };
+    client.on('telnyx.notification', (notification: { type: string; call?: SdkCall }) => {
+        const call = notification.call;
+        if (notification.type !== 'callUpdate' || !call || (current && call.id !== current.id)) return;
+        if (!current && call.direction === 'inbound' && call.state === 'ringing') {
+            current = call;
+            events.onRinging();
+            events.onIncoming({ answer: () => void call.answer(), decline: () => call.hangup() });
+        }
+        if (current && call.state === 'active' && !answered) {
+            answered = true;
+            events.onAnswered();
+        }
+        if (current && (call.state === 'hangup' || call.state === 'destroy'))
+            finish({ sipCode: call.sipCode, cause: call.cause });
+    });
+    await new Promise<void>((resolve, reject) => {
+        client.on('telnyx.ready', () => resolve());
+        client.on('telnyx.error', () => {
+            const error = 'Telnyx would not connect the browser phone. Try again in a moment.';
+            if (current) finish({ error });
+            else {
+                void client.disconnect();
+                reject(new Error(error));
+            }
+        });
+        void client.connect();
+    });
+    return {
+        hangup: () => (current ? current.hangup() : finish({})),
+        setMuted: (muted) => (muted ? current?.muteAudio() : current?.unmuteAudio()),
+        sendDigit: (digit) => current?.dtmf(digit),
     };
 }
 

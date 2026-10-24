@@ -13,7 +13,7 @@ import {
     updateCredentialConnection,
 } from '@/server/voice-agent/telnyx';
 import { appLabel } from '@/server/voice-agent/telnyx-numbers';
-import { ensureTelnyxConnection } from '@/server/voice-agent/web-phone';
+import { ensureTelnyxConnection, ensureTelnyxCredential } from '@/server/voice-agent/web-phone';
 
 /**
  * The softphone: a SIP app (Zoiper, Linphone…) signed in to the owner's own Telnyx account, so they hear their
@@ -27,11 +27,16 @@ import { ensureTelnyxConnection } from '@/server/voice-agent/web-phone';
  *   to the number. Strangers cannot, so nobody else runs up the owner's Gemini bill.
  * - Calls OUT: the agent dials `sip:<userName>@sip.telnyx.com` (placeTestCall, `to` = SOFTPHONE_TARGET).
  *   Telnyx refuses that on a trial account (D61) until the account is upgraded.
+ * - The browser (WebRTC over 443, which no network blocks) does the same with the number's telephony credential
+ *   (the web dialer's): it dials the number's SIP address, or the agent dials `sip:<gencred…>@sip.telnyx.com`
+ *   (`to` = BROWSER_TARGET) while the page waits for the call.
  */
 
 export const SOFTPHONE_DOMAIN = 'sip.telnyx.com';
 /** What placeTestCall takes as `to` for "call my softphone". */
 export const SOFTPHONE_TARGET = 'softphone';
+/** What placeTestCall takes as `to` for "call me in this browser". */
+export const BROWSER_TARGET = 'browser';
 
 export function softphoneUri(userName: string): string {
     return `sip:${userName}@${SOFTPHONE_DOMAIN}`;
@@ -79,7 +84,7 @@ export async function issueSoftphoneLogin(
     const connectionId = await ensureTelnyxConnection(key);
     const { user_name: userName } = await getCredentialConnection(key, connectionId);
     const password = randomBytes(18).toString('base64url');
-    await updateCredentialConnection(key, connectionId, { password, sipUriCalling: 'internal' });
+    await updateCredentialConnection(key, connectionId, { password });
 
     const now = new Date();
     const current = await getSoftphone(userId);
@@ -95,8 +100,8 @@ export async function issueSoftphoneLogin(
 }
 
 /**
- * Signs the softphone out for good: the connection gets a password nobody knows and its SIP URI takes no calls.
- * The connection stays (the web dialer uses it). Forgotten here even when Telnyx no longer takes the number's key.
+ * Signs the softphone out for good: the connection gets a password nobody knows. The connection stays (the browser
+ * phone uses it). Forgotten here even when Telnyx no longer takes the number's key.
  */
 export async function removeSoftphone(userId: MongoObjectId, number: OwnedNumberDoc | null): Promise<void> {
     const softphone = await getSoftphone(userId);
@@ -105,7 +110,6 @@ export async function removeSoftphone(userId: MongoObjectId, number: OwnedNumber
         try {
             await updateCredentialConnection(openSecret(number.apiKeySealed), softphone.connectionId, {
                 password: randomBytes(24).toString('base64url'),
-                sipUriCalling: 'disabled',
             });
         } catch (error) {
             const gone = error instanceof TelnyxApiError && [401, 403, 404].includes(error.status);
@@ -142,4 +146,14 @@ export async function ensureSipHost(number: OwnedNumberDoc): Promise<string | nu
     });
     await updateItem('numbers', { _id: number._id }, { set: { sipSubdomain } });
     return `${sipSubdomain}.${SOFTPHONE_DOMAIN}`;
+}
+
+/** The SIP URI that rings this browser, signed in with `number`'s telephony credential (the web dialer's). */
+export async function browserUri(number: OwnedNumberDoc): Promise<string> {
+    if (number.provider !== VoiceProvider.TELNYX) throw new Error('Only a Telnyx number can ring this browser for now.');
+    const { key, connectionId, credential } = await ensureTelnyxCredential(number);
+    if (!credential.sip_username) throw new Error('Telnyx did not give the browser phone a SIP address. Try again.');
+    // Calls from the account's own connections only (the agent's), on connections made before this was set.
+    await updateCredentialConnection(key, connectionId, {});
+    return softphoneUri(credential.sip_username);
 }

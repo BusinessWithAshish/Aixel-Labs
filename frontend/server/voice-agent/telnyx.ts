@@ -231,6 +231,8 @@ export async function listRecordingsForCall(apiKey: string, callControlId: strin
 export type TelnyxTelephonyCredential = {
     id: string;
     name?: string | null;
+    /** "gencred…": calls to `sip:<sip_username>@sip.telnyx.com` ring the browser signed in with it. */
+    sip_username?: string | null;
     connection_id?: string | null;
     expired?: boolean;
 };
@@ -249,6 +251,8 @@ export async function createCredentialConnection(
         connection_name: input.connectionName,
         user_name: input.userName,
         password: input.password,
+        // Its logins' SIP URIs ring for the account's own calls only (an agent testing its owner's phone).
+        sip_uri_calling_preference: 'internal',
         outbound: { outbound_voice_profile_id: input.outboundVoiceProfileId },
     });
     return { id: res.data.id };
@@ -288,17 +292,13 @@ export async function getCredentialConnection(apiKey: string, id: string): Promi
 }
 
 /**
- * `PATCH /v2/credential_connections/{id}` — a new SIP password, and who may ring `sip:<user_name>@sip.telnyx.com`:
- * "internal" = calls from the account's own connections only, "disabled" = nobody.
+ * `PATCH /v2/credential_connections/{id}` — a new SIP password (when given), and SIP URI calls to its logins
+ * (`sip:<user>@sip.telnyx.com`) from the account's own connections only ("internal").
  */
-export async function updateCredentialConnection(
-    apiKey: string,
-    id: string,
-    input: { password: string; sipUriCalling: 'internal' | 'disabled' },
-): Promise<void> {
+export async function updateCredentialConnection(apiKey: string, id: string, input: { password?: string }): Promise<void> {
     await telnyxRequest<unknown>(apiKey, 'PATCH', `/v2/credential_connections/${encodeURIComponent(id)}`, {
-        password: input.password,
-        sip_uri_calling_preference: input.sipUriCalling,
+        ...input,
+        sip_uri_calling_preference: 'internal',
     });
 }
 

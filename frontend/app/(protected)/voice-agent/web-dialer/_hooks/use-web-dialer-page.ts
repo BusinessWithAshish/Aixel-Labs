@@ -1,11 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getWebPhoneSession, type WebPhoneNumber } from '@/app/actions/voice-web-phone-actions';
+import {
+    getWebPhoneSession,
+    listWebPhoneAgents,
+    type WebPhoneAgent,
+    type WebPhoneNumber,
+} from '@/app/actions/voice-web-phone-actions';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { describeCallEnd, describeMicError, NEEDS_COUNTRY_CODE, toE164 } from '@/helpers/voice-web-phone';
 import type { WebPhoneSession } from '@/server/voice-agent/web-phone';
-import { placeBrowserCall, preloadBrowserPhone, type BrowserCall, type BrowserCallEnd } from '../_utils/browser-call';
+import { placeBrowserCall, preloadBrowserPhone, type BrowserCall, type BrowserCallEnd } from '@/helpers/voice-browser-call';
 import { webCallUsdPerMinute } from '../_utils/web-dialer';
 
 export type WebDialerPageData = {
@@ -17,7 +22,7 @@ export type WebDialerPageData = {
 export type WebPhonePhase = 'idle' | 'mic' | 'starting' | 'ringing' | 'active';
 
 /** The phone's bottom tabs. */
-export type WebDialerTab = 'keypad' | 'recents';
+export type WebDialerTab = 'keypad' | 'agents' | 'recents';
 
 /** The last call, shown once it ends. */
 export type FinishedCall = { to: string; seconds: number; usd: number | null };
@@ -64,6 +69,9 @@ export function useWebDialerPage(data: WebDialerPageData) {
     const [micBlocked, setMicBlocked] = useState(false);
     const [finished, setFinished] = useState<FinishedCall | null>(null);
     const [error, setError] = useState<string | null>(loadError);
+    /** Agents to call (Agents tab), loaded when the tab first opens; the one on the line now. */
+    const [agents, setAgents] = useState<WebPhoneAgent[] | null>(null);
+    const [agentCall, setAgentCall] = useState<WebPhoneAgent | null>(null);
     const callRef = useRef<BrowserCall | null>(null);
     /** The owner hung up (or left the page): no "why it ended" message, and a call still starting is dropped. */
     const hungUpRef = useRef(false);
@@ -136,14 +144,19 @@ export function useWebDialerPage(data: WebDialerPageData) {
         session(number.id).catch(() => {});
     }, [dialing, number]);
 
-    function ended(end: BrowserCallEnd, seconds: number) {
+    function ended(end: BrowserCallEnd, seconds: number, agent: WebPhoneAgent | null) {
         callRef.current = null;
         setPhase('idle');
         setAnsweredAt(null);
         setMuted(false);
         setKeypadOpen(false);
+        setAgentCall(null);
         // A call that failed may have failed on its sign-in: the next one signs in again.
         if (end.error || !end.answered) sessionRef.current = null;
+        if (agent) {
+            if (!hungUpRef.current) setError(end.error ?? describeCallEnd({ providerLabel: 'Telnyx', ...end }));
+            return;
+        }
         if (!number || !to) return;
         setFinished({
             to,
@@ -161,13 +174,24 @@ export function useWebDialerPage(data: WebDialerPageData) {
             setError(NEEDS_COUNTRY_CODE);
             return;
         }
+        const nextRecents = [to, ...recents.filter((n) => n !== to)].slice(0, RECENTS_SHOWN);
+        setRecents(nextRecents);
+        store(RECENTS_KEY, JSON.stringify(nextRecents));
+        await dial(to, number.id, null);
+    }
+
+    /** Calls an agent like a customer would: its SIP address, signed in on the number it answers. */
+    async function callAgent(agent: WebPhoneAgent) {
+        if (phase !== 'idle') return;
+        setAgentCall(agent);
+        await dial(agent.address, agent.numberId, agent);
+    }
+
+    async function dial(destination: string, fromId: string, agent: WebPhoneAgent | null) {
         setError(null);
         setFinished(null);
         setTones('');
         hungUpRef.current = false;
-        const nextRecents = [to, ...recents.filter((n) => n !== to)].slice(0, RECENTS_SHOWN);
-        setRecents(nextRecents);
-        store(RECENTS_KEY, JSON.stringify(nextRecents));
         setPhase('mic');
         try {
             // Asked first, so the browser's microphone prompt shows before anything is set up.
@@ -176,18 +200,20 @@ export function useWebDialerPage(data: WebDialerPageData) {
             setMicBlocked(false);
         } catch (micError) {
             setPhase('idle');
+            setAgentCall(null);
             setError(describeMicError(micError));
             return;
         }
         setPhase('starting');
         try {
-            const signedIn = await session(number.id);
+            const signedIn = await session(fromId);
             if (hungUpRef.current) {
                 setPhase('idle');
+                setAgentCall(null);
                 return;
             }
             let answered: number | null = null;
-            const placed = await placeBrowserCall(signedIn, to, {
+            const placed = await placeBrowserCall(signedIn, destination, {
                 onRinging: () => setPhase((p) => (p === 'active' ? p : 'ringing')),
                 onAnswered: () => {
                     answered = Date.now();
@@ -195,13 +221,14 @@ export function useWebDialerPage(data: WebDialerPageData) {
                     setAnsweredAt(answered);
                     setNow(answered);
                 },
-                onEnded: (end) => ended(end, answered === null ? 0 : Math.round((Date.now() - answered) / 1000)),
+                onEnded: (end) => ended(end, answered === null ? 0 : Math.round((Date.now() - answered) / 1000), agent),
             });
             callRef.current = placed;
             if (hungUpRef.current) placed.hangup();
         } catch (callError) {
             sessionRef.current = null;
             setPhase('idle');
+            setAgentCall(null);
             if (!hungUpRef.current) setError(callError instanceof Error ? callError.message : 'Could not start the call');
         }
     }
@@ -242,8 +269,7 @@ export function useWebDialerPage(data: WebDialerPageData) {
         if (/^[\d*#]$/.test(e.key) || (e.key === '+' && phase === 'idle')) {
             pressKey(e.key);
             setTab('keypad');
-        }
-        else if (e.key === 'Backspace' && phase === 'idle') backspace();
+        } else if (e.key === 'Backspace' && phase === 'idle') backspace();
         else if (e.key === 'Enter' && phase === 'idle' && !target?.closest('button, a')) void call();
         else return;
         e.preventDefault();
@@ -271,7 +297,20 @@ export function useWebDialerPage(data: WebDialerPageData) {
             setTab('keypad');
         },
         tab,
-        setTab,
+        /** Opening Agents loads them once. */
+        setTab: (next: WebDialerTab) => {
+            setTab(next);
+            if (next === 'agents' && agents === null) {
+                void listWebPhoneAgents().then((res) => {
+                    setAgents(res.data ?? []);
+                    if (!res.success) setError(res.error ?? 'Could not load your agents');
+                });
+            }
+        },
+        agents,
+        /** The agent on the line, else null (a number was dialled). */
+        agentCall,
+        callAgent,
         tones,
         keypadOpen,
         toggleKeypad: () => setKeypadOpen((open) => !open),

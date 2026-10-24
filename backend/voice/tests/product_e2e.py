@@ -225,6 +225,15 @@ async def test_texml(port, number):
            f"from={doc['from']} to={doc['to']} voice={doc['voice']} endedBy={doc['endedBy']} duration={doc['durationSec']}s gaps={doc['gapsMs']}")
         ok("answered as the agent (her prompt, not prompt.md)", "priya" in agent_text or "sunrise" in agent_text, agent_text[:160])
 
+    # The owner's browser dials the number's SIP address; Telnyx may send a phone number as From: the log keeps the address.
+    t_start = datetime.now(timezone.utc).replace(microsecond=0)
+    address = "sip:testreceptionist-browser@aixel0a1b2c3d4e5f.sip.telnyx.com"
+    await scripted.run(str(port), "busy", texml=True, number=nid, caller="+15550001111", to=address)
+    await asyncio.sleep(2)
+    doc = latest_call(numberId=number["_id"], direction="INBOUND", startedAt={"$gte": t_start})
+    ok("a call to the number's SIP address is logged from that address, no caller phone",
+       doc is not None and doc["from"] == address and not doc.get("callerPhone"), str(doc and doc.get("from")))
+
 
 # --- POST /calls ---------------------------------------------------------------------------------
 
@@ -253,6 +262,8 @@ async def test_calls(port, number, no_agent, no_cc):
     sent = [s for s in SEEN if s["path"] == "/v2/calls"]
     ok("the owner's softphone (sip:<user>@sip.telnyx.com) is dialled as it is", st == 200 and len(sent) == 1
        and sent[0]["body"]["to"] == "sip:aixelsoft01@sip.telnyx.com", f"HTTP {st} {body}")
+    st, body = await ahttp("POST", url, {"numberId": str(number["_id"]), "to": "sip:gencredAb12Cd34Ef56Gh78Ij90Kl12Mn34Op@sip.telnyx.com"}, auth)
+    ok("the owner's browser phone (a telephony credential's gencred…) too", st == 200, f"HTTP {st} {body}")
     st, body = await ahttp("POST", url, {"numberId": str(number["_id"]), "to": "sip:someone@example.com"}, auth)
     ok("any other SIP URI -> 400", st == 400, f"HTTP {st} {body}")
     SEEN.clear()
