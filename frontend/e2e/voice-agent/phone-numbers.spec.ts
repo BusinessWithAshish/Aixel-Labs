@@ -413,8 +413,10 @@ test('the agent page starts a test call with that agent, from a number that uses
     const answering = await seedNumber(db, SECOND_NUMBER, { inboundAgentId: new ObjectId(frontDesk) });
     await openVoiceAgent(page, frontDesk);
 
-    await page.getByRole('button', { name: 'Test call' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Test call' });
+    // The agent page's test dialog, phone tab: the old Test call, the agent fixed.
+    await page.getByRole('button', { name: 'Call this agent' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Call this agent' });
+    await dialog.getByRole('tab', { name: 'From your phone' }).click();
     // The agent is fixed; the number it answers on is picked first.
     await expect(dialog.getByRole('combobox', { name: 'Agent that calls' })).toHaveCount(0);
     await expect(dialog.getByRole('combobox', { name: 'Calls from' })).toHaveText(`Telnyx · ${formatPhone(SECOND_NUMBER)}`);

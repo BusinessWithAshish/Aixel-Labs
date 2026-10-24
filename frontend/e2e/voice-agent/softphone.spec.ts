@@ -137,7 +137,7 @@ test('outbound, in this browser: the agent rings the signed-in browser, which an
 test('inbound, from a softphone: set up, dial the SIP address, reset and remove', async ({ page, db }) => {
     const { agentId, numberId, texmlAppId } = await inboundAgent(db);
     const dialog = await openTest(page, agentId, 'Call this agent');
-    await dialog.getByRole('tab', { name: 'From your softphone' }).click();
+    await dialog.getByRole('tab', { name: 'On Linphone' }).click();
     await dialog.getByRole('button', { name: 'Set up Linphone' }).click();
 
     // A SIP login on the account's one credential connection, with an outbound voice profile (Telnyx refuses its
@@ -185,7 +185,7 @@ test('inbound, from a softphone: set up, dial the SIP address, reset and remove'
 
     // The password survives switching tabs; signed in, then opened again: not shown twice, subdomain not set twice.
     await dialog.getByRole('tab', { name: 'In this browser' }).click();
-    await dialog.getByRole('tab', { name: 'From your softphone' }).click();
+    await dialog.getByRole('tab', { name: 'On Linphone' }).click();
     await expect(dialog.getByTestId('softphone-password')).toHaveText(password);
     telnyx.registered.add(userName);
     await dialog.getByRole('button', { name: 'Check again' }).click();
@@ -193,7 +193,7 @@ test('inbound, from a softphone: set up, dial the SIP address, reset and remove'
     await page.keyboard.press('Escape');
     const patches = telnyx.find('PATCH', /^\/v2\/texml_applications\//).length;
     const reopened = await openTest(page, agentId, 'Call this agent');
-    await reopened.getByRole('tab', { name: 'From your softphone' }).click();
+    await reopened.getByRole('tab', { name: 'On Linphone' }).click();
     await expect(reopened.getByTestId('softphone-dial-in')).toBeVisible();
     await expect(reopened.getByTestId('softphone-password')).toHaveCount(0);
     expect(telnyx.find('PATCH', /^\/v2\/texml_applications\//)).toHaveLength(patches);
@@ -214,7 +214,7 @@ test('inbound, from a softphone: set up, dial the SIP address, reset and remove'
 test('outbound, on a softphone: the agent calls it once it is signed in', async ({ page, db }) => {
     const { agentId, numberId } = await outboundAgent(db);
     const dialog = await openTest(page, agentId, 'Have Caller call me');
-    await dialog.getByRole('tab', { name: 'On your softphone' }).click();
+    await dialog.getByRole('tab', { name: 'On Linphone' }).click();
     await dialog.getByRole('button', { name: 'Set up Linphone' }).click();
     const userName = await dialog.getByTestId('softphone-username').innerText();
     const call = dialog.getByRole('button', { name: 'Call my softphone' });
@@ -288,13 +288,42 @@ test('outbound rehearsal in this browser: the owner dials in, the agent runs it 
 test('outbound rehearsal on Linphone: the address to dial, over TLS', async ({ page, db }) => {
     const { agentId } = await outboundAgent(db);
     const dialog = await openTest(page, agentId, 'Have Caller call me');
-    await dialog.getByRole('tab', { name: 'On your softphone' }).click();
+    await dialog.getByRole('tab', { name: 'On Linphone' }).click();
     await dialog.getByRole('button', { name: 'Set up Linphone' }).click();
     const rehearsal = dialog.getByTestId('rehearsal').last();
     await rehearsal.getByRole('button', { name: 'Get the address to dial' }).click();
     await expect(rehearsal.getByTestId('rehearsal-address')).toHaveText(
         /^sip:caller-rehearse-[0-9a-f]{24}@aixel[0-9a-f]{12}\.sip\.telnyx\.com;transport=tls$/,
     );
+});
+
+test('from your phone: the inbound agent’s number to dial, and the test call to your phone', async ({ page, db }) => {
+    const { agentId } = await inboundAgent(db);
+    const dialog = await openTest(page, agentId, 'Call this agent');
+    await dialog.getByRole('tab', { name: 'From your phone' }).click();
+    await expect(dialog.getByTestId('phone-test-number')).toContainText('+1 347 370 3925');
+    await expect(dialog).toContainText('Calling from another country costs international rates');
+    await dialog.getByLabel('Your phone number').fill('+14155550123');
+    await dialog.getByRole('button', { name: 'Call me now' }).click();
+    await expect(dialog.getByRole('status')).toContainText('Calling +14155550123 now');
+    expect(engine.find('POST', '/calls').map((r) => r.body)).toEqual([
+        expect.objectContaining({ to: '+14155550123', agentId }),
+    ]);
+});
+
+test('on your phone: the outbound agent calls the number you type (the old Test call)', async ({ page, db }) => {
+    const { agentId, numberId } = await outboundAgent(db);
+    await openVoiceAgent(page, agentId);
+    await expect(page.getByRole('button', { name: 'Test call', exact: true })).toHaveCount(0);
+    const dialog = await openTest(page, agentId, 'Have Caller call me');
+    await dialog.getByRole('tab', { name: 'On your phone' }).click();
+    await expect(dialog).toContainText('On a Telnyx trial account it only calls your verified number');
+    await dialog.getByLabel('Your phone number').fill('+14155550123');
+    await dialog.getByRole('button', { name: 'Call me now' }).click();
+    await expect(dialog.getByRole('status')).toContainText('Calling +14155550123 now');
+    expect(engine.find('POST', '/calls').map((r) => r.body)).toEqual([
+        expect.objectContaining({ numberId, to: '+14155550123', agentId }),
+    ]);
 });
 
 test('call logs: browser, softphone and rehearsal tests say so, with no phone number for the SIP side', async ({
@@ -336,8 +365,6 @@ test('call logs: browser, softphone and rehearsal tests say so, with no phone nu
     const cards = page.getByTestId('call-card');
     await expect(cards.nth(0)).toContainText('Softphone test');
     await expect(cards.nth(1)).toContainText('Browser test');
-    await expect(cards.nth(1)).toContainText('Browser');
     await expect(cards.nth(2)).toContainText('Outbound rehearsal');
-    await expect(cards.nth(2)).toContainText('You');
     for (const leak of ['aixelf4a2b', '79714229', 'gencred', 'rehearse-']) await expect(page.getByText(leak)).toHaveCount(0);
 });

@@ -463,10 +463,10 @@ test('a stack step with no key: the card and the playground say why, and every w
         'href',
         '/voice-agent/settings#gemini-key',
     );
-    await expect(page.getByRole('button', { name: 'Test call' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Have Maya outbound call me' })).toBeDisabled();
     await expect(page.getByRole('button', { name: /Start call/ })).toBeDisabled();
     const reasons = page.getByTestId('disabled-reason');
-    await expect(reasons).toHaveCount(3); // Test call, the browser / softphone test, Start call
+    await expect(reasons).toHaveCount(2); // the agent's test (browser, Linphone, phone), Start call
     await reasons.first().focus();
     await expect(page.getByRole('tooltip')).toContainText('No Deepgram API key');
 
@@ -484,11 +484,11 @@ test('a stack step with no key: the card and the playground say why, and every w
     await expect(page.locator('#agent-name')).toHaveValue('Maya outbound');
     await expect(blockers).toHaveCount(0);
     await expect(reasons).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Test call' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Have Maya outbound call me' })).toBeEnabled();
     await expect(page.getByRole('button', { name: /Start call/ })).toBeEnabled();
 });
 
-test('test calls and the browser / softphone test need a number; the playground does not', async ({ page, db }) => {
+test('trying the agent (browser, Linphone, phone) needs a number; the playground does not', async ({ page, db }) => {
     await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
     const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Maya', callType: VoiceAgentCallType.INBOUND });
     await openVoiceAgent(page, agentId);
@@ -496,7 +496,7 @@ test('test calls and the browser / softphone test need a number; the playground 
     await expect(card).toHaveCount(1); // the agent card's; the playground has nothing to say
     await expect(card).toContainText('It is not on a phone number yet.');
     await expect(card.getByRole('link', { name: 'Link a phone number →' })).toHaveAttribute('href', '#agent-numbers');
-    await expect(page.getByRole('button', { name: 'Test call' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Call this agent' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Start call' })).toBeEnabled();
     await expect(page.getByTestId('playground-no-number')).toHaveText(
         'Runs in your browser straight to the model: no phone number needed.',

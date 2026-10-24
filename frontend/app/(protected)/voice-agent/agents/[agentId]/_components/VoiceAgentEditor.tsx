@@ -21,7 +21,6 @@ import type { PromptTool } from '../_utils/prompt-tools';
 import { AgentNumbersField, slotHolder } from './AgentNumbersField';
 import { CallBlockers } from '@/components/common/voice-agent/CallBlockers';
 import { AgentTestButton } from './AgentTestButton';
-import { AgentTestCallButton } from './AgentTestCallButton';
 import { PromptField } from './PromptField';
 import { PromptTemplates } from './PromptTemplates';
 import { CallSettingsCard } from './settings/CallSettingsCard';
@@ -116,7 +115,6 @@ export function VoiceAgentEditor() {
                                         Discard
                                     </Button>
                                 ) : null}
-                                <AgentTestCallButton />
                                 <AgentTestButton />
                                 <Button
                                     type="button"
