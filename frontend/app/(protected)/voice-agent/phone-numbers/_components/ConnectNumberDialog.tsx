@@ -11,12 +11,17 @@ import {
     connectTelnyx,
     connectTwilio,
     connectVoiceLink,
+    connectWhatsApp,
     importTelnyxNumbers,
     importTwilioNumbers,
     importVoiceLinkNumbers,
+    importWhatsAppNumbers,
     type AccountNumber,
     type TwilioCredentials,
+    type VoiceNumberListItem,
+    type WhatsAppCredentials,
 } from '@/app/actions/voice-number-actions';
+import type { ALApiResponse } from '@aixellabs/backend/api/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -50,6 +55,9 @@ const credentialsSchema = z
         authMode: z.enum(['apiKey', 'authToken']),
         apiKeySid: z.string().trim(),
         secret: z.string().trim(),
+        appId: z.string().trim(),
+        appSecret: z.string().trim(),
+        accessToken: z.string().trim(),
     })
     .superRefine((c, ctx) => {
         const missing = (field: keyof typeof c, message: string) =>
@@ -60,6 +68,11 @@ const credentialsSchema = z
             missing('accountSid', 'Paste your Twilio Account SID');
             if (c.authMode === 'apiKey') missing('apiKeySid', 'Paste the API key SID');
             missing('secret', c.authMode === 'apiKey' ? 'Paste the API key secret' : 'Paste the Auth Token');
+        }
+        if (c.provider === VoiceProvider.WHATSAPP) {
+            missing('appId', 'Paste your Meta App ID');
+            missing('appSecret', 'Paste your Meta App secret');
+            missing('accessToken', 'Paste the system user access token');
         }
     });
 
@@ -74,17 +87,61 @@ const NO_CREDENTIALS: Credentials = {
     authMode: 'apiKey',
     apiKeySid: '',
     secret: '',
+    appId: '',
+    appSecret: '',
+    accessToken: '',
 };
 
 function twilioCredentials(c: Credentials): TwilioCredentials {
     return { accountSid: c.accountSid, apiKeySid: c.authMode === 'apiKey' ? c.apiKeySid : null, secret: c.secret };
 }
 
-/** Where each provider keeps what the form asks for, and what to call it. */
-const CREDENTIAL_WORDS: Record<VoiceProvider, { secret: string; another: string }> = {
-    [VoiceProvider.TELNYX]: { secret: 'key', another: 'Use another key' },
-    [VoiceProvider.TWILIO]: { secret: 'credentials', another: 'Use other credentials' },
-    [VoiceProvider.VOICELINK]: { secret: 'token', another: 'Use another token' },
+function whatsappCredentials(c: Credentials): WhatsAppCredentials {
+    return { appId: c.appId, appSecret: c.appSecret, token: c.accessToken };
+}
+
+/** Each provider's server actions, fed from the form: check the credentials and list the numbers, then import. */
+const ACCOUNT_ACTIONS: Record<
+    VoiceProvider,
+    {
+        find(c: Credentials): Promise<ALApiResponse<AccountNumber[]>>;
+        importChosen(c: Credentials, ids: string[]): Promise<ALApiResponse<VoiceNumberListItem[]>>;
+    }
+> = {
+    [VoiceProvider.TELNYX]: {
+        find: (c) => connectTelnyx(c.apiKey),
+        importChosen: (c, ids) => importTelnyxNumbers(c.apiKey, ids),
+    },
+    [VoiceProvider.TWILIO]: {
+        find: (c) => connectTwilio(twilioCredentials(c)),
+        importChosen: (c, ids) => importTwilioNumbers(twilioCredentials(c), ids),
+    },
+    [VoiceProvider.VOICELINK]: {
+        find: (c) => connectVoiceLink({ apiToken: c.apiToken, clientId: c.clientId }),
+        importChosen: (c, ids) => importVoiceLinkNumbers({ apiToken: c.apiToken, clientId: c.clientId }, ids),
+    },
+    [VoiceProvider.WHATSAPP]: {
+        find: (c) => connectWhatsApp(whatsappCredentials(c)),
+        importChosen: (c, ids) => importWhatsAppNumbers(whatsappCredentials(c), ids),
+    },
+};
+
+/** Where each provider keeps what the form asks for, what to call it, and the badge on a number it cannot import. */
+const CREDENTIAL_WORDS: Record<VoiceProvider, { secret: string; plural: boolean; another: string; unusable: string }> = {
+    [VoiceProvider.TELNYX]: { secret: 'key', plural: false, another: 'Use another key', unusable: 'No voice calls' },
+    [VoiceProvider.TWILIO]: {
+        secret: 'credentials',
+        plural: true,
+        another: 'Use other credentials',
+        unusable: 'No voice calls',
+    },
+    [VoiceProvider.VOICELINK]: { secret: 'token', plural: false, another: 'Use another token', unusable: 'No voice calls' },
+    [VoiceProvider.WHATSAPP]: {
+        secret: 'app secret and token',
+        plural: true,
+        another: 'Use other credentials',
+        unusable: 'Not on the Cloud API',
+    },
 };
 
 const NO_NUMBERS: Record<VoiceProvider, string> = {
@@ -93,6 +150,8 @@ const NO_NUMBERS: Record<VoiceProvider, string> = {
         'This Twilio account has no phone numbers. Buy one in the Twilio Console (Phone Numbers), then connect again.',
     [VoiceProvider.VOICELINK]:
         'This VoiceLink account has no phone numbers. Ask VoiceLink (or your reseller) to assign one, then connect again.',
+    [VoiceProvider.WHATSAPP]:
+        'This WhatsApp account has no phone numbers. Add your business number in your Meta app (WhatsApp, API Setup), then connect again.',
 };
 
 type CredentialFieldProps = {
@@ -139,8 +198,10 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
     const authMode = form.watch('authMode');
     const isVoiceLink = provider === VoiceProvider.VOICELINK;
     const isTwilio = provider === VoiceProvider.TWILIO;
+    const isWhatsApp = provider === VoiceProvider.WHATSAPP;
     const { label } = numberProviderInfo(provider);
     const words = CREDENTIAL_WORDS[provider];
+    const actions = ACCOUNT_ACTIONS[provider];
 
     /** Back to the key / token step. */
     const resetCredentials = () => {
@@ -152,12 +213,7 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
 
     const findNumbers = form.handleSubmit(async (c) => {
         setError(null);
-        const res =
-            c.provider === VoiceProvider.TWILIO
-                ? await connectTwilio(twilioCredentials(c))
-                : c.provider === VoiceProvider.VOICELINK
-                  ? await connectVoiceLink({ apiToken: c.apiToken, clientId: c.clientId })
-                  : await connectTelnyx(c.apiKey);
+        const res = await actions.find(c);
         if (!res.success || !res.data) {
             setError(res.error ?? `Could not reach ${label}`);
             return;
@@ -177,11 +233,7 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
         const ids = [...selected];
         setImporting(true);
         setError(null);
-        const res = isTwilio
-            ? await importTwilioNumbers(twilioCredentials(c), ids)
-            : isVoiceLink
-              ? await importVoiceLinkNumbers({ apiToken: c.apiToken, clientId: c.clientId }, ids)
-              : await importTelnyxNumbers(c.apiKey, ids);
+        const res = await actions.importChosen(c, ids);
         setImporting(false);
         if (!res.success || !res.data) {
             setError(res.error ?? 'Could not import the numbers');
@@ -213,7 +265,7 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
                 <DialogDescription>
                     {accountNumbers
                         ? `Choose the numbers to add from ${label}. Nothing changes in ${label} until an agent uses a number.`
-                        : `We use your own ${label} account for calls. Your ${words.secret} ${isTwilio ? 'are' : 'is'} encrypted before ${isTwilio ? 'they are' : 'it is'} stored and never shown again.`}
+                        : `We use your own ${label} account for calls. Your ${words.secret} ${words.plural ? 'are' : 'is'} encrypted before ${words.plural ? 'they are' : 'it is'} stored and never shown again.`}
                 </DialogDescription>
                 <Button
                     type="button"
@@ -278,6 +330,31 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
                                         hint="Next to the Account SID on the Console home page. An API key is safer: you can delete it without changing anything else."
                                     />
                                 )}
+                            </>
+                        ) : isWhatsApp ? (
+                            <>
+                                <CredentialField
+                                    name="appId"
+                                    id="whatsapp-app-id"
+                                    label="App ID"
+                                    inputMode="numeric"
+                                    hint="Your Meta app (one just for Aixel Labs): App settings, Basic."
+                                />
+                                <CredentialField
+                                    name="appSecret"
+                                    id="whatsapp-app-secret"
+                                    label="App secret"
+                                    secret
+                                    hint="Next to the App ID: click Show."
+                                />
+                                <CredentialField
+                                    name="accessToken"
+                                    id="whatsapp-access-token"
+                                    label="Access token"
+                                    secret
+                                    placeholder="EA…"
+                                    hint="Business Settings, System users: a token that never expires, with whatsapp_business_management and whatsapp_business_messaging."
+                                />
                             </>
                         ) : isVoiceLink ? (
                             <>
@@ -348,7 +425,7 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
                                         <Badge variant="yellow">Used by another account</Badge>
                                     ) : n.cannotImport ? (
                                         <Badge variant="outline" title={n.cannotImport}>
-                                            No voice calls
+                                            {words.unusable}
                                         </Badge>
                                     ) : n.status !== 'active' ? (
                                         <Badge variant="outline">{n.status}</Badge>

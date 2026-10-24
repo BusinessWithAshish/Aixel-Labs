@@ -44,6 +44,7 @@ import speech
 import tools
 import twilio
 import voicelink
+import whatsapp
 from bot import (  # one source of truth
     GEMINI_LIVE_MODEL_DEFAULT,
     RawPCMSerializer,
@@ -596,7 +597,7 @@ def busy() -> int:
     """What a draining process still waits for: calls (and lines being prepared), campaign calls it
     placed and has not settled, and the work it does after a call or a carrier's webhook."""
     return (len(ACTIVE) + len(PREPARED) + len(campaigns.INFLIGHT) + len(product._AFTER_CALL)
-            + len(twilio._TASKS) + len(voicelink._TASKS))
+            + len(twilio._TASKS) + len(voicelink._TASKS) + len(whatsapp._TASKS))
 
 
 DRAINING_ERROR = "The voice engine is restarting: try again in a moment."
@@ -604,14 +605,14 @@ DRAINING_ERROR = "The voice engine is restarting: try again in a moment."
 _EVENTS: set[asyncio.Task] = set()
 
 
-def to_other_slots(path: str, query: str, body: bytes):
+def to_other_slots(path: str, query: str, body: bytes, headers: dict | None = None):
     """Hand a carrier event this process has no call for to the service's other slot, in the background.
-    Once only: the other slot never hands it back (FORWARDED)."""
+    Once only: the other slot never hands it back (FORWARDED). `headers` go along (a signature it checks again)."""
     async def send(port: int):
         try:
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
                 async with session.post(f"http://127.0.0.1:{port}{path}?{query}", data=body,
-                                        headers={"Content-Type": "application/json", FORWARDED: "1"}) as r:
+                                        headers={**(headers or {}), "Content-Type": "application/json", FORWARDED: "1"}) as r:
                     logger.info(f"{path}: handed to the slot on :{port} (HTTP {r.status})")
         except Exception as e:
             logger.debug(f"{path}: the slot on :{port} is not there ({e!r})")
@@ -1110,6 +1111,113 @@ def make_app() -> FastAPI:
         twilio.handle_status(number_id, agent_id, form)
         return {"ok": True}
 
+    @app.get("/whatsapp")
+    async def whatsapp_verify(request: Request):
+        """Meta checks the callback the app set on a customer's Meta app (`?app=&sig=`): echo its challenge."""
+        q = request.query_params
+        app_id = q.get("app") or ""
+        if (not product.sig_ok(q.get("sig"), "whatsapp", app_id) or q.get("hub.mode") != "subscribe"
+                or not whatsapp.verify_ok(app_id, q.get("hub.verify_token"))):
+            logger.warning(f"whatsapp: refused a callback check for app {app_id!r}")
+            return Response(status_code=403)
+        return Response(content=q.get("hub.challenge") or "", media_type="text/plain")
+
+    @app.post("/whatsapp")
+    async def whatsapp_events(request: Request):
+        """Every webhook of a customer's Meta app (`?app=&sig=`, see whatsapp.py), signed with its app
+        secret. 200 at once (Meta retries otherwise); a call coming in is answered in the background."""
+        q = request.query_params
+        app_id = q.get("app") or ""
+        if not product.sig_ok(q.get("sig"), "whatsapp", app_id):
+            return Response(status_code=403)
+        raw = await request.body()
+        try:
+            numbers = await asyncio.to_thread(product.whatsapp_numbers, app_id)
+        except Exception as e:
+            logger.error(f"whatsapp: could not load the numbers of app {app_id}: {e}")
+            return Response(status_code=503)  # Meta tries again later
+        signature = request.headers.get("x-hub-signature-256")
+        if not whatsapp.signed(numbers, raw, signature):
+            logger.warning(f"whatsapp: refused a webhook for app {app_id!r}: X-Hub-Signature-256 does not match")
+            return Response(status_code=403)
+        try:
+            payload = json.loads(raw)
+        except ValueError:
+            return Response(status_code=400)
+        for event in whatsapp.calls_in(payload):
+            # The number must be on this app: a webhook names only numbers its own app's secret can sign for.
+            number = next((n for n in numbers if n["providerNumberId"] == event["phone_number_id"]), None)
+            if not number or not whatsapp.fresh(event["id"], event["event"]):
+                continue
+            if event["event"] == "connect" and event["direction"] == "USER_INITIATED":
+                whatsapp.spawn(answer_whatsapp(number, event))
+            elif event["event"] == "terminate" and not await whatsapp.hang_up(event["id"]):
+                if not request.headers.get(FORWARDED):  # the call may be on the other slot (a deploy's drain)
+                    to_other_slots("/whatsapp", request.url.query, raw, {"X-Hub-Signature-256": signature or ""})
+        return {"ok": True}
+
+    async def answer_whatsapp(number: dict, event: dict):
+        """A WhatsApp call coming in to a customer's number: its inbound agent answers over WebRTC."""
+        call_id, pnid = event["id"], number["providerNumberId"]
+        try:
+            token = product.open_secret(number["apiKeySealed"])
+        except Exception as e:
+            return logger.error(f"whatsapp: number {number['_id']}: its access token cannot be opened ({e})")
+
+        async def reject(why: str):
+            logger.warning(f"whatsapp: call {call_id} to {number.get('phoneNumber')}: {why}, rejecting")
+            await whatsapp.call_action(token, pnid, call_id, "reject")
+
+        if draining():
+            return await reject("draining")
+        if len(ACTIVE) >= MAX_CALLS:
+            return await reject(f"{len(ACTIVE)} calls already running (MAX_CALLS={MAX_CALLS})")
+        if not event["sdp"] or event["sdp_type"] != "offer":
+            return await reject("no SDP offer")
+        caller = normalize_number(event["from"])  # None for someone known only by username
+        try:
+            _, agent = await asyncio.to_thread(product.load_number, number["_id"], "INBOUND")
+            if not agent:
+                return await reject("the number has no inbound agent")
+            ctx = await asyncio.to_thread(product.phone_call, number, agent, "INBOUND", caller)
+        except product.CallRefused as e:
+            await asyncio.to_thread(product.save_refused, number, agent, "INBOUND", caller, e)
+            return await reject(str(e))
+        except Exception as e:
+            logger.error(f"whatsapp: call {call_id}: {e}")
+            return await reject("the database is unavailable")
+        # Needs aiortc (pipecat-ai[webrtc]): imported here, so the engine runs without it until a WhatsApp call comes.
+        from pipecat.transports.base_transport import TransportParams
+        from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
+        from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
+
+        # No STUN: Meta is ICE-lite and accepts the address our checks arrive from, so gathering more only delays the answer.
+        connection = SmallWebRTCConnection()
+        try:
+            await connection.initialize(sdp=event["sdp"], type="offer")
+            answer = whatsapp.for_whatsapp(connection.get_answer()["sdp"])
+        except Exception as e:
+            await connection.disconnect()
+            return await reject(f"Meta's offer could not be answered ({e!r})")
+        transport = SmallWebRTCTransport(webrtc_connection=connection, params=TransportParams(
+            audio_in_enabled=True, audio_out_enabled=True,
+            audio_in_sample_rate=GEMINI_SAMPLE_RATE_IN, audio_out_sample_rate=GEMINI_SAMPLE_RATE_OUT))
+        voice = ctx["voice"] if ctx["voice"] in VOICES else DEFAULT_VOICE
+        logger.info(f"whatsapp: {caller or 'a username'} calling {number.get('phoneNumber')} (call {call_id})"
+                    f" -> agent {agent['_id']} ({voice})")
+        started = asyncio.get_running_loop().create_future()
+        started.set_result({"whatsapp": event})
+        whatsapp.CALLS[call_id] = connection
+        # The pipeline is up before Meta hears our answer: media can only flow once it has it.
+        line = asyncio.create_task(serve(None, voice, caller, 0, 0, started, Hold(name="hold"), ctx, transport=transport))
+        for action in ("pre_accept", "accept"):
+            status, _ = await whatsapp.call_action(token, pnid, call_id, action, answer)
+            if status != 200:
+                line.cancel()
+                await connection.disconnect()
+                return
+        await line
+
     @app.post("/calls")
     async def place_call(request: Request):
         """The app asks for a call from a customer's number: {"numberId", "to", "agentId"?, "variables"?}.
@@ -1176,6 +1284,8 @@ def make_app() -> FastAPI:
             return await place_voicelink_call(number, agent, to)
         if number.get("provider") == "TWILIO":
             return await place_twilio_call(number, agent, to)
+        if number.get("provider") == "WHATSAPP":  # business-initiated calls: whatsapp.py, next
+            return JSONResponse({"error": "A WhatsApp number only answers calls for now"}, status_code=409)
         if not number.get("callControlAppId"):
             return JSONResponse({"error": "this number has no Call Control application"}, status_code=409)
         if is_suppressed(to):
@@ -1332,7 +1442,7 @@ async def serve(*args, **kwargs):
 
 
 async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: int, started: asyncio.Future, hold: Hold,
-                      ctx: dict | None = None, *, slot: str):
+                      ctx: dict | None = None, *, slot: str, transport=None):
     """One call, from an open line to the written record.
 
     `started` resolves to Telnyx's "start" message. It is already there for a
@@ -1347,25 +1457,30 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
     link to /voicelink-events), and the hang-up, which is closing the socket. The
     transport closes it on every end of the pipeline, so every guard's hang-up
     (goodbye, dnc, abuse, voicemail...) ends a VoiceLink call with no extra step.
+
+    A WhatsApp call (ctx provider WHATSAPP) comes with its `transport` built: WebRTC
+    from Meta (whatsapp.py), so no socket, serializer or recording. Meta's call id is
+    its id, and however it ends, we send Meta `terminate` (whatsapp.end).
     """
     vl = bool(ctx and ctx.get("provider") == "VOICELINK")
     # A Twilio number's call: Twilio's serializer with the customer's credentials (hang-up by
     # REST), the CallSid as its id, the recording asked for from their account once it is live.
     tw = bool(ctx and ctx.get("provider") == "TWILIO")
+    wa = transport is not None
     prepared = not started.done()
     # A call that came in is already answered; one we placed is not, yet.
     line = {"pickup": asyncio.Event(), "answered": not ring, "cause": None}
     if not ring:
         line["pickup"].set()
 
-    serializer = voicelink.VoiceLinkSerializer() if vl else twilio.TwilioSerializer(ctx["twilio"]) if tw else TelnyxFrameSerializer(
+    serializer = None if wa else voicelink.VoiceLinkSerializer() if vl else twilio.TwilioSerializer(ctx["twilio"]) if tw else TelnyxFrameSerializer(
         stream_id="pending",
         call_control_id="pending",
         outbound_encoding="PCMU",
         inbound_encoding="PCMU",
         api_key=ctx["api_key"] if ctx else os.environ["TELNYX_API_KEY"],
     )
-    if prepared and not vl:  # no call to hang up until the stream is bound (bind() turns it on)
+    if prepared and not vl and not wa:  # no call to hang up until the stream is bound (bind() turns it on)
         serializer._params.auto_hang_up = False
     state: dict = {}
     record = {
@@ -1384,7 +1499,11 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
     def bind(call: dict):
         """The stream is open: now we know which call this is."""
         nonlocal is_test
-        if vl:  # VoiceLink's start: its own ids and codec, read by its serializer
+        if wa:  # answer_whatsapp's {"whatsapp": event}: Meta's call id names the call
+            call_id = call["whatsapp"]["id"]
+            record["stream_id"] = "".join(c if c.isalnum() or c in "-_.:" else "_" for c in call_id) or f"wa-{slot}"
+            record["call_control_id"] = call_id
+        elif vl:  # VoiceLink's start: its own ids and codec, read by its serializer
             serializer.start(call)
             # Names the call's record file: keep it a plain file name.
             record["stream_id"] = "".join(c if c.isalnum() or c in "-_.:" else "_" for c in serializer.stream_sid) or f"vl-{slot}"
@@ -1418,7 +1537,7 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
     if not prepared:
         bind(started.result())
 
-    transport = FastAPIWebsocketTransport(
+    transport = transport or FastAPIWebsocketTransport(
         websocket=sock,
         params=FastAPIWebsocketParams(
             audio_in_enabled=True,
@@ -1516,7 +1635,7 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
         # kept back, so they go out the instant the line is live. A VoiceLink
         # stream opens only at pickup: there her opener is made while the person
         # says hello.
-        early = bool(prepared or (ring and OPENER_WHILE_RINGING) or vl or tw)
+        early = bool(prepared or (ring and OPENER_WHILE_RINGING) or vl or tw or wa)
         if early:
             await open_with_her_line()
         if prepared:
@@ -1550,7 +1669,7 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
         if tw:
             if not is_test and record["call_control_id"]:
                 asyncio.create_task(twilio.start_recording(ctx["twilio"], record["call_control_id"]))
-        elif not is_test and not vl:
+        elif not is_test and not vl and not wa:
             asyncio.create_task(start_recording(record["call_control_id"], ctx["api_key"] if ctx else None))
         # A person says "hello?" when they pick up. She waits for it, unless she speaks first (her
         # agent's firstSpeaker: by default an inbound agent greets, an outbound one waits).
@@ -1576,6 +1695,8 @@ async def _serve_line(sock, voice: str, callee: str | None, inbound: int, ring: 
         finished = True
         watch.stop()
         LINES.pop(record["call_control_id"], None)
+        if wa:
+            whatsapp.end(ctx, record["call_control_id"])
         refused = bool(ctx and ctx.get("gemini_refused"))
         if record["stream_id"] is None:
             # A prepared line nobody arrived on: there was no call. Unless Google refused the owner's

@@ -69,6 +69,22 @@ export function numberWebhookUrl(
     return `${voiceEngineUrl()}${path}?n=${numberId}&sig=${signParts('number', numberId)}`;
 }
 
+/**
+ * Where a customer's Meta app sends its WhatsApp webhooks (`<engine>/whatsapp?app=…&sig=…`, one for all
+ * the app's numbers), and the token Meta echoes when it checks that callback.
+ */
+export function whatsappWebhook(appId: string): { callbackUrl: string; verifyToken: string } {
+    return {
+        callbackUrl: `${voiceEngineUrl()}/whatsapp?app=${encodeURIComponent(appId)}&sig=${signParts('whatsapp', appId)}`,
+        verifyToken: signParts('whatsapp-verify', appId),
+    };
+}
+
+/** Whether a webhook callback is this engine's WhatsApp one (whatever app it names). */
+export function isWhatsAppWebhook(url: string | undefined): boolean {
+    return !!url && url.startsWith(`${voiceEngineUrl()}/whatsapp?`);
+}
+
 /** The media socket a VoiceLink number's bot streams calls in to: `wss://<engine>/voicelink?n=…&sig=…`. */
 export function voicelinkSocketUrl(numberId: string): string {
     const base = voiceEngineUrl().replace(/^http/, 'ws');

@@ -30,9 +30,25 @@ export const NUMBER_PROVIDERS: Record<VoiceProvider, NumberProviderInfo> = {
         callExample: '+919876543210',
         logo: '/brand-logos/voicelink.png',
     },
+    [VoiceProvider.WHATSAPP]: {
+        label: 'WhatsApp',
+        region: 'WhatsApp Business numbers, any country (answers calls)',
+        callExample: '+919876543210',
+        logo: '/brand-logos/whatsapp.svg',
+    },
 };
 
-export const NUMBER_PROVIDER_ORDER: VoiceProvider[] = [VoiceProvider.TELNYX, VoiceProvider.TWILIO, VoiceProvider.VOICELINK];
+export const NUMBER_PROVIDER_ORDER: VoiceProvider[] = [
+    VoiceProvider.TELNYX,
+    VoiceProvider.TWILIO,
+    VoiceProvider.VOICELINK,
+    VoiceProvider.WHATSAPP,
+];
+
+/** Providers whose numbers can place calls (a WhatsApp number only answers, for now). */
+export function placesCalls(provider: VoiceProvider): boolean {
+    return provider !== VoiceProvider.WHATSAPP;
+}
 
 export function numberProviderInfo(provider: VoiceProvider): NumberProviderInfo {
     return NUMBER_PROVIDERS[provider] ?? NUMBER_PROVIDERS[VoiceProvider.TELNYX];

@@ -101,6 +101,10 @@ export async function findCallRecording(owner: VoiceOwnerScope, call: VoiceCallD
             reason: 'VoiceLink has not sent the recording for this call yet. It usually arrives a minute or two after the call ends.',
         };
     }
+    // Never past here: the Telnyx lookup below would send the number's Meta token to Telnyx.
+    if (number?.provider === VoiceProvider.WHATSAPP) {
+        return { available: false, reason: 'WhatsApp calls are not recorded yet.' };
+    }
     const providerName = number?.provider === VoiceProvider.TWILIO ? 'Twilio' : 'Telnyx';
     if (!call.providerCallId) {
         return { available: false, reason: `This call was not placed through ${providerName}, so there is no recording.` };

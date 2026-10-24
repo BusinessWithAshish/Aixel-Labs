@@ -20,6 +20,7 @@ import {
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
 import { customVariableNames } from '@/helpers/voice-agent-features';
+import { placesCalls } from '@/helpers/voice-number-providers';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { type CampaignContactInput, campaignCountry, checkContacts } from '@/helpers/voice-campaign-contacts';
 import { campaignSettingsSchema, parseOrThrow, type VoiceCampaignSettingsInput } from '@/helpers/voice-schemas';
@@ -328,7 +329,9 @@ export const getVoiceCampaignSetup = async (): Promise<ALApiResponse<VoiceCampai
                 })),
                 promptChars: (d.prompt ?? '').length,
             })),
-            numbers: numberDocs.map((d) => ({ id: d._id.toString(), phoneNumber: d.phoneNumber, provider: d.provider })),
+            numbers: numberDocs
+                .filter((d) => placesCalls(d.provider))
+                .map((d) => ({ id: d._id.toString(), phoneNumber: d.phoneNumber, provider: d.provider })),
             geminiFreeTier: geminiKey.tier === 'free',
         };
     });

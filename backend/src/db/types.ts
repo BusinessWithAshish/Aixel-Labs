@@ -529,6 +529,8 @@ export enum VoiceProvider {
   VOICELINK = "VOICELINK",
   /** US and international numbers in the customer's own Twilio account (twilio.com). */
   TWILIO = "TWILIO",
+  /** WhatsApp Business numbers (any country) on the customer's own Meta app, through the WhatsApp Cloud API. */
+  WHATSAPP = "WHATSAPP",
 }
 
 /** A VoiceLink DID's routing rule, as VoiceLink stores it (one rule covers both directions). */
@@ -588,6 +590,36 @@ export type TwilioNumberState = {
   previousRouting?: TwilioVoiceRouting;
 };
 
+/**
+ * The part of a WhatsApp number's calling settings (`/{phone-number-id}/settings`, `calling`) that AI
+ * answering changes, in Meta's own field names. Nothing else (call hours, SIP...) is ever touched.
+ */
+export type WhatsAppCallingSettings = {
+  /** "ENABLED" | "DISABLED" */
+  status: string;
+  /** "DEFAULT" | "DISABLE_ALL"; absent when Meta had none. */
+  call_icon_visibility?: string;
+};
+
+/**
+ * How we reach a customer's own Meta app and WhatsApp Business Account (WABA) for one number. The
+ * access token (a system user's, never expiring) is `apiKeySealed`. The app's webhook (fields `calls`,
+ * `messages`) points at the engine's `/whatsapp?app=…&sig=…` once AI answering is on.
+ */
+export type WhatsAppNumberState = {
+  /** The customer's Meta app: every webhook is signed with its secret. */
+  appId: string;
+  /** The app secret, sealed like `apiKeySealed`: the engine checks each webhook's X-Hub-Signature-256 with it. */
+  appSecretSealed: string;
+  /** The WABA the number is in (its webhooks are subscribed per WABA). */
+  wabaId: string;
+  /**
+   * The number's calling settings before AI answering first turned calling on. Absent = we never changed
+   * them. Saved on the first change only; put back, then dropped, when AI answering goes off or the number is removed.
+   */
+  previousCalling?: WhatsAppCallingSettings;
+};
+
 /** A number the customer brought, in their own provider account. Kept in its owner's VoiceAccountDoc.numbers. */
 export type VoiceNumberDoc<Id = ObjectId> = {
   /** Calls, campaigns and campaign contacts point at it (`numberId`). */
@@ -595,11 +627,12 @@ export type VoiceNumberDoc<Id = ObjectId> = {
   provider: VoiceProvider;
   /** E.164, e.g. "+13473703925". Unique across owners: a number is connected to one account. */
   phoneNumber: string;
-  /** The provider's id for the number (Telnyx phone_number id, VoiceLink DID id, Twilio IncomingPhoneNumber SID "PN…"). */
+  /** The provider's id for the number (Telnyx phone_number id, VoiceLink DID id, Twilio IncomingPhoneNumber SID "PN…", WhatsApp phone number id). */
   providerNumberId: string;
   /**
-   * The customer's API key (Telnyx), API token (VoiceLink), or API key secret / Auth Token (Twilio, see
-   * `twilio.apiKeySid`), sealed (AES-256-GCM, see frontend/server/voice-agent/engine.ts). Never sent to the client.
+   * The customer's API key (Telnyx), API token (VoiceLink), API key secret / Auth Token (Twilio, see
+   * `twilio.apiKeySid`), or system-user access token (WhatsApp), sealed (AES-256-GCM, see
+   * frontend/server/voice-agent/engine.ts). Never sent to the client.
    */
   apiKeySealed: string;
   /** Telnyx TeXML application we created in their account for calls coming in. */
@@ -628,12 +661,14 @@ export type VoiceNumberDoc<Id = ObjectId> = {
   voicelink?: VoiceLinkNumberState;
   /** Twilio numbers only. */
   twilio?: TwilioNumberState;
+  /** WhatsApp numbers only. */
+  whatsapp?: WhatsAppNumberState;
   createdAt: Date;
   updatedAt: Date;
 };
 
-/** Client view: no sealed key. */
-export type VoiceNumber = Omit<VoiceNumberDoc<string>, "apiKeySealed" | "createdAt" | "updatedAt"> & {
+/** Client view: no sealed key (the WhatsApp state holds the sealed app secret, so it stays on the server too). */
+export type VoiceNumber = Omit<VoiceNumberDoc<string>, "apiKeySealed" | "whatsapp" | "createdAt" | "updatedAt"> & {
   tenantId: string;
   userId: string;
   createdAt: string;

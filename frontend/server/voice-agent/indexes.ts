@@ -44,6 +44,11 @@ export async function ensureVoiceAgentIndexes(): Promise<void> {
         ),
         // The engine finds a call's number (and so its owner and key) by the number's id.
         accounts.createIndex({ 'numbers._id': 1 }),
+        // A WhatsApp webhook names its Meta app: the engine finds the app's numbers (and its secret) by it.
+        accounts.createIndex(
+            { 'numbers.whatsapp.appId': 1 },
+            { partialFilterExpression: { 'numbers.whatsapp.appId': { $exists: true } } },
+        ),
         // Linphone's one-time setup link finds its softphone by the link's token.
         accounts.createIndex(
             { 'softphone.provisioning.tokenHash': 1 },

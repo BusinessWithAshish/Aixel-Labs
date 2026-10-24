@@ -137,6 +137,18 @@ def find_number(number_id) -> dict | None:
     return {**account["numbers"][0], "userId": account["userId"], "tenantId": account["tenantId"]}
 
 
+def whatsapp_numbers(app_id: str) -> list[dict]:
+    """Every WhatsApp number on one Meta app, whoever owns it (one app's webhook carries them all), each
+    with its owner's `userId` and `tenantId` as find_number gives them."""
+    if not app_id:
+        return []
+    found = []
+    for account in db().voice_accounts.find({"numbers.whatsapp.appId": app_id}, {"numbers": 1, "userId": 1, "tenantId": 1}):
+        found += [{**n, "userId": account["userId"], "tenantId": account["tenantId"]} for n in account.get("numbers") or []
+                  if n.get("provider") == "WHATSAPP" and (n.get("whatsapp") or {}).get("appId") == app_id]
+    return found
+
+
 def load_number(number_id, direction: str = "INBOUND", agent_id=None) -> tuple[dict | None, dict | None]:
     """A customer's number and the agent for this call (None for either that is missing).
 
@@ -470,7 +482,8 @@ def phone_call(number: dict, agent: dict, direction: str, other: str | None) -> 
     `api_key` is the customer's Telnyx key (hang-up, recording). A VoiceLink call needs none
     while it runs: it is hung up by closing its socket, and VoiceLink records it. A Twilio
     call's `api_key` is the API key secret (or Auth Token), and `twilio` says how to use it
-    (twilio.creds_of: account, key SID, whether Twilio's own signatures can be checked).
+    (twilio.creds_of: account, key SID, whether Twilio's own signatures can be checked). A WhatsApp
+    call's `api_key` is the system-user access token, and `whatsapp` names the number for the Graph API.
     """
     ours = number.get("phoneNumber")
     provider = number.get("provider") or "TELNYX"
@@ -480,6 +493,8 @@ def phone_call(number: dict, agent: dict, direction: str, other: str | None) -> 
         import twilio  # imports this module: loaded on first use
 
         extra["twilio"] = twilio.creds_of(number, api_key)
+    elif provider == "WHATSAPP":
+        extra["whatsapp"] = {"phone_number_id": number["providerNumberId"]}
     return _finish_ctx({
         **extra,
         # A booking's phone when the caller gives none: theirs on a call in, the callee's on one we place.

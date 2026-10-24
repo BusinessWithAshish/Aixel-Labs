@@ -46,6 +46,13 @@ import type { TwilioAuth } from '@/server/voice-agent/twilio';
 import { listTwilioAccountNumbers, twilioNumberProblem, twilioNumbers } from '@/server/voice-agent/twilio-numbers';
 import type { VoiceLinkAuth } from '@/server/voice-agent/voicelink';
 import { listVoiceLinkAccountNumbers, voicelinkNumbers } from '@/server/voice-agent/voicelink-numbers';
+import type { WhatsAppAuth } from '@/server/voice-agent/whatsapp';
+import {
+    listWhatsAppAccountNumbers,
+    whatsappNumberProblem,
+    whatsappNumbers,
+    type WhatsAppAccountNumber,
+} from '@/server/voice-agent/whatsapp-numbers';
 
 /** A number in the customer's provider account (Telnyx, VoiceLink or Twilio), as offered for import. */
 export type AccountNumber = ProviderAccountNumber & {
@@ -73,6 +80,13 @@ export type TwilioCredentials = {
     apiKeySid?: string | null;
     /** The API key's secret, or the Auth Token. */
     secret: string;
+};
+
+/** What the Connect dialog sends for WhatsApp: the customer's own Meta app and a system user's access token. */
+export type WhatsAppCredentials = {
+    appId: string;
+    appSecret: string;
+    token: string;
 };
 
 export type VoiceNumberListItem = VoiceNumber & {
@@ -136,6 +150,23 @@ function assertTwilioCredentials(credentials: TwilioCredentials): TwilioAuth {
         );
     }
     return { accountSid, apiKeySid: apiKeySid || null, secret };
+}
+
+function assertWhatsAppCredentials(credentials: WhatsAppCredentials): WhatsAppAuth {
+    const appId = typeof credentials?.appId === 'string' ? credentials.appId.trim() : '';
+    const appSecret = typeof credentials?.appSecret === 'string' ? credentials.appSecret.trim() : '';
+    const token = typeof credentials?.token === 'string' ? credentials.token.trim() : '';
+    if (!/^\d{5,20}$/.test(appId)) {
+        throw new Error('The App ID is a number, at the top of your Meta app (App settings, Basic)');
+    }
+    if (!/^[0-9a-f]{32}$/i.test(appSecret)) {
+        throw new Error('The App secret is 32 letters and digits: App settings, Basic, App secret, Show');
+    }
+    if (!token) throw new Error('Paste the access token you generated for the system user');
+    if (token.length > 1024 || /\s/.test(token) || !token.startsWith('EA')) {
+        throw new Error('That does not look like a Meta access token (it starts with EA)');
+    }
+    return { appId, appSecret, token };
 }
 
 /**
@@ -274,8 +305,10 @@ type ImportInput = {
     wantedIds: string[];
     apiKeySealed: string;
     providerName: string;
-    /** Provider fields stored with each new number (and refreshed on a re-import). */
-    extra?: Pick<VoiceNumberDoc, 'voicelink' | 'twilio'>;
+    /** Provider fields stored with each new number (and refreshed on a re-import); per number when they differ. */
+    extra?:
+        | Pick<VoiceNumberDoc, 'voicelink' | 'twilio' | 'whatsapp'>
+        | ((n: ProviderAccountNumber) => Pick<VoiceNumberDoc, 'whatsapp'>);
     /** Why a chosen number cannot be imported, or null. */
     problemWith?: (n: ProviderAccountNumber) => string | null;
 };
@@ -303,6 +336,8 @@ async function importNumbers(owner: VoiceOwnerScope, input: ImportInput): Promis
 
     for (const n of chosen) {
         const now = new Date();
+        const extra: Pick<VoiceNumberDoc, 'voicelink' | 'twilio' | 'whatsapp'> | undefined =
+            typeof input.extra === 'function' ? input.extra(n) : input.extra;
         const doc: VoiceNumberDoc = {
             _id: new MongoObjectId(),
             provider: input.provider,
@@ -312,7 +347,7 @@ async function importNumbers(owner: VoiceOwnerScope, input: ImportInput): Promis
             inboundAgentId: null,
             outboundAgentId: null,
             previousConnectionId: null,
-            ...input.extra,
+            ...extra,
             createdAt: now,
             updatedAt: now,
         };
@@ -328,11 +363,16 @@ async function importNumbers(owner: VoiceOwnerScope, input: ImportInput): Promis
         } else {
             // Re-import of a number we already have: refresh the key (it may have been rotated).
             const refresh: Record<string, unknown> = { apiKeySealed: input.apiKeySealed };
-            if (input.extra?.voicelink) refresh['voicelink.clientId'] = input.extra.voicelink.clientId ?? null;
-            // The routing saved before AI answering (twilio.previousRouting) is kept.
-            if (input.extra?.twilio) {
-                refresh['twilio.accountSid'] = input.extra.twilio.accountSid;
-                refresh['twilio.apiKeySid'] = input.extra.twilio.apiKeySid;
+            if (extra?.voicelink) refresh['voicelink.clientId'] = extra.voicelink.clientId ?? null;
+            // The routing saved before AI answering (twilio.previousRouting, whatsapp.previousCalling) is kept.
+            if (extra?.twilio) {
+                refresh['twilio.accountSid'] = extra.twilio.accountSid;
+                refresh['twilio.apiKeySid'] = extra.twilio.apiKeySid;
+            }
+            if (extra?.whatsapp) {
+                refresh['whatsapp.appId'] = extra.whatsapp.appId;
+                refresh['whatsapp.appSecretSealed'] = extra.whatsapp.appSecretSealed;
+                refresh['whatsapp.wabaId'] = extra.whatsapp.wabaId;
             }
             const same = await updateItem(
                 'numbers',
@@ -433,6 +473,42 @@ export const importTwilioNumbers = async (
             providerName: twilioNumbers.label,
             extra: { twilio: { accountSid: auth.accountSid, apiKeySid: auth.apiKeySid } },
             problemWith: twilioNumberProblem,
+        });
+    });
+
+/** Checks the Meta app and token, then lists the numbers in the WhatsApp accounts the token reaches. Nothing is stored. */
+export const connectWhatsApp = async (credentials: WhatsAppCredentials): Promise<ALApiResponse<AccountNumber[]>> =>
+    runAuthenticatedAction(async function connectWhatsApp(userId) {
+        const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        assertRateLimit(`voice-check:${owner.userId}`, 30);
+        const auth = assertWhatsAppCredentials(credentials);
+        const numbers = await withImportState(owner, VoiceProvider.WHATSAPP, await listWhatsAppAccountNumbers(auth));
+        return numbers.map((n) => ({ ...n, cannotImport: whatsappNumberProblem(n) }));
+    });
+
+/**
+ * Stores the chosen WhatsApp numbers with the token and the app secret sealed (the App ID and the
+ * WhatsApp account id are kept in the clear: they name things, they open nothing). Nothing changes at
+ * Meta until AI answering is turned on.
+ */
+export const importWhatsAppNumbers = async (
+    credentials: WhatsAppCredentials,
+    providerNumberIds: string[],
+): Promise<ALApiResponse<VoiceNumberListItem[]>> =>
+    runAuthenticatedAction(async function importWhatsAppNumbers(userId) {
+        const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        const auth = assertWhatsAppCredentials(credentials);
+        const appSecretSealed = sealSecret(auth.appSecret);
+        return importNumbers(owner, {
+            provider: VoiceProvider.WHATSAPP,
+            accountNumbers: await listWhatsAppAccountNumbers(auth),
+            wantedIds: providerNumberIds,
+            apiKeySealed: sealSecret(auth.token),
+            providerName: whatsappNumbers.label,
+            extra: (n) => ({
+                whatsapp: { appId: auth.appId, appSecretSealed, wabaId: (n as WhatsAppAccountNumber).wabaId },
+            }),
+            problemWith: whatsappNumberProblem,
         });
     });
 

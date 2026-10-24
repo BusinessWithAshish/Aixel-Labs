@@ -29,6 +29,11 @@
       "source": "twilio.com/en-us/voice/pricing/us ('current as of August 2026': local in 0.0085, out 0.014, Media Streams 0.0044) + /pricing/in (checked 2026-10-22: to Indian mobiles 0.0496, landlines 0.0699; OUTBOUND_IN is the mobile rate, most leads are mobiles); recording 0.0025.",
       "usdPerMinute": { "INBOUND": 0.0085, "OUTBOUND": 0.014, "OUTBOUND_IN": 0.0496 },
       "extrasUsdPerMinute": 0.0069
+    },
+    "WHATSAPP": {
+      "source": "developers.facebook.com/documentation/business-messaging/whatsapp/pricing (read 2026-10-24): user-initiated calls are free in every country; Meta bills the customer's own WABA directly, nothing goes through us.",
+      "usdPerMinute": { "INBOUND": 0 },
+      "extrasUsdPerMinute": 0
     }
   },
   "providersWithoutRates": {
