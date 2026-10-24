@@ -12,9 +12,8 @@ import QRCode from 'qrcode';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { assertRateLimit } from '@/server/rate-limit';
 import { findItem, listItems } from '@/server/voice-agent/accounts';
-import { assertGeminiKeySet } from '@/server/voice-agent/gemini-key';
+import { assertCallReady } from '@/server/voice-agent/call-readiness';
 import { cleanCallVariables, customVariableNames } from '@/helpers/voice-agent-features';
-import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
 import type { VoiceAgentVariableOption } from '@/app/actions/voice-agent-actions';
 import type { OwnedNumberDoc } from '@/server/voice-agent/number-provider';
 import { requestOrigin } from '@/server/voice-agent/public-url';
@@ -194,14 +193,14 @@ export const startRehearsal = async (
         const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
         const agent = await agents.findOne(
             { _id: toObjectId(agentId, 'Agent ID'), userId: owner.userId },
-            { projection: { name: 1, prompt: 1 } },
+            { projection: { name: 1 } },
         );
         if (!agent?._id) throw new Error('Agent not found');
-        if (!agent.prompt?.trim()) throw new Error(VOICE_AGENT_NO_PROMPT_MESSAGE);
         const numbers = await listItems('numbers', owner.userId);
         const number = numbers.find((n) => n._id.equals(toObjectId(numberId, 'Number ID')));
         if (!number) throw new Error('Number not found');
-        await assertGeminiKeySet(owner.userId);
+        // The same refusals as every other call (no prompt, a key its stack needs).
+        await assertCallReady(owner.userId, agent._id);
         const rehearsal = await issueRehearsal(number, numbers, agent, callVariables);
         return { ...rehearsal, expiresAt: rehearsal.expiresAt.toISOString() };
     });
