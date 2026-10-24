@@ -131,7 +131,7 @@ test('inbound, from a softphone: set up, dial the SIP address, reset and remove'
     const { agentId, numberId, texmlAppId } = await inboundAgent(db);
     const dialog = await openTest(page, agentId, 'Call this agent');
     await dialog.getByRole('tab', { name: 'From your softphone' }).click();
-    await dialog.getByRole('button', { name: 'Set up softphone' }).click();
+    await dialog.getByRole('button', { name: 'Set up Linphone' }).click();
 
     // A SIP login on the account's one credential connection, with an outbound voice profile (Telnyx refuses its
     // calls to an "only my connections" subdomain without one), its SIP URI open to the account's own calls only.
@@ -146,7 +146,20 @@ test('inbound, from a softphone: set up, dial the SIP address, reset and remove'
         outbound: { outbound_voice_profile_id: '1911630617284445511' },
     });
     await expect(dialog.getByTestId('softphone-status')).toContainText('Not signed in yet');
-    await expect(dialog).toContainText('TLS (port 5061)');
+
+    // Linphone's one-time setup link (and its QR code): the whole account as Linphone XML, once, never cached.
+    await expect(dialog.getByTestId('linphone-qr')).toBeVisible();
+    const link = await dialog.getByTestId('linphone-setup-link').innerText();
+    expect(link).toMatch(/\/api\/voice-agent\/softphone\/provision\/[A-Za-z0-9_-]{43}$/);
+    const first = await page.request.get(link);
+    expect(first.status()).toBe(200);
+    expect(first.headers()['cache-control']).toContain('no-store');
+    const xml = await first.text();
+    expect(xml).toContain(`<entry name="username" overwrite="true">${userName}</entry>`);
+    expect(xml).toContain(`<entry name="passwd" overwrite="true">${password}</entry>`);
+    expect(xml).toContain('<entry name="reg_route" overwrite="true">&lt;sip:sip.telnyx.com;transport=tls&gt;</entry>');
+    expect((await page.request.get(link)).status()).toBe(404);
+    expect((await db.getVoiceAccount(E2E_USER))?.softphone?.provisioning).toBeNull();
 
     // The number's TeXML app takes SIP calls from the account's own connections, and still points at the engine.
     const app = telnyx.texmlApps.get(texmlAppId) as { inbound: Record<string, string>; voice_url: string };
@@ -156,11 +169,8 @@ test('inbound, from a softphone: set up, dial the SIP address, reset and remove'
     await expect(dialog.getByTestId('softphone-dial-in')).toHaveText(
         `sip:frontdesk@${app.inbound.sip_subdomain}.sip.telnyx.com;transport=tls`,
     );
-    await expect(dialog.getByTestId('softphone-dial-in-plain')).toHaveText(
-        `sip:frontdesk@${app.inbound.sip_subdomain}.sip.telnyx.com`,
-    );
 
-    // Nothing secret is stored: the password lives only in Telnyx and on screen once.
+    // Nothing secret is kept once the link is spent: the password lives only in Telnyx and was on screen once.
     const account = await db.getVoiceAccount(E2E_USER);
     expect(account?.softphone).toMatchObject({ userName, connectionId: connection.id });
     expect(JSON.stringify(account?.softphone)).not.toContain(password);
@@ -181,7 +191,7 @@ test('inbound, from a softphone: set up, dial the SIP address, reset and remove'
     await expect(reopened.getByTestId('softphone-password')).toHaveCount(0);
     expect(telnyx.find('PATCH', /^\/v2\/texml_applications\//)).toHaveLength(patches);
 
-    await reopened.getByRole('button', { name: 'Reset password' }).click();
+    await reopened.getByRole('button', { name: 'New setup link' }).click();
     await expect(reopened.getByTestId('softphone-password')).toBeVisible();
     const newPassword = await reopened.getByTestId('softphone-password').innerText();
     expect(newPassword).not.toBe(password);
@@ -189,7 +199,7 @@ test('inbound, from a softphone: set up, dial the SIP address, reset and remove'
 
     await reopened.getByRole('button', { name: 'Remove' }).click();
     await page.getByRole('dialog', { name: 'Remove the softphone?' }).getByRole('button', { name: 'Remove' }).click();
-    await expect(reopened.getByRole('button', { name: 'Set up softphone' })).toBeVisible();
+    await expect(reopened.getByRole('button', { name: 'Set up Linphone' })).toBeVisible();
     expect(connection.password).not.toBe(newPassword);
     expect((await db.getVoiceAccount(E2E_USER))?.softphone).toBeNull();
 });
@@ -198,7 +208,7 @@ test('outbound, on a softphone: the agent calls it once it is signed in', async 
     const { agentId, numberId } = await outboundAgent(db);
     const dialog = await openTest(page, agentId, 'Have Caller call me');
     await dialog.getByRole('tab', { name: 'On your softphone' }).click();
-    await dialog.getByRole('button', { name: 'Set up softphone' }).click();
+    await dialog.getByRole('button', { name: 'Set up Linphone' }).click();
     const userName = await dialog.getByTestId('softphone-username').innerText();
     const call = dialog.getByRole('button', { name: 'Call my softphone' });
     await expect(call).toBeDisabled();
@@ -206,7 +216,7 @@ test('outbound, on a softphone: the agent calls it once it is signed in', async 
     telnyx.registered.add(userName);
     await dialog.getByRole('button', { name: 'Check again' }).click();
     await call.click();
-    await expect(dialog.getByRole('status')).toContainText(`Caller is calling your softphone from ${NUMBER}`);
+    await expect(dialog.getByRole('status')).toContainText(`Caller is calling Linphone from ${NUMBER}`);
     expect(engine.find('POST', '/calls').map((r) => r.body)).toEqual([
         { numberId, to: `sip:${userName}@sip.telnyx.com`, agentId },
     ]);

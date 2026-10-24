@@ -8,6 +8,7 @@ import {
     type VoiceAgentDoc,
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
+import QRCode from 'qrcode';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { assertRateLimit } from '@/server/rate-limit';
 import { findItem, listItems } from '@/server/voice-agent/accounts';
@@ -50,8 +51,17 @@ export type SoftphoneView = {
     callFrom: (SoftphoneNumber & { softphone: boolean })[];
 };
 
-/** What setting up or resetting returns: the only time the password is shown. */
-export type SoftphoneLogin = { userName: string; password: string; domain: string };
+/** What setting up or resetting returns: the only time the password is shown, with Linphone's one-time setup link. */
+export type SoftphoneLogin = {
+    userName: string;
+    password: string;
+    domain: string;
+    /** Linphone fetches its whole setup from here, once, within 10 minutes. */
+    setupLink: string;
+    /** The link as a QR code (an SVG document), for Linphone's "Scan QR code". */
+    setupQrSvg: string;
+    expiresAt: string;
+};
 
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.AGENTS;
 
@@ -110,6 +120,18 @@ export const getBrowserTestSession = async (numberId: string): Promise<ALApiResp
     });
 };
 
+async function issueLogin(owner: VoiceOwnerScope, number: OwnedNumberDoc): Promise<SoftphoneLogin> {
+    const { token, expiresAt, ...login } = await issueSoftphoneLogin(owner.userId, number);
+    const setupLink = `${await requestOrigin()}/api/voice-agent/softphone/provision/${token}`;
+    return {
+        ...login,
+        domain: SOFTPHONE_DOMAIN,
+        setupLink,
+        setupQrSvg: await QRCode.toString(setupLink, { type: 'svg', margin: 1 }),
+        expiresAt: expiresAt.toISOString(),
+    };
+}
+
 /** Sets the softphone up on `numberId`'s Telnyx account. */
 export const setUpSoftphone = async (numberId: string): Promise<ALApiResponse<SoftphoneLogin>> => {
     assertValidObjectId(numberId, 'Number ID');
@@ -117,18 +139,18 @@ export const setUpSoftphone = async (numberId: string): Promise<ALApiResponse<So
         const owner = await softphoneOwner(userId);
         const number = await findItem('numbers', { _id: toObjectId(numberId, 'Number ID') }, owner.userId);
         if (!number) throw new Error('Number not found');
-        return { ...(await issueSoftphoneLogin(owner.userId, number)), domain: SOFTPHONE_DOMAIN };
+        return issueLogin(owner, number);
     });
 };
 
-/** A new password: softphones signed in with the old one are signed out. */
+/** A new password and a new Linphone setup link: softphones signed in with the old password are signed out. */
 export const resetSoftphonePassword = async (): Promise<ALApiResponse<SoftphoneLogin>> =>
     runAuthenticatedAction(async function resetSoftphonePassword(userId) {
         const owner = await softphoneOwner(userId);
         const softphone = await getSoftphone(owner.userId);
         const number = softphone && (await findItem('numbers', { _id: softphone.numberId }, owner.userId));
         if (!number) throw new Error('Set up your softphone first');
-        return { ...(await issueSoftphoneLogin(owner.userId, number)), domain: SOFTPHONE_DOMAIN };
+        return issueLogin(owner, number);
     });
 
 export const removeSoftphoneLogin = async (): Promise<ALApiResponse<{ removed: true }>> =>

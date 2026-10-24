@@ -6,9 +6,9 @@ import { ChevronLeft, ChevronRight, ExternalLink, ZoomIn, ZoomOut } from 'lucide
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { setupGuideStepIndex, type SetupGuide } from '../_utils/setup-guides';
+import { setupGuideStepIndex, type SetupGuide } from '@/helpers/voice-setup-guides';
 
-type ProviderSetupGuideProps = {
+type SetupGuideDialogProps = {
     guide: SetupGuide;
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -17,10 +17,10 @@ type ProviderSetupGuideProps = {
 };
 
 /**
- * A provider's setup steps as a carousel in a dialog: a few sentences per step, with a picture
+ * Setup steps (a phone provider's, Linphone's) as a carousel in a dialog: a few sentences per step, with a picture
  * when the step has one (a step without one shows its text only).
  */
-export function ProviderSetupGuide({ guide, open, onOpenChange, initialStepId }: ProviderSetupGuideProps) {
+export function SetupGuideDialog({ guide, open, onOpenChange, initialStepId }: SetupGuideDialogProps) {
     const [index, setIndex] = useState(() => setupGuideStepIndex(guide, initialStepId));
     const [zoomed, setZoomed] = useState(false);
     const [shownFor, setShownFor] = useState({ open, guide, initialStepId });

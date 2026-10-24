@@ -1,9 +1,9 @@
 import 'server-only';
 
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { type MongoObjectId, type VoiceSoftphoneDoc, VoiceProvider } from '@aixellabs/backend/db';
 import { updateItem, voiceAccountsCollection } from '@/server/voice-agent/accounts';
-import { numberWebhookUrl, openSecret } from '@/server/voice-agent/engine';
+import { numberWebhookUrl, openSecret, sealSecret } from '@/server/voice-agent/engine';
 import type { OwnedNumberDoc } from '@/server/voice-agent/number-provider';
 import {
     getCredentialConnection,
@@ -16,7 +16,7 @@ import { appLabel } from '@/server/voice-agent/telnyx-numbers';
 import { ensureTelnyxConnection, ensureTelnyxCredential } from '@/server/voice-agent/web-phone';
 
 /**
- * The softphone: a SIP app (Zoiper, Linphone…) signed in to the owner's own Telnyx account, so they hear their
+ * The softphone: Linphone (set up from a one-time link or QR code, see helpers/linphone-provisioning.ts) signed in to the owner's own Telnyx account, so they hear their
  * agents exactly as a phone caller does, over the internet, from any country and on a trial account.
  *
  * - The login is the SIP username + password of the account's "Aixel Labs web phone" credential connection (one per
@@ -71,14 +71,20 @@ export function inSoftphoneAccount(doc: OwnedNumberDoc, softphoneNumber: OwnedNu
     );
 }
 
+/** How long Linphone's setup link works (it also stops after its first fetch). */
+const PROVISIONING_TTL_MS = 10 * 60 * 1000;
+const PROVISIONING_TOKEN = /^[A-Za-z0-9_-]{43}$/;
+
+const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
+
 /**
- * Sets up the softphone on `number`'s Telnyx account, or gives the one there a new password. Returns the login;
- * the password is not kept anywhere, so this is the only time it is shown.
+ * Sets up the softphone on `number`'s Telnyx account, or gives the one there a new password. Returns the login and
+ * the token of Linphone's one-time setup link; the password is shown now and kept nowhere but behind that link.
  */
 export async function issueSoftphoneLogin(
     userId: MongoObjectId,
     number: OwnedNumberDoc,
-): Promise<{ userName: string; password: string }> {
+): Promise<{ userName: string; password: string; token: string; expiresAt: Date }> {
     if (number.provider !== VoiceProvider.TELNYX) throw new Error('The softphone works with Telnyx numbers for now.');
     const key = openSecret(number.apiKeySealed);
     const connectionId = await ensureTelnyxConnection(key);
@@ -87,16 +93,35 @@ export async function issueSoftphoneLogin(
     await updateCredentialConnection(key, connectionId, { password });
 
     const now = new Date();
+    const token = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(now.getTime() + PROVISIONING_TTL_MS);
     const current = await getSoftphone(userId);
     await saveSoftphone(userId, {
         provider: VoiceProvider.TELNYX,
         numberId: number._id,
         connectionId,
         userName,
+        provisioning: { tokenHash: hashToken(token), passwordSealed: sealSecret(password), expiresAt },
         createdAt: current?.connectionId === connectionId ? current.createdAt : now,
         updatedAt: now,
     });
-    return { userName, password };
+    return { userName, password, token, expiresAt };
+}
+
+/**
+ * The login behind a Linphone setup link, once: the link is spent by this fetch (or was, or expired), so a second
+ * fetch gets null. Called by the public route Linphone fetches, which has no session: the token is the key.
+ */
+export async function takeSoftphoneProvisioning(token: string): Promise<{ userName: string; password: string } | null> {
+    if (!PROVISIONING_TOKEN.test(token)) return null;
+    const accounts = await voiceAccountsCollection();
+    const doc = await accounts.findOneAndUpdate(
+        { 'softphone.provisioning.tokenHash': hashToken(token), 'softphone.provisioning.expiresAt': { $gt: new Date() } },
+        { $set: { 'softphone.provisioning': null } },
+        { projection: { softphone: 1 } },
+    );
+    const provisioning = doc?.softphone?.provisioning;
+    return provisioning ? { userName: doc.softphone!.userName, password: openSecret(provisioning.passwordSealed) } : null;
 }
 
 /**

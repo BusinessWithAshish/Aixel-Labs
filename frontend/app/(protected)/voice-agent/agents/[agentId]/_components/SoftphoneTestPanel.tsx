@@ -6,7 +6,7 @@ import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ChevronDown, Copy, Info, RefreshCw } from 'lucide-react';
+import { Copy, Info, RefreshCw } from 'lucide-react';
 import { VOICE_AGENT_SUB_MODULES, VoiceProvider } from '@aixellabs/backend/db/types';
 import { placeTestCall } from '@/app/actions/voice-number-actions';
 import {
@@ -16,13 +16,14 @@ import {
     type SoftphoneLogin,
 } from '@/app/actions/voice-softphone-actions';
 import { PhoneNumberControlledField } from '@/components/common/voice-agent/PhoneNumberSelect';
+import { SetupGuideDialog } from '@/components/common/voice-agent/SetupGuideDialog';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { SubModuleUrls } from '@/config/app-config';
 import { agentSipAddress } from '@/helpers/voice-call-format';
+import { LINPHONE_GUIDE } from '../_utils/linphone-guide';
 import type { AgentTestPanelProps } from './AgentTestDialog';
 import { NoTelnyxNumber } from './BrowserTestPanel';
 
@@ -42,7 +43,7 @@ async function copy(value: string, what: string) {
 
 function CopyRow({ label, value, testId }: { label: string; value: string; testId?: string }) {
     return (
-        <div className="flex min-w-0 items-center justify-between gap-2 rounded-md border px-3 py-2">
+        <div className="bg-background flex min-w-0 items-center justify-between gap-2 rounded-md border px-3 py-2">
             <div className="flex min-w-0 flex-col">
                 <span className="text-muted-foreground text-xs">{label}</span>
                 <span className="font-mono text-sm break-all" data-testid={testId}>
@@ -72,45 +73,50 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
     );
 }
 
-/** Linphone over TLS first: SIP on 5060 is blocked by many mobile networks (Indian carriers included), 5061 is not. */
-function SetupSteps({ userName }: { userName: string }) {
+/** Linphone's one-time setup link and its QR code: Linphone fetches the whole account (TLS, proxy, no IPv6/video). */
+function SetupLink({ login }: { login: SoftphoneLogin }) {
     return (
-        <Collapsible defaultOpen>
-            <CollapsibleTrigger className="text-primary flex items-center gap-1 text-sm underline-offset-4 hover:underline [&[data-state=open]>svg]:rotate-180">
-                How to sign in with Linphone
-                <ChevronDown className="size-4 transition-transform" />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="text-muted-foreground mt-2 grid gap-3 text-sm">
-                <ol className="ml-5 list-decimal">
+        <Alert variant="info" data-testid="linphone-setup">
+            <Info className="size-4" />
+            <AlertTitle>Set up Linphone in one step</AlertTitle>
+            <AlertDescription className="flex flex-col gap-3">
+                <ol className="ml-4 list-decimal space-y-1">
                     <li>
-                        Install Linphone (free: Mac, Windows, Linux, iPhone, Android) from linphone.org or your app store.
-                    </li>
-                    <li>Choose “Use a SIP account” (a third-party account, not a Linphone one).</li>
-                    <li>
-                        Username <span className="font-mono">{userName}</span>, the password, domain{' '}
-                        <span className="font-mono">sip.telnyx.com</span>, transport <strong>TLS</strong>.
+                        Install <strong>Linphone</strong> (free: iPhone, Android, Mac, Windows, Linux) and open it.
                     </li>
                     <li>
-                        In the account’s settings, turn on <strong>Outbound proxy</strong> (route calls through
-                        sip.telnyx.com), so every call goes over the same TLS connection.
+                        On a phone, choose <strong>Scan QR code</strong> and scan this code. On a computer, choose{' '}
+                        <strong>Fetch remote configuration</strong> and paste the link.
                     </li>
-                    <li>Leave media encryption on None, and allow the microphone.</li>
+                    <li>Linphone signs in by itself, over TLS, so it works on networks that block internet calling.</li>
                 </ol>
-                <p>
-                    Why TLS: it signs in on port 5061, which works on networks that block internet calling. Zoiper’s free
-                    version has no TLS: use it only on Wi-Fi that does not block port 5060, and dial with{' '}
-                    <span className="font-mono">sip:</span> at the front.
-                </p>
-            </CollapsibleContent>
-        </Collapsible>
+                <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- an inline SVG data URL, nothing to optimise */}
+                    <img
+                        src={`data:image/svg+xml;utf8,${encodeURIComponent(login.setupQrSvg)}`}
+                        alt="QR code of the Linphone setup link"
+                        className="size-40 shrink-0 rounded-md bg-white p-1"
+                        data-testid="linphone-qr"
+                    />
+                    <div className="flex w-full min-w-0 flex-col gap-2">
+                        <CopyRow label="Setup link" value={login.setupLink} testId="linphone-setup-link" />
+                        <p>
+                            <strong>It works once, for 10 minutes.</strong> It carries your password, so do not share it.
+                            Need another? Make a new setup link.
+                        </p>
+                    </div>
+                </div>
+            </AlertDescription>
+        </Alert>
     );
 }
 
-/** A SIP app signed in to the owner's own Telnyx account: it dials the agent, or the agent calls it. */
+/** A SIP app (Linphone) signed in to the owner's own Telnyx account: it dials the agent, or the agent calls it. */
 export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, loading }: AgentTestPanelProps) {
     const [error, setError] = useState<string | null>(null);
-    /** The password, right after it was set: it is not shown again. */
+    /** The login right after it was set: the password and setup link are not shown again. */
     const [issued, setIssued] = useState<SoftphoneLogin | null>(null);
+    const [guideOpen, setGuideOpen] = useState(false);
     const [removeOpen, setRemoveOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [calling, setCalling] = useState<string | null>(null);
@@ -162,14 +168,16 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
             {error}
         </p>
     ) : null;
+    const guide = <SetupGuideDialog guide={LINPHONE_GUIDE} open={guideOpen} onOpenChange={setGuideOpen} />;
 
     if (!login) {
         return (
             <FormProvider {...setupForm}>
                 <form onSubmit={setUp} className="flex flex-col gap-3" noValidate>
                     <p className="text-sm">
-                        A free SIP app (Linphone) on your computer or phone. We add a SIP login to your Telnyx account; only
-                        your own account can call it, so nobody else reaches your agents through it.
+                        Use <strong>Linphone</strong>, a free calling app for your phone or computer. We add a SIP login to
+                        your Telnyx account and give you a QR code that sets Linphone up for you. Only your own account can
+                        call it, so nobody else reaches your agents through it.
                     </p>
                     {view.telnyxNumbers.length > 1 ? (
                         <PhoneNumberControlledField
@@ -181,7 +189,7 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                     ) : null}
                     {errorLine}
                     <Button type="submit" className="self-start" disabled={setupForm.formState.isSubmitting}>
-                        {setupForm.formState.isSubmitting ? 'Setting up…' : 'Set up softphone'}
+                        {setupForm.formState.isSubmitting ? 'Setting up…' : 'Set up Linphone'}
                     </Button>
                 </form>
             </FormProvider>
@@ -190,7 +198,7 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
 
     return (
         <div className="flex flex-col gap-5">
-            <Section title="1. Sign in on your softphone">
+            <Section title="1. Sign in on Linphone">
                 <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="softphone-status">
                     {login.registered === true ? (
                         <Badge className="bg-emerald-600 text-white">Signed in</Badge>
@@ -204,25 +212,29 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                         Check again
                     </Button>
                 </div>
-                <CopyRow label="Username" value={login.userName} testId="softphone-username" />
                 {issued ? (
-                    <>
-                        <CopyRow label="Password" value={issued.password} testId="softphone-password" />
-                        <Alert variant="warning">
-                            <Info className="size-4" />
-                            <AlertDescription>
-                                Save the password in your softphone now: it is not shown again. Lost it? Reset it.
-                            </AlertDescription>
-                        </Alert>
-                    </>
+                    <SetupLink login={issued} />
                 ) : (
-                    <p className="text-muted-foreground text-xs">
-                        The password was shown once, when it was set. Reset it to get a new one.
-                    </p>
+                    <Alert variant="info">
+                        <Info className="size-4" />
+                        <AlertDescription>
+                            Setting Linphone up on another phone or computer? Make a <strong>new setup link</strong> below.
+                            It gives the login a new password, so Linphone signed in elsewhere has to sign in again.
+                        </AlertDescription>
+                    </Alert>
                 )}
-                <CopyRow label="Domain" value={login.domain} />
-                <CopyRow label="Transport" value="TLS (port 5061)" />
-                <SetupSteps userName={login.userName} />
+                <div className="flex flex-col gap-2">
+                    <p className="text-sm">
+                        Or by hand: username, {issued ? 'password, ' : ''}domain <strong>sip.telnyx.com</strong>, transport{' '}
+                        <strong>TLS</strong>.{' '}
+                        <Button type="button" variant="link" className="h-auto p-0" onClick={() => setGuideOpen(true)}>
+                            Step-by-step guide
+                        </Button>
+                    </p>
+                    <CopyRow label="Username" value={login.userName} testId="softphone-username" />
+                    {issued ? <CopyRow label="Password" value={issued.password} testId="softphone-password" /> : null}
+                    <CopyRow label="Outbound proxy and registrar" value="<sip:sip.telnyx.com;transport=tls>" />
+                </div>
             </Section>
 
             {inbound ? (
@@ -230,22 +242,16 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                     {dialIn.length > 0 ? (
                         <>
                             {dialIn.map((n) => (
-                                <div key={n.id} className="flex flex-col gap-2">
-                                    <CopyRow
-                                        label={`Dial from the softphone (like calling ${n.phoneNumber})`}
-                                        value={agentSipAddress(n.user, n.host, 'softphone', true)}
-                                        testId="softphone-dial-in"
-                                    />
-                                    <CopyRow
-                                        label="Or, on Wi-Fi that does not block internet calling"
-                                        value={agentSipAddress(n.user, n.host, 'softphone')}
-                                        testId="softphone-dial-in-plain"
-                                    />
-                                </div>
+                                <CopyRow
+                                    key={n.id}
+                                    label={`Dial this in Linphone (like calling ${n.phoneNumber})`}
+                                    value={agentSipAddress(n.user, n.host, 'softphone', true)}
+                                    testId="softphone-dial-in"
+                                />
                             ))}
-                            <p className="text-muted-foreground text-xs">
-                                Bookings, tools and the call log all work as on a real call. Only softphones signed in to
-                                your Telnyx account can dial it.
+                            <p className="text-sm">
+                                Bookings, tools and the call log all work as on a real call. Only Linphone signed in to your
+                                Telnyx account can dial it.
                             </p>
                         </>
                     ) : (
@@ -259,7 +265,7 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                 <Section title={`2. ${agentName} calls you`}>
                     {calling ? (
                         <p className="text-sm" role="status">
-                            {agentName} is calling your softphone from {calling}. Answer it to talk. The call shows up in{' '}
+                            {agentName} is calling Linphone from {calling}. Answer it to talk. The call shows up in{' '}
                             <Link
                                 className="text-primary underline-offset-4 hover:underline"
                                 href={SubModuleUrls[VOICE_AGENT_SUB_MODULES.CALL_LOGS]}
@@ -294,9 +300,7 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                                     {callForm.formState.isSubmitting ? 'Calling…' : 'Call my softphone'}
                                 </Button>
                                 {login.registered === false ? (
-                                    <p className="text-muted-foreground text-xs">
-                                        Sign in on your softphone first, then Check again.
-                                    </p>
+                                    <p className="text-sm">Sign in on Linphone first, then Check again.</p>
                                 ) : null}
                             </form>
                         </FormProvider>
@@ -318,18 +322,19 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                     Remove
                 </Button>
                 <Button type="button" variant="outline" disabled={busy} onClick={() => void reset()}>
-                    Reset password
+                    New setup link
                 </Button>
             </div>
             <ConfirmDialog
                 open={removeOpen}
                 onOpenChange={setRemoveOpen}
                 title="Remove the softphone?"
-                alertMessage="Softphones signed in with it are signed out. You can set it up again later."
+                alertMessage="Linphone signed in with it is signed out. You can set it up again later."
                 onConfirm={() => void remove()}
                 isLoading={busy}
                 confirmText="Remove"
             />
+            {guide}
         </div>
     );
 }

@@ -44,6 +44,11 @@ export async function ensureVoiceAgentIndexes(): Promise<void> {
         ),
         // The engine finds a call's number (and so its owner and key) by the number's id.
         accounts.createIndex({ 'numbers._id': 1 }),
+        // Linphone's one-time setup link finds its softphone by the link's token.
+        accounts.createIndex(
+            { 'softphone.provisioning.tokenHash': 1 },
+            { partialFilterExpression: { 'softphone.provisioning.tokenHash': { $exists: true } } },
+        ),
         agents.createIndex({ userId: 1, updatedAt: -1 }),
         calls.createIndex({ userId: 1, startedAt: -1 }),
         calls.createIndex({ agentId: 1, startedAt: -1 }),

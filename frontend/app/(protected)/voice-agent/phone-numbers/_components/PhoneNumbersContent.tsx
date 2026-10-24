@@ -14,7 +14,7 @@ import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page
 import { setupGuideFor } from '../_utils/setup-guides';
 import { ConnectNumberDialog } from './ConnectNumberDialog';
 import { PhoneNumberRow } from './PhoneNumberRow';
-import { ProviderSetupGuide } from './ProviderSetupGuide';
+import { SetupGuideDialog } from '@/components/common/voice-agent/SetupGuideDialog';
 import { RemoveNumberDialog } from './RemoveNumberDialog';
 
 /** Picks the provider, then opens its connect dialog (its setup guide is one click from there). */
@@ -65,10 +65,10 @@ function NumberTestCallDialog() {
     );
 }
 
-function SetupGuideDialog() {
+function ProviderSetupGuide() {
     const { setupGuide, closeSetupGuide } = usePage<UsePhoneNumbersPageReturn>();
     return (
-        <ProviderSetupGuide
+        <SetupGuideDialog
             guide={setupGuideFor(setupGuide.provider)}
             open={setupGuide.open}
             initialStepId={setupGuide.stepId}
@@ -123,7 +123,7 @@ export function PhoneNumbersContent() {
             <ConnectNumberDialog />
             <NumberTestCallDialog />
             <RemoveNumberDialog />
-            <SetupGuideDialog />
+            <ProviderSetupGuide />
         </>
     );
 }

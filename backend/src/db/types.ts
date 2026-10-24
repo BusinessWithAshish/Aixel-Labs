@@ -1152,10 +1152,10 @@ export type VoiceTtsVoice = {
 };
 
 /**
- * The owner's softphone line (Zoiper, Linphone…), for testing agents over the internet: no phone network, so no
+ * The owner's softphone line (Linphone), for testing agents over the internet: no phone network, so no
  * country limits. Telnyx only: the SIP login of the "Aixel Labs web phone" credential connection in their account
- * (the web dialer's browser logins are telephony credentials on the same connection). Its password is never stored:
- * it is shown once, when set up or reset.
+ * (the web dialer's browser logins are telephony credentials on the same connection). Its password is not kept: it is
+ * shown once, when set up or reset, and sits sealed behind Linphone's one-time setup link for at most 10 minutes.
  */
 export type VoiceSoftphoneDoc<Id = ObjectId> = {
   provider: VoiceProvider.TELNYX;
@@ -1164,6 +1164,11 @@ export type VoiceSoftphoneDoc<Id = ObjectId> = {
   connectionId: string;
   /** Signs in at `sip.telnyx.com`; calls to `sip:<userName>@sip.telnyx.com` ring it (from the owner's account only). */
   userName: string;
+  /**
+   * Linphone's one-time setup link, made with each new password: the link's token (SHA-256 hex, never the token) and
+   * the password (sealed) until the link is fetched once or `expiresAt` (10 minutes) passes; then null.
+   */
+  provisioning?: { tokenHash: string; passwordSealed: string; expiresAt: Date } | null;
   createdAt: Date;
   updatedAt: Date;
 };

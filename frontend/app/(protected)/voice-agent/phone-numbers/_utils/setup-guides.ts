@@ -1,30 +1,7 @@
 import { VoiceProvider } from '@aixellabs/backend/db/types';
+import { guideImage, type SetupGuide } from '@/helpers/voice-setup-guides';
 
-export type SetupGuideImage = {
-    /** Under `public/`, e.g. `/voice-agent/guides/telnyx/2-api-key.webp`. */
-    src: string;
-    alt: string;
-    width: number;
-    height: number;
-};
-
-export type SetupGuideStep = {
-    /** Stable id, so a link elsewhere can open the guide at this step. */
-    id: string;
-    title: string;
-    /** One or two short paragraphs. */
-    body: string[];
-    /** A screenshot or an illustration of the step. Optional: a step without one shows its text only. */
-    image?: SetupGuideImage;
-    /** A page in the provider's own portal, opened in a new tab. */
-    link?: { href: string; label: string };
-};
-
-export type SetupGuide = {
-    provider: VoiceProvider;
-    title: string;
-    steps: SetupGuideStep[];
-};
+export type { SetupGuide };
 
 /** Step ids other components open the Telnyx guide at. */
 export const TELNYX_GUIDE_STEP = {
@@ -36,15 +13,9 @@ export const TELNYX_GUIDE_STEP = {
     CHANGES: 'changes',
 } as const;
 
-/** Every guide image is 1400x875, under `public/voice-agent/guides/<provider>/`. */
-function guideImage(provider: string, file: string, alt: string): SetupGuideImage {
-    return { src: `/voice-agent/guides/${provider}/${file}`, alt, width: 1400, height: 875 };
-}
-
 const telnyxImage = (file: string, alt: string) => guideImage('telnyx', file, alt);
 
 const TELNYX_GUIDE: SetupGuide = {
-    provider: VoiceProvider.TELNYX,
     title: 'Set up Telnyx for your voice agents',
     steps: [
         {
@@ -141,7 +112,6 @@ export const TWILIO_GUIDE_STEP = {
 const twilioImage = (file: string, alt: string) => guideImage('twilio', file, alt);
 
 const TWILIO_GUIDE: SetupGuide = {
-    provider: VoiceProvider.TWILIO,
     title: 'Set up Twilio for your voice agents',
     steps: [
         {
@@ -262,7 +232,6 @@ export const VOICELINK_GUIDE_STEP = {
 const voicelinkImage = (file: string, alt: string) => guideImage('voicelink', file, alt);
 
 const VOICELINK_GUIDE: SetupGuide = {
-    provider: VoiceProvider.VOICELINK,
     title: 'Set up VoiceLink for your voice agents',
     steps: [
         {
@@ -349,13 +318,4 @@ const SETUP_GUIDES: Record<VoiceProvider, SetupGuide> = {
 /** Every provider's step-by-step setup guide (the setup-guide spec opens each one). */
 export function setupGuideFor(provider: VoiceProvider): SetupGuide {
     return SETUP_GUIDES[provider];
-}
-
-/** Index of a step by id; the first step when the id is missing or unknown. */
-export function setupGuideStepIndex(guide: SetupGuide, stepId?: string | null): number {
-    if (!stepId) return 0;
-    return Math.max(
-        0,
-        guide.steps.findIndex((step) => step.id === stepId),
-    );
 }
