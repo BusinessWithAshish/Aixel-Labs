@@ -115,6 +115,8 @@ export function StackStep({ part, stack, className }: StackStepProps) {
                     name={`${id}-model`}
                     id={`${id}-model`}
                     label="Model"
+                    description="Prices are a minute of the model alone."
+                    classNames={{ description: 'text-xs' }}
                     value={current.model}
                     onChange={pickModel}
                     options={modelOptions}

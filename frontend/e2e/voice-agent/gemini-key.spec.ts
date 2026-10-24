@@ -629,7 +629,7 @@ test('several keys, and each agent its own stack: one voice model or three steps
     const stack = page.getByTestId('agent-stack');
     await expect(stack.getByRole('radio', { name: /^One voice model/ })).toBeChecked();
     await stack.locator('#stack-realtime-model').click();
-    await expect(page.getByRole('option', { name: /^Gemini 3\.8 Live · \$0\.02\d\/min$/ })).toBeVisible();
+    await expect(page.getByRole('option', { name: /^Gemini 3\.8 Live · \$0\.05\d\/min$/ })).toBeVisible();
     await expect(page.getByRole('option', { name: /^GPT-Realtime mini · .* · coming soon$/ })).toBeDisabled();
     await page.keyboard.press('Escape');
     // Its key: the provider's keys only (the first is the default), named after the model's provider.

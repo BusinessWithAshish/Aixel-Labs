@@ -613,7 +613,14 @@ export function useVoiceAgentEditorPage({
     // What a minute should cost, as the stack, prompt and booking on screen stand, on the numbers it is on.
     const stack = (form.stack ?? VOICE_DEFAULT_STACK) as VoiceStack<string>;
     // What stops its calls, as the form stands (the playground saves it first; the actions check the saved agent).
+    // The playground goes straight to the model; test calls and the browser / softphone tests need a number.
     const callBlockers = voiceCallBlockers({ prompt: form.prompt, stack, keys: stackOptions.keys });
+    const phoneBlockers = voiceCallBlockers({
+        prompt: form.prompt,
+        stack,
+        keys: stackOptions.keys,
+        onNumber: usage.inbound.length + usage.outbound.length > 0,
+    });
     const thinker = stack.kind === VoiceStackKind.REALTIME ? stack : stack.llm;
     const costEstimate = estimateAgentCost({
         promptChars: form.prompt.length,
@@ -639,6 +646,7 @@ export function useVoiceAgentEditorPage({
         geminiKey,
         stackOptions,
         callBlockers,
+        phoneBlockers,
         costEstimate,
         costTotals,
         saved,

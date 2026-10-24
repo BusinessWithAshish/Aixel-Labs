@@ -31,8 +31,8 @@ export function VoiceAgentCostEstimate() {
     const lines: { label: string; detail: string; usd: number | null }[] = [
         ...estimate.stack.map(({ label, detail, usdPerMinute }) => ({ label, detail, usd: usdPerMinute })),
         ...estimate.tools.map(({ tool, tokens, usesPerCall, usdPerMinute }) => ({
-            label: tool.kind === 'booking' ? 'Booking' : tool.name,
-            detail: `${count(tokens)} tokens a turn, ~${usesPerCall} ${usesPerCall === 1 ? 'use' : 'uses'} a call`,
+            label: tool.kind === 'booking' ? 'Booking tools' : tool.name,
+            detail: `${tool.kind === 'booking' ? 'their descriptions' : 'its description'} (${count(tokens)} tokens) read every turn, ~${usesPerCall} ${usesPerCall === 1 ? 'use' : 'uses'} a call`,
             usd: usdPerMinute,
         })),
         ...(estimate.providers.length === 0
@@ -48,13 +48,13 @@ export function VoiceAgentCostEstimate() {
         <Card className="border-primary/20 bg-primary/5 h-auto min-w-0 gap-3" data-testid="agent-cost-estimate">
             <CardHeader>
                 <CardTitle>Cost per minute</CardTitle>
-                <CardDescription>An estimate from list prices.</CardDescription>
+                <CardDescription>All in: the models, your prompt, tools and phone, from list prices.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 text-sm">
                 <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5" data-testid="agent-cost-parts">
                     {lines.map(({ label, detail, usd }) => (
                         <div key={label} className="contents">
-                            <dt className="min-w-0 truncate">
+                            <dt className="min-w-0 truncate" title={`${label} · ${detail}`}>
                                 {label} <span className="text-muted-foreground text-xs">· {detail}</span>
                             </dt>
                             <dd className={cn('text-right tabular-nums', usd === null && 'text-muted-foreground')}>
@@ -71,6 +71,17 @@ export function VoiceAgentCostEstimate() {
                     >
                         {money(estimate.usdPerMinute)}
                     </dd>
+                    {estimate.paidUsdPerMinute !== estimate.usdPerMinute ? (
+                        <>
+                            <dt className="text-muted-foreground text-xs">On a paid key</dt>
+                            <dd
+                                className="text-muted-foreground text-right text-xs tabular-nums"
+                                data-testid="agent-cost-paid"
+                            >
+                                {money(estimate.paidUsdPerMinute)}
+                            </dd>
+                        </>
+                    ) : null}
                     <dt className="text-muted-foreground">A {estimate.typicalCallMinutes}-minute call</dt>
                     <dd className="text-right tabular-nums">{money(estimate.usdPerMinute * estimate.typicalCallMinutes)}</dd>
                 </dl>

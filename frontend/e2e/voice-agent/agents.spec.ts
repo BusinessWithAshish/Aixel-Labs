@@ -373,14 +373,16 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
     await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.083');
     await page.locator('#agent-prompt').fill('x'.repeat(2400)); // back as saved, so leaving asks nothing
 
-    // Booking adds its 525 tokens a turn and two uses a call: $0.005 a minute.
+    // Booking adds its descriptions (525 tokens) every turn and two uses a call: $0.004 a minute.
     await db.setVoiceAgentTools(agentId, { booking: { ...defaultVoiceBookingTool('UTC'), enabled: true }, webhooks: [] });
     await openVoiceAgent(page, agentId);
-    await expect(parts).toContainText('Booking · 525 tokens a turn, ~2 uses a call$0.005');
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.082');
+    await expect(parts).toContainText(
+        'Booking tools · their descriptions (525 tokens) read every turn, ~2 uses a call$0.004',
+    );
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.081');
 
     // A pipeline stack bills its three parts; thinking grows with the prompt (its list rate assumes 1,500
-    // tokens a turn), and so do the tools' tokens: $0.0048 + $0.0029 + $0.039 + booking $0.0024 + Telnyx.
+    // tokens a turn), and so do the tools' tokens: $0.0048 + $0.0029 + $0.039 + booking $0.0015 + Telnyx.
     await db.setVoiceAgentFields(agentId, {
         stack: {
             kind: VoiceStackKind.PIPELINE,
@@ -394,7 +396,7 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
     await expect(parts).toContainText('Thinking (LLM) · Gemini 3.5 Flash Lite, 1,200 tokens a turn$0.003');
     await expect(parts).toContainText('Text to speech · Cartesia Sonic 3.6$0.039');
     await expect(parts).not.toContainText('Gemini 3.8 Live');
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.060');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.059');
     await db.setVoiceAgentFields(agentId, { stack: null });
 
     // A free-tier key pays nothing for Gemini; a priced call gives the real average.
@@ -424,8 +426,13 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
         },
     ]);
     await openVoiceAgent(page, agentId);
+    // Free tier: the Gemini lines and the booking tools Gemini reads cost nothing; the paid price shows beside.
     await expect(parts).toContainText('Gemini 3.8 Live · free-tier key$0.000');
+    await expect(parts).toContainText(
+        'Booking tools · their descriptions (525 tokens) read every turn, ~2 uses a call$0.000',
+    );
     await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.011');
+    await expect(card.getByTestId('agent-cost-paid')).toHaveText('$0.081');
     await expect(card.getByTestId('agent-cost-real')).toHaveText(
         'Real so far: $0.030 a minute over 1 call (phone part partly estimated).',
     );
@@ -446,6 +453,7 @@ test('a stack step with no key: the card and the playground say why, and every w
             tts: { provider: VoiceKeyProvider.DEEPGRAM, model: 'aura' },
         },
     });
+    await db.setVoiceNumberAgents(await seedNumber(db, '+15550100009'), { outboundAgentId: agentId });
     await openVoiceAgent(page, agentId);
 
     const blockers = page.getByTestId('call-blockers');
@@ -478,6 +486,21 @@ test('a stack step with no key: the card and the playground say why, and every w
     await expect(reasons).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Test call' })).toBeEnabled();
     await expect(page.getByRole('button', { name: /Start call/ })).toBeEnabled();
+});
+
+test('test calls and the browser / softphone test need a number; the playground does not', async ({ page, db }) => {
+    await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
+    const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Maya', callType: VoiceAgentCallType.INBOUND });
+    await openVoiceAgent(page, agentId);
+    const card = page.getByTestId('call-blockers');
+    await expect(card).toHaveCount(1); // the agent card's; the playground has nothing to say
+    await expect(card).toContainText('It is not on a phone number yet.');
+    await expect(card.getByRole('link', { name: 'Link a phone number →' })).toHaveAttribute('href', '#agent-numbers');
+    await expect(page.getByRole('button', { name: 'Test call' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Start call' })).toBeEnabled();
+    await expect(page.getByTestId('playground-no-number')).toHaveText(
+        'Runs in your browser straight to the model: no phone number needed.',
+    );
 });
 
 test('edits and saves every field', async ({ page, db }) => {

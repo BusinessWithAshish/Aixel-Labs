@@ -11,17 +11,17 @@ import { AgentTestDialog, agentTestTitle } from './AgentTestDialog';
 
 /** Beside Test call: talk to the agent over the internet, for owners who cannot call or be called internationally. */
 export function AgentTestButton() {
-    const { agentId, saved, callBlockers } = usePage<UseVoiceAgentEditorPageReturn>();
+    const { agentId, saved, phoneBlockers } = usePage<UseVoiceAgentEditorPageReturn>();
     const [open, setOpen] = useState(false);
     return (
         <>
-            <DisabledReason reason={callBlockers.length ? blockerText(callBlockers) : null}>
+            <DisabledReason reason={phoneBlockers.length ? blockerText(phoneBlockers) : null}>
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => setOpen(true)}
-                    disabled={callBlockers.length > 0}
+                    disabled={phoneBlockers.length > 0}
                 >
                     <Headset className="size-4" />
                     {agentTestTitle(saved.name, saved.callType)}

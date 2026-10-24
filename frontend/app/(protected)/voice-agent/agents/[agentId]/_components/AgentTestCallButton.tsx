@@ -13,7 +13,7 @@ import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-ed
 
 /** The agent rings the owner's phone, from a number it is on when it has one. Green: the card's one call to try it out. */
 export function AgentTestCallButton() {
-    const { agentId, usage, ownedNumbers, geminiKey, callBlockers } = usePage<UseVoiceAgentEditorPageReturn>();
+    const { agentId, usage, ownedNumbers, geminiKey, phoneBlockers } = usePage<UseVoiceAgentEditorPageReturn>();
     const [loading, setLoading] = useState(false);
     const [agents, setAgents] = useState<VoiceAgentOption[] | null>(null);
 
@@ -30,12 +30,12 @@ export function AgentTestCallButton() {
 
     return (
         <>
-            <DisabledReason reason={callBlockers.length ? blockerText(callBlockers) : null}>
+            <DisabledReason reason={phoneBlockers.length ? blockerText(phoneBlockers) : null}>
                 <Button
                     type="button"
                     size="sm"
                     className="bg-emerald-700 text-white hover:bg-emerald-800"
-                    disabled={loading || callBlockers.length > 0}
+                    disabled={loading || phoneBlockers.length > 0}
                     onClick={() => void open()}
                 >
                     {loading ? <Loader2 className="size-4 animate-spin" /> : <PhoneCall className="size-4" />}

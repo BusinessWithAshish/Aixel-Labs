@@ -126,6 +126,11 @@ export function VoicePlayground({ className }: { className?: string }) {
                         </span>
                     ) : null}
                 </div>
+                {busy ? null : (
+                    <p className="text-muted-foreground -mt-2 text-xs" data-testid="playground-no-number">
+                        Runs in your browser straight to the model: no phone number needed.
+                    </p>
+                )}
 
                 <div className="flex items-center gap-2" aria-label="Microphone level">
                     <Mic className="text-muted-foreground size-4 shrink-0" aria-hidden />
