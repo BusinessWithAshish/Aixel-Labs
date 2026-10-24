@@ -10,7 +10,7 @@ import {
     type VoiceCallCost,
     type VoiceProvider,
 } from '@aixellabs/backend/db/types';
-import { PIPELINE_PARTS, stackModel, VOICE_STACK_PART_LABELS } from '@/helpers/voice-stack';
+import { conversationUsdPerMinute, PIPELINE_PARTS, stackModel, VOICE_STACK_PART_LABELS } from '@/helpers/voice-stack';
 
 /**
  * Call costs in words (Call logs, call detail, the agent's estimate, test calls). Costs are kept in US
@@ -110,7 +110,7 @@ export type AgentCostLine = { label: string; detail: string; usdPerMinute: numbe
 export type AgentCostEstimate = {
     /** Prompt tokens read every turn: the agent's words plus the engine's own sections (tools apart). */
     promptTokens: number;
-    /** What the voice stack costs: a realtime model's talk time and prompt, or a pipeline's three parts. */
+    /** What the voice stack costs: a realtime model's talk time, conversation and prompt, or a pipeline's three parts. */
     stack: AgentCostLine[];
     /** One row per tool: what it adds every turn plus its uses, spread over a typical call. */
     tools: { tool: CostTool; tokens: number; usesPerCall: number; usdPerMinute: number }[];
@@ -119,11 +119,14 @@ export type AgentCostEstimate = {
     /** Every line together, with the dearest known provider. */
     usdPerMinute: number;
     typicalCallMinutes: number;
+    /** A realtime model re-reads the whole conversation every turn: longer calls cost more a minute. */
+    growsWithLength: boolean;
 };
 
 /**
  * What a minute with an agent should cost before any call, as a bill: the voice stack (a realtime
- * model's talk time plus its prompt, read again every turn; or a pipeline's speech to text, thinking
+ * model's talk time, the conversation so far and its prompt, both read again every turn, on a typical
+ * call; or a pipeline's speech to text, thinking
  * and text to speech), each tool (its text every turn, and its uses: the answer read as text and the
  * line held open while it runs), and the phone at the providers' list rates. Gemini parts are free
  * on a free-tier key.
@@ -180,6 +183,11 @@ export function estimateAgentCost(input: {
                 usdPerMinute: paid(thinker) * rate('realtime', stack.model),
             },
             {
+                label: 'Conversation so far',
+                detail: 're-read every turn',
+                usdPerMinute: paid(thinker) * conversationUsdPerMinute(stackModel('realtime', stack.model, input.catalogue)),
+            },
+            {
                 label: 'Prompt',
                 detail: `${promptTokens.toLocaleString('en-US')} tokens, read every turn`,
                 usdPerMinute: promptTokens * tokenUsdPerMinute,
@@ -224,6 +232,7 @@ export function estimateAgentCost(input: {
         providers,
         usdPerMinute: stackUsdPerMinute + tools.reduce((sum, t) => sum + t.usdPerMinute, 0) + phoneUsdPerMinute,
         typicalCallMinutes: model.typicalCallMinutes,
+        growsWithLength: stack.kind === VoiceStackKind.REALTIME,
     };
 }
 

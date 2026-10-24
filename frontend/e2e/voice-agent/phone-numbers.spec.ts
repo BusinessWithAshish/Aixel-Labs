@@ -330,9 +330,9 @@ test('a test call names the chosen agent, prices a minute by where it goes, and 
     const numberId = await seedNumber(db, FIRST_NUMBER, { outboundAgentId: new ObjectId(sales) });
     await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY); // paid: Gemini is priced
     await openPhoneNumbers(page);
-    // A 41-character prompt: Gemini $0.0287 a minute (paid key), plus Telnyx's $0.0125 out to the US.
+    // A 41-character prompt: Gemini $0.0616 a minute (paid key; talk time, the conversation re-read, the prompt), plus Telnyx's $0.0125 out to the US.
     await expect(numberRow(page, FIRST_NUMBER).getByTestId('number-cost-estimate')).toHaveText(
-        'About $0.041 a minute to the US',
+        'About $0.074 a minute to the US',
     );
     await expect(numberUse(page, FIRST_NUMBER)).toHaveText(places('Sales outreach'));
 
@@ -340,12 +340,12 @@ test('a test call names the chosen agent, prices a minute by where it goes, and 
     const dialog = page.getByRole('dialog', { name: 'Test call' });
     await expect(dialog).toContainText('On a Telnyx trial account, calls only go to numbers you have verified');
     await expect(dialog.getByTestId('test-call-cost')).toHaveText(
-        'It should cost about $0.041 a minute to the US (an estimate).',
+        'It should cost about $0.074 a minute to the US (an estimate).',
     );
     // Telnyx publishes no rate for India: only Gemini is counted.
     await dialog.getByLabel('Your phone number').fill('+919876543210');
     await expect(dialog.getByTestId('test-call-cost')).toHaveText(
-        'It should cost about $0.029 a minute to India (an estimate, without Telnyx’s charge).',
+        'It should cost about $0.062 a minute to India (an estimate, without Telnyx’s charge).',
     );
     await expect(dialog.getByRole('combobox', { name: 'Agent that calls' })).toHaveText('Sales outreach (makes calls)');
 
