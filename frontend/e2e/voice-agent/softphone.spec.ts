@@ -154,6 +154,9 @@ test('inbound, from a softphone: set up, dial the SIP address, reset and remove'
     expect(app.voice_url).toBe(`${E2E_VOICE_ENGINE_URL}/texml?n=${numberId}&sig=${sig}`);
     expect(app.inbound.sip_subdomain_receive_settings).toBe('only_my_connections');
     await expect(dialog.getByTestId('softphone-dial-in')).toHaveText(
+        `sip:frontdesk@${app.inbound.sip_subdomain}.sip.telnyx.com;transport=tls`,
+    );
+    await expect(dialog.getByTestId('softphone-dial-in-plain')).toHaveText(
         `sip:frontdesk@${app.inbound.sip_subdomain}.sip.telnyx.com`,
     );
 

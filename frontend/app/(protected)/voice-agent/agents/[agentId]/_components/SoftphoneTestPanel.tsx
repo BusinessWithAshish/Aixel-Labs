@@ -90,6 +90,10 @@ function SetupSteps({ userName }: { userName: string }) {
                         Username <span className="font-mono">{userName}</span>, the password, domain{' '}
                         <span className="font-mono">sip.telnyx.com</span>, transport <strong>TLS</strong>.
                     </li>
+                    <li>
+                        In the account’s settings, turn on <strong>Outbound proxy</strong> (route calls through
+                        sip.telnyx.com), so every call goes over the same TLS connection.
+                    </li>
                     <li>Leave media encryption on None, and allow the microphone.</li>
                 </ol>
                 <p>
@@ -226,12 +230,18 @@ export function SoftphoneTestPanel({ view, agentId, agentName, inbound, reload, 
                     {dialIn.length > 0 ? (
                         <>
                             {dialIn.map((n) => (
-                                <CopyRow
-                                    key={n.id}
-                                    label={`Dial from the softphone (like calling ${n.phoneNumber})`}
-                                    value={agentSipAddress(n.user, n.host, 'softphone')}
-                                    testId="softphone-dial-in"
-                                />
+                                <div key={n.id} className="flex flex-col gap-2">
+                                    <CopyRow
+                                        label={`Dial from the softphone (like calling ${n.phoneNumber})`}
+                                        value={agentSipAddress(n.user, n.host, 'softphone', true)}
+                                        testId="softphone-dial-in"
+                                    />
+                                    <CopyRow
+                                        label="Or, on Wi-Fi that does not block internet calling"
+                                        value={agentSipAddress(n.user, n.host, 'softphone')}
+                                        testId="softphone-dial-in-plain"
+                                    />
+                                </div>
                             ))}
                             <p className="text-muted-foreground text-xs">
                                 Bookings, tools and the call log all work as on a real call. Only softphones signed in to

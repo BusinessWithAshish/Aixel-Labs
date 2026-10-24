@@ -46,9 +46,13 @@ export function formatParty(value: string | undefined, fallback: string): string
 /** What the browser adds to an agent's SIP user, so Call logs tell its calls from the softphone's. */
 const BROWSER_SUFFIX = '-browser';
 
-/** What reaches a number's inbound agent over SIP, like a call to the number. */
-export function agentSipAddress(user: string, host: string, via: 'browser' | 'softphone'): string {
-    return `sip:${user}${via === 'browser' ? BROWSER_SUFFIX : ''}@${host}`;
+/**
+ * What reaches a number's inbound agent over SIP, like a call to the number. `tls`: the softphone sends the call over
+ * TLS (port 5061) too; the subdomain has no SRV records, so without it the INVITE goes out on UDP 5060, which many
+ * mobile networks block even when the softphone signed in over TLS.
+ */
+export function agentSipAddress(user: string, host: string, via: 'browser' | 'softphone', tls = false): string {
+    return `sip:${user}${via === 'browser' ? BROWSER_SUFFIX : ''}@${host}${tls ? ';transport=tls' : ''}`;
 }
 
 /**
