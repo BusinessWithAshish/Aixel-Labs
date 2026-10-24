@@ -29,8 +29,10 @@ export default function PageLayout({ children, className, title, headerEnd }: Pa
 
     const end = headerEnd === undefined ? <CreditsBadge /> : headerEnd;
 
+    // overflow-clip, not -hidden: a hidden box can still be scrolled by scrollIntoView, which shifted the whole
+    // shell up (header off the top, a blank strip at the bottom). Only the children container scrolls.
     return (
-        <SidebarInset id="sidebar-inset" className="p-2 rounded-md gap-4 overflow-hidden">
+        <SidebarInset id="sidebar-inset" className="p-2 rounded-md gap-4 overflow-clip">
             <header
                 id="header"
                 className="z-10 sticky p-3 backdrop-blur-lg rounded-md flex justify-start items-center border shadow-md drop-shadow-md w-full top-2 h-12 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 shrink-0"
