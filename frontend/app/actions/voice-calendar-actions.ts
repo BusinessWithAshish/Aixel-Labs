@@ -262,7 +262,7 @@ export const confirmVoiceAppConnection = async (
                     status,
                     composioSessionId,
                     label: state?.label ?? null,
-                    statusReason: state ? state.statusReason : 'Composio does not list this connection under your account',
+                    statusReason: state ? state.statusReason : 'this sign-in is not listed under your account',
                 },
             },
         );

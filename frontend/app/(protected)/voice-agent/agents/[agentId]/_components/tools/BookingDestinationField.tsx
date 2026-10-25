@@ -227,7 +227,7 @@ export function BookingDestinationField() {
                         <Alert variant="info">
                             <Info className="size-4" />
                             <AlertDescription>
-                                You sign in on Composio&apos;s secure page; we never see your password. Your changes are
+                                You sign in with {app.label} on a secure page; we never see your password. Your changes are
                                 saved first. Until {app.label} is connected, bookings go to {now}.
                             </AlertDescription>
                         </Alert>
