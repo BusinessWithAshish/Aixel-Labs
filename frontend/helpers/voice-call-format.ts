@@ -10,6 +10,7 @@ import {
 
 export function callTypeLabel(channel: VoiceCallChannel, direction: VoiceCallDirection): string {
     if (channel === VoiceCallChannel.PLAYGROUND || direction === VoiceCallDirection.PLAYGROUND) return 'Playground';
+    if (channel === VoiceCallChannel.WHATSAPP) return 'WhatsApp chat';
     return direction === VoiceCallDirection.INBOUND ? 'Inbound' : 'Outbound';
 }
 

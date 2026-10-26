@@ -23,7 +23,8 @@ URLs, short-lived stream tokens, `VOICELAB_KEY`, Twilio's signature).
 | `cascade.py` | Each call's stack (the agent's `stack`; none = Gemini Live on its default model). The PIPELINE one (`VoiceStackKind.PIPELINE`): speech-to-text, a text model and text-to-speech (Deepgram / Gemini / OpenAI STT, Gemini / OpenAI text, Cartesia / ElevenLabs / OpenAI / Gemini / Deepgram Aura TTS) on the owner's keys, inside the same call as Gemini Live (turn taking, guard, tools, record). REALTIME = Gemini Live on the stack's model. Each part is billed at the price the app saved with it (costs.py) |
 | `costs.py` | Each call's cost (`voice_calls.cost`): Gemini tokens at list price (0 on a free-tier key), the phone minutes at the provider's list rate, then the provider's own charge after the call (Twilio's Call `price`, VoiceLink's call-log `total_cost`). Rates, sources and dates: `backend/src/db/voice-call-rates.json`, shared with the app |
 | `twilio.py`, `voicelink.py` | Twilio and VoiceLink numbers (Telnyx is built into `phone.py`) |
-| `whatsapp.py` | WhatsApp numbers on the customer's own Meta app: `/whatsapp` webhook (signed with the app secret), call signalling over the Graph API, audio over WebRTC (Pipecat SmallWebRTC, needs `pipecat-ai[webrtc]`). Calls coming in only, for now |
+| `whatsapp.py` | WhatsApp numbers on the customer's own Meta app: `/whatsapp` webhook (signed with the app secret), call signalling over the Graph API, audio over WebRTC (Pipecat SmallWebRTC, needs `pipecat-ai[webrtc]`). Calls and chats coming in, for now. A chat is one voice_calls document (channel WHATSAPP), closed after 15 quiet minutes, then analysed into the same caller memory as calls |
+| `chat.py` | The agent in a text chat: the next reply to a conversation, with the call's prompt and tools as Gemini functions, on the chat model (voice-call-rates.json `chat`) |
 | `fillers.py`, `fillers/` | The short "mm" and voicemail clips in each voice (shipped ones; others are made once and kept in `cache/`) |
 | `prospect.py` | A fake prospect for test calls on the Telnyx path |
 | `tests/` | Unit and end-to-end suites (below) |
@@ -91,7 +92,7 @@ exact command (engine settings, fake ports). Most use real Gemini Live sessions,
 
 ```bash
 export MONGODB_URI=mongodb://127.0.0.1:27018 MONGODB_DB_NAME=AixelLabsVoiceEngineDev
-.venv/bin/python tests/tools_unit.py          # also: calendars_unit, agent_features_unit, campaigns_unit, guard_unit, costs_unit, speech_unit, cascade_unit, whatsapp_unit
+.venv/bin/python tests/tools_unit.py          # also: calendars_unit, agent_features_unit, campaigns_unit, guard_unit, costs_unit, speech_unit, cascade_unit, whatsapp_unit, whatsapp_chat_unit
 .venv/bin/python tests/drain_e2e.py 8131      # starts its own two slots: SIGTERM drain + event handover
 ```
 

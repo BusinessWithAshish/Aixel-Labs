@@ -678,6 +678,8 @@ export type VoiceNumber = Omit<VoiceNumberDoc<string>, "apiKeySealed" | "whatsap
 export enum VoiceCallChannel {
   PHONE = "PHONE",
   PLAYGROUND = "PLAYGROUND",
+  /** A WhatsApp text chat with a customer's WhatsApp number: one document per conversation (`chat`). */
+  WHATSAPP = "WHATSAPP",
 }
 
 /**
@@ -723,7 +725,25 @@ export enum VoiceCallEndReason {
   GEMINI_KEY_ERROR = "gemini_key_error",
   /** The caller stayed silent after she checked in (`speech.silenceSecs`). */
   SILENCE = "silence",
+  /** A WhatsApp chat still going: no quiet spell long enough to close it yet (`chat.open`). */
+  CHAT_OPEN = "chat_open",
+  /** A WhatsApp chat closed after a quiet spell (VOICE_CHAT_LIMITS.idleMinutes). */
+  CHAT_ENDED = "chat_ended",
 }
+
+export const VOICE_CHAT_LIMITS = {
+  /** A WhatsApp chat closes this long after its last message; the next message starts a new one. */
+  idleMinutes: 15,
+} as const;
+
+/** A WhatsApp chat's own state, on its voice_calls document (channel WHATSAPP). */
+export type VoiceCallChat = {
+  /** True until the chat goes quiet and the engine closes it (analysis and caller memory follow). */
+  open: boolean;
+  lastMessageAt: Date;
+  /** Tokens the chat model used so far, every reply added (its cost is worked out when it closes). */
+  tokens: { textIn: number; textOut: number };
+};
 
 export type VoiceCallTurn = {
   role: "agent" | "caller";
@@ -777,6 +797,8 @@ export type VoiceCallDoc<Id = ObjectId> = {
   memory?: VoiceCallMemory | null;
   /** What the call cost the owner, written by the engine when the call ends (absent on calls before 2026-10-21). */
   cost?: VoiceCallCost | null;
+  /** WhatsApp chats only (channel WHATSAPP). */
+  chat?: VoiceCallChat | null;
 };
 
 /**
@@ -838,7 +860,7 @@ export type VoiceCallToolCall = {
   bookingId?: string | null;
 };
 
-export type VoiceCall = Omit<VoiceCallDoc<string>, "startedAt" | "endedAt" | "memoryUsed" | "recordingUrl"> & {
+export type VoiceCall = Omit<VoiceCallDoc<string>, "startedAt" | "endedAt" | "memoryUsed" | "recordingUrl" | "chat"> & {
   startedAt: string;
   endedAt: string;
   memoryUsed?: { brief: string; lastCallAt: string } | null;

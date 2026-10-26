@@ -32,7 +32,7 @@ export const NUMBER_PROVIDERS: Record<VoiceProvider, NumberProviderInfo> = {
     },
     [VoiceProvider.WHATSAPP]: {
         label: 'WhatsApp',
-        region: 'WhatsApp Business numbers, any country (answers calls)',
+        region: 'WhatsApp Business numbers, any country (answers calls and chats)',
         callExample: '+919876543210',
         logo: '/brand-logos/whatsapp.svg',
     },

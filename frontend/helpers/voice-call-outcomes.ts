@@ -21,6 +21,8 @@ const ENDED_BY_LABELS: Record<VoiceCallEndReason, string> = {
     [VoiceCallEndReason.ERROR]: 'Error',
     [VoiceCallEndReason.GEMINI_KEY_ERROR]: 'Gemini key problem',
     [VoiceCallEndReason.SILENCE]: 'Caller went quiet',
+    [VoiceCallEndReason.CHAT_OPEN]: 'Chat still going',
+    [VoiceCallEndReason.CHAT_ENDED]: 'Chat ended',
 };
 
 /** Known reasons in words; anything new from the engine is shown as it was written. */
@@ -67,6 +69,8 @@ const ENDED_BY_TONES: Record<VoiceCallEndReason, OutcomeTone> = {
     [VoiceCallEndReason.AGENT_HUNG_UP]: 'good',
     [VoiceCallEndReason.GOODBYE]: 'good',
     [VoiceCallEndReason.VOICEMAIL_MESSAGE]: 'good',
+    [VoiceCallEndReason.CHAT_OPEN]: 'good',
+    [VoiceCallEndReason.CHAT_ENDED]: 'good',
     [VoiceCallEndReason.DNC]: 'fair',
     [VoiceCallEndReason.VOICEMAIL]: 'fair',
     [VoiceCallEndReason.IVR]: 'fair',

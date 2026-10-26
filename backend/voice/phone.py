@@ -1125,7 +1125,7 @@ def make_app() -> FastAPI:
     @app.post("/whatsapp")
     async def whatsapp_events(request: Request):
         """Every webhook of a customer's Meta app (`?app=&sig=`, see whatsapp.py), signed with its app
-        secret. 200 at once (Meta retries otherwise); a call coming in is answered in the background."""
+        secret. 200 at once (Meta retries otherwise); a call coming in, or a message, is answered in the background."""
         q = request.query_params
         app_id = q.get("app") or ""
         if not product.sig_ok(q.get("sig"), "whatsapp", app_id):
@@ -1154,6 +1154,10 @@ def make_app() -> FastAPI:
             elif event["event"] == "terminate" and not await whatsapp.hang_up(event["id"]):
                 if not request.headers.get(FORWARDED):  # the call may be on the other slot (a deploy's drain)
                     to_other_slots("/whatsapp", request.url.query, raw, {"X-Hub-Signature-256": signature or ""})
+        for message in whatsapp.messages_in(payload):
+            number = next((n for n in numbers if n["providerNumberId"] == message["phone_number_id"]), None)
+            if number and whatsapp.fresh(message["id"], "message"):
+                whatsapp.spawn(whatsapp.answer_message(number, message))
         return {"ok": True}
 
     async def answer_whatsapp(number: dict, event: dict):
@@ -1427,6 +1431,8 @@ def make_app() -> FastAPI:
 
     # Outbound campaigns dial from this process, through /calls above (campaigns.py).
     campaigns.install(app, room=lambda: MAX_CALLS - len(ACTIVE), draining=draining)
+    # WhatsApp chats gone quiet are closed (analysis, caller memory) from here.
+    whatsapp.install(app, draining=draining)
     return app
 
 

@@ -38,6 +38,8 @@ GEMINI_USD_PER_M = RATES["gemini"]["usdPerMillionTokens"]
 STACK_RATES = RATES["pipeline"]
 # USD per 1M tokens for the post-call analysis's text model.
 ANALYSIS_USD_PER_M = RATES["analysis"]["usdPerMillionTokens"]
+# A WhatsApp chat's replies (chat.py), billed on the text model's tokens.
+CHAT_USD_PER_M = RATES["chat"]["usdPerMillionTokens"]
 # USD a minute, every part the engine uses (voice, media stream, recording), by provider and direction.
 # shortcut: US rates for every destination but India (Twilio); Telnyx's India rates are not public.
 PROVIDER_USD_PER_MIN = {(name, direction): rate for name, p in RATES["providers"].items()
@@ -112,6 +114,18 @@ def call_cost(doc: dict, usage: dict, provider: str | None, sealed: str | None =
     if usage.get("stack") == "PIPELINE":
         # shortcut: a Gemini part is free when the call's Gemini key is; per-part keys' tiers are not read.
         cost["stack"] = pipeline_cost(usage, doc["durationSec"], free)
+    cost["totalUsd"] = total(cost)
+    return cost
+
+
+def chat_cost(doc: dict, tokens: dict, sealed: str | None = None) -> dict:
+    """The `cost` of a closed WhatsApp chat: every reply's tokens on the chat model at list price (0 on a free-tier
+    key). Meta's own charge for replies past the month's free ones goes to the customer's account, not here.
+    Reads the key's tier: run it off the event loop."""
+    free = free_tier(doc["userId"], sealed)
+    tokens = {"textIn": int(tokens.get("textIn") or 0), "audioIn": 0, "textOut": int(tokens.get("textOut") or 0), "audioOut": 0}
+    usd = 0.0 if free else (tokens["textIn"] * CHAT_USD_PER_M["textIn"] + tokens["textOut"] * CHAT_USD_PER_M["textOut"]) / 1e6
+    cost = {"geminiUsd": round(usd, 6), "geminiFreeTier": free, "geminiTokens": tokens, "providerUsd": 0.0, "providerExact": False}
     cost["totalUsd"] = total(cost)
     return cost
 

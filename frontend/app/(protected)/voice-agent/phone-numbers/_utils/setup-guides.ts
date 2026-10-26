@@ -342,7 +342,7 @@ const WHATSAPP_GUIDE: SetupGuide = {
             id: WHATSAPP_GUIDE_STEP.CONNECT,
             title: 'Paste them here, pick your number and give it an agent',
             body: [
-                'On this page, open Connect a number, choose WhatsApp, paste the three and click Find my numbers. Import your number, then give it an agent that answers calls.',
+                'On this page, open Connect a number, choose WhatsApp, paste the three and click Find my numbers. Import your number, then give it an agent that answers calls: it answers WhatsApp messages too, and remembers each person across both.',
                 'That is the moment we change things at Meta: your app’s webhook points at Aixel Labs and calling is turned on for the number, with the call button shown. Unlink the agent or remove the number and its calling settings go back as they were.',
             ],
         },

@@ -68,6 +68,21 @@ def module_tests():
 
     sdp = "v=0\r\na=fingerprint:sha-256 AA\r\na=fingerprint:sha-512 BB\r\na=setup:active"
     ok("SDP: only the sha-256 fingerprint is left", whatsapp.for_whatsapp(sdp) == "v=0\r\na=fingerprint:sha-256 AA\r\na=setup:active\r\n")
+    texts = webhook("p1", field="messages")
+    texts["entry"][0]["changes"][0]["value"].update(
+        contacts=[{"wa_id": "919876543210", "profile": {"name": "Ravi"}}],
+        messages=[{"id": "wamid.1", "from": "919876543210", "type": "text", "text": {"body": " Hi there "}},
+                  {"id": "wamid.2", "from": "919876543210", "type": "interactive",
+                   "interactive": {"type": "button_reply", "button_reply": {"id": "b1", "title": "Book a visit"}}},
+                  {"id": "wamid.3", "from": "919876543210", "type": "audio", "audio": {"id": "m1"}},
+                  {"id": "wamid.4", "type": "text"}, "junk"],
+        statuses=[{"id": "wamid.out", "status": "delivered"}])
+    got = whatsapp.messages_in(texts)
+    ok("messages: text and a tapped button read as text, a voice note as no text, with the sender's name",
+       [(m["id"], m["text"], m["name"]) for m in got]
+       == [("wamid.1", "Hi there", "Ravi"), ("wamid.2", "Book a visit", "Ravi"), ("wamid.3", None, "Ravi")], str(got))
+    ok("messages: delivery receipts and call events are not messages",
+       whatsapp.messages_in(webhook("p1", CONNECT)) == [] and whatsapp.calls_in(texts) == [])
     ok("verify token: the app's signParts('whatsapp-verify', appId)",
        whatsapp.verify_ok(APP, product.sign("whatsapp-verify", APP)) and not whatsapp.verify_ok(OTHER_APP, product.sign("whatsapp-verify", APP)))
 
@@ -76,7 +91,10 @@ def route_tests():
     numbers = {APP: [number("p1")], OTHER_APP: [number("p2", app=OTHER_APP, secret="s2")]}
     product.whatsapp_numbers = lambda app_id: numbers.get(app_id, [])
     caught = []
-    whatsapp.spawn = lambda coro: (caught.append(coro.cr_frame.f_locals.get("event")), coro.close())
+    def caught_spawn(coro):
+        caught.append(coro.cr_frame.f_locals.get("event") or coro.cr_frame.f_locals.get("message"))
+        coro.close()
+    whatsapp.spawn = caught_spawn
     client = TestClient(phone.make_app())
     url = f"/whatsapp?app={APP}&sig={product.sign('whatsapp', APP)}"
 
@@ -102,6 +120,13 @@ def route_tests():
     ok("events: a number on ANOTHER app is not reachable through this app's webhook", len(caught) == 1)
     post(webhook("p1", {**CONNECT, "id": "wacid.C3", "direction": "BUSINESS_INITIATED", "session": {"sdp_type": "answer", "sdp": "x"}}))
     ok("events: a business-initiated connect (outbound, not built) is not answered", len(caught) == 1)
+    text = webhook("p1", field="messages")
+    text["entry"][0]["changes"][0]["value"]["messages"] = [{"id": "wamid.9", "from": "919876543210", "type": "text",
+                                                           "text": {"body": "Hello"}}]
+    post(text)
+    post(text)
+    ok("messages: a signed message is answered in the background, once", [c and c["id"] for c in caught][1:] == ["wamid.9"],
+       str(caught))
 
 
 module_tests()

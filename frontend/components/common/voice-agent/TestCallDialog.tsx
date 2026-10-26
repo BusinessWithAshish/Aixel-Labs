@@ -35,7 +35,7 @@ const PROVIDER_NOTE: Record<VoiceProvider, string> = {
     [VoiceProvider.TWILIO]:
         'On a Twilio trial account, calls only go to numbers you have verified in Twilio (Phone Numbers, Verified Caller IDs), and you hear a short Twilio message and press a key before the agent speaks.',
     [VoiceProvider.VOICELINK]: 'The call is charged to your VoiceLink balance, like any other call.',
-    [VoiceProvider.WHATSAPP]: 'A WhatsApp number only answers calls for now: call it from WhatsApp on your phone to test it.',
+    [VoiceProvider.WHATSAPP]: 'A WhatsApp number answers calls and chats, and cannot place calls yet: call or message it from WhatsApp to test it.',
 };
 
 const AGENT_JOB: Record<VoiceAgentCallType, string> = {

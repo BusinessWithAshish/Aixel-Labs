@@ -28,6 +28,7 @@ import {
  * - AI answering off / remove = those calling settings are put back, then forgotten. The app's webhook
  *   stays on the engine (the app is the customer's app for Aixel Labs, and the engine ignores numbers
  *   without an inbound agent).
+ * - The inbound agent answers the number's WhatsApp chats too (the engine's `messages` webhook).
  * - Calls out are not built yet: placing calls is refused in plain words.
  *
  * Connecting refuses an app whose WhatsApp webhooks already go somewhere else: we never take over an
@@ -37,7 +38,7 @@ import {
 const SCOPES = ['whatsapp_business_management', 'whatsapp_business_messaging'];
 const NOT_CLOUD_API = 'not on the Cloud API';
 const PLACING_CALLS_SOON =
-    'A WhatsApp number only answers calls for now: placing calls from WhatsApp is coming soon. Give it an inbound agent.';
+    'A WhatsApp number answers calls and chats for now: placing calls from WhatsApp is coming soon. Give it an inbound agent.';
 
 /** A number in the customer's WhatsApp accounts, as offered for import: with the account it is in. */
 export type WhatsAppAccountNumber = ProviderAccountNumber & { wabaId: string };

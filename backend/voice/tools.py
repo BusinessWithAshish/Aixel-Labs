@@ -622,6 +622,14 @@ class CallTools:
         self.record["turns"].append({"at": time.strftime("%H:%M:%S"), "who": "agent", "text": self.speech["toolWaitLine"]})
         await self.llm.push_frame(OutputAudioRawFrame(audio=line.result(), sample_rate=fillers.SAMPLE_RATE, num_channels=1))
 
+    async def run(self, name: str, args: dict, after: int) -> tuple[bool, str, str | None]:
+        """One tool run outside a call's pipeline (a chat reply, chat.py), dispatched and logged like a call's.
+        `after`: how many turns the conversation had when it ran."""
+        t0 = time.monotonic()
+        ok, result, booking_id = await self._dispatch(name, args)
+        self._log(name, args, ok, result, after, t0, booking_id)
+        return ok, result, booking_id
+
     def _log(self, name, args, ok, result, after, t0, booking_id) -> dict:
         entry = {"name": name, "arguments": args, "result": result[:RESULT_MAX], "ok": bool(ok), "afterTurn": after,
                  "durationMs": round((time.monotonic() - t0) * 1000), "bookingId": booking_id}

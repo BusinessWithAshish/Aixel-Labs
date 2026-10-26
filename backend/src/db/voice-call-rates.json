@@ -19,6 +19,11 @@
     "estimateSource": "A typical 3-minute call: about 1,000 transcript tokens plus 500 of instructions in; summary, fields and memory note out.",
     "estimateTokens": { "textIn": 1500, "textOut": 300 }
   },
+  "chat": {
+    "model": "gemini-3.5-flash-lite",
+    "source": "ai-gateway.vercel.sh/v1/models google/gemini-3.5-flash-lite (read 2026-10-26: input 0.0000003, output 0.0000025 a token), the same model and price as the analysis. Thinking bills as text out. The free tier is free of charge.",
+    "usdPerMillionTokens": { "textIn": 0.3, "textOut": 2.5 }
+  },
   "providers": {
     "TELNYX": {
       "source": "telnyx.com/pricing/call-control (Voice API 0.002, media streaming 0.0035, recording 0.002) + telnyx.com/pricing/elastic-sip (US local in from 0.0032, out from 0.005). Telnyx publishes no India rates (/pricing/elastic-sip/in and /pricing/call-control/in list none, checked 2026-10-22): calls to India show without Telnyx's charge. SIP (a softphone test, either way): the same without the phone-network leg, 0.0075.",

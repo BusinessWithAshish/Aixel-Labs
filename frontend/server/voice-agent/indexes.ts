@@ -90,6 +90,11 @@ export async function ensureVoiceAgentIndexes(): Promise<void> {
             { agentId: 1, startedAt: -1 },
             { name: 'memory_list', partialFilterExpression: { 'memory.current': true } },
         ),
+        // WhatsApp chats still open: the engine adds each message to one, and closes those gone quiet.
+        calls.createIndex(
+            { numberId: 1, callerPhone: 1, 'chat.lastMessageAt': -1 },
+            { name: 'chat_open', partialFilterExpression: { 'chat.open': true } },
+        ),
     ]);
 
     indexesEnsured = true;
