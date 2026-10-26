@@ -28,6 +28,7 @@ leaves out for people with a username, and refuse `statuses` and `messages` payl
 import asyncio
 import hashlib
 import hmac
+import json
 import os
 import time
 
@@ -123,8 +124,8 @@ def calls_in(payload: dict) -> list[dict]:
 
 def messages_in(payload: dict) -> list[dict]:
     """The messages people sent in one webhook body (field `messages`), each as
-    {phone_number_id, id, from, name, type, text}. `text` is what they typed or tapped (a button, a list row),
-    None for anything else (a voice note, a picture...). Delivery receipts (`statuses`) are left out."""
+    {phone_number_id, id, from, name, type, text, media_id, mime}. `text` is what they typed or tapped (a button,
+    a list row), None for anything else; a voice note carries its `media_id`. Delivery receipts (`statuses`) are left out."""
     found = []
     for value in _values(payload, "messages"):
         names = {str(c.get("wa_id")): str((c.get("profile") or {}).get("name") or "")
@@ -138,9 +139,11 @@ def messages_in(payload: dict) -> list[dict]:
             text = ((m.get("text") or {}).get("body") if kind == "text"
                     else picked.get("title") if kind == "interactive"
                     else (m.get("button") or {}).get("text") if kind == "button" else None)
+            audio = m.get("audio") if kind == "audio" and isinstance(m.get("audio"), dict) else {}
             found.append({"phone_number_id": _number_id(value), "id": str(m["id"]), "from": str(m["from"]),
                           "name": names.get(str(m["from"])) or None, "type": kind,
-                          "text": str(text).strip() if isinstance(text, str) and text.strip() else None})
+                          "text": str(text).strip() if isinstance(text, str) and text.strip() else None,
+                          "media_id": str(audio.get("id") or "") or None, "mime": audio.get("mime_type")})
     return found
 
 
@@ -219,7 +222,7 @@ async def hang_up(call_id: str) -> bool:
 
 IDLE_SECS = 15 * 60  # VOICE_CHAT_LIMITS.idleMinutes
 SWEEP_SECS = 60
-NOT_TEXT = "Sorry, I can only read text messages for now. Could you type it?"
+NOT_TEXT = "Sorry, I can only read text and voice messages for now. Could you type it?"
 # shortcut: one lock per (number, person) in this process, never pruned; two slots (a deploy) may answer the same person at once.
 _LOCKS: dict[tuple[str, str], asyncio.Lock] = {}
 
@@ -239,21 +242,74 @@ async def mark_read(token: str, phone_number_id: str, message_id: str):
         "typing_indicator": {"type": "text"}})
 
 
-def _open_chat(number: dict, agent: dict, phone: str, text: str) -> dict:
-    """The person's chat with the number, their message added: the open one, or a new one."""
+async def graph_get(token: str, path_or_url: str) -> tuple[int, bytes, str]:
+    """GET a Graph path, or a media URL Meta handed out (it wants the token too): (status, body, content type)."""
+    url = path_or_url if path_or_url.startswith("http") else f"{graph_base()}/{GRAPH_VERSION}{path_or_url}"
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+            async with session.get(url, headers={"Authorization": f"Bearer {token}"}) as r:
+                return r.status, await r.read(), r.headers.get("Content-Type", "")
+    except Exception as e:
+        logger.error(f"whatsapp: GET {path_or_url[:80]}: {e!r}")
+        return 0, b"", ""
+
+
+async def download_media(token: str, media_id: str) -> tuple[bytes | None, str]:
+    """A voice note's audio: Meta names its short-lived URL first, then serves it with the same token."""
+    status, body, _ = await graph_get(token, f"/{media_id}")
+    try:
+        meta = json.loads(body) if status == 200 else {}
+    except ValueError:
+        meta = {}
+    if not meta.get("url"):
+        return None, ""
+    status, audio, kind = await graph_get(token, meta["url"])
+    return (audio if status == 200 and audio else None), (meta.get("mime_type") or kind)
+
+
+async def send_voice(token: str, phone_number_id: str, to: str, ogg: bytes) -> bool:
+    """A voice note (OGG/Opus) to `to`: uploaded to Meta first, then sent as audio that plays as a voice note."""
+    form = aiohttp.FormData()
+    form.add_field("messaging_product", "whatsapp")
+    form.add_field("type", "audio/ogg")
+    form.add_field("file", ogg, filename="reply.ogg", content_type="audio/ogg")
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+            async with session.post(f"{graph_base()}/{GRAPH_VERSION}/{phone_number_id}/media", data=form,
+                                    headers={"Authorization": f"Bearer {token}"}) as r:
+                media = await r.json(content_type=None) if r.status == 200 else {}
+    except Exception as e:
+        logger.error(f"whatsapp: uploading a voice reply: {e!r}")
+        return False
+    if not media.get("id"):
+        return False
+    status, _ = await graph_post(token, f"/{phone_number_id}/messages", {
+        "messaging_product": "whatsapp", "recipient_type": "individual", "to": to, "type": "audio",
+        "audio": {"id": media["id"], "voice": True}})
+    return status == 200
+
+
+def _open_chat(number: dict, agent: dict, phone: str, turn: dict, name: str | None) -> dict:
+    """The person's chat with the number, their message added: the open one, or a new one, which takes over
+    the conversation's state (a team member's takeover, a request for a person) from their last chat."""
     calls, now = product.db().voice_calls, product.now()
-    turn = {"role": "caller", "text": text}
     doc = calls.find_one_and_update(
         {"numberId": number["_id"], "callerPhone": phone, "chat.open": True,
          "chat.lastMessageAt": {"$gte": now - timedelta(seconds=IDLE_SECS)}},
-        {"$push": {"turns": turn}, "$set": {"chat.lastMessageAt": now, "endedAt": now}},
+        {"$push": {"turns": turn}, "$set": {"chat.lastMessageAt": now, "endedAt": now, **({"chat.name": name} if name else {})},
+         "$inc": {"chat.unread": 1}},
         return_document=ReturnDocument.AFTER)
     if doc:
         return doc
+    last = calls.find_one({"numberId": number["_id"], "callerPhone": phone, "channel": "WHATSAPP"},
+                          {"chat": 1}, sort=[("startedAt", -1)]) or {}
+    kept = {k: v for k, v in (last.get("chat") or {}).items() if k in ("human", "needsHuman", "name") and v}
     doc = {"tenantId": number["tenantId"], "userId": number["userId"], "agentId": agent["_id"], "numberId": number["_id"],
            "channel": "WHATSAPP", "direction": "INBOUND", "from": phone, "to": number.get("phoneNumber"), "voice": "",
            "startedAt": now, "endedAt": now, "durationSec": 0, "endedBy": "chat_open", "flags": [], "turns": [turn],
-           "gapsMs": [], "callerPhone": phone, "chat": {"open": True, "lastMessageAt": now, "tokens": {"textIn": 0, "textOut": 0}}}
+           "gapsMs": [], "callerPhone": phone,
+           "chat": {**kept, **({"name": name} if name else {}), "open": True, "lastMessageAt": now, "unread": 1,
+                    "model": chat.model_of(agent), "tokens": {"textIn": 0, "textOut": 0}}}
     doc["_id"] = calls.insert_one(doc).inserted_id
     logger.info(f"whatsapp: chat {doc['_id']} started with {phone} on {number.get('phoneNumber')}")
     return doc
@@ -293,7 +349,8 @@ async def close_chat(chat_id):
         ctx = await asyncio.to_thread(product.phone_call, number, agent, "INBOUND", doc.get("callerPhone"), "WHATSAPP")
         ctx["doc"]["_id"] = doc["_id"]
         doc["cost"] = await asyncio.to_thread(costs.chat_cost, doc, (doc.get("chat") or {}).get("tokens") or {},
-                                              ctx.get("gemini_sealed"))
+                                              ctx.get("gemini_sealed"), (doc.get("chat") or {}).get("model"),
+                                              (doc.get("chat") or {}).get("voice"))
         await asyncio.to_thread(product.db().voice_calls.update_one, {"_id": doc["_id"]}, {"$set": {"cost": doc["cost"]}})
         logger.info(f"whatsapp: chat {chat_id} closed ({len(doc.get('turns') or [])} messages)")
         await analysis.after_call(ctx, doc)
@@ -321,30 +378,63 @@ async def _answer(number: dict, message: dict, phone: str):
     _, agent = await asyncio.to_thread(product.load_number, number["_id"], "INBOUND")
     if not agent:
         return logger.info(f"whatsapp: message to {number.get('phoneNumber')}, which has no inbound agent: not answered")
-    spawn(mark_read(token, pnid, message["id"]))
     # A chat gone quiet is closed first, so this one starts from the memory it leaves.
     for stale in await asyncio.to_thread(_stale_chats, {"numberId": number["_id"], "callerPhone": phone}):
         await close_chat(stale)
-    doc = await asyncio.to_thread(_open_chat, number, agent, phone, message["text"] or f"[{message['type'] or 'message'}]")
-    if message["text"] is None:
-        text, usage, runs = NOT_TEXT, {}, []
+    try:
+        ctx = await asyncio.to_thread(product.phone_call, number, agent, "INBOUND", phone, "WHATSAPP")
+    except product.CallRefused as e:  # no prompt, no Gemini key: kept for the inbox, not answered
+        ctx = None
+        logger.warning(f"whatsapp: message to {number.get('phoneNumber')}: not answered: {e}")
+    text, heard = message["text"], {}
+    if message["media_id"] and ctx:
+        audio, mime = await download_media(token, message["media_id"])
+        if audio:
+            text, heard = await chat.transcribe(ctx, audio, mime or message.get("mime") or "audio/ogg")
+    voice = bool(message["media_id"])
+    turn = {"role": "caller", "text": text or f"[{message['type'] or 'message'}]", "at": product.now(), **({"voice": True} if voice else {})}
+    doc = await asyncio.to_thread(_open_chat, number, agent, phone, turn, message.get("name"))
+    usage, runs, spent = {"textIn": heard.get("textIn", 0), "textOut": heard.get("textOut", 0)}, [], {}
+    if heard.get("secs"):
+        spent = {"chat.voice.sttSecs": heard["secs"]}
+    state = doc.get("chat") or {}
+    if not ctx or state.get("human") or state.get("needsHuman"):
+        reply = None  # a person has it (or was asked for): the AI stays quiet
+    elif text is None:
+        reply = NOT_TEXT
     else:
-        try:
-            ctx = await asyncio.to_thread(product.phone_call, number, agent, "INBOUND", phone, "WHATSAPP")
-        except product.CallRefused as e:  # no prompt, no Gemini key: the person hears nothing, the owner sees why
-            return logger.warning(f"whatsapp: chat {doc['_id']}: not answered: {e}")
         ctx["doc"]["_id"] = doc["_id"]
         record = {"turns": doc["turns"]}
         call_tools = tools.CallTools(ctx, record, prefetch=False)
-        text, usage = await chat.reply(ctx, doc["turns"], call_tools or None)
+        settings = agent.get("whatsapp") if isinstance(agent.get("whatsapp"), dict) else {}
+
+        async def handoff(reason: str) -> str:
+            await asyncio.to_thread(product.db().voice_calls.update_one, {"_id": doc["_id"]},
+                                    {"$set": {"chat.needsHuman": {"since": product.now(), "reason": reason or "asked for a person"}}})
+            logger.info(f"whatsapp: chat {doc['_id']} handed to a person: {reason!r}")
+            return "Done: the team has been told. Tell the person a team member will reply here soon; don't promise a time."
+
+        spawn(mark_read(token, pnid, message["id"]))
+        reply, got = await chat.reply(ctx, doc["turns"], call_tools or None, chat.model_of(agent),
+                                      handoff if settings.get("handoff", True) is not False else None)
+        usage = {k: usage[k] + got.get(k, 0) for k in usage}
         runs = record.get("tool_calls") or []
-    sent = bool(text) and await send_text(token, pnid, message["from"], text)
+    sent = spoken = False
+    if reply and voice and ctx and (agent.get("whatsapp") or {}).get("voiceReplies", True) is not False:
+        if ogg := await chat.speak(ctx, reply):
+            spoken = sent = await send_voice(token, pnid, message["from"], ogg)
+            if spoken:
+                spent["chat.voice.ttsSecs"] = await asyncio.to_thread(chat.audio_secs, ogg)
+    if reply and not sent:
+        sent = await send_text(token, pnid, message["from"], reply)
     # Google billed the tokens and the tools ran, whether or not Meta took the message.
-    update: dict = {"$set": {"chat.lastMessageAt": product.now()},
-                    "$inc": {"chat.tokens.textIn": usage.get("textIn", 0), "chat.tokens.textOut": usage.get("textOut", 0)}}
-    push = {**({"turns": {"role": "agent", "text": text}} if sent else {}), **({"toolCalls": {"$each": runs}} if runs else {})}
+    update: dict = {"$set": {"chat.lastMessageAt": product.now(), **({"chat.voice.sttModel": heard["model"]} if heard.get("model") else {})},
+                    "$inc": {"chat.tokens.textIn": usage["textIn"], "chat.tokens.textOut": usage["textOut"], **spent}}
+    agent_turn = {"role": "agent", "text": reply, "at": product.now(), **({"voice": True} if spoken else {})}
+    push = {**({"turns": agent_turn} if sent else {}), **({"toolCalls": {"$each": runs}} if runs else {})}
     if push:
         update["$push"] = push
+        update["$set"]["chat.unread"] = 0  # the AI answered: nothing waits for a person
     await asyncio.to_thread(product.db().voice_calls.update_one, {"_id": doc["_id"]}, update)
 
 

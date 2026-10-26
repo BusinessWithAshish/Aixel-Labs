@@ -74,7 +74,8 @@ def transcript(doc: dict) -> str:
         runs.setdefault(int(t.get("afterTurn") or 0), []).append(line)
     lines = list(runs.get(0, []))
     for i, turn in enumerate(doc.get("turns") or [], start=1):
-        lines.append(f"{'Agent' if turn['role'] == 'agent' else 'Caller'}: {turn['text']}")
+        speaker = {"agent": "Agent", "human": "Team member"}.get(turn["role"], "Caller")
+        lines.append(f"{speaker}{' (voice note)' if turn.get('voice') else ''}: {turn['text']}")
         lines += runs.get(i, [])
     text = "\n".join(lines)
     return text[-TRANSCRIPT_MAX:]

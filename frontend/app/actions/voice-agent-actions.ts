@@ -25,6 +25,7 @@ import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { requireUserObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { DEFAULT_VOICE_AGENT_NAME, DEFAULT_VOICE_AGENT_VOICE } from '@/helpers/voice-agent-defaults';
 import { customVariableNames } from '@/helpers/voice-agent-features';
+import { agentChannelsOf, type AgentChannels } from '@/helpers/voice-agent-channels';
 import {
     bookingToolSchema,
     callSettingsSchema,
@@ -40,7 +41,7 @@ import {
     webhookToolSchema,
 } from '@/helpers/voice-schemas';
 import { assertRateLimit } from '@/server/rate-limit';
-import { openSecret, playgroundSocketUrl, sealSecret } from '@/server/voice-agent/engine';
+import { engineFetch, openSecret, playgroundSocketUrl, sealSecret } from '@/server/voice-agent/engine';
 import { assertCallReady } from '@/server/voice-agent/call-readiness';
 import { stackView } from '@/server/voice-agent/provider-keys';
 import { pricedStack } from '@/server/voice-agent/voice-catalogue';
@@ -137,6 +138,7 @@ function mapVoiceAgentDocToVoiceAgent(doc: VoiceAgentDoc): VoiceAgent {
         analysis: doc.analysis ?? null,
         memory: doc.memory === true,
         speech: doc.speech ?? null,
+        whatsapp: doc.whatsapp ?? null,
         createdAt: doc.createdAt.toISOString(),
         updatedAt: doc.updatedAt.toISOString(),
     };
@@ -154,6 +156,13 @@ export const listVoiceAgents = async (): Promise<ALApiResponse<VoiceAgent[]>> =>
         const agents = await agentsCollection();
         const docs = await agents.find({ userId: uid }).sort({ updatedAt: -1 }).toArray();
         return docs.map(mapVoiceAgentDocToVoiceAgent);
+    });
+
+/** Each of the user's agents' channels (phone, WhatsApp, both), from the numbers it is on. */
+export const getAgentChannels = async (): Promise<ALApiResponse<Record<string, AgentChannels>>> =>
+    runAuthenticatedAction(async function getAgentChannels(userId) {
+        const owner = await agentOwner(userId);
+        return agentChannelsOf(await listItems('numbers', owner.userId));
     });
 
 /**
@@ -303,6 +312,54 @@ export const getPlaygroundSocketUrl = async (agentId: string): Promise<ALApiResp
         const id = toObjectId(agentId, 'Agent ID');
         await assertCallReady(uid, id);
         return { url: playgroundSocketUrl(id.toString(), uid.toString()) };
+    });
+
+/** One message of a test chat, as the browser keeps it. */
+export type TestChatTurn = { role: 'caller' | 'agent'; text: string };
+
+export type TestChatReply = {
+    reply: string;
+    /** Tools it ran for this reply, in words the chat shows. */
+    toolCalls: { name: string; result: string; ok: boolean }[];
+    /** Set when it handed the chat to a person (on a real number: Needs you in the inbox). */
+    handoff: string | null;
+};
+
+const TEST_CHAT_MAX = { turns: 200, chars: 4000 };
+
+/**
+ * The agent's next WhatsApp reply to a test chat kept in the browser: the engine runs the saved agent exactly as on a
+ * WhatsApp number (prompt, tools, chat model, hand-off) on the owner's own key, and stores nothing.
+ */
+export const sendTestChatMessage = async (agentId: string, turns: TestChatTurn[]): Promise<ALApiResponse<TestChatReply>> =>
+    runAuthenticatedAction(async function sendTestChatMessage(userId) {
+        const { userId: uid } = await agentOwner(userId);
+        assertRateLimit(`voice-test-chat:${uid}`, 30);
+        const id = toObjectId(agentId, 'Agent ID');
+        const clean = Array.isArray(turns)
+            ? turns
+                  .filter((t) => (t?.role === 'caller' || t?.role === 'agent') && typeof t.text === 'string' && t.text.trim())
+                  .slice(-TEST_CHAT_MAX.turns)
+                  .map((t) => ({ role: t.role, text: t.text.trim().slice(0, TEST_CHAT_MAX.chars) }))
+            : [];
+        if (clean.at(-1)?.role !== 'caller') throw new Error('Write a message first');
+        await assertCallReady(uid, id);
+        try {
+            const res = await engineFetch<Partial<TestChatReply> & { reply: string }>('/chat', {
+                agentId: id.toString(),
+                userId: uid.toString(),
+                turns: clean,
+            });
+            return {
+                reply: res.reply,
+                toolCalls: (res.toolCalls ?? []).map((t) => ({ name: t.name, result: t.result, ok: t.ok })),
+                handoff: res.handoff ?? null,
+            };
+        } catch (error) {
+            console.error('[voice] sendTestChatMessage: engine error', error);
+            const reason = /"error"\s*:\s*"((?:[^"\\]|\\.)*)/.exec(error instanceof Error ? error.message : '')?.[1];
+            throw new Error(reason ?? 'The voice engine could not answer. Try again in a moment.');
+        }
     });
 
 // ---------------------------------------------------------------------------

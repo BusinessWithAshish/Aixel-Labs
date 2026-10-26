@@ -21,8 +21,13 @@
   },
   "chat": {
     "model": "gemini-3.5-flash-lite",
-    "source": "ai-gateway.vercel.sh/v1/models google/gemini-3.5-flash-lite (read 2026-10-26: input 0.0000003, output 0.0000025 a token), the same model and price as the analysis. Thinking bills as text out. The free tier is free of charge.",
-    "usdPerMillionTokens": { "textIn": 0.3, "textOut": 2.5 }
+    "source": "ai-gateway.vercel.sh/v1/models (read 2026-10-26): google/gemini-3.5-flash-lite input 0.0000003, output 0.0000025 a token; google/gemini-3.5-flash input 0.0000015, output 0.000009. Thinking bills as text out. The free tier is free of charge. `model` is the default (VOICE_WHATSAPP_DEFAULTS.chatModel).",
+    "models": {
+      "gemini-3.5-flash-lite": { "usdPerMillionTokens": { "textIn": 0.3, "textOut": 2.5 } },
+      "gemini-3.5-flash": { "usdPerMillionTokens": { "textIn": 1.5, "textOut": 9.0 } }
+    },
+    "estimateSource": "One WhatsApp reply: the agent's prompt, what she remembers and the chat so far in (about 3,000 tokens), one short message out.",
+    "estimateTokens": { "textIn": 3000, "textOut": 120 }
   },
   "providers": {
     "TELNYX": {

@@ -28,6 +28,7 @@ export const SubModuleUrls: Record<SubModule, string> = {
     [VOICE_AGENT_SUB_MODULES.AGENTS]: '/voice-agent/agents',
     [VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]: '/voice-agent/phone-numbers',
     [VOICE_AGENT_SUB_MODULES.CALL_LOGS]: '/voice-agent/call-logs',
+    [VOICE_AGENT_SUB_MODULES.INBOX]: '/voice-agent/inbox',
     [VOICE_AGENT_SUB_MODULES.WEB_DIALER]: '/voice-agent/web-dialer',
     [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: '/voice-agent/bookings',
     [VOICE_AGENT_SUB_MODULES.CAMPAIGNS]: '/voice-agent/campaigns',

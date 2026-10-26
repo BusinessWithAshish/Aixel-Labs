@@ -2,8 +2,8 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { PhoneIncoming, PhoneOff, PhoneOutgoing, Trash2 } from 'lucide-react';
-import { VoiceAgentCallType } from '@aixellabs/backend/db/types';
+import { MessageCircleMore, PhoneIncoming, PhoneOff, PhoneOutgoing, Trash2 } from 'lucide-react';
+import { VOICE_AGENT_SUB_MODULES, VoiceAgentCallType, VoiceProvider } from '@aixellabs/backend/db/types';
 import type { VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 import { NumberProviderLogo } from '@/components/common/voice-agent/NumberProviderLogo';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { estimateAgentCost, formatMoney, RATE_COUNTRY_NAME, rateCountry } from '
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { GEMINI_KEY_URL, voiceAgentUrl } from '@/helpers/voice-routes';
 import { GEMINI_ALWAYS } from '@/helpers/voice-stack';
+import { SubModuleUrls } from '@/config/app-config';
 import { cn } from '@/lib/utils';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
 
@@ -21,14 +22,14 @@ const LINK = 'font-medium underline-offset-4 hover:underline';
 /** One agent use of the number, as the agent editor set it. */
 type NumberUse = { callType: VoiceAgentCallType; agentId: string; name: string };
 
-/** "Answers calls with Front desk" / "Places calls with Outreach", linking to the agent while it exists. */
-function UseLine({ use, exists }: { use: NumberUse; exists: boolean }) {
+/** "Answers calls with Front desk" / "Places calls with Outreach" (a WhatsApp number: "Answers chats and calls with"), linking to the agent while it exists. */
+function UseLine({ use, exists, whatsapp }: { use: NumberUse; exists: boolean; whatsapp: boolean }) {
     const inbound = use.callType === VoiceAgentCallType.INBOUND;
-    const Icon = inbound ? PhoneIncoming : PhoneOutgoing;
+    const Icon = whatsapp ? MessageCircleMore : inbound ? PhoneIncoming : PhoneOutgoing;
     return (
         <p className="flex items-center gap-1.5 text-sm">
             <Icon className="text-muted-foreground size-3.5 shrink-0" aria-hidden />
-            {inbound ? 'Answers calls with' : 'Places calls with'}{' '}
+            {whatsapp ? 'Answers chats and calls with' : inbound ? 'Answers calls with' : 'Places calls with'}{' '}
             {exists ? (
                 <Link className={cn(LINK, 'text-primary')} href={voiceAgentUrl(use.agentId)}>
                     {use.name}
@@ -44,6 +45,7 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
     const { agents, hasGeminiKey, geminiKey, setTestCallNumber, setRemoveTarget } = usePage<UsePhoneNumbersPageReturn>();
     const currency = useDisplayCurrency();
     const providerLabel = numberProviderInfo(number.provider).label;
+    const whatsapp = number.provider === VoiceProvider.WHATSAPP;
 
     const uses: NumberUse[] = [];
     if (number.inboundAgentId) {
@@ -88,6 +90,16 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
                     </Link>
                 </span>
             ),
+        };
+    } else if (whatsapp) {
+        const calling = number.whatsappCalling;
+        status = {
+            attention: !!calling && !calling.on,
+            text: calling?.on
+                ? 'Chats and WhatsApp calls are on. Meta charges nothing for messages and calls people start.'
+                : calling
+                  ? `Chats are on. Calls are off: ${calling.problem ?? 'Meta did not turn calling on'}`
+                  : 'Chats are on.',
         };
     } else {
         // Its own country: a minute in to it, or out to numbers like it (a VoiceLink plan's rate is not published).
@@ -134,7 +146,7 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
                         Not linked to an agent
                     </p>
                 ) : (
-                    uses.map((use) => <UseLine key={use.callType} use={use} exists={!!agentOf(use)} />)
+                    uses.map((use) => <UseLine key={use.callType} use={use} exists={!!agentOf(use)} whatsapp={whatsapp} />)
                 )}
                 {status ? (
                     <p
@@ -149,10 +161,19 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
             </div>
 
             <div className="flex items-center gap-2 sm:justify-end">
-                <Button type="button" variant="outline" size="sm" onClick={() => setTestCallNumber(number)}>
-                    <PhoneOutgoing className="size-3.5" aria-hidden />
-                    Test call
-                </Button>
+                {whatsapp ? (
+                    <Button asChild variant="outline" size="sm">
+                        <Link href={SubModuleUrls[VOICE_AGENT_SUB_MODULES.INBOX]}>
+                            <MessageCircleMore className="size-3.5" aria-hidden />
+                            Open inbox
+                        </Link>
+                    </Button>
+                ) : (
+                    <Button type="button" variant="outline" size="sm" onClick={() => setTestCallNumber(number)}>
+                        <PhoneOutgoing className="size-3.5" aria-hidden />
+                        Test call
+                    </Button>
+                )}
                 <Button
                     type="button"
                     variant="ghost"

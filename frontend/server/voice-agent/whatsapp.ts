@@ -72,6 +72,7 @@ const KNOWN_ERRORS: Record<number, string> = {
     131044: 'Your WhatsApp account has no payment method, and Meta needs one before calls work (even calls coming in, which are free). Add one in WhatsApp Manager (Payment settings), then try again.',
     138015: 'Meta turns on calling only for numbers that can message at least 2,000 people a day. Verify your business in Meta Business Settings (Security Center) to raise the limit, then try again.',
     138018: 'Meta could not see this app subscribed to calls yet. Wait a minute and try again.',
+    131047: 'More than 24 hours have passed since this person last wrote, so WhatsApp only allows a template message now. Reply once they write again.',
 };
 
 function graphBase(): string {
@@ -200,4 +201,16 @@ export async function setCallingSettings(
     calling: WhatsAppCallingSettings,
 ): Promise<void> {
     await graphRequest(auth.token, 'POST', `/${encodeURIComponent(phoneNumberId)}/settings`, { calling });
+}
+
+/** `POST /{phone-number-id}/messages`: a text from the business to `to` (their WhatsApp id, digits). Free-form text
+ * is only allowed within 24 hours of their last message; Meta refuses it after (131047). */
+export async function sendTextMessage(auth: WhatsAppAuth, phoneNumberId: string, to: string, text: string): Promise<void> {
+    await graphRequest(auth.token, 'POST', `/${encodeURIComponent(phoneNumberId)}/messages`, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'text',
+        text: { body: text, preview_url: false },
+    });
 }

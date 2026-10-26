@@ -10,6 +10,7 @@ import { formatPhone } from '@/helpers/voice-campaign-contacts';
 import { BrowserTestPanel } from './BrowserTestPanel';
 import { PhoneTestPanel } from './PhoneTestPanel';
 import { SoftphoneTestPanel } from './SoftphoneTestPanel';
+import { WhatsAppTestPanel } from './WhatsAppTestPanel';
 
 /** The dialog's title and button: who calls whom. */
 export function agentTestTitle(agentName: string, callType: VoiceAgentCallType): string {
@@ -70,6 +71,7 @@ export function AgentTestDialog({ open, onOpenChange, agentId, agentName, callTy
                             <TabsTrigger value="browser">In this browser</TabsTrigger>
                             <TabsTrigger value="softphone">On Linphone</TabsTrigger>
                             <TabsTrigger value="phone">{inbound ? 'From your phone' : 'On your phone'}</TabsTrigger>
+                            {inbound ? <TabsTrigger value="whatsapp">WhatsApp chat</TabsTrigger> : null}
                         </TabsList>
                         {/* All stay mounted: a call in progress and a password shown once survive a switch. */}
                         <TabsContent value="browser" forceMount className="data-[state=inactive]:hidden">
@@ -81,6 +83,11 @@ export function AgentTestDialog({ open, onOpenChange, agentId, agentName, callTy
                         <TabsContent value="phone" forceMount className="data-[state=inactive]:hidden">
                             <PhoneTestPanel agentId={agentId} agentName={agentName} inbound={inbound} />
                         </TabsContent>
+                        {inbound ? (
+                            <TabsContent value="whatsapp" forceMount className="data-[state=inactive]:hidden">
+                                <WhatsAppTestPanel agentId={agentId} agentName={agentName} />
+                            </TabsContent>
+                        ) : null}
                     </Tabs>
                 ) : error ? (
                     <p className="text-destructive text-sm" role="alert">

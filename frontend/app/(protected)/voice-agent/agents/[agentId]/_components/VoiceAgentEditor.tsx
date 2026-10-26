@@ -14,6 +14,8 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
 import { VOICE_AGENT_CALL_TYPES, VOICE_AGENT_PROMPT_TEMPLATES } from '@/helpers/voice-agent-defaults';
+import { AgentChannelBadge } from '@/components/common/voice-agent/AgentChannelBadge';
+import { channelsOfProviders } from '@/helpers/voice-agent-channels';
 import { VoiceAgentCallTypeBadge } from '../../_components/VoiceAgentCallTypeBadge';
 import { VoiceAgentCallTypeSelect } from '../../_components/VoiceAgentCallTypeSelect';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
@@ -93,6 +95,9 @@ export function VoiceAgentEditor() {
                             <CardTitle className="flex flex-wrap items-center gap-2">
                                 Agent
                                 <VoiceAgentCallTypeBadge callType={form.callType} />
+                                <AgentChannelBadge
+                                    channels={channelsOfProviders([...usage.inbound, ...usage.outbound].map((n) => n.provider))}
+                                />
                             </CardTitle>
                             <CardDescription>
                                 {agentDirty ? (

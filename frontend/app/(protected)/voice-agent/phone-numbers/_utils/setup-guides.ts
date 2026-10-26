@@ -325,7 +325,7 @@ const WHATSAPP_GUIDE: SetupGuide = {
             title: 'Create a Meta app for Aixel Labs and add your number',
             body: [
                 'In Meta for Developers, click Create app, choose Business, then add the WhatsApp product. Use a new app just for Aixel Labs. In WhatsApp, API Setup, add your business number and add a payment method: Meta needs one even though calls people make to you are free.',
-                'Calling works on numbers that can message at least 2,000 people a day. A new account starts lower, so verify your business in Meta Business Settings (Security Center) first.',
+                'No business number yet? Every new Meta app comes with a free test number (WhatsApp, API Setup): add your own phone as a recipient and chat with your agent through it. Chats work on any number; calls need a number that can message 2,000 people a day (verify your business in Meta Business Settings), and Meta allows them on test numbers.',
             ],
             link: { href: 'https://developers.facebook.com/apps/creation/', label: 'Create a Meta app' },
         },

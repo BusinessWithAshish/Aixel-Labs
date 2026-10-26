@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { type VoiceAgent, VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import { createVoiceAgent } from '@/app/actions/voice-agent-actions';
 import { DEFAULT_VOICE_AGENT_NAME } from '@/helpers/voice-agent-defaults';
+import type { AgentChannels } from '@/helpers/voice-agent-channels';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
 import { voiceAgentSchema } from '@/helpers/voice-schemas';
 
@@ -18,7 +19,7 @@ const NEW_AGENT = {
     name: DEFAULT_VOICE_AGENT_NAME,
 };
 
-export function useVoiceAgentsPage({ agents }: { agents: VoiceAgent[] }) {
+export function useVoiceAgentsPage({ agents, channels }: { agents: VoiceAgent[]; channels: Record<string, AgentChannels> }) {
     const router = useProgressRouter();
     const [createOpen, setCreateOpen] = useState(false);
     const createForm = useForm({ resolver: zodResolver(newAgentSchema), defaultValues: NEW_AGENT, mode: 'onChange' });
@@ -51,6 +52,7 @@ export function useVoiceAgentsPage({ agents }: { agents: VoiceAgent[] }) {
     });
 
     return {
+        channels,
         agents,
         createOpen,
         openCreate,

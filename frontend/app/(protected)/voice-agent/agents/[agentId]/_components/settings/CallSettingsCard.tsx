@@ -17,6 +17,7 @@ import { AnalysisSettings } from './AnalysisSettings';
 import { CallerMemorySettings } from './CallerMemorySettings';
 import { PersonalitySettings } from './PersonalitySettings';
 import { SpeechSettings } from './SpeechSettings';
+import { WhatsAppSettings } from './WhatsAppSettings';
 
 const VOICEMAIL_CHOICES = [
     { value: VoiceVoicemailAction.HANG_UP, title: 'Hang up', description: 'End the call as soon as a recording answers.' },
@@ -124,6 +125,12 @@ export function CallSettingsCard() {
                     <AnalysisSettings />
                     <Separator />
                     <CallerMemorySettings />
+                    {places ? null : (
+                        <>
+                            <Separator />
+                            <WhatsAppSettings />
+                        </>
+                    )}
                 </CardContent>
             </FormProvider>
         </Card>

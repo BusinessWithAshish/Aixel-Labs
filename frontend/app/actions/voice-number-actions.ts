@@ -94,6 +94,8 @@ export type VoiceNumberListItem = VoiceNumber & {
     inboundAgentName: string | null;
     /** Name of the agent that places calls from this number. */
     outboundAgentName: string | null;
+    /** WhatsApp numbers: whether Meta turned calling on (chats never depend on it); null until AI answering is on. */
+    whatsappCalling: { on: boolean; problem?: string | null } | null;
 };
 
 export type PlaceTestCallResult = {
@@ -240,6 +242,7 @@ function mapVoiceNumberDoc(doc: OwnedNumberDoc, names: Map<string, string>): Voi
         updatedAt: doc.updatedAt.toISOString(),
         inboundAgentName: inboundAgentId ? (names.get(inboundAgentId) ?? null) : null,
         outboundAgentName: outboundAgentId ? (names.get(outboundAgentId) ?? null) : null,
+        whatsappCalling: doc.whatsapp?.calling ?? null,
     };
 }
 

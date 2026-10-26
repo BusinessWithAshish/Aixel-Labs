@@ -333,6 +333,16 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
                             </>
                         ) : isWhatsApp ? (
                             <>
+                                <div className="flex flex-col gap-2">
+                                    <Button type="button" variant="outline" disabled className="justify-center gap-2">
+                                        <NumberProviderLogo provider={VoiceProvider.WHATSAPP} />
+                                        Continue with Meta
+                                        <Badge variant="secondary">Coming soon</Badge>
+                                    </Button>
+                                    <p className="text-muted-foreground text-center text-xs">
+                                        For now, paste three things from your own Meta app:
+                                    </p>
+                                </div>
                                 <CredentialField
                                     name="appId"
                                     id="whatsapp-app-id"

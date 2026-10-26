@@ -146,19 +146,25 @@ async function routeCallsToAi(doc: OwnedNumberDoc): Promise<void> {
     await subscribeApp(auth, callbackUrl, verifyToken);
     await subscribeWaba(auth, doc.whatsapp.wabaId);
 
-    const current = await getCallingSettings(auth, doc.providerNumberId);
-    // Saved before anything changes, so a failure half-way still knows what to put back.
-    const savedNow = !doc.whatsapp.previousCalling;
-    if (savedNow) await savePreviousCalling(doc, current);
+    // Chats work from here on. Calls need Meta to turn calling on, which it refuses below a 2,000 messaging
+    // limit (138015): that is kept on the number and shown, never a reason to stop the chats.
+    let calling: { on: boolean; problem: string | null };
+    let savedNow = false;
     try {
+        const current = await getCallingSettings(auth, doc.providerNumberId);
+        // Saved before anything changes, so a failure half-way still knows what to put back.
+        savedNow = !doc.whatsapp.previousCalling;
+        if (savedNow) await savePreviousCalling(doc, current);
         await setCallingSettings(auth, doc.providerNumberId, { status: 'ENABLED', call_icon_visibility: 'DEFAULT' });
+        calling = { on: true, problem: null };
     } catch (error) {
-        // Meta refused: nothing changed, so the copy is not kept.
-        if (savedNow && error instanceof WhatsAppApiError && error.status >= 400 && error.status < 500) {
-            await forgetPreviousCalling(doc);
-        }
-        throw error;
+        if (!(error instanceof WhatsAppApiError) || error.status === 0 || error.status >= 500) throw error;
+        // Meta refused: nothing changed, so the copy made now is not kept.
+        if (savedNow) await forgetPreviousCalling(doc);
+        calling = { on: false, problem: error.message };
     }
+    await updateItem('numbers', { _id: doc._id }, { set: { 'whatsapp.calling': calling } });
+    doc.whatsapp.calling = calling;
 }
 
 /** Puts the number's saved calling settings back. Nothing to do when we never changed them. */

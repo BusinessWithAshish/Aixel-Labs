@@ -62,6 +62,8 @@ export enum VOICE_AGENT_SUB_MODULES {
   AGENTS = "AGENTS",
   PHONE_NUMBERS = "PHONE_NUMBERS",
   CALL_LOGS = "CALL_LOGS",
+  /** WhatsApp chats (and calls) of the owner's WhatsApp numbers, where a person can take a chat over from the AI. */
+  INBOX = "INBOX",
   WEB_DIALER = "WEB_DIALER",
   INQUIRY_BOOKINGS = "INQUIRY_BOOKINGS",
   CAMPAIGNS = "CAMPAIGNS",
@@ -293,8 +295,30 @@ export type VoiceAgentDoc<Id = ObjectId> = {
   stack?: VoiceStack<Id> | null;
   /** The voice it speaks in on a PIPELINE stack. A REALTIME stack speaks in `voice` (Gemini Live's own voices). Absent = none picked yet. */
   ttsVoice?: VoiceTtsVoice | null;
+  /** How it chats on WhatsApp. Absent = VOICE_WHATSAPP_DEFAULTS. */
+  whatsapp?: VoiceAgentWhatsApp | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+/** The text models a WhatsApp chat can run on (prices: voice-call-rates.json `chat.models`), cheapest first. */
+export const VOICE_CHAT_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash"] as const;
+export type VoiceChatModel = (typeof VOICE_CHAT_MODELS)[number];
+
+/** An agent's WhatsApp chat settings. */
+export type VoiceAgentWhatsApp = {
+  /** The text model its replies run on (the owner's Gemini key). */
+  chatModel: VoiceChatModel;
+  /** A voice note is answered with a voice note in the agent's voice (and its words in text); off = text only. */
+  voiceReplies: boolean;
+  /** It may hand a chat to a person (the inbox shows "Needs you") when asked for one or when it cannot help. */
+  handoff: boolean;
+};
+
+export const VOICE_WHATSAPP_DEFAULTS: VoiceAgentWhatsApp = {
+  chatModel: "gemini-3.5-flash-lite",
+  voiceReplies: true,
+  handoff: true,
 };
 
 /** Days of the week as stored, Monday first (booking hours, campaign calling days). */
@@ -618,6 +642,11 @@ export type WhatsAppNumberState = {
    * them. Saved on the first change only; put back, then dropped, when AI answering goes off or the number is removed.
    */
   previousCalling?: WhatsAppCallingSettings;
+  /**
+   * Whether Meta turned calling on for the number when AI answering went on. Chats never depend on it:
+   * a number below Meta's 2,000 messaging limit still chats (calling is refused, 138015). Absent = not tried yet.
+   */
+  calling?: { on: boolean; problem?: string | null } | null;
 };
 
 /** A number the customer brought, in their own provider account. Kept in its owner's VoiceAccountDoc.numbers. */
@@ -737,17 +766,39 @@ export const VOICE_CHAT_LIMITS = {
 } as const;
 
 /** A WhatsApp chat's own state, on its voice_calls document (channel WHATSAPP). */
-export type VoiceCallChat = {
+export type VoiceCallChat<Id = ObjectId> = {
   /** True until the chat goes quiet and the engine closes it (analysis and caller memory follow). */
   open: boolean;
   lastMessageAt: Date;
   /** Tokens the chat model used so far, every reply added (its cost is worked out when it closes). */
   tokens: { textIn: number; textOut: number };
+  /** Seconds of voice notes heard (and the speech-to-text model), and of voice replies spoken, for the cost. */
+  voice?: { sttSecs: number; ttsSecs: number; sttModel?: string };
+  /**
+   * A team member took the conversation over: the AI stays quiet until they hand it back. Carried to
+   * the person's next chat while it is set (the takeover belongs to the conversation, not one chat).
+   */
+  human?: { since: Date; userId: Id; name: string } | null;
+  /** The AI asked for a person (the person wanted one, or it could not help): shown in the inbox until someone takes over. */
+  needsHuman?: { since: Date; reason: string } | null;
+  /** The person's messages nobody has opened in the inbox yet. */
+  unread?: number;
+  /** Their WhatsApp profile name, as Meta sends it with their messages. */
+  name?: string | null;
+  /** The text model this chat's replies ran on (the agent's `whatsapp.chatModel` when it started), for its cost. */
+  model?: VoiceChatModel;
 };
 
 export type VoiceCallTurn = {
-  role: "agent" | "caller";
+  /** caller = the person; agent = the AI; human = a team member who took over a WhatsApp chat. */
+  role: "agent" | "caller" | "human";
   text: string;
+  /** WhatsApp chats only: when it was sent. */
+  at?: Date;
+  /** WhatsApp chats only: it was a voice note (its `text` is what was said). */
+  voice?: boolean;
+  /** A team member's message: their name. */
+  by?: string;
 };
 
 /** Written by the voice engine when a call ends, however it ended. */
@@ -798,7 +849,7 @@ export type VoiceCallDoc<Id = ObjectId> = {
   /** What the call cost the owner, written by the engine when the call ends (absent on calls before 2026-10-21). */
   cost?: VoiceCallCost | null;
   /** WhatsApp chats only (channel WHATSAPP). */
-  chat?: VoiceCallChat | null;
+  chat?: VoiceCallChat<Id> | null;
 };
 
 /**
@@ -837,6 +888,8 @@ export type VoiceCallCost = {
   providerUsd: number;
   /** True: the provider's own charge for the call. False: minutes × its list rate, until that charge arrives. */
   providerExact: boolean;
+  /** WhatsApp chats: voice notes heard (speech-to-text) and voice replies spoken (TTS), on the owner's keys. */
+  voiceNotesUsd?: number;
 };
 
 /**

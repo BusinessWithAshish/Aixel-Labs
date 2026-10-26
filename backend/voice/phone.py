@@ -40,6 +40,7 @@ from loguru import logger
 import product  # before bot: it keeps the Mongo settings the process was started with (see there)
 import campaigns
 import cascade
+import chat
 import speech
 import tools
 import twilio
@@ -1159,6 +1160,43 @@ def make_app() -> FastAPI:
             if number and whatsapp.fresh(message["id"], "message"):
                 whatsapp.spawn(whatsapp.answer_message(number, message))
         return {"ok": True}
+
+    @app.post("/chat")
+    async def test_chat(request: Request):
+        """The app's test chat: {"agentId", "userId", "turns": [{"role": "caller"|"agent", "text"}]} -> the agent's next
+        WhatsApp reply, as the agent's settings make it (chat model, tools, hand-off). Nothing is stored; a booking is
+        a playground one."""
+        if not product.bearer_ok(request.headers.get("authorization")):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        turns = body.get("turns") if isinstance(body, dict) else None
+        if not isinstance(turns, list) or not 0 < len(turns) <= 200 or not all(
+                isinstance(t, dict) and t.get("role") in ("caller", "agent") and isinstance(t.get("text"), str)
+                and 0 < len(t["text"]) <= 4000 for t in turns):
+            return JSONResponse({"error": "turns must be 1 to 200 messages of up to 4,000 characters"}, status_code=400)
+        agent = await asyncio.to_thread(product.load_agent, body.get("agentId"), body.get("userId"))
+        if not agent:
+            return JSONResponse({"error": "agent not found"}, status_code=404)
+        try:
+            ctx = await asyncio.to_thread(product.play_call, agent)
+        except product.CallRefused as e:
+            return JSONResponse({"error": e.words, "code": e.code}, status_code=409)
+        record = {"turns": turns}
+        call_tools = tools.CallTools(ctx, record, prefetch=False)
+        handed: list[str] = []
+
+        async def handoff(reason: str) -> str:
+            handed.append(reason or "asked for a person")
+            return "Done: the team has been told. Tell the person a team member will reply here soon; don't promise a time."
+
+        settings = agent.get("whatsapp") if isinstance(agent.get("whatsapp"), dict) else {}
+        reply, usage = await chat.reply(ctx, turns, call_tools or None, chat.model_of(agent),
+                                        handoff if settings.get("handoff", True) is not False else None)
+        return {"reply": reply, "toolCalls": record.get("tool_calls") or [], "handoff": handed[0] if handed else None,
+                "usage": usage, "model": chat.model_of(agent)}
 
     async def answer_whatsapp(number: dict, event: dict):
         """A WhatsApp call coming in to a customer's number: its inbound agent answers over WebRTC."""
