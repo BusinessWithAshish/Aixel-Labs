@@ -95,12 +95,16 @@ test('marks tools the agent has, and warns about ones it does not', async ({ pag
     await page.mouse.move(0, 0);
     await expect(page.getByRole('tooltip')).toHaveCount(0);
 
-    // "Go to Tools" lands on check_availability's switch; turning it on clears both warnings before any save.
+    // "Go to Tools" lands on check_availability's switch; turning it on clears its warning before any save.
+    // book_appointment has its own switch: it stays off (and warned about) until that one is turned on.
     await problems.nth(0).getByRole('button', { name: 'Go to Tools' }).click();
     const toggle = page.getByTestId('voice-agent-tools').getByRole('switch', { name: 'Use check_availability' });
     await expect(toggle).toBeFocused();
     await expect(toggle).toBeInViewport();
     await toggle.click();
+    await expect(mark(page, 'check_availability')).not.toHaveAttribute('data-problem');
+    await expect(mark(page, 'book_appointment')).toHaveAttribute('data-problem', BOOKING_OFF);
+    await page.getByTestId('voice-agent-tools').getByRole('switch', { name: 'Use book_appointment' }).click();
     await expect(mark(page, 'book_appointment')).not.toHaveAttribute('data-problem');
     await expect(problems).toHaveCount(1);
 

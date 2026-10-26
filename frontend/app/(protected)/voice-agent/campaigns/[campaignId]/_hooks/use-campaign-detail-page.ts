@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter } from '@/hooks/use-progress-router';
 import { toast } from 'sonner';
 import { VoiceCampaignStatus } from '@aixellabs/backend/db/types';
 import {
@@ -19,7 +19,7 @@ import { CAMPAIGN_ACTION_DONE } from '../../_utils/campaign-format';
 const REFRESH_MS = 4000;
 
 export function useCampaignDetailPage(data: VoiceCampaignDetail) {
-    const router = useRouter();
+    const router = useProgressRouter();
     const [detail, setDetail] = useState(data);
     const [filter, setFilterState] = useState<VoiceCampaignContactFilter>('all');
     const [loadingFilter, setLoadingFilter] = useState(false);

@@ -75,7 +75,7 @@ test('counts current agents only, unless deleted agents are included; every cost
     await expect(stats).toContainText('1 of 1 calls');
     await expect(page.getByText('Call analysis', { exact: true })).toBeVisible();
 
-    await page.getByRole('switch', { name: 'Include deleted agents' }).click();
+    await page.getByRole('switch', { name: 'Show deleted agents' }).click();
     await expect(page).toHaveURL(/[?&]deleted=1/);
     await expect(stats).toContainText('1 of 2 calls');
     await expect(stats).toContainText('50%');
@@ -84,5 +84,5 @@ test('counts current agents only, unless deleted agents are included; every cost
     await page.getByRole('combobox', { name: 'Agent' }).click();
     await page.getByRole('option', { name: 'Sales', exact: true }).click();
     await expect(stats).toContainText('1 of 1 calls');
-    await expect(page.getByRole('switch', { name: 'Include deleted agents' })).toBeDisabled();
+    await expect(page.getByRole('switch', { name: 'Show deleted agents' })).toBeDisabled();
 });

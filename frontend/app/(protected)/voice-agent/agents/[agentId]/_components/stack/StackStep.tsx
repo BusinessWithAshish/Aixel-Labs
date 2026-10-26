@@ -115,6 +115,8 @@ export function StackStep({ part, stack, className }: StackStepProps) {
                     name={`${id}-model`}
                     id={`${id}-model`}
                     label="Model"
+                    description="Prices are a minute of the model alone."
+                    classNames={{ description: 'text-xs' }}
                     value={current.model}
                     onChange={pickModel}
                     options={modelOptions}
@@ -137,7 +139,7 @@ export function StackStep({ part, stack, className }: StackStepProps) {
                 <Alert variant="warning" data-testid={`${id}-no-key`}>
                     <TriangleAlert className="size-4" aria-hidden />
                     <AlertDescription className="text-xs">
-                        No {providerName} key yet: this agent cannot take or make calls.{' '}
+                        No {providerName} API key yet: this agent cannot take or make calls.{' '}
                         <Link href={GEMINI_KEY_URL} className="font-medium underline underline-offset-4">
                             Add one in Settings
                         </Link>

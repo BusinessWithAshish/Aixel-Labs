@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatPhone } from '@/helpers/voice-campaign-contacts';
 import { BrowserTestPanel } from './BrowserTestPanel';
+import { PhoneTestPanel } from './PhoneTestPanel';
 import { SoftphoneTestPanel } from './SoftphoneTestPanel';
 
 /** The dialog's title and button: who calls whom. */
@@ -24,8 +25,9 @@ type AgentTestDialogProps = {
 };
 
 /**
- * Talk to the agent exactly as a phone caller would, over the internet: in this browser (nothing to install, works
- * on any network) or from a SIP app signed in to the owner's Telnyx account. No phone network, so no country limits.
+ * The one place to try an agent, as a phone caller would: in this browser (nothing to install, works on any network),
+ * on Linphone signed in to the owner's Telnyx account (both over the internet: no country limits, trial-friendly), or
+ * on the owner's own phone over the phone network (the test call).
  */
 export function AgentTestDialog({ open, onOpenChange, agentId, agentName, callType }: AgentTestDialogProps) {
     const [view, setView] = useState<SoftphoneView | null>(null);
@@ -59,23 +61,25 @@ export function AgentTestDialog({ open, onOpenChange, agentId, agentName, callTy
                         {inbound
                             ? `You call ${agentName} the way a customer would. You’ll hear ${agentName} answer as if you called ${asIf}.`
                             : `${agentName} calls you and starts the conversation the way it would with a lead.`}{' '}
-                        It goes over the internet, so it works from any country.
+                        In this browser and on Linphone it goes over the internet, so it works from any country.
                     </DialogDescription>
                 </DialogHeader>
                 {view ? (
                     <Tabs defaultValue="browser" className="gap-4">
                         <TabsList className="w-full">
                             <TabsTrigger value="browser">In this browser</TabsTrigger>
-                            <TabsTrigger value="softphone">
-                                {inbound ? 'From your softphone' : 'On your softphone'}
-                            </TabsTrigger>
+                            <TabsTrigger value="softphone">On Linphone</TabsTrigger>
+                            <TabsTrigger value="phone">{inbound ? 'From your phone' : 'On your phone'}</TabsTrigger>
                         </TabsList>
-                        {/* Both stay mounted: a call in progress and a password shown once survive a switch. */}
+                        {/* All stay mounted: a call in progress and a password shown once survive a switch. */}
                         <TabsContent value="browser" forceMount className="data-[state=inactive]:hidden">
                             <BrowserTestPanel {...panelProps} />
                         </TabsContent>
                         <TabsContent value="softphone" forceMount className="data-[state=inactive]:hidden">
                             <SoftphoneTestPanel {...panelProps} />
+                        </TabsContent>
+                        <TabsContent value="phone" forceMount className="data-[state=inactive]:hidden">
+                            <PhoneTestPanel agentId={agentId} agentName={agentName} inbound={inbound} />
                         </TabsContent>
                     </Tabs>
                 ) : error ? (

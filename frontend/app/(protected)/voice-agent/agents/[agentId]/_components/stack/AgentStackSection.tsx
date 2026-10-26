@@ -12,13 +12,7 @@ import { usePage } from '@/contexts/PageStore';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { formatMoney } from '@/helpers/voice-call-cost';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
-import {
-    conversationUsdPerMinute,
-    defaultStack,
-    PIPELINE_PARTS,
-    stackModel,
-    stackUsdPerMinute,
-} from '@/helpers/voice-stack';
+import { defaultStack, fromUsdPerMinute, PIPELINE_PARTS } from '@/helpers/voice-stack';
 import type { VoiceAgentInput } from '@/helpers/voice-schemas';
 import type { UseVoiceAgentEditorPageReturn } from '../../_hooks/use-voice-agent-editor-page';
 import { fitTtsVoice, StackStep } from './StackStep';
@@ -46,21 +40,14 @@ export function AgentStackSection() {
     };
 
     const { catalogue } = stackOptions;
-    // A live model's from-price includes re-reading the conversation, as its bill does.
-    const cheapest = (kind: VoiceStackKind) => {
-        const stack = defaultStack(kind);
-        return (
-            stackUsdPerMinute(stack, catalogue) +
-            (stack.kind === VoiceStackKind.REALTIME
-                ? conversationUsdPerMinute(stackModel('realtime', stack.model, catalogue))
-                : 0)
-        );
-    };
+    // Models alone, as each model's own price (a live one's includes re-reading the conversation); the cost box adds the rest.
+    const from = (kind: VoiceStackKind) =>
+        `From ${perMin(fromUsdPerMinute(kind, catalogue))} for the model${kind === VoiceStackKind.REALTIME ? '' : 's'} alone.`;
     const options: RadioCardOption<VoiceStackKind>[] = [
         {
             value: VoiceStackKind.REALTIME,
             title: 'One voice model',
-            description: `A live voice model hears the caller and answers out loud. Fastest replies (about 1 s). From ${perMin(cheapest(VoiceStackKind.REALTIME))}.`,
+            description: `A live voice model hears the caller and answers out loud. Fastest replies (about 1 s). ${from(VoiceStackKind.REALTIME)}`,
         },
         {
             value: VoiceStackKind.PIPELINE,
@@ -69,7 +56,7 @@ export function AgentStackSection() {
                     Three steps <Badge variant="outline">Beta</Badge>
                 </>
             ),
-            description: `Speech to text, then a text model, then a voice, each from the provider you pick. 0.2 to 0.5 s slower a reply. From ${perMin(cheapest(VoiceStackKind.PIPELINE))}.`,
+            description: `Speech to text, then a text model, then a voice, each from the provider you pick. 0.2 to 0.5 s slower a reply. ${from(VoiceStackKind.PIPELINE)}`,
         },
     ];
 

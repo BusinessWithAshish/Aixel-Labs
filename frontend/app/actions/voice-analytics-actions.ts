@@ -16,16 +16,20 @@ import {
 } from '@aixellabs/backend/db';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { assertValidObjectId, runAuthenticatedAction } from '@/helpers/server-action-helpers';
+import {
+    DAY_MS,
+    DEFAULT_ANALYTICS_RANGE,
+    parseCallRange,
+    rangeStart,
+    type VoiceCallRange,
+} from '@/helpers/voice-call-ranges';
 import { agentIdMatch } from '@/server/voice-agent/agent-match';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
 import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 
-/** Days back from now, or every call there is. */
-export type VoiceAnalyticsRange = '7' | '30' | '90' | '365' | 'all';
-
 export type VoiceAnalyticsInput = {
     agentId?: string | null;
-    range?: VoiceAnalyticsRange;
+    range?: VoiceCallRange;
     /** Also count agents that were deleted since (without an agent picked). */
     includeDeleted?: boolean;
 };
@@ -95,10 +99,8 @@ export type VoiceAnalytics = {
 };
 
 const SUB_MODULE = VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS;
-const RANGES: VoiceAnalyticsRange[] = ['7', '30', '90', '365', 'all'];
 // shortcut: every owner is counted in Indian time for now; take the owner's zone once accounts keep one.
 const ANALYTICS_TIMEZONE = 'Asia/Kolkata';
-const DAY_MS = 24 * 60 * 60 * 1000;
 const REPLY_BUCKETS_MS = [0, 500, 1000, 1500, 2000, 3000];
 const CAMPAIGNS_SHOWN = 10;
 const SENTIMENTS: VoiceCallSentiment[] = ['positive', 'neutral', 'negative'];
@@ -128,8 +130,8 @@ function daysSince(from: Date): string[] {
 export const getVoiceAnalytics = async (input: VoiceAnalyticsInput = {}): Promise<ALApiResponse<VoiceAnalytics>> => {
     const agentId = input.agentId || null;
     if (agentId) assertValidObjectId(agentId, 'Agent ID');
-    const range = input.range && RANGES.includes(input.range) ? input.range : '30';
-    const from = range === 'all' ? null : new Date(Date.now() - Number(range) * DAY_MS);
+    const range = parseCallRange(input.range) ?? DEFAULT_ANALYTICS_RANGE;
+    const from = rangeStart(range);
     const period = range === 'all' || range === '365' ? 'month' : 'day';
 
     return runAuthenticatedAction(async function getVoiceAnalytics(userId): Promise<VoiceAnalytics> {

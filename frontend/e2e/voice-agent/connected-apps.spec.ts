@@ -75,7 +75,9 @@ const NOT_FOUND = /No data found|not found|could not be found/i;
  * Records, across full page loads, whether the page ever said "not found" and whether it said what
  * it was connecting (`window.sessionStorage`, so Composio's redirect and ours do not lose it).
  */
-async function watchCallback(page: Page): Promise<() => Promise<{ notFound: boolean; connecting: string[] }>> {
+async function watchCallback(
+    page: Page,
+): Promise<() => Promise<{ notFound: boolean; connecting: string[]; said: string[] }>> {
     await page.addInitScript((pattern) => {
         const notFound = new RegExp(pattern, 'i');
         const check = () => {
@@ -83,6 +85,13 @@ async function watchCallback(page: Page): Promise<() => Promise<{ notFound: bool
             if (notFound.test(text)) sessionStorage.setItem('e2e-not-found', text.slice(0, 300));
             const connecting = text.match(/Connecting [A-Za-z. ]+…/);
             if (connecting) sessionStorage.setItem('e2e-connecting', connecting[0]);
+            // The callback's other states, and any mention of the vendor behind it (never shown).
+            const said = new Set(JSON.parse(sessionStorage.getItem('e2e-said') ?? '[]') as string[]);
+            // Only on our own pages: the fake sign-in page stands in for the vendor's own.
+            if (!location.pathname.startsWith('/voice-agent')) return;
+            for (const m of text.matchAll(/[A-Za-z. ]+ connected(?=\n|$)|Taking you back to [^…]+…|Composio/g))
+                said.add(m[0].trim());
+            sessionStorage.setItem('e2e-said', JSON.stringify([...said]));
         };
         new MutationObserver(check).observe(document, { childList: true, subtree: true, characterData: true });
     }, NOT_FOUND.source);
@@ -90,6 +99,7 @@ async function watchCallback(page: Page): Promise<() => Promise<{ notFound: bool
         page.evaluate(() => ({
             notFound: !!sessionStorage.getItem('e2e-not-found'),
             connecting: [sessionStorage.getItem('e2e-connecting') ?? ''].filter(Boolean),
+            said: JSON.parse(sessionStorage.getItem('e2e-said') ?? '[]') as string[],
         }));
 }
 
@@ -183,7 +193,13 @@ test('connect Google Calendar: Connect Link, back to the agent booking into it, 
     await expect(page).toHaveURL(new RegExp(`${voiceAgentUrl(agentId)}$`), { timeout: 30_000 });
     await expect(page.getByText('Google Calendar connected as ravi@example.com')).toBeVisible();
     await expect(page.getByText("Bookings now go to Ravi's calendar.")).toBeVisible();
-    expect(await callbackSeen()).toEqual({ notFound: false, connecting: ['Connecting Google Calendar…'] });
+    // The return screen: connecting, then connected and on its way back to the agent; the vendor never named.
+    expect(await callbackSeen()).toEqual({
+        notFound: false,
+        connecting: ['Connecting Google Calendar…'],
+        said: expect.arrayContaining(['Google Calendar connected', 'Taking you back to Front desk…']),
+    });
+    expect((await callbackSeen()).said).not.toContain('Composio');
     await expect(page.getByTestId('voice-agent-tools')).toBeInViewport();
 
     // One Composio-managed auth config for the toolkit; the link comes from a session made for this
@@ -320,10 +336,11 @@ test('a new agent connects Google Calendar straight away: its unsaved tools are 
     await expect(page.locator('#booking-calendar')).toHaveText(/Ravi's calendar/);
     await expect(page.getByRole('switch', { name: 'Use check_availability' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByTestId('voice-agent-tools').getByText('Unsaved changes')).toHaveCount(0);
-    // Saved before leaving (tools switched on, the edit kept), then pointed at the account on the way back.
+    // Saved before leaving (check_availability switched on, book_appointment left to its own switch, the edit
+    // kept), then pointed at the account on the way back.
     expect((await db.getVoiceAgentDoc(agentId)).tools?.booking).toMatchObject({
         enabled: true,
-        bookAppointment: true,
+        bookAppointment: false,
         maxDaysAhead: 21,
         destination: { provider: VoiceCalendarProvider.GOOGLE_CALENDAR, calendarId: 'primary' },
     });
@@ -338,7 +355,7 @@ test('the callback refuses an account this user did not start, and a refused con
     );
     const error = page.getByTestId('connected-app-callback-error');
     await expect(error).toContainText('This connection was not started from your account');
-    await expect(error.getByRole('link', { name: 'Back to the agent' })).toHaveAttribute('href', voiceAgentUrl(agentId));
+    await expect(error.getByRole('link', { name: 'Back to Front desk' })).toHaveAttribute('href', voiceAgentUrl(agentId));
     expect(await db.getVoiceCalendarConnections(E2E_USER)).toHaveLength(0);
 
     // The owner closes Composio's consent screen.
@@ -354,7 +371,14 @@ test('the callback refuses an account this user did not start, and a refused con
     // No session is kept for it: the link's one is deleted, none pinned.
     expect(failed.composioSessionId ?? null).toBeNull();
     expect(composio.sessions.size).toBe(0);
-    await page.getByRole('link', { name: 'Back to the agent' }).click();
+    // Said plainly, with a retry and the way back named after the agent; the vendor is never named.
+    const screen = page.getByTestId('connected-app-callback-error');
+    await expect(screen).toContainText("Couldn't connect Outlook");
+    await expect(screen).not.toContainText('Composio');
+    await expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+    // The consent screen was closed: the sign-in itself is the step that failed.
+    await expect(screen.locator('li[data-state="failed"]')).toHaveText('Signed in with Outlook');
+    await page.getByRole('link', { name: 'Back to Front desk' }).click();
     await waitForHydration(page, '#agent-prompt');
     // Bookings still go to the built-in calendar; under Outlook the attempt is listed as not connected,
     // with a retry and a remove, and connecting is offered again.

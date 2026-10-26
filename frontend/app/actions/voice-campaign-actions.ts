@@ -25,7 +25,8 @@ import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpe
 import { type CampaignContactInput, campaignCountry, checkContacts } from '@/helpers/voice-campaign-contacts';
 import { campaignSettingsSchema, parseOrThrow, type VoiceCampaignSettingsInput } from '@/helpers/voice-schemas';
 import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key';
-import { assertGeminiKeySet, loadGeminiKeyView } from '@/server/voice-agent/gemini-key';
+import { loadGeminiKeyView } from '@/server/voice-agent/gemini-key';
+import { assertCallReady } from '@/server/voice-agent/call-readiness';
 import { ensureVoiceAgentIndexes } from '@/server/voice-agent/indexes';
 import { findItem, listItems } from '@/server/voice-agent/accounts';
 import { providerOf, type OwnedNumberDoc } from '@/server/voice-agent/number-provider';
@@ -289,11 +290,11 @@ async function findOwnedNumber(owner: VoiceOwnerScope, numberId: string): Promis
     return doc;
 }
 
-/** Everything a running campaign needs before the engine may dial: the agent, the number ready at its provider, a Gemini key. */
+/** Everything a running campaign needs before the engine may dial: the agent and its keys (`assertCallReady`), the number ready at its provider. */
 async function assertReadyToCall(owner: VoiceOwnerScope, campaign: VoiceCampaignDoc) {
     await findOutboundAgent(owner, campaign.agentId.toString());
     const number = await findOwnedNumber(owner, campaign.numberId.toString());
-    await assertGeminiKeySet(owner.userId);
+    await assertCallReady(owner.userId, campaign.agentId);
     await providerOf(number).prepareCall(number);
 }
 
@@ -486,7 +487,7 @@ export const addVoiceCampaignContacts = async (
 
 /**
  * start (DRAFT), pause (RUNNING), resume (PAUSED), cancel (DRAFT/RUNNING/PAUSED). Start and resume
- * check the agent, the number (its provider gets ready to place calls) and the Gemini key first.
+ * check the agent and its keys, and the number (its provider gets ready to place calls) first.
  * The engine picks a RUNNING campaign up within seconds; pausing stops new calls at once, calls
  * already ringing finish.
  */

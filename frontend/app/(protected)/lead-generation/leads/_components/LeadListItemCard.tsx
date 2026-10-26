@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import type { UserLeadList } from '@aixellabs/backend/db/types';
 import { Pencil, Users } from 'lucide-react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter } from '@/hooks/use-progress-router';
 import { useCallback } from 'react';
 import type { TUseUserLeadListsPageReturn } from '../_hooks/use-user-lead-lists-page';
 import { FILTERABLE_SOURCES, SOURCE_META } from '../_utils/lead-filter-constants';
@@ -21,7 +21,7 @@ type LeadListItemCardProps = {
 };
 
 export function LeadListItemCard({ list, selected, onToggleSelect }: LeadListItemCardProps) {
-    const router = useRouter();
+    const router = useProgressRouter();
     const { openEditDialog } = usePage<TUseUserLeadListsPageReturn>();
     const titleLabel = list.name.trim() || 'Untitled list';
 

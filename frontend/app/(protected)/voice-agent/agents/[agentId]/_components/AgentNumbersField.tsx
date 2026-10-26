@@ -29,6 +29,13 @@ function numberJobs(number: VoiceNumberListItem, agentId: string): string | null
     return jobs.length ? jobs.join(' · ') : null;
 }
 
+/** Scrolls to the prompt and puts the cursor in it. */
+function openPrompt() {
+    const prompt = document.getElementById('agent-prompt');
+    prompt?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    prompt?.focus({ preventScroll: true });
+}
+
 /** A pick that takes the slot from another agent, waiting for the owner to confirm it. */
 type Takeover = { id: string; phoneNumber: string; holder: string; holderKeepsOne: boolean };
 
@@ -45,18 +52,40 @@ export function AgentNumbersField() {
     const typePending = form.callType !== saved.callType;
     const [takeover, setTakeover] = useState<Takeover | null>(null);
 
+    // The server refuses a number for an agent with no saved prompt (it would answer with nothing): say so first.
+    const noPrompt = !saved.prompt.trim();
+    const current = numbers[0]?.id ?? null;
+    // A pick shows at once and until the refresh brings the saved number (`from` is what was there before it).
+    const [pending, setPending] = useState<{ id: string | null; from: string | null } | null>(null);
+    const waiting = pending !== null && pending.from === current;
+    const shown = waiting ? pending.id : current;
+
     // shortcut: the UI keeps one number per agent; one linked before then shows the first and a pick keeps only it.
     const link = async (id: string | null) => {
         setTakeover(null);
-        if (id && !(await linkNumbers([id], true))) return;
-        await linkNumbers(
-            numbers.map((n) => n.id).filter((n) => n !== id),
-            false,
-        );
+        setPending({ id, from: current });
+        const ok =
+            (!id || (await linkNumbers([id], true))) &&
+            (await linkNumbers(
+                numbers.map((n) => n.id).filter((n) => n !== id),
+                false,
+            ));
+        // The toast says what failed; the picker goes back to what is saved.
+        if (!ok) setPending(null);
     };
 
+    const hint = typePending
+        ? 'Save the new agent type first.'
+        : numbers.length > 0
+          ? inbound
+              ? 'Calls to this number are answered by this agent.'
+              : 'This agent calls from this number.'
+          : inbound
+            ? 'No number yet: pick the one it answers.'
+            : 'No number yet: pick the one it calls from.';
+
     const pick = (id: string | null) => {
-        if (id === (numbers[0]?.id ?? null)) return;
+        if (id === shown) return;
         const number = ownedNumbers.find((n) => n._id === id);
         const holder = number ? slotHolder(number, saved.callType) : null;
         if (!number || !holder || holder.id === agentId) return void link(id);
@@ -70,7 +99,7 @@ export function AgentNumbersField() {
         <Field data-testid="agent-numbers">
             <FieldLabel htmlFor="agent-numbers">
                 Phone number
-                {linking ? <Loader2 className="text-muted-foreground size-3.5 animate-spin" /> : null}
+                {linking || waiting ? <Loader2 className="text-muted-foreground size-3.5 animate-spin" /> : null}
             </FieldLabel>
             {ownedNumbers.length > 0 ? (
                 <PhoneNumberSelect
@@ -85,11 +114,11 @@ export function AgentNumbersField() {
                             detail: mine ? null : numberJobs(n, agentId),
                         };
                     })}
-                    value={numbers[0]?.id ?? null}
+                    value={shown}
                     onChange={pick}
                     placeholder={inbound ? 'Pick the number it answers' : 'Pick the number it calls from'}
                     noneLabel="No number"
-                    disabled={typePending || linking}
+                    disabled={typePending || noPrompt || linking}
                 />
             ) : (
                 <p className="text-muted-foreground text-sm" data-testid="agent-numbers-empty">
@@ -100,15 +129,17 @@ export function AgentNumbersField() {
                 </p>
             )}
             <FieldDescription className="text-xs">
-                {typePending
-                    ? 'Save the new agent type first.'
-                    : numbers.length > 0
-                      ? inbound
-                          ? 'Calls to this number are answered by this agent.'
-                          : 'This agent calls from this number.'
-                      : inbound
-                        ? 'No number yet: pick the one it answers.'
-                        : 'No number yet: pick the one it calls from.'}
+                {noPrompt && ownedNumbers.length > 0 ? (
+                    <span className="text-amber-700 dark:text-amber-400" data-testid="agent-numbers-no-prompt">
+                        {form.prompt.trim() ? 'Save the prompt first' : 'Write a prompt or pick a template first'}, so the
+                        number doesn&apos;t answer with an empty agent.{' '}
+                        <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={openPrompt}>
+                            Go to the prompt
+                        </Button>
+                    </span>
+                ) : (
+                    hint
+                )}
             </FieldDescription>
             <ConfirmDialog
                 open={!!takeover}

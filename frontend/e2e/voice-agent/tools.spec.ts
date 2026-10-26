@@ -175,6 +175,49 @@ test('booking: turn it on, set hours, save, and it is still there after a reload
         .toMatchObject({ enabled: false, timezone: 'Europe/London', slotMinutes: 45 });
 });
 
+test('booking: each built-in tool has its own switch', async ({ page, db }) => {
+    const agentId = await inboundAgent(db);
+    await openVoiceAgent(page, agentId);
+    const card = tools(page);
+    const check = card.getByRole('switch', { name: 'Use check_availability' });
+    const book = card.getByRole('switch', { name: 'Use book_appointment' });
+
+    // check_availability on alone: book_appointment stays off.
+    await check.click();
+    await expect(check).toHaveAttribute('aria-checked', 'true');
+    await expect(book).toHaveAttribute('aria-checked', 'false');
+    // Off on its own, with check_availability left on.
+    await book.click();
+    await expect(book).toHaveAttribute('aria-checked', 'true');
+    await book.click();
+    await expect(book).toHaveAttribute('aria-checked', 'false');
+    await expect(check).toHaveAttribute('aria-checked', 'true');
+    // book_appointment needs check_availability: turning check_availability off turns it off, with a note...
+    await book.click();
+    await check.click();
+    await expect(check).toHaveAttribute('aria-checked', 'false');
+    await expect(book).toHaveAttribute('aria-checked', 'false');
+    await expect(page.getByText('book_appointment is off too: it books only times check_availability finds.')).toBeVisible();
+    // ...and turning book_appointment on turns check_availability on.
+    await book.click();
+    await expect(check).toHaveAttribute('aria-checked', 'true');
+    await expect(book).toHaveAttribute('aria-checked', 'true');
+
+    await check.click();
+    await check.click();
+    await card.getByRole('button', { name: 'Save tools' }).click();
+    await expect(page.getByText('Booking settings saved')).toBeVisible();
+    await expect
+        .poll(async () => (await db.getVoiceAgentDoc(agentId)).tools?.booking)
+        .toMatchObject({ enabled: true, bookAppointment: false });
+    await openVoiceAgent(page, agentId);
+    await expect(tools(page).getByRole('switch', { name: 'Use check_availability' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+    );
+    await expect(tools(page).getByRole('switch', { name: 'Use book_appointment' })).toHaveAttribute('aria-checked', 'false');
+});
+
 test('booking: impossible hours and limits are refused in plain words', async ({ page, db }) => {
     const agentId = await inboundAgent(db);
     await openVoiceAgent(page, agentId);
@@ -528,6 +571,52 @@ async function seedFullTools(db: E2eDb): Promise<string> {
         ],
     });
     return agentId;
+}
+
+/**
+ * The page shell stays put: only the page's own container scrolls. A jump that also scrolls the shell moves the
+ * header off the top and leaves a blank strip under the last card.
+ */
+async function expectShellInPlace(page: Page): Promise<void> {
+    const shell = await page.evaluate(() => {
+        const inset = document.getElementById('sidebar-inset')!;
+        const container = document.getElementById('page-children-container')!.getBoundingClientRect();
+        return {
+            insetScrolled: inset.scrollTop,
+            documentTaller: document.documentElement.scrollHeight - window.innerHeight,
+            headerTop: document.getElementById('header')!.getBoundingClientRect().top,
+            blankBelow: window.innerHeight - container.bottom,
+        };
+    });
+    expect(shell.insetScrolled).toBe(0);
+    expect(shell.documentTaller).toBeLessThanOrEqual(0);
+    expect(shell.headerTop).toBeGreaterThanOrEqual(0);
+    // The scroll container reaches the bottom of the screen, less the shell's own padding.
+    expect(shell.blankBelow).toBeLessThanOrEqual(16);
+}
+
+for (const [label, size] of [
+    ['desktop', { width: 1440, height: 900 }],
+    ['a 390 px phone', { width: 390, height: 844 }],
+] as const) {
+    test(`jumping to Tools and opening a tool keeps the page in place (${label})`, async ({ page, db }) => {
+        await page.setViewportSize(size);
+        const agentId = await db.insertVoiceAgent(E2E_USER, {
+            name: 'Maya',
+            callType: VoiceAgentCallType.INBOUND,
+            prompt: 'Offer times with check_availability, then book_appointment.',
+        });
+        await openVoiceAgent(page, agentId);
+        await page.getByRole('button', { name: 'Go to Tools' }).first().click();
+        await expect(tools(page).getByRole('switch', { name: 'Use check_availability' })).toBeInViewport();
+        await expectShellInPlace(page);
+        await openVoiceTool(page, 'check_availability');
+        await expectShellInPlace(page);
+        // Scrolled to the end: the last card is on screen, with nothing blank under it.
+        await page.mouse.wheel(0, 20_000);
+        await expect(page.locator('#page-children-container [data-slot="card"]').last()).toBeInViewport();
+        await expectShellInPlace(page);
+    });
 }
 
 test('the Tools card fits a desktop screen', async ({ page, db }) => {

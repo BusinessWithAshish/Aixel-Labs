@@ -413,8 +413,10 @@ test('the agent page starts a test call with that agent, from a number that uses
     const answering = await seedNumber(db, SECOND_NUMBER, { inboundAgentId: new ObjectId(frontDesk) });
     await openVoiceAgent(page, frontDesk);
 
-    await page.getByRole('button', { name: 'Test call' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Test call' });
+    // The agent page's test dialog, phone tab: the old Test call, the agent fixed.
+    await page.getByRole('button', { name: 'Call this agent' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Call this agent' });
+    await dialog.getByRole('tab', { name: 'From your phone' }).click();
     // The agent is fixed; the number it answers on is picked first.
     await expect(dialog.getByRole('combobox', { name: 'Agent that calls' })).toHaveCount(0);
     await expect(dialog.getByRole('combobox', { name: 'Calls from' })).toHaveText(`Telnyx · ${formatPhone(SECOND_NUMBER)}`);
@@ -492,8 +494,29 @@ test.describe('linking from the agent editor', () => {
             prompt: ' ',
         });
         await seedNumber(db);
-        await expect(linkNumber(page, draft, FIRST_NUMBER)).rejects.toThrow();
+
+        // The picker is off, saying why, with the way to the prompt.
+        await openVoiceAgent(page, draft);
+        const select = page.getByTestId('agent-numbers-select');
+        await expect(select).toBeDisabled();
+        const hint = page.getByTestId('agent-numbers-no-prompt');
+        await expect(hint).toContainText(
+            "Write a prompt or pick a template first, so the number doesn't answer with an empty agent.",
+        );
+        await hint.getByRole('button', { name: 'Go to the prompt' }).click();
+        await expect(page.locator('#agent-prompt')).toBeFocused();
+        await page.locator('#agent-prompt').fill('You are the front desk.');
+        await expect(hint).toContainText('Save the prompt first');
+
+        // The server refuses too (the prompt emptied since the page loaded): the picker goes back, with the reason.
+        await db.setVoiceAgentFields(draft, { prompt: 'You are the front desk.' });
+        await openVoiceAgent(page, draft);
+        await db.setVoiceAgentFields(draft, { prompt: ' ' });
+        await expect(select).toBeEnabled();
+        await select.click();
+        await page.getByRole('option', { name: formatPhone(FIRST_NUMBER) }).click();
         await expect(page.locator('[data-sonner-toast]').getByText(VOICE_AGENT_NO_PROMPT_MESSAGE)).toBeVisible();
+        await expect(select).toHaveText('Pick the number it answers');
         expect(telnyxWrites()).toHaveLength(0);
         expect((await db.getVoiceNumbers(E2E_USER))[0].inboundAgentId).toBeNull();
     });

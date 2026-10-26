@@ -3,17 +3,14 @@
 import { useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
-import type { CallSuccessFilter, VoiceCallListItem } from '@/app/actions/voice-call-actions';
+import type { VoiceCallListItem } from '@/app/actions/voice-call-actions';
 import { costParts, isCostEstimated } from '@/helpers/voice-call-cost';
+import { callLogFiltersQuery, NO_CALL_LOG_FILTERS, type CallLogFilters } from '../_utils/call-log-filters';
 
 export type CallLogsPageData = {
     calls: VoiceCallListItem[];
     agents: VoiceAgentOption[];
-    agentFilter: string | null;
-    /** Calls the analysis judged successful or not (`?success=yes|no`). */
-    successFilter: CallSuccessFilter | null;
-    /** Calls of agents deleted since show too (`?deleted=1`). */
-    includeDeleted: boolean;
+    filters: CallLogFilters;
     limit: number;
     loadError: string | null;
 };
@@ -22,27 +19,17 @@ export function useCallLogsPage(data: CallLogsPageData) {
     const router = useRouter();
     const pathname = usePathname();
     const [filtering, startFiltering] = useTransition();
+    const { filters } = data;
 
-    /** The filters live in the URL (`?agent=&success=&deleted=1`), so a filtered list can be reloaded and shared. */
-    const applyFilters = (next: Partial<{ agent: string | null; success: CallSuccessFilter | null; deleted: boolean }>) => {
-        const { agent, success, deleted } = {
-            agent: data.agentFilter,
-            success: data.successFilter,
-            deleted: data.includeDeleted,
-            ...next,
-        };
-        const params = new URLSearchParams();
-        if (agent) params.set('agent', agent);
-        if (success) params.set('success', success);
-        if (deleted) params.set('deleted', '1');
-        const query = params.toString();
+    const pushFilters = (next: CallLogFilters) => {
+        const query = callLogFiltersQuery(next);
         startFiltering(() => {
             router.push(query ? `${pathname}?${query}` : pathname);
         });
     };
 
-    const agentFilterName = data.agentFilter
-        ? (data.agents.find((a) => a.id === data.agentFilter)?.name ?? 'Deleted agent')
+    const agentFilterName = filters.agent
+        ? (data.agents.find((a) => a.id === filters.agent)?.name ?? 'Deleted agent')
         : null;
 
     // The summary above the list adds up exactly the calls in it; only some calls have a cost.
@@ -74,13 +61,12 @@ export function useCallLogsPage(data: CallLogsPageData) {
         calls: data.calls,
         summary,
         agents: data.agents,
-        agentFilter: data.agentFilter,
+        filters,
+        filtersSet: callLogFiltersQuery(filters) !== '',
+        setFilter: <K extends keyof CallLogFilters>(key: K, value: CallLogFilters[K]) =>
+            pushFilters({ ...filters, [key]: value }),
+        clearFilters: () => pushFilters(NO_CALL_LOG_FILTERS),
         agentFilterName,
-        successFilter: data.successFilter,
-        includeDeleted: data.includeDeleted,
-        setSuccessFilter: (success: CallSuccessFilter | null) => applyFilters({ success }),
-        setAgentFilter: (agent: string | null) => applyFilters({ agent }),
-        setIncludeDeleted: (deleted: boolean) => applyFilters({ deleted }),
         limit: data.limit,
         loadError: data.loadError,
         filtering,

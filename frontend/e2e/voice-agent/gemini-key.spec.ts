@@ -261,7 +261,7 @@ test('without a key: the card says so, and the playground, answering, making cal
 
     await openAgents(page);
     await expect(page.getByTestId('gemini-key-notice')).toContainText(
-        'Your agents need your Gemini API key to take or make calls.',
+        'Your agents need a Gemini API key to take or make calls: the summary after every call runs on Gemini.',
     );
     await expect(page.getByTestId('gemini-key-notice').getByRole('link', { name: 'Add it in Settings' })).toHaveAttribute(
         'href',
@@ -271,13 +271,15 @@ test('without a key: the card says so, and the playground, answering, making cal
     // The agent's stack says its step has no key, with the way to Settings.
     await openVoiceAgent(page, inbound);
     await expect(page.getByTestId('agent-stack').getByRole('radio', { name: /^One voice model/ })).toBeChecked();
-    await expect(page.getByTestId('stack-realtime-no-key')).toContainText('No Gemini key yet');
+    await expect(page.getByTestId('stack-realtime-no-key')).toContainText('No Gemini API key yet');
     await expect(page.getByTestId('stack-realtime-no-key').getByRole('link')).toHaveAttribute('href', GEMINI_KEY_URL);
 
     await openSettings(page);
     await expect(page.getByTestId('voice-stack-card')).toHaveCount(0);
     await expect(card(page).getByTestId('voice-key')).toHaveCount(0);
-    await expect(card(page)).toContainText('Your agents cannot take or make calls until you add your own Gemini key.');
+    await expect(card(page)).toContainText(
+        'Your agents cannot take or make calls until you add a Gemini API key: the summary after every call runs on Gemini, whatever else they use.',
+    );
     await expect(card(page).getByRole('button', { name: 'Add key' })).toBeVisible();
 
     await openVoiceAgent(page, inbound);
@@ -291,7 +293,7 @@ test('without a key: the card says so, and the playground, answering, making cal
 
     await openPhoneNumbers(page);
     await expect(page.getByTestId('gemini-key-notice')).toContainText(
-        'Your agents need your Gemini API key to answer or make calls.',
+        'Your agents need a Gemini API key to answer or make calls: the summary after every call runs on Gemini.',
     );
     await expect(numberRow(page, answering).getByTestId('gemini-key-hint')).toHaveCount(1);
     await expect(numberRow(page, answering).getByTestId('gemini-key-hint').getByRole('link')).toHaveAttribute(
@@ -301,7 +303,7 @@ test('without a key: the card says so, and the playground, answering, making cal
     await numberRow(page).getByRole('button', { name: 'Test call' }).click();
     const dialog = page.getByRole('dialog', { name: 'Test call' });
     await expect(dialog.getByTestId('gemini-key-notice')).toContainText(
-        'Your agents need your Gemini API key to place calls.',
+        'Your agents need a Gemini API key to place calls: the summary after every call runs on Gemini.',
     );
     await expect(dialog.getByRole('button', { name: 'Call me now' })).toHaveCount(0);
 
@@ -336,7 +338,9 @@ test('the server refuses too: a key removed after the page loaded blocks test ca
     await openVoiceAgent(page, inbound);
     await db.setVoiceGeminiKey(E2E_USER, null);
     await page.getByRole('button', { name: 'Start call' }).click();
-    await expect(page.getByRole('alert').filter({ hasText: 'No Gemini API key: voice model needs one.' })).toBeVisible();
+    await expect(
+        page.getByText('No Gemini API key: voice model needs one. Add a Gemini API key in Settings.', { exact: true }),
+    ).toBeVisible();
     expect(engine.connected).toBe(false);
 });
 
@@ -427,9 +431,9 @@ test('saving: Google’s refusals in plain words, then a good key is saved seale
     await openVoiceAgent(page, inbound);
     await expect(page.getByRole('button', { name: 'Start call' })).toBeEnabled();
     await expect(page.getByTestId('gemini-key-notice')).toHaveCount(0);
-    await expect(page.getByTestId('gemini-key-line')).toHaveCount(1); // the playground; the editor's stack names its key
+    await expect(page.getByTestId('stack-keys-line')).toHaveCount(1); // the playground; the editor's stack names its key
     // Every place an agent shows says which key it runs on.
-    await expect(page.getByTestId('gemini-key-line').first()).toHaveText(
+    await expect(page.getByTestId('stack-keys-line').first()).toHaveText(
         `Runs on your Gemini key ending ${GOOD_KEY.slice(-4)} · paid tier`,
     );
     await openPhoneNumbers(page);
@@ -487,7 +491,7 @@ test('a key Google refused on a call: the card, the playground and the call log 
     await expect(page.getByTestId('gemini-key-notice')).toContainText(
         'Google refused your Gemini API key: it is not a valid API key',
     );
-    await expect(page.getByTestId('gemini-key-line').first()).toContainText('which Google refused');
+    await expect(page.getByTestId('stack-keys-line').first()).toContainText('which Gemini refused');
     await expect(page.getByRole('button', { name: 'Start call' })).toBeEnabled(); // quota and billing can come back
 
     await openAgents(page);
@@ -629,7 +633,7 @@ test('several keys, and each agent its own stack: one voice model or three steps
     const stack = page.getByTestId('agent-stack');
     await expect(stack.getByRole('radio', { name: /^One voice model/ })).toBeChecked();
     await stack.locator('#stack-realtime-model').click();
-    await expect(page.getByRole('option', { name: /^Gemini 3\.8 Live · \$0\.02\d\/min$/ })).toBeVisible();
+    await expect(page.getByRole('option', { name: /^Gemini 3\.8 Live · \$0\.05\d\/min$/ })).toBeVisible();
     await expect(page.getByRole('option', { name: /^GPT-Realtime mini · .* · coming soon$/ })).toBeDisabled();
     await page.keyboard.press('Escape');
     // Its key: the provider's keys only (the first is the default), named after the model's provider.
@@ -652,7 +656,7 @@ test('several keys, and each agent its own stack: one voice model or three steps
         /^3Text to speech/,
     ]);
     await expect(stack.locator('#stack-stt-model')).toContainText('Deepgram Nova-3');
-    await expect(page.getByTestId('stack-stt-no-key')).toContainText('No Deepgram key yet');
+    await expect(page.getByTestId('stack-stt-no-key')).toContainText('No Deepgram API key yet');
     await expect(page.getByTestId('stack-tts-no-key')).toHaveCount(0);
     // Text models: those the key lists and the engine can run, cheapest first, or by name.
     await stack.locator('#stack-llm-model').click();
@@ -704,7 +708,7 @@ test('several keys, and each agent its own stack: one voice model or three steps
     expect(saved).toMatchObject({ kind: 'REALTIME', provider: 'gemini', model: 'gemini-3.8-live' });
     expect(String(saved && 'keyId' in saved ? saved.keyId : '')).toBe(mainId);
     expect(saved && 'price' in saved && saved.price && 'usdPerMillionTokens' in saved.price).toBe(true);
-    await expect(page.getByTestId('gemini-key-line').first()).toContainText(`ending ${GOOD_KEY.slice(-4)}`);
+    await expect(page.getByTestId('stack-keys-line').first()).toContainText(`ending ${GOOD_KEY.slice(-4)}`);
     expect(clinicId).not.toBe(mainId);
 });
 

@@ -6,8 +6,8 @@ import { PageProvider } from '@/contexts/PageStore';
 import { getVoiceAnalytics } from '@/app/actions/voice-analytics-actions';
 import { getVoiceAgentOptions } from '@/app/actions/voice-agent-actions';
 import { isValidObjectId } from '@/helpers/object-id';
+import { DEFAULT_ANALYTICS_RANGE, parseCallRange } from '@/helpers/voice-call-ranges';
 import { useVoiceAnalyticsPage } from './_hooks/use-voice-analytics-page';
-import { ANALYTICS_RANGES, DEFAULT_ANALYTICS_RANGE } from './_utils/analytics-ranges';
 import { VoiceAnalyticsContent } from './_components/VoiceAnalyticsContent';
 
 const PAGE_TITLE = subModuleLabelMap[VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS];
@@ -20,7 +20,7 @@ async function VoiceAnalyticsPage({
     const { agent, range: rangeParam, deleted } = await searchParams;
     const agentFilter = typeof agent === 'string' && isValidObjectId(agent) ? agent : null;
     const includeDeleted = deleted === '1';
-    const range = ANALYTICS_RANGES.find((r) => r.value === rangeParam)?.value ?? DEFAULT_ANALYTICS_RANGE;
+    const range = parseCallRange(rangeParam) ?? DEFAULT_ANALYTICS_RANGE;
 
     const [analyticsRes, agentsRes] = await Promise.all([
         getVoiceAnalytics({ agentId: agentFilter, range, includeDeleted }),

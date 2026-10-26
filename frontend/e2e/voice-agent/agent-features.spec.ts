@@ -407,7 +407,7 @@ test('call logs show each call’s summary and verdicts, and filter by success',
     await expect(cards).toHaveCount(1);
 
     await page.getByRole('combobox', { name: 'Outcome' }).click();
-    await page.getByRole('option', { name: 'All calls' }).click();
+    await page.getByRole('option', { name: 'All outcomes' }).click();
     await expect(page).toHaveURL(/\?agent=[0-9a-f]{24}$/);
     await expect(cards).toHaveCount(4);
 

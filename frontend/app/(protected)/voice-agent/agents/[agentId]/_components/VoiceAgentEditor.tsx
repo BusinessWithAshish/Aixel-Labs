@@ -21,7 +21,6 @@ import type { PromptTool } from '../_utils/prompt-tools';
 import { AgentNumbersField, slotHolder } from './AgentNumbersField';
 import { CallBlockers } from '@/components/common/voice-agent/CallBlockers';
 import { AgentTestButton } from './AgentTestButton';
-import { AgentTestCallButton } from './AgentTestCallButton';
 import { PromptField } from './PromptField';
 import { PromptTemplates } from './PromptTemplates';
 import { CallSettingsCard } from './settings/CallSettingsCard';
@@ -69,7 +68,7 @@ export function VoiceAgentEditor() {
         setDeleteOpen,
         deleting,
         confirmDelete,
-        callBlockers,
+        phoneBlockers,
     } = usePage<UseVoiceAgentEditorPageReturn>();
 
     const onNumbers = usage.inbound.length + usage.outbound.length > 0;
@@ -116,7 +115,6 @@ export function VoiceAgentEditor() {
                                         Discard
                                     </Button>
                                 ) : null}
-                                <AgentTestCallButton />
                                 <AgentTestButton />
                                 <Button
                                     type="button"
@@ -137,7 +135,7 @@ export function VoiceAgentEditor() {
                         </CardHeader>
 
                         <CardContent className="grid gap-5">
-                            <CallBlockers blockers={callBlockers} />
+                            <CallBlockers blockers={phoneBlockers} />
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <StringControlledField
                                     name="name"

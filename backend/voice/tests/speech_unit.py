@@ -205,6 +205,51 @@ def style_tests():
        and set(speech.PACES) | {"NORMAL"} == {"RELAXED", "NORMAL", "BRISK"} and set(speech.LENGTHS) | {"NORMAL"} == {"BRIEF", "NORMAL"})
 
 
+async def recovery_tests():
+    print("\n== Gemini drops mid-call (a simulated 1011): she comes back and carries on ==")
+    from unittest.mock import AsyncMock, patch
+    from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
+    llm = bot.TurnSafeGeminiLive(api_key="unused", system_instruction="x")
+    queued, reconnects = [], []
+    llm.queue_frame = AsyncMock(side_effect=queued.append)
+    llm._reconnect = AsyncMock(side_effect=lambda: reconnects.append(llm._session_resumption_handle))
+    llm._session_resumption_handle = "h1"
+    error = Exception("1011 None. Internal error encountered.")
+    ok("a server error: Pipecat's reconnect, resuming the session", await llm._handle_connection_error(error) is True
+       and llm._recovering is not None and llm._session_resumption_handle == "h1")
+    with patch.object(GeminiLiveLLMService, "_connection_task_handler", AsyncMock(side_effect=Exception("resumption refused"))):
+        await llm._connection_task_handler(None)
+    ok("the resumed connect fails: a fresh session (no handle, seeded from the context)", reconnects == [None] and llm._fresh_tries == 1)
+    with patch.object(GeminiLiveLLMService, "_handle_session_ready", AsyncMock()):
+        await llm._handle_session_ready(object())
+    ok("back: she is told to say the line cut out and carry on, once", len(queued) == 1
+       and isinstance(queued[0], LLMMessagesAppendFrame) and queued[0].messages[0]["content"] == llm.RECOVERED_NOTE
+       and llm._recovering is None and llm._fresh_tries == 0 and llm.usage.get("recoveries") == 1)
+    with patch.object(GeminiLiveLLMService, "_handle_session_ready", AsyncMock()):
+        await llm._handle_session_ready(object())
+    ok("an ordinary connect (the call's first): no note", len(queued) == 1)
+    llm._session_resumption_handle = "h2"
+    await llm._handle_connection_error(error)
+    await llm._handle_connection_error(error)
+    ok("the error again before she is back: the next try is a fresh session", llm._session_resumption_handle is None)
+    llm._fresh_tries = llm.FRESH_TRIES
+    try:
+        with patch.object(GeminiLiveLLMService, "_connection_task_handler", AsyncMock(side_effect=Exception("still down"))):
+            await llm._connection_task_handler(None)
+        gave_up = False
+    except Exception:
+        gave_up = True
+    ok(f"after {llm.FRESH_TRIES} fresh tries it gives up as Pipecat would (the call ends)", gave_up)
+    fresh = bot.TurnSafeGeminiLive(api_key="unused", system_instruction="x")
+    try:
+        with patch.object(GeminiLiveLLMService, "_connection_task_handler", AsyncMock(side_effect=Exception("boom at start"))):
+            await fresh._connection_task_handler(None)
+        start_raised = False
+    except Exception:
+        start_raised = True
+    ok("a connect failing at the start of a call (no recovery under way) is not retried here", start_raised)
+
+
 async def product_tests():
     print("\n== a call reads them from the agent ==")
     tenant, user = ObjectId(), ObjectId()
@@ -234,6 +279,7 @@ async def main():
     await tool_line_tests()
     pipeline_tests()
     await watch_tests()
+    await recovery_tests()
     await product_tests()
     passed = sum(1 for _, p in RESULTS if p)
     print(f"\n{passed}/{len(RESULTS)} passed")

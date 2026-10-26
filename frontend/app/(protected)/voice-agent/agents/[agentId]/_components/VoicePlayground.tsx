@@ -17,7 +17,7 @@ import { DisabledReason } from '@/components/wrappers/DisabledReason';
 import { blockerText } from '@/helpers/voice-call-readiness';
 import { defaultFirstSpeaker } from '@/helpers/voice-agent-features';
 import { GEMINI_KEY_URL } from '@/helpers/voice-routes';
-import { GeminiKeyLine } from '../../_components/GeminiKeyLine';
+import { StackKeysLine } from '../../_components/StackKeysLine';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import {
     median,
@@ -63,7 +63,7 @@ function speedWord(ms: number): string {
 
 /** Calls run on the owner's keys and the agent's saved prompt: none while anything blocks them (`callBlockers`). */
 export function VoicePlayground({ className }: { className?: string }) {
-    const { agentId, geminiKey, saved, isDirty, isValid, saving, save, callBlockers } =
+    const { agentId, geminiKey, saved, isDirty, isValid, saving, save, callBlockers, stack, stackOptions } =
         usePage<UseVoiceAgentEditorPageReturn>();
     const blocked = callBlockers.length > 0;
     const { status, error, keyError, endedReason, timeline, gaps, level, agentSpeaking, start, end } = useVoicePlayground({
@@ -80,7 +80,7 @@ export function VoicePlayground({ className }: { className?: string }) {
             <CardHeader>
                 <CardTitle>Playground</CardTitle>
                 <CardDescription>
-                    <GeminiKeyLine view={geminiKey} link />
+                    <StackKeysLine stack={stack} keys={stackOptions.keys} link />
                 </CardDescription>
                 <CardAction>
                     <Badge variant={badge.variant} data-testid="playground-status">
@@ -126,6 +126,11 @@ export function VoicePlayground({ className }: { className?: string }) {
                         </span>
                     ) : null}
                 </div>
+                {busy ? null : (
+                    <p className="text-muted-foreground -mt-2 text-xs" data-testid="playground-no-number">
+                        Runs in your browser straight to the model: no phone number needed.
+                    </p>
+                )}
 
                 <div className="flex items-center gap-2" aria-label="Microphone level">
                     <Mic className="text-muted-foreground size-4 shrink-0" aria-hidden />

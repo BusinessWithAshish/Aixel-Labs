@@ -22,6 +22,7 @@ type Key = { _id: unknown; provider: VoiceKeyProvider; tier?: VoiceGeminiKeyTier
 
 const PROMPT_HREF = '#agent-prompt';
 const STACK_HREF = '#agent-stack-title';
+const NUMBERS_HREF = '#agent-numbers';
 
 const and = (words: string[]) => words.join(' and ');
 
@@ -29,12 +30,18 @@ export function voiceCallBlockers({
     prompt,
     stack,
     keys,
+    onNumber,
 }: {
     prompt: string;
     stack?: VoiceStack<unknown> | null;
     keys: Key[];
+    /** For calls over a phone line (test calls, the browser and softphone tests): whether the agent is on a number. */
+    onNumber?: boolean;
 }): VoiceCallBlocker[] {
     const blockers: VoiceCallBlocker[] = [];
+    if (onNumber === false) {
+        blockers.push({ message: 'It is not on a phone number yet.', fix: 'Link a phone number', href: NUMBERS_HREF });
+    }
     if (!prompt.trim()) {
         blockers.push({
             message: 'This agent has no prompt yet, so it would not know what to say.',

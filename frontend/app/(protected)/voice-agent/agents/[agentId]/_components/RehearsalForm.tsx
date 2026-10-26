@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatPhone } from '@/helpers/voice-campaign-contacts';
 import { agentSipAddress } from '@/helpers/voice-call-format';
-import { CopyRow } from './CopyRow';
+import { CopyRow } from '@/components/common/voice-agent/CopyRow';
 
 const rehearsalSchema = z.object({
     numberId: z.string().min(1, 'Choose a number'),

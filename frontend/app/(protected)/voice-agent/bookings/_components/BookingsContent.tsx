@@ -7,8 +7,8 @@ import type { VoiceBookingListItem } from '@/app/actions/voice-booking-actions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/common/EmptyState';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FilterToolbar } from '@/components/common/FilterToolbar';
+import { AgentFilter } from '@/components/common/voice-agent/AgentFilter';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
@@ -17,7 +17,6 @@ import type { UseBookingsPageReturn } from '../_hooks/use-bookings-page';
 import { formatSlotIn } from '../_utils/booking-format';
 import { BookingCard } from './BookingCard';
 
-const ALL_AGENTS = 'all';
 const AGENTS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.AGENTS];
 
 function BookingSection({
@@ -84,29 +83,15 @@ export function BookingsContent() {
                         ? 'Appointments your agents book during calls.'
                         : `${scheduled} upcoming ${scheduled === 1 ? 'appointment' : 'appointments'}${agentFilterName ? ` with ${agentFilterName}` : ''}. Times are shown in the agent’s booking timezone.`}
                 </p>
-                <div className="flex w-full flex-col gap-1.5 sm:w-60">
-                    <Label htmlFor="bookings-agent-filter">Agent</Label>
-                    <Select
-                        value={agentFilter ?? ALL_AGENTS}
+                <FilterToolbar label="Filter bookings" className="w-full grid-cols-1 sm:w-auto">
+                    <AgentFilter
+                        id="bookings-agent-filter"
+                        agents={agents}
+                        agentId={agentFilter}
                         disabled={filtering}
-                        onValueChange={(value) => setAgentFilter(value === ALL_AGENTS ? null : value)}
-                    >
-                        <SelectTrigger id="bookings-agent-filter" className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ALL_AGENTS}>All agents</SelectItem>
-                            {agentFilter && !agents.some((a) => a.id === agentFilter) ? (
-                                <SelectItem value={agentFilter}>Deleted agent</SelectItem>
-                            ) : null}
-                            {agents.map((agent) => (
-                                <SelectItem key={agent.id} value={agent.id}>
-                                    {agent.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+                        onAgentChange={setAgentFilter}
+                    />
+                </FilterToolbar>
             </div>
 
             {loadError ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import type { VoiceCallCost } from '@aixellabs/backend/db/types';
+import { StatStrip } from '@/components/common/StatStrip';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { usePage } from '@/contexts/PageStore';
 import { costPartLabel, costParts, costPerMinute, formatMoney, isCostEstimated } from '@/helpers/voice-call-cost';
@@ -81,25 +82,18 @@ export function CallCostSummary() {
             : `Cost of ${summary.priced} priced ${summary.priced === 1 ? 'call' : 'calls'}`;
 
     return (
-        <dl
-            className="grid grid-cols-2 gap-3 rounded-md border p-3 text-sm sm:grid-cols-4"
+        <StatStrip
             aria-label="Call costs"
             data-testid="call-cost-summary"
-        >
-            {[
-                ['Calls', `${calls.length} · ${formatDuration(summary.durationSec)} talking`],
-                [costLabel, `${money(summary.totalUsd)}${summary.estimated ? ' est.' : ''}`],
-                ['Average per minute', perMinute === null ? '—' : money(perMinute)],
-                [
-                    Object.keys(summary.parts).map(costPartLabel).join(' · ') || 'Parts',
-                    Object.values(summary.parts).map(money).join(' · ') || '—',
-                ],
-            ].map(([label, value]) => (
-                <div key={label} className="flex flex-col gap-0.5">
-                    <dt className="text-muted-foreground text-xs">{label}</dt>
-                    <dd className="text-base font-semibold tabular-nums">{value}</dd>
-                </div>
-            ))}
-        </dl>
+            stats={[
+                { label: 'Calls', value: `${calls.length} · ${formatDuration(summary.durationSec)} talking` },
+                { label: costLabel, value: `${money(summary.totalUsd)}${summary.estimated ? ' est.' : ''}` },
+                { label: 'Average per minute', value: perMinute === null ? '—' : money(perMinute) },
+                {
+                    label: Object.keys(summary.parts).map(costPartLabel).join(' · ') || 'Parts',
+                    value: Object.values(summary.parts).map(money).join(' · ') || '—',
+                },
+            ]}
+        />
     );
 }

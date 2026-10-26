@@ -12,6 +12,7 @@ import { usePage } from '@/contexts/PageStore';
 import { estimateAgentCost, formatMoney, RATE_COUNTRY_NAME, rateCountry } from '@/helpers/voice-call-cost';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import { GEMINI_KEY_URL, voiceAgentUrl } from '@/helpers/voice-routes';
+import { GEMINI_ALWAYS } from '@/helpers/voice-stack';
 import { cn } from '@/lib/utils';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
 
@@ -81,7 +82,7 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
             attention: true,
             text: (
                 <span data-testid="gemini-key-hint">
-                    Add your Gemini API key so the AI can take calls.{' '}
+                    Add a Gemini API key so the AI can take calls: {GEMINI_ALWAYS}.{' '}
                     <Link className={cn(LINK, 'underline')} href={GEMINI_KEY_URL}>
                         Add key
                     </Link>

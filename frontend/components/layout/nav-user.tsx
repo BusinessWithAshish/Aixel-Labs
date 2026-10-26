@@ -25,11 +25,11 @@ import { handleSignOut } from '@/app/actions/auth-actions';
 import { UserRoleBadge } from '@/components/common/UserRoleBadge';
 import { UserAvatar } from '@/components/common/UserAvatar';
 import { SIGN_IN_PATH } from '@/lib/auth/constants';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter } from '@/hooks/use-progress-router';
 
 export function NavUser({ user }: { user: SidebarUser }) {
     const { isMobile } = useSidebar();
-    const router = useRouter();
+    const router = useProgressRouter();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 

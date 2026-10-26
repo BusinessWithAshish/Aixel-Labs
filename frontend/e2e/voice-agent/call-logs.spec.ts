@@ -6,6 +6,7 @@ import {
     VOICE_AGENT_SUB_MODULES,
     VoiceCallChannel,
     VoiceCallDirection,
+    VoiceCallTest,
     VoiceProvider,
     type VoiceCallCost,
     type VoiceCallDoc,
@@ -265,7 +266,7 @@ test.describe('with seeded calls', () => {
         await expect(cards).toHaveCount(4);
         await expect(cards.filter({ hasText: 'Deleted agent' })).toHaveCount(0);
 
-        await page.getByRole('switch', { name: 'Include deleted agents' }).click();
+        await page.getByRole('switch', { name: 'Show deleted agents' }).click();
         await expect(page).toHaveURL(/\?deleted=1$/);
         await expect(cards).toHaveCount(5);
         await expect(cards.nth(0)).toContainText('Deleted agent');
@@ -275,6 +276,57 @@ test.describe('with seeded calls', () => {
         await expect(page.getByTestId('call-cost-breakdown')).toHaveText(
             'Gemini $0.010 · Telnyx $0.020 (estimate) · Call analysis $0.001',
         );
+    });
+
+    test('one toolbar filters by type, search and period, and clears back to every call', async ({ page, db }) => {
+        await db.insertVoiceCalls(E2E_USER, [
+            call({
+                agentId: new ObjectId(frontDeskId),
+                direction: VoiceCallDirection.INBOUND,
+                test: VoiceCallTest.BROWSER,
+                from: 'aixelf4a2b32690a7837d@sip.telnyx.com',
+                to: '+13473703925',
+                startedAt: new Date(Date.now() - 30 * MINUTE),
+            }),
+        ]);
+        await openCallLogs(page);
+        const cards = page.getByTestId('call-card');
+        await expect(cards).toHaveCount(5);
+
+        // Test calls carry their tag and no phone number.
+        await page.getByRole('combobox', { name: 'Type' }).click();
+        await page.getByRole('option', { name: 'Test calls' }).click();
+        await expect(page).toHaveURL(/\?kind=test$/);
+        await expect(cards).toHaveCount(1);
+        await expect(cards.first()).toContainText('Browser test');
+        await expect(cards.first()).not.toContainText('+1');
+
+        await page.getByRole('combobox', { name: 'Type' }).click();
+        await page.getByRole('option', { name: 'Inbound' }).click();
+        await expect(cards).toHaveCount(1);
+        await expect(cards.first()).toContainText('Caller hung up');
+
+        // Words in the transcript, then digits of a number.
+        await page.getByRole('button', { name: 'Clear' }).click();
+        await expect(page).toHaveURL(CALL_LOGS_URL);
+        await expect(cards).toHaveCount(5);
+        await page.getByRole('searchbox', { name: 'Search calls' }).fill('your hours');
+        await page.getByRole('searchbox', { name: 'Search calls' }).press('Enter');
+        await expect(cards).toHaveCount(1);
+        await expect(cards.first()).toContainText('Front desk');
+        await page.getByRole('searchbox', { name: 'Search calls' }).fill('415 555 0123');
+        await page.getByRole('searchbox', { name: 'Search calls' }).press('Enter');
+        await expect(cards).toHaveCount(1);
+        await expect(cards.first()).toContainText('Said goodbye');
+
+        await page.getByRole('combobox', { name: 'Period' }).click();
+        await page.getByRole('option', { name: 'Last 7 days' }).click();
+        await expect(page).toHaveURL(/range=7/);
+        await expect(cards).toHaveCount(1);
+
+        await page.getByRole('button', { name: 'Clear' }).click();
+        await expect(cards).toHaveCount(5);
+        await expect(page.getByRole('searchbox', { name: 'Search calls' })).toHaveValue('');
     });
 
     test('a call shows its transcript, per-turn gaps, flags and the recording', async ({ page }) => {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
+import { useProgressRouter } from '@/hooks/use-progress-router';
 import { toast } from 'sonner';
 import { VOICE_CAMPAIGN_LIMITS, VOICE_WEEKDAYS, VoiceCampaignRetryOutcome } from '@aixellabs/backend/db/types';
 import {
@@ -62,7 +62,7 @@ function countryForNumber(phoneNumber: string | undefined): string {
 }
 
 export function useNewCampaignPage(data: NewCampaignPageData) {
-    const router = useRouter();
+    const router = useProgressRouter();
     const { agents, numbers } = data.setup;
     const [step, setStep] = useState(0);
 

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormProvider } from 'react-hook-form';
+import { toast } from 'sonner';
 import { Info } from 'lucide-react';
 import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -17,15 +18,22 @@ const DIRTY = { shouldDirty: true, shouldValidate: true };
 type BookingToolRowsProps = { open: string | null; onOpen: (name: string | null) => void };
 
 /**
- * The two built-in booking tools as rows of the Tools list. check_availability's switch is the calendar's
- * on/off; book_appointment books only times it found, so it needs check_availability on. Both open on the
- * same settings: where bookings go and the times offered. Saved with the Tools card's Save.
+ * The two built-in booking tools as rows of the Tools list, each with its own switch. book_appointment books only
+ * times check_availability found: turning it on turns check_availability on, and turning check_availability off
+ * turns it off (with a note); nothing else moves the other switch. Both open on the same settings: where bookings
+ * go and the booking hours. Saved with the Tools card's Save.
  */
 export function BookingToolRows({ open, onOpen }: BookingToolRowsProps) {
     const { bookingForm, booking, promptTools } = usePage<UseVoiceAgentEditorPageReturn>();
     const [check, book] = promptTools.filter((tool) => tool.kind === 'booking');
 
-    const setCheck = (on: boolean) => bookingForm.setValue('enabled', on, DIRTY);
+    const setCheck = (on: boolean) => {
+        bookingForm.setValue('enabled', on, DIRTY);
+        if (!on && bookingForm.getValues('bookAppointment')) {
+            bookingForm.setValue('bookAppointment', false, DIRTY);
+            toast.info('book_appointment is off too: it books only times check_availability finds.');
+        }
+    };
     const setBook = (on: boolean) => {
         bookingForm.setValue('bookAppointment', on, DIRTY);
         if (on) setCheck(true);
@@ -53,19 +61,13 @@ export function BookingToolRows({ open, onOpen }: BookingToolRowsProps) {
                 badges={builtIn}
                 data-testid="booking-tool-row"
             >
-                {booking.bookAppointment && !booking.enabled ? (
+                {!booking.bookAppointment ? (
                     <Alert variant="info">
                         <Info className="size-4" />
                         <AlertDescription>
-                            It books only times check_availability found, so it is off while check_availability is.
-                        </AlertDescription>
-                    </Alert>
-                ) : null}
-                {!booking.bookAppointment && booking.enabled ? (
-                    <Alert variant="info">
-                        <Info className="size-4" />
-                        <AlertDescription>
-                            Off: the agent tells callers which times are free and takes a message instead of booking.
+                            {booking.enabled
+                                ? 'Off: the agent tells callers which times are free and takes a message instead of booking.'
+                                : 'Off. It books only times check_availability finds, so turning it on turns check_availability on too.'}
                         </AlertDescription>
                     </Alert>
                 ) : null}

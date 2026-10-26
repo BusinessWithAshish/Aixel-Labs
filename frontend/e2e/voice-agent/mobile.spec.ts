@@ -284,6 +284,11 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await page.getByTestId('personality-settings').scrollIntoViewIfNeeded();
             await check('agent-call-settings-personality');
 
+            // Back from connecting an app, when the sign-in did not finish: the reason, a retry and the way back.
+            await open(`/voice-agent/agents/connected-apps/callback?agent=${frontDesk}&app=GOOGLE_CALENDAR&status=failed`);
+            await expect(page.getByTestId('connected-app-callback-error')).toContainText("Couldn't connect Google Calendar");
+            await check('connected-app-callback-error');
+
             // Phone numbers: the list, the provider menu, the connect dialog and its guide carousel.
             await open(PHONE_NUMBERS_URL);
             await expect(page.getByTestId('voice-number-row')).toHaveCount(2);

@@ -36,6 +36,8 @@ DEFAULT_VOICES = {
 
 
 PARTS = ("stt", "llm", "tts")
+# The app's VOICE_KEY_PROVIDERS names (frontend/helpers/voice-stack.ts), for words the owner reads.
+PROVIDER_NAMES = {"gemini": "Gemini", "openai": "OpenAI", "deepgram": "Deepgram", "cartesia": "Cartesia", "elevenlabs": "ElevenLabs"}
 
 
 def resolve(user_id, agent: dict) -> dict:
@@ -63,7 +65,7 @@ class ProviderKeyMissing(product.CallRefused):
 
     def __init__(self, why: str, provider: str):
         super().__init__(why)
-        self.words = f"No {provider} API key is saved for this agent's voice stack: add one under Voice agent > Settings in the app."
+        self.words = f"No {PROVIDER_NAMES.get(provider, provider)} API key is saved for this agent's voice stack: add one under Voice agent > Settings in the app."
 
 
 def is_pipeline(ctx: dict | None) -> bool:

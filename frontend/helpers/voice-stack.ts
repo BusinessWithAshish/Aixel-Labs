@@ -105,10 +105,12 @@ export function usdPerMinuteOf(price: VoiceStackPrice, provider: VoiceKeyProvide
 
 /**
  * What a live model's re-reading of the conversation so far adds a minute on a typical call (measured on Gemini
- * Live, `estimate.source`), on another live model at its own audio-in price. It grows as the call goes on.
+ * Live, `estimate.source`; another Gemini live model at its own audio-in price). It grows as the call goes on.
+ * shortcut: unmeasured for OpenAI Realtime (listed as coming soon, its context caching differs): 0 until measured.
  */
-export function conversationUsdPerMinute(model: Pick<VoiceStackModel, 'price'> | null): number {
-    const price = model?.price;
+export function conversationUsdPerMinute(model: Pick<VoiceStackModel, 'price' | 'provider'> | null): number {
+    if (model?.provider !== VoiceKeyProvider.GEMINI) return 0;
+    const price = model.price;
     const audioIn =
         price && 'usdPerMillionTokens' in price && 'audioIn' in price.usdPerMillionTokens
             ? price.usdPerMillionTokens.audioIn
@@ -137,7 +139,10 @@ export function stackModelOf(
     return {
         ...m,
         price,
-        usdPerMinute: usdPerMinuteOf(price, m.provider),
+        // A minute of the model alone; a live model's includes re-reading the conversation.
+        usdPerMinute:
+            usdPerMinuteOf(price, m.provider) +
+            (part === 'realtime' ? conversationUsdPerMinute({ price, provider: m.provider }) : 0),
         ...(soon ? { soon } : {}),
         ...(needsPaidKey(part, m.provider) ? { paidKeyOnly: true } : {}),
     };
@@ -188,10 +193,25 @@ export function stackParts<P>(stack: VoiceStack<P>) {
         : PIPELINE_PARTS.map((name) => ({ name: name as VoiceStackPartName, part: stack[name] }));
 }
 
-/** List price of a whole stack per call-minute, from its parts' rates. */
-export function stackUsdPerMinute(stack: VoiceStack<unknown>, catalogue?: VoiceStackCatalogue): number {
-    return stackParts(stack).reduce(
-        (sum, { name, part }) => sum + (stackModel(name, part.model, catalogue)?.usdPerMinute ?? 0),
+/** The providers a stack runs on, once each, in its order (with the key its first part of that provider names). */
+export function stackProviders<P>(stack: VoiceStack<P>) {
+    const seen = new Map<VoiceKeyProvider, P | null | undefined>();
+    for (const { part } of stackParts(stack)) if (!seen.has(part.provider)) seen.set(part.provider, part.keyId);
+    return [...seen].map(([provider, keyId]) => ({ provider, keyId }));
+}
+
+/** Providers named for people: "Gemini", "Deepgram + Gemini + Cartesia". */
+export const providersLabel = (providers: VoiceKeyProvider[]) =>
+    providers.map((p) => VOICE_KEY_PROVIDERS[p].name).join(' + ');
+
+/** Why every call needs a Gemini key, whatever its stack (product.gemini_key_for: the post-call summary). */
+export const GEMINI_ALWAYS = 'the summary after every call runs on Gemini';
+
+/** The cheapest a minute of a stack of `kind` can be, models alone: its cheapest model of each part that runs. */
+export function fromUsdPerMinute(kind: VoiceStackKind, catalogue: VoiceStackCatalogue = FALLBACK_CATALOGUE): number {
+    const parts: VoiceStackPartName[] = kind === VoiceStackKind.REALTIME ? ['realtime'] : [...PIPELINE_PARTS];
+    return parts.reduce(
+        (sum, part) => sum + Math.min(...catalogue[part].filter((m) => !m.soon).map((m) => m.usdPerMinute)),
         0,
     );
 }

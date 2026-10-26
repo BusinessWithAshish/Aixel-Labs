@@ -1,67 +1,57 @@
 'use client';
 
 import type { VoiceAgentOption } from '@/app/actions/voice-agent-actions';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
+import { FilterSelect, FilterSwitch } from '@/components/common/FilterToolbar';
 
 const ALL_AGENTS = 'all';
 
 /**
- * Call logs' and Analytics' agent picker, and whether agents deleted since count too (off by
- * default: only current agents). A deleted agent picked through the URL stays pickable.
+ * The agent filter of Call logs, Analytics and Bookings, for a `FilterToolbar`. With
+ * `onIncludeDeletedChange`, also whether agents deleted since count (off by default: current agents
+ * only). A deleted agent picked through the URL stays pickable.
  */
 export function AgentFilter({
     id,
     agents,
     agentId,
-    includeDeleted,
     disabled,
     onAgentChange,
+    includeDeleted = false,
     onIncludeDeletedChange,
 }: {
     id: string;
     agents: VoiceAgentOption[];
     agentId: string | null;
-    includeDeleted: boolean;
     disabled: boolean;
     onAgentChange: (agentId: string | null) => void;
-    onIncludeDeletedChange: (includeDeleted: boolean) => void;
+    includeDeleted?: boolean;
+    onIncludeDeletedChange?: (includeDeleted: boolean) => void;
 }) {
+    const options = [
+        { value: ALL_AGENTS, label: 'All agents' },
+        ...(agentId && !agents.some((a) => a.id === agentId) ? [{ value: agentId, label: 'Deleted agent' }] : []),
+        ...agents.map((agent) => ({ value: agent.id, label: agent.name })),
+    ];
     return (
         <>
-            <div className="flex w-full flex-col gap-1.5 sm:w-56">
-                <Label htmlFor={id}>Agent</Label>
-                <Select
-                    value={agentId ?? ALL_AGENTS}
-                    disabled={disabled}
-                    onValueChange={(value) => onAgentChange(value === ALL_AGENTS ? null : value)}
-                >
-                    <SelectTrigger id={id} className="w-full">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value={ALL_AGENTS}>All agents</SelectItem>
-                        {agentId && !agents.some((a) => a.id === agentId) ? (
-                            <SelectItem value={agentId}>Deleted agent</SelectItem>
-                        ) : null}
-                        {agents.map((agent) => (
-                            <SelectItem key={agent.id} value={agent.id}>
-                                {agent.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="flex items-center gap-2 sm:h-9">
-                <Switch
+            <FilterSelect
+                id={id}
+                label="Agent"
+                value={agentId ?? ALL_AGENTS}
+                options={options}
+                disabled={disabled}
+                onChange={(value) => onAgentChange(value === ALL_AGENTS ? null : value)}
+                className="sm:max-w-56"
+            />
+            {onIncludeDeletedChange ? (
+                <FilterSwitch
                     id={`${id}-deleted`}
+                    label="Show deleted agents"
                     checked={includeDeleted}
                     disabled={disabled || !!agentId}
-                    onCheckedChange={onIncludeDeletedChange}
+                    onChange={onIncludeDeletedChange}
                 />
-                <Label htmlFor={`${id}-deleted`}>Include deleted agents</Label>
-            </div>
+            ) : null}
         </>
     );
 }
