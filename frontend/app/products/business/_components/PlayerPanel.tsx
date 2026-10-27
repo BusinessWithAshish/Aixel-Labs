@@ -1,13 +1,13 @@
 'use client';
 
 import { ArrowLeftRight, HandCoins, Handshake, KeyRound, PartyPopper } from 'lucide-react';
-import { canBail, canHoldMela, netWorth, ownedBy, splitPair } from '@aixellabs/backend/business/compute';
+import { canBail, canHoldFestival, netWorth, ownedBy, splitPair } from '@aixellabs/backend/business/compute';
 import type { BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { rs } from '../_lib/client';
 import { Avatar, Cash, GButton, Pop } from './bits';
-import { BUSINESS_MELA_SETS, BUSINESS_SETS, type BusinessSetKey } from '@aixellabs/backend/business/constants';
-import { JailCardChip, MelaCardChip, MiniCard, MiniCards } from './MiniCard';
+import { BUSINESS_FESTIVAL_SETS, BUSINESS_SETS, type BusinessSetKey } from '@aixellabs/backend/business/constants';
+import { JailCardChip, FestivalCardChip, MiniCard, MiniCards } from './MiniCard';
 import type { OfferDraft } from './OfferComposer';
 
 type PlayerPanelProps = {
@@ -18,12 +18,12 @@ type PlayerPanelProps = {
     onClose: () => void;
     onSpace: (space: number) => void;
     onOffer: (draft: OfferDraft) => void;
-    /** Opens the mela pop-up (only offered on your own panel, on your turn, with a card and a set to use it on). */
-    onMela: () => void;
+    /** Opens the festival pop-up (only offered on your own panel, on your turn, with a card and a set to use it on). */
+    onFestival: () => void;
 };
 
 /** Opens when a player plate is tapped: what they own and owe, plus deals you can start with them. */
-export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer, onMela }: PlayerPanelProps) {
+export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer, onFestival }: PlayerPanelProps) {
     const p = state.players[seat];
     const owned = ownedBy(state, seat);
     const myTurn = state.turn === me;
@@ -34,9 +34,9 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer, 
     const bailFor = p.jail > 0 && canBail(state, me) ? seat : state.players[me].jail > 0 && canBail(state, seat) ? me : null;
     /** A player held in Jail deals in nothing but their bail. */
     const jailed = p.jail > 0 ? p : state.players[me].jail > 0 ? state.players[me] : null;
-    /** With someone in Jail a trade can still swap cards (Jail free, Mela), if either of you holds one. */
-    const cardsToTrade = p.jailCards + p.melaCards + state.players[me].jailCards + state.players[me].melaCards > 0;
-    const canMela = seat === me && canRepay && BUSINESS_MELA_SETS.some((set) => canHoldMela(state, me, set) === null);
+    /** With someone in Jail a trade can still swap cards (Jail free, Festival), if either of you holds one. */
+    const cardsToTrade = p.jailCards + p.festivalCards + state.players[me].jailCards + state.players[me].festivalCards > 0;
+    const canFestival = seat === me && canRepay && BUSINESS_FESTIVAL_SETS.some((set) => canHoldFestival(state, me, set) === null);
     /** Colour sets this player shares with someone. */
     const splits = state.splits.filter((s) => s.major === seat || s.minor === seat);
     /** A set the two of you could split: held only by the two of you, two and one, or one each. */
@@ -60,9 +60,9 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer, 
             )}
 
             <span className="small">Properties ({owned.length})</span>
-            {owned.length || p.jailCards || p.melaCards ? (
+            {owned.length || p.jailCards || p.festivalCards ? (
                 <MiniCards>
-                    {p.melaCards > 0 && <MelaCardChip count={p.melaCards} />}
+                    {p.festivalCards > 0 && <FestivalCardChip count={p.festivalCards} />}
                     {p.jailCards > 0 && <JailCardChip count={p.jailCards} />}
                     {owned.map((i) => (
                         <MiniCard key={i} state={state} space={i} onClick={() => onSpace(i)} />
@@ -72,10 +72,10 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer, 
                 <p className="small">Nothing yet.</p>
             )}
 
-            {canMela && (
-                <GButton tone="red" onClick={onMela}>
+            {canFestival && (
+                <GButton tone="red" onClick={onFestival}>
                     <PartyPopper className="lu" />
-                    Hold a mela
+                    Hold a festival
                 </GButton>
             )}
 
@@ -158,7 +158,7 @@ export function PlayerPanel({ state, me, seat, send, onClose, onSpace, onOffer, 
                             {bailFor === me ? `Ask ${p.name} for bail` : `Bail ${p.name} out of Jail`}
                         </GButton>
                     )}
-                    {jailed && <p className="small center">{jailed.seat === me ? 'You are' : `${jailed.name} is`} in Jail: only bail and cards (Jail free, Mela) can be dealt.</p>}
+                    {jailed && <p className="small center">{jailed.seat === me ? 'You are' : `${jailed.name} is`} in Jail: only bail and cards (Jail free, Festival) can be dealt.</p>}
                     {!canDeal && <p className="small center">You can make offers on your own turn.</p>}
                 </>
             )}

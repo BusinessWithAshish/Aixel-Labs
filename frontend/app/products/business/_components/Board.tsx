@@ -1,15 +1,17 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useEffect, useState, type ReactNode } from 'react';
 import { CircleHelp, Handshake, Landmark as BankIcon, TrendingUp } from 'lucide-react';
 import {
     BUSINESS_BOARD,
     BUSINESS_JAIL_INDEX,
+    BUSINESS_FESTIVAL_SETS,
     BUSINESS_RULES,
     BUSINESS_SETS,
+    type BusinessSetKey,
     type BusinessSpace,
 } from '@aixellabs/backend/business/constants';
-import { melaAt, splitAt } from '@aixellabs/backend/business/compute';
+import { festivalAt, splitAt } from '@aixellabs/backend/business/compute';
 import { useBoardUnit } from '../_hooks/use-board-unit';
 import type { BusinessProperty, BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
@@ -19,6 +21,26 @@ import { Logo } from './bits';
 
 const N = BUSINESS_BOARD.length;
 const CORNER_LABELS: Record<string, string> = { launch: 'Launch', jail: 'Jail', break: 'Break', gojail: 'Go to jail' };
+const CORNER_SUBS: Record<string, string> = { launch: 'Collect salary', break: 'Rest or jail one', gojail: 'No salary' };
+/** What moves behind each corner's icon: a launch ring and flame, rising steam, a police light's sweep. */
+const CORNER_ART: Record<string, ReactNode> = {
+    launch: (
+        <>
+            <i className="ring" />
+            <i className="flame" />
+        </>
+    ),
+    break: (
+        <span className="steam">
+            <i />
+            <i />
+            <i />
+        </span>
+    ),
+    gojail: <i className="beam" />,
+};
+/** How long the Launch pad's lift-off plays once a pawn comes onto it. */
+const LAUNCH_MS = 1800;
 
 /**
  * Board geometry as percentages of the board width. These mirror the CSS grid
@@ -110,12 +132,14 @@ type TileProps = {
     selected: boolean;
     /** Faded: while a player is raising cash, everything that is not theirs steps back. */
     dim: boolean;
-    /** Its set is holding a mela: rent is multiplied, and the tile says so. */
-    mela: boolean;
+    /** Its set is holding a festival: rent is multiplied, and the tile says so. */
+    festival: boolean;
+    /** Launch only: a pawn has just come onto it, so the pad lifts off. */
+    launching?: boolean;
     onSelect: (index: number) => void;
 };
 
-const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, selected, dim, mela, onSelect }: TileProps) {
+const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, selected, dim, festival, launching = false, onSelect }: TileProps) {
     const [row, col] = cell(index);
     const where = side(index);
     const set = space.set ? BUSINESS_SETS[space.set] : null;
@@ -123,11 +147,13 @@ const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, s
     const houses = prop?.houses ?? 0;
     // Railways and utilities can never be built on, so they carry their icon where a city has its colour band.
     const city = space.kind === 'city';
+    // The cheap sets are villages: a meadow tint tells them apart, and only they can hold a festival.
+    const village = !!space.set && BUSINESS_FESTIVAL_SETS.includes(space.set);
 
     return (
         <button
             type="button"
-            className={cn('tile', where, `k-${space.kind}`, selected && 'sel', dim && 'dim', prop?.mortgaged && 'mort', houses > 0 && 'built', mela && 'mela', space.name.length > 8 && 'long')}
+            className={cn('tile', where, `k-${space.kind}`, selected && 'sel', dim && 'dim', prop?.mortgaged && 'mort', houses > 0 && 'built', village && 'village', festival && 'festival', launching && 'go', space.name.length > 8 && 'long')}
             style={{ gridArea: `${row} / ${col}` }}
             aria-label={space.price ? `${space.name}, ${rs(space.price)}` : space.name}
             onClick={() => onSelect(index)}
@@ -158,10 +184,19 @@ const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, s
                         </span>
                         <span className="walkway">Visiting</span>
                     </span>
+                ) : where === 'corner' ? (
+                    <span className="body">
+                        <span className="halo">
+                            {CORNER_ART[space.kind]}
+                            {Icon && <Icon className="ticon" />}
+                        </span>
+                        <span className="cn">{CORNER_LABELS[space.kind]}</span>
+                        {CORNER_SUBS[space.kind] && <span className="sub">{CORNER_SUBS[space.kind]}</span>}
+                    </span>
                 ) : (
                     <span className="body">
                         {Icon && <Icon className="ticon" />}
-                        {where === 'corner' ? <span className="cn">{CORNER_LABELS[space.kind]}</span> : <span className="nm">{space.name}</span>}
+                        <span className="nm">{space.name}</span>
                     </span>
                 )
             )}
@@ -171,7 +206,6 @@ const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, s
                     <BankIcon />
                 </span>
             )}
-            {mela && <span className="melaflag">×{BUSINESS_RULES.MELA_RENT_MULTIPLIER}</span>}
             {lenderColor && (
                 <span className="cover share" style={cssVars({ '--bc': lenderColor ?? '#6A35E0' })}>
                     <Handshake />
@@ -180,6 +214,167 @@ const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, s
         </button>
     );
 });
+
+/** Lit and dark windows on a block, in a fixed pattern so the skyline never flickers between renders. */
+function Windows({ x, y, w, h }: { x: number; y: number; w: number; h: number }) {
+    const out: ReactNode[] = [];
+    for (let wy = y + 3; wy < y + h - 2; wy += 5)
+        for (let wx = x + 2; wx < x + w - 2; wx += 4) if ((wx * 7 + wy * 13) % 5 < 2) out.push(<rect key={`${wx}-${wy}`} className="win" x={wx} y={wy} width={1.6} height={2} />);
+    return <>{out}</>;
+}
+
+function Block({ x, w, h }: { x: number; w: number; h: number }) {
+    return (
+        <>
+            <rect className="fr" x={x} y={60 - h} width={w} height={h} />
+            <Windows x={x} y={60 - h} w={w} h={h} />
+        </>
+    );
+}
+
+const Tree = ({ x, r = 5 }: { x: number; r?: number }) => (
+    <>
+        <rect className="fr" x={x - 0.8} y={60 - r * 2} width={1.6} height={r * 2} />
+        <circle className="leaf" cx={x} cy={60 - r * 2.1} r={r} />
+    </>
+);
+
+const Hut = ({ x }: { x: number }) => (
+    <>
+        <path className="fr" d={`M${x} 60v-9l8-7 8 7v9z`} />
+        <path className="roof" d={`M${x - 2} 51.5 ${x + 8} 43l10 8.5`} />
+        <rect className="win" x={x + 6.5} y={53} width={3} height={7} />
+    </>
+);
+
+/**
+ * Four skylines line the middle of the board, each standing on the row of tiles it belongs to and
+ * rising inwards, the way the ownership markers point: villages along the bottom (brown, sky, pink),
+ * PCMC's factory towns on the left (orange, red), the suburbs along the top (yellow, green), and
+ * Pune's prime towers on the right (blue, purple). Each is drawn rising from a 400×60 ground line
+ * and turned to face its row; its tints come from the sets on that side.
+ */
+const SKYLINES: { side: 's-bottom' | 's-left' | 's-top' | 's-right'; sets: BusinessSetKey[]; art: ReactNode }[] = [
+    {
+        side: 's-bottom',
+        sets: ['sky', 'brown'],
+        art: (
+            <>
+                <path className="bk" d="M0 60V46C40 32 70 32 110 42S190 30 240 40s90-10 160 2V60z" />
+                <Hut x={22} />
+                <Tree x={52} />
+                <Tree x={64} r={4} />
+                <path className="fr" d="M104 60V49h4l7-18 7 18h4v11z" />
+                <path className="flag" d="M115 31v-7l6 2.2-6 2.3" />
+                <Hut x={150} />
+                <Tree x={180} r={6} />
+                <path className="fr" d="M200 60c0-7 4-11 9-11s9 4 9 11z" />
+                <Hut x={236} />
+                <Tree x={266} />
+                <Hut x={300} />
+                <Tree x={330} r={4} />
+                <Tree x={344} r={6} />
+                <Hut x={366} />
+            </>
+        ),
+    },
+    {
+        side: 's-left',
+        sets: ['orange', 'red'],
+        art: (
+            <>
+                <path className="bk" d="M0 60V48h30v-6h24v10h30V40h20v12h36v-8h28v8h40V42h30v6h40V36h30v14h40v-8h52V60z" />
+                <path className="fr" d="M18 60V44l14-8v8l14-8v8l14-8v8l14-8v24z" />
+                <rect className="fr" x={84} y={22} width={6} height={38} />
+                <rect className="fr" x={96} y={30} width={5} height={30} />
+                <circle className="smoke" cx={87} cy={17} r={4} />
+                <circle className="smoke s2" cx={99} cy={25} r={3} />
+                <rect className="fr" x={124} y={40} width={2} height={20} />
+                <rect className="fr" x={138} y={40} width={2} height={20} />
+                <rect className="fr" x={120} y={28} width={24} height={13} rx={5} />
+                <Block x={160} w={22} h={30} />
+                <path className="fr" d="M192 60V46l13-7v7l13-7v7l13-7v21z" />
+                <rect className="fr" x={240} y={26} width={6} height={34} />
+                <circle className="smoke s3" cx={243} cy={21} r={3.5} />
+                <Block x={258} w={18} h={24} />
+                <Block x={282} w={26} h={34} />
+                <Block x={314} w={16} h={20} />
+                <path className="fr" d="M336 60V46l12-7v7l12-7v7l12-7v7l12-7v21z" />
+            </>
+        ),
+    },
+    {
+        side: 's-top',
+        sets: ['yellow', 'green'],
+        art: (
+            <>
+                <path className="bk" d="M0 60V42Q60 24 120 38t140-4 140 2V60z" />
+                <Block x={14} w={20} h={30} />
+                <Block x={38} w={16} h={22} />
+                <Tree x={62} />
+                <Block x={74} w={24} h={36} />
+                <Block x={102} w={18} h={26} />
+                <Tree x={128} r={4} />
+                <Block x={138} w={22} h={32} />
+                <path className="fr" d="M170 60V30l34-8v38z" />
+                <Windows x={170} y={30} w={34} h={30} />
+                <Block x={212} w={16} h={24} />
+                <Tree x={236} />
+                <Block x={248} w={24} h={34} />
+                <Block x={276} w={18} h={22} />
+                <Tree x={302} r={4} />
+                <Block x={312} w={22} h={30} />
+                <Block x={338} w={18} h={38} />
+                <Block x={360} w={24} h={26} />
+            </>
+        ),
+    },
+    {
+        side: 's-right',
+        sets: ['blue', 'purple'],
+        art: (
+            <>
+                <path className="bk" d="M0 60V44h24V34h18v12h26V28h20v16h30V36h24v10h28V30h22v14h36V38h26v8h30V32h24v14h30V40h42v20z" />
+                <Block x={12} w={16} h={34} />
+                <path className="fr" d="M36 60V20h7V10h2v10h7v40z" />
+                <Windows x={36} y={20} w={16} h={40} />
+                <Block x={58} w={20} h={44} />
+                <path className="fr" d="M86 60V24l9-9 9 9v36z" />
+                <Windows x={86} y={24} w={18} h={36} />
+                <Block x={112} w={14} h={30} />
+                <rect className="fr" x={134} y={26} width={10} height={34} />
+                <path className="fr" d="M132 27l7-8 7 8z" />
+                <circle className="win" cx={139} cy={32} r={2.6} />
+                <Block x={152} w={22} h={50} />
+                <Block x={180} w={16} h={38} />
+                <path className="fr" d="M204 60V14l10-6 10 6v46z" />
+                <Windows x={204} y={14} w={20} h={46} />
+                <Block x={232} w={18} h={30} />
+                <Block x={256} w={24} h={46} />
+                <Block x={286} w={14} h={34} />
+                <path className="fr" d="M306 60V18h8V8h2v10h8v42z" />
+                <Windows x={306} y={18} w={18} h={42} />
+                <Block x={332} w={20} h={40} />
+                <Block x={358} w={16} h={28} />
+                <Block x={380} w={16} h={36} />
+            </>
+        ),
+    },
+];
+
+function Skylines() {
+    return (
+        <>
+            {SKYLINES.map(({ side: where, sets, art }) => (
+                <span key={where} className={cn('sky', where)} style={cssVars({ '--sa': BUSINESS_SETS[sets[0]].color, '--sb': BUSINESS_SETS[sets[1]].color })}>
+                    <svg viewBox="0 0 400 60" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+                        {art}
+                    </svg>
+                </span>
+            ))}
+        </>
+    );
+}
 
 type BoardProps = {
     state: BusinessPublicState;
@@ -209,6 +404,15 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
     };
     const area = useBoardUnit<HTMLDivElement>();
     const faded = (i: number, owner?: number) => (lit ? !lit.has(i) : spotlight !== null && owner !== spotlight);
+    // A pawn coming onto Launch (landing or passing) lifts the pad off for a moment.
+    const onLaunch = shown.some((pos, seat) => pos % N === 0 && !state.players[seat].bankrupt);
+    const [launching, setLaunching] = useState(false);
+    useEffect(() => {
+        if (!onLaunch) return;
+        setLaunching(true);
+        const t = setTimeout(() => setLaunching(false), LAUNCH_MS);
+        return () => clearTimeout(t);
+    }, [onLaunch]);
     const groups = new Map<number, number[]>();
     shown.forEach((pos, seat) => {
         if (state.players[seat].bankrupt) return;
@@ -231,12 +435,15 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                                 lenderColor={partnerColor(i, prop?.owner)}
                                 selected={selected === i}
                                 dim={faded(i, prop?.owner)}
-                                mela={!!melaAt(state, i)}
+                                festival={!!festivalAt(state, i)}
+                                launching={i === 0 && launching}
                                 onSelect={onSelect}
                             />
                         );
                     })}
                     <div className="centre">
+                        <span className="stars" aria-hidden="true" />
+                        <Skylines />
                         <Logo />
                         <div className="decks">
                             <button type="button" className="deck ch" onClick={onChance}>
@@ -258,9 +465,15 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                             </button>
                         </div>
                         <div className="rules">
-                            Salary <b>+{rs(BUSINESS_RULES.SALARY_STEP)}</b> more each lap
-                            <br />
-                            Full colour set <b>3× rent</b>
+                            <span>
+                                Salary <b>+{rs(BUSINESS_RULES.SALARY_STEP)}</b> each lap
+                            </span>
+                            <span>
+                                Full set <b>3× rent</b>
+                            </span>
+                            <span className="vil">
+                                <i /> Villages hold a <b>festival</b>
+                            </span>
                         </div>
                         {overlay && <div className="overlay">{overlay}</div>}
                     </div>
@@ -271,9 +484,11 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                         const i = Number(key);
                         const prop = state.props[i];
                         const color = state.players[prop.owner].color;
+                        // A festival's ×3 sits beside the owner's marker, inside the board, clear of the houses on the band.
                         return (
                             <span key={i} className={cn('mk', side(i), faded(i, prop.owner) && 'dim')} style={markerSpot(i)}>
                                 <HomeMark color={color} />
+                                {festivalAt(state, i) && <i className="mx">×{BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}</i>}
                             </span>
                         );
                     })}

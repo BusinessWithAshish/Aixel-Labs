@@ -13,7 +13,7 @@ import {
   BUSINESS_PHASE_SECONDS,
   BUSINESS_RULES,
   BUSINESS_SETS,
-  BUSINESS_MELA_LENGTHS,
+  BUSINESS_FESTIVAL_LENGTHS,
   type BusinessCard,
 } from "../constants";
 import type {
@@ -39,11 +39,11 @@ import {
   isBuyable,
   lapInterest,
   setSpaces,
-  melaAt,
-  melaRent,
-  canHoldMela,
+  festivalAt,
+  festivalRent,
+  canHoldFestival,
   holdsSet,
-  melaLength,
+  festivalLength,
   splitAt,
   splitPair,
   splitShares,
@@ -86,9 +86,9 @@ function rollDie(state: BusinessGameState): number {
 }
 
 function shuffleDeck(state: BusinessGameState) {
-  // Every card once, except the Mela card: more copies the longer the match has run (see addMelaCard).
-  const melas = Math.min(BUSINESS_RULES.MELA_CARDS_MAX, BUSINESS_RULES.MELA_CARDS + Math.floor(state.round / BUSINESS_RULES.MELA_CARD_EVERY_ROUNDS));
-  const deck = BUSINESS_CHANCE_CARDS.flatMap((card, i) => Array(card.effect.type === "mela" ? melas : 1).fill(i) as number[]);
+  // Every card once, except the Festival card: more copies the longer the match has run (see addFestivalCard).
+  const festivals = Math.min(BUSINESS_RULES.FESTIVAL_CARDS_MAX, BUSINESS_RULES.FESTIVAL_CARDS + Math.floor(state.round / BUSINESS_RULES.FESTIVAL_CARD_EVERY_ROUNDS));
+  const deck = BUSINESS_CHANCE_CARDS.flatMap((card, i) => Array(card.effect.type === "festival" ? festivals : 1).fill(i) as number[]);
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(random(state) * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -96,11 +96,11 @@ function shuffleDeck(state: BusinessGameState) {
   state.deck = deck;
 }
 
-/** As the match goes on, another Mela card goes into the deck at a random place (up to the cap). */
-function addMelaCard(state: BusinessGameState) {
-  const mela = BUSINESS_CHANCE_CARDS.findIndex((c) => c.effect.type === "mela");
-  if (state.deck.filter((i) => i === mela).length >= BUSINESS_RULES.MELA_CARDS_MAX) return;
-  state.deck.splice(Math.floor(random(state) * (state.deck.length + 1)), 0, mela);
+/** As the match goes on, another Festival card goes into the deck at a random place (up to the cap). */
+function addFestivalCard(state: BusinessGameState) {
+  const festival = BUSINESS_CHANCE_CARDS.findIndex((c) => c.effect.type === "festival");
+  if (state.deck.filter((i) => i === festival).length >= BUSINESS_RULES.FESTIVAL_CARDS_MAX) return;
+  state.deck.splice(Math.floor(random(state) * (state.deck.length + 1)), 0, festival);
 }
 
 function drawCard(state: BusinessGameState): BusinessCard {
@@ -135,12 +135,12 @@ function describeTerms(state: BusinessGameState, from: number, to: number, terms
       return `end the split of the ${split ? BUSINESS_SETS[split.set].name : ""} set`;
     }
     case "trade": {
-      const side = (s: { cash: number; spaces: number[]; cards: number; melas?: number }) =>
+      const side = (s: { cash: number; spaces: number[]; cards: number; festivals?: number }) =>
         [
           s.cash ? rs(s.cash) : null,
           ...s.spaces.map((i) => BUSINESS_BOARD[i].name),
           s.cards ? `${s.cards} Jail card${s.cards === 1 ? "" : "s"}` : null,
-          s.melas ? `${s.melas} Mela card${s.melas === 1 ? "" : "s"}` : null,
+          s.festivals ? `${s.festivals} Festival card${s.festivals === 1 ? "" : "s"}` : null,
         ]
           .filter(Boolean)
           .join(" + ") || "nothing";
@@ -252,16 +252,16 @@ function checkOver(state: BusinessGameState): boolean {
   return true;
 }
 
-/** Ends the melas whose time is up, or whose owner no longer holds the whole set. */
-function endMelas(state: BusinessGameState, now: number) {
-  const over = state.melas.filter((m) => {
+/** Ends the festivals whose time is up, or whose owner no longer holds the whole set. */
+function endFestivals(state: BusinessGameState, now: number) {
+  const over = state.festivals.filter((m) => {
     const owner = state.players[m.owner];
     const lost = owner.bankrupt || !holdsSet(state, m.owner, m.set);
     const due = m.mode === "minutes" ? now >= m.until : m.mode === "laps" ? owner.laps >= m.until : state.round >= m.until;
     return lost || due;
   });
-  for (const m of over) log(state, `The mela in ${state.players[m.owner].name}'s ${BUSINESS_SETS[m.set].name} set is over.`, m.owner);
-  state.melas = state.melas.filter((m) => !over.includes(m));
+  for (const m of over) log(state, `The festival in ${state.players[m.owner].name}'s ${BUSINESS_SETS[m.set].name} set is over.`, m.owner);
+  state.festivals = state.festivals.filter((m) => !over.includes(m));
 }
 
 function advance(state: BusinessGameState, now: number) {
@@ -290,7 +290,7 @@ function advance(state: BusinessGameState, now: number) {
     i = (i + 1) % state.players.length;
     if (i === 0) {
       state.round++;
-      if (state.round % BUSINESS_RULES.MELA_CARD_EVERY_ROUNDS === 0) addMelaCard(state);
+      if (state.round % BUSINESS_RULES.FESTIVAL_CARD_EVERY_ROUNDS === 0) addFestivalCard(state);
     }
     const p = state.players[i];
     if (p.bankrupt) continue;
@@ -302,7 +302,7 @@ function advance(state: BusinessGameState, now: number) {
     break;
   }
   state.turn = i;
-  endMelas(state, now);
+  endFestivals(state, now);
   // Short before the turn begins (a debt put off last turn, or their share of a house a split
   // partner built): that comes first.
   const next = state.players[i];
@@ -491,11 +491,11 @@ function chargeRent(state: BusinessGameState, p: BusinessPlayer, space: number) 
       log(state, `${p.name} landed on ${name}. No rent between teammates.`, p.seat);
       return;
     }
-    // A mela multiplies the rent of its whole set.
-    const mela = melaAt(state, space);
-    const due = mela ? melaRent(rent) : rent;
+    // A festival multiplies the rent of its whole set.
+    const festival = festivalAt(state, space);
+    const due = festival ? festivalRent(rent) : rent;
     pay(state, p.seat, owner.seat, due);
-    const why = mela ? ` (${BUSINESS_RULES.MELA_RENT_MULTIPLIER}× for the mela)` : "";
+    const why = festival ? ` (${BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× for the festival)` : "";
     log(state, `${p.name} paid ${rs(due)} rent to ${owner.name} for ${name}${why}.`, p.seat, undefined, { kind: "rent", from: p.seat, to: owner.seat, amount: due, space });
     return;
   }
@@ -504,7 +504,7 @@ function chargeRent(state: BusinessGameState, p: BusinessPlayer, space: number) 
     log(state, `${p.name} landed on ${name}. Partners in a split set pay no rent there.`, p.seat);
     return;
   }
-  const shares = splitShares(split, melaAt(state, space) ? melaRent(rent) : rent);
+  const shares = splitShares(split, festivalAt(state, space) ? festivalRent(rent) : rent);
   const major = state.players[split.major];
   const minor = state.players[split.minor];
   const toMajor = free(major.seat) ? 0 : shares.major;
@@ -680,8 +680,8 @@ function applyCard(state: BusinessGameState, now: number) {
     sendToJail(state, p, "card", `${p.name} drew "Go to Jail" and goes straight there.`);
     return continueTurn(state, now);
   }
-  if (effect.type === "mela") {
-    p.melaCards++;
+  if (effect.type === "festival") {
+    p.festivalCards++;
     log(state, `${p.name} drew a Chance card: ${text}`, p.seat);
     return continueTurn(state, now);
   }
@@ -902,9 +902,9 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
   for (const i of terms.get.spaces) state.props[i].owner = from;
   P[from].jailCards += terms.get.cards - terms.give.cards;
   P[to].jailCards += terms.give.cards - terms.get.cards;
-  const melas = (terms.get.melas ?? 0) - (terms.give.melas ?? 0);
-  P[from].melaCards += melas;
-  P[to].melaCards -= melas;
+  const festivals = (terms.get.festivals ?? 0) - (terms.give.festivals ?? 0);
+  P[from].festivalCards += festivals;
+  P[to].festivalCards -= festivals;
   // Public: everyone sees that a trade happened. What was swapped shows only on the board.
   log(state, `${P[from].name} and ${P[to].name} made a trade.`, from, undefined, { kind: "trade", from, to, amount: 0 });
   log(state, `The trade: ${describeTerms(state, from, to, terms)}.`, from, [from, to]);
@@ -935,7 +935,7 @@ export function createGame(
       bankrupt: false,
       missed: 0,
       jailCards: 0,
-      melaCards: 0,
+      festivalCards: 0,
       laps: 0,
       deferred: false,
       owed: [],
@@ -950,7 +950,7 @@ export function createGame(
     owed: [],
     loans: [],
     splits: [],
-    melas: [],
+    festivals: [],
     opening: false,
     grace: false,
     offers: [],
@@ -1043,15 +1043,15 @@ export function applyCommand(
       }
       break;
 
-    case "mela": {
+    case "festival": {
       need("roll", "end");
-      guard(canHoldMela(state, seat, cmd.set));
-      me.melaCards--;
-      const length = BUSINESS_MELA_LENGTHS[cmd.mode];
+      guard(canHoldFestival(state, seat, cmd.set));
+      me.festivalCards--;
+      const length = BUSINESS_FESTIVAL_LENGTHS[cmd.mode];
       const until = cmd.mode === "minutes" ? now + length * 60_000 : cmd.mode === "laps" ? me.laps + length : state.round + length;
-      state.melas.push({ set: cmd.set, owner: seat, mode: cmd.mode, until });
-      log(state, `${me.name} is holding a mela in the ${BUSINESS_SETS[cmd.set].name} set: ${BUSINESS_RULES.MELA_RENT_MULTIPLIER}× rent there for ${melaLength(cmd.mode)}.`, seat, undefined, {
-        kind: "mela",
+      state.festivals.push({ set: cmd.set, owner: seat, mode: cmd.mode, until });
+      log(state, `${me.name} is holding a festival in the ${BUSINESS_SETS[cmd.set].name} set: ${BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× rent there for ${festivalLength(cmd.mode)}.`, seat, undefined, {
+        kind: "festival",
         from: seat,
         to: null,
         amount: 0,
@@ -1363,10 +1363,10 @@ export function applyCommand(
  */
 export function tick(prev: BusinessGameState, now: number): BusinessGameState {
   if (prev.phase === "over") return prev;
-  const melaOver = prev.melas.some((m) => m.mode === "minutes" && now >= m.until);
-  if (melaOver) {
+  const festivalOver = prev.festivals.some((m) => m.mode === "minutes" && now >= m.until);
+  if (festivalOver) {
     const ended = structuredClone(prev);
-    endMelas(ended, now);
+    endFestivals(ended, now);
     ended.rev++;
     return tick(ended, now);
   }

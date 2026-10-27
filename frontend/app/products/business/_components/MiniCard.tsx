@@ -118,13 +118,13 @@ export function JailCardChip({ count }: { count: number }) {
     );
 }
 
-/** Mela cards a player holds, beside the properties like Jail cards. */
-export function MelaCardChip({ count }: { count: number }) {
+/** Festival cards a player holds, beside the properties like Jail cards. */
+export function FestivalCardChip({ count }: { count: number }) {
     return (
-        <div className="minicard cashchip melachip">
+        <div className="minicard cashchip festivalchip">
             <PartyPopper className="lu" />
             <b>× {count}</b>
-            <span>Mela</span>
+            <span>Festival</span>
         </div>
     );
 }

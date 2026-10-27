@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, CircleHelp, Coffee, Crown, Flag, Dices, HandCoins, Handshake, House, IndianRupee, KeyRound, LockKeyhole, Landmark as BankIcon, Map, Minus, PartyPopper, RefreshCw, ScrollText, Siren, TrendingDown, TrendingUp } from 'lucide-react';
-import { BUSINESS_BOARD, BUSINESS_MELA_SETS, BUSINESS_RULES, BUSINESS_SETS, type BusinessCard, type BusinessSetKey } from '@aixellabs/backend/business/constants';
-import { canHoldMela, canMortgage, canSellHouse, cardMath, melaLength, rentFor, setSpaces, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
-import type { BusinessInterestMode, BusinessLoan, BusinessMelaMode, BusinessLogEntry, BusinessOffer, BusinessPending, BusinessPublicState } from '@aixellabs/backend/business/types';
+import { BUSINESS_BOARD, BUSINESS_FESTIVAL_SETS, BUSINESS_RULES, BUSINESS_SETS, type BusinessCard, type BusinessSetKey } from '@aixellabs/backend/business/constants';
+import { canHoldFestival, canMortgage, canSellHouse, cardMath, festivalLength, rentFor, setSpaces, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
+import type { BusinessInterestMode, BusinessLoan, BusinessFestivalMode, BusinessLogEntry, BusinessOffer, BusinessPending, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { cn } from '@/lib/utils';
 import { cssVars, Die, HomeMark } from '../_lib/art';
@@ -13,7 +13,7 @@ import { sfx, sfxShared } from '../_lib/sound';
 import { rs } from '../_lib/client';
 import { Avatar, Cash, GButton, Pop, Ribbon, Slider } from './bits';
 import { Houses } from './Board';
-import { CashChip, JailCardChip, MelaCardChip, MiniCard, MiniCards } from './MiniCard';
+import { CashChip, JailCardChip, FestivalCardChip, MiniCard, MiniCards } from './MiniCard';
 import { SplitView } from './SplitView';
 import { InterestMode } from './OfferComposer';
 
@@ -53,7 +53,7 @@ const CARD_LOOK: Record<BusinessCard['effect']['type'], { tone: string; Icon: ty
     back: { tone: 'move', Icon: ArrowLeft, kind: 'You move' },
     jail: { tone: 'move', Icon: LockKeyhole, kind: 'You move' },
     jailcard: { tone: 'keep', Icon: KeyRound, kind: 'A card to keep' },
-    mela: { tone: 'keep', Icon: PartyPopper, kind: 'A card to keep' },
+    festival: { tone: 'keep', Icon: PartyPopper, kind: 'A card to keep' },
 };
 
 /** A drawn Chance card: a playing card on the table, with its own frame instead of the usual pop-up. */
@@ -204,27 +204,27 @@ export function BreakPopup({ state, me, send, startPicking = false }: Base & { s
  * Choose a stake, see exactly what each roll would do to your cash, then roll.
  * Every number has a fixed-width slot, so moving the slider never moves the layout.
  */
-/** The three ways a mela can last: the holder picks one as it starts. */
-const MELA_MODES: { mode: BusinessMelaMode; hint: string }[] = [
+/** The three ways a festival can last: the holder picks one as it starts. */
+const FESTIVAL_MODES: { mode: BusinessFestivalMode; hint: string }[] = [
     { mode: 'rounds', hint: 'Everyone gets this many turns. Steady and sure.' },
     { mode: 'laps', hint: 'Until you next pass Launch. Best when Launch is far ahead of you.' },
     { mode: 'minutes', hint: 'On the clock. Best when the table plays slowly.' },
 ];
 
-/** Hold a mela: pick the gaon set (when you have more than one ready) and how long it lasts. */
-export function MelaPopup({ state, me, send, onClose }: Base & { onClose: () => void }) {
-    const ready = BUSINESS_MELA_SETS.filter((set) => canHoldMela(state, me, set) === null);
+/** Hold a festival: pick the village set (when you have more than one ready) and how long it lasts. */
+export function FestivalPopup({ state, me, send, onClose }: Base & { onClose: () => void }) {
+    const ready = BUSINESS_FESTIVAL_SETS.filter((set) => canHoldFestival(state, me, set) === null);
     const [set, setSet] = useState<BusinessSetKey | undefined>(ready[0]);
     if (!set) return null;
     const spaces = setSpaces(set);
     return (
         <Pop onClose={onClose}>
-            <Ribbon>Hold a mela</Ribbon>
+            <Ribbon>Hold a festival</Ribbon>
             <div className="stackc">
                 <PartyPopper style={{ width: 44, height: 44 }} />
             </div>
             <p className="center" style={{ fontWeight: 800 }}>
-                Every city in the {BUSINESS_SETS[set].name} set charges {BUSINESS_RULES.MELA_RENT_MULTIPLIER}× rent while the mela lasts.
+                Every city in the {BUSINESS_SETS[set].name} set charges {BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× rent while the festival lasts.
             </p>
             {ready.length > 1 && (
                 <div className="opts">
@@ -241,12 +241,12 @@ export function MelaPopup({ state, me, send, onClose }: Base & { onClose: () => 
                 ))}
             </MiniCards>
             <p className="small center">
-                Rent now {spaces.map((i) => rs(rentFor(state, i, 7))).join(' · ')} → {spaces.map((i) => rs(rentFor(state, i, 7) * BUSINESS_RULES.MELA_RENT_MULTIPLIER)).join(' · ')}
+                Rent now {spaces.map((i) => rs(rentFor(state, i, 7))).join(' · ')} → {spaces.map((i) => rs(rentFor(state, i, 7) * BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER)).join(' · ')}
             </p>
             <div className="dealwith">
-                {MELA_MODES.map(({ mode, hint }) => (
-                    <button key={mode} type="button" className="plate dw" onClick={() => (send({ type: 'mela', set, mode }), onClose())}>
-                        <b>{melaLength(mode)}</b>
+                {FESTIVAL_MODES.map(({ mode, hint }) => (
+                    <button key={mode} type="button" className="plate dw" onClick={() => (send({ type: 'festival', set, mode }), onClose())}>
+                        <b>{festivalLength(mode)}</b>
                         <small>{hint}</small>
                     </button>
                 ))}
@@ -798,7 +798,7 @@ export function describeOffer(state: BusinessPublicState, offer: BusinessOffer):
             s.cash ? rs(s.cash) : null,
             ...s.spaces.map((i) => BUSINESS_BOARD[i].name),
             s.cards ? `${s.cards} Jail card${s.cards === 1 ? '' : 's'}` : null,
-            s.melas ? `${s.melas} Mela card${s.melas === 1 ? '' : 's'}` : null,
+            s.festivals ? `${s.festivals} Festival card${s.festivals === 1 ? '' : 's'}` : null,
         ]
             .filter(Boolean)
             .join(' + ') || 'nothing';
@@ -896,12 +896,12 @@ export function OfferInbox({ state, me, send, offer, now }: Base & { offer: Busi
     } else {
         ask = `${from.name} offers you a trade`;
         // Seen from the receiver: what the proposer sends is what you get.
-        const side = ({ cash, spaces, cards, melas = 0 }: typeof t.give) =>
-            cash || spaces.length || cards || melas ? (
+        const side = ({ cash, spaces, cards, festivals = 0 }: typeof t.give) =>
+            cash || spaces.length || cards || festivals ? (
                 <MiniCards>
                     {cash > 0 && <CashChip value={cash} />}
                     {cards > 0 && <JailCardChip count={cards} />}
-                    {melas > 0 && <MelaCardChip count={melas} />}
+                    {festivals > 0 && <FestivalCardChip count={festivals} />}
                     {spaces.map((i) => (
                         <MiniCard key={i} state={state} space={i} />
                     ))}

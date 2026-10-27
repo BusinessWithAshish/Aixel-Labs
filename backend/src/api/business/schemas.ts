@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BUSINESS_BOARD, BUSINESS_MATCH_MINUTES, BUSINESS_MELA_SETS, BUSINESS_MISS_LIMITS, BUSINESS_RULES, BUSINESS_SALARY_CAPS, BUSINESS_SETS, type BusinessSetKey } from "./constants";
+import { BUSINESS_BOARD, BUSINESS_MATCH_MINUTES, BUSINESS_FESTIVAL_SETS, BUSINESS_MISS_LIMITS, BUSINESS_RULES, BUSINESS_SALARY_CAPS, BUSINESS_SETS, type BusinessSetKey } from "./constants";
 
 const SPACE = z.number().int().min(0).max(BUSINESS_BOARD.length - 1);
 const SEAT = z.number().int().min(0).max(BUSINESS_RULES.MAX_SEATS - 1);
@@ -13,8 +13,8 @@ const TRADE_SIDE = z.object({
   spaces: z.array(SPACE).max(28),
   /** "Get out of Jail free" cards. */
   cards: z.number().int().min(0).max(9).default(0),
-  /** Mela cards. */
-  melas: z.number().int().min(0).max(9).optional(),
+  /** Festival cards. */
+  festivals: z.number().int().min(0).max(9).optional(),
 });
 
 export const BUSINESS_OFFER_TERMS_SCHEMA = z.discriminatedUnion("kind", [
@@ -83,8 +83,8 @@ export const BUSINESS_COMMAND_SCHEMA = z.discriminatedUnion("type", [
   z.object({ type: z.literal("break"), rest: z.boolean(), jail: SEAT.optional(), random: z.boolean().optional() }),
   /** In Jail: hand in a "get out of Jail free" card and walk out. */
   z.object({ type: z.literal("useJailCard") }),
-  /** Spend a Mela card on a whole gaon set you own. */
-  z.object({ type: z.literal("mela"), set: z.enum(BUSINESS_MELA_SETS as [BusinessSetKey, ...BusinessSetKey[]]), mode: z.enum(["rounds", "laps", "minutes"]) }),
+  /** Spend a Festival card on a whole village set you own. */
+  z.object({ type: z.literal("festival"), set: z.enum(BUSINESS_FESTIVAL_SETS as [BusinessSetKey, ...BusinessSetKey[]]), mode: z.enum(["rounds", "laps", "minutes"]) }),
   z.object({ type: z.literal("endTurn") }),
   z.object({ type: z.literal("build"), space: SPACE }),
   z.object({ type: z.literal("sellHouse"), space: SPACE }),

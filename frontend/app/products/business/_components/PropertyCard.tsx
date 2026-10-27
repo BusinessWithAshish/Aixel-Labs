@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { Gavel, Hammer, Handshake, Hotel, House, IndianRupee, KeyRound, Landmark as BankIcon, Receipt } from 'lucide-react';
 import {
     BUSINESS_BOARD,
-    BUSINESS_MELA_SETS,
+    BUSINESS_FESTIVAL_SETS,
     BUSINESS_RAIL_TOLL_PCT,
     BUSINESS_RULES,
     BUSINESS_SETS,
@@ -22,8 +22,8 @@ import {
     isBuyable,
     mortgageValue,
     splitAt,
-    melaAt,
-    melaLeft,
+    festivalAt,
+    festivalLeft,
     splitShares,
     utilityMultiplier,
     redeemCost,
@@ -91,14 +91,14 @@ export function PropertyCard({ space, state, me, send, mode = 'view' }: Property
     if (tile.kind === 'city' && tile.set) {
         const ladder = rentLadder(space);
         const level = live ? rentLevel(state, space) : -1;
-        const mela = melaAt(state, space);
-        const gaon = BUSINESS_MELA_SETS.includes(tile.set);
+        const festival = festivalAt(state, space);
+        const village = BUSINESS_FESTIVAL_SETS.includes(tile.set);
         sections = (
             <>
-                {mela && (
-                    <div className="banner mela">
+                {festival && (
+                    <div className="banner festival">
                         <span>
-                            Mela on: {BUSINESS_RULES.MELA_RENT_MULTIPLIER}× rent here, {melaLeft(state, mela, Date.now())}.
+                            Festival on: {BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× rent here, {festivalLeft(state, festival, Date.now())}.
                         </span>
                     </div>
                 )}
@@ -135,8 +135,8 @@ export function PropertyCard({ space, state, me, send, mode = 'view' }: Property
                     ))}
                     <Row icons={<Hotel className="lu ht" />} label="Hotel" amount={<Rupees value={ladder[6]} />} current={level === 6} />
                 </div>
-                {gaon && !mela && (
-                    <p className="small center">A gaon set: with a Mela card, its owner can hold a mela for {BUSINESS_RULES.MELA_RENT_MULTIPLIER}× rent on the whole set.</p>
+                {village && !festival && (
+                    <p className="small center">A village set: with a Festival card, its owner can hold a festival for {BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× rent on the whole set.</p>
                 )}
             </>
         );

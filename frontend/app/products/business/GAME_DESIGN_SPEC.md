@@ -36,7 +36,7 @@ Net worth = cash + property prices (a bank-mortgaged property counts half)
 Clockwise from Launch. Corners: Launch (0), Jail (12), Take a Break (24), Go to Jail (36).
 
 Places in Pune and Pimpri-Chinchwad, priced as they are in real life: the three cheap
-sets are well-known gaons and hill towns around Pune (Mulshi, Dehu, Alandi, Lonavala…),
+sets are well-known villages and hill towns around Pune (Mulshi, Dehu, Alandi, Lonavala…),
 orange and red are PCMC towns, and the rest are Pune's areas, up to Boat Club and
 Koregaon (Park).
 
@@ -46,7 +46,7 @@ Koregaon (Park).
 | Sky | Dehu 80, Alandi 80, Jejuri 100 | 50 |
 | Pink | Lavasa 120, Khandala 120, Lonavala 140 | 50 |
 | Orange | Akurdi 160, Nigdi 160, Pimpri 180 | 100 |
-| Red | Ravet 200, Sangvi 200, Wakad 220 | 100 |
+| Red | Ravet 200, Saudagar (Pimple Saudagar) 200, Wakad 220 | 100 |
 | Yellow | Katraj 240, Warje 240, Wagholi 260 | 150 |
 | Green | Pashan 280, Kharadi 280, Kothrud 300 | 150 |
 | Blue | Aundh 320, Viman 320, Baner 340 | 200 |
@@ -205,17 +205,17 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   sold in a trade like cash. A drawn card is shown as a playing card in the
   colour of what it does (green collects, red pays, blue moves, gold is kept).
   Under the amount it shows the sum, such as "10% of ₹4,200".
-- **Mela cards:** the deck also holds 5 Mela cards, and one more is shuffled
-  in every 8 rounds (up to 10 in the deck), so a long match sees more melas
-  than a short one, timed or not. A Mela card is kept and
+- **Festival cards:** the deck also holds 5 Festival cards, and one more is shuffled
+  in every 8 rounds (up to 10 in the deck), so a long match sees more festivals
+  than a short one, timed or not. A Festival card is kept and
   can be traded like a Jail card (also with a player in Jail). Its holder
-  spends it on their turn on a whole gaon set (brown, sky or pink) that is
+  spends it on their turn on a whole village set (brown, sky or pink) that is
   theirs, alone or as a partner in a split of it: every city in that set
-  charges **3× rent** while the mela lasts (split rent is shared as usual).
+  charges **3× rent** while the festival lasts (split rent is shared as usual).
   The holder picks how long when they start it: **6 rounds**, **1 lap** (until
   they next pass Launch) or **15 minutes** (paused with the match); the three
-  run for about the same share of a match. One mela per set at a time; a second
-  card can go on another gaon set. A mela ends early if the set stops being
+  run for about the same share of a match. One festival per set at a time; a second
+  card can go on another village set. A festival ends early if the set stops being
   theirs. Everyone gets a one-time banner as it starts; while it runs its tiles
   show a ×3 flag, and the property card says how long is left.
 - **Market:** a player who owns a property may stake ₹10–₹1,000 (never more

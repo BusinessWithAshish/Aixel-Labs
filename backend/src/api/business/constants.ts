@@ -12,14 +12,14 @@ export const BUSINESS_ROUTES = {
 
 export const BUSINESS_RULES = {
   START_CASH: 2000,
-  /** Copies of the Mela card in a freshly shuffled Chance deck (the other cards appear once each)… */
-  MELA_CARDS: 5,
-  /** …and one more is shuffled into the deck every this many rounds, so long matches get more melas… */
-  MELA_CARD_EVERY_ROUNDS: 8,
+  /** Copies of the Festival card in a freshly shuffled Chance deck (the other cards appear once each)… */
+  FESTIVAL_CARDS: 5,
+  /** …and one more is shuffled into the deck every this many rounds, so long matches get more festivals… */
+  FESTIVAL_CARD_EVERY_ROUNDS: 8,
   /** …while the deck holds fewer than this many. */
-  MELA_CARDS_MAX: 10,
-  /** A mela multiplies the rent of every city in its set by this. */
-  MELA_RENT_MULTIPLIER: 3,
+  FESTIVAL_CARDS_MAX: 10,
+  /** A festival multiplies the rent of every city in its set by this. */
+  FESTIVAL_RENT_MULTIPLIER: 3,
   /** Salary grows with every lap a player completes: lap 1 pays this, lap 2 twice this, and so on. */
   SALARY_STEP: 100,
   /** A levy or a percentage card never takes or pays less than this. */
@@ -196,7 +196,7 @@ const market = (): BusinessSpace => ({ kind: "market", name: "Market", icon: "tr
 
 /**
  * Places in Pune and Pimpri-Chinchwad, priced the way they are in real life: the cheap sets are
- * gaons (villages) on the edge of PCMC, the middle ones PCMC towns, the dear ones Pune's prime areas.
+ * villages on the edge of PCMC, the middle ones PCMC towns, the dear ones Pune's prime areas.
  * Names stay short (eight letters at most): on a phone a tile is about 22px wide.
  */
 /** 48 spaces, clockwise from Launch. Index 12 is Jail, 24 Break, 36 Go to Jail. */
@@ -222,7 +222,7 @@ export const BUSINESS_BOARD: readonly BusinessSpace[] = [
   rail("Pimpri Stn"),
   chance(),
   city("Ravet", "red", 200),
-  city("Sangvi", "red", 200),
+  city("Saudagar", "red", 200),
   city("Wakad", "red", 220),
   market(),
   { kind: "break", name: "Take a Break", icon: "coffee" },
@@ -253,10 +253,10 @@ export const BUSINESS_BOARD: readonly BusinessSpace[] = [
 
 export const BUSINESS_JAIL_INDEX = 12;
 
-/** The gaon sets: cheap, and the only ones that can hold a mela. */
-export const BUSINESS_MELA_SETS: readonly BusinessSetKey[] = ["brown", "sky", "pink"];
-/** How long a mela lasts, by what its holder picks when it starts. Balanced to run for about the same share of a match. */
-export const BUSINESS_MELA_LENGTHS = { rounds: 6, laps: 1, minutes: 15 } as const;
+/** The village sets: cheap, and the only ones that can hold a festival. */
+export const BUSINESS_FESTIVAL_SETS: readonly BusinessSetKey[] = ["brown", "sky", "pink"];
+/** How long a festival lasts, by what its holder picks when it starts. Balanced to run for about the same share of a match. */
+export const BUSINESS_FESTIVAL_LENGTHS = { rounds: 6, laps: 1, minutes: 15 } as const;
 
 export type BusinessCardEffect =
   /** Collect this share (in percent) of the cash you hold. */
@@ -271,8 +271,8 @@ export type BusinessCardEffect =
   | { type: "jail" }
   /** A "get out of Jail free" card: kept until it is used, and tradeable like cash. */
   | { type: "jailcard" }
-  /** A Mela card: kept, tradeable, and spent to start a mela on a whole town set. */
-  | { type: "mela" };
+  /** A Festival card: kept, tradeable, and spent to start a festival on a whole village set. */
+  | { type: "festival" };
 
 export type BusinessCard = { text: string; effect: BusinessCardEffect };
 
@@ -296,7 +296,7 @@ export const BUSINESS_CHANCE_CARDS: readonly BusinessCard[] = [
   { text: "Go back 3 spaces.", effect: { type: "back", steps: 3 } },
   { text: "Go to Jail.", effect: { type: "jail" } },
   { text: "Get out of Jail free. Keep this card until you need it, or trade it.", effect: { type: "jailcard" } },
-  { text: "Mela! Keep this card. Spend it to hold a mela on a whole gaon set you own: its rent is tripled while the mela lasts. Or trade it.", effect: { type: "mela" } },
+  { text: "Festival! Keep this card. Spend it to hold a festival on a whole village set you own: its rent is tripled while the festival lasts. Or trade it.", effect: { type: "festival" } },
 ];
 
 export const BUSINESS_ERRORS = {

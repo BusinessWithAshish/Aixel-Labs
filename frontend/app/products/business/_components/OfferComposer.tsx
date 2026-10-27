@@ -111,11 +111,11 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
     const [giveCash, setGiveCash] = useState(0);
     const [getCash, setGetCash] = useState(0);
     const [giveCards, setGiveCards] = useState(0);
-    const [giveMelas, setGiveMelas] = useState(0);
+    const [giveFestivals, setGiveFestivals] = useState(0);
     /** Bail: whether the helper comes to the Jail as part of the deal. */
     const [bringHelper, setBringHelper] = useState(true);
     const [getCards, setGetCards] = useState(0);
-    const [getMelas, setGetMelas] = useState(0);
+    const [getFestivals, setGetFestivals] = useState(0);
 
     const mePlayer = state.players[me];
     const otherPlayer = other === undefined ? null : state.players[other];
@@ -253,8 +253,8 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
         const blockedFor = (seat: number) => (i: number) => canTrade(state, seat, i);
         terms = {
             kind: 'trade',
-            give: { cash: giveCash, spaces: give, cards: giveCards, melas: giveMelas },
-            get: { cash: getCash, spaces: get, cards: getCards, melas: getMelas },
+            give: { cash: giveCash, spaces: give, cards: giveCards, festivals: giveFestivals },
+            get: { cash: getCash, spaces: get, cards: getCards, festivals: getFestivals },
         };
         // "Send" is what leaves your hands, "ask for" is what you want back.
         body = (
@@ -272,10 +272,10 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
                             <Stepper value={giveCards} min={0} max={mePlayer.jailCards} onChange={setGiveCards} />
                         </div>
                     )}
-                    {mePlayer.melaCards > 0 && (
+                    {mePlayer.festivalCards > 0 && (
                         <div className="pctrow">
-                            <span>Mela cards you send</span>
-                            <Stepper value={giveMelas} min={0} max={mePlayer.melaCards} onChange={setGiveMelas} />
+                            <span>Festival cards you send</span>
+                            <Stepper value={giveFestivals} min={0} max={mePlayer.festivalCards} onChange={setGiveFestivals} />
                         </div>
                     )}
                 </div>
@@ -292,10 +292,10 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
                             <Stepper value={getCards} min={0} max={otherPlayer.jailCards} onChange={setGetCards} />
                         </div>
                     )}
-                    {otherPlayer.melaCards > 0 && (
+                    {otherPlayer.festivalCards > 0 && (
                         <div className="pctrow">
-                            <span>Mela cards you ask for</span>
-                            <Stepper value={getMelas} min={0} max={otherPlayer.melaCards} onChange={setGetMelas} />
+                            <span>Festival cards you ask for</span>
+                            <Stepper value={getFestivals} min={0} max={otherPlayer.festivalCards} onChange={setGetFestivals} />
                         </div>
                     )}
                 </div>

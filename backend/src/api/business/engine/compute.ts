@@ -6,8 +6,8 @@
 import {
   BUSINESS_BOARD,
   BUSINESS_JAIL_INDEX,
-  BUSINESS_MELA_LENGTHS,
-  BUSINESS_MELA_SETS,
+  BUSINESS_FESTIVAL_LENGTHS,
+  BUSINESS_FESTIVAL_SETS,
   BUSINESS_RAIL_TOLL_PCT,
   BUSINESS_RENT_LADDER,
   BUSINESS_RULES,
@@ -17,7 +17,7 @@ import {
   type BusinessSetKey,
   type BusinessSpaceKind,
 } from "../constants";
-import type { BusinessInterestMode, BusinessMela, BusinessMelaMode, BusinessOfferTerms, BusinessPublicState, BusinessSplit } from "../types";
+import type { BusinessInterestMode, BusinessFestival, BusinessFestivalMode, BusinessOfferTerms, BusinessPublicState, BusinessSplit } from "../types";
 
 type State = Pick<BusinessPublicState, "players" | "props" | "loans" | "splits" | "bailAnyone">;
 
@@ -361,9 +361,9 @@ export function validateOffer(
   // and a loan of theirs that has fallen due.
   const held = a.jail ? a : b.jail ? b : null;
   const cardTrade =
-    terms.kind === "trade" && !terms.give.spaces.length && !terms.get.spaces.length && terms.give.cards + terms.get.cards + (terms.give.melas ?? 0) + (terms.get.melas ?? 0) > 0;
+    terms.kind === "trade" && !terms.give.spaces.length && !terms.get.spaces.length && terms.give.cards + terms.get.cards + (terms.give.festivals ?? 0) + (terms.get.festivals ?? 0) > 0;
   if (held && terms.kind !== "bail" && terms.kind !== "renew" && !cardTrade)
-    return `${held.name} is in Jail: only bail and cards (Jail free, Mela) can be dealt.`;
+    return `${held.name} is in Jail: only bail and cards (Jail free, Festival) can be dealt.`;
 
   if (terms.kind === "loan") {
     if (!pair(terms.lender, terms.borrower)) return "A loan is between the two of you.";
@@ -417,11 +417,11 @@ export function validateOffer(
   }
 
   const { give, get } = terms;
-  if (!give.cash && !get.cash && !give.spaces.length && !get.spaces.length && !give.cards && !get.cards && !give.melas && !get.melas) return "The trade is empty.";
+  if (!give.cash && !get.cash && !give.spaces.length && !get.spaces.length && !give.cards && !get.cards && !give.festivals && !get.festivals) return "The trade is empty.";
   if (give.cards > a.jailCards) return `${a.name} does not have that many Jail cards.`;
   if (get.cards > b.jailCards) return `${b.name} does not have that many Jail cards.`;
-  if ((give.melas ?? 0) > a.melaCards) return `${a.name} does not have that many Mela cards.`;
-  if ((get.melas ?? 0) > b.melaCards) return `${b.name} does not have that many Mela cards.`;
+  if ((give.festivals ?? 0) > a.festivalCards) return `${a.name} does not have that many Festival cards.`;
+  if ((get.festivals ?? 0) > b.festivalCards) return `${b.name} does not have that many Festival cards.`;
   if (new Set([...give.spaces, ...get.spaces]).size !== give.spaces.length + get.spaces.length)
     return "A property is listed twice.";
   if (give.cash > Math.max(0, a.cash)) return `${a.name} does not have ₹${give.cash}.`;
@@ -436,14 +436,14 @@ export function validateOffer(
   return check(give.spaces, from) ?? check(get.spaces, to);
 }
 
-/* ---------- melas ---------- */
+/* ---------- festivals ---------- */
 
-type MelaState = State & Pick<BusinessPublicState, "melas">;
+type FestivalState = State & Pick<BusinessPublicState, "festivals">;
 
-/** The mela running on this space's set, if any. */
-export function melaAt(state: MelaState, space: number): BusinessMela | undefined {
+/** The festival running on this space's set, if any. */
+export function festivalAt(state: FestivalState, space: number): BusinessFestival | undefined {
   const set = BUSINESS_BOARD[space].set;
-  return set ? state.melas.find((m) => m.set === set) : undefined;
+  return set ? state.festivals.find((m) => m.set === set) : undefined;
 }
 
 /** The whole set is this player's, alone or as a partner in a split of it. */
@@ -453,36 +453,36 @@ export function holdsSet(state: State, seat: number, set: BusinessSetKey): boole
   return setSpaces(set).every((i) => state.props[i]?.owner === seat);
 }
 
-/** "5 rounds", "1 lap", "10 minutes": how long a mela started in this mode lasts. */
-export function melaLength(mode: BusinessMelaMode): string {
-  const n = BUSINESS_MELA_LENGTHS[mode];
+/** "5 rounds", "1 lap", "10 minutes": how long a festival started in this mode lasts. */
+export function festivalLength(mode: BusinessFestivalMode): string {
+  const n = BUSINESS_FESTIVAL_LENGTHS[mode];
   const unit = mode === "rounds" ? "round" : mode === "laps" ? "lap" : "minute";
   return `${n} ${unit}${n === 1 ? "" : "s"}`;
 }
 
-/** What is left of a mela, for its flag: "3 rounds left", "until Ashish passes Launch", "7:12 left". */
-export function melaLeft(state: MelaState & Pick<BusinessPublicState, "round">, mela: BusinessMela, now: number): string {
-  if (mela.mode === "laps") return `until ${state.players[mela.owner].name} passes Launch`;
-  if (mela.mode === "rounds") {
-    const n = Math.max(1, mela.until - state.round);
+/** What is left of a festival, for its flag: "3 rounds left", "until Ashish passes Launch", "7:12 left". */
+export function festivalLeft(state: FestivalState & Pick<BusinessPublicState, "round">, festival: BusinessFestival, now: number): string {
+  if (festival.mode === "laps") return `until ${state.players[festival.owner].name} passes Launch`;
+  if (festival.mode === "rounds") {
+    const n = Math.max(1, festival.until - state.round);
     return n === 1 ? "last round" : `${n} rounds left`;
   }
-  const secs = Math.max(0, Math.ceil((mela.until - now) / 1000));
+  const secs = Math.max(0, Math.ceil((festival.until - now) / 1000));
   return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")} left`;
 }
 
-/** Rent on a city of a set holding a mela. */
-export function melaRent(rent: number): number {
-  return rent * BUSINESS_RULES.MELA_RENT_MULTIPLIER;
+/** Rent on a city of a set holding a festival. */
+export function festivalRent(rent: number): number {
+  return rent * BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER;
 }
 
-/** Why this player cannot hold a mela on this set now, or null when they can. */
-export function canHoldMela(state: MelaState, seat: number, set: BusinessSetKey): string | null {
+/** Why this player cannot hold a festival on this set now, or null when they can. */
+export function canHoldFestival(state: FestivalState, seat: number, set: BusinessSetKey): string | null {
   const p = state.players[seat];
   const name = BUSINESS_SETS[set].name;
-  if (!BUSINESS_MELA_SETS.includes(set)) return "Only a gaon set (brown, sky or pink) can hold a mela.";
-  if (p.melaCards < 1) return "You have no Mela card.";
+  if (!BUSINESS_FESTIVAL_SETS.includes(set)) return "Only a village set (brown, sky or pink) can hold a festival.";
+  if (p.festivalCards < 1) return "You have no Festival card.";
   if (!holdsSet(state, seat, set)) return `You need the whole ${name} set, alone or in a split.`;
-  if (state.melas.some((m) => m.set === set)) return `A mela is already on in the ${name} set.`;
+  if (state.festivals.some((m) => m.set === set)) return `A festival is already on in the ${name} set.`;
   return null;
 }
