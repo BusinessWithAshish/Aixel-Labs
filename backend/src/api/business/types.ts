@@ -40,6 +40,8 @@ export type BusinessPlayer = {
   missed: number;
   /** "Get out of Jail free" cards held: used to walk out, or traded like cash. */
   jailCards: number;
+  /** Mela cards held: each starts a mela on a whole town set the player owns. */
+  melaCards: number;
   /** Laps completed: the salary grows with each one. */
   laps: number;
   /** In debt and already put it off once: at their next turn it must be raised before anything else. */
@@ -51,7 +53,8 @@ export type BusinessPlayer = {
 };
 
 /**
- * A three-city colour set shared by its two owners: `major` holds two cities, `minor` one. Each city
+ * A colour set shared by its two owners: in a three-city set `major` holds two cities and `minor` one;
+ * in a two-city set each holds one, and `major` holds the dearer (or later) one. Each city
  * keeps its owner, but the set counts as complete, rent from any of its cities is shared by
  * `minorPct` / the rest, and only `major` builds, with each paying their share of every house.
  */
@@ -143,6 +146,8 @@ export type BusinessFxKind =
   | "out"
   /** `from` and `to` split a colour set, or ended a split (`amount` 0 = started). */
   | "split"
+  /** `from` started a mela on the set `set`. */
+  | "mela"
   /** `to` got `from` out of Jail; `from` paid them `amount` (0 for players outside the deal). `to` null: a Jail card. */
   | "bail";
 
@@ -154,6 +159,8 @@ export type BusinessFx = {
   /** 0 with `kind` loan/mortgage: a private deal announced to the others without its numbers. */
   amount: number;
   space?: number;
+  /** For a mela: the gaon set it is held in. */
+  set?: BusinessSetKey;
   why?: "speeding" | "gojail" | "card" | "sent" | "random";
 };
 
@@ -183,6 +190,8 @@ export type BusinessGameState = {
   loans: BusinessLoan[];
   /** Colour sets split between two players. */
   splits: BusinessSplit[];
+  /** Melas running: a gaon set whose rent is multiplied until `until`. */
+  melas: BusinessMela[];
   /** The active player put their debt off for this turn: it is played on without paying up. */
   grace: boolean;
   /** The turn began in debt (a partner's share of a house): once it is cleared, the roll comes next. */
@@ -218,12 +227,27 @@ export type BusinessGameState = {
 
 export type BusinessPublicState = Omit<BusinessGameState, "rng" | "deck">;
 
+export type BusinessMelaMode = "rounds" | "laps" | "minutes";
+
+/**
+ * What a mela's length counts, picked by the player who holds it: rounds of the table, laps of its
+ * owner, or minutes on the clock. `until`: the round, the owner's lap count, or the epoch ms it ends at.
+ */
+export type BusinessMela = { set: BusinessSetKey; owner: number; mode: BusinessMelaMode; until: number };
+
 /** `teams`: two teams (Alpha against Beta) instead of everyone for themselves. */
 /**
  * `salaryCap`: the most a lap's salary can pay; 0 = no cap.
  * `bailAnyone`: any player may bail a prisoner out; otherwise only a player visiting Jail.
  */
-export type BusinessRoomConfig = { seats: number; minutes: number; missLimit: number; teams: boolean; salaryCap: number; bailAnyone: boolean };
+export type BusinessRoomConfig = {
+  seats: number;
+  minutes: number;
+  missLimit: number;
+  teams: boolean;
+  salaryCap: number;
+  bailAnyone: boolean;
+};
 
 export type BusinessSeatView = {
   seat: number;

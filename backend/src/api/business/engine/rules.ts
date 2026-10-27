@@ -13,6 +13,7 @@ import {
   BUSINESS_PHASE_SECONDS,
   BUSINESS_RULES,
   BUSINESS_SETS,
+  BUSINESS_MELA_LENGTHS,
   type BusinessCard,
 } from "../constants";
 import type {
@@ -38,6 +39,11 @@ import {
   isBuyable,
   lapInterest,
   setSpaces,
+  melaAt,
+  melaRent,
+  canHoldMela,
+  holdsSet,
+  melaLength,
   splitAt,
   splitPair,
   splitShares,
@@ -80,12 +86,21 @@ function rollDie(state: BusinessGameState): number {
 }
 
 function shuffleDeck(state: BusinessGameState) {
-  const deck = BUSINESS_CHANCE_CARDS.map((_, i) => i);
+  // Every card once, except the Mela card: more copies the longer the match has run (see addMelaCard).
+  const melas = Math.min(BUSINESS_RULES.MELA_CARDS_MAX, BUSINESS_RULES.MELA_CARDS + Math.floor(state.round / BUSINESS_RULES.MELA_CARD_EVERY_ROUNDS));
+  const deck = BUSINESS_CHANCE_CARDS.flatMap((card, i) => Array(card.effect.type === "mela" ? melas : 1).fill(i) as number[]);
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(random(state) * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
   state.deck = deck;
+}
+
+/** As the match goes on, another Mela card goes into the deck at a random place (up to the cap). */
+function addMelaCard(state: BusinessGameState) {
+  const mela = BUSINESS_CHANCE_CARDS.findIndex((c) => c.effect.type === "mela");
+  if (state.deck.filter((i) => i === mela).length >= BUSINESS_RULES.MELA_CARDS_MAX) return;
+  state.deck.splice(Math.floor(random(state) * (state.deck.length + 1)), 0, mela);
 }
 
 function drawCard(state: BusinessGameState): BusinessCard {
@@ -120,8 +135,13 @@ function describeTerms(state: BusinessGameState, from: number, to: number, terms
       return `end the split of the ${split ? BUSINESS_SETS[split.set].name : ""} set`;
     }
     case "trade": {
-      const side = (s: { cash: number; spaces: number[]; cards: number }) =>
-        [s.cash ? rs(s.cash) : null, ...s.spaces.map((i) => BUSINESS_BOARD[i].name), s.cards ? `${s.cards} Jail card${s.cards === 1 ? "" : "s"}` : null]
+      const side = (s: { cash: number; spaces: number[]; cards: number; melas?: number }) =>
+        [
+          s.cash ? rs(s.cash) : null,
+          ...s.spaces.map((i) => BUSINESS_BOARD[i].name),
+          s.cards ? `${s.cards} Jail card${s.cards === 1 ? "" : "s"}` : null,
+          s.melas ? `${s.melas} Mela card${s.melas === 1 ? "" : "s"}` : null,
+        ]
           .filter(Boolean)
           .join(" + ") || "nothing";
       return `${P[from].name} gives ${side(terms.give)}, ${P[to].name} gives ${side(terms.get)}`;
@@ -232,6 +252,18 @@ function checkOver(state: BusinessGameState): boolean {
   return true;
 }
 
+/** Ends the melas whose time is up, or whose owner no longer holds the whole set. */
+function endMelas(state: BusinessGameState, now: number) {
+  const over = state.melas.filter((m) => {
+    const owner = state.players[m.owner];
+    const lost = owner.bankrupt || !holdsSet(state, m.owner, m.set);
+    const due = m.mode === "minutes" ? now >= m.until : m.mode === "laps" ? owner.laps >= m.until : state.round >= m.until;
+    return lost || due;
+  });
+  for (const m of over) log(state, `The mela in ${state.players[m.owner].name}'s ${BUSINESS_SETS[m.set].name} set is over.`, m.owner);
+  state.melas = state.melas.filter((m) => !over.includes(m));
+}
+
 function advance(state: BusinessGameState, now: number) {
   if (checkOver(state)) return;
   // An offer outlives the turn it was made in: the other player still has its own clock to answer.
@@ -256,7 +288,10 @@ function advance(state: BusinessGameState, now: number) {
   let i = state.turn;
   for (let k = 0; k < state.players.length * 2; k++) {
     i = (i + 1) % state.players.length;
-    if (i === 0) state.round++;
+    if (i === 0) {
+      state.round++;
+      if (state.round % BUSINESS_RULES.MELA_CARD_EVERY_ROUNDS === 0) addMelaCard(state);
+    }
     const p = state.players[i];
     if (p.bankrupt) continue;
     if (p.skip) {
@@ -267,6 +302,7 @@ function advance(state: BusinessGameState, now: number) {
     break;
   }
   state.turn = i;
+  endMelas(state, now);
   // Short before the turn begins (a debt put off last turn, or their share of a house a split
   // partner built): that comes first.
   const next = state.players[i];
@@ -445,7 +481,7 @@ function finishAuction(state: BusinessGameState, now: number) {
 function chargeRent(state: BusinessGameState, p: BusinessPlayer, space: number) {
   const prop = state.props[space];
   const name = BUSINESS_BOARD[space].name;
-  const rent = rentFor(state, space, state.dice[0] + state.dice[1]);
+  const rent = rentFor(state, space, state.dice[0] + state.dice[1], p.cash);
   const split = splitAt(state, space);
   const free = (seat: number) => seat === p.seat || state.players[seat].team === p.team;
 
@@ -455,8 +491,12 @@ function chargeRent(state: BusinessGameState, p: BusinessPlayer, space: number) 
       log(state, `${p.name} landed on ${name}. No rent between teammates.`, p.seat);
       return;
     }
-    pay(state, p.seat, owner.seat, rent);
-    log(state, `${p.name} paid ${rs(rent)} rent to ${owner.name} for ${name}.`, p.seat, undefined, { kind: "rent", from: p.seat, to: owner.seat, amount: rent, space });
+    // A mela multiplies the rent of its whole set.
+    const mela = melaAt(state, space);
+    const due = mela ? melaRent(rent) : rent;
+    pay(state, p.seat, owner.seat, due);
+    const why = mela ? ` (${BUSINESS_RULES.MELA_RENT_MULTIPLIER}× for the mela)` : "";
+    log(state, `${p.name} paid ${rs(due)} rent to ${owner.name} for ${name}${why}.`, p.seat, undefined, { kind: "rent", from: p.seat, to: owner.seat, amount: due, space });
     return;
   }
 
@@ -464,7 +504,7 @@ function chargeRent(state: BusinessGameState, p: BusinessPlayer, space: number) 
     log(state, `${p.name} landed on ${name}. Partners in a split set pay no rent there.`, p.seat);
     return;
   }
-  const shares = splitShares(split, rent);
+  const shares = splitShares(split, melaAt(state, space) ? melaRent(rent) : rent);
   const major = state.players[split.major];
   const minor = state.players[split.minor];
   const toMajor = free(major.seat) ? 0 : shares.major;
@@ -638,6 +678,11 @@ function applyCard(state: BusinessGameState, now: number) {
   }
   if (effect.type === "jail") {
     sendToJail(state, p, "card", `${p.name} drew "Go to Jail" and goes straight there.`);
+    return continueTurn(state, now);
+  }
+  if (effect.type === "mela") {
+    p.melaCards++;
+    log(state, `${p.name} drew a Chance card: ${text}`, p.seat);
     return continueTurn(state, now);
   }
   if (effect.type === "jailcard") {
@@ -857,6 +902,9 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
   for (const i of terms.get.spaces) state.props[i].owner = from;
   P[from].jailCards += terms.get.cards - terms.give.cards;
   P[to].jailCards += terms.give.cards - terms.get.cards;
+  const melas = (terms.get.melas ?? 0) - (terms.give.melas ?? 0);
+  P[from].melaCards += melas;
+  P[to].melaCards -= melas;
   // Public: everyone sees that a trade happened. What was swapped shows only on the board.
   log(state, `${P[from].name} and ${P[to].name} made a trade.`, from, undefined, { kind: "trade", from, to, amount: 0 });
   log(state, `The trade: ${describeTerms(state, from, to, terms)}.`, from, [from, to]);
@@ -887,6 +935,7 @@ export function createGame(
       bankrupt: false,
       missed: 0,
       jailCards: 0,
+      melaCards: 0,
       laps: 0,
       deferred: false,
       owed: [],
@@ -901,6 +950,7 @@ export function createGame(
     owed: [],
     loans: [],
     splits: [],
+    melas: [],
     opening: false,
     grace: false,
     offers: [],
@@ -992,6 +1042,23 @@ export function applyCommand(
         log(state, `${me.name} paid to leave Jail: ${BUSINESS_RULES.JAIL_PCT}% of their cash, ${rs(fine)}, shared among the other players.`, seat, undefined, { kind: "tax", from: seat, to: null, amount: fine });
       }
       break;
+
+    case "mela": {
+      need("roll", "end");
+      guard(canHoldMela(state, seat, cmd.set));
+      me.melaCards--;
+      const length = BUSINESS_MELA_LENGTHS[cmd.mode];
+      const until = cmd.mode === "minutes" ? now + length * 60_000 : cmd.mode === "laps" ? me.laps + length : state.round + length;
+      state.melas.push({ set: cmd.set, owner: seat, mode: cmd.mode, until });
+      log(state, `${me.name} is holding a mela in the ${BUSINESS_SETS[cmd.set].name} set: ${BUSINESS_RULES.MELA_RENT_MULTIPLIER}× rent there for ${melaLength(cmd.mode)}.`, seat, undefined, {
+        kind: "mela",
+        from: seat,
+        to: null,
+        amount: 0,
+        set: cmd.set,
+      });
+      break;
+    }
 
     case "useJailCard":
       need("roll");
@@ -1209,7 +1276,7 @@ export function applyCommand(
         log(state, `${me.name} declined ${state.players[offer.from].name}'s offer.`, seat, [seat, offer.from]);
         break;
       }
-      guard(validateOffer(state, offer.from, offer.to, offer.terms));
+      guard(validateOffer(state, offer.from, offer.to, offer.terms, true));
       log(state, `${me.name} accepted ${state.players[offer.from].name}'s offer.`, seat, [seat, offer.from]);
       executeOffer(state, offer.from, offer.to, offer.terms);
       break;
@@ -1296,6 +1363,13 @@ export function applyCommand(
  */
 export function tick(prev: BusinessGameState, now: number): BusinessGameState {
   if (prev.phase === "over") return prev;
+  const melaOver = prev.melas.some((m) => m.mode === "minutes" && now >= m.until);
+  if (melaOver) {
+    const ended = structuredClone(prev);
+    endMelas(ended, now);
+    ended.rev++;
+    return tick(ended, now);
+  }
   const offersExpired = prev.offers.some((o) => o.expiresAt <= now);
   const timeUp = prev.endsAt !== null && now >= prev.endsAt;
   const holdOver = prev.hold !== null && now >= prev.hold.until;

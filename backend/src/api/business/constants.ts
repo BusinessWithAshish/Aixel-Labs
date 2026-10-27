@@ -5,16 +5,23 @@
 
 export const BUSINESS_ROUTES = {
   ROOM: "/rooms/:code",
+  /** Owner only, from the server itself: running matches, and steering a player's luck in one. */
   /** WebSocket upgrade path on the backend HTTP server (not an Express route). */
   WS: "/business/ws",
 } as const;
 
 export const BUSINESS_RULES = {
   START_CASH: 2000,
+  /** Copies of the Mela card in a freshly shuffled Chance deck (the other cards appear once each)… */
+  MELA_CARDS: 5,
+  /** …and one more is shuffled into the deck every this many rounds, so long matches get more melas… */
+  MELA_CARD_EVERY_ROUNDS: 8,
+  /** …while the deck holds fewer than this many. */
+  MELA_CARDS_MAX: 10,
+  /** A mela multiplies the rent of every city in its set by this. */
+  MELA_RENT_MULTIPLIER: 3,
   /** Salary grows with every lap a player completes: lap 1 pays this, lap 2 twice this, and so on. */
   SALARY_STEP: 100,
-  /** Every house on the board (a hotel counts as five) adds this to a railway's rent, however many railways the owner has. */
-  RAIL_RENT_PER_HOUSE: 5,
   /** A levy or a percentage card never takes or pays less than this. */
   PCT_MIN: 50,
   /** Leaving Jail without doubles costs this share of the cash held, shared out among the other players. */
@@ -41,6 +48,8 @@ export const BUSINESS_RULES = {
   MAX_SPLITS: 3,
   /** A split gives the player with one city of the set this share of it, in percent… */
   SPLIT_DEFAULT_PCT: 33,
+  /** …or this share in a two-city set, where each partner holds one city… */
+  SPLIT_PAIR_DEFAULT_PCT: 50,
   SPLIT_MIN_PCT: 10,
   SPLIT_MAX_PCT: 90,
   /** …set in steps of this many percent. */
@@ -103,7 +112,8 @@ export const BUSINESS_SALARY_CAPS = [0, 500, 1000, 1500] as const;
 
 /** Rent as a multiple of price: alone, colour set, 1–4 houses, hotel. */
 export const BUSINESS_RENT_LADDER = [0.1, 0.3, 1, 2.5, 4.5, 6, 7.5] as const;
-export const BUSINESS_RAIL_RENT = [0, 25, 50, 100, 200] as const;
+/** A station's rent is a toll on the cash the lander holds: this share (in percent) for an owner of 1–4 stations. */
+export const BUSINESS_RAIL_TOLL_PCT = [0, 10, 20, 30, 40] as const;
 /** Utility rent is the dice total times this. Every house on the board (a hotel counts as five) adds one to it. */
 export const BUSINESS_UTILITY_MULTIPLIER = { ONE: 4, BOTH: 10 } as const;
 
@@ -125,7 +135,8 @@ export const BUSINESS_PLAYER_COLORS = [
 ] as const;
 
 export const BUSINESS_SETS = {
-  brown: { name: "Brown", color: "#8B5A2B", text: "#FFFFFF", house: 50 },
+  /** Two cities only, so its rent runs half again above its price, or it is never worth owning. */
+  brown: { name: "Brown", color: "#8B5A2B", text: "#FFFFFF", house: 50, rent: 1.5 },
   sky: { name: "Sky", color: "#6CC8F5", text: "#2A1B4D", house: 50 },
   pink: { name: "Pink", color: "#FF7EB6", text: "#2A1B4D", house: 50 },
   orange: { name: "Orange", color: "#FF8A1F", text: "#2A1B4D", house: 100 },
@@ -184,62 +195,68 @@ const chance = (): BusinessSpace => ({ kind: "chance", name: "Chance", icon: "ci
 const market = (): BusinessSpace => ({ kind: "market", name: "Market", icon: "trending-up" });
 
 /**
- * City names are short on purpose (six letters at most): on a phone a tile is
- * about 22px wide, and the name has to be readable on it.
+ * Places in Pune and Pimpri-Chinchwad, priced the way they are in real life: the cheap sets are
+ * gaons (villages) on the edge of PCMC, the middle ones PCMC towns, the dear ones Pune's prime areas.
+ * Names stay short (eight letters at most): on a phone a tile is about 22px wide.
  */
 /** 48 spaces, clockwise from Launch. Index 12 is Jail, 24 Break, 36 Go to Jail. */
 export const BUSINESS_BOARD: readonly BusinessSpace[] = [
   { kind: "launch", name: "Launch", icon: "rocket" },
-  city("Gaya", "brown", 60),
-  city("Puri", "brown", 60),
+  city("Mulshi", "brown", 80),
+  city("Kamshet", "brown", 100),
   chance(),
-  city("Shimla", "sky", 80),
-  city("Leh", "sky", 80),
-  city("Ooty", "sky", 100),
-  rail("North Rail"),
+  city("Dehu", "sky", 80),
+  city("Alandi", "sky", 80),
+  city("Jejuri", "sky", 100),
+  rail("Pune Stn"),
   { kind: "levy", name: "Income Tax", icon: "receipt", pct: 10 },
-  city("Ajmer", "pink", 120),
-  city("Kota", "pink", 120),
-  city("Jaipur", "pink", 140),
+  city("Lavasa", "pink", 120),
+  city("Khandala", "pink", 120),
+  city("Lonavala", "pink", 140),
   { kind: "jail", name: "Jail", icon: "lock-keyhole" },
-  city("Agra", "orange", 160),
-  city("Patna", "orange", 160),
-  city("Kanpur", "orange", 180),
+  city("Akurdi", "orange", 160),
+  city("Nigdi", "orange", 160),
+  city("Pimpri", "orange", 180),
   market(),
   utility("Power", "zap"),
-  rail("Coast Rail"),
+  rail("Pimpri Stn"),
   chance(),
-  city("Nagpur", "red", 200),
-  city("Bhopal", "red", 200),
-  city("Indore", "red", 220),
+  city("Ravet", "red", 200),
+  city("Sangvi", "red", 200),
+  city("Wakad", "red", 220),
   market(),
   { kind: "break", name: "Take a Break", icon: "coffee" },
-  city("Goa", "yellow", 240),
-  city("Mysuru", "yellow", 240),
-  city("Kochi", "yellow", 260),
+  city("Katraj", "yellow", 240),
+  city("Warje", "yellow", 240),
+  city("Wagholi", "yellow", 260),
   chance(),
-  rail("Metro"),
+  rail("Swargate"),
   utility("Telecom", "wifi"),
   market(),
-  city("Ranchi", "green", 280),
-  city("Surat", "green", 280),
-  city("Mohali", "green", 300),
+  city("Pashan", "green", 280),
+  city("Kharadi", "green", 280),
+  city("Kothrud", "green", 300),
   chance(),
   { kind: "gojail", name: "Go to Jail", icon: "siren" },
-  city("Thane", "blue", 320),
-  city("Nashik", "blue", 320),
-  city("Rajkot", "blue", 340),
+  city("Aundh", "blue", 320),
+  city("Viman", "blue", 320),
+  city("Baner", "blue", 340),
   market(),
-  rail("Airport", "plane"),
-  city("Pune", "purple", 360),
-  city("Noida", "purple", 360),
-  city("Vizag", "purple", 380),
+  rail("Lohegaon", "plane"),
+  city("Camp", "purple", 360),
+  city("Deccan", "purple", 360),
+  city("Kalyani", "purple", 380),
   { kind: "levy", name: "Luxury Tax", icon: "receipt", pct: 20 },
-  city("Delhi", "black", 400),
-  city("Mumbai", "black", 400),
+  city("Boat Club", "black", 400),
+  city("Koregaon", "black", 400),
 ];
 
 export const BUSINESS_JAIL_INDEX = 12;
+
+/** The gaon sets: cheap, and the only ones that can hold a mela. */
+export const BUSINESS_MELA_SETS: readonly BusinessSetKey[] = ["brown", "sky", "pink"];
+/** How long a mela lasts, by what its holder picks when it starts. Balanced to run for about the same share of a match. */
+export const BUSINESS_MELA_LENGTHS = { rounds: 6, laps: 1, minutes: 15 } as const;
 
 export type BusinessCardEffect =
   /** Collect this share (in percent) of the cash you hold. */
@@ -253,7 +270,9 @@ export type BusinessCardEffect =
   | { type: "back"; steps: number }
   | { type: "jail" }
   /** A "get out of Jail free" card: kept until it is used, and tradeable like cash. */
-  | { type: "jailcard" };
+  | { type: "jailcard" }
+  /** A Mela card: kept, tradeable, and spent to start a mela on a whole town set. */
+  | { type: "mela" };
 
 export type BusinessCard = { text: string; effect: BusinessCardEffect };
 
@@ -277,6 +296,7 @@ export const BUSINESS_CHANCE_CARDS: readonly BusinessCard[] = [
   { text: "Go back 3 spaces.", effect: { type: "back", steps: 3 } },
   { text: "Go to Jail.", effect: { type: "jail" } },
   { text: "Get out of Jail free. Keep this card until you need it, or trade it.", effect: { type: "jailcard" } },
+  { text: "Mela! Keep this card. Spend it to hold a mela on a whole gaon set you own: its rent is tripled while the mela lasts. Or trade it.", effect: { type: "mela" } },
 ];
 
 export const BUSINESS_ERRORS = {
