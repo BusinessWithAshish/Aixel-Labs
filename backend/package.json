@@ -70,6 +70,18 @@
       "types": "./src/api/crawl/constants.ts",
       "default": "./src/api/crawl/constants.ts"
     },
+    "./content-lab/types": {
+      "types": "./src/api/content-lab/types.ts",
+      "default": "./src/api/content-lab/types.ts"
+    },
+    "./content-lab/constants": {
+      "types": "./src/api/content-lab/constants.ts",
+      "default": "./src/api/content-lab/constants.ts"
+    },
+    "./content-lab/schemas": {
+      "types": "./src/api/content-lab/schemas.ts",
+      "default": "./src/api/content-lab/schemas.ts"
+    },
     "./gsearch": {
       "types": "./src/api/gsearch/index.ts",
       "default": "./src/api/gsearch/index.ts"

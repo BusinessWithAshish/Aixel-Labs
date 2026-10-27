@@ -1,4 +1,5 @@
 import {
+    CONTENT_LAB_SUB_MODULES,
     EMAIL_SUB_MODULES,
     LEAD_ENRICHMENT_SUB_MODULES,
     LEAD_GENERATION_SUB_MODULES,
@@ -39,7 +40,28 @@ export const SubModuleUrls: Record<SubModule, string> = {
     [EMAIL_SUB_MODULES.WARM_OUTREACH]: '/email',
     [EMAIL_SUB_MODULES.TEMPLATES]: '/email',
     [EMAIL_SUB_MODULES.AI_REPLIES]: '/email',
+    [CONTENT_LAB_SUB_MODULES.SEARCH]: '/content-lab/search',
+    [CONTENT_LAB_SUB_MODULES.BOARDS]: '/content-lab/boards',
+    [CONTENT_LAB_SUB_MODULES.WATCHING]: '/content-lab/watching',
+    [CONTENT_LAB_SUB_MODULES.SETTINGS]: '/content-lab/settings',
 };
+
+/** Content Lab pages under Search; nested so the Search grant covers them (path ACL is prefix-based). */
+export const CONTENT_LAB_EXPLORE_ROUTE = `${SubModuleUrls[CONTENT_LAB_SUB_MODULES.SEARCH]}/explore`;
+export const CONTENT_LAB_CHECK_ROUTE = `${SubModuleUrls[CONTENT_LAB_SUB_MODULES.SEARCH]}/check`;
+export const contentLabPostRoute = (postId: string) =>
+    `${SubModuleUrls[CONTENT_LAB_SUB_MODULES.SEARCH]}/post/${encodeURIComponent(postId)}`;
+export const contentLabBoardRoute = (boardId: string) =>
+    `${SubModuleUrls[CONTENT_LAB_SUB_MODULES.BOARDS]}/${encodeURIComponent(boardId)}`;
+/** Browser → Next BFF for every Content Lab data/AI call (mockable in e2e, like LEAD_GEN_SCRAPE_API_ROUTE). */
+export const CONTENT_LAB_API_ROUTES = {
+    EXPLORE: '/api/content-lab/explore',
+    BREAKDOWN: '/api/content-lab/breakdown',
+    CHECK: '/api/content-lab/check',
+    CREATOR: '/api/content-lab/creator',
+    WRITE: '/api/content-lab/write',
+    ADS: '/api/content-lab/ads',
+} as const;
 
 export const DEFAULT_LOGO_SRC = '/aixellabs-logo.svg';
 

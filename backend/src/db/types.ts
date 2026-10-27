@@ -13,6 +13,7 @@ import {
   LINKEDIN_BY_PEOPLE_RESPONSE,
 } from "../api/linkedin/types";
 import type { CRAWL_RESPONSE } from "../api/crawl";
+import type { ContentLabFormat, ContentLabPlatform } from "../api/content-lab/types";
 import voiceCallRates from "./voice-call-rates.json";
 
 export enum TenantType {
@@ -37,6 +38,11 @@ export enum MongoCollections {
   VOICE_BOOKINGS = "voice_bookings",
   VOICE_CAMPAIGNS = "voice_campaigns",
   VOICE_CAMPAIGN_CONTACTS = "voice_campaign_contacts",
+  /** One per user: their own handles (for "my voice" / "compare with mine") and defaults. */
+  CONTENT_LAB_PROFILES = "content_lab_profiles",
+  CONTENT_LAB_BOARDS = "content_lab_boards",
+  /** One per (user, platform, handle) the user watches, with its latest standout posts. */
+  CONTENT_LAB_WATCHLIST = "content_lab_watchlist",
 }
 
 export enum Modules {
@@ -45,6 +51,7 @@ export enum Modules {
   MESSAGING = "MESSAGING",
   EMAIL = "EMAIL",
   LEAD_ENRICHMENT = "LEAD_ENRICHMENT",
+  CONTENT_LAB = "CONTENT_LAB",
 }
 
 export enum LEAD_GENERATION_SUB_MODULES {
@@ -86,12 +93,21 @@ export enum LEAD_ENRICHMENT_SUB_MODULES {
   PHONE_VERIFICATION = "PHONE_VERIFICATION",
 }
 
+/** Values are prefixed: SubModule values share one key space (`SubModuleUrls`), and VOICE_AGENT already has SETTINGS. */
+export enum CONTENT_LAB_SUB_MODULES {
+  SEARCH = "CONTENT_LAB_SEARCH",
+  BOARDS = "CONTENT_LAB_BOARDS",
+  WATCHING = "CONTENT_LAB_WATCHING",
+  SETTINGS = "CONTENT_LAB_SETTINGS",
+}
+
 export type SubModule =
   | LEAD_GENERATION_SUB_MODULES
   | VOICE_AGENT_SUB_MODULES
   | MESSAGING_SUB_MODULES
   | EMAIL_SUB_MODULES
-  | LEAD_ENRICHMENT_SUB_MODULES;
+  | LEAD_ENRICHMENT_SUB_MODULES
+  | CONTENT_LAB_SUB_MODULES;
 
 export type ModuleAccess = {
   [Modules.LEAD_GENERATION]?: LEAD_GENERATION_SUB_MODULES[];
@@ -99,6 +115,7 @@ export type ModuleAccess = {
   [Modules.MESSAGING]?: MESSAGING_SUB_MODULES[];
   [Modules.EMAIL]?: EMAIL_SUB_MODULES[];
   [Modules.LEAD_ENRICHMENT]?: LEAD_ENRICHMENT_SUB_MODULES[];
+  [Modules.CONTENT_LAB]?: CONTENT_LAB_SUB_MODULES[];
 };
 
 export type LeadData =
@@ -1389,3 +1406,119 @@ export type VoiceCampaignContactDoc<Id = ObjectId> = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+// ─── Content Lab ─────────────────────────────────────────────────────────────
+
+/** What a Write node produces, one per platform format. */
+export const CONTENT_LAB_WRITE_FORMATS = ["youtube-script", "reel", "carousel", "linkedin-post", "x-thread"] as const;
+export type ContentLabWriteFormat = (typeof CONTENT_LAB_WRITE_FORMATS)[number];
+
+export enum ContentLabNodeKind {
+  /** Auto: the user's own voice, from their saved handles. */
+  VOICE = "voice",
+  /** Live: what's working for a topic (explore). */
+  WORKING = "working",
+  /** Live: one creator's standout posts. */
+  CREATOR = "creator",
+  /** Live: the user's watchlist. */
+  WATCHING = "watching",
+  /** Auto: one pasted post's breakdown. */
+  POST = "post",
+  /** Auto: hooks, structure and CTAs pulled from every post/outlier node wired into it. */
+  HOOKS = "hooks",
+  /** Live: competitor ads (ad library). */
+  ADS = "ads",
+  NOTE = "note",
+  WRITE = "write",
+  OUTPUT = "output",
+  /** Auto: scores the output wired into it against the niche's winners. */
+  CHECK = "check",
+}
+
+/** Settings of one node; which fields apply depends on `kind`. */
+export type ContentLabNodeData = {
+  title?: string;
+  query?: string;
+  platforms?: ContentLabPlatform[];
+  country?: string;
+  platform?: ContentLabPlatform;
+  handle?: string;
+  url?: string;
+  /** Note text, or an Output's draft. */
+  text?: string;
+  format?: ContentLabWriteFormat;
+  language?: string;
+};
+
+export type ContentLabBoardNode = {
+  id: string;
+  kind: ContentLabNodeKind;
+  x: number;
+  y: number;
+  data: ContentLabNodeData;
+};
+
+export type ContentLabBoardEdge = { id: string; source: string; target: string };
+
+export type ContentLabBoardDoc<Id = ObjectId> = {
+  _id?: Id;
+  userId: Id;
+  title: string;
+  /** Template it started from, or null for a blank board. */
+  templateId: string | null;
+  nodes: ContentLabBoardNode[];
+  edges: ContentLabBoardEdge[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ContentLabBoard = Omit<ContentLabBoardDoc<string>, "createdAt" | "updatedAt"> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ContentLabStandout = {
+  postId: string;
+  title: string;
+  url: string;
+  format: ContentLabFormat;
+  multiple: number;
+  publishedAt: string | null;
+};
+
+export type ContentLabWatchDoc<Id = ObjectId> = {
+  _id?: Id;
+  userId: Id;
+  platform: ContentLabPlatform;
+  /** As typed, normalised: no leading @, lowercase. */
+  handle: string;
+  name: string | null;
+  followers: number | null;
+  usualViews: number | null;
+  /** Posts at or above the outlier multiple, newest first. */
+  standouts: ContentLabStandout[];
+  lastCheckedAt: Date | null;
+  createdAt: Date;
+};
+
+export type ContentLabWatch = Omit<ContentLabWatchDoc<string>, "lastCheckedAt" | "createdAt"> & {
+  lastCheckedAt: string | null;
+  createdAt: string;
+};
+
+export const CONTENT_LAB_BETA_PLATFORMS = ["x", "linkedin"] as const;
+export type ContentLabBetaPlatform = (typeof CONTENT_LAB_BETA_PLATFORMS)[number];
+
+export type ContentLabProfileDoc<Id = ObjectId> = {
+  _id?: Id;
+  userId: Id;
+  /** The user's own accounts, by platform (public handles; no login needed). */
+  handles: Partial<Record<ContentLabPlatform, string>>;
+  /** X and LinkedIn handles: stored now, used once those platforms leave beta (no data source yet). */
+  betaHandles?: Partial<Record<ContentLabBetaPlatform, string>>;
+  country: string;
+  language: string;
+  updatedAt: Date;
+};
+
+export type ContentLabProfile = Omit<ContentLabProfileDoc<string>, "updatedAt"> & { updatedAt: string };

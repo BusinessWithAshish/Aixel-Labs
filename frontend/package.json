@@ -45,6 +45,7 @@
     "@telnyx/webrtc": "2.27.10",
     "@thumbmarkjs/thumbmarkjs": "^1.10.1",
     "@twilio/voice-sdk": "^2.18.5",
+    "@xyflow/react": "^12.12.0",
     "ai": "^6.0.105",
     "aws-sdk": "^2.1691.0",
     "axios": "^1.11.0",

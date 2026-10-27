@@ -5,6 +5,7 @@ import {
     MESSAGING_SUB_MODULES,
     LEAD_ENRICHMENT_SUB_MODULES,
     EMAIL_SUB_MODULES,
+    CONTENT_LAB_SUB_MODULES,
     type ModuleAccess,
     type SubModule,
 } from '@aixellabs/backend/db/types';
@@ -24,6 +25,8 @@ export function getSubModulesForModule(module: Modules): SubModule[] {
             return Object.values(EMAIL_SUB_MODULES);
         case Modules.LEAD_ENRICHMENT:
             return Object.values(LEAD_ENRICHMENT_SUB_MODULES);
+        case Modules.CONTENT_LAB:
+            return Object.values(CONTENT_LAB_SUB_MODULES);
         default:
             const _exhaustive: never = module;
             return [];
@@ -45,6 +48,7 @@ export function getDefaultModuleAccess(): ModuleAccess {
         [Modules.MESSAGING]: Object.values(MESSAGING_SUB_MODULES),
         [Modules.EMAIL]: Object.values(EMAIL_SUB_MODULES),
         [Modules.LEAD_ENRICHMENT]: Object.values(LEAD_ENRICHMENT_SUB_MODULES),
+        [Modules.CONTENT_LAB]: Object.values(CONTENT_LAB_SUB_MODULES),
     };
 }
 
