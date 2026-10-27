@@ -2162,6 +2162,35 @@
     background: linear-gradient(180deg, #74bcff, #2470cc);
     box-shadow: 0 3px 0 var(--blue-d);
 }
+.bb .deal.melad {
+    --dc: #ff4fa0;
+}
+.bb .banner.mela {
+    background: linear-gradient(180deg, #ff6fb1, #c41f63);
+    box-shadow: 0 3px 0 #8a1243;
+}
+/* A city in a mela: a festive rim and a ×3 flag on it, so everyone sees where not to land. */
+.bb .tile.mela {
+    box-shadow: inset 0 0 0 calc(0.45 * var(--u)) #ff4fa0;
+}
+.bb .tile .melaflag {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 3;
+    padding: calc(0.2 * var(--u)) calc(0.45 * var(--u));
+    border-bottom-left-radius: calc(1 * var(--u));
+    font-family: var(--bb-num);
+    font-size: calc(2.3 * var(--u));
+    line-height: 1;
+    color: #fff;
+    background: #e0287a;
+    animation: bb-mela 1.4s ease-in-out infinite alternate;
+}
+@keyframes bb-mela {
+    from { transform: scale(1); }
+    to { transform: scale(1.12); }
+}
 .bb .log {
     list-style: none;
     padding: 0;
@@ -4440,6 +4469,10 @@
 .bb .minicard.jailchip {
     color: #5e3408;
     background: linear-gradient(180deg, #ffe07a, #f5ae1b);
+}
+.bb .minicard.melachip {
+    color: #fff;
+    background: linear-gradient(180deg, #ff6fb1, #d6246e);
 }
 
 /* One player sent another to Jail: the culprit wears horns and gloats, the victim sits behind bars. */

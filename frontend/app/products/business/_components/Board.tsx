@@ -9,7 +9,7 @@ import {
     BUSINESS_SETS,
     type BusinessSpace,
 } from '@aixellabs/backend/business/constants';
-import { splitAt } from '@aixellabs/backend/business/compute';
+import { melaAt, splitAt } from '@aixellabs/backend/business/compute';
 import { useBoardUnit } from '../_hooks/use-board-unit';
 import type { BusinessProperty, BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
@@ -110,10 +110,12 @@ type TileProps = {
     selected: boolean;
     /** Faded: while a player is raising cash, everything that is not theirs steps back. */
     dim: boolean;
+    /** Its set is holding a mela: rent is multiplied, and the tile says so. */
+    mela: boolean;
     onSelect: (index: number) => void;
 };
 
-const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, selected, dim, onSelect }: TileProps) {
+const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, selected, dim, mela, onSelect }: TileProps) {
     const [row, col] = cell(index);
     const where = side(index);
     const set = space.set ? BUSINESS_SETS[space.set] : null;
@@ -125,7 +127,7 @@ const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, s
     return (
         <button
             type="button"
-            className={cn('tile', where, `k-${space.kind}`, selected && 'sel', dim && 'dim', prop?.mortgaged && 'mort', houses > 0 && 'built', space.name.length > 8 && 'long')}
+            className={cn('tile', where, `k-${space.kind}`, selected && 'sel', dim && 'dim', prop?.mortgaged && 'mort', houses > 0 && 'built', mela && 'mela', space.name.length > 8 && 'long')}
             style={{ gridArea: `${row} / ${col}` }}
             aria-label={space.price ? `${space.name}, ${rs(space.price)}` : space.name}
             onClick={() => onSelect(index)}
@@ -169,6 +171,7 @@ const Tile = memo(function Tile({ index, space, prop, ownerColor, lenderColor, s
                     <BankIcon />
                 </span>
             )}
+            {mela && <span className="melaflag">×{BUSINESS_RULES.MELA_RENT_MULTIPLIER}</span>}
             {lenderColor && (
                 <span className="cover share" style={cssVars({ '--bc': lenderColor ?? '#6A35E0' })}>
                     <Handshake />
@@ -228,6 +231,7 @@ export function Board({ state, shown, moving, pace, selected, onSelect, onMarket
                                 lenderColor={partnerColor(i, prop?.owner)}
                                 selected={selected === i}
                                 dim={faded(i, prop?.owner)}
+                                mela={!!melaAt(state, i)}
                                 onSelect={onSelect}
                             />
                         );

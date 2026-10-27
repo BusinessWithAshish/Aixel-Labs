@@ -1,7 +1,7 @@
 'use client';
 
-import { ArrowLeftRight, ChevronsRight, Dices, Gauge, Gavel, Handshake, KeyRound, Landmark, LockKeyhole, Siren, UserX } from 'lucide-react';
-import { BUSINESS_BOARD, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
+import { ArrowLeftRight, ChevronsRight, Dices, Gauge, Gavel, Handshake, KeyRound, Landmark, LockKeyhole, PartyPopper, Siren, UserX } from 'lucide-react';
+import { BUSINESS_BOARD, BUSINESS_RULES, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
 import type { BusinessFx, BusinessLogEntry, BusinessPublicState } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
 import { cssVars } from '../_lib/art';
@@ -22,6 +22,7 @@ export function dealSound(fx: BusinessFx): BusinessSound | null {
     if (fx.kind === 'rent') return 'rent';
     if (fx.kind === 'salary') return 'salary';
     if (fx.kind === 'loan' || fx.kind === 'repay' || fx.kind === 'trade' || fx.kind === 'interest' || fx.kind === 'split' || fx.kind === 'bail') return 'loan';
+    if (fx.kind === 'mela') return 'win';
     return fx.to === null ? 'pay' : 'income';
 }
 
@@ -49,7 +50,7 @@ export function dealFromLog(entry: BusinessLogEntry): Deal | null {
     if (!entry.fx || quietSound(entry.fx)) return null;
     // These are news even without an amount: trades, players going out or to Jail, a flat
     // Market, and other players' loans (announced without their numbers).
-    const newsAnyway = ['trade', 'out', 'jail', 'market', 'loan', 'split', 'bail'];
+    const newsAnyway = ['trade', 'out', 'jail', 'market', 'loan', 'split', 'bail', 'mela'];
     if (entry.fx.amount <= 0 && !newsAnyway.includes(entry.fx.kind)) return null;
     return { id: entry.n, fx: entry.fx, text: entry.text };
 }
@@ -91,6 +92,8 @@ function caption(state: BusinessPublicState, deal: Deal): string {
             return `${name(fx.from)} is out of the match`;
         case 'bail':
             return fx.to === null ? 'Out free with a Jail card' : `${name(fx.to)} bailed ${name(fx.from)} out of Jail`;
+        case 'mela':
+            return `Mela in the ${fx.set ? BUSINESS_SETS[fx.set].name : ''} set!`;
         case 'split':
             return fx.amount === 0 && !deal.text.includes('no longer') ? `${name(fx.from)} and ${name(fx.to)} split a colour set` : 'Split ended: the houses went back to the bank';
     }
@@ -198,6 +201,26 @@ export function DealBanner({ state, deal }: { state: BusinessPublicState; deal: 
                 <Icon className="dl-siren" />
                 <div className="dl-cap">{caption(state, deal)}</div>
                 <div className="dl-sub">{p.name} goes to Jail</div>
+            </div>
+        );
+    }
+    if (fx.kind === 'mela' && fx.from !== null) {
+        // A festival: the holder, the set's colour, and how long the tripled rent lasts.
+        const lasts = deal.text.split(' for ').pop()?.replace(/\.$/, '') ?? '';
+        return (
+            <div key={deal.id} className="deal melad">
+                <div className="dl-row">
+                    <Party state={state} seat={fx.from} />
+                    <span className="dl-arrow" aria-hidden="true">
+                        <PartyPopper className="dl-chev swap" />
+                    </span>
+                    <span className="dl-party">
+                        <span className="dl-ph" style={cssVars({ '--sc': fx.set ? BUSINESS_SETS[fx.set].color : '#241A3D' })} />
+                        <b>{BUSINESS_RULES.MELA_RENT_MULTIPLIER}× rent</b>
+                    </span>
+                </div>
+                <div className="dl-cap">{caption(state, deal)}</div>
+                <div className="dl-sub">for {lasts}</div>
             </div>
         );
     }

@@ -9,6 +9,21 @@ export type BusinessUpdate = { id: number; title: string; points: string[] };
 
 export const BUSINESS_UPDATES: readonly BusinessUpdate[] = [
     {
+        id: 5,
+        title: 'Pune board and the Mela',
+        points: [
+            'The board is now Pune and PCMC: gaons like Mulshi, Dehu and Lonavala up to Boat Club and Koregaon.',
+            'New Mela cards in Chance: own a whole gaon set (brown, sky or pink) and hold a mela for 3× rent on all of it.',
+            'Pick how long: 6 rounds, until you next pass Launch, or 15 minutes. Trade Mela cards like Jail cards.',
+            'The longer the match, the more Mela cards come into the deck.',
+            'Stations are tolls now: 10%, 20%, 30% or 40% of the cash of whoever lands, by how many the owner has.',
+            'Brown is worth having: Mulshi costs ₹80, Kamshet ₹100, and both charge 1.5× the usual rent.',
+            'Brown and black can now be split too: one city each, and the player with the dearer city builds.',
+            'In Jail you can still trade cards (Jail free and Mela).',
+            'A bail offered from Take a Break can still be accepted after the helper rolls on.',
+        ],
+    },
+    {
         id: 4,
         title: 'Fairer Jail, safer exits',
         points: [
