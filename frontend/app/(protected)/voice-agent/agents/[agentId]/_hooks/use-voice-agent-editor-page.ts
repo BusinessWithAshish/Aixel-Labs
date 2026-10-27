@@ -34,6 +34,7 @@ import type { VoiceAgentStackOptions } from '@/app/actions/voice-settings-action
 import { setNumberAgent, unlinkAgentNumber, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 import { estimateAgentCost } from '@/helpers/voice-call-cost';
 import { voiceCallBlockers } from '@/helpers/voice-call-readiness';
+import { channelOf } from '@/helpers/voice-agent-channels';
 import {
     disconnectVoiceApp,
     listVoiceAppCalendars,
@@ -620,6 +621,7 @@ export function useVoiceAgentEditorPage({
         stack,
         keys: stackOptions.keys,
         onNumber: usage.inbound.length + usage.outbound.length > 0,
+        channel: channelOf(saved),
     });
     const thinker = stack.kind === VoiceStackKind.REALTIME ? stack : stack.llm;
     const costEstimate = estimateAgentCost({

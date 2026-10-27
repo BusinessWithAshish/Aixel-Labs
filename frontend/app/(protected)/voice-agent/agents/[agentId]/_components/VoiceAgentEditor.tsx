@@ -4,7 +4,7 @@ import type { FormEvent } from 'react';
 import { format } from 'date-fns';
 import { Controller, FormProvider } from 'react-hook-form';
 import { Loader2, Save, Trash2 } from 'lucide-react';
-import { VOICE_AGENT_LIMITS, VoiceAgentCallType } from '@aixellabs/backend/db/types';
+import { VOICE_AGENT_LIMITS, VoiceAgentCallType, VoiceAgentChannel } from '@aixellabs/backend/db/types';
 import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -15,7 +15,9 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
 import { VOICE_AGENT_CALL_TYPES, VOICE_AGENT_PROMPT_TEMPLATES } from '@/helpers/voice-agent-defaults';
 import { AgentChannelBadge } from '@/components/common/voice-agent/AgentChannelBadge';
-import { channelsOfProviders } from '@/helpers/voice-agent-channels';
+import { CHANNEL_WORDS, channelOf, servesPhone } from '@/helpers/voice-agent-channels';
+import { RadioCards } from '@/components/wrappers/RadioCards';
+import { DuplicateAgentButton } from './DuplicateAgentButton';
 import { VoiceAgentCallTypeBadge } from '../../_components/VoiceAgentCallTypeBadge';
 import { VoiceAgentCallTypeSelect } from '../../_components/VoiceAgentCallTypeSelect';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
@@ -95,9 +97,7 @@ export function VoiceAgentEditor() {
                             <CardTitle className="flex flex-wrap items-center gap-2">
                                 Agent
                                 <VoiceAgentCallTypeBadge callType={form.callType} />
-                                <AgentChannelBadge
-                                    channels={channelsOfProviders([...usage.inbound, ...usage.outbound].map((n) => n.provider))}
-                                />
+                                <AgentChannelBadge channel={channelOf(form)} />
                             </CardTitle>
                             <CardDescription>
                                 {agentDirty ? (
@@ -121,6 +121,7 @@ export function VoiceAgentEditor() {
                                     </Button>
                                 ) : null}
                                 <AgentTestButton />
+                                <DuplicateAgentButton />
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -140,7 +141,10 @@ export function VoiceAgentEditor() {
                         </CardHeader>
 
                         <CardContent className="grid gap-5">
-                            <CallBlockers blockers={phoneBlockers} />
+                            <CallBlockers
+                                blockers={phoneBlockers}
+                                title={servesPhone(channelOf(saved)) ? undefined : 'It can’t answer chats or calls yet'}
+                            />
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <StringControlledField
                                     name="name"
@@ -167,6 +171,25 @@ export function VoiceAgentEditor() {
                                     )}
                                 />
                             </div>
+
+                            {form.callType === VoiceAgentCallType.INBOUND ? (
+                                <Controller
+                                    control={agentForm.control}
+                                    name="channel"
+                                    render={({ field }) => (
+                                        <Field>
+                                            <FieldLabel id="agent-channel-label">Where it works</FieldLabel>
+                                            <RadioCards
+                                                value={field.value ?? VoiceAgentChannel.PHONE}
+                                                onValueChange={field.onChange}
+                                                options={Object.values(VoiceAgentChannel).map((value) => ({ value, ...CHANNEL_WORDS[value] }))}
+                                                aria-labelledby="agent-channel-label"
+                                                className="lg:grid-cols-3"
+                                            />
+                                        </Field>
+                                    )}
+                                />
+                            ) : null}
 
                             <AgentStackSection />
 

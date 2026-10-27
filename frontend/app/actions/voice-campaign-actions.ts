@@ -7,6 +7,7 @@ import {
     VOICE_AGENT_SUB_MODULES,
     VOICE_CAMPAIGN_LIMITS,
     VoiceAgentCallType,
+    VoiceAgentChannel,
     VoiceCampaignContactStatus,
     VoiceCampaignStatus,
     VoiceProvider,
@@ -324,6 +325,7 @@ export const getVoiceCampaignSetup = async (): Promise<ALApiResponse<VoiceCampai
                 id: d._id.toString(),
                 name: d.name,
                 callType: VoiceAgentCallType.OUTBOUND,
+                channel: VoiceAgentChannel.PHONE,
                 variables: customVariableNames(d.prompt ?? '', d.voicemail?.message ?? '').map((name) => ({
                     name,
                     value: d.variables?.[name] ?? '',

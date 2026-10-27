@@ -9,13 +9,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { voiceAgentVoiceCharacter, voiceAgentVoiceName } from '@/helpers/voice-agent-defaults';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
 import { AgentChannelBadge } from '@/components/common/voice-agent/AgentChannelBadge';
-import type { AgentChannels } from '@/helpers/voice-agent-channels';
 import { VoiceAgentCallTypeBadge } from './VoiceAgentCallTypeBadge';
 
 type VoiceAgentCardProps = {
     agent: VoiceAgent;
-    /** Where it talks to people, from the numbers it is on. */
-    channels?: AgentChannels;
 };
 
 /** First non-heading line of the prompt, as a one-glance summary. */
@@ -23,7 +20,7 @@ function promptPreview(prompt: string): string {
     return prompt.split('\n').find((line) => line.trim() && !line.trimStart().startsWith('#')) ?? '';
 }
 
-export function VoiceAgentCard({ agent, channels }: VoiceAgentCardProps) {
+export function VoiceAgentCard({ agent }: VoiceAgentCardProps) {
     const character = voiceAgentVoiceCharacter(agent.voice);
     const preview = promptPreview(agent.prompt);
 
@@ -42,7 +39,7 @@ export function VoiceAgentCard({ agent, channels }: VoiceAgentCardProps) {
                         <CardTitle className="truncate">{agent.name}</CardTitle>
                         <div className="flex flex-wrap gap-1.5">
                             <VoiceAgentCallTypeBadge callType={agent.callType} />
-                            <AgentChannelBadge channels={channels} />
+                            <AgentChannelBadge channel={agent.channel} />
                             <Badge variant="secondary">
                                 {voiceAgentVoiceName(agent.voice)}
                                 {character ? <span className="text-muted-foreground">· {character}</span> : null}

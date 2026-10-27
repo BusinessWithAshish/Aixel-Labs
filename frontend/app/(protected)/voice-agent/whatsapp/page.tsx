@@ -4,8 +4,9 @@ import { PageProvider } from '@/contexts/PageStore';
 import { getInboxThread, listInboxThreads } from '@/app/actions/voice-inbox-actions';
 import { useInboxPage } from './_hooks/use-inbox-page';
 import { InboxContent } from './_components/InboxContent';
+import { WhatsAppTabs } from './_components/WhatsAppTabs';
 
-const PAGE_TITLE = 'WhatsApp Inbox';
+const PAGE_TITLE = 'WhatsApp';
 
 async function InboxPage({ searchParams }: { searchParams: Promise<{ c?: string | string[] }> }) {
     const { c } = await searchParams;
@@ -17,6 +18,7 @@ async function InboxPage({ searchParams }: { searchParams: Promise<{ c?: string 
 
     return (
         <PageLayout title={PAGE_TITLE} className="flex flex-col gap-4 p-1">
+            <WhatsAppTabs />
             <PageProvider
                 data={{
                     threads: threadsRes.success && threadsRes.data ? threadsRes.data : [],

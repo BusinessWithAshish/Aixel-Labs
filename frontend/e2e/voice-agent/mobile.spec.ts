@@ -6,6 +6,7 @@ import { encryptOverrides } from 'flags';
 import {
     VOICE_AGENT_SUB_MODULES,
     VoiceAgentCallType,
+    VoiceAgentChannel,
     VoiceBookingStatus,
     VoiceCallChannel,
     VoiceCallDirection,
@@ -13,6 +14,7 @@ import {
 } from '@aixellabs/backend/db/types';
 import { SubModuleUrls } from '@/config/app-config';
 import { FeatureFlagKey } from '@/flags';
+import { WHATSAPP_AGENTS_URL, WHATSAPP_NUMBERS_URL, WHATSAPP_URL } from '@/helpers/voice-routes';
 import { expect, test } from '../support/fixtures';
 import { E2E_ARTIFACTS_DIR, E2E_BASE_URL, E2E_FLAGS_SECRET, USER_STORAGE_STATE } from '../support/env';
 import {
@@ -26,7 +28,12 @@ import {
 import { E2E_USER } from '../support/users';
 import {
     CALL_LOGS_URL,
+    FAKE_META_APP_ID,
+    FAKE_META_APP_SECRET,
+    FAKE_META_TOKEN,
     FAKE_TELNYX_KEY,
+    FAKE_WABA_ID,
+    FAKE_WHATSAPP_NUMBER,
     FAKE_VOICELINK_TOKEN,
     FakeTelnyx,
     makeTestWav,
@@ -43,6 +50,7 @@ const BOOKINGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS];
 const WEB_DIALER_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.WEB_DIALER];
 const VIEWPORTS = {
     phone: { width: 390, height: 844 },
+    tablet: { width: 768, height: 1024 },
     desktop: { width: 1440, height: 900 },
 };
 const SCREENS_DIR = path.join(E2E_ARTIFACTS_DIR, 'voice-agent-screens');
@@ -338,6 +346,89 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await db.resetVoiceBookings(E2E_USER);
             await open(BOOKINGS_URL);
             await check('bookings-empty');
+
+            // WhatsApp: the Telnyx line is on WhatsApp too, answered by the same agent; a chat a person took over.
+            await db.updateVoiceAgent(frontDesk, { channel: VoiceAgentChannel.BOTH });
+            const whatsappNumber = await db.insertVoiceNumber(E2E_USER, {
+                provider: VoiceProvider.WHATSAPP,
+                phoneNumber: FAKE_WHATSAPP_NUMBER.phone,
+                providerNumberId: FAKE_WHATSAPP_NUMBER.id,
+                apiKeySealed: sealForE2e(FAKE_META_TOKEN),
+                inboundAgentId: new ObjectId(frontDesk),
+                whatsapp: {
+                    appId: FAKE_META_APP_ID,
+                    appSecretSealed: sealForE2e(FAKE_META_APP_SECRET),
+                    wabaId: FAKE_WABA_ID,
+                    calling: {
+                        on: false,
+                        problem:
+                            'Meta turns on calling only for numbers that can message at least 2,000 people a day. Verify your business in Meta Business Settings (Security Center) to raise the limit, then try again.',
+                    },
+                },
+            });
+            const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000);
+            await db.insertVoiceCalls(E2E_USER, [
+                {
+                    agentId: new ObjectId(frontDesk),
+                    numberId: new ObjectId(whatsappNumber),
+                    channel: VoiceCallChannel.WHATSAPP,
+                    direction: VoiceCallDirection.INBOUND,
+                    from: '+919876543210',
+                    to: FAKE_WHATSAPP_NUMBER.phone,
+                    callerPhone: '+919876543210',
+                    voice: 'sulafat',
+                    startedAt: at(30),
+                    endedAt: at(2),
+                    durationSec: 0,
+                    endedBy: 'chat_open',
+                    turns: [
+                        { role: 'caller', text: 'Hi, is Dr. Rao in on Saturday? I need a cleaning and maybe whitening too.', at: at(30) },
+                        { role: 'agent', text: 'Dr. Rao sees patients *Saturday 10 am to 2 pm*. Shall I book a cleaning at 11?', at: at(30) },
+                        { role: 'caller', text: 'Can I get a cleaning at 11 and what does whitening cost?', at: at(20), voice: true },
+                        { role: 'agent', text: 'Booked for Saturday at 11. Whitening is quoted at the visit.', at: at(20), voice: true },
+                        { role: 'caller', text: 'https://maps.example.com/sunrise-dental-clinic-koramangala-bengaluru-560034?ref=whatsapp-share-link', at: at(5) },
+                        { role: 'human', text: 'Hi Ravi, Priya here from billing: whitening is ₹6,000 a session.', at: at(2), by: 'Priya' },
+                    ],
+                    chat: {
+                        open: true,
+                        lastMessageAt: at(2),
+                        tokens: { textIn: 2400, textOut: 140 },
+                        human: { since: at(3), userId: new ObjectId(), name: 'Priya' },
+                        name: 'Ravi Kumar Venkataraman Subramanian',
+                        unread: 0,
+                    },
+                } as never,
+            ]);
+            await open(WHATSAPP_URL);
+            await check('whatsapp-inbox');
+            await page.getByRole('button', { name: /Ravi Kumar/ }).click();
+            await expect(page.getByRole('button', { name: 'Hand back to AI' })).toBeVisible();
+            await check('whatsapp-thread');
+            await open(WHATSAPP_AGENTS_URL);
+            await check('whatsapp-agents');
+            await open(WHATSAPP_NUMBERS_URL);
+            await expect(page.getByTestId('number-twin')).toBeVisible();
+            await check('whatsapp-numbers');
+            await page.getByRole('button', { name: 'Connect a WhatsApp number' }).first().click();
+            await expect(page.getByRole('dialog', { name: 'Connect a WhatsApp number' })).toBeVisible();
+            await check('whatsapp-connect');
+            await page.keyboard.press('Escape');
+            await open(PHONE_NUMBERS_URL);
+            await expect(page.getByTestId('number-twin')).toBeVisible();
+            await check('phone-numbers-twin');
+
+            // The agent on both: its editor, Duplicate, and the test dialog's WhatsApp chat.
+            await page.goto(voiceAgentUrl(frontDesk));
+            await waitForHydration(page, '#agent-prompt');
+            await check('agent-editor-both');
+            await page.getByRole('button', { name: 'Duplicate' }).click();
+            await expect(page.getByRole('dialog', { name: /^Duplicate/ })).toBeVisible();
+            await check('agent-duplicate');
+            await page.keyboard.press('Escape');
+            await page.getByRole('button', { name: 'Call this agent' }).click();
+            await page.getByRole('tab', { name: 'WhatsApp chat' }).click();
+            await check('agent-test-whatsapp');
+            await page.keyboard.press('Escape');
 
             // Web dialer (behind a flag): the phone, its recents, the in-call screen (the microphone prompt
             // never answers, so no call is placed), and with no number.

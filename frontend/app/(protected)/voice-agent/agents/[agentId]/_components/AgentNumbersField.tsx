@@ -10,7 +10,8 @@ import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
-import { VOICE_PHONE_NUMBERS_URL } from '@/helpers/voice-routes';
+import { VOICE_PHONE_NUMBERS_URL, WHATSAPP_NUMBERS_URL } from '@/helpers/voice-routes';
+import { channelOf, numberInScope, servesPhone, servesWhatsApp, type AgentScope } from '@/helpers/voice-agent-channels';
 import { linkedNumbers, type UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 
 /** The agent in the number's slot for this type (inbound: answers it, outbound: calls from it), if any. */
@@ -45,11 +46,28 @@ type Takeover = { id: string; phoneNumber: string; holder: string; holderKeepsOn
  * agent's slot on it at once (asking first when another agent has that slot) and lets its previous number go.
  */
 export function AgentNumbersField() {
-    const { agentId, saved, form, usage, ownedNumbers, numbers, linking, linkNumbers } =
-        usePage<UseVoiceAgentEditorPageReturn>();
+    const { saved } = usePage<UseVoiceAgentEditorPageReturn>();
+    const channel = channelOf(saved);
+    return (
+        <>
+            {servesPhone(channel) ? <NumberPicker kind="phone" /> : null}
+            {servesWhatsApp(channel) ? <NumberPicker kind="whatsapp" /> : null}
+        </>
+    );
+}
+
+/** The agent's number of one kind (a phone line, or a WhatsApp number): a Phone + WhatsApp agent has one of each. */
+function NumberPicker({ kind }: { kind: AgentScope }) {
+    const page = usePage<UseVoiceAgentEditorPageReturn>();
+    const { agentId, saved, form, usage, linking, linkNumbers } = page;
+    const ownedNumbers = page.ownedNumbers.filter((n) => numberInScope(n.provider, kind));
+    const numbers = page.numbers.filter((n) => numberInScope(n.provider, kind));
     const inbound = saved.callType === VoiceAgentCallType.INBOUND;
-    const stray = linkedNumbers(usage, inbound ? VoiceAgentCallType.OUTBOUND : VoiceAgentCallType.INBOUND);
-    const typePending = form.callType !== saved.callType;
+    const stray = linkedNumbers(usage, inbound ? VoiceAgentCallType.OUTBOUND : VoiceAgentCallType.INBOUND).filter((n) =>
+        numberInScope(n.provider, kind),
+    );
+    const typePending = form.callType !== saved.callType || channelOf(form) !== channelOf(saved);
+    const whatsapp = kind === 'whatsapp';
     const [takeover, setTakeover] = useState<Takeover | null>(null);
 
     // The server refuses a number for an agent with no saved prompt (it would answer with nothing): say so first.
@@ -75,14 +93,18 @@ export function AgentNumbersField() {
     };
 
     const hint = typePending
-        ? 'Save the new agent type first.'
+        ? 'Save the agent first.'
         : numbers.length > 0
-          ? inbound
-              ? 'Calls to this number are answered by this agent.'
-              : 'This agent calls from this number.'
-          : inbound
-            ? 'No number yet: pick the one it answers.'
-            : 'No number yet: pick the one it calls from.';
+          ? whatsapp
+              ? 'Chats, voice notes and calls to this WhatsApp number are answered by this agent.'
+              : inbound
+                ? 'Calls to this number are answered by this agent.'
+                : 'This agent calls from this number.'
+          : whatsapp
+            ? 'No WhatsApp number yet: pick the one it answers.'
+            : inbound
+              ? 'No number yet: pick the one it answers.'
+              : 'No number yet: pick the one it calls from.';
 
     const pick = (id: string | null) => {
         if (id === shown) return;
@@ -96,15 +118,15 @@ export function AgentNumbersField() {
     };
 
     return (
-        <Field data-testid="agent-numbers">
-            <FieldLabel htmlFor="agent-numbers">
-                Phone number
+        <Field data-testid={whatsapp ? 'agent-whatsapp-numbers' : 'agent-numbers'}>
+            <FieldLabel htmlFor={`agent-numbers-${kind}`}>
+                {whatsapp ? 'WhatsApp number' : 'Phone number'}
                 {linking || waiting ? <Loader2 className="text-muted-foreground size-3.5 animate-spin" /> : null}
             </FieldLabel>
             {ownedNumbers.length > 0 ? (
                 <PhoneNumberSelect
-                    id="agent-numbers"
-                    data-testid="agent-numbers-select"
+                    id={`agent-numbers-${kind}`}
+                    data-testid={whatsapp ? 'agent-whatsapp-numbers-select' : 'agent-numbers-select'}
                     numbers={ownedNumbers.map((n) => {
                         const mine = numbers.some((x) => x.id === n._id);
                         return {
@@ -116,15 +138,24 @@ export function AgentNumbersField() {
                     })}
                     value={shown}
                     onChange={pick}
-                    placeholder={inbound ? 'Pick the number it answers' : 'Pick the number it calls from'}
+                    placeholder={
+                        whatsapp
+                            ? 'Pick the WhatsApp number it answers'
+                            : inbound
+                              ? 'Pick the number it answers'
+                              : 'Pick the number it calls from'
+                    }
                     noneLabel="No number"
                     disabled={typePending || noPrompt || linking}
                 />
             ) : (
                 <p className="text-muted-foreground text-sm" data-testid="agent-numbers-empty">
-                    No numbers yet.{' '}
-                    <Link href={VOICE_PHONE_NUMBERS_URL} className="text-primary underline-offset-4 hover:underline">
-                        Connect one on Phone numbers
+                    {whatsapp ? 'No WhatsApp numbers yet.' : 'No numbers yet.'}{' '}
+                    <Link
+                        href={whatsapp ? WHATSAPP_NUMBERS_URL : VOICE_PHONE_NUMBERS_URL}
+                        className="text-primary underline-offset-4 hover:underline"
+                    >
+                        {whatsapp ? 'Connect one under WhatsApp, Numbers' : 'Connect one on Phone numbers'}
                     </Link>
                 </p>
             )}

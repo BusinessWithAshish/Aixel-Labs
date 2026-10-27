@@ -25,6 +25,7 @@ async function PhoneNumbersPage() {
                     agents: agentsRes.success && agentsRes.data ? agentsRes.data : [],
                     loadError: numbersRes.success ? null : (numbersRes.error ?? 'Could not load your numbers'),
                     geminiKey: keyRes.data ?? NO_GEMINI_KEY,
+                    scope: 'phone',
                 }}
                 usePageHook={usePhoneNumbersPage}
             >

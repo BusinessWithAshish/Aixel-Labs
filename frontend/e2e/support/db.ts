@@ -11,7 +11,7 @@ import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 import { E2E_DB_NAME, E2E_GEMINI_API_KEY, E2E_MONGODB_URI, E2E_TENANT } from './env';
 import { DEFAULT_USER_CREDITS, E2E_ADMIN, E2E_USER, type E2eUser } from './users';
 // Voice agents (e2e/voice-agent/agents + playground specs).
-import { VoiceAgentCallType, type VoiceAgentDoc, type VoiceAgentVoice } from '@aixellabs/backend/db/types';
+import { VoiceAgentCallType, type VoiceAgentChannel, type VoiceAgentDoc, type VoiceAgentVoice } from '@aixellabs/backend/db/types';
 import { ObjectId as MongoObjectId } from 'mongodb';
 // Voice numbers + call logs (e2e/voice-agent/phone-numbers + call-logs specs).
 import {
@@ -202,6 +202,7 @@ export class E2eDb {
             callType?: VoiceAgentCallType;
             voice?: VoiceAgentVoice;
             prompt?: string;
+            channel?: VoiceAgentChannel;
         },
     ): Promise<string> {
         const { _id: userId, tenantId } = await this.getUser(user);
@@ -213,6 +214,7 @@ export class E2eDb {
             callType: fields.callType ?? VoiceAgentCallType.OUTBOUND,
             voice: fields.voice ?? 'sulafat',
             prompt: fields.prompt ?? 'You are a test agent.',
+            ...(fields.channel ? { channel: fields.channel } : {}),
             createdAt: now,
             updatedAt: now,
         });
@@ -308,6 +310,7 @@ export class E2eDb {
                     | 'previousConnectionId'
                     | 'voicelink'
                     | 'twilio'
+                    | 'whatsapp'
                 >
             >,
     ): Promise<string> {
@@ -387,6 +390,19 @@ export class E2eDb {
     /** Replaces an agent's tools as stored (secrets must already be sealed). */
     async setVoiceAgentTools(agentId: string, tools: VoiceAgentDoc['tools']): Promise<void> {
         await this.voiceAgents.updateOne({ _id: new MongoObjectId(agentId) }, { $set: { tools } });
+    }
+
+    /** Sets fields on an agent as stored (caller memory, WhatsApp settings). */
+    async updateVoiceAgent(agentId: string, fields: Partial<VoiceAgentDoc>): Promise<void> {
+        await this.voiceAgents.updateOne({ _id: new MongoObjectId(agentId) }, { $set: fields });
+    }
+
+    /** Moves a WhatsApp chat's last message `minutes` back, as if the person had gone quiet that long ago. */
+    async ageVoiceChat(callId: string, minutes: number): Promise<void> {
+        await this.voiceCalls.updateOne(
+            { _id: new MongoObjectId(callId) },
+            { $set: { 'chat.lastMessageAt': new Date(Date.now() - minutes * 60_000) } },
+        );
     }
 
     // -----------------------------------------------------------------------

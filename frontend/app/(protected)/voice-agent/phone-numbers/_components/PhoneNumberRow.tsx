@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { MessageCircleMore, PhoneIncoming, PhoneOff, PhoneOutgoing, Trash2 } from 'lucide-react';
-import { VOICE_AGENT_SUB_MODULES, VoiceAgentCallType, VoiceProvider } from '@aixellabs/backend/db/types';
+import { VoiceAgentCallType, VoiceProvider } from '@aixellabs/backend/db/types';
 import type { VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 import { NumberProviderLogo } from '@/components/common/voice-agent/NumberProviderLogo';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,8 @@ import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { usePage } from '@/contexts/PageStore';
 import { estimateAgentCost, formatMoney, RATE_COUNTRY_NAME, rateCountry } from '@/helpers/voice-call-cost';
 import { numberProviderInfo } from '@/helpers/voice-number-providers';
-import { GEMINI_KEY_URL, voiceAgentUrl } from '@/helpers/voice-routes';
+import { GEMINI_KEY_URL, voiceAgentUrl, WHATSAPP_NUMBERS_URL, WHATSAPP_URL } from '@/helpers/voice-routes';
 import { GEMINI_ALWAYS } from '@/helpers/voice-stack';
-import { SubModuleUrls } from '@/config/app-config';
 import { cn } from '@/lib/utils';
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
 
@@ -38,6 +37,48 @@ function UseLine({ use, exists, whatsapp }: { use: NumberUse; exists: boolean; w
                 <span className="font-medium">{use.name}</span>
             )}
         </p>
+    );
+}
+
+/** The same number connected the other way: a phone line also on WhatsApp, and the one click to share its agent. */
+function TwinLine({ number }: { number: VoiceNumberListItem }) {
+    const { twinOf, shareTwin, sharing } = usePage<UsePhoneNumbersPageReturn>();
+    const twin = twinOf(number);
+    if (!twin) return null;
+    if (number.provider !== VoiceProvider.WHATSAPP) {
+        return (
+            <p className="flex items-center gap-1.5 text-xs" data-testid="number-twin">
+                <NumberProviderLogo provider={VoiceProvider.WHATSAPP} className="size-3.5" />
+                <span>
+                    Also on WhatsApp{twin.inboundAgentName ? `, answered by ${twin.inboundAgentName}` : ''}.{' '}
+                    <Link className={cn(LINK, 'text-primary')} href={WHATSAPP_NUMBERS_URL}>
+                        See it
+                    </Link>
+                </span>
+            </p>
+        );
+    }
+    const phoneAgent = twin.inboundAgentId && twin.inboundAgentId !== number.inboundAgentId ? twin.inboundAgentName : null;
+    return (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" data-testid="number-twin">
+            <span className="flex items-center gap-1.5">
+                <NumberProviderLogo provider={twin.provider} className="size-3.5" />
+                Also your {numberProviderInfo(twin.provider).label} phone line
+                {twin.inboundAgentName ? `, answered by ${twin.inboundAgentName}` : ''}.
+            </span>
+            {phoneAgent ? (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    disabled={sharing === number._id}
+                    onClick={() => void shareTwin(number)}
+                >
+                    Use {phoneAgent} here too (one memory)
+                </Button>
+            ) : null}
+        </div>
     );
 }
 
@@ -148,6 +189,7 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
                 ) : (
                     uses.map((use) => <UseLine key={use.callType} use={use} exists={!!agentOf(use)} whatsapp={whatsapp} />)
                 )}
+                <TwinLine number={number} />
                 {status ? (
                     <p
                         className={cn(
@@ -163,7 +205,7 @@ export function PhoneNumberRow({ number }: { number: VoiceNumberListItem }) {
             <div className="flex items-center gap-2 sm:justify-end">
                 {whatsapp ? (
                     <Button asChild variant="outline" size="sm">
-                        <Link href={SubModuleUrls[VOICE_AGENT_SUB_MODULES.INBOX]}>
+                        <Link href={WHATSAPP_URL}>
                             <MessageCircleMore className="size-3.5" aria-hidden />
                             Open inbox
                         </Link>

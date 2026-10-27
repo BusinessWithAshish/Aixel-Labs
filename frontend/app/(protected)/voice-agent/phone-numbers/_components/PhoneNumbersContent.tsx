@@ -1,6 +1,8 @@
 'use client';
 
-import { ChevronDown, Info, PhoneIcon, Plus } from 'lucide-react';
+import { ChevronDown, Info, MessageCircleMore, PhoneIcon, Plus } from 'lucide-react';
+import { VoiceProvider } from '@aixellabs/backend/db/types';
+import { numberInScope } from '@/helpers/voice-agent-channels';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItems, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -19,7 +21,15 @@ import { RemoveNumberDialog } from './RemoveNumberDialog';
 
 /** Picks the provider, then opens its connect dialog (its setup guide is one click from there). */
 function ConnectNumberMenu() {
-    const { openConnect } = usePage<UsePhoneNumbersPageReturn>();
+    const { openConnect, scope } = usePage<UsePhoneNumbersPageReturn>();
+    if (scope === 'whatsapp') {
+        return (
+            <Button onClick={() => openConnect(VoiceProvider.WHATSAPP)}>
+                <Plus className="size-4" aria-hidden />
+                Connect a WhatsApp number
+            </Button>
+        );
+    }
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -31,7 +41,7 @@ function ConnectNumberMenu() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-60">
                 <DropdownMenuItems
-                    options={NUMBER_PROVIDER_ORDER.map((provider) => {
+                    options={NUMBER_PROVIDER_ORDER.filter((provider) => numberInScope(provider, 'phone')).map((provider) => {
                         const { label, region } = numberProviderInfo(provider);
                         return {
                             key: provider,
@@ -77,8 +87,27 @@ function ProviderSetupGuide() {
     );
 }
 
+const SCOPE_WORDS = {
+    phone: {
+        emptyTitle: 'No phone numbers yet',
+        emptyText: 'Bring a number you already have with Telnyx, Twilio or VoiceLink. Nothing changes until an agent uses it.',
+        lead: 'Link a number to an agent from the agent’s page. Until then, its calls ring the way they always have.',
+        listLabel: 'Your phone numbers',
+        keyAction: 'answer or make calls',
+    },
+    whatsapp: {
+        emptyTitle: 'No WhatsApp numbers yet',
+        emptyText:
+            'Connect your WhatsApp Business number through your own Meta app (no business number yet? Meta gives every app a free test number). Its agent then answers chats, voice notes and calls.',
+        lead: 'Link a number to a WhatsApp agent from the agent’s page. Its chats show up in the Inbox.',
+        listLabel: 'Your WhatsApp numbers',
+        keyAction: 'answer chats and calls',
+    },
+};
+
 export function PhoneNumbersContent() {
-    const { numbers, loadError, geminiKey } = usePage<UsePhoneNumbersPageReturn>();
+    const { numbers, loadError, geminiKey, scope } = usePage<UsePhoneNumbersPageReturn>();
+    const words = SCOPE_WORDS[scope];
 
     return (
         <>
@@ -88,35 +117,34 @@ export function PhoneNumbersContent() {
                 </Alert>
             ) : null}
 
-            <GeminiKeyNotice view={geminiKey} action="answer or make calls" />
+            <GeminiKeyNotice view={geminiKey} action={words.keyAction} />
 
             {numbers.length === 0 ? (
                 <EmptyState
-                    icon={<PhoneIcon />}
-                    title="No phone numbers yet"
-                    description="Bring a number you already have with Telnyx, Twilio or VoiceLink. Nothing changes until an agent uses it."
+                    icon={scope === 'whatsapp' ? <MessageCircleMore /> : <PhoneIcon />}
+                    title={words.emptyTitle}
+                    description={words.emptyText}
                 >
                     <ConnectNumberMenu />
                 </EmptyState>
             ) : (
                 <>
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="text-muted-foreground max-w-3xl text-sm">
-                            Link a number to an agent from the agent&rsquo;s page. Until then, its calls ring the way they
-                            always have.
-                        </p>
+                        <p className="text-muted-foreground max-w-3xl text-sm">{words.lead}</p>
                         <ConnectNumberMenu />
                     </div>
-                    <ul className="bg-card divide-y rounded-lg border" aria-label="Your phone numbers">
+                    <ul className="bg-card divide-y rounded-lg border" aria-label={words.listLabel}>
                         {numbers.map((number) => (
                             <PhoneNumberRow key={number._id} number={number} />
                         ))}
                     </ul>
-                    <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
-                        <Info className="mt-px size-3.5 shrink-0" aria-hidden />
-                        Call recordings stay in your Telnyx, Twilio or VoiceLink account. We only keep a link to each one,
-                        never the audio.
-                    </p>
+                    {scope === 'phone' ? (
+                        <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
+                            <Info className="mt-px size-3.5 shrink-0" aria-hidden />
+                            Call recordings stay in your Telnyx, Twilio or VoiceLink account. We only keep a link to each one,
+                            never the audio.
+                        </p>
+                    ) : null}
                 </>
             )}
 

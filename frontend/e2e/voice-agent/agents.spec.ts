@@ -495,7 +495,7 @@ test('trying the agent (browser, Linphone, phone) needs a number; the playground
     const card = page.getByTestId('call-blockers');
     await expect(card).toHaveCount(1); // the agent card's; the playground has nothing to say
     await expect(card).toContainText('It is not on a phone number yet.');
-    await expect(card.getByRole('link', { name: 'Link a phone number →' })).toHaveAttribute('href', '#agent-numbers');
+    await expect(card.getByRole('link', { name: 'Link a phone number →' })).toHaveAttribute('href', '#agent-numbers-phone');
     await expect(page.getByRole('button', { name: 'Call this agent' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Start call' })).toBeEnabled();
     await expect(page.getByTestId('playground-no-number')).toHaveText(

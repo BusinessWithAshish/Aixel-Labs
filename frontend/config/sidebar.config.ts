@@ -37,7 +37,7 @@ import {
 /** Sidebar labels that differ from the enum's title case. */
 export const subModuleLabelMap: Partial<Record<SubModule, string>> = {
     [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: 'Bookings',
-    [VOICE_AGENT_SUB_MODULES.INBOX]: 'WhatsApp Inbox',
+    [VOICE_AGENT_SUB_MODULES.WHATSAPP]: 'WhatsApp',
     [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: 'Analytics',
 };
 
@@ -122,7 +122,7 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
         icon: History,
         color: '!text-blue-500',
     },
-    [VOICE_AGENT_SUB_MODULES.INBOX]: {
+    [VOICE_AGENT_SUB_MODULES.WHATSAPP]: {
         icon: MessageCircleMore,
         color: '!text-green-600',
     },

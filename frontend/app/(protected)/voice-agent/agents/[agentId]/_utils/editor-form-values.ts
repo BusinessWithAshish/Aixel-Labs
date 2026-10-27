@@ -17,6 +17,7 @@ export function agentFormValues(agent: VoiceAgent): VoiceAgentInput {
     return {
         name: agent.name,
         callType: agent.callType,
+        channel: agent.channel,
         voice: agent.voice,
         ttsVoice: agent.ttsVoice ?? null,
         stack: agent.stack ?? defaultStack(VoiceStackKind.REALTIME),

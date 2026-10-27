@@ -13,7 +13,8 @@ import { VoiceAgentCallTypeSelect } from './VoiceAgentCallTypeSelect';
 
 /** Inbound or outbound, and a name; the prompt and voice come next, on the agent's page. */
 export function CreateVoiceAgentDialog() {
-    const { createOpen, onCreateOpenChange, createForm, creating, createAgent } = usePage<UseVoiceAgentsPageReturn>();
+    const { createOpen, onCreateOpenChange, createForm, creating, createAgent, scope } = usePage<UseVoiceAgentsPageReturn>();
+    const whatsapp = scope === 'whatsapp';
 
     return (
         <Dialog open={createOpen} onOpenChange={onCreateOpenChange}>
@@ -21,11 +22,14 @@ export function CreateVoiceAgentDialog() {
                 <FormProvider {...createForm}>
                     <form onSubmit={createAgent} className="grid gap-4">
                         <DialogHeader>
-                            <DialogTitle>New voice agent</DialogTitle>
+                            <DialogTitle>{whatsapp ? 'New WhatsApp agent' : 'New voice agent'}</DialogTitle>
                             <DialogDescription>
-                                Next you pick a template for its prompt, or write your own.
+                                {whatsapp
+                                    ? 'It answers chats, voice notes and calls on your WhatsApp number. Next you pick a template for its prompt, or write your own.'
+                                    : 'Next you pick a template for its prompt, or write your own.'}
                             </DialogDescription>
                         </DialogHeader>
+                        {whatsapp ? null : (
                         <Controller
                             control={createForm.control}
                             name="callType"
@@ -41,6 +45,7 @@ export function CreateVoiceAgentDialog() {
                                 </Field>
                             )}
                         />
+                        )}
                         <StringControlledField
                             name="name"
                             id="new-agent-name"

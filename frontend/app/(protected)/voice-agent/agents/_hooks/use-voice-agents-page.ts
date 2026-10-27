@@ -5,10 +5,10 @@ import { useProgressRouter } from '@/hooks/use-progress-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { type VoiceAgent, VoiceAgentCallType } from '@aixellabs/backend/db/types';
+import { type VoiceAgent, VoiceAgentCallType, VoiceAgentChannel } from '@aixellabs/backend/db/types';
 import { createVoiceAgent } from '@/app/actions/voice-agent-actions';
 import { DEFAULT_VOICE_AGENT_NAME } from '@/helpers/voice-agent-defaults';
-import type { AgentChannels } from '@/helpers/voice-agent-channels';
+import { channelOf, inScope, type AgentScope } from '@/helpers/voice-agent-channels';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
 import { voiceAgentSchema } from '@/helpers/voice-schemas';
 
@@ -19,7 +19,14 @@ const NEW_AGENT = {
     name: DEFAULT_VOICE_AGENT_NAME,
 };
 
-export function useVoiceAgentsPage({ agents, channels }: { agents: VoiceAgent[]; channels: Record<string, AgentChannels> }) {
+export type VoiceAgentsPageData = {
+    agents: VoiceAgent[];
+    /** Voice agents (phone) or the WhatsApp section's agents. */
+    scope: AgentScope;
+};
+
+export function useVoiceAgentsPage({ agents: allAgents, scope }: VoiceAgentsPageData) {
+    const agents = allAgents.filter((agent) => inScope(channelOf(agent), scope));
     const router = useProgressRouter();
     const [createOpen, setCreateOpen] = useState(false);
     const createForm = useForm({ resolver: zodResolver(newAgentSchema), defaultValues: NEW_AGENT, mode: 'onChange' });
@@ -41,7 +48,12 @@ export function useVoiceAgentsPage({ agents, channels }: { agents: VoiceAgent[];
     );
 
     const createAgent = createForm.handleSubmit(async (values) => {
-        const response = await createVoiceAgent(values);
+        // A WhatsApp agent answers: placing calls is phone only.
+        const response = await createVoiceAgent(
+            scope === 'whatsapp'
+                ? { ...values, callType: VoiceAgentCallType.INBOUND, channel: VoiceAgentChannel.WHATSAPP }
+                : { ...values, channel: VoiceAgentChannel.PHONE },
+        );
         if (!response.success || !response.data?._id) {
             toast.error(response.error ?? 'Could not create the agent');
             return;
@@ -52,7 +64,7 @@ export function useVoiceAgentsPage({ agents, channels }: { agents: VoiceAgent[];
     });
 
     return {
-        channels,
+        scope,
         agents,
         createOpen,
         openCreate,

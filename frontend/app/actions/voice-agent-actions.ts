@@ -14,6 +14,7 @@ import {
     VOICE_WEBHOOK_LIMITS,
     type VoiceAgentBookingTool,
     VoiceAgentCallType,
+    VoiceAgentChannel,
     type VoiceAgentTools,
     type VoiceAgentToolsView,
     type VoiceAgentWebhookTool,
@@ -25,7 +26,8 @@ import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { requireUserObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { DEFAULT_VOICE_AGENT_NAME, DEFAULT_VOICE_AGENT_VOICE } from '@/helpers/voice-agent-defaults';
 import { customVariableNames } from '@/helpers/voice-agent-features';
-import { agentChannelsOf, type AgentChannels } from '@/helpers/voice-agent-channels';
+import { channelAllowed, channelOf, fitsNumber } from '@/helpers/voice-agent-channels';
+import { numberProviderInfo } from '@/helpers/voice-number-providers';
 import {
     bookingToolSchema,
     callSettingsSchema,
@@ -61,6 +63,8 @@ export type VoiceAgentOption = {
     id: string;
     name: string;
     callType: VoiceAgentCallType;
+    /** Where it works: which numbers it fits (`fitsNumber`). */
+    channel: VoiceAgentChannel;
     /** Its custom variables, for a test call to fill in. */
     variables: VoiceAgentVariableOption[];
     /** Length of its prompt, for the cost estimate (`estimateAgentCost`). */
@@ -128,6 +132,7 @@ function mapVoiceAgentDocToVoiceAgent(doc: VoiceAgentDoc): VoiceAgent {
         userId: doc.userId.toString(),
         name: doc.name,
         callType: callTypeOf(doc),
+        channel: channelOf(doc),
         voice: doc.voice,
         ttsVoice: doc.ttsVoice ?? null,
         stack: doc.stack ? stackView(doc.stack) : null,
@@ -158,13 +163,6 @@ export const listVoiceAgents = async (): Promise<ALApiResponse<VoiceAgent[]>> =>
         return docs.map(mapVoiceAgentDocToVoiceAgent);
     });
 
-/** Each of the user's agents' channels (phone, WhatsApp, both), from the numbers it is on. */
-export const getAgentChannels = async (): Promise<ALApiResponse<Record<string, AgentChannels>>> =>
-    runAuthenticatedAction(async function getAgentChannels(userId) {
-        const owner = await agentOwner(userId);
-        return agentChannelsOf(await listItems('numbers', owner.userId));
-    });
-
 /**
  * `{ id, name, callType, variables }` for every agent the user owns, for pickers (Phone Numbers filters
  * by type; its test call fills in the variables).
@@ -174,13 +172,17 @@ export const getVoiceAgentOptions = async (): Promise<ALApiResponse<VoiceAgentOp
         const uid = requireUserObjectId(userId);
         const agents = await agentsCollection();
         const docs = await agents
-            .find({ userId: uid }, { projection: { name: 1, callType: 1, prompt: 1, variables: 1, 'voicemail.message': 1 } })
+            .find(
+                { userId: uid },
+                { projection: { name: 1, callType: 1, channel: 1, prompt: 1, variables: 1, 'voicemail.message': 1 } },
+            )
             .sort({ name: 1 })
             .toArray();
         return docs.map((doc) => ({
             id: doc._id.toString(),
             name: doc.name,
             callType: callTypeOf(doc),
+            channel: channelOf(doc),
             variables: customVariableNames(doc.prompt ?? '', doc.voicemail?.message ?? '').map((name) => ({
                 name,
                 value: doc.variables?.[name] ?? '',
@@ -198,9 +200,26 @@ export const getVoiceAgent = async (agentId: string): Promise<ALApiResponse<Voic
         return mapVoiceAgentDocToVoiceAgent(doc);
     });
 
-export type CreateVoiceAgentInput = Partial<Pick<VoiceAgentInput, 'name' | 'voice' | 'ttsVoice'>> & {
+export type CreateVoiceAgentInput = Partial<Pick<VoiceAgentInput, 'name' | 'voice' | 'ttsVoice' | 'channel'>> & {
     callType: VoiceAgentCallType;
 };
+
+const PLACES_CALLS_PHONE_ONLY = 'An agent that places calls works on phone numbers only. Make it answer calls to use WhatsApp.';
+
+/**
+ * The agent may change channel only when the numbers it is on still fit (a WhatsApp number for a phone-only
+ * agent would stop being answered).
+ */
+async function assertChannelFitsNumbers(uid: MongoObjectId, agentId: MongoObjectId, channel: VoiceAgentChannel) {
+    const misfit = (await listItems('numbers', uid)).find(
+        (n) => [n.inboundAgentId, n.outboundAgentId].some((id) => id?.equals(agentId)) && !fitsNumber(channel, n.provider),
+    );
+    if (misfit) {
+        throw new Error(
+            `It is still on ${misfit.phoneNumber} (${numberProviderInfo(misfit.provider).label}). Unlink that number first, or pick a setting that keeps it.`,
+        );
+    }
+}
 
 /**
  * Creates an agent of the given call type with an empty prompt: the editor offers templates, and
@@ -215,12 +234,14 @@ export const createVoiceAgent = async (input: CreateVoiceAgentInput): Promise<AL
             {
                 name: input.name ?? DEFAULT_VOICE_AGENT_NAME,
                 callType: input.callType,
+                channel: input.channel ?? VoiceAgentChannel.PHONE,
                 voice: input.voice ?? DEFAULT_VOICE_AGENT_VOICE,
                 ttsVoice: input.ttsVoice ?? null,
                 variables: {},
             },
             'Invalid agent',
         );
+        if (!channelAllowed(fields.channel, fields.callType)) throw new Error(PLACES_CALLS_PHONE_ONLY);
 
         const now = new Date();
         const doc: VoiceAgentDoc = { tenantId, userId: uid, ...fields, prompt: '', createdAt: now, updatedAt: now };
@@ -234,6 +255,8 @@ export const updateVoiceAgent = async (agentId: string, input: VoiceAgentInput):
         const { userId: uid } = await agentOwner(userId);
         const id = toObjectId(agentId, 'Agent ID');
         const { stack, ...fields } = parseOrThrow(voiceAgentSchema, input, 'Invalid agent');
+        if (!channelAllowed(fields.channel, fields.callType)) throw new Error(PLACES_CALLS_PHONE_ONLY);
+        await assertChannelFitsNumbers(uid, id, fields.channel);
         const accounts = await voiceAccountsCollection();
         const keys = stack ? ((await accounts.findOne({ userId: uid }, { projection: { keys: 1 } }))?.keys ?? []) : [];
 
@@ -244,6 +267,25 @@ export const updateVoiceAgent = async (agentId: string, input: VoiceAgentInput):
             { returnDocument: 'after' },
         );
         if (!doc) throw new Error('Agent not found');
+        return mapVoiceAgentDocToVoiceAgent(doc);
+    });
+
+/** An agent's copy (prompt, voice, stack, tools, settings; not its numbers or memories) under another name and channel. */
+export const duplicateVoiceAgent = async (
+    agentId: string,
+    input: { name: string; channel: VoiceAgentChannel },
+): Promise<ALApiResponse<VoiceAgent>> =>
+    runAuthenticatedAction(async function duplicateVoiceAgent(userId) {
+        const { userId: uid } = await agentOwner(userId);
+        const source = await findOwnedAgent(uid, agentId);
+        const { name, channel } = parseOrThrow(voiceAgentSchema.pick({ name: true, channel: true }), input, 'Check the name');
+        const callType = channel === VoiceAgentChannel.PHONE ? callTypeOf(source) : VoiceAgentCallType.INBOUND;
+        if (callTypeOf(source) === VoiceAgentCallType.OUTBOUND && channel !== VoiceAgentChannel.PHONE) {
+            throw new Error('This agent places calls, which WhatsApp agents do not do yet. Copy an agent that answers calls.');
+        }
+        const now = new Date();
+        const doc: VoiceAgentDoc = { ...source, _id: new MongoObjectId(), name, channel, callType, createdAt: now, updatedAt: now };
+        await (await agentsCollection()).insertOne(doc);
         return mapVoiceAgentDocToVoiceAgent(doc);
     });
 

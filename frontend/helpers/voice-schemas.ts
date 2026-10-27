@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+    VoiceAgentChannel,
     VOICE_CHAT_MODELS,
     VOICE_AGENT_FEATURE_LIMITS,
     VOICE_AGENT_LIMITS,
@@ -99,6 +100,8 @@ export const voiceAgentSchema = z.object({
         .min(1, 'Name is required')
         .max(VOICE_AGENT_LIMITS.nameMax, `Name must be ${VOICE_AGENT_LIMITS.nameMax} characters or fewer`),
     callType: z.nativeEnum(VoiceAgentCallType, { errorMap: () => ({ message: 'Pick inbound or outbound' }) }),
+    /** Where it works (phone, WhatsApp, both); placing calls is phone only (checked by the actions). */
+    channel: z.nativeEnum(VoiceAgentChannel).default(VoiceAgentChannel.PHONE),
     voice: z.enum(VOICE_KEYS, { errorMap: () => ({ message: 'Pick one of the listed voices' }) }),
     prompt: z
         .string()

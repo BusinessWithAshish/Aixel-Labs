@@ -1,4 +1,4 @@
-import { createCipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { SubModuleUrls } from '@/config/app-config';
@@ -9,6 +9,7 @@ import {
     E2E_VOICE_ENGINE_SECRET,
     E2E_VOICE_ENGINE_URL,
     E2E_VOICELINK_API_BASE,
+    E2E_WHATSAPP_GRAPH_BASE,
 } from '../support/env';
 import type { FakePlaygroundEngine } from '../support/voice-agents';
 
@@ -43,6 +44,10 @@ async function readBody(req: IncomingMessage): Promise<JsonValue | null> {
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(chunk as Buffer);
     if (chunks.length === 0) return null;
+    // Meta's media upload: a multipart form; the fake keeps its size, not its parts.
+    if (req.headers['content-type']?.startsWith('multipart/form-data')) {
+        return { multipart: true, bytes: Buffer.concat(chunks).length };
+    }
     const text = Buffer.concat(chunks).toString('utf8');
     // Twilio's API takes forms; everything else here speaks JSON.
     if (req.headers['content-type']?.startsWith('application/x-www-form-urlencoded')) {
@@ -934,6 +939,280 @@ export class FakeTwilioMediaStream {
     /** Every message from the engine named our stream. */
     allCarryStreamSid(): boolean {
         return this.messages.every((m) => m.streamSid === this.streamSid);
+    }
+}
+
+/** The customer's own Meta app, as they paste it into Connect a WhatsApp number. Made up: only the fake accepts them. */
+export const FAKE_META_APP_ID = '1180000000000042';
+export const FAKE_META_APP_SECRET = 'e2e0'.repeat(8);
+export const FAKE_META_TOKEN = 'EAAe2eFakeSystemUserTokenDoNotUse';
+export const FAKE_WABA_ID = '102290129340398';
+/** Their WhatsApp Business number, on the Cloud API: the same number as the first fake Telnyx line, a twin. */
+export const FAKE_WHATSAPP_NUMBER = { id: '106540352242922', phone: '+13473703925' };
+
+export type FakeWhatsAppNumber = { id: string; display_phone_number: string; verified_name: string; platform_type: string };
+/** What the business sent a person: a text, or a voice note (an uploaded media id). */
+export type WhatsAppSent = { to: string; type: string; text?: string; mediaId?: string; voice?: boolean };
+export type WhatsAppCallAction = { callId: string; action: string; sdp?: string };
+
+/**
+ * Stands in for graph.facebook.com on `E2E_WHATSAPP_GRAPH_BASE`, for the app and the engine both, and for
+ * Meta's side of a customer's chats and calls. Like Meta it checks a webhook callback (a GET with
+ * `hub.challenge`) before saving it, refuses calling below the 2,000 limit (138015) unless told otherwise,
+ * signs every webhook it sends with the app secret (X-Hub-Signature-256), and serves media only with the token.
+ */
+export class FakeMeta extends FakeHttpServer {
+    numbers: FakeWhatsAppNumber[] = [];
+    subscription: { callback_url: string; verify_token: string; fields: string[] } | null = null;
+    wabaSubscribed = false;
+    readonly calling = new Map<string, JsonValue>();
+    /** A new business's number: Meta turns calling on only from a 2,000 messaging limit. */
+    refuseCalling = true;
+    /** Whether `POST /{app}/subscriptions` calls the callback first, as Meta does (needs the real engine up). */
+    verifyCallbacks = false;
+    /** Media by id: voice notes people sent (served) and the ones the business uploaded. */
+    readonly media = new Map<string, { bytes: Buffer; mime: string }>();
+    readonly sent: WhatsAppSent[] = [];
+    /** Message ids marked read (blue ticks). */
+    readonly reads: string[] = [];
+    readonly callActions: WhatsAppCallAction[] = [];
+    private nextId = 0;
+
+    static async start(): Promise<FakeMeta> {
+        const fake = new FakeMeta();
+        await fake.start(E2E_WHATSAPP_GRAPH_BASE);
+        fake.reset();
+        return fake;
+    }
+
+    reset(): void {
+        this.clear();
+        this.numbers = [
+            {
+                id: FAKE_WHATSAPP_NUMBER.id,
+                display_phone_number: '+1 347-370-3925',
+                verified_name: 'Sunrise Dental',
+                platform_type: 'CLOUD_API',
+            },
+            // Still on the WhatsApp Business app: listed, not importable.
+            { id: '106540352242999', display_phone_number: '+91 98450 12345', verified_name: 'Sunrise Dental', platform_type: 'NOT_APPLICABLE' },
+        ];
+        this.subscription = null;
+        this.wabaSubscribed = false;
+        this.calling.clear();
+        this.refuseCalling = true;
+        this.verifyCallbacks = false;
+        this.media.clear();
+        this.sent.length = 0;
+        this.reads.length = 0;
+        this.callActions.length = 0;
+    }
+
+    private newId(prefix: string): string {
+        this.nextId += 1;
+        return `${prefix}${Date.now()}${this.nextId}`;
+    }
+
+    protected handle(req: RecordedRequest, res: ServerResponse): void {
+        void this.route(req, res).catch((error: unknown) => send(res, 500, { error: String(error) }));
+    }
+
+    private async route(req: RecordedRequest, res: ServerResponse): Promise<void> {
+        const fail = (status: number, code: number, message: string) => send(res, status, { error: { message, code } });
+        const appAuth = req.authorization === `Bearer ${FAKE_META_APP_ID}|${FAKE_META_APP_SECRET}`;
+        const tokenAuth = req.authorization === `Bearer ${FAKE_META_TOKEN}`;
+        const file = /^\/media-files\/(.+)$/.exec(req.path);
+        if (file) {
+            const media = this.media.get(file[1]);
+            if (!tokenAuth) return fail(401, 190, 'Invalid OAuth access token');
+            if (!media) return send(res, 404, {});
+            res.writeHead(200, { 'Content-Type': media.mime, 'Content-Length': String(media.bytes.length) });
+            res.end(media.bytes);
+            return;
+        }
+        const path = req.path.replace(/^\/v\d+\.\d+/, '');
+        const [, first, second] = path.split('/');
+
+        if (path === '/debug_token') {
+            if (!appAuth) return fail(400, 190, 'Invalid OAuth access token - Cannot parse access token');
+            const valid = req.query.input_token === FAKE_META_TOKEN;
+            const scopes = ['whatsapp_business_management', 'whatsapp_business_messaging'];
+            return send(res, 200, {
+                data: {
+                    is_valid: valid,
+                    app_id: FAKE_META_APP_ID,
+                    scopes: valid ? scopes : [],
+                    granular_scopes: valid ? scopes.map((scope) => ({ scope, target_ids: [FAKE_WABA_ID] })) : [],
+                },
+            });
+        }
+        if (first === FAKE_META_APP_ID && second === 'subscriptions') {
+            if (!appAuth) return fail(400, 190, 'Invalid OAuth access token');
+            if (req.method === 'GET') {
+                const s = this.subscription;
+                return send(res, 200, {
+                    data: s
+                        ? [{ object: 'whatsapp_business_account', callback_url: s.callback_url, active: true, fields: s.fields.map((name) => ({ name })) }]
+                        : [],
+                });
+            }
+            const body = req.body ?? {};
+            const callback = String(body.callback_url);
+            const verifyToken = String(body.verify_token);
+            if (this.verifyCallbacks) {
+                const challenge = randomBytes(6).toString('hex');
+                const url = new URL(callback);
+                url.searchParams.set('hub.mode', 'subscribe');
+                url.searchParams.set('hub.challenge', challenge);
+                url.searchParams.set('hub.verify_token', verifyToken);
+                const check = await fetch(url).catch(() => null);
+                const echoed = check?.ok ? await check.text() : null;
+                if (echoed !== challenge) {
+                    return fail(400, 2200, `(#2200) Callback verification failed with the following errors: HTTP Status Code = ${check?.status ?? 'no answer'}`);
+                }
+            }
+            this.subscription = { callback_url: callback, verify_token: verifyToken, fields: (body.fields as string[]) ?? [] };
+            return send(res, 200, { success: true });
+        }
+        if (!tokenAuth) return fail(401, 190, 'Invalid OAuth access token');
+        if (first === FAKE_WABA_ID && second === 'subscribed_apps') {
+            this.wabaSubscribed = true;
+            return send(res, 200, { success: true });
+        }
+        if (first === FAKE_WABA_ID && second === 'phone_numbers') return send(res, 200, { data: this.numbers });
+
+        const number = this.numbers.find((n) => n.id === first);
+        if (number && second === 'settings') {
+            if (req.method === 'GET') return send(res, 200, { calling: this.calling.get(number.id) ?? { status: 'DISABLED' } });
+            const calling = (req.body?.calling ?? {}) as JsonValue;
+            if (this.refuseCalling && calling.status === 'ENABLED') {
+                return fail(400, 138015, 'Calling is not available for this phone number: messaging limit below 2000');
+            }
+            this.calling.set(number.id, { ...(this.calling.get(number.id) ?? {}), ...calling });
+            return send(res, 200, { success: true });
+        }
+        if (number && second === 'messages') {
+            const body = req.body ?? {};
+            if (body.status === 'read') {
+                this.reads.push(String(body.message_id));
+                return send(res, 200, { success: true });
+            }
+            const audio = body.audio as { id?: string; voice?: boolean } | undefined;
+            this.sent.push({
+                to: String(body.to),
+                type: String(body.type),
+                ...(body.type === 'text' ? { text: String((body.text as JsonValue)?.body) } : {}),
+                ...(audio ? { mediaId: audio.id, voice: audio.voice } : {}),
+            });
+            return send(res, 200, {
+                messaging_product: 'whatsapp',
+                contacts: [{ input: body.to, wa_id: body.to }],
+                messages: [{ id: this.newId('wamid.out') }],
+            });
+        }
+        if (number && second === 'media' && req.method === 'POST') {
+            const id = this.newId('media-up');
+            this.media.set(id, { bytes: Buffer.alloc(Number(req.body?.bytes ?? 0)), mime: 'audio/ogg' });
+            return send(res, 200, { id });
+        }
+        if (number && second === 'calls') {
+            const body = req.body ?? {};
+            const session = body.session as { sdp?: string } | undefined;
+            this.callActions.push({ callId: String(body.call_id), action: String(body.action), ...(session?.sdp ? { sdp: session.sdp } : {}) });
+            return send(res, 200, { messaging_product: 'whatsapp', success: true });
+        }
+        const media = this.media.get(first);
+        if (media && req.method === 'GET') {
+            return send(res, 200, {
+                url: `${E2E_WHATSAPP_GRAPH_BASE}/media-files/${first}`,
+                mime_type: media.mime,
+                file_size: media.bytes.length,
+                id: first,
+                messaging_product: 'whatsapp',
+            });
+        }
+        send(res, 404, { error: { message: `Unsupported request ${req.method} ${path}`, code: 100 } });
+    }
+
+    /** A webhook to the app's callback, signed with the app secret like Meta signs it: its HTTP status. */
+    async deliver(field: 'messages' | 'calls', value: JsonValue): Promise<number> {
+        if (!this.subscription) throw new Error('No webhook callback: connect the WhatsApp number first');
+        const number = this.numbers[0];
+        const raw = JSON.stringify({
+            object: 'whatsapp_business_account',
+            entry: [
+                {
+                    id: FAKE_WABA_ID,
+                    changes: [
+                        {
+                            field,
+                            value: {
+                                messaging_product: 'whatsapp',
+                                metadata: { display_phone_number: number.display_phone_number.replace(/\D/g, ''), phone_number_id: number.id },
+                                ...value,
+                            },
+                        },
+                    ],
+                },
+            ],
+        });
+        const signature = `sha256=${createHmac('sha256', FAKE_META_APP_SECRET).update(raw).digest('hex')}`;
+        const res = await fetch(this.subscription.callback_url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': signature },
+            body: raw,
+        });
+        return res.status;
+    }
+
+    private async customerMessage(from: string, name: string, message: JsonValue): Promise<string> {
+        const id = this.newId('wamid.in');
+        const status = await this.deliver('messages', {
+            contacts: [{ profile: { name }, wa_id: from }],
+            messages: [{ from, id, timestamp: String(Math.floor(Date.now() / 1000)), ...message }],
+        });
+        if (status !== 200) throw new Error(`The engine answered the message webhook with ${status}`);
+        return id;
+    }
+
+    /** A person writes to the business number (`from` is their WhatsApp id: digits, no +). */
+    customerTexts(from: string, name: string, text: string): Promise<string> {
+        return this.customerMessage(from, name, { type: 'text', text: { body: text } });
+    }
+
+    /** A person sends a voice note (OGG/Opus, as WhatsApp records them). */
+    customerSendsVoiceNote(from: string, name: string, ogg: Buffer): Promise<string> {
+        const mediaId = this.newId('media-in');
+        this.media.set(mediaId, { bytes: ogg, mime: 'audio/ogg; codecs=opus' });
+        return this.customerMessage(from, name, { type: 'audio', audio: { id: mediaId, mime_type: 'audio/ogg; codecs=opus', voice: true } });
+    }
+
+    /** A person taps the call button: `connect` with their WebRTC offer. Returns the call id. */
+    async customerCalls(from: string, sdp: string): Promise<string> {
+        const id = `wacid.${this.newId('')}`;
+        const status = await this.deliver('calls', {
+            contacts: [{ profile: { name: 'Caller' }, wa_id: from }],
+            calls: [
+                {
+                    id,
+                    from,
+                    to: this.numbers[0].display_phone_number.replace(/\D/g, ''),
+                    event: 'connect',
+                    direction: 'USER_INITIATED',
+                    timestamp: String(Math.floor(Date.now() / 1000)),
+                    session: { sdp_type: 'offer', sdp },
+                },
+            ],
+        });
+        if (status !== 200) throw new Error(`The engine answered the call webhook with ${status}`);
+        return id;
+    }
+
+    /** The person hangs up: Meta's `terminate`. */
+    async customerHangsUp(callId: string, from: string): Promise<void> {
+        await this.deliver('calls', {
+            calls: [{ id: callId, from, event: 'terminate', direction: 'USER_INITIATED', status: 'COMPLETED', timestamp: String(Math.floor(Date.now() / 1000)) }],
+        });
     }
 }
 

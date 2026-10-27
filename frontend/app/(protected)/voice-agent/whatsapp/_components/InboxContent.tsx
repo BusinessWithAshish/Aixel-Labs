@@ -2,10 +2,9 @@
 
 import Link from 'next/link';
 import { Bot, Hand, MessageCircleMore, Undo2 } from 'lucide-react';
-import { VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { SubModuleUrls } from '@/config/app-config';
+import { WHATSAPP_NUMBERS_URL } from '@/helpers/voice-routes';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import type { UseInboxPageReturn } from '../_hooks/use-inbox-page';
@@ -57,7 +56,7 @@ function TakeoverGuide({ hasThreads }: { hasThreads: boolean }) {
             </ol>
             {!hasThreads ? (
                 <Button asChild variant="outline">
-                    <Link href={SubModuleUrls[VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]}>Connect a WhatsApp number</Link>
+                    <Link href={WHATSAPP_NUMBERS_URL}>Connect a WhatsApp number</Link>
                 </Button>
             ) : null}
             <p className="text-muted-foreground max-w-lg text-center text-xs">
@@ -77,7 +76,7 @@ export function InboxContent() {
                     <AlertDescription>{loadError}</AlertDescription>
                 </Alert>
             ) : null}
-            <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[minmax(18rem,22rem)_1fr]">
+            <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
                 <div className={cn('min-h-0', thread && 'hidden md:block')}>
                     <ThreadList />
                 </div>

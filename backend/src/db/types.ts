@@ -62,8 +62,8 @@ export enum VOICE_AGENT_SUB_MODULES {
   AGENTS = "AGENTS",
   PHONE_NUMBERS = "PHONE_NUMBERS",
   CALL_LOGS = "CALL_LOGS",
-  /** WhatsApp chats (and calls) of the owner's WhatsApp numbers, where a person can take a chat over from the AI. */
-  INBOX = "INBOX",
+  /** The WhatsApp section: its inbox (chats and calls, where a person can take over from the AI), agents and numbers. */
+  WHATSAPP = "VOICE_WHATSAPP",
   WEB_DIALER = "WEB_DIALER",
   INQUIRY_BOOKINGS = "INQUIRY_BOOKINGS",
   CAMPAIGNS = "CAMPAIGNS",
@@ -295,11 +295,24 @@ export type VoiceAgentDoc<Id = ObjectId> = {
   stack?: VoiceStack<Id> | null;
   /** The voice it speaks in on a PIPELINE stack. A REALTIME stack speaks in `voice` (Gemini Live's own voices). Absent = none picked yet. */
   ttsVoice?: VoiceTtsVoice | null;
+  /** Where it talks to people: phone numbers, WhatsApp numbers, or both. Absent = PHONE (agents made before WhatsApp). */
+  channel?: VoiceAgentChannel;
   /** How it chats on WhatsApp. Absent = VOICE_WHATSAPP_DEFAULTS. */
   whatsapp?: VoiceAgentWhatsApp | null;
   createdAt: Date;
   updatedAt: Date;
 };
+
+/**
+ * Where an agent works. The app shows PHONE agents under Voice agents, WHATSAPP agents in the WhatsApp section, and
+ * BOTH in both: one agent for a business whose WhatsApp number is also its phone line (one prompt, one memory).
+ * A WHATSAPP or BOTH agent answers (callType INBOUND); placing calls is phone only.
+ */
+export enum VoiceAgentChannel {
+  PHONE = "PHONE",
+  WHATSAPP = "WHATSAPP",
+  BOTH = "BOTH",
+}
 
 /** The text models a WhatsApp chat can run on (prices: voice-call-rates.json `chat.models`), cheapest first. */
 export const VOICE_CHAT_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash"] as const;
@@ -541,8 +554,10 @@ export type VoiceBooking = Omit<VoiceBookingDoc<string>, "start" | "end" | "crea
 };
 
 /** Client view: tools without secrets (always present, empty when the agent has none). */
-export type VoiceAgent = Omit<VoiceAgentDoc<string>, "tools" | "createdAt" | "updatedAt"> & {
+export type VoiceAgent = Omit<VoiceAgentDoc<string>, "tools" | "channel" | "createdAt" | "updatedAt"> & {
   tools: VoiceAgentToolsView;
+  /** Always set on the client view (PHONE for agents saved before WhatsApp). */
+  channel: VoiceAgentChannel;
   createdAt: string;
   updatedAt: string;
 };
@@ -654,7 +669,8 @@ export type VoiceNumberDoc<Id = ObjectId> = {
   /** Calls, campaigns and campaign contacts point at it (`numberId`). */
   _id: Id;
   provider: VoiceProvider;
-  /** E.164, e.g. "+13473703925". Unique across owners: a number is connected to one account. */
+  /** E.164, e.g. "+13473703925". Unique per provider across owners: a number is connected to one account, once as a
+   * phone line and once more as WhatsApp when the business uses the same number for both. */
   phoneNumber: string;
   /** The provider's id for the number (Telnyx phone_number id, VoiceLink DID id, Twilio IncomingPhoneNumber SID "PN…", WhatsApp phone number id). */
   providerNumberId: string;

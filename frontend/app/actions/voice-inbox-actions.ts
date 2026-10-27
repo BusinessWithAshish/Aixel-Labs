@@ -8,7 +8,7 @@ import { requireVoiceOwner } from '@/server/voice-agent/owner-scope';
 import type { InboxThread, InboxThreadView } from '@/helpers/voice-inbox';
 import { getThread, handBack, listThreads, sendReply, takeOver } from '@/server/voice-agent/whatsapp-inbox';
 
-const SUB_MODULE = VOICE_AGENT_SUB_MODULES.INBOX;
+const SUB_MODULE = VOICE_AGENT_SUB_MODULES.WHATSAPP;
 
 /** Every WhatsApp conversation of the caller's numbers, latest first. */
 export const listInboxThreads = async (): Promise<ALApiResponse<InboxThread[]>> =>

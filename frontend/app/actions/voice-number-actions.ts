@@ -6,6 +6,7 @@ import {
     MongoObjectId,
     VOICE_AGENT_SUB_MODULES,
     VoiceAgentCallType,
+    VoiceAgentChannel,
     VOICE_NUMBER_LIMITS,
     VoiceProvider,
     type VoiceAgentDoc,
@@ -16,6 +17,7 @@ import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { assertValidObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { isMongoDuplicateKeyError } from '@/server/auth/membership/duplicate-key';
 import { VOICE_AGENT_NO_PROMPT_MESSAGE } from '@/helpers/voice-agent-defaults';
+import { channelOf, channelProblem } from '@/helpers/voice-agent-channels';
 import { cleanCallVariables } from '@/helpers/voice-agent-features';
 import { engineFetch, sealSecret } from '@/server/voice-agent/engine';
 import { assertRateLimit } from '@/server/rate-limit';
@@ -262,18 +264,23 @@ async function findOwnedNumber(owner: VoiceOwnerScope, numberId: string): Promis
     return doc;
 }
 
-type OwnedAgent = { _id: MongoObjectId; name: string; callType: VoiceAgentCallType };
+type OwnedAgent = { _id: MongoObjectId; name: string; callType: VoiceAgentCallType; channel: VoiceAgentChannel };
 
 /** The caller's agent and the calls it is for (agents saved before types make calls), refused when it has no prompt yet. */
 async function findOwnedAgent(owner: VoiceOwnerScope, agentId: string): Promise<OwnedAgent> {
     const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
     const agent = await agents.findOne(
         { _id: toObjectId(agentId, 'Agent ID'), userId: owner.userId },
-        { projection: { name: 1, callType: 1, prompt: 1 } },
+        { projection: { name: 1, callType: 1, channel: 1, prompt: 1 } },
     );
     if (!agent?._id) throw new Error('Agent not found');
     if (!agent.prompt?.trim()) throw new Error(VOICE_AGENT_NO_PROMPT_MESSAGE);
-    return { _id: agent._id, name: agent.name, callType: agent.callType ?? VoiceAgentCallType.OUTBOUND };
+    return {
+        _id: agent._id,
+        name: agent.name,
+        callType: agent.callType ?? VoiceAgentCallType.OUTBOUND,
+        channel: channelOf(agent),
+    };
 }
 
 async function listItemFor(owner: VoiceOwnerScope, numberId: MongoObjectId): Promise<VoiceNumberListItem> {
@@ -290,9 +297,12 @@ async function withImportState(
     accountNumbers: ProviderAccountNumber[],
 ): Promise<AccountNumber[]> {
     const wanted = new Set(accountNumbers.map((n) => n.phoneNumber));
-    const existing = await findItemsAnywhere('numbers', { phoneNumber: { $in: [...wanted] } });
+    const existing = await findItemsAnywhere('numbers', { phoneNumber: { $in: [...wanted] }, provider });
+    // The same number may also be connected through another provider (a phone line that is on WhatsApp too).
     const ownerOf = new Map(
-        existing.filter((doc) => wanted.has(doc.phoneNumber)).map((doc) => [doc.phoneNumber, doc.userId.toString()]),
+        existing
+            .filter((doc) => wanted.has(doc.phoneNumber) && doc.provider === provider)
+            .map((doc) => [doc.phoneNumber, doc.userId.toString()]),
     );
     const me = owner.userId.toString();
 
@@ -356,7 +366,7 @@ async function importNumbers(owner: VoiceOwnerScope, input: ImportInput): Promis
         };
         let added: boolean;
         try {
-            added = await pushItem('numbers', owner, doc, { phoneNumber: n.phoneNumber });
+            added = await pushItem('numbers', owner, doc, { phoneNumber: n.phoneNumber, provider: input.provider });
         } catch (error) {
             if (!isMongoDuplicateKeyError(error)) throw error;
             throw new Error(`${n.phoneNumber} is already connected to another Aixel Labs account`);
@@ -591,6 +601,34 @@ export const setNumberAgent = async (
             return listItemFor(owner, doc._id);
         }
         const agent = await findOwnedAgent(owner, agentId);
+        const misfit = channelProblem(agent, doc.provider);
+        if (misfit) throw new Error(misfit);
+        await assertGeminiKeySet(owner.userId);
+        return linkAgent(owner, doc, agent);
+    });
+};
+
+/**
+ * A number that is both a phone line and on WhatsApp: the agent answering its phone calls answers its WhatsApp too
+ * (one agent, one memory of each person). That agent becomes Phone + WhatsApp if it was a phone agent.
+ */
+export const shareTwinAgent = async (whatsappNumberId: string): Promise<ALApiResponse<VoiceNumberListItem>> => {
+    assertValidObjectId(whatsappNumberId, 'Number ID');
+
+    return runAuthenticatedAction(async function shareTwinAgent(userId) {
+        const owner = await requireVoiceOwner(userId, SUB_MODULE);
+        const doc = await findOwnedNumber(owner, whatsappNumberId);
+        if (doc.provider !== VoiceProvider.WHATSAPP) throw new Error('Pick the WhatsApp number');
+        const twin = (await listItems('numbers', owner.userId)).find(
+            (n) => n.phoneNumber === doc.phoneNumber && n.provider !== VoiceProvider.WHATSAPP,
+        );
+        if (!twin?.inboundAgentId) throw new Error(`${doc.phoneNumber} has no agent answering its phone calls`);
+        const agent = await findOwnedAgent(owner, twin.inboundAgentId.toString());
+        if (agent.channel === VoiceAgentChannel.PHONE) {
+            const agents = await getCollection<VoiceAgentDoc>(MongoCollections.VOICE_AGENTS);
+            await agents.updateOne({ _id: agent._id, userId: owner.userId }, { $set: { channel: VoiceAgentChannel.BOTH, updatedAt: new Date() } });
+            agent.channel = VoiceAgentChannel.BOTH;
+        }
         await assertGeminiKeySet(owner.userId);
         return linkAgent(owner, doc, agent);
     });

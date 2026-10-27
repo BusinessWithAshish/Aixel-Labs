@@ -30,12 +30,16 @@ export async function ensureVoiceAgentIndexes(): Promise<void> {
     const campaigns = await getCollection<VoiceCampaignDoc>(MongoCollections.VOICE_CAMPAIGNS);
     const contacts = await getCollection<VoiceCampaignContactDoc>(MongoCollections.VOICE_CAMPAIGN_CONTACTS);
 
+    // A number was once unique on its own; now once per provider (the same number may be a phone line and on
+    // WhatsApp). The old index would refuse the second, so it goes first. Missing (a new database) is fine.
+    await accounts.dropIndex('numbers.phoneNumber_1').catch(() => undefined);
+
     await Promise.all([
         accounts.createIndex({ userId: 1 }, { unique: true }),
-        // A number or a connected app belongs to one account. Partial: accounts without any would
+        // A number (per provider) or a connected app belongs to one account. Partial: accounts without any would
         // all index the missing value and collide.
         accounts.createIndex(
-            { 'numbers.phoneNumber': 1 },
+            { 'numbers.phoneNumber': 1, 'numbers.provider': 1 },
             { unique: true, partialFilterExpression: { 'numbers.phoneNumber': { $exists: true } } },
         ),
         accounts.createIndex(
