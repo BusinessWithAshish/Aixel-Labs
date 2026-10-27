@@ -1,6 +1,6 @@
 import { type ModuleAccess, Modules, type SubModule } from '@aixellabs/backend/db/types';
 import { SubModuleUrls, ALWAYS_ALLOWED_PATHS, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
-import { SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS } from '@/config/sidebar.config';
+import { SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS, subModuleGroups } from '@/config/sidebar.config';
 import { getHiddenSubModules } from '@/flags';
 import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 import type { AppSessionUser } from '@/lib/auth/types';
@@ -22,13 +22,21 @@ function buildSidebarFromModuleAccess(moduleAccess: ModuleAccess, hidden: Readon
             continue;
         }
 
+        const groups = subModules.flatMap((subModule) => {
+            const group = subModuleGroups[subModule as keyof typeof subModuleGroups];
+            return group ? [{ title: group.key, items: group.links.map(({ title, url }) => ({ title, url })) }] : [];
+        });
         navMain.push({
             title: module,
-            items: subModules.map((subModule) => ({
-                title: subModule,
-                url: SubModuleUrls[subModule],
-            })),
+            items: subModules
+                .filter((subModule) => !(subModule in subModuleGroups))
+                .map((subModule) => ({
+                    title: subModule,
+                    url: SubModuleUrls[subModule],
+                })),
         });
+        // A sub-module with pages of its own (WhatsApp) is a group right below its module.
+        navMain.push(...groups);
     }
 
     return { navMain };

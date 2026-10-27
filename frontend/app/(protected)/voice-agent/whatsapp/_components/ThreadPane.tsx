@@ -70,7 +70,9 @@ function TakeoverBar({ thread }: { thread: InboxThreadView }) {
     const words = {
         [InboxStatus.AI]: `${thread.agentName ?? 'Your agent'} is answering this chat.`,
         [InboxStatus.NEEDS_YOU]: `The AI asked for a person${thread.statusDetail ? `: ${thread.statusDetail}` : ''}. It stays quiet until you take over.`,
-        [InboxStatus.HUMAN]: `${thread.statusDetail ?? 'You'} ${thread.statusDetail ? 'is' : 'are'} answering. The AI is paused for this chat.`,
+        [InboxStatus.HUMAN]: thread.statusDetail
+            ? `${thread.statusDetail} is answering. The AI is paused for this chat.`
+            : 'You’re answering. The AI is paused for this chat.',
     }[thread.status];
 
     return (
@@ -107,7 +109,6 @@ export function ThreadPane() {
             className="h-full"
             scrollKey={`${thread.key}:${thread.items.length}`}
             title={thread.name ?? formatPhone(thread.phone)}
-            subtitle={`${thread.name ? `${formatPhone(thread.phone)} · ` : ''}to ${formatPhone(thread.businessNumber)}`}
             actions={
                 <>
                     <InboxStatusChip status={thread.status} name={mine ? thread.statusDetail : null} />

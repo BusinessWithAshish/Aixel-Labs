@@ -61,8 +61,15 @@ export async function threadRef(owner: VoiceOwnerScope, key: string): Promise<Th
     return { numberId: number._id, phone, number };
 }
 
-function statusOf(doc: Pick<VoiceCallDoc, 'chat'> | null | undefined): Pick<InboxThread, 'status' | 'statusDetail'> {
-    if (doc?.chat?.human) return { status: InboxStatus.HUMAN, statusDetail: doc.chat.human.name };
+/** `statusDetail` names who took over only when it is someone else: the signed-in owner reads "You". */
+function statusOf(
+    doc: Pick<VoiceCallDoc, 'chat'> | null | undefined,
+    owner: VoiceOwnerScope,
+): Pick<InboxThread, 'status' | 'statusDetail'> {
+    if (doc?.chat?.human) {
+        const mine = doc.chat.human.userId.equals(owner.userId);
+        return { status: InboxStatus.HUMAN, statusDetail: mine ? null : doc.chat.human.name };
+    }
     if (doc?.chat?.needsHuman) return { status: InboxStatus.NEEDS_YOU, statusDetail: doc.chat.needsHuman.reason };
     return { status: InboxStatus.AI, statusDetail: null };
 }
@@ -130,7 +137,7 @@ export async function listThreads(owner: VoiceOwnerScope): Promise<InboxThread[]
         businessNumber: byId.get(row._id.numberId.toString())?.phoneNumber ?? '',
         unread: row.unread,
         ...lastOf(row.doc),
-        ...statusOf(latestChats[i]),
+        ...statusOf(latestChats[i], owner),
     }));
 }
 
@@ -151,13 +158,14 @@ export async function getThread(owner: VoiceOwnerScope, key: string): Promise<In
     await calls.updateMany({ ...match, 'chat.unread': { $gt: 0 } }, { $set: { 'chat.unread': 0 } });
 
     const items: InboxItem[] = [];
+    const myName = await personName(owner);
     let lastCallerAt: Date | null = null;
     for (const doc of docs) {
         if (doc.channel === VoiceCallChannel.WHATSAPP) {
             for (const turn of doc.turns) {
                 const at = turn.at ?? doc.startedAt;
                 if (turn.role === 'caller') lastCallerAt = at;
-                items.push({ kind: 'message', role: turn.role, text: turn.text, at: at.toISOString(), voice: !!turn.voice, by: turn.by ?? null });
+                items.push({ kind: 'message', role: turn.role, text: turn.text, at: at.toISOString(), voice: !!turn.voice, by: turn.by === myName ? null : (turn.by ?? null) });
             }
         } else if (doc._id) {
             items.push({
@@ -186,7 +194,7 @@ export async function getThread(owner: VoiceOwnerScope, key: string): Promise<In
         businessNumber: ref.number.phoneNumber,
         unread: 0,
         ...lastOf(last),
-        ...statusOf(latest),
+        ...statusOf(latest, owner),
         agentName: agent?.name ?? null,
         items,
         windowOpen: windowEnds !== null && windowEnds > Date.now(),

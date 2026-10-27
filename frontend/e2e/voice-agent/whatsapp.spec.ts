@@ -248,6 +248,8 @@ test('a team member takes a chat over, replies through Meta, and hands it back t
     await thread.click();
     await page.getByRole('button', { name: 'Take over' }).click();
     await expect(page.getByRole('button', { name: 'Hand back to AI' })).toBeVisible();
+    // The signed-in owner is "you", never their own name.
+    await expect(page.getByText('You’re answering. The AI is paused for this chat.')).toBeVisible();
 
     await page.getByLabel('Message').fill('Hi Ravi, this is Priya from billing. Let me check that for you.');
     await page.getByLabel('Send').click();

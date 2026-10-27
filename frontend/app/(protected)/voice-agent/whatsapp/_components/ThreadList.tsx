@@ -91,10 +91,10 @@ export function ThreadList() {
                     aria-label="Show"
                 >
                     {FILTERS.map((f) => (
-                        <ToggleGroupItem key={f.value} value={f.value} className="flex-1 text-xs">
+                        <ToggleGroupItem key={f.value} value={f.value} className="flex-auto gap-1 px-2 text-xs">
                             {f.label}
                             {f.value === 'needs-you' && counts['needs-you'] ? (
-                                <span className="ml-1 rounded-full bg-amber-400 px-1.5 text-[10px] font-semibold text-white">
+                                <span className="rounded-full bg-amber-400 px-1.5 text-[10px] leading-4 font-semibold text-white">
                                     {counts['needs-you']}
                                 </span>
                             ) : null}

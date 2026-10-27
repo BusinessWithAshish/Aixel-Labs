@@ -17,7 +17,7 @@ import {
 import type { SidebarNavItem } from '@/config/sidebar.config';
 import { ReactNode, useCallback, useEffect } from 'react';
 import { Modules, SubModule } from '@aixellabs/backend/db/types';
-import { modulesIconMap, subModuleIconMap, subModuleLabelMap } from '@/config/sidebar.config';
+import { modulesIconMap, navGroupLabelMap, subModuleIconMap, subModuleLabelMap, type SidebarGroupKey } from '@/config/sidebar.config';
 import { enumToTitleCase } from '@/helpers/string-helpers';
 import { DEFAULT_HOME_PAGE_ROUTE, TENANT_HOME_PAGE_ROUTE } from '@/config/app-config';
 import { eventBus } from '@/lib/event-bus';
@@ -67,14 +67,15 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                 {items.map((item) => {
                     const itemActive = isItemActive(item);
                     const Icon = modulesIconMap[item.title as Modules];
+                    const label = navGroupLabelMap[item.title as Modules | SidebarGroupKey] ?? enumToTitleCase(item.title);
 
                     return (
                         <Collapsible key={item.title} asChild defaultOpen={itemActive} className="group/collapsible">
                             <SidebarMenuItem>
                                 <CollapsibleTrigger asChild>
-                                    <SidebarMenuButton className='cursor-pointer' tooltip={enumToTitleCase(item.title)} active={itemActive}>
+                                    <SidebarMenuButton className='cursor-pointer' tooltip={label} active={itemActive}>
                                         {Icon && <Icon />}
-                                        <span>{enumToTitleCase(item.title)}</span>
+                                        <span>{label}</span>
                                         <ChevronRight className="ml-auto cursor-pointer transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[state=open]/collapsible:text-primary" />
                                     </SidebarMenuButton>
                                 </CollapsibleTrigger>
