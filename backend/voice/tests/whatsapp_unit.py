@@ -47,6 +47,14 @@ def module_tests():
     raw = b'{"a":1}'
     ok("signature: the app secret's HMAC passes", whatsapp.signature_ok(SECRET, raw, hub(raw)))
     ok("signature: another secret fails", not whatsapp.signature_ok(SECRET, raw, hub(raw, "other")))
+    ok("signature: non-ASCII in the header fails, not raises", not whatsapp.signature_ok(SECRET, raw, "sha256=é"))
+    ok("media: only Meta's https hosts (or the Graph base, a fake in tests) get the token",
+       whatsapp.media_url_ok("https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=1")
+       and whatsapp.media_url_ok(f"{whatsapp.graph_base()}/media-files/1")
+       and not whatsapp.media_url_ok("http://lookaside.fbsbx.com/x") and not whatsapp.media_url_ok("https://evil.example/x")
+       and not whatsapp.media_url_ok("https://fbsbx.com.evil.example/x") and not whatsapp.media_url_ok("http://169.254.169.254/"))
+    ok("media: an id that would change the Graph path is not fetched",
+       asyncio.run(whatsapp.download_media("t", "../me?fields=x")) == (None, ""))
     ok("signature: no header / no prefix fails",
        not whatsapp.signature_ok(SECRET, raw, None) and not whatsapp.signature_ok(SECRET, raw, hub(raw)[7:]))
     ok("signed: any number's secret will do (one still on an old secret)",
@@ -111,6 +119,14 @@ def route_tests():
         return client.post(path, content=raw, headers={"X-Hub-Signature-256": hub(raw, secret), "Content-Type": "application/json"})
 
     ok("events: our own URL signature is checked first", post(webhook("p1", CONNECT), f"/whatsapp?app={APP}&sig=bad").status_code == 403)
+    ok("events: a non-ASCII sig is a plain 403, not a crash", client.post(f"/whatsapp?app={APP}&sig=%C3%A9", content=b"{}").status_code == 403)
+    big = b"x" * (phone.WEBHOOK_MAX_BYTES + 1)
+    ok("events: a body over the cap is refused before it is read",
+       client.post(url, content=big, headers={"X-Hub-Signature-256": hub(big)}).status_code == 413)
+    bearer = {"Authorization": f"Bearer {os.environ['VOICELAB_KEY']}"}
+    ok("voice note: only the app may encode one", client.post("/voice-note", content=b"OggS").status_code == 401)
+    ok("voice note: a playlist pointing at a file is refused, not read",
+       client.post("/voice-note", content=b"ffconcat version 1.0\nfile /etc/hostname\n", headers=bearer).status_code == 422)
     ok("events: a body not signed with the app's secret is refused", post(webhook("p1", CONNECT), secret="other").status_code == 403)
     ok("events: a signed connect is answered in the background",
        post(webhook("p1", CONNECT)).status_code == 200 and [e and e["id"] for e in caught] == ["wacid.A1"], str(caught))

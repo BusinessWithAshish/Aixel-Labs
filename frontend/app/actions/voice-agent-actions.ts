@@ -78,7 +78,9 @@ export type VoiceAgentNumberUse = { id: string; phoneNumber: string; provider: V
 export type VoiceAgentUsage = { inbound: VoiceAgentNumberUse[]; outbound: VoiceAgentNumberUse[] };
 
 /** The signed-in owner, after checking they were granted the Agents page (writes only; reads filter by owner). */
-const agentOwner = (userId: string) => requireVoiceOwner(userId, VOICE_AGENT_SUB_MODULES.AGENTS);
+// Agents are edited from Agents and from WhatsApp's Agents page.
+const agentOwner = (userId: string) =>
+    requireVoiceOwner(userId, [VOICE_AGENT_SUB_MODULES.AGENTS, VOICE_AGENT_SUB_MODULES.WHATSAPP]);
 
 /** Agents saved before call types existed were all cold-callers. */
 function callTypeOf(doc: Pick<VoiceAgentDoc, 'callType'>): VoiceAgentCallType {
@@ -277,6 +279,7 @@ export const duplicateVoiceAgent = async (
 ): Promise<ALApiResponse<VoiceAgent>> =>
     runAuthenticatedAction(async function duplicateVoiceAgent(userId) {
         const { userId: uid } = await agentOwner(userId);
+        assertRateLimit(`voice-agent-copy:${uid}`, 20);
         const source = await findOwnedAgent(uid, agentId);
         const { name, channel } = parseOrThrow(voiceAgentSchema.pick({ name: true, channel: true }), input, 'Check the name');
         const callType = channel === VoiceAgentChannel.PHONE ? callTypeOf(source) : VoiceAgentCallType.INBOUND;

@@ -140,6 +140,8 @@ PREPARED: dict[str, dict] = {}
 RING_SECS = 30
 # A voice note recorded in the inbox (/voice-note): two minutes of browser Opus is about 0.5 MB, so this is plenty.
 VOICE_NOTE_MAX_BYTES = 2 * 1024 * 1024
+# A WhatsApp webhook (/whatsapp): Meta's own are a few KB.
+WEBHOOK_MAX_BYTES = 1024 * 1024
 # Her opening line is made while the phone rings and kept back until pickup, so
 # it is heard with no wait on the model. An unanswered dial then
 # still costs one short reply (nothing on the free tier, about $0.004 on a paid key).
@@ -1133,7 +1135,12 @@ def make_app() -> FastAPI:
         app_id = q.get("app") or ""
         if not product.sig_ok(q.get("sig"), "whatsapp", app_id):
             return Response(status_code=403)
+        # Meta's webhooks are a few KB; the URL's sig sits in the customer's Meta app, so a body is capped before it is read.
+        if int(request.headers.get("content-length") or 0) > WEBHOOK_MAX_BYTES:
+            return Response(status_code=413)
         raw = await request.body()
+        if len(raw) > WEBHOOK_MAX_BYTES:
+            return Response(status_code=413)
         try:
             numbers = await asyncio.to_thread(product.whatsapp_numbers, app_id)
         except Exception as e:

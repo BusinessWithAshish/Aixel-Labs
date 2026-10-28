@@ -16,12 +16,16 @@ export type VoiceOwnerScope = {
 };
 
 /**
- * The signed-in owner of voice numbers / calls, after checking they were granted the
- * voice sub-module (the page guard only covers the first page load, not later actions).
+ * The signed-in owner of voice numbers / calls, after checking they were granted the voice
+ * sub-module, or one of several (the page guard only covers the first page load, not later actions).
  */
-export async function requireVoiceOwner(userId: string, subModule: VOICE_AGENT_SUB_MODULES): Promise<VoiceOwnerScope> {
+export async function requireVoiceOwner(
+    userId: string,
+    subModule: VOICE_AGENT_SUB_MODULES | readonly VOICE_AGENT_SUB_MODULES[],
+): Promise<VoiceOwnerScope> {
     const session = await requireAppSession();
-    const granted = session.user.isAdmin || (session.user.moduleAccess?.[Modules.VOICE_AGENT] ?? []).includes(subModule);
+    const mine = session.user.moduleAccess?.[Modules.VOICE_AGENT] ?? [];
+    const granted = session.user.isAdmin || [subModule].flat().some((s) => mine.includes(s));
     if (!granted) throw new Error('You do not have access to voice agents');
 
     const users = await getCollection<UserDoc>(MongoCollections.USERS);

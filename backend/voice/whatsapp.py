@@ -30,7 +30,9 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
+import urllib.parse
 
 from datetime import timedelta
 
@@ -69,7 +71,7 @@ def signature_ok(secret: str, raw: bytes, header: str | None) -> bool:
     if not secret or not header or not header.startswith("sha256="):
         return False
     want = hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(want, header[len("sha256="):])
+    return hmac.compare_digest(want.encode(), header[len("sha256="):].encode())
 
 
 def signed(numbers: list[dict], raw: bytes, header: str | None) -> bool:
@@ -242,13 +244,32 @@ async def mark_read(token: str, phone_number_id: str, message_id: str):
         "typing_indicator": {"type": "text"}})
 
 
+# Hosts Meta serves media from. The token goes with the download, so it goes nowhere else (and never follows a redirect).
+MEDIA_HOSTS = (".fbsbx.com", ".fbcdn.net", ".facebook.com", ".whatsapp.net")
+MEDIA_MAX_BYTES = 16 * 1024 * 1024  # WhatsApp's own cap on audio
+
+
+def media_url_ok(url: str) -> bool:
+    """A media URL from Meta: https on one of its hosts, or the Graph base itself (a local fake in tests)."""
+    parts, base = urllib.parse.urlsplit(url), urllib.parse.urlsplit(graph_base())
+    if (parts.scheme, parts.netloc) == (base.scheme, base.netloc):
+        return True
+    host = (parts.hostname or "").lower()
+    return parts.scheme == "https" and any(host.endswith(suffix) for suffix in MEDIA_HOSTS)
+
+
 async def graph_get(token: str, path_or_url: str) -> tuple[int, bytes, str]:
-    """GET a Graph path, or a media URL Meta handed out (it wants the token too): (status, body, content type)."""
+    """GET a Graph path, or a media URL Meta handed out (it wants the token too): (status, body, content type).
+    At most MEDIA_MAX_BYTES; no redirects."""
     url = path_or_url if path_or_url.startswith("http") else f"{graph_base()}/{GRAPH_VERSION}{path_or_url}"
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-            async with session.get(url, headers={"Authorization": f"Bearer {token}"}) as r:
-                return r.status, await r.read(), r.headers.get("Content-Type", "")
+            async with session.get(url, headers={"Authorization": f"Bearer {token}"}, allow_redirects=False) as r:
+                body = await r.content.read(MEDIA_MAX_BYTES + 1)
+                if len(body) > MEDIA_MAX_BYTES:
+                    logger.warning(f"whatsapp: GET {path_or_url[:80]}: over {MEDIA_MAX_BYTES} bytes, dropped")
+                    return 0, b"", ""
+                return r.status, body, r.headers.get("Content-Type", "")
     except Exception as e:
         logger.error(f"whatsapp: GET {path_or_url[:80]}: {e!r}")
         return 0, b"", ""
@@ -256,12 +277,16 @@ async def graph_get(token: str, path_or_url: str) -> tuple[int, bytes, str]:
 
 async def download_media(token: str, media_id: str) -> tuple[bytes | None, str]:
     """A voice note's audio: Meta names its short-lived URL first, then serves it with the same token."""
+    if not re.fullmatch(r"[\w-]{1,128}", str(media_id)):  # it goes into the Graph path: no slashes, dots or query
+        return None, ""
     status, body, _ = await graph_get(token, f"/{media_id}")
     try:
         meta = json.loads(body) if status == 200 else {}
     except ValueError:
         meta = {}
-    if not meta.get("url"):
+    if not meta.get("url") or not media_url_ok(str(meta["url"])):
+        if meta.get("url"):
+            logger.warning(f"whatsapp: media {media_id}: not a Meta URL, not fetched")
         return None, ""
     status, audio, kind = await graph_get(token, meta["url"])
     return (audio if status == 200 and audio else None), (meta.get("mime_type") or kind)

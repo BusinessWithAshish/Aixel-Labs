@@ -15,37 +15,79 @@ import {
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import type { SidebarNavItem } from '@/config/sidebar.config';
-import { ReactNode, useCallback, useEffect } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Modules, SubModule } from '@aixellabs/backend/db/types';
-import { modulesIconMap, navGroupLabelMap, subModuleIconMap, subModuleLabelMap, type SidebarGroupKey } from '@/config/sidebar.config';
+import { modulesIconMap, subModuleIconMap, subModuleLabelMap, type SidebarKey, type SidebarPageKey } from '@/config/sidebar.config';
 import { enumToTitleCase } from '@/helpers/string-helpers';
 import { DEFAULT_HOME_PAGE_ROUTE, TENANT_HOME_PAGE_ROUTE } from '@/config/app-config';
 import { eventBus } from '@/lib/event-bus';
+import { cn } from '@/lib/utils';
+
+/** Reports a link's navigation as loading, for the top progress bar. */
+function LinkItem({ children }: { children: ReactNode }) {
+    const { pending } = useLinkStatus();
+    useEffect(() => {
+        void eventBus.publish('navigation:loading', pending);
+    }, [pending]);
+    return <>{children}</>;
+}
+
+const labelOf = (key: SidebarKey) => subModuleLabelMap[key] ?? enumToTitleCase(key);
+
+/** Whether `pathname` is this entry's page, or a page anywhere inside this folder. */
+function holds(item: SidebarNavItem, pathname: string): boolean {
+    if (item.url && (pathname === item.url || pathname.startsWith(`${item.url}/`))) return true;
+    return item.items?.some((child) => holds(child, pathname)) ?? false;
+}
+
+/** A folder's entries, each a page or a folder of its own; folders nest as deep as the config goes. */
+function NavEntries({ items, pathname, nested = false }: { items: SidebarNavItem[]; pathname: string; nested?: boolean }) {
+    return (
+        // Deeper folders keep the left rule but not its side margins, so three levels still fit the sidebar.
+        <SidebarMenuSub className={cn(nested && 'mr-0 ml-2 pr-0')}>
+            {items.map((item) => {
+                const SubItemIcon = subModuleIconMap[item.title as SubModule | SidebarPageKey];
+                const icon = SubItemIcon && <SubItemIcon.icon className={SubItemIcon.color} />;
+                const label = labelOf(item.title);
+                if (item.url) {
+                    return (
+                        <SidebarMenuSubItem key={item.title}>
+                            <SidebarMenuSubButton asChild active={holds(item, pathname)}>
+                                <Link prefetch={true} href={item.url}>
+                                    <LinkItem>
+                                        {icon}
+                                        <span title={label}>{label}</span>
+                                    </LinkItem>
+                                </Link>
+                            </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                    );
+                }
+                return (
+                    <Collapsible key={item.title} asChild defaultOpen={holds(item, pathname)}>
+                        <SidebarMenuSubItem>
+                            <CollapsibleTrigger asChild>
+                                <SidebarMenuSubButton asChild className="cursor-pointer data-[state=open]:[&>svg:last-child]:rotate-90">
+                                    <button type="button" className="w-full">
+                                        {icon}
+                                        <span title={label}>{label}</span>
+                                        <ChevronRight className="ml-auto transition-transform duration-200" />
+                                    </button>
+                                </SidebarMenuSubButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <NavEntries items={item.items ?? []} pathname={pathname} nested />
+                            </CollapsibleContent>
+                        </SidebarMenuSubItem>
+                    </Collapsible>
+                );
+            })}
+        </SidebarMenuSub>
+    );
+}
 
 export function NavMain({ items }: { items: SidebarNavItem[] }) {
     const pathname = usePathname();
-
-    // Memoize isItemActive to recalculate only when pathname or items change
-    const isItemActive = useCallback(
-        (item: (typeof items)[0]) =>
-            item.items?.some(
-                (subItem) => pathname === subItem.url || pathname.startsWith(`${subItem.url}/`),
-            ) ?? false,
-        [pathname],
-    );
-
-    const isSubItemActive = useCallback(
-        (url: string) => pathname === url || pathname.startsWith(`${url}/`),
-        [pathname],
-    );
-
-    const LinkItem = ({ children }: { children: ReactNode }) => {
-        const { pending } = useLinkStatus()
-        useEffect(() => {
-            void eventBus.publish('navigation:loading', pending);
-        }, [pending]);
-        return <>{children}</>
-    };
 
     return (
         <SidebarGroup>
@@ -65,9 +107,9 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
             <SidebarGroupLabel>Platform</SidebarGroupLabel>
             <SidebarMenu>
                 {items.map((item) => {
-                    const itemActive = isItemActive(item);
+                    const itemActive = holds(item, pathname);
                     const Icon = modulesIconMap[item.title as Modules];
-                    const label = navGroupLabelMap[item.title as Modules | SidebarGroupKey] ?? enumToTitleCase(item.title);
+                    const label = labelOf(item.title);
 
                     return (
                         <Collapsible key={item.title} asChild defaultOpen={itemActive} className="group/collapsible">
@@ -80,26 +122,7 @@ export function NavMain({ items }: { items: SidebarNavItem[] }) {
                                     </SidebarMenuButton>
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
-                                    <SidebarMenuSub>
-                                        {item.items?.map((subItem) => {
-                                            const SubItemIcon = subModuleIconMap[subItem.title as SubModule];
-
-                                            return (
-                                                <SidebarMenuSubItem key={subItem.title}>
-                                                    <SidebarMenuSubButton asChild active={isSubItemActive(subItem.url)}>
-                                                        <Link prefetch={true} href={subItem.url}>
-                                                            <LinkItem>
-                                                                {SubItemIcon && <SubItemIcon.icon className={SubItemIcon.color} />}
-                                                                <span title={subModuleLabelMap[subItem.title as SubModule] ?? enumToTitleCase(subItem.title)}>
-                                                                    {subModuleLabelMap[subItem.title as SubModule] ?? enumToTitleCase(subItem.title)}
-                                                                </span>
-                                                            </LinkItem>
-                                                        </Link>
-                                                    </SidebarMenuSubButton>
-                                                </SidebarMenuSubItem>
-                                            );
-                                        })}
-                                    </SidebarMenuSub>
+                                    <NavEntries items={item.items ?? []} pathname={pathname} />
                                 </CollapsibleContent>
                             </SidebarMenuItem>
                         </Collapsible>

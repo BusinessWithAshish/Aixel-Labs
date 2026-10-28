@@ -36,47 +36,41 @@ import {
     Settings,
 } from 'lucide-react';
 
+/** Sidebar pages that live inside a sub-module (each labelled and iconed in the maps below). */
+export type SidebarPageKey = 'WHATSAPP_INBOX' | 'WHATSAPP_AGENTS' | 'WHATSAPP_NUMBERS';
+/** Anything the sidebar shows: a module, a sub-module, or a page inside one. */
+export type SidebarKey = Modules | SubModule | SidebarPageKey;
+
 /**
- * Sub-modules shown as a sidebar group of their own, right below their module, instead of one link: the group's
- * key, and its pages in order (each key labelled and iconed in the maps below). Access stays the sub-module's.
+ * One sidebar entry: a page (`url`), or a folder of entries (`items`). Folders nest to any depth, each one opening
+ * inside its parent (Voice Agent > WhatsApp > Inbox).
  */
-export const subModuleGroups = {
-    [VOICE_AGENT_SUB_MODULES.WHATSAPP]: {
-        key: 'WHATSAPP_GROUP',
-        links: [
-            { title: 'WHATSAPP_INBOX', url: WHATSAPP_URL },
-            { title: 'WHATSAPP_AGENTS', url: WHATSAPP_AGENTS_URL },
-            { title: 'WHATSAPP_NUMBERS', url: WHATSAPP_NUMBERS_URL },
-        ],
-    },
-} as const satisfies Partial<Record<SubModule, { key: string; links: readonly { title: string; url: string }[] }>>;
-
-type SubModuleGroup = (typeof subModuleGroups)[keyof typeof subModuleGroups];
-/** A sidebar group made from a sub-module, and one of its links. */
-export type SidebarGroupKey = SubModuleGroup['key'];
-export type SidebarGroupLink = SubModuleGroup['links'][number]['title'];
-
-/** Group labels that differ from the key's title case. */
-export const navGroupLabelMap: Partial<Record<Modules | SidebarGroupKey, string>> = {
-    WHATSAPP_GROUP: 'WhatsApp',
+export type SidebarNavItem = {
+    title: SidebarKey;
+    url?: string;
+    items?: SidebarNavItem[];
 };
 
-/** Sidebar labels that differ from the enum's title case. */
-export const subModuleLabelMap: Partial<Record<SubModule | SidebarGroupLink, string>> = {
+/**
+ * Sub-modules that are a folder of pages instead of one page: the entries inside, in order (any of them may be a
+ * folder again). Access stays the sub-module's: a user granted it sees all of it.
+ */
+export const subModuleChildren: Partial<Record<SubModule, SidebarNavItem[]>> = {
+    [VOICE_AGENT_SUB_MODULES.WHATSAPP]: [
+        { title: 'WHATSAPP_INBOX', url: WHATSAPP_URL },
+        { title: 'WHATSAPP_AGENTS', url: WHATSAPP_AGENTS_URL },
+        { title: 'WHATSAPP_NUMBERS', url: WHATSAPP_NUMBERS_URL },
+    ],
+};
+
+/** Sidebar labels that differ from the key's title case. */
+export const subModuleLabelMap: Partial<Record<SidebarKey, string>> = {
     WHATSAPP_INBOX: 'Inbox',
     WHATSAPP_AGENTS: 'Agents',
     WHATSAPP_NUMBERS: 'Numbers',
     [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: 'Bookings',
     [VOICE_AGENT_SUB_MODULES.WHATSAPP]: 'WhatsApp',
     [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: 'Analytics',
-};
-
-export type SidebarNavItem = {
-    title: string;
-    items?: {
-        title: string;
-        url: string;
-    }[];
 };
 
 export type SidebarUser = {
@@ -91,8 +85,7 @@ export type SidebarConfig = {
     navMain: SidebarNavItem[];
 };
 
-export const modulesIconMap: Record<Modules | SidebarGroupKey, LucideIcon> = {
-    WHATSAPP_GROUP: MessageCircleMore,
+export const modulesIconMap: Record<Modules, LucideIcon> = {
     [Modules.LEAD_GENERATION]: UsersRound,
     [Modules.VOICE_AGENT]: AudioWaveform,
     [Modules.MESSAGING]: MessageCircleMore,
@@ -100,7 +93,7 @@ export const modulesIconMap: Record<Modules | SidebarGroupKey, LucideIcon> = {
     [Modules.LEAD_ENRICHMENT]: UsersRound,
 };
 
-export const subModuleIconMap: Record<SubModule | SidebarGroupLink, { icon: LucideIcon; color: string }> = {
+export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: LucideIcon; color: string }> = {
     WHATSAPP_INBOX: { icon: Inbox, color: '!text-green-600' },
     WHATSAPP_AGENTS: { icon: Bot, color: '!text-green-600' },
     WHATSAPP_NUMBERS: { icon: Phone, color: '!text-green-600' },

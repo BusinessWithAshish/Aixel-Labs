@@ -713,9 +713,20 @@ export type VoiceNumberDoc<Id = ObjectId> = {
 };
 
 /** Client view: no sealed key (the WhatsApp state holds the sealed app secret, so it stays on the server too). */
-export type VoiceNumber = Omit<VoiceNumberDoc<string>, "apiKeySealed" | "whatsapp" | "createdAt" | "updatedAt"> & {
-  tenantId: string;
-  userId: string;
+/** A number as the browser gets it: no secrets, and none of the provider's or our internal ids it has no use for. */
+export type VoiceNumber = Omit<
+  VoiceNumberDoc<string>,
+  | "apiKeySealed"
+  | "whatsapp"
+  | "createdAt"
+  | "updatedAt"
+  | "tenantId"
+  | "userId"
+  | "providerNumberId"
+  | "texmlAppId"
+  | "callControlAppId"
+  | "previousConnectionId"
+> & {
   createdAt: string;
   updatedAt: string;
 };

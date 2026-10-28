@@ -2,8 +2,10 @@ import type { BrowserContext, Page } from '@playwright/test';
 import { encryptOverrides } from 'flags';
 import { Modules, type SubModule, VOICE_AGENT_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { SubModuleUrls, TENANT_HOME_PAGE_ROUTE } from '@/config/app-config';
+import { subModuleChildren } from '@/config/sidebar.config';
 import { FeatureFlagKey, SUB_MODULE_FLAG_KEY } from '@/flags';
 import { getDefaultModuleAccess, getSubModulesForModule } from '@/helpers/module-access-helpers';
+import { sidebarUrls } from '@/helpers/sidebar-config-helpers';
 import { enumToTitleCase } from '@/helpers/string-helpers';
 import { expect, test } from '../support/fixtures';
 import { ADMIN_STORAGE_STATE, E2E_BASE_URL, E2E_FLAGS_SECRET, USER_STORAGE_STATE } from '../support/env';
@@ -13,19 +15,30 @@ import { E2E_ADMIN, E2E_USER } from '../support/users';
 /** Every flag is off by default, so every flagged page is hidden and the rest are shown. */
 const ALL_SUB_MODULES = Object.values(getDefaultModuleAccess()).flat() as SubModule[];
 const isFlagged = (subModule: SubModule) => subModule in SUB_MODULE_FLAG_KEY;
-const urlsOf = (subModules: SubModule[]) => [...new Set(subModules.map((subModule) => SubModuleUrls[subModule]))].sort();
+// A sub-module that is a folder (WhatsApp) shows its pages instead of one link.
+const urlsOf = (subModules: SubModule[]) =>
+    [
+        ...new Set(
+            subModules.flatMap((subModule) => {
+                const children = subModuleChildren[subModule];
+                return children ? sidebarUrls(children) : [SubModuleUrls[subModule]];
+            }),
+        ),
+    ].sort();
 
 const HIDDEN_URLS = urlsOf(ALL_SUB_MODULES.filter(isFlagged));
 const SHOWN_URLS = urlsOf(ALL_SUB_MODULES.filter((subModule) => !isFlagged(subModule)));
 const HIDDEN_MODULES = Object.values(Modules).filter((module) => getSubModulesForModule(module).every(isFlagged));
 const WEB_DIALER_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.WEB_DIALER];
 
-/** Opens every module group and returns the sidebar's module links. */
+/** Opens every module group and every folder inside them, and returns the sidebar's page links. */
 async function sidebarLinks(page: Page): Promise<string[]> {
     await page.goto(TENANT_HOME_PAGE_ROUTE);
     const sidebar = page.locator('[data-sidebar="sidebar"]').first();
     await waitForHydration(page, '[data-sidebar="menu-button"]');
-    const closed = sidebar.locator('[data-sidebar="menu-item"][data-state="closed"] > [data-sidebar="menu-button"]');
+    const closed = sidebar.locator(
+        '[data-sidebar="menu-item"][data-state="closed"] > [data-sidebar="menu-button"], [data-sidebar="menu-sub-item"][data-state="closed"] > [data-sidebar="menu-sub-button"]',
+    );
     while ((await closed.count()) > 0) {
         await closed.first().click();
     }

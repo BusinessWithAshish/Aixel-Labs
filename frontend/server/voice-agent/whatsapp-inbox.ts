@@ -253,7 +253,11 @@ export async function sendVoiceReply(owner: VoiceOwnerScope, key: string, audio:
     if (audio.byteLength > VOICE_CHAT_LIMITS.voiceNoteBytes) throw new Error('A voice note is at most 2 minutes');
     if (!/^audio\/[\w.+-]+(;.*)?$/.test(mime)) throw new Error('That recording is not audio');
     await deliver(owner, key, async (ref) => {
-        const { ogg, secs } = await engineVoiceNote(audio, mime);
+        // The engine's own words (its URL, its errors) stay in the server log; the person gets a plain one.
+        const { ogg, secs } = await engineVoiceNote(audio, mime).catch((error: unknown) => {
+            console.error('[voice] sendVoiceReply: the engine could not encode the voice note', error);
+            throw new Error('That voice note could not be prepared. Record it again.');
+        });
         await sendVoiceMessage(whatsappAuthOf(ref.number), ref.number.providerNumberId, ref.phone.slice(1), ogg);
         return { text: `Voice note (${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')})`, voice: true };
     });

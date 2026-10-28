@@ -67,13 +67,13 @@ def sign(*parts: str) -> str:
 
 
 def sig_ok(sig: str | None, *parts: str) -> bool:
-    return bool(VOICELAB_KEY and sig) and hmac.compare_digest(sig, sign(*parts))
+    return bool(VOICELAB_KEY and sig) and hmac.compare_digest(sig.encode(), sign(*parts).encode())  # bytes: any text compares
 
 
 def bearer_ok(header: str | None) -> bool:
     """The app talking to us server to server: `Authorization: Bearer <VOICELAB_KEY>`."""
     scheme, _, secret = (header or "").partition(" ")
-    return bool(VOICELAB_KEY) and scheme.lower() == "bearer" and hmac.compare_digest(secret.strip(), VOICELAB_KEY)
+    return bool(VOICELAB_KEY) and scheme.lower() == "bearer" and hmac.compare_digest(secret.strip().encode(), VOICELAB_KEY.encode())
 
 
 # --- Customer keys at rest: AES-256-GCM, "v1." + base64url(iv + ciphertext + tag) ---------------

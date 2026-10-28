@@ -115,6 +115,7 @@ export async function engineVoiceNote(
         headers: { 'Content-Type': mime, Authorization: `Bearer ${engineSecret()}` },
         body: audio,
         cache: 'no-store',
+        signal: AbortSignal.timeout(60_000),
     });
     if (!res.ok) throw new Error(`Voice engine /voice-note: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
     return { ogg: new Uint8Array(await res.arrayBuffer()), secs: Number(res.headers.get('X-Duration-Secs')) || 0 };

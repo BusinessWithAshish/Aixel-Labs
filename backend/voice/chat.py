@@ -34,6 +34,9 @@ MODEL = os.getenv("CHAT_MODEL", costs.RATES["chat"]["model"])
 MODELS = tuple(costs.CHAT_RATES)
 DEEPGRAM_MODEL, OPENAI_STT_MODEL = "nova-3", "gpt-4o-mini-transcribe"
 SPOKEN_MAX_SECS = 120.0  # a voice reply longer than this is cut
+# The containers a voice note comes in (WhatsApp's OGG, a browser's WebM or MP4, Meta's AAC/MP3/AMR): ffmpeg reads
+# nothing else from a customer's bytes, so no playlist (HLS, concat) can point it at a URL or a file.
+AUDIO_FORMATS = "ogg,matroska,webm,mov,mp4,m4a,3gp,3g2,mj2,aac,mp3,amr,wav"
 HANDOFF = {
     "name": "ask_for_a_person",
     "description": ("Hand this chat to a person from the team. Use it when the person asks for a human, is upset, "
@@ -146,8 +149,13 @@ def audio_secs(audio: bytes) -> float:
     with tempfile.NamedTemporaryFile(suffix=".audio") as f:
         f.write(audio)
         f.flush()
-        out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f.name],
-                             capture_output=True, text=True, timeout=30)
+        # Only this one file: a crafted playlist inside it can't make ffprobe open URLs or other files.
+        try:
+            out = subprocess.run(["ffprobe", "-v", "error", "-protocol_whitelist", "file", "-format_whitelist", AUDIO_FORMATS,
+                                  "-show_entries", "format=duration", "-of", "csv=p=0", f.name],
+                                 capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired:
+            return 0.0
     try:
         return round(float(out.stdout.strip()), 1)
     except ValueError:
@@ -219,9 +227,14 @@ async def speak(ctx: dict, text: str) -> bytes | None:
 async def voice_note(audio: bytes, source: list[str] | None = None) -> bytes | None:
     """`audio` as WhatsApp plays a voice note: OGG/Opus, mono. `source` describes raw input (PCM); else ffmpeg reads the
     container (a browser's WebM or MP4 recording). None when it could not be encoded."""
-    out = await asyncio.to_thread(subprocess.run, [
-        "ffmpeg", "-v", "error", *(source or []), "-i", "pipe:0", "-t", str(SPOKEN_MAX_SECS), "-ac", "1",
-        "-c:a", "libopus", "-b:a", "32k", "-application", "voip", "-f", "ogg", "pipe:1"], input=audio, capture_output=True, timeout=60)
+    try:
+        out = await asyncio.to_thread(subprocess.run, [
+            "ffmpeg", "-v", "error", "-protocol_whitelist", "pipe", *(source or ["-format_whitelist", AUDIO_FORMATS]),
+            "-i", "pipe:0", "-t", str(SPOKEN_MAX_SECS), "-ac", "1",
+            "-c:a", "libopus", "-b:a", "32k", "-application", "voip", "-f", "ogg", "pipe:1"], input=audio, capture_output=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        logger.warning("chat: encoding a voice note took over 60 s, dropped")
+        return None
     if out.returncode or not out.stdout:
         logger.warning(f"chat: could not encode a voice note: {out.stderr[:200]!r}")
         return None
