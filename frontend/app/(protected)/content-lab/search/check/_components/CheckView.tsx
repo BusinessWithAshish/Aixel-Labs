@@ -220,7 +220,7 @@ function Winners({ result }: { result: CONTENT_LAB_CHECK_RESPONSE }) {
 export function CheckView() {
     const { check } = usePage<UseCheckPageReturn>();
     return (
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-2">
+        <div className="flex w-full flex-col gap-6 p-1 sm:p-2">
             <header className="flex flex-col gap-1">
                 <p className="text-primary text-xs font-medium tracking-wider uppercase">3 · Check</p>
                 <h1 className="text-2xl font-bold tracking-tight text-balance sm:text-3xl">Check my idea before I post</h1>

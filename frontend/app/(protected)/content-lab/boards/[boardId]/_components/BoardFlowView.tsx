@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { usePage } from '@/contexts/PageStore';
-import { CONTENT_LAB_NODE_META } from '../../../_constants';
+import { cn } from '@/lib/utils';
+import { CONTENT_LAB_NODE_META, CONTENT_LAB_NODE_ROLES, nodeRole } from '../../../_constants';
+import { NodeIcon, ROLE_STYLE } from '../../_components/NodeRole';
 import { nodeLabel, type UseBoardPageReturn } from '../_hooks/use-board-page';
 import { BoardNodeBody, NodeStatusIcon, NodeTagBadge } from './BoardNodeBody';
 
@@ -23,17 +25,25 @@ export function BoardFlowView() {
                 const label = labelOf.get(node.id)!;
                 const run = page.runs[node.id];
                 const feeds = page.edges.filter((edge) => edge.source === node.id);
+                const role = nodeRole(node.kind);
                 return (
                     <li key={node.id}>
                         <Card
-                            className="gap-3 py-3"
+                            className={cn('gap-3 border-l-4 py-3', ROLE_STYLE[role].side)}
                             data-testid="flow-card"
                             data-node-id={node.id}
                             data-kind={node.kind}
+                            data-role={role}
                             data-status={run?.status ?? 'idle'}
                         >
                             <CardHeader className="flex flex-row items-center gap-2 px-3">
-                                <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">{label}</h3>
+                                <NodeIcon kind={node.kind} />
+                                <span className="flex min-w-0 flex-1 flex-col">
+                                    <span className="text-muted-foreground text-[10px] leading-none font-medium tracking-wider uppercase">
+                                        {CONTENT_LAB_NODE_ROLES[role].label}
+                                    </span>
+                                    <h3 className="truncate text-sm font-semibold">{label}</h3>
+                                </span>
                                 <NodeStatusIcon run={run} />
                                 <NodeTagBadge kind={node.kind} />
                                 <Button

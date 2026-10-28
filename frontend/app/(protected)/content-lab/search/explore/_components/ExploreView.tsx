@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangleIcon, LayoutDashboardIcon, Loader2Icon, RotateCwIcon, SearchXIcon, TrendingUpIcon } from 'lucide-react';
-import { CONTENT_LAB_ERROR_MESSAGES, CONTENT_LAB_OUTLIER_MULTIPLE } from '@aixellabs/backend/content-lab/constants';
+import { CONTENT_LAB_ERROR_MESSAGES, CONTENT_LAB_OUTLIER_MULTIPLE, CONTENT_LAB_PLATFORMS } from '@aixellabs/backend/content-lab/constants';
 import type { ContentLabPlatform } from '@aixellabs/backend/content-lab/types';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -18,11 +18,16 @@ import {
     CONTENT_LAB_POST_FORMAT_LABELS,
     type ContentLabPlatformFilter,
 } from '../../../_constants';
+import { PlatformIcon } from '../../../_components/PlatformIcon';
 import { PostCard } from '../../_components/PostCard';
 import { SmartBox } from '../../_components/SmartBox';
 import { TOPIC_BOARD_TEMPLATE, POST_BOARD_TEMPLATE } from '../../_hooks/use-post-actions';
 import { compactNumber, creatorLabel, formatMultiple } from '../../_utils/format';
 import type { ExploreResult, UseExplorePageReturn } from '../_hooks/use-explore-page';
+
+/** YouTube results sit in a 16:9 grid, Instagram in a denser 9:16 one, like each platform's own. */
+const LANDSCAPE_GRID = 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4';
+const PORTRAIT_GRID = 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6';
 
 const countryName = (code: string) => CONTENT_LAB_COUNTRIES.find((c) => c.code === code)?.label ?? code;
 
@@ -44,6 +49,7 @@ function Toolbar() {
                         value={filter.value}
                         className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-3"
                     >
+                        {filter.value === 'both' ? null : <PlatformIcon platform={filter.value} className="in-data-[state=on]:text-current" />}
                         {filter.label}
                     </ToggleGroupItem>
                 ))}
@@ -87,8 +93,8 @@ function LoadingResults({ withTakeaways }: { withTakeaways: boolean }) {
                     ))}
                 </div>
             ) : null}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div className={LANDSCAPE_GRID}>
+                {[0, 1, 2, 3].map((i) => (
                     <div key={i} className="flex flex-col gap-2 rounded-xl border p-0">
                         <Skeleton className="aspect-video w-full rounded-b-none" />
                         <div className="flex flex-col gap-2 p-4">
@@ -171,7 +177,10 @@ function CreatorSummary({ result }: { result: ExploreResult }) {
         <div className="grid gap-3 sm:grid-cols-2">
             {result.creators.map(({ creator, usualViews, posts }) => (
                 <Card key={`${creator.platform}:${creator.id}`} className="gap-1 px-4">
-                    <span className="text-muted-foreground text-xs font-medium uppercase">{CONTENT_LAB_PLATFORM_LABELS[creator.platform]}</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium uppercase">
+                        <PlatformIcon platform={creator.platform} className="size-3.5" />
+                        {CONTENT_LAB_PLATFORM_LABELS[creator.platform]}
+                    </span>
                     <p className="font-semibold break-words">
                         {creator.name ?? creatorLabel(creator)} <span className="text-muted-foreground font-normal">{creatorLabel(creator)}</span>
                     </p>
@@ -214,17 +223,29 @@ function Results() {
                     <h2 id="explore-posts" className="text-lg font-semibold">
                         The posts
                     </h2>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {result.posts.map((post) => (
-                            <PostCard
-                                key={post.id}
-                                post={post}
-                                busy={busy}
-                                onWatch={() => watchCreator(post.creator)}
-                                onBoard={() => startBoard(POST_BOARD_TEMPLATE, { url: post.url })}
-                            />
-                        ))}
-                    </div>
+                    {CONTENT_LAB_PLATFORMS.map((platform) => {
+                        const posts = result.posts.filter((post) => post.platform === platform);
+                        if (!posts.length) return null;
+                        return (
+                            <div key={platform} className="flex flex-col gap-2">
+                                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                                    <PlatformIcon platform={platform} /> {CONTENT_LAB_PLATFORM_LABELS[platform]}
+                                    <span className="text-muted-foreground font-normal">· {posts.length}</span>
+                                </h3>
+                                <div className={platform === 'instagram' ? PORTRAIT_GRID : LANDSCAPE_GRID}>
+                                    {posts.map((post) => (
+                                        <PostCard
+                                            key={post.id}
+                                            post={post}
+                                            busy={busy}
+                                            onWatch={() => watchCreator(post.creator)}
+                                            onBoard={() => startBoard(POST_BOARD_TEMPLATE, { url: post.url })}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </section>
             ) : (
                 <EmptyState
@@ -247,7 +268,7 @@ export function ExploreView() {
         : `Posts in ${countryName(country)}, ranked by how far they beat their own creator's usual views.`;
 
     return (
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-2">
+        <div className="flex w-full flex-col gap-6 p-1 sm:p-2">
             <header className="flex flex-col gap-1">
                 <p className="text-primary text-xs font-medium tracking-wider uppercase">1 · Find</p>
                 <h1 className="text-2xl font-bold tracking-tight break-words text-balance sm:text-3xl">{title}</h1>

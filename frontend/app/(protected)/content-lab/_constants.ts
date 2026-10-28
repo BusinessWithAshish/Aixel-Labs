@@ -7,41 +7,54 @@ import {
     type ContentLabNodeData,
     type ContentLabWriteFormat,
 } from '@aixellabs/backend/db/types';
-import { CONTENT_LAB_CHECK_ROUTE, CONTENT_LAB_EXPLORE_ROUTE } from '@/config/app-config';
 
-/** The three jobs on Search home; each maps to one page under Search. */
-export const CONTENT_LAB_JOBS = [
+/** What the Search box takes, each with what it gives back. Topic examples run a search when clicked. */
+export const CONTENT_LAB_QUERY_KINDS = [
     {
-        step: 'Find',
-        title: "What's working in my niche?",
-        description: "Posts that got 5–15x their creator's usual views, on YouTube and Instagram, with the reason in plain words.",
-        example: 'protein breakfast · India',
-        href: `${CONTENT_LAB_EXPLORE_ROUTE}?q=${encodeURIComponent('protein breakfast')}`,
+        kind: 'topic',
+        title: 'A topic, niche or keyword',
+        examples: ['protein breakfast', 'skincare for men', 'Pune cafes'],
+        gives: "Posts that got far more views than their creator's usual, on YouTube and Instagram, and why.",
     },
     {
-        step: 'Learn',
-        title: 'Break down any video or reel',
-        description: "Hook, structure, CTA and thumbnail of anyone's post. Then write your own version.",
-        example: 'youtu.be/… or instagram.com/reel/…',
-        href: CONTENT_LAB_EXPLORE_ROUTE,
+        kind: 'link',
+        title: 'A YouTube or Instagram link',
+        examples: ['youtu.be/…', 'instagram.com/reel/…'],
+        gives: 'That post broken down: hook, structure, CTA and thumbnail, ready to write your own version.',
     },
     {
-        step: 'Check',
-        title: 'Check my idea before I post',
-        description: 'Score your title or hook against what won in your niche this month. Get 3 stronger versions.',
-        example: '"My protein breakfast routine"',
-        href: CONTENT_LAB_CHECK_ROUTE,
+        kind: 'creator',
+        title: 'A creator',
+        examples: ['@hostelkitchen'],
+        gives: 'Their posts that beat their own usual, so you see what works for them.',
     },
 ] as const;
 
-/** Why use this when YouTube Studio / Instagram insights exist. */
+/** Why use this when YouTube Studio / Instagram insights exist: the short version, for the side card. */
 export const CONTENT_LAB_VS_STUDIO = [
-    { label: 'Whose content', studio: 'Only yours', lab: "Anyone's, in any niche" },
-    { label: 'When it helps', studio: 'After you post', lab: 'Before you post' },
-    { label: 'What you learn', studio: 'Numbers', lab: 'Why it worked and what to copy' },
-    { label: 'Platforms', studio: 'One at a time', lab: 'YouTube and Instagram side by side' },
-    { label: 'Output', studio: 'Charts', lab: 'Scripts, hooks, carousels in your voice' },
+    { label: 'Whose posts', studio: 'Only yours', lab: "Anyone's" },
+    { label: 'When', studio: 'After you post', lab: 'Before you post' },
+    { label: 'You get', studio: 'Charts', lab: 'Why it worked + drafts' },
 ] as const;
+
+/**
+ * The worked example on Search home: one topic, a winner on each platform, the pattern they share
+ * and that hook rewritten per platform. Illustrative (labelled "Example"), not live data.
+ */
+export const CONTENT_LAB_HOME_EXAMPLE = {
+    query: 'protein breakfast',
+    country: 'India',
+    youtube: { title: 'I ate a 30g protein breakfast for 30 days', multiple: '12x', creator: '@fitwithriya' },
+    instagram: { title: '30g protein. 5 minutes. No eggs.', multiple: '8x', creator: '@hostelkitchen' },
+    pattern: 'A number and a result in the first words',
+    evidence: '14 of 18 winners put a number in the title',
+    hooks: [
+        { platform: 'youtube', label: 'YouTube title', text: 'I tried 5 high-protein breakfasts (30g each)' },
+        { platform: 'instagram', label: 'Reel, first line', text: '30g protein before 9am. No eggs.' },
+        { platform: 'linkedin', label: 'LinkedIn opener', text: 'One number fixed my 3pm slump: 30g.' },
+        { platform: 'x', label: 'X thread opener', text: '30g of protein at breakfast changed my workday. The 5-minute version 🧵' },
+    ],
+} as const;
 
 /** Explore's platform toggle (`?platform=`). */
 export const CONTENT_LAB_PLATFORM_FILTERS = [
@@ -141,6 +154,23 @@ export const CONTENT_LAB_NODE_META: Record<ContentLabNodeKind, NodeMeta> = {
     [ContentLabNodeKind.WRITE]: { label: 'Write', tag: 'you', hint: 'Drafts on your own Gemini key', acceptsInput: true, givesOutput: true, stage: 2 },
     [ContentLabNodeKind.OUTPUT]: { label: 'Output', tag: 'you', hint: 'An editable draft', acceptsInput: true, givesOutput: true, stage: 3 },
     [ContentLabNodeKind.CHECK]: { label: 'Check before posting', tag: 'auto', hint: 'Scores the draft vs niche winners', acceptsInput: true, givesOutput: false, stage: 4 },
+};
+
+/** Inputs bring ideas in, steps read them and write, outputs are what you post (and its check). */
+export type ContentLabNodeRole = 'input' | 'step' | 'output';
+
+export const CONTENT_LAB_NODE_ROLES: Record<ContentLabNodeRole, { label: string; plural: string; hint: string }> = {
+    input: { label: 'Input', plural: 'Inputs', hint: 'Where ideas come from: top posts, creators, ads, your voice' },
+    step: { label: 'Step', plural: 'Steps', hint: 'AI reads what is wired in, finds the patterns and writes' },
+    output: { label: 'Output', plural: 'Outputs', hint: 'The drafts you post, each checked against the winners' },
+};
+
+export const CONTENT_LAB_NODE_ROLE_ORDER: ContentLabNodeRole[] = ['input', 'step', 'output'];
+
+/** A box's role follows its stage: inputs are stage 0, Hooks and Write are steps, Output and Check are outputs. */
+export const nodeRole = (kind: ContentLabNodeKind): ContentLabNodeRole => {
+    const { stage } = CONTENT_LAB_NODE_META[kind];
+    return stage === 0 ? 'input' : stage <= 2 ? 'step' : 'output';
 };
 
 export const CONTENT_LAB_BOARD_TEMPLATE_IDS = ['reel-from-outliers', 'youtube-script', 'repurpose', 'why-it-won', 'ad-hooks'] as const;

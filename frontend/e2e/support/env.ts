@@ -37,8 +37,8 @@ export const E2E_BASE_URL = e2eBaseUrl(WORKER);
 export const E2E_MONGODB_URI = 'mongodb://127.0.0.1:27018';
 export const E2E_DB_NAME = e2eDbName(WORKER);
 
-/** Emulator accounts are per project, so a run on its own project never clears another run's users. */
-export const E2E_FIREBASE_PROJECT_ID = process.env.E2E_FIREBASE_PROJECT_ID || 'demo-aixel-e2e';
+/** One project for every run: the emulator signs custom tokens in only to its default project. */
+export const E2E_FIREBASE_PROJECT_ID = 'demo-aixel-e2e';
 export const E2E_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 
 /** Closed port: an unmocked scrape fails fast instead of reaching a real backend. */

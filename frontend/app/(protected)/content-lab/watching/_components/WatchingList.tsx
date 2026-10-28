@@ -25,7 +25,7 @@ export function WatchingList() {
     const busy = !!page.progress || !!page.refreshingId;
 
     return (
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-2">
+        <div className="flex w-full flex-col gap-5 p-1 sm:p-2">
             <p className="text-muted-foreground max-w-prose">
                 Creators you follow closely. Refresh to see what they posted far above their usual.
             </p>

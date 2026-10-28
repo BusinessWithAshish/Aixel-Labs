@@ -291,5 +291,5 @@ export function BreakdownView() {
         body = <Breakdown breakdown={state.breakdown} />;
     }
 
-    return <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-2">{body}</div>;
+    return <div className="flex w-full flex-col gap-6 p-1 sm:p-2">{body}</div>;
 }

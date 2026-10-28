@@ -7,15 +7,17 @@ import { Link2, X } from 'lucide-react';
 import { Background, Controls, Handle, MiniMap, Position, ReactFlow, type NodeProps } from '@xyflow/react';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
-import { CONTENT_LAB_NODE_META } from '../../../_constants';
+import { CONTENT_LAB_NODE_META, CONTENT_LAB_NODE_ROLES, nodeRole } from '../../../_constants';
+import { NodeIcon, ROLE_STYLE } from '../../_components/NodeRole';
 import { nodeLabel, type BoardFlowNode, type UseBoardPageReturn } from '../_hooks/use-board-page';
 import { BoardNodeBody, NodeStatusIcon, NodeTagBadge } from './BoardNodeBody';
 
-const HANDLE_CLASS = '!size-3.5 !border-2 !border-background !bg-primary';
+const HANDLE_CLASS = '!size-3.5 !border-2 !border-background';
 
 function BoardCanvasNode({ id, data, selected }: NodeProps<BoardFlowNode>) {
     const page = usePage<UseBoardPageReturn>();
     const meta = CONTENT_LAB_NODE_META[data.kind];
+    const role = nodeRole(data.kind);
     const run = page.runs[id];
     const label = nodeLabel(data.kind, data.settings);
 
@@ -24,12 +26,25 @@ function BoardCanvasNode({ id, data, selected }: NodeProps<BoardFlowNode>) {
             data-testid="board-node"
             data-node-id={id}
             data-kind={data.kind}
+            data-role={role}
             data-status={run?.status ?? 'idle'}
-            className={cn('bg-card text-card-foreground w-64 rounded-xl border shadow-sm', selected && 'ring-primary ring-2')}
+            className={cn(
+                'bg-card text-card-foreground w-64 rounded-xl border border-t-4 shadow-sm',
+                ROLE_STYLE[role].edge,
+                selected && 'ring-primary ring-2',
+            )}
         >
-            {meta.acceptsInput ? <Handle type="target" position={Position.Left} className={HANDLE_CLASS} /> : null}
-            <header className="board-node-drag flex cursor-grab items-center gap-1.5 border-b py-1.5 pr-1.5 pl-3 active:cursor-grabbing">
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{label}</span>
+            {meta.acceptsInput ? (
+                <Handle type="target" position={Position.Left} className={cn(HANDLE_CLASS, ROLE_STYLE[role].handle)} title="Wire in" />
+            ) : null}
+            <header className="board-node-drag flex cursor-grab items-center gap-2 border-b py-1.5 pr-1.5 pl-2 active:cursor-grabbing">
+                <NodeIcon kind={data.kind} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-muted-foreground text-[10px] leading-none font-medium tracking-wider uppercase">
+                        {CONTENT_LAB_NODE_ROLES[role].label}
+                    </span>
+                    <span className="truncate text-sm font-semibold">{label}</span>
+                </span>
                 <NodeStatusIcon run={run} />
                 <NodeTagBadge kind={data.kind} />
                 {meta.givesOutput ? (
@@ -54,7 +69,9 @@ function BoardCanvasNode({ id, data, selected }: NodeProps<BoardFlowNode>) {
             <div className="p-3">
                 <BoardNodeBody id={id} />
             </div>
-            {meta.givesOutput ? <Handle type="source" position={Position.Right} className={HANDLE_CLASS} /> : null}
+            {meta.givesOutput ? (
+                <Handle type="source" position={Position.Right} className={cn(HANDLE_CLASS, ROLE_STYLE[role].handle)} title="Drag to wire out" />
+            ) : null}
         </div>
     );
 }
@@ -65,12 +82,14 @@ const NODE_TYPES = { board: BoardCanvasNode };
 export function BoardCanvas({ className }: { className?: string }) {
     const page = usePage<UseBoardPageReturn>();
     const { resolvedTheme } = useTheme();
+    // A wire takes the colour of the box it leaves.
+    const wireColor = new Map(page.nodes.map((node) => [node.id, ROLE_STYLE[nodeRole(node.data.kind)].hex]));
 
     return (
         <div className={cn('bg-muted/30 overflow-hidden rounded-xl border', className)} data-testid="board-canvas">
             <ReactFlow<BoardFlowNode>
                 nodes={page.nodes}
-                edges={page.running ? page.edges.map((edge) => ({ ...edge, animated: true })) : page.edges}
+                edges={page.edges.map((edge) => ({ ...edge, animated: page.running, style: { stroke: wireColor.get(edge.source), strokeWidth: 2 } }))}
                 nodeTypes={NODE_TYPES}
                 onNodesChange={page.onNodesChange}
                 onEdgesChange={page.onEdgesChange}
@@ -84,7 +103,7 @@ export function BoardCanvas({ className }: { className?: string }) {
             >
                 <Background gap={18} />
                 <Controls showInteractive={false} />
-                <MiniMap pannable zoomable className="!hidden lg:!block" />
+                <MiniMap pannable zoomable nodeColor={(node: BoardFlowNode) => ROLE_STYLE[nodeRole(node.data.kind)].hex} className="!hidden lg:!block" />
             </ReactFlow>
         </div>
     );

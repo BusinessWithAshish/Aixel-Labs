@@ -49,7 +49,8 @@ async function toggleWire(page: Page, sourceLabel: string, targetLabel: string):
     await page.getByRole('button', { name: `Connect ${sourceLabel} to…` }).first().click();
     const sheet = page.getByRole('dialog');
     await expect(sheet.getByText(`Connect ${sourceLabel} to…`)).toBeVisible();
-    await sheet.getByLabel(targetLabel, { exact: true }).click();
+    // The label's text, not the checkbox: in dev the Next.js badge covers a checkbox low on the left of a phone screen.
+    await sheet.getByText(targetLabel, { exact: true }).click();
     await page.keyboard.press('Escape');
     await expect(sheet).toBeHidden();
 }
@@ -120,7 +121,7 @@ for (const viewport of VIEWPORTS) {
             await waitForHydration(page, '[data-testid="board-card"] button');
 
             await page.getByRole('button', { name: 'Rename Old name' }).click();
-            await page.getByLabel('Name').fill('Breakfast script');
+            await page.getByLabel('Name', { exact: true }).fill('Breakfast script');
             await page.getByRole('button', { name: 'Save' }).click();
             await expect(page.getByRole('link', { name: 'Breakfast script' })).toBeVisible();
             await expect.poll(async () => (await lab.getBoard(id))?.title).toBe('Breakfast script');

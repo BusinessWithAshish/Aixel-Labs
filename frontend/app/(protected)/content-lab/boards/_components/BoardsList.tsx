@@ -14,6 +14,7 @@ import { contentLabBoardRoute } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
 import { CONTENT_LAB_BOARD_TEMPLATES } from '../../_constants';
 import type { UseBoardsPageReturn } from '../_hooks/use-boards-page';
+import { BoardLegend, TemplatePipeline } from './NodeRole';
 
 const templateTitle = (templateId: string | null) =>
     CONTENT_LAB_BOARD_TEMPLATES.find((template) => template.id === templateId)?.title ?? 'Blank board';
@@ -23,20 +24,35 @@ export function BoardsList() {
     const { boards, creatingTemplateId } = page;
 
     return (
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-2">
+        <div className="flex w-full flex-col gap-8 p-1 sm:p-2">
+            <section className="flex flex-col gap-3" aria-labelledby="how-boards-work">
+                <div>
+                    <h2 id="how-boards-work" className="text-lg font-semibold">
+                        How a board works
+                    </h2>
+                    <p className="text-muted-foreground max-w-prose text-sm">
+                        A board is a recipe for one piece of content. Boxes on the left bring ideas in, the middle ones read them and write,
+                        and the ones on the right are what you post. Wires carry what a box found to the next one; press Run board and it all
+                        fills in.
+                    </p>
+                </div>
+                <BoardLegend detailed />
+            </section>
+
             <section className="flex flex-col gap-3" aria-labelledby="new-board-title">
                 <div>
                     <h2 id="new-board-title" className="text-lg font-semibold">
                         New board
                     </h2>
                     <p className="text-muted-foreground text-sm">
-                        Pick a template. Its inputs fill themselves from YouTube and Instagram, then you write on your own AI key.
+                        Pick a template: it comes already wired. Fill in the topic or link, then run it. Writing uses your own Gemini key.
                     </p>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
                     {CONTENT_LAB_BOARD_TEMPLATES.map((template) => (
                         <Card key={template.id} className="h-full gap-3 py-4" data-testid={`template-${template.id}`}>
-                            <CardHeader className="px-4">
+                            <CardHeader className="gap-2 px-4">
+                                <TemplatePipeline nodes={template.nodes} />
                                 <CardTitle className="text-base">{template.title}</CardTitle>
                                 <CardDescription>{template.description}</CardDescription>
                             </CardHeader>
