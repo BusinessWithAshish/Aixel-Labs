@@ -138,6 +138,8 @@ LINES: dict[str, dict] = {}
 PREPARED: dict[str, dict] = {}
 # Telnyx gives up after this long; ours is the same wait plus slack for its webhook.
 RING_SECS = 30
+# A voice note recorded in the inbox (/voice-note): two minutes of browser Opus is about 0.5 MB, so this is plenty.
+VOICE_NOTE_MAX_BYTES = 2 * 1024 * 1024
 # Her opening line is made while the phone rings and kept back until pickup, so
 # it is heard with no wait on the model. An unanswered dial then
 # still costs one short reply (nothing on the free tier, about $0.004 on a paid key).
@@ -1160,6 +1162,21 @@ def make_app() -> FastAPI:
             if number and whatsapp.fresh(message["id"], "message"):
                 whatsapp.spawn(whatsapp.answer_message(number, message))
         return {"ok": True}
+
+    @app.post("/voice-note")
+    async def encode_voice_note(request: Request):
+        """A person's voice note recorded in the app's inbox (the browser's WebM or MP4) -> OGG/Opus, the only audio WhatsApp
+        plays as a voice note, and its seconds (X-Duration-Secs). The app sends it on; nothing is kept here."""
+        if not product.bearer_ok(request.headers.get("authorization")):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        audio = await request.body()
+        if not 0 < len(audio) <= VOICE_NOTE_MAX_BYTES:
+            return JSONResponse({"error": "a voice note is up to 2 MB"}, status_code=413)
+        ogg = await chat.voice_note(audio)
+        if not ogg:
+            return JSONResponse({"error": "that recording could not be read"}, status_code=422)
+        secs = await asyncio.to_thread(chat.audio_secs, ogg)
+        return Response(ogg, media_type="audio/ogg", headers={"X-Duration-Secs": f"{secs:.1f}"})
 
     @app.post("/chat")
     async def test_chat(request: Request):

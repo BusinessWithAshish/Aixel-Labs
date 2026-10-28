@@ -135,11 +135,11 @@ def chat_cost(doc: dict, tokens: dict, sealed: str | None = None, model: str | N
 
 def voice_notes_usd(voice: dict, gemini_free: bool) -> float:
     """Voice notes heard (minutes at the speech-to-text model's rate; Gemini's are in its tokens already) and spoken
-    (minutes at the Gemini TTS rate, 0 on a free-tier key). A model with no rate in the rates file costs 0."""
+    (minutes at the voice-note TTS model's rate, 0 on a free-tier key). A model with no rate in the rates file costs 0."""
     import fillers  # it reads .env and numpy: loaded on first use
 
     stt = (STACK_RATES["stt"].get(voice.get("sttModel") or "") or {}).get("usdPerMinute", 0)
-    tts = 0 if gemini_free else (STACK_RATES["tts"].get(fillers.TTS_MODEL) or {}).get("usdPerAudioMinute", 0)
+    tts = 0 if gemini_free else (STACK_RATES["tts"].get(fillers.VOICE_NOTE_MODEL) or {}).get("usdPerAudioMinute", 0)
     return float(voice.get("sttSecs") or 0) / 60 * stt + float(voice.get("ttsSecs") or 0) / 60 * tts
 
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
-import { Bot, CheckCheck, Mic, Phone, SendHorizontal, UserRound } from 'lucide-react';
+import { Bot, CheckCheck, Mic, Phone, SendHorizontal, Trash2, UserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -172,7 +172,13 @@ export function WhatsAppBubble({ side, text, time, voice, sender, tail = true }:
                     </div>
                 ) : null}
                 <p className={cn('break-words whitespace-pre-wrap', voice && 'text-[13px] text-[#54656f] italic dark:text-[#8696a0]')}>
-                    {voice ? `“${text}”` : <WhatsAppText text={text} />}
+                    {voice ? (
+                        <>
+                            “<WhatsAppText text={text} />”
+                        </>
+                    ) : (
+                        <WhatsAppText text={text} />
+                    )}
                     <span className="invisible ml-2 inline-block w-14" aria-hidden />
                 </p>
                 <span className="absolute right-2 bottom-1 flex items-center gap-0.5 text-[11px] text-[#667781] dark:text-[#8696a0]">
@@ -226,14 +232,44 @@ type WhatsAppComposerProps = {
     disabled?: boolean;
     sending?: boolean;
     placeholder?: string;
+    /** Given, an empty field shows WhatsApp's mic: hold a voice note, then send it or bin it. */
+    voiceNote?: { recording: boolean; secs: number; start: () => void; stop: (send: boolean) => void };
 };
 
-/** WhatsApp's message bar: a rounded field and the round green send button. */
-export function WhatsAppComposer({ value, onChange, onSend, disabled, sending, placeholder = 'Type a message' }: WhatsAppComposerProps) {
+const ROUND_BUTTON =
+    'flex size-10 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white transition-opacity disabled:opacity-40';
+
+/** WhatsApp's message bar: a rounded field and the round green send button (a mic while the field is empty). */
+export function WhatsAppComposer({ value, onChange, onSend, disabled, sending, placeholder = 'Type a message', voiceNote }: WhatsAppComposerProps) {
     const submit = (e: FormEvent) => {
         e.preventDefault();
         if (!disabled && !sending && value.trim()) onSend();
     };
+    if (voiceNote?.recording) {
+        return (
+            <div className="flex items-center gap-2 bg-[#f0f2f5] px-3 py-2.5 dark:bg-[#202c33]" role="status">
+                <button
+                    type="button"
+                    onClick={() => voiceNote.stop(false)}
+                    aria-label="Delete voice note"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-[#54656f] hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/10"
+                >
+                    <Trash2 className="size-5" aria-hidden />
+                </button>
+                <span className="flex min-h-10 flex-1 items-center gap-2 rounded-lg bg-white px-3 text-sm text-[#111b21] dark:bg-[#2a3942] dark:text-[#e9edef]">
+                    <span className="size-2.5 animate-pulse rounded-full bg-red-500" aria-hidden />
+                    <span className="tabular-nums">
+                        {Math.floor(voiceNote.secs / 60)}:{String(voiceNote.secs % 60).padStart(2, '0')}
+                    </span>
+                    <span className="text-[#667781]">Recording…</span>
+                </span>
+                <button type="button" onClick={() => voiceNote.stop(true)} aria-label="Send voice note" className={ROUND_BUTTON}>
+                    <SendHorizontal className="size-5" aria-hidden />
+                </button>
+            </div>
+        );
+    }
+    const mic = voiceNote && !value.trim();
     return (
         <form onSubmit={submit} className="flex items-end gap-2 bg-[#f0f2f5] px-3 py-2.5 dark:bg-[#202c33]">
             <textarea
@@ -249,14 +285,21 @@ export function WhatsAppComposer({ value, onChange, onSend, disabled, sending, p
                 maxLength={4096}
                 className="max-h-32 min-h-10 flex-1 resize-none rounded-lg bg-white px-3 py-2.5 text-sm text-[#111b21] outline-none placeholder:text-[#667781] disabled:opacity-60 dark:bg-[#2a3942] dark:text-[#e9edef]"
             />
-            <button
-                type="submit"
-                disabled={disabled || sending || !value.trim()}
-                aria-label="Send"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white transition-opacity disabled:opacity-40"
-            >
-                <SendHorizontal className="size-5" aria-hidden />
-            </button>
+            {mic ? (
+                <button
+                    type="button"
+                    onClick={voiceNote.start}
+                    disabled={disabled || sending}
+                    aria-label="Record a voice note"
+                    className={ROUND_BUTTON}
+                >
+                    <Mic className="size-5" aria-hidden />
+                </button>
+            ) : (
+                <button type="submit" disabled={disabled || sending || !value.trim()} aria-label="Send" className={ROUND_BUTTON}>
+                    <SendHorizontal className="size-5" aria-hidden />
+                </button>
+            )}
         </form>
     );
 }

@@ -9,9 +9,11 @@ import {
     handBackInboxThread,
     listInboxThreads,
     sendInboxReply,
+    sendInboxVoiceNote,
     takeOverInboxThread,
 } from '@/app/actions/voice-inbox-actions';
 import { InboxStatus, type InboxThread, type InboxThreadView } from '@/helpers/voice-inbox';
+import { useVoiceNoteRecorder } from './use-voice-note-recorder';
 
 export type InboxPageData = {
     threads: InboxThread[];
@@ -105,6 +107,13 @@ export function useInboxPage(data: InboxPageData) {
         if (!(await run('send', () => sendInboxReply(thread.key, text)))) setDraft(text);
     };
 
+    const voiceNote = useVoiceNoteRecorder((audio) => {
+        if (!thread) return;
+        const form = new FormData();
+        form.append('audio', audio, 'voice-note');
+        void run('send', () => sendInboxVoiceNote(thread.key, form));
+    });
+
     const visible = useMemo(() => threads.filter(FILTER_MATCH[filter]), [threads, filter]);
     const counts = useMemo(
         () => ({
@@ -129,6 +138,7 @@ export function useInboxPage(data: InboxPageData) {
         takeOver,
         handBack,
         send,
+        voiceNote,
         loadError: data.loadError,
     };
 }

@@ -105,6 +105,21 @@ export async function engineFetch<T>(path: string, body: unknown): Promise<T> {
     return JSON.parse(text) as T;
 }
 
+/** A voice note recorded in the browser (WebM/MP4) as the OGG/Opus WhatsApp plays as one, and its seconds (engine `/voice-note`). */
+export async function engineVoiceNote(
+    audio: Uint8Array<ArrayBuffer>,
+    mime: string,
+): Promise<{ ogg: Uint8Array<ArrayBuffer>; secs: number }> {
+    const res = await fetch(`${voiceEngineUrl()}/voice-note`, {
+        method: 'POST',
+        headers: { 'Content-Type': mime, Authorization: `Bearer ${engineSecret()}` },
+        body: audio,
+        cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(`Voice engine /voice-note: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+    return { ogg: new Uint8Array(await res.arrayBuffer()), secs: Number(res.headers.get('X-Duration-Secs')) || 0 };
+}
+
 /**
  * Customer provider keys at rest: AES-256-GCM, key = sha256("aixel-voice-secrets|" + secret),
  * stored as `v1.<base64url(iv[12] + ciphertext + tag[16])>`. The engine opens them the same way.

@@ -18,6 +18,11 @@ import {
 import type { UseInboxPageReturn } from '../_hooks/use-inbox-page';
 import { InboxStatusChip } from './InboxStatusChip';
 
+/** The AI as the inbox names it: "AI", and which agent in brackets. */
+function aiName(thread: InboxThreadView): string {
+    return thread.agentName ? `AI (${thread.agentName})` : 'AI';
+}
+
 function sideOf(item: InboxItem): 'in' | 'out' | 'call' {
     return item.kind === 'call' ? 'call' : item.role === 'caller' ? 'in' : 'out';
 }
@@ -44,7 +49,7 @@ function Messages({ thread }: { thread: InboxThreadView }) {
                                 tail={tail}
                                 sender={
                                     item.role === 'agent'
-                                        ? { name: `AI · ${thread.agentName ?? 'your agent'}`, ai: true }
+                                        ? { name: aiName(thread), ai: true }
                                         : item.role === 'human'
                                           ? { name: item.by ?? 'You', ai: false }
                                           : null
@@ -68,7 +73,7 @@ function TakeoverBar({ thread }: { thread: InboxThreadView }) {
     }[thread.status];
     const Icon = { [InboxStatus.AI]: Bot, [InboxStatus.NEEDS_YOU]: Hand, [InboxStatus.HUMAN]: UserRound }[thread.status];
     const words = {
-        [InboxStatus.AI]: `${thread.agentName ?? 'Your agent'} is answering this chat.`,
+        [InboxStatus.AI]: `${aiName(thread)} is answering this chat.`,
         [InboxStatus.NEEDS_YOU]: `The AI asked for a person${thread.statusDetail ? `: ${thread.statusDetail}` : ''}. It stays quiet until you take over.`,
         [InboxStatus.HUMAN]: thread.statusDetail
             ? `${thread.statusDetail} is answering. The AI is paused for this chat.`
@@ -95,14 +100,9 @@ function TakeoverBar({ thread }: { thread: InboxThreadView }) {
 }
 
 export function ThreadPane() {
-    const { thread, openThread, draft, setDraft, busy, send } = usePage<UseInboxPageReturn>();
+    const { thread, openThread, draft, setDraft, busy, send, voiceNote } = usePage<UseInboxPageReturn>();
     if (!thread) return null;
     const mine = thread.status === InboxStatus.HUMAN;
-    const placeholder = !mine
-        ? 'Take over to reply yourself'
-        : !thread.windowOpen
-          ? 'Over 24 hours since they last wrote: reply when they write again'
-          : 'Type a message';
 
     return (
         <WhatsAppFrame
@@ -125,14 +125,18 @@ export function ThreadPane() {
             }
             banner={<TakeoverBar thread={thread} />}
             footer={
-                <WhatsAppComposer
-                    value={draft}
-                    onChange={setDraft}
-                    onSend={() => void send()}
-                    disabled={!mine || !thread.windowOpen}
-                    sending={busy === 'send'}
-                    placeholder={placeholder}
-                />
+                // Only the person who took the chat over writes in it; until then the bar above offers "Take over".
+                mine ? (
+                    <WhatsAppComposer
+                        value={draft}
+                        onChange={setDraft}
+                        onSend={() => void send()}
+                        disabled={!thread.windowOpen}
+                        sending={busy === 'send'}
+                        placeholder={thread.windowOpen ? 'Type a message' : 'Over 24 hours since they last wrote: reply when they write again'}
+                        voiceNote={thread.windowOpen ? voiceNote : undefined}
+                    />
+                ) : null
             }
         >
             <Messages thread={thread} />

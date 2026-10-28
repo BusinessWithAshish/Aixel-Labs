@@ -2,7 +2,7 @@
 
 import { Phone } from 'lucide-react';
 import { usePage } from '@/contexts/PageStore';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatPhone } from '@/helpers/voice-campaign-contacts';
 import { InboxStatus, type InboxThread } from '@/helpers/voice-inbox';
 import { cn } from '@/lib/utils';
@@ -80,27 +80,22 @@ export function ThreadList() {
     const { threads, counts, filter, setFilter, selectedKey, openThread } = usePage<UseInboxPageReturn>();
     return (
         <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-white dark:bg-[#111b21]" aria-label="Conversations">
-            <div className="border-b p-3">
-                <ToggleGroup
-                    type="single"
-                    value={filter}
-                    onValueChange={(v) => v && setFilter(v as InboxFilter)}
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    aria-label="Show"
-                >
-                    {FILTERS.map((f) => (
-                        <ToggleGroupItem key={f.value} value={f.value} className="flex-auto gap-1 px-2 text-xs">
-                            {f.label}
-                            {f.value === 'needs-you' && counts['needs-you'] ? (
-                                <span className="rounded-full bg-amber-400 px-1.5 text-[10px] leading-4 font-semibold text-white">
-                                    {counts['needs-you']}
-                                </span>
-                            ) : null}
-                        </ToggleGroupItem>
-                    ))}
-                </ToggleGroup>
+            <div className="flex flex-col gap-3 border-b px-4 pt-4 pb-3">
+                <h2 className="text-lg font-semibold">Chats</h2>
+                <Tabs value={filter} onValueChange={(v) => setFilter(v as InboxFilter)}>
+                    <TabsList className="w-full" aria-label="Show">
+                        {FILTERS.map((f) => (
+                            <TabsTrigger key={f.value} value={f.value} className="min-w-0 px-1.5 text-xs">
+                                {f.label}
+                                {f.value === 'needs-you' && counts['needs-you'] ? (
+                                    <span className="rounded-full bg-amber-400 px-1.5 text-[10px] leading-4 font-semibold text-white">
+                                        {counts['needs-you']}
+                                    </span>
+                                ) : null}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </Tabs>
             </div>
             {threads.length === 0 ? (
                 <p className="text-muted-foreground p-6 text-center text-sm">

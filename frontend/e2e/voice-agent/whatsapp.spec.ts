@@ -245,7 +245,14 @@ test('a team member takes a chat over, replies through Meta, and hands it back t
     await open(page, WHATSAPP_URL);
     const thread = page.getByRole('button', { name: /Ravi/ });
     await expect(thread).toContainText('Needs you');
+    // The filters are tabs: "AI" has nothing waiting, "Needs you" has Ravi.
+    await page.getByRole('tab', { name: 'AI', exact: true }).click();
+    await expect(page.getByText('Nothing here right now.')).toBeVisible();
+    await page.getByRole('tab', { name: /^Needs you/ }).click();
     await thread.click();
+    // The AI's messages say "AI (<agent>)"; nobody types here until someone takes the chat over.
+    await expect(page.getByText('AI (Chat desk)', { exact: true }).first()).toBeVisible();
+    await expect(page.getByLabel('Message')).toHaveCount(0);
     await page.getByRole('button', { name: 'Take over' }).click();
     await expect(page.getByRole('button', { name: 'Hand back to AI' })).toBeVisible();
     // The signed-in owner is "you", never their own name.
@@ -266,5 +273,6 @@ test('a team member takes a chat over, replies through Meta, and hands it back t
 
     await page.getByRole('button', { name: 'Hand back to AI' }).click();
     await expect(page.getByRole('button', { name: 'Take over' })).toBeVisible();
+    await expect(page.getByLabel('Message')).toHaveCount(0);
     expect((await db.getVoiceCalls(E2E_USER))[0].chat?.human ?? null).toBeNull();
 });

@@ -103,7 +103,9 @@ def stt_service(part: dict):
     if provider == "deepgram":
         from pipecat.services.deepgram.stt import DeepgramSTTService
 
-        return DeepgramSTTService(api_key=key, settings=DeepgramSTTService.Settings(model=model))
+        # Nova-3 hears callers in any of its languages, switching mid-call (Hinglish too); pipecat's default is English only.
+        extra = {"language": "multi"} if model == "nova-3" else {}
+        return DeepgramSTTService(api_key=key, settings=DeepgramSTTService.Settings(model=model, **extra))
     if provider == "gemini":
         from pipecat.services.google.gemini_live.stt import GeminiSTTService
 

@@ -159,20 +159,29 @@ test('chats: the AI answers texts and voice notes through Meta, a person takes o
     await page.getByLabel('Send').click();
     await expect.poll(() => meta.sent.length).toBe(3);
     expect(meta.sent[2]).toEqual({ to: PERSON, type: 'text', text: 'Hi Ravi, Priya here: whitening is ₹6,000 a session.' });
+    // A voice note recorded in the inbox (the fake mic): the engine turns the browser's WebM into WhatsApp's OGG/Opus.
+    await page.getByRole('button', { name: 'Record a voice note' }).click();
+    await expect(page.getByText('Recording…')).toBeVisible();
+    await page.waitForTimeout(2_500);
+    await page.getByRole('button', { name: 'Send voice note' }).click();
+    await expect.poll(() => meta.sent.length, { timeout: 30_000 }).toBe(4);
+    expect(meta.sent[3]).toMatchObject({ to: PERSON, type: 'audio', voice: true });
+    expect(meta.find('POST', /\/media$/).at(-1)?.body).toMatchObject({ multipart: true, ogg: true });
+    expect((await openChat(db))?.turns.at(-1)).toMatchObject({ role: 'human', voice: true, text: expect.stringMatching(/^Voice note \(0:0\d\)$/) });
 
     // Handed back: the AI answers again.
     await page.getByRole('button', { name: 'Hand back to AI' }).click();
     await expect(page.getByRole('button', { name: 'Take over' })).toBeVisible();
     await meta.customerTexts(PERSON, 'Ravi', 'Great, please book the cleaning for Saturday at 11.');
-    await expect.poll(() => meta.sent.length, { timeout: 60_000 }).toBe(4);
-    expect(meta.sent[3].type).toBe('text');
+    await expect.poll(() => meta.sent.length, { timeout: 60_000 }).toBe(5);
+    expect(meta.sent[4].type).toBe('text');
 
     // The person goes quiet past the idle time: their next message closes the chat first (cost, analysis, memory),
     // then opens a new one that starts from what the agent remembers.
     const closing = await openChat(db);
     await db.ageVoiceChat(closing!._id.toString(), 16);
     await meta.customerTexts(PERSON, 'Ravi', 'Hi again! What did I ask you about last time?');
-    await expect.poll(() => meta.sent.length, { timeout: 120_000 }).toBe(5);
+    await expect.poll(() => meta.sent.length, { timeout: 120_000 }).toBe(6);
     const calls = await db.getVoiceCalls(E2E_USER);
     const closed = calls.find((c) => c._id.equals(closing!._id));
     expect(closed?.chat?.open).toBe(false);
@@ -183,7 +192,7 @@ test('chats: the AI answers texts and voice notes through Meta, a person takes o
     expect(memory?.brief).toMatch(/clean|whiten|saturday/i);
     expect((await openChat(db))?.agentId.toString()).toBe(agentId);
     // The new chat's reply draws on that memory.
-    expect.soft(meta.sent[4].text).toMatch(/clean|whiten|saturday/i);
+    expect.soft(meta.sent[5].text).toMatch(/clean|whiten|saturday/i);
     console.log('[whatsapp live] replies:', meta.sent.map((s) => s.text ?? `[${s.type}]`));
     console.log('[whatsapp live] memory:', memory?.brief);
 });

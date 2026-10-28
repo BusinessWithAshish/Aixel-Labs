@@ -95,8 +95,9 @@ async function graphRequest<T>(
     bearer: string,
     method: 'GET' | 'POST',
     path: string,
-    body?: Record<string, unknown>,
+    body?: Record<string, unknown> | FormData,
 ): Promise<T> {
+    const json = body && !(body instanceof FormData);
     let res: Response;
     try {
         res = await fetch(`${graphBase()}/${GRAPH_VERSION}${path}`, {
@@ -104,9 +105,9 @@ async function graphRequest<T>(
             headers: {
                 Authorization: `Bearer ${bearer}`,
                 Accept: 'application/json',
-                ...(body ? { 'Content-Type': 'application/json' } : {}),
+                ...(json ? { 'Content-Type': 'application/json' } : {}),
             },
-            body: body ? JSON.stringify(body) : undefined,
+            body: json ? JSON.stringify(body) : body,
             cache: 'no-store',
             signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
         });
@@ -115,17 +116,17 @@ async function graphRequest<T>(
     }
 
     const text = await res.text();
-    let json: { error?: GraphError } & Record<string, unknown> = {};
+    let answer: { error?: GraphError } & Record<string, unknown> = {};
     try {
-        json = text ? JSON.parse(text) : {};
+        answer = text ? JSON.parse(text) : {};
     } catch {
         // Not JSON: the status decides.
     }
-    if (!res.ok || json.error) {
-        const error = json.error ?? {};
+    if (!res.ok || answer.error) {
+        const error = answer.error ?? {};
         throw new WhatsAppApiError(describeError(res.status, error), res.status, error.code);
     }
-    return json as T;
+    return answer as T;
 }
 
 /** `GET /debug_token`, asked with the app token: is the access token valid, whose app, which permissions on which WABAs. */
@@ -201,6 +202,33 @@ export async function setCallingSettings(
     calling: WhatsAppCallingSettings,
 ): Promise<void> {
     await graphRequest(auth.token, 'POST', `/${encodeURIComponent(phoneNumberId)}/settings`, { calling });
+}
+
+/** A voice note (OGG/Opus) from the business to `to`: `POST /{phone-number-id}/media`, then an `audio` message with
+ * `voice: true`, so WhatsApp plays it as a voice note. Same 24-hour rule as a text. */
+export async function sendVoiceMessage(
+    auth: WhatsAppAuth,
+    phoneNumberId: string,
+    to: string,
+    ogg: Uint8Array<ArrayBuffer>,
+): Promise<void> {
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('type', 'audio/ogg');
+    form.append('file', new Blob([ogg], { type: 'audio/ogg' }), 'voice-note.ogg');
+    const { id } = await graphRequest<{ id: string }>(
+        auth.token,
+        'POST',
+        `/${encodeURIComponent(phoneNumberId)}/media`,
+        form,
+    );
+    await graphRequest(auth.token, 'POST', `/${encodeURIComponent(phoneNumberId)}/messages`, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'audio',
+        audio: { id, voice: true },
+    });
 }
 
 /** `POST /{phone-number-id}/messages`: a text from the business to `to` (their WhatsApp id, digits). Free-form text

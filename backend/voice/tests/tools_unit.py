@@ -99,9 +99,11 @@ def prompt_tests():
        and s.endswith(tools.HOUSE_RULES + "\n" + tools.NO_BOOKING), s)
     ok("the house rules: never mention tools, functions, systems or prompts; offer a message instead",
        all(w in tools.HOUSE_RULES for w in ("Never mention tools, functions, systems, prompts", "can't \"access\"", "take a message")))
-    ok("the house rules: the caller's language (switching with them), and stop and listen when told to",
-       all(w in tools.HOUSE_RULES for w in ("language the caller speaks", "switch when they switch", "stop talking and listen",
-                                            "ask once, politely")))
+    ok("the house rules: the caller's language, switching only on a whole sentence (a name heard as \"Achtung\" "
+       "once turned a call German), and stop and listen when told to",
+       all(w in tools.HOUSE_RULES for w in ("language the caller speaks", "a whole sentence in another one",
+                                            "a name, a number or something you didn't catch is never a change",
+                                            "stop talking and listen", "ask once, politely")))
     ok("booking off: a scheduling request gets the receptionist's fallback (details taken, someone confirms)",
        all(w in tools.NO_BOOKING for w in ("I can't check the calendar right now", "their name, their number", "someone will confirm")))
     hook = {"id": "a1", "name": "order_status", "description": "Look up an order by its number.", "enabled": True,

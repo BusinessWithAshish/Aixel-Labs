@@ -111,6 +111,9 @@ def build_tests():
            and isinstance(back[1], cascade.Meter) and llm._settings.model == s["llm"]["model"], str(got))
     llm, _, _ = phone.build_pipeline_parts("kore", "You are a test.", None, "AIza-test")
     ok("no ctx: Gemini Live, nothing around it", isinstance(llm, phone.TurnSafeGeminiLive) and phone.stack_ends(llm) == ([], []))
+    ok("Deepgram Nova-3 listens in every language it knows (multi), so Hindi or Hinglish callers are heard; Nova-2 stays as pipecat sets it",
+       cascade.stt_service({"provider": "deepgram", "model": "nova-3", "key": "k"})._settings.language == "multi"
+       and cascade.stt_service({"provider": "deepgram", "model": "nova-2", "key": "k"})._settings.language != "multi")
     try:
         cascade.stt_service({"provider": "cartesia", "model": "x", "key": "k"})
         ok("a provider with no STT here is refused", False)
@@ -179,7 +182,7 @@ def cost_tests(user):
     doc = {"_id": ObjectId(), "userId": user, "channel": "PHONE", "direction": "INBOUND", "durationSec": 180, "endedBy": "goodbye"}
     c = costs.call_cost(doc, usage, "TELNYX")
     s = c.get("stack") or {}
-    want = {"stt": 3 * 0.0048, "llm": (20000 * 0.3 + 800 * 2.5) / 1e6, "tts": 1500 * 39 / 1e6}
+    want = {"stt": 3 * 0.0058, "llm": (20000 * 0.3 + 800 * 2.5) / 1e6, "tts": 1500 * 39 / 1e6}
     ok("Deepgram 3 min + Flash-Lite tokens + Cartesia characters", all(abs(s[p]["usd"] - v) < 1e-9 for p, v in want.items()), str(s))
     ok("no Gemini Live tokens; the total is every part", c["geminiUsd"] == 0
        and abs(c["totalUsd"] - (sum(want.values()) + c["providerUsd"])) < 1e-6, str(c))

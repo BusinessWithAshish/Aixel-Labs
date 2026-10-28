@@ -13,12 +13,13 @@ voice-call-rates.json `chat.models`), whatever voice stack the agent uses for ca
 
 Voice notes (no keys of ours, ever): `transcribe` hears one on the owner's own speech-to-text (the agent's
 PIPELINE STT, else their Deepgram key, then OpenAI, else Gemini on their Gemini key), and `speak` says a
-reply in the agent's voice (Gemini TTS on their Gemini key, fillers.get_line) as an OGG/Opus voice note.
+reply in the agent's voice (Gemini TTS on their Gemini key, fillers.get_line on VOICE_NOTE_MODEL) as an OGG/Opus voice note.
 """
 
 import asyncio
 import base64
 import os
+import re
 import subprocess
 import tempfile
 
@@ -201,15 +202,27 @@ async def transcribe(ctx: dict, audio: bytes, mime: str) -> tuple[str | None, di
     return (text or None), usage
 
 
+def spoken(text: str) -> str:
+    """A reply as it is said: WhatsApp's *bold*, _italic_, ~strike~ and `code` marks dropped, so TTS never reads them."""
+    return re.sub(r"(?<![\w*_~`])[*_~`]+(?=\S)|(?<=\S)[*_~`]+(?![\w*_~`])", "", text)
+
+
 async def speak(ctx: dict, text: str) -> bytes | None:
     """`text` as a voice note (OGG/Opus) in the agent's voice, on the owner's Gemini key. None when it failed."""
-    pcm = await asyncio.to_thread(fillers.get_line, ctx["voice"] or "aoede", text, ctx["gemini_key"], SPOKEN_MAX_SECS)
+    pcm = await asyncio.to_thread(fillers.get_line, ctx["voice"] or "aoede", spoken(text), ctx["gemini_key"], SPOKEN_MAX_SECS,
+                                  fillers.VOICE_NOTE_MODEL)
     if not pcm:
         return None
+    return await voice_note(pcm, ["-f", "s16le", "-ar", str(fillers.SAMPLE_RATE), "-ac", "1"])
+
+
+async def voice_note(audio: bytes, source: list[str] | None = None) -> bytes | None:
+    """`audio` as WhatsApp plays a voice note: OGG/Opus, mono. `source` describes raw input (PCM); else ffmpeg reads the
+    container (a browser's WebM or MP4 recording). None when it could not be encoded."""
     out = await asyncio.to_thread(subprocess.run, [
-        "ffmpeg", "-v", "error", "-f", "s16le", "-ar", str(fillers.SAMPLE_RATE), "-ac", "1", "-i", "pipe:0",
-        "-c:a", "libopus", "-b:a", "32k", "-application", "voip", "-f", "ogg", "pipe:1"], input=pcm, capture_output=True, timeout=60)
+        "ffmpeg", "-v", "error", *(source or []), "-i", "pipe:0", "-t", str(SPOKEN_MAX_SECS), "-ac", "1",
+        "-c:a", "libopus", "-b:a", "32k", "-application", "voip", "-f", "ogg", "pipe:1"], input=audio, capture_output=True, timeout=60)
     if out.returncode or not out.stdout:
-        logger.warning(f"chat: could not encode a voice reply: {out.stderr[:200]!r}")
+        logger.warning(f"chat: could not encode a voice note: {out.stderr[:200]!r}")
         return None
     return out.stdout

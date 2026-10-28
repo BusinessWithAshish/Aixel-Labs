@@ -16,7 +16,8 @@ import {
 import { listItems } from '@/server/voice-agent/accounts';
 import type { OwnedNumberDoc } from '@/server/voice-agent/number-provider';
 import type { VoiceOwnerScope } from '@/server/voice-agent/owner-scope';
-import { sendTextMessage } from '@/server/voice-agent/whatsapp';
+import { engineVoiceNote } from '@/server/voice-agent/engine';
+import { sendTextMessage, sendVoiceMessage } from '@/server/voice-agent/whatsapp';
 import { whatsappAuthOf } from '@/server/voice-agent/whatsapp-numbers';
 import { InboxStatus, type InboxItem, type InboxThread, type InboxThreadView } from '@/helpers/voice-inbox';
 
@@ -240,18 +241,43 @@ export async function sendReply(owner: VoiceOwnerScope, key: string, text: strin
     const body = typeof text === 'string' ? text.trim() : '';
     if (!body) throw new Error('Write a message first');
     if (body.length > TEXT_MAX) throw new Error(`A WhatsApp message is at most ${TEXT_MAX} characters`);
+    await deliver(owner, key, async (ref) => {
+        await sendTextMessage(whatsappAuthOf(ref.number), ref.number.providerNumberId, ref.phone.slice(1), body);
+        return { text: body };
+    });
+}
+
+/** A person's voice note recorded in the browser (WebM/MP4): the engine makes it WhatsApp's OGG/Opus, then as sendReply. */
+export async function sendVoiceReply(owner: VoiceOwnerScope, key: string, audio: Uint8Array<ArrayBuffer>, mime: string): Promise<void> {
+    if (!audio.byteLength) throw new Error('That recording is empty');
+    if (audio.byteLength > VOICE_CHAT_LIMITS.voiceNoteBytes) throw new Error('A voice note is at most 2 minutes');
+    if (!/^audio\/[\w.+-]+(;.*)?$/.test(mime)) throw new Error('That recording is not audio');
+    await deliver(owner, key, async (ref) => {
+        const { ogg, secs } = await engineVoiceNote(audio, mime);
+        await sendVoiceMessage(whatsappAuthOf(ref.number), ref.number.providerNumberId, ref.phone.slice(1), ogg);
+        return { text: `Voice note (${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, '0')})`, voice: true };
+    });
+}
+
+/** Sends one reply of the person's (`send`, once they may) and keeps it on the conversation, as sendReply says. */
+async function deliver(
+    owner: VoiceOwnerScope,
+    key: string,
+    send: (ref: ThreadRef & { number: OwnedNumberDoc }) => Promise<{ text: string; voice?: boolean }>,
+): Promise<void> {
     const view = await getThread(owner, key);
     if (view.status !== InboxStatus.HUMAN) throw new Error('Take the chat over first: the AI is answering it');
     if (!view.windowOpen) {
         throw new Error('More than 24 hours have passed since this person last wrote. You can reply once they write again.');
     }
     const ref = await threadRef(owner, key);
-    await sendTextMessage(whatsappAuthOf(ref.number), ref.number.providerNumberId, ref.phone.slice(1), body);
+    const sent = await send(ref);
 
     const calls = await callsCollection();
     const now = new Date();
     const chat = await latestChat(ref);
-    const turn: VoiceCallTurn = { role: 'human', text: body, at: now, by: chat?.chat?.human?.name ?? (await personName(owner)) };
+    const by = chat?.chat?.human?.name ?? (await personName(owner));
+    const turn: VoiceCallTurn = { role: 'human', text: sent.text, at: now, by, ...(sent.voice ? { voice: true } : {}) };
     const quietSince = new Date(now.getTime() - VOICE_CHAT_LIMITS.idleMinutes * 60_000);
     if (chat?._id && chat.chat?.open && chat.chat.lastMessageAt >= quietSince) {
         await calls.updateOne({ _id: chat._id }, { $push: { turns: turn }, $set: { 'chat.lastMessageAt': now, endedAt: now } });

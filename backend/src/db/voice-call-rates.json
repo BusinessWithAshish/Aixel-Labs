@@ -53,7 +53,7 @@
     "readAt": "2026-10-23",
     "note": "What the engine bills each part of a PIPELINE stack on (costs.pipeline_cost), by model. stt: the whole call's minutes (the stream is open from start to end); llm: tokens in and out (thinking counts as out); tts: characters sent, or minutes of audio made for the token-billed ones (Gemini about 1,500 audio tokens a minute, 25 a second).",
     "stt": {
-      "nova-3": { "usdPerMinute": 0.0048, "source": "deepgram.com/pricing (read 2026-10-23): Nova-3 Monolingual streaming, pay as you go (the engine asks for English; Multilingual is $0.0058)." },
+      "nova-3": { "usdPerMinute": 0.0058, "source": "deepgram.com/pricing (read 2026-10-23): Nova-3 Multilingual streaming, pay as you go (the engine asks for language=multi since 2026-10-28; Monolingual is $0.0048)." },
       "nova-2": { "usdPerMinute": 0.0058, "source": "deepgram.com/pricing (read 2026-10-23), FAQ: Nova-2 streaming $0.35 an hour." },
       "nova-2-phonecall": { "usdPerMinute": 0.0058, "source": "deepgram.com/pricing (read 2026-10-23), FAQ: Nova-2 streaming $0.35 an hour." },
       "gemini-3.5-transcribe-live": { "usdPerMinute": 0.009, "source": "ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22): $0.005/min audio in + $0.004/min text out." },

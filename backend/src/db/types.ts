@@ -779,6 +779,10 @@ export enum VoiceCallEndReason {
 export const VOICE_CHAT_LIMITS = {
   /** A WhatsApp chat closes this long after its last message; the next message starts a new one. */
   idleMinutes: 15,
+  /** A voice note a person records in the inbox: its length, and the most the app takes. Two minutes at 32 kbps is
+   * about 0.5 MB, under Next's 1 MB server-action body. */
+  voiceNoteSecs: 120,
+  voiceNoteBytes: 900 * 1024,
 } as const;
 
 /** A WhatsApp chat's own state, on its voice_calls document (channel WHATSAPP). */

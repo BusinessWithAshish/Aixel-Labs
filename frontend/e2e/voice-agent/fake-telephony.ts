@@ -44,9 +44,10 @@ async function readBody(req: IncomingMessage): Promise<JsonValue | null> {
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(chunk as Buffer);
     if (chunks.length === 0) return null;
-    // Meta's media upload: a multipart form; the fake keeps its size, not its parts.
+    // Meta's media upload: a multipart form; the fake keeps its size and whether it carries an OGG file, not its parts.
     if (req.headers['content-type']?.startsWith('multipart/form-data')) {
-        return { multipart: true, bytes: Buffer.concat(chunks).length };
+        const form = Buffer.concat(chunks);
+        return { multipart: true, bytes: form.length, ogg: form.includes('OggS') };
     }
     const text = Buffer.concat(chunks).toString('utf8');
     // Twilio's API takes forms; everything else here speaks JSON.

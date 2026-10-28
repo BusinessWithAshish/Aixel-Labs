@@ -180,6 +180,9 @@ async def main():
            chat.contents([{"role": "agent", "text": "Hi!"}, {"role": "caller", "text": "a"}, {"role": "caller", "text": "b"},
                           {"role": "agent", "text": "c"}])
            == [{"role": "user", "parts": [{"text": "a"}, {"text": "b"}]}, {"role": "model", "parts": [{"text": "c"}]}])
+        ok("a voice reply is said without WhatsApp's marks (a price was read with its asterisks); maths and names keep theirs",
+           chat.spoken("Whitening is *₹6,000*. Booked for _Saturday_, ~no~ `ok`") == "Whitening is ₹6,000. Booked for Saturday, no ok"
+           and chat.spoken("5 * 3 is 15, mail my_name_here") == "5 * 3 is 15, mail my_name_here")
     finally:
         db.voice_calls.delete_many({"userId": user})
         db.voice_bookings.delete_many({"userId": user})
