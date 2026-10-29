@@ -243,7 +243,7 @@ test('changing the type keeps the prompt; with numbers linked, saving asks what 
     await expect(page.getByTestId('call-type-note')).toContainText('does not rewrite the prompt');
     await expect(page.locator('#agent-prompt')).toHaveValue(DEFAULT_VOICE_AGENT_PROMPT);
     // Numbers follow the saved type, so they wait for the save.
-    await expect(page.getByTestId('agent-numbers')).toContainText('Save the new agent type first.');
+    await expect(page.getByTestId('agent-numbers')).toContainText('Save the agent first.');
 
     // No number yet: it just saves.
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -396,7 +396,7 @@ test('the cost card is a bill: the voice stack, the prompt, each tool and the ph
     await expect(parts).toContainText('Thinking (LLM) · Gemini 3.5 Flash Lite, 1,200 tokens a turn$0.003');
     await expect(parts).toContainText('Text to speech · Cartesia Sonic 3.6$0.039');
     await expect(parts).not.toContainText('Gemini 3.8 Live');
-    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.059');
+    await expect(card.getByTestId('agent-cost-per-minute')).toHaveText('$0.060');
     await db.setVoiceAgentFields(agentId, { stack: null });
 
     // A free-tier key pays nothing for Gemini; a priced call gives the real average.

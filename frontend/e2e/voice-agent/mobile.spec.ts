@@ -79,7 +79,15 @@ async function sidewaysOverflow(page: Page): Promise<string[]> {
                 .slice(0, 4)
                 .join('.')}`;
         const docExtra = document.documentElement.scrollWidth - vw;
-        if (docExtra > 1) issues.push(`document is ${docExtra}px wider than the viewport`);
+        if (docExtra > 1) {
+            // The innermost elements past the edge: their parents only stick out because of them.
+            const offenders = [...document.body.querySelectorAll('*')]
+                .filter((el) => el.getBoundingClientRect().right > vw + 1)
+                .filter((el, _, all) => !all.some((other) => other !== el && el.contains(other)))
+                .slice(0, 3)
+                .map(describe);
+            issues.push(`document is ${docExtra}px wider than the viewport (${offenders.join(', ')})`);
+        }
         const scrollers = [
             document.getElementById('page-children-container'),
             ...document.querySelectorAll('[role="dialog"]'),

@@ -115,7 +115,7 @@ export function ThreadPane() {
                     <Button
                         size="icon"
                         variant="ghost"
-                        className="text-white hover:bg-white/10 hover:text-white md:hidden"
+                        className="text-white hover:bg-white/10 hover:text-white @2xl/inbox:hidden"
                         onClick={() => void openThread(null)}
                         aria-label="Back to conversations"
                     >

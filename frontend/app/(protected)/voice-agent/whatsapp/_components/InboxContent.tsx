@@ -32,7 +32,7 @@ const STEPS = [
 /** The empty right side: how a person steps in, in three steps. */
 function TakeoverGuide({ hasThreads }: { hasThreads: boolean }) {
     return (
-        <div className="flex h-full flex-col items-center justify-center gap-6 rounded-xl border bg-[#f0f2f5] p-8 dark:bg-[#222e35]">
+        <div className="@container flex h-full flex-col items-center justify-center gap-6 overflow-y-auto rounded-xl border bg-[#f0f2f5] p-8 dark:bg-[#222e35]">
             <span className="flex size-16 items-center justify-center rounded-full bg-[#00a884] text-white">
                 <MessageCircleMore className="size-8" aria-hidden />
             </span>
@@ -42,7 +42,7 @@ function TakeoverGuide({ hasThreads }: { hasThreads: boolean }) {
                     {hasThreads ? 'Pick a conversation on the left.' : 'Conversations appear here as soon as someone writes to your WhatsApp number.'}
                 </p>
             </div>
-            <ol className="grid w-full max-w-3xl gap-3 sm:grid-cols-3">
+            <ol className="grid w-full max-w-3xl gap-3 @xl:grid-cols-3">
                 {STEPS.map((step, i) => (
                     <li key={step.title} className="rounded-xl border bg-white p-4 dark:bg-[#111b21]">
                         <span className="flex items-center gap-2 text-sm font-semibold">
@@ -66,21 +66,22 @@ function TakeoverGuide({ hasThreads }: { hasThreads: boolean }) {
     );
 }
 
-/** WhatsApp Web's layout: the conversations on the left, the open chat on the right (one at a time on a phone). */
+/** WhatsApp Web's layout: the conversations on the left, the open chat on the right (one at a time when the inbox is
+ * narrow: a phone, or a tablet with the sidebar open, so it goes by the inbox's own width, not the screen's). */
 export function InboxContent() {
     const { thread, allCount, loadError } = usePage<UseInboxPageReturn>();
     return (
-        <div className="flex h-[calc(100dvh-7.5rem)] min-h-[32rem] flex-col gap-3">
+        <div className="@container/inbox flex h-[calc(100dvh-7.5rem)] min-h-[32rem] flex-col gap-3">
             {loadError ? (
                 <Alert variant="destructive">
                     <AlertDescription>{loadError}</AlertDescription>
                 </Alert>
             ) : null}
-            <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
-                <div className={cn('min-h-0', thread && 'hidden md:block')}>
+            <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3 @2xl/inbox:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
+                <div className={cn('min-h-0', thread && 'hidden @2xl/inbox:block')}>
                     <ThreadList />
                 </div>
-                <div className={cn('min-h-0', !thread && 'hidden md:block')}>
+                <div className={cn('min-h-0', !thread && 'hidden @2xl/inbox:block')}>
                     {thread ? <ThreadPane /> : <TakeoverGuide hasThreads={allCount > 0} />}
                 </div>
             </div>

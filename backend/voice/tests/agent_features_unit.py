@@ -112,7 +112,7 @@ def voicemail_tests():
     ok("no voice (the playground): never", not bot.GuardAgent(bot.CallGuard(dict(record)), message="Hi").can_leave_message())
     made = []
     real = fillers._generate
-    fillers._generate = lambda voice, text=fillers.FILLER_TEXT, max_seconds=0.7, api_key=None: (made.append((voice, text, max_seconds, api_key)) or b"\x01\x00" * 2400)
+    fillers._generate = lambda voice, text=fillers.FILLER_TEXT, max_seconds=0.7, api_key=None, model=fillers.TTS_MODEL: (made.append((voice, text, max_seconds, api_key)) or b"\x01\x00" * 2400)
     try:
         a = fillers.get_voicemail("kore", "KEY", "Hi Ravi, call back.")
         b = fillers.get_voicemail("kore", "KEY", "Hi Ravi, call back.")
