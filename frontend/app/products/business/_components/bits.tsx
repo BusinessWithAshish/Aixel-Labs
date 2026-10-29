@@ -275,7 +275,7 @@ export const missLabel = (n: number) => `${n} turns`;
 
 const TIPS = [
     `Your salary at Launch grows by ${rs(BUSINESS_RULES.SALARY_STEP)} with every lap you complete.`,
-    'Railway rent climbs with every house built on the board.',
+    'Railway rent is a share of the cash you hold when you land: the more railways the owner has, the bigger the share.',
     'Taxes take a share of the cash you hold.',
     'Own a full colour set and rent there triples.',
     'Short of cash? Mortgage a property, or ask a player for a loan.',

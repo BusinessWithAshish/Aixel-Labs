@@ -13,6 +13,7 @@ import {
   BUSINESS_PHASE_SECONDS,
   BUSINESS_RULES,
   BUSINESS_SETS,
+  BUSINESS_FESTIVAL_LENGTHS,
   type BusinessCard,
 } from "../constants";
 import type {
@@ -38,6 +39,11 @@ import {
   isBuyable,
   lapInterest,
   setSpaces,
+  festivalAt,
+  festivalRent,
+  canHoldFestival,
+  holdsSet,
+  festivalLength,
   splitAt,
   splitPair,
   splitShares,
@@ -80,12 +86,21 @@ function rollDie(state: BusinessGameState): number {
 }
 
 function shuffleDeck(state: BusinessGameState) {
-  const deck = BUSINESS_CHANCE_CARDS.map((_, i) => i);
+  // Every card once, except the Festival card: more copies the longer the match has run (see addFestivalCard).
+  const festivals = Math.min(BUSINESS_RULES.FESTIVAL_CARDS_MAX, BUSINESS_RULES.FESTIVAL_CARDS + Math.floor(state.round / BUSINESS_RULES.FESTIVAL_CARD_EVERY_ROUNDS));
+  const deck = BUSINESS_CHANCE_CARDS.flatMap((card, i) => Array(card.effect.type === "festival" ? festivals : 1).fill(i) as number[]);
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(random(state) * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
   state.deck = deck;
+}
+
+/** As the match goes on, another Festival card goes into the deck at a random place (up to the cap). */
+function addFestivalCard(state: BusinessGameState) {
+  const festival = BUSINESS_CHANCE_CARDS.findIndex((c) => c.effect.type === "festival");
+  if (state.deck.filter((i) => i === festival).length >= BUSINESS_RULES.FESTIVAL_CARDS_MAX) return;
+  state.deck.splice(Math.floor(random(state) * (state.deck.length + 1)), 0, festival);
 }
 
 function drawCard(state: BusinessGameState): BusinessCard {
@@ -120,8 +135,13 @@ function describeTerms(state: BusinessGameState, from: number, to: number, terms
       return `end the split of the ${split ? BUSINESS_SETS[split.set].name : ""} set`;
     }
     case "trade": {
-      const side = (s: { cash: number; spaces: number[]; cards: number }) =>
-        [s.cash ? rs(s.cash) : null, ...s.spaces.map((i) => BUSINESS_BOARD[i].name), s.cards ? `${s.cards} Jail card${s.cards === 1 ? "" : "s"}` : null]
+      const side = (s: { cash: number; spaces: number[]; cards: number; festivals?: number }) =>
+        [
+          s.cash ? rs(s.cash) : null,
+          ...s.spaces.map((i) => BUSINESS_BOARD[i].name),
+          s.cards ? `${s.cards} Jail card${s.cards === 1 ? "" : "s"}` : null,
+          s.festivals ? `${s.festivals} Festival card${s.festivals === 1 ? "" : "s"}` : null,
+        ]
           .filter(Boolean)
           .join(" + ") || "nothing";
       return `${P[from].name} gives ${side(terms.give)}, ${P[to].name} gives ${side(terms.get)}`;
@@ -232,6 +252,18 @@ function checkOver(state: BusinessGameState): boolean {
   return true;
 }
 
+/** Ends the festivals whose time is up, or whose owner no longer holds the whole set. */
+function endFestivals(state: BusinessGameState, now: number) {
+  const over = state.festivals.filter((m) => {
+    const owner = state.players[m.owner];
+    const lost = owner.bankrupt || !holdsSet(state, m.owner, m.set);
+    const due = m.mode === "minutes" ? now >= m.until : m.mode === "laps" ? owner.laps >= m.until : state.round >= m.until;
+    return lost || due;
+  });
+  for (const m of over) log(state, `The festival in ${state.players[m.owner].name}'s ${BUSINESS_SETS[m.set].name} set is over.`, m.owner);
+  state.festivals = state.festivals.filter((m) => !over.includes(m));
+}
+
 function advance(state: BusinessGameState, now: number) {
   if (checkOver(state)) return;
   // An offer outlives the turn it was made in: the other player still has its own clock to answer.
@@ -256,7 +288,10 @@ function advance(state: BusinessGameState, now: number) {
   let i = state.turn;
   for (let k = 0; k < state.players.length * 2; k++) {
     i = (i + 1) % state.players.length;
-    if (i === 0) state.round++;
+    if (i === 0) {
+      state.round++;
+      if (state.round % BUSINESS_RULES.FESTIVAL_CARD_EVERY_ROUNDS === 0) addFestivalCard(state);
+    }
     const p = state.players[i];
     if (p.bankrupt) continue;
     if (p.skip) {
@@ -267,6 +302,7 @@ function advance(state: BusinessGameState, now: number) {
     break;
   }
   state.turn = i;
+  endFestivals(state, now);
   // Short before the turn begins (a debt put off last turn, or their share of a house a split
   // partner built): that comes first.
   const next = state.players[i];
@@ -445,7 +481,7 @@ function finishAuction(state: BusinessGameState, now: number) {
 function chargeRent(state: BusinessGameState, p: BusinessPlayer, space: number) {
   const prop = state.props[space];
   const name = BUSINESS_BOARD[space].name;
-  const rent = rentFor(state, space, state.dice[0] + state.dice[1]);
+  const rent = rentFor(state, space, state.dice[0] + state.dice[1], p.cash);
   const split = splitAt(state, space);
   const free = (seat: number) => seat === p.seat || state.players[seat].team === p.team;
 
@@ -455,8 +491,12 @@ function chargeRent(state: BusinessGameState, p: BusinessPlayer, space: number) 
       log(state, `${p.name} landed on ${name}. No rent between teammates.`, p.seat);
       return;
     }
-    pay(state, p.seat, owner.seat, rent);
-    log(state, `${p.name} paid ${rs(rent)} rent to ${owner.name} for ${name}.`, p.seat, undefined, { kind: "rent", from: p.seat, to: owner.seat, amount: rent, space });
+    // A festival multiplies the rent of its whole set.
+    const festival = festivalAt(state, space);
+    const due = festival ? festivalRent(rent) : rent;
+    pay(state, p.seat, owner.seat, due);
+    const why = festival ? ` (${BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× for the festival)` : "";
+    log(state, `${p.name} paid ${rs(due)} rent to ${owner.name} for ${name}${why}.`, p.seat, undefined, { kind: "rent", from: p.seat, to: owner.seat, amount: due, space });
     return;
   }
 
@@ -464,7 +504,7 @@ function chargeRent(state: BusinessGameState, p: BusinessPlayer, space: number) 
     log(state, `${p.name} landed on ${name}. Partners in a split set pay no rent there.`, p.seat);
     return;
   }
-  const shares = splitShares(split, rent);
+  const shares = splitShares(split, festivalAt(state, space) ? festivalRent(rent) : rent);
   const major = state.players[split.major];
   const minor = state.players[split.minor];
   const toMajor = free(major.seat) ? 0 : shares.major;
@@ -638,6 +678,11 @@ function applyCard(state: BusinessGameState, now: number) {
   }
   if (effect.type === "jail") {
     sendToJail(state, p, "card", `${p.name} drew "Go to Jail" and goes straight there.`);
+    return continueTurn(state, now);
+  }
+  if (effect.type === "festival") {
+    p.festivalCards++;
+    log(state, `${p.name} drew a Chance card: ${text}`, p.seat);
     return continueTurn(state, now);
   }
   if (effect.type === "jailcard") {
@@ -857,6 +902,9 @@ function executeOffer(state: BusinessGameState, from: number, to: number, terms:
   for (const i of terms.get.spaces) state.props[i].owner = from;
   P[from].jailCards += terms.get.cards - terms.give.cards;
   P[to].jailCards += terms.give.cards - terms.get.cards;
+  const festivals = (terms.get.festivals ?? 0) - (terms.give.festivals ?? 0);
+  P[from].festivalCards += festivals;
+  P[to].festivalCards -= festivals;
   // Public: everyone sees that a trade happened. What was swapped shows only on the board.
   log(state, `${P[from].name} and ${P[to].name} made a trade.`, from, undefined, { kind: "trade", from, to, amount: 0 });
   log(state, `The trade: ${describeTerms(state, from, to, terms)}.`, from, [from, to]);
@@ -887,6 +935,7 @@ export function createGame(
       bankrupt: false,
       missed: 0,
       jailCards: 0,
+      festivalCards: 0,
       laps: 0,
       deferred: false,
       owed: [],
@@ -901,6 +950,7 @@ export function createGame(
     owed: [],
     loans: [],
     splits: [],
+    festivals: [],
     opening: false,
     grace: false,
     offers: [],
@@ -992,6 +1042,23 @@ export function applyCommand(
         log(state, `${me.name} paid to leave Jail: ${BUSINESS_RULES.JAIL_PCT}% of their cash, ${rs(fine)}, shared among the other players.`, seat, undefined, { kind: "tax", from: seat, to: null, amount: fine });
       }
       break;
+
+    case "festival": {
+      need("roll", "end");
+      guard(canHoldFestival(state, seat, cmd.set));
+      me.festivalCards--;
+      const length = BUSINESS_FESTIVAL_LENGTHS[cmd.mode];
+      const until = cmd.mode === "minutes" ? now + length * 60_000 : cmd.mode === "laps" ? me.laps + length : state.round + length;
+      state.festivals.push({ set: cmd.set, owner: seat, mode: cmd.mode, until });
+      log(state, `${me.name} is holding a festival in the ${BUSINESS_SETS[cmd.set].name} set: ${BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× rent there for ${festivalLength(cmd.mode)}.`, seat, undefined, {
+        kind: "festival",
+        from: seat,
+        to: null,
+        amount: 0,
+        set: cmd.set,
+      });
+      break;
+    }
 
     case "useJailCard":
       need("roll");
@@ -1209,7 +1276,7 @@ export function applyCommand(
         log(state, `${me.name} declined ${state.players[offer.from].name}'s offer.`, seat, [seat, offer.from]);
         break;
       }
-      guard(validateOffer(state, offer.from, offer.to, offer.terms));
+      guard(validateOffer(state, offer.from, offer.to, offer.terms, true));
       log(state, `${me.name} accepted ${state.players[offer.from].name}'s offer.`, seat, [seat, offer.from]);
       executeOffer(state, offer.from, offer.to, offer.terms);
       break;
@@ -1296,6 +1363,13 @@ export function applyCommand(
  */
 export function tick(prev: BusinessGameState, now: number): BusinessGameState {
   if (prev.phase === "over") return prev;
+  const festivalOver = prev.festivals.some((m) => m.mode === "minutes" && now >= m.until);
+  if (festivalOver) {
+    const ended = structuredClone(prev);
+    endFestivals(ended, now);
+    ended.rev++;
+    return tick(ended, now);
+  }
   const offersExpired = prev.offers.some((o) => o.expiresAt <= now);
   const timeUp = prev.endsAt !== null && now >= prev.endsAt;
   const holdOver = prev.hold !== null && now >= prev.hold.until;

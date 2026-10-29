@@ -18,12 +18,14 @@ type SplitViewProps = {
     ending?: boolean;
 };
 
-/** A colour set shared by two players: its three cities, the two shares, and what the split means. */
+/** A colour set shared by two players: its cities, the two shares, and what the split means. */
 export function SplitView({ state, set, major, minor, minorPct, ending = false }: SplitViewProps) {
     const A = state.players[major];
     const B = state.players[minor];
     const majorPct = 100 - minorPct;
     const ids = setSpaces(set);
+    const all = ids.length === 2 ? 'both' : 'all three';
+    const any = ids.length === 2 ? 'either' : 'any of the three';
     const refund = ids.reduce((sum, i) => sum + (state.props[i]?.houses ?? 0) * houseResale(i), 0);
     const minorRefund = Math.floor((refund * minorPct) / 100);
     return (
@@ -58,9 +60,9 @@ export function SplitView({ state, set, major, minor, minorPct, ending = false }
                 </ul>
             ) : (
                 <ul className="splitrules">
-                    <li>The set counts as complete: rent on all three cities triples.</li>
+                    <li>The set counts as complete: rent on {all} cities triples.</li>
                     <li>
-                        Rent from any of the three is shared {majorPct}% / {minorPct}%.
+                        Rent from {any} is shared {majorPct}% / {minorPct}%.
                     </li>
                     <li>
                         Only {A.name} builds. {B.name} pays {minorPct}% of every house, even if it leaves them short, and gets {minorPct}% back when one is sold.

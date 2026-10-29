@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeftRight, Bot, Building2, Eye, Hammer, HandCoins, LockKeyhole, LogOut, Pause, Play, ScrollText, Signal, SignalHigh, SignalLow, SignalMedium, Timer, WifiOff } from 'lucide-react';
-import { BUSINESS_BOARD, BUSINESS_JAIL_INDEX, BUSINESS_PHASE_SECONDS, BUSINESS_RULES } from '@aixellabs/backend/business/constants';
+import { ArrowLeftRight, Bot, Building2, Eye, Hammer, HandCoins, LockKeyhole, LogOut, PartyPopper, Pause, Play, ScrollText, Signal, SignalHigh, SignalLow, SignalMedium, Timer, WifiOff } from 'lucide-react';
+import { BUSINESS_BOARD, BUSINESS_JAIL_INDEX, BUSINESS_FESTIVAL_SETS, BUSINESS_PHASE_SECONDS, BUSINESS_RULES } from '@aixellabs/backend/business/constants';
 import type { BusinessCommand, BusinessPublicState, BusinessRoomView } from '@aixellabs/backend/business/types';
 import { cn } from '@/lib/utils';
 import type { BusinessSend } from '../_hooks/use-business-room';
@@ -11,7 +11,7 @@ import { cssVars, Die } from '../_lib/art';
 import { fmt, rs } from '../_lib/client';
 import { buzz } from '../_lib/haptic';
 import { sfx, sfxQueued, sfxShared } from '../_lib/sound';
-import { canBuild, canMortgage, canSellHouse, canBail, houseCost, ownedBy, setSpaces, shareOfCash } from '@aixellabs/backend/business/compute';
+import { canBail, canBuild, canHoldFestival, canMortgage, canSellHouse, houseCost, ownedBy, setSpaces, shareOfCash } from '@aixellabs/backend/business/compute';
 import { DealBanner, dealFromLog, dealSound, quietSound, type Deal } from './DealBanner';
 import { notify } from '../_lib/toast';
 import { AudioToggles, Avatar, Cash, GButton, Pop } from './bits';
@@ -30,6 +30,7 @@ import {
     LogPopup,
     MarketBook,
     MarketPopup,
+    FestivalPopup,
     MenuPopup,
     OfferInbox,
     ResultPopup,
@@ -54,7 +55,7 @@ const DEAL_MS = 3000;
 const DEAL_FAST_MS = 1700;
 /** Banners that tell a story (someone jailed, bailed, out, a split, a trade, a Chance card) stay up longer to be read. */
 const DEAL_NEWS_MS = 4500;
-const NEWS_KINDS: readonly string[] = ['jail', 'bail', 'out', 'split', 'trade', 'card'];
+const NEWS_KINDS: readonly string[] = ['jail', 'bail', 'out', 'split', 'trade', 'card', 'festival'];
 const FLOAT_MS = 1500;
 
 /**
@@ -400,6 +401,7 @@ type View =
     | { t: 'chance' }
     | { t: 'log' }
     | { t: 'guide' }
+    | { t: 'festival' }
     | { t: 'menu' };
 
 /** What the board is showing while the player works on their own properties. */
@@ -561,6 +563,8 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                         : mine,
               );
     const others = state.players.filter((p) => p.seat !== me && !p.bankrupt);
+    /** On your turn, with a Festival card and a village set ready for it. */
+    const canFestival = myTurn && !over && (state.phase === 'roll' || state.phase === 'end') && BUSINESS_FESTIVAL_SETS.some((set) => canHoldFestival(state, me, set) === null);
     /** Who could bail this player out (see canBail). */
     const bailers = others.filter((p) => canBail(state, p.seat));
     const tapSent = useRef({ rev: -1, at: 0 });
@@ -724,6 +728,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
     else if (view?.t === 'log') pop = <LogPopup log={state.log} me={me} onClose={() => setView(null)} />;
     else if (view?.t === 'market') pop = <MarketBook onClose={() => setView(null)} />;
     else if (view?.t === 'chance') pop = <ChanceBook onClose={() => setView(null)} />;
+    else if (view?.t === 'festival') pop = <FestivalPopup state={state} me={me} send={send} onClose={() => setView(null)} />;
     else if (view?.t === 'player')
         pop = (
             <PlayerPanel
@@ -734,6 +739,7 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                 onClose={() => setView(null)}
                 onSpace={openSpace}
                 onOffer={(draft) => setView({ t: 'offer', draft })}
+                onFestival={() => setView({ t: 'festival' })}
             />
         );
     else if (view?.t === 'deal')
@@ -875,6 +881,16 @@ export function Table({ room, send, clockOffset, online, rtt, homeHref, onPause,
                     )}
                     <GButton size="sm" tone="gold" disabled={mePlayer.cash < BUSINESS_RULES.PCT_MIN} onClick={() => send({ type: 'payJail' })}>
                         Pay {rs(shareOfCash(mePlayer.cash, BUSINESS_RULES.JAIL_PCT))}
+                    </GButton>
+                </div>
+            )}
+            {canFestival && (
+                <div className="banner info">
+                    <span>
+                        <PartyPopper className="lu" /> You can hold a festival: {BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× rent on a whole village set.
+                    </span>
+                    <GButton size="sm" tone="red" onClick={() => setView({ t: 'festival' })}>
+                        Hold a festival
                     </GButton>
                 </div>
             )}

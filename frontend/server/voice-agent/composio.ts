@@ -119,9 +119,9 @@ function apiBase(): string {
     return (process.env.COMPOSIO_API_BASE?.trim() || DEFAULT_API_BASE).replace(/\/+$/, '');
 }
 
-type Json = Record<string, unknown>;
+export type Json = Record<string, unknown>;
 
-function isRecord(value: unknown): value is Json {
+export function isRecord(value: unknown): value is Json {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -172,13 +172,12 @@ async function composio(
 // Auth configs (one Composio-managed config per toolkit)
 // ---------------------------------------------------------------------------
 
-const authConfigIds = new Map<VoiceCalendarProvider, string>();
+const authConfigIds = new Map<string, string>();
 
-/** The Composio-managed auth config for a provider's toolkit: found, else created. */
-export async function ensureManagedAuthConfig(provider: VoiceCalendarProvider): Promise<string> {
-    const cached = authConfigIds.get(provider);
+/** The Composio-managed auth config for a toolkit: found, else created (named `name`). */
+export async function ensureToolkitAuthConfig(toolkit: string, name: string): Promise<string> {
+    const cached = authConfigIds.get(toolkit);
     if (cached) return cached;
-    const toolkit = COMPOSIO_TOOLKITS[provider];
     const list = await composio('GET', '/auth_configs', {
         query: { toolkit_slug: toolkit, is_composio_managed: true, limit: 50 },
     });
@@ -193,20 +192,22 @@ export async function ensureManagedAuthConfig(provider: VoiceCalendarProvider): 
     let id = typeof existing?.id === 'string' ? existing.id : null;
     if (!id) {
         const created = await composio('POST', '/auth_configs', {
-            body: {
-                toolkit: { slug: toolkit },
-                auth_config: {
-                    type: 'use_composio_managed_auth',
-                    name: `Aixel voice agents: ${voiceCalendarProviderLabel(provider)}`,
-                },
-            },
+            body: { toolkit: { slug: toolkit }, auth_config: { type: 'use_composio_managed_auth', name } },
         });
         const config = isRecord(created.auth_config) ? created.auth_config : null;
         id = typeof config?.id === 'string' ? config.id : null;
         if (!id) throw new ComposioError('Composio did not return the new auth config', 502);
     }
-    authConfigIds.set(provider, id);
+    authConfigIds.set(toolkit, id);
     return id;
+}
+
+/** The Composio-managed auth config for a provider's toolkit: found, else created. */
+export async function ensureManagedAuthConfig(provider: VoiceCalendarProvider): Promise<string> {
+    return ensureToolkitAuthConfig(
+        COMPOSIO_TOOLKITS[provider],
+        `Aixel voice agents: ${voiceCalendarProviderLabel(provider)}`,
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -218,22 +219,22 @@ export async function ensureManagedAuthConfig(provider: VoiceCalendarProvider): 
 // ---------------------------------------------------------------------------
 
 /**
- * A direct-tools-preset session for one provider of `userId`: only `CALENDAR_TOOLS`, no search,
- * no multi-execute, no in-chat auth, no sandbox; pinned to `connectedAccountId` when given (a
- * session without the pin is only for making a Connect Link). Same body as session_config() in
- * the engine's calendars.py.
+ * A direct-tools-preset session for one toolkit of `userId`: only `tools`, no search, no
+ * multi-execute, no in-chat auth, no sandbox; pinned to `connectedAccountId` when given (a session
+ * without the pin is only for making a Connect Link).
  */
-export function sessionConfig(input: {
+export function toolkitSessionConfig(input: {
     userId: string;
-    provider: VoiceCalendarProvider;
+    toolkit: string;
+    tools: string[];
     authConfigId?: string | null;
     connectedAccountId?: string | null;
 }): Json {
-    const toolkit = COMPOSIO_TOOLKITS[input.provider];
+    const { toolkit } = input;
     return {
         user_id: input.userId,
         toolkits: { enable: [toolkit] },
-        tools: { [toolkit]: { enable: CALENDAR_TOOLS[input.provider] } },
+        tools: { [toolkit]: { enable: input.tools } },
         manage_connections: { enable: false },
         workbench: { enable: false },
         preload: { tools: 'all' },
@@ -247,13 +248,29 @@ export function sessionConfig(input: {
     };
 }
 
-/** A new Composio session (see `sessionConfig`); its id. */
-export async function createCalendarSession(input: Parameters<typeof sessionConfig>[0]): Promise<string> {
-    const body = await composio('POST', '/tool_router/session', { body: sessionConfig(input) });
+/** A calendar provider's session (`toolkitSessionConfig` with `CALENDAR_TOOLS`). Same body as session_config() in the engine's calendars.py. */
+export function sessionConfig(input: {
+    userId: string;
+    provider: VoiceCalendarProvider;
+    authConfigId?: string | null;
+    connectedAccountId?: string | null;
+}): Json {
+    const { provider, ...rest } = input;
+    return toolkitSessionConfig({ ...rest, toolkit: COMPOSIO_TOOLKITS[provider], tools: CALENDAR_TOOLS[provider] });
+}
+
+/** A new Composio session from a `toolkitSessionConfig` body; its id. */
+export async function createToolkitSession(config: Json): Promise<string> {
+    const body = await composio('POST', '/tool_router/session', { body: config });
     if (typeof body.session_id !== 'string' || !body.session_id) {
         throw new ComposioError('Composio did not return a session', 502);
     }
     return body.session_id;
+}
+
+/** A new Composio session (see `sessionConfig`); its id. */
+export async function createCalendarSession(input: Parameters<typeof sessionConfig>[0]): Promise<string> {
+    return createToolkitSession(sessionConfig(input));
 }
 
 /** Deletes a session; already gone counts as done. */
@@ -278,21 +295,34 @@ async function sessionGone(sessionId: string): Promise<boolean> {
 export type ComposioConnectLink = { redirectUrl: string; connectedAccountId: string };
 
 /**
- * A hosted Connect Link for the session's user to connect one app (`session.authorize()`);
+ * A hosted Connect Link for the session's user to connect one toolkit (`session.authorize()`);
  * Composio returns the browser to `callbackUrl`. The session must not pin an account for it.
  */
-export async function createConnectLink(input: {
+export async function createToolkitConnectLink(input: {
     sessionId: string;
-    provider: VoiceCalendarProvider;
+    toolkit: string;
     callbackUrl: string;
 }): Promise<ComposioConnectLink> {
     const body = await composio('POST', `/tool_router/session/${encodeURIComponent(input.sessionId)}/link`, {
-        body: { toolkit: COMPOSIO_TOOLKITS[input.provider], callback_url: input.callbackUrl },
+        body: { toolkit: input.toolkit, callback_url: input.callbackUrl },
     });
     if (typeof body.redirect_url !== 'string' || typeof body.connected_account_id !== 'string') {
         throw new ComposioError('Composio did not return a connect link', 502);
     }
     return { redirectUrl: body.redirect_url, connectedAccountId: body.connected_account_id };
+}
+
+/** A Connect Link for one calendar provider (see `createToolkitConnectLink`). */
+export async function createConnectLink(input: {
+    sessionId: string;
+    provider: VoiceCalendarProvider;
+    callbackUrl: string;
+}): Promise<ComposioConnectLink> {
+    return createToolkitConnectLink({
+        sessionId: input.sessionId,
+        toolkit: COMPOSIO_TOOLKITS[input.provider],
+        callbackUrl: input.callbackUrl,
+    });
 }
 
 export type ComposioAccountState = {

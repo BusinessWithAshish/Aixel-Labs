@@ -24,7 +24,7 @@ const userSchema = z.object({
     name: z.string().max(100, 'Name must be less than 100 characters').optional().or(z.literal('')),
     isAdmin: z.boolean(),
     credits: z.coerce
-        .number({ invalid_type_error: 'Credits must be a number' })
+        .number({ error: 'Credits must be a number' })
         .int('Credits must be a whole number')
         .min(0, 'Credits cannot be below zero')
         .max(MAX_USER_CREDITS, `Credits cannot exceed ${MAX_USER_CREDITS.toLocaleString()}`),
@@ -71,7 +71,7 @@ export function UserDialog({
     const [pendingSubmit, setPendingSubmit] = useState<UserFormData | null>(null);
     const previousIsAdminRef = useRef(false);
 
-    const form = useForm<UserFormData>({
+    const form = useForm<z.input<typeof userSchema>, unknown, UserFormData>({
         resolver: zodResolver(userSchema),
         defaultValues: { name: '', isAdmin: false, credits: 0 },
     });

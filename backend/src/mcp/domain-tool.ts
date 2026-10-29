@@ -38,7 +38,7 @@ function domainInputSchema(opKeys: [string, ...string[]]) {
       .describe(
         "Arguments for this op. Same shape as that op's HTTP POST body. Validated with the existing API Zod schema.",
       ),
-  });
+  }).strict(); // zod 4 only emits additionalProperties:false for strict objects
 }
 
 /**

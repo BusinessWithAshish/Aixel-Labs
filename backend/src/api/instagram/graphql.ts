@@ -270,15 +270,16 @@ export async function igLoggedOutQuery<T>(
 /**
  * A numeric field (`posts_count`, `video_view_count`, …) from an embed page's
  * escaped `contextJSON`, fetched direct. Embed pages 500 on roughly one fetch
- * in four, so up to 4 attempts on fresh sessions with a growing pause;
- * `null` when the field never shows up.
+ * in four, so up to `attempts` (default 4) tries on fresh sessions with a
+ * growing pause; `null` when the field never shows up.
  */
 export async function readEmbedNumber(
   url: string,
   field: string,
+  attempts = 4,
 ): Promise<number | null> {
   const re = new RegExp(`\\\\?"${field}\\\\?":(\\d+)`);
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0) await sleep(RETRY_BASE_DELAY_MS * attempt + jitter(500));
     const session = await createUrlFetchSession({ useProxy: false });
     try {

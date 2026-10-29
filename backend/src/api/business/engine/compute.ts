@@ -6,7 +6,9 @@
 import {
   BUSINESS_BOARD,
   BUSINESS_JAIL_INDEX,
-  BUSINESS_RAIL_RENT,
+  BUSINESS_FESTIVAL_LENGTHS,
+  BUSINESS_FESTIVAL_SETS,
+  BUSINESS_RAIL_TOLL_PCT,
   BUSINESS_RENT_LADDER,
   BUSINESS_RULES,
   BUSINESS_SETS,
@@ -15,7 +17,7 @@ import {
   type BusinessSetKey,
   type BusinessSpaceKind,
 } from "../constants";
-import type { BusinessInterestMode, BusinessOfferTerms, BusinessPublicState, BusinessSplit } from "../types";
+import type { BusinessInterestMode, BusinessFestival, BusinessFestivalMode, BusinessOfferTerms, BusinessPublicState, BusinessSplit } from "../types";
 
 type State = Pick<BusinessPublicState, "players" | "props" | "loans" | "splits" | "bailAnyone">;
 
@@ -60,18 +62,31 @@ export function splitShares(split: BusinessSplit, amount: number): { major: numb
 }
 
 /**
- * The two owners who could split a set: one holding two of its three cities, the other one.
+ * The two owners who could split a set: in a three-city set, the one holding two cities is the major partner;
+ * in a two-city set, the one holding the dearer city (or, at equal prices, the later one on the board).
  * Null when the set is not owned that way.
  */
 export function splitPair(state: State, set: BusinessSetKey): { major: number; minor: number } | null {
   const ids = setSpaces(set);
-  if (ids.length !== 3 || ids.some((i) => !state.props[i])) return null;
+  if (ids.some((i) => !state.props[i])) return null;
+  if (ids.length === 2) {
+    const [a, b] = ids.map((i) => state.props[i].owner);
+    if (a === b) return null;
+    const bFirst = (BUSINESS_BOARD[ids[1]].price ?? 0) >= (BUSINESS_BOARD[ids[0]].price ?? 0);
+    return bFirst ? { major: b, minor: a } : { major: a, minor: b };
+  }
+  if (ids.length !== 3) return null;
   const owners = ids.map((i) => state.props[i].owner);
   const counts = new Map<number, number>();
   for (const o of owners) counts.set(o, (counts.get(o) ?? 0) + 1);
   if (counts.size !== 2) return null;
   const [[a, an], [b]] = [...counts];
   return an === 2 ? { major: a, minor: b } : { major: b, minor: a };
+}
+
+/** The minor partner's starting share when a split of this set is offered. */
+export function splitDefaultPct(set: BusinessSetKey): number {
+  return setSpaces(set).length === 2 ? BUSINESS_RULES.SPLIT_PAIR_DEFAULT_PCT : BUSINESS_RULES.SPLIT_DEFAULT_PCT;
 }
 
 /** The set counts as complete for rent and building: one owner, or split between two. */
@@ -119,8 +134,11 @@ export function rentLevel(state: State, space: number): number {
 
 /** Rent for every step of a city's ladder, in ladder order. */
 export function rentLadder(space: number): number[] {
-  const price = BUSINESS_BOARD[space].price ?? 0;
-  return BUSINESS_RENT_LADDER.map((m) => Math.round(price * m));
+  const tile = BUSINESS_BOARD[space];
+  // A set may charge more than its price alone says (`rent` on the set, 1 when absent).
+  const set = tile.set ? (BUSINESS_SETS[tile.set] as { rent?: number }) : undefined;
+  const boost = set?.rent ?? 1;
+  return BUSINESS_RENT_LADDER.map((m) => Math.round((tile.price ?? 0) * m * boost));
 }
 
 /** Houses standing anywhere on the board; a hotel counts as five. */
@@ -128,9 +146,9 @@ export function housesOnBoard(state: State): number {
   return Object.values(state.props).reduce((sum, p) => sum + p.houses, 0);
 }
 
-/** Railway rent for an owner of `count` railways: the base, plus a little for every house on the board. */
-export function railRent(state: State, count: number): number {
-  return count > 0 ? BUSINESS_RAIL_RENT[count] + BUSINESS_RULES.RAIL_RENT_PER_HOUSE * housesOnBoard(state) : 0;
+/** Station rent for an owner of `count` stations: a share of the lander's cash (at least `PCT_MIN`). */
+export function railRent(count: number, landerCash: number): number {
+  return count > 0 ? shareOfCash(landerCash, BUSINESS_RAIL_TOLL_PCT[count]) : 0;
 }
 
 /** What the dice total is multiplied by on a utility: 4 with one, 10 with both, plus one for every house on the board. */
@@ -196,12 +214,13 @@ export function cardDelta(state: State, seat: number, effect: BusinessCardEffect
   return math.gain ? math.amount : -math.amount;
 }
 
-export function rentFor(state: State, space: number, diceSum: number): number {
+/** Rent due on a space. `landerCash` only matters on a station, whose rent is a share of it. */
+export function rentFor(state: State, space: number, diceSum: number, landerCash = 0): number {
   const prop = state.props[space];
   const tile = BUSINESS_BOARD[space];
   if (!prop || prop.mortgaged) return 0;
   if (tile.kind === "city") return rentLadder(space)[rentLevel(state, space)];
-  if (tile.kind === "rail") return railRent(state, countKind(state, prop.owner, "rail"));
+  if (tile.kind === "rail") return railRent(countKind(state, prop.owner, "rail"), landerCash);
   if (tile.kind === "utility") return utilityMultiplier(state, countKind(state, prop.owner, "utility")) * diceSum;
   return 0;
 }
@@ -217,7 +236,7 @@ export function canBuild(state: State, seat: number, space: number): string | nu
   const split = splitOf(state, tile.set);
   if (!prop || (prop.owner !== seat && split?.major !== seat)) return "You do not own this city.";
   if (builderOf(state, tile.set) !== seat)
-    return split ? `Only ${state.players[split.major].name}, who holds two cities of this set, builds here.` : "Own the whole colour set first.";
+    return split ? `Only ${state.players[split.major].name}, the major partner in this split, builds here.` : "Own the whole colour set first.";
   const ids = setSpaces(tile.set);
   // Houses and mortgages never mix: the whole set must be free of the bank.
   if (ids.some((i) => state.props[i].mortgaged)) return "Redeem every city in this set from the bank first.";
@@ -321,20 +340,30 @@ export function canTrade(state: State, owner: number, space: number): string | n
   return null;
 }
 
+/**
+ * Why an offer cannot be made, or null when it can. `accepting`: checked again as it is accepted,
+ * when only what has to be true at that moment counts (a helper who offered bail from Take a Break
+ * may have rolled on since).
+ */
 export function validateOffer(
   state: State,
   from: number,
   to: number,
   terms: BusinessOfferTerms,
+  accepting = false,
 ): string | null {
   const a = state.players[from];
   const b = state.players[to];
   if (!a || !b || from === to) return "Pick another player.";
   if (a.bankrupt || b.bankrupt) return "That player is out of the match.";
   const pair = (x: number, y: number) => (x === from && y === to) || (x === to && y === from);
-  // A player held in Jail deals in nothing but their bail (and a loan of theirs that has fallen due).
+  // A player held in Jail deals in nothing but their bail, Jail free cards (for cash, or swapped),
+  // and a loan of theirs that has fallen due.
   const held = a.jail ? a : b.jail ? b : null;
-  if (held && terms.kind !== "bail" && terms.kind !== "renew") return `${held.name} is in Jail: only bail can be offered.`;
+  const cardTrade =
+    terms.kind === "trade" && !terms.give.spaces.length && !terms.get.spaces.length && terms.give.cards + terms.get.cards + (terms.give.festivals ?? 0) + (terms.get.festivals ?? 0) > 0;
+  if (held && terms.kind !== "bail" && terms.kind !== "renew" && !cardTrade)
+    return `${held.name} is in Jail: only bail and cards (Jail free, Festival) can be dealt.`;
 
   if (terms.kind === "loan") {
     if (!pair(terms.lender, terms.borrower)) return "A loan is between the two of you.";
@@ -349,7 +378,7 @@ export function validateOffer(
     const name = BUSINESS_SETS[terms.set].name;
     if (splitOf(state, terms.set)) return `The ${name} set is already split.`;
     const owners = splitPair(state, terms.set);
-    if (!owners || !pair(owners.major, owners.minor)) return `Only a three-city set held two and one by the two of you can be split.`;
+    if (!owners || !pair(owners.major, owners.minor)) return `Only a set held between the two of you (two and one, or one each in a two-city set) can be split.`;
     if (a.team === b.team) return "Teammates already pay each other no rent.";
     if (setSpaces(terms.set).some((i) => state.props[i].mortgaged)) return "Redeem every city in this set from the bank first.";
     if (state.splits.length >= BUSINESS_RULES.MAX_SPLITS)
@@ -364,8 +393,8 @@ export function validateOffer(
     if (!prisoner.jail) return `${prisoner.name} is not in Jail.`;
     const h = state.players[helper];
     if (h.jail > 0) return `${h.name} is in Jail too.`;
-    if (h.freed) return `${h.name} has only just left Jail and cannot bail anyone out until they move on.`;
-    if (!canBail(state, helper)) return `Only a player visiting Jail or on Take a Break can bail ${prisoner.name} out.`;
+    if (!accepting && h.freed) return `${h.name} has only just left Jail and cannot bail anyone out until they move on.`;
+    if (!accepting && !canBail(state, helper)) return `Only a player visiting Jail or on Take a Break can bail ${prisoner.name} out.`;
     if (terms.amount > Math.max(0, prisoner.cash)) return `${prisoner.name} does not have ₹${terms.amount}.`;
     return null;
   }
@@ -388,9 +417,11 @@ export function validateOffer(
   }
 
   const { give, get } = terms;
-  if (!give.cash && !get.cash && !give.spaces.length && !get.spaces.length && !give.cards && !get.cards) return "The trade is empty.";
+  if (!give.cash && !get.cash && !give.spaces.length && !get.spaces.length && !give.cards && !get.cards && !give.festivals && !get.festivals) return "The trade is empty.";
   if (give.cards > a.jailCards) return `${a.name} does not have that many Jail cards.`;
   if (get.cards > b.jailCards) return `${b.name} does not have that many Jail cards.`;
+  if ((give.festivals ?? 0) > a.festivalCards) return `${a.name} does not have that many Festival cards.`;
+  if ((get.festivals ?? 0) > b.festivalCards) return `${b.name} does not have that many Festival cards.`;
   if (new Set([...give.spaces, ...get.spaces]).size !== give.spaces.length + get.spaces.length)
     return "A property is listed twice.";
   if (give.cash > Math.max(0, a.cash)) return `${a.name} does not have ₹${give.cash}.`;
@@ -403,4 +434,55 @@ export function validateOffer(
     return null;
   };
   return check(give.spaces, from) ?? check(get.spaces, to);
+}
+
+/* ---------- festivals ---------- */
+
+type FestivalState = State & Pick<BusinessPublicState, "festivals">;
+
+/** The festival running on this space's set, if any. */
+export function festivalAt(state: FestivalState, space: number): BusinessFestival | undefined {
+  const set = BUSINESS_BOARD[space].set;
+  return set ? state.festivals.find((m) => m.set === set) : undefined;
+}
+
+/** The whole set is this player's, alone or as a partner in a split of it. */
+export function holdsSet(state: State, seat: number, set: BusinessSetKey): boolean {
+  const split = splitOf(state, set);
+  if (split) return split.major === seat || split.minor === seat;
+  return setSpaces(set).every((i) => state.props[i]?.owner === seat);
+}
+
+/** "5 rounds", "1 lap", "10 minutes": how long a festival started in this mode lasts. */
+export function festivalLength(mode: BusinessFestivalMode): string {
+  const n = BUSINESS_FESTIVAL_LENGTHS[mode];
+  const unit = mode === "rounds" ? "round" : mode === "laps" ? "lap" : "minute";
+  return `${n} ${unit}${n === 1 ? "" : "s"}`;
+}
+
+/** What is left of a festival, for its flag: "3 rounds left", "until Ashish passes Launch", "7:12 left". */
+export function festivalLeft(state: FestivalState & Pick<BusinessPublicState, "round">, festival: BusinessFestival, now: number): string {
+  if (festival.mode === "laps") return `until ${state.players[festival.owner].name} passes Launch`;
+  if (festival.mode === "rounds") {
+    const n = Math.max(1, festival.until - state.round);
+    return n === 1 ? "last round" : `${n} rounds left`;
+  }
+  const secs = Math.max(0, Math.ceil((festival.until - now) / 1000));
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")} left`;
+}
+
+/** Rent on a city of a set holding a festival. */
+export function festivalRent(rent: number): number {
+  return rent * BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER;
+}
+
+/** Why this player cannot hold a festival on this set now, or null when they can. */
+export function canHoldFestival(state: FestivalState, seat: number, set: BusinessSetKey): string | null {
+  const p = state.players[seat];
+  const name = BUSINESS_SETS[set].name;
+  if (!BUSINESS_FESTIVAL_SETS.includes(set)) return "Only a village set (brown, sky or pink) can hold a festival.";
+  if (p.festivalCards < 1) return "You have no Festival card.";
+  if (!holdsSet(state, seat, set)) return `You need the whole ${name} set, alone or in a split.`;
+  if (state.festivals.some((m) => m.set === set)) return `A festival is already on in the ${name} set.`;
+  return null;
 }

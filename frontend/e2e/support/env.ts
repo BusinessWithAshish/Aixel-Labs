@@ -17,10 +17,17 @@ export const E2E_DIST_DIR = '.next-e2e';
 /** Set inside a test worker; the config and global setup run as worker 0. */
 const WORKER = Number(process.env.TEST_PARALLEL_INDEX || 0);
 
+/**
+ * Two runs on one box (e.g. two branches' sessions) collide on ports, databases and emulator
+ * accounts. Each run can move all three; the defaults are the suite's usual values.
+ */
+const E2E_PORT_BASE = Number(process.env.E2E_PORT_BASE || 3103);
+const E2E_DB_PREFIX = process.env.E2E_DB_PREFIX || 'AixelLabsE2E';
+
 const shift = (worker: number) => worker * 20;
-export const e2ePort = (worker: number) => 3103 + worker;
+export const e2ePort = (worker: number) => E2E_PORT_BASE + worker;
 export const e2eBaseUrl = (worker: number) => `http://${E2E_HOST}:${e2ePort(worker)}`;
-export const e2eDbName = (worker: number) => (worker === 0 ? 'AixelLabsE2E' : `AixelLabsE2E${worker}`);
+export const e2eDbName = (worker: number) => (worker === 0 ? E2E_DB_PREFIX : `${E2E_DB_PREFIX}${worker}`);
 
 export const E2E_PORT = e2ePort(WORKER);
 export const E2E_TENANT = 'e2e';
@@ -30,6 +37,7 @@ export const E2E_BASE_URL = e2eBaseUrl(WORKER);
 export const E2E_MONGODB_URI = 'mongodb://127.0.0.1:27018';
 export const E2E_DB_NAME = e2eDbName(WORKER);
 
+/** One project for every run: the emulator signs custom tokens in only to its default project. */
 export const E2E_FIREBASE_PROJECT_ID = 'demo-aixel-e2e';
 export const E2E_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 

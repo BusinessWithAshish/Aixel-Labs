@@ -99,10 +99,10 @@ export const voiceAgentSchema = z.object({
         .trim()
         .min(1, 'Name is required')
         .max(VOICE_AGENT_LIMITS.nameMax, `Name must be ${VOICE_AGENT_LIMITS.nameMax} characters or fewer`),
-    callType: z.nativeEnum(VoiceAgentCallType, { errorMap: () => ({ message: 'Pick inbound or outbound' }) }),
+    callType: z.nativeEnum(VoiceAgentCallType, { error: 'Pick inbound or outbound' }),
     /** Where it works (phone, WhatsApp, both); placing calls is phone only (checked by the actions). */
     channel: z.nativeEnum(VoiceAgentChannel).default(VoiceAgentChannel.PHONE),
-    voice: z.enum(VOICE_KEYS, { errorMap: () => ({ message: 'Pick one of the listed voices' }) }),
+    voice: z.enum(VOICE_KEYS, { error: 'Pick one of the listed voices' }),
     prompt: z
         .string()
         .trim()
@@ -127,7 +127,7 @@ export type VoiceAgentInput = z.input<typeof voiceAgentSchema>;
 
 const voicemailSchema = z
     .object({
-        action: z.nativeEnum(VoiceVoicemailAction, { errorMap: () => ({ message: 'Pick what to do on a voicemail' }) }),
+        action: z.nativeEnum(VoiceVoicemailAction, { error: 'Pick what to do on a voicemail' }),
         message: z
             .string()
             .trim()
@@ -174,7 +174,7 @@ const analysisFieldSchema = z
                 VOICE_VARIABLE_NAME_PATTERN,
                 'Field names are lowercase letters, numbers and _, starting with a letter (like budget)',
             ),
-        type: z.enum(VOICE_ANALYSIS_FIELD_TYPES, { errorMap: () => ({ message: 'Pick a field type' }) }),
+        type: z.enum(VOICE_ANALYSIS_FIELD_TYPES, { error: 'Pick a field type' }),
         description: z
             .string()
             .trim()
@@ -222,33 +222,31 @@ const analysisSchema = z
 
 const speechSchema = z
     .object({
-        toolWait: z.nativeEnum(VoiceToolWait, {
-            errorMap: () => ({ message: 'Pick what the agent does while a tool works' }),
-        }),
+        toolWait: z.nativeEnum(VoiceToolWait, { error: 'Pick what the agent does while a tool works' }),
         toolWaitLine: z
             .string()
             .trim()
             .max(LIMITS.toolWaitLineMax, `The line is up to ${LIMITS.toolWaitLineMax} characters`),
-        replyWait: z.nativeEnum(VoiceReplyWait, { errorMap: () => ({ message: 'Pick how long the agent waits' }) }),
+        replyWait: z.nativeEnum(VoiceReplyWait, { error: 'Pick how long the agent waits' }),
         silenceSecs: z
-            .number({ invalid_type_error: 'Give the seconds of silence, or 0 for never' })
+            .number({ error: 'Give the seconds of silence, or 0 for never' })
             .int('Whole seconds only')
             .refine(
                 (secs) => secs === 0 || (secs >= LIMITS.silenceSecsMin && secs <= LIMITS.silenceSecsMax),
                 `Silence is ${LIMITS.silenceSecsMin} to ${LIMITS.silenceSecsMax} seconds, or 0 for never`,
             ),
         maxCallMinutes: z
-            .number({ invalid_type_error: 'Give the minutes, or 0 for no limit' })
+            .number({ error: 'Give the minutes, or 0 for no limit' })
             .int('Whole minutes only')
             .refine(
                 (mins) => mins === 0 || (mins >= LIMITS.maxCallMinutesMin && mins <= LIMITS.maxCallMinutesMax),
                 `The time limit is ${LIMITS.maxCallMinutesMin} to ${LIMITS.maxCallMinutesMax} minutes, or 0 for no limit`,
             ),
         /** Null = the call type's default (an inbound agent greets, an outbound one waits for "hello?"). */
-        firstSpeaker: z.nativeEnum(VoiceFirstSpeaker, { errorMap: () => ({ message: 'Pick who speaks first' }) }).nullable(),
-        tone: z.nativeEnum(VoiceTone, { errorMap: () => ({ message: 'Pick a tone' }) }),
-        pace: z.nativeEnum(VoicePace, { errorMap: () => ({ message: 'Pick a speaking pace' }) }),
-        replyLength: z.nativeEnum(VoiceReplyLength, { errorMap: () => ({ message: 'Pick a reply length' }) }),
+        firstSpeaker: z.nativeEnum(VoiceFirstSpeaker, { error: 'Pick who speaks first' }).nullable(),
+        tone: z.nativeEnum(VoiceTone, { error: 'Pick a tone' }),
+        pace: z.nativeEnum(VoicePace, { error: 'Pick a speaking pace' }),
+        replyLength: z.nativeEnum(VoiceReplyLength, { error: 'Pick a reply length' }),
     })
     .strict()
     .refine((speech) => speech.toolWait !== VoiceToolWait.SAY || speech.toolWaitLine.length > 0, {
@@ -291,7 +289,7 @@ const bookingRules = {
     bookAppointment: z.boolean(),
     timezone: z.string().trim().min(1, 'Pick a timezone').refine(isIanaTimezone, 'Pick a timezone from the list'),
     slotMinutes: z
-        .number({ invalid_type_error: 'Pick an appointment length' })
+        .number({ error: 'Pick an appointment length' })
         .int('Appointment length is a whole number of minutes')
         .min(VOICE_BOOKING_LIMITS.slotMinutesMin, `Appointments are at least ${VOICE_BOOKING_LIMITS.slotMinutesMin} minutes`)
         .max(VOICE_BOOKING_LIMITS.slotMinutesMax, `Appointments are at most ${VOICE_BOOKING_LIMITS.slotMinutesMax} minutes`)
@@ -300,16 +298,14 @@ const bookingRules = {
             `Appointment length goes in steps of ${VOICE_BOOKING_LIMITS.slotMinutesStep} minutes`,
         ),
     maxDaysAhead: z.coerce
-        .number({ invalid_type_error: DAYS_AHEAD_RANGE })
+        .number({ error: DAYS_AHEAD_RANGE })
         .int(DAYS_AHEAD_RANGE)
         .min(VOICE_BOOKING_LIMITS.maxDaysAheadMin, DAYS_AHEAD_RANGE)
         .max(VOICE_BOOKING_LIMITS.maxDaysAheadMax, DAYS_AHEAD_RANGE),
     /** Null = the built-in calendar. Ownership is checked against the owner's connected apps (voice_accounts.calendars) on save. */
     destination: z
         .object({
-            provider: z.nativeEnum(VoiceCalendarProvider, {
-                errorMap: () => ({ message: 'Pick one of the connected apps' }),
-            }),
+            provider: z.nativeEnum(VoiceCalendarProvider, { error: 'Pick one of the connected apps' }),
             connectedAccountId: z
                 .string()
                 .trim()
@@ -381,12 +377,13 @@ export const bookingFormSchema = z
             >,
         ),
     })
-    .transform(({ days, destination, ...rules }) => ({
+    // Typed as the pipe target's input: zod 4 checks a pipe's input exactly.
+    .transform(({ days, destination, ...rules }): z.input<typeof bookingToolSchema> => ({
         ...rules,
         destination: destination ?? null,
         hours: Object.fromEntries(
             VOICE_WEEKDAYS.flatMap((day) => (days[day].open ? [[day, { open: days[day].from, close: days[day].to }]] : [])),
-        ),
+        ) as Partial<Record<VoiceWeekday, { open: string; close: string }>>,
     }))
     .pipe(bookingToolSchema);
 
@@ -405,7 +402,7 @@ const webhookParamSchema = z
                 VOICE_TOOL_PARAM_NAME_PATTERN,
                 'Parameter names are lowercase letters, numbers and _, starting with a letter (like order_id)',
             ),
-        type: z.enum(VOICE_WEBHOOK_PARAM_TYPES, { errorMap: () => ({ message: 'Pick a parameter type' }) }),
+        type: z.enum(VOICE_WEBHOOK_PARAM_TYPES, { error: 'Pick a parameter type' }),
         description: z
             .string()
             .trim()
@@ -597,7 +594,7 @@ export type VoiceCampaignSettingsInput = z.input<typeof campaignSettingsSchema>;
 // VoiceStack, VoiceTtsVoice)
 // ---------------------------------------------------------------------------
 
-const keyProviderSchema = z.nativeEnum(VoiceKeyProvider, { errorMap: () => ({ message: 'Pick a provider' }) });
+const keyProviderSchema = z.nativeEnum(VoiceKeyProvider, { error: 'Pick a provider' });
 const keyIdSchema = z
     .string()
     .nullish()

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, CircleHelp, Coffee, Crown, Flag, Dices, HandCoins, Handshake, House, IndianRupee, KeyRound, LockKeyhole, Landmark as BankIcon, Map, Minus, RefreshCw, ScrollText, Siren, TrendingDown, TrendingUp } from 'lucide-react';
-import { BUSINESS_BOARD, BUSINESS_RULES, BUSINESS_SETS, type BusinessCard } from '@aixellabs/backend/business/constants';
-import { canMortgage, canSellHouse, cardMath, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
-import type { BusinessInterestMode, BusinessLoan, BusinessLogEntry, BusinessOffer, BusinessPending, BusinessPublicState } from '@aixellabs/backend/business/types';
+import { ArrowDownLeft, ArrowLeft, ArrowRight, ArrowUpRight, CircleHelp, Coffee, Crown, Flag, Dices, HandCoins, Handshake, House, IndianRupee, KeyRound, LockKeyhole, Landmark as BankIcon, Map, Minus, PartyPopper, RefreshCw, ScrollText, Siren, TrendingDown, TrendingUp } from 'lucide-react';
+import { BUSINESS_BOARD, BUSINESS_FESTIVAL_SETS, BUSINESS_RULES, BUSINESS_SETS, type BusinessCard, type BusinessSetKey } from '@aixellabs/backend/business/constants';
+import { canHoldFestival, canMortgage, canSellHouse, cardMath, festivalLength, rentFor, setSpaces, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
+import type { BusinessInterestMode, BusinessLoan, BusinessFestivalMode, BusinessLogEntry, BusinessOffer, BusinessPending, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { cn } from '@/lib/utils';
 import { cssVars, Die, HomeMark } from '../_lib/art';
@@ -13,7 +13,7 @@ import { sfx, sfxShared } from '../_lib/sound';
 import { rs } from '../_lib/client';
 import { Avatar, Cash, GButton, Pop, Ribbon, Slider } from './bits';
 import { Houses } from './Board';
-import { CashChip, JailCardChip, MiniCard, MiniCards } from './MiniCard';
+import { CashChip, JailCardChip, FestivalCardChip, MiniCard, MiniCards } from './MiniCard';
 import { SplitView } from './SplitView';
 import { InterestMode } from './OfferComposer';
 
@@ -53,6 +53,7 @@ const CARD_LOOK: Record<BusinessCard['effect']['type'], { tone: string; Icon: ty
     back: { tone: 'move', Icon: ArrowLeft, kind: 'You move' },
     jail: { tone: 'move', Icon: LockKeyhole, kind: 'You move' },
     jailcard: { tone: 'keep', Icon: KeyRound, kind: 'A card to keep' },
+    festival: { tone: 'keep', Icon: PartyPopper, kind: 'A card to keep' },
 };
 
 /** A drawn Chance card: a playing card on the table, with its own frame instead of the usual pop-up. */
@@ -203,6 +204,57 @@ export function BreakPopup({ state, me, send, startPicking = false }: Base & { s
  * Choose a stake, see exactly what each roll would do to your cash, then roll.
  * Every number has a fixed-width slot, so moving the slider never moves the layout.
  */
+/** The three ways a festival can last: the holder picks one as it starts. */
+const FESTIVAL_MODES: { mode: BusinessFestivalMode; hint: string }[] = [
+    { mode: 'rounds', hint: 'Everyone gets this many turns. Steady and sure.' },
+    { mode: 'laps', hint: 'Until you next pass Launch. Best when Launch is far ahead of you.' },
+    { mode: 'minutes', hint: 'On the clock. Best when the table plays slowly.' },
+];
+
+/** Hold a festival: pick the village set (when you have more than one ready) and how long it lasts. */
+export function FestivalPopup({ state, me, send, onClose }: Base & { onClose: () => void }) {
+    const ready = BUSINESS_FESTIVAL_SETS.filter((set) => canHoldFestival(state, me, set) === null);
+    const [set, setSet] = useState<BusinessSetKey | undefined>(ready[0]);
+    if (!set) return null;
+    const spaces = setSpaces(set);
+    return (
+        <Pop onClose={onClose}>
+            <Ribbon>Hold a festival</Ribbon>
+            <div className="stackc">
+                <PartyPopper style={{ width: 44, height: 44 }} />
+            </div>
+            <p className="center" style={{ fontWeight: 800 }}>
+                Every city in the {BUSINESS_SETS[set].name} set charges {BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× rent while the festival lasts.
+            </p>
+            {ready.length > 1 && (
+                <div className="opts">
+                    {ready.map((k) => (
+                        <GButton key={k} tone={k === set ? 'gold' : 'violet'} className="opt" onClick={() => setSet(k)}>
+                            {BUSINESS_SETS[k].name}
+                        </GButton>
+                    ))}
+                </div>
+            )}
+            <MiniCards>
+                {spaces.map((i) => (
+                    <MiniCard key={i} state={state} space={i} />
+                ))}
+            </MiniCards>
+            <p className="small center">
+                Rent now {spaces.map((i) => rs(rentFor(state, i, 7))).join(' · ')} → {spaces.map((i) => rs(rentFor(state, i, 7) * BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER)).join(' · ')}
+            </p>
+            <div className="dealwith">
+                {FESTIVAL_MODES.map(({ mode, hint }) => (
+                    <button key={mode} type="button" className="plate dw" onClick={() => (send({ type: 'festival', set, mode }), onClose())}>
+                        <b>{festivalLength(mode)}</b>
+                        <small>{hint}</small>
+                    </button>
+                ))}
+            </div>
+        </Pop>
+    );
+}
+
 export function MarketPopup({ state, me, send }: Base) {
     const cash = state.players[me].cash;
     const max = Math.floor(Math.min(cash, BUSINESS_RULES.MARKET_MAX_STAKE) / 10) * 10;
@@ -733,13 +785,21 @@ export function describeOffer(state: BusinessPublicState, offer: BusinessOffer):
         return [`extend the loan: pay ${rs(t.pay)} now${t.extra ? `, borrow ${rs(t.extra)} more` : ''}.`, interestLine(0, t.interestPct, t.interestMode, t.laps)];
     }
     if (t.kind === 'bail') return [`bail ${P[t.prisoner].name} out of Jail for ${rs(t.amount)}${t.bringHelper ? ', and the helper comes to the Jail' : ''}.`];
-    if (t.kind === 'split') return [`split the ${BUSINESS_SETS[t.set].name} set, ${t.minorPct}% to the player with one city.`];
+    if (t.kind === 'split') {
+        const pair = splitPair(state, t.set);
+        return [`split the ${BUSINESS_SETS[t.set].name} set, ${t.minorPct}% to ${pair ? P[pair.minor].name : 'the partner who builds less'}.`];
+    }
     if (t.kind === 'unsplit') {
         const split = state.splits.find((s) => s.id === t.split);
         return [`end the ${split ? BUSINESS_SETS[split.set].name : ''} split. Every house there goes back to the bank.`];
     }
     const side = (s: typeof t.give) =>
-        [s.cash ? rs(s.cash) : null, ...s.spaces.map((i) => BUSINESS_BOARD[i].name), s.cards ? `${s.cards} Jail card${s.cards === 1 ? '' : 's'}` : null]
+        [
+            s.cash ? rs(s.cash) : null,
+            ...s.spaces.map((i) => BUSINESS_BOARD[i].name),
+            s.cards ? `${s.cards} Jail card${s.cards === 1 ? '' : 's'}` : null,
+            s.festivals ? `${s.festivals} Festival card${s.festivals === 1 ? '' : 's'}` : null,
+        ]
             .filter(Boolean)
             .join(' + ') || 'nothing';
     return [`you send ${side(t.give)}, you ask for ${side(t.get)}.`, `Sent to ${P[offer.to].name}.`];
@@ -836,11 +896,12 @@ export function OfferInbox({ state, me, send, offer, now }: Base & { offer: Busi
     } else {
         ask = `${from.name} offers you a trade`;
         // Seen from the receiver: what the proposer sends is what you get.
-        const side = ({ cash, spaces, cards }: typeof t.give) =>
-            cash || spaces.length || cards ? (
+        const side = ({ cash, spaces, cards, festivals = 0 }: typeof t.give) =>
+            cash || spaces.length || cards || festivals ? (
                 <MiniCards>
                     {cash > 0 && <CashChip value={cash} />}
                     {cards > 0 && <JailCardChip count={cards} />}
+                    {festivals > 0 && <FestivalCardChip count={festivals} />}
                     {spaces.map((i) => (
                         <MiniCard key={i} state={state} space={i} />
                     ))}

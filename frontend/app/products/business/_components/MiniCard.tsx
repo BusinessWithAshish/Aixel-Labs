@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Check, Handshake, IndianRupee, KeyRound, Landmark as BankIcon } from 'lucide-react';
+import { Check, Handshake, IndianRupee, KeyRound, Landmark as BankIcon, PartyPopper } from 'lucide-react';
 import { BUSINESS_BOARD, BUSINESS_SETS } from '@aixellabs/backend/business/constants';
 import { splitAt } from '@aixellabs/backend/business/compute';
 import type { BusinessPublicState } from '@aixellabs/backend/business/types';
@@ -114,6 +114,17 @@ export function JailCardChip({ count }: { count: number }) {
             <KeyRound className="lu" />
             <b>× {count}</b>
             <span>Jail free</span>
+        </div>
+    );
+}
+
+/** Festival cards a player holds, beside the properties like Jail cards. */
+export function FestivalCardChip({ count }: { count: number }) {
+    return (
+        <div className="minicard cashchip festivalchip">
+            <PartyPopper className="lu" />
+            <b>× {count}</b>
+            <span>Festival</span>
         </div>
     );
 }

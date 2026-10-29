@@ -4,6 +4,7 @@ import { FILE_UPLOADS_ROUTE, MANAGE_TENANTS_ROUTE } from './app-config';
 /** Admin-only paths (not in sidebar nav). Exact match or nested routes (e.g. /manage-tenants/[tenantId]) require admin. */
 export const ADMIN_ONLY_PATHS = [MANAGE_TENANTS_ROUTE, FILE_UPLOADS_ROUTE] as const;
 import {
+    CONTENT_LAB_SUB_MODULES,
     EMAIL_SUB_MODULES,
     LEAD_ENRICHMENT_SUB_MODULES,
     LEAD_GENERATION_SUB_MODULES,
@@ -34,6 +35,9 @@ import {
     Megaphone,
     ChartColumn,
     Settings,
+    Sparkles,
+    Workflow,
+    Eye,
 } from 'lucide-react';
 
 /** Sidebar pages that live inside a sub-module (each labelled and iconed in the maps below). */
@@ -71,6 +75,10 @@ export const subModuleLabelMap: Partial<Record<SidebarKey, string>> = {
     [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: 'Bookings',
     [VOICE_AGENT_SUB_MODULES.WHATSAPP]: 'WhatsApp',
     [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: 'Analytics',
+    [CONTENT_LAB_SUB_MODULES.SEARCH]: 'Search',
+    [CONTENT_LAB_SUB_MODULES.BOARDS]: 'Boards',
+    [CONTENT_LAB_SUB_MODULES.WATCHING]: 'Watching',
+    [CONTENT_LAB_SUB_MODULES.SETTINGS]: 'Settings',
 };
 
 export type SidebarUser = {
@@ -91,6 +99,7 @@ export const modulesIconMap: Record<Modules, LucideIcon> = {
     [Modules.MESSAGING]: MessageCircleMore,
     [Modules.EMAIL]: Mail,
     [Modules.LEAD_ENRICHMENT]: UsersRound,
+    [Modules.CONTENT_LAB]: Sparkles,
 };
 
 export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: LucideIcon; color: string }> = {
@@ -196,6 +205,22 @@ export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: Lucide
     [EMAIL_SUB_MODULES.AI_REPLIES]: {
         icon: Mail,
         color: '!text-purple-500',
+    },
+    [CONTENT_LAB_SUB_MODULES.SEARCH]: {
+        icon: SearchIcon,
+        color: '!text-teal-600',
+    },
+    [CONTENT_LAB_SUB_MODULES.BOARDS]: {
+        icon: Workflow,
+        color: '!text-violet-500',
+    },
+    [CONTENT_LAB_SUB_MODULES.WATCHING]: {
+        icon: Eye,
+        color: '!text-amber-600',
+    },
+    [CONTENT_LAB_SUB_MODULES.SETTINGS]: {
+        icon: Settings,
+        color: '!text-slate-600',
     },
 };
 

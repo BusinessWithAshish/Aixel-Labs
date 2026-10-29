@@ -87,6 +87,7 @@ Default stays `/mcp`. Extra servers: path-split under the MCP router **or** new
 | `AIXEL_MEDIA_ROOT` | **Single root for every on-disk media path** (`src/media.ts`, `AIXEL_MEDIA` const). Unset → `cwd/storage` (local/dev). VPS systemd: `/home/ubuntu/media`. Every subdir — `media` `cut`/`condense`/`fetch` output, `youtube` `video_download`, `chatgpt`'s staged reference images (`refs/`) — is a fixed subpath derived from this one root; none of them has its own override env var. Repoint the whole tree by changing this one var, not by adding a new one. |
 | `AIXEL_MEDIA_PUBLIC_BASE` | Public URL prefix for staged files (default `https://hermes.aixellabs.in/media`) |
 | `CHANNEL_API_KEYS_DIR` | Folder of per-channel `<slug>.json` Gemini/Groq key files (`src/channel-keys.ts`), outside the repo. Unset → the `channel` field is ignored and the shared keys are used. VPS systemd sets it. |
+| `CONTENT_LAB_RUN_DUE_URL` + `CRON_SECRET` | Content Lab scheduled boards: the `api` service posts to this frontend URL (`…/api/content-lab/boards/run-due`) every 5 minutes with `Authorization: Bearer $CRON_SECRET` (`src/board-schedule-ticker.ts`, started in `server.ts`, stopped on SIGTERM). The frontend needs the same `CRON_SECRET`. Either unset → scheduled runs are off. |
 
 Proxy scrape env (`EVOMI_*`) is documented under `backend-utils`.
 

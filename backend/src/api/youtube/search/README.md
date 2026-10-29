@@ -48,6 +48,15 @@ Filter `sp` query values live in `../constants.ts` → `YOUTUBE_SEARCH_FILTER_SP
 4. Walk search renderer tree; paginate via POST `/youtubei/v1/search` with `gl` = `country`.
 5. Slice to `limit` and return.
 
+## One page at a time (`fetchYoutubeSearchBatch`, no route)
+
+For callers that page on later (Content Lab explore): one InnerTube
+`POST /youtubei/v1/search` with `query` + `params` (a decoded `sp`, e.g.
+`YOUTUBE_SEARCH_SORT_SP.POPULAR_THIS_MONTH`), or with a `continuation` token,
+on the cached client version. Returns ~20 items and the next token. ~0.5 s,
+no results HTML. Sort / upload-window `sp` values: `../constants.ts` →
+`YOUTUBE_SEARCH_SORT_SP` (verified live 2026-10-28).
+
 ## Shared dependencies
 
 - `../schemas` — `YOUTUBE_GEO_REQUEST_SCHEMA`

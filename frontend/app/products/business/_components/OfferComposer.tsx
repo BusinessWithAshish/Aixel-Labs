@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { BUSINESS_RULES, BUSINESS_SETS, type BusinessSetKey } from '@aixellabs/backend/business/constants';
-import { canTrade, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
+import { canTrade, lapInterest, loanDue, maxLoan, ownedBy, shareOfCash, splitDefaultPct, splitPair, validateOffer } from '@aixellabs/backend/business/compute';
 import type { BusinessInterestMode, BusinessOfferTerms, BusinessPublicState } from '@aixellabs/backend/business/types';
 import type { BusinessSend } from '../_hooks/use-business-room';
 import { rs } from '../_lib/client';
@@ -104,16 +104,18 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
               })
             : [];
     const [splitSet, setSplitSet] = useState<BusinessSetKey | undefined>(splittable[0]);
-    const [minorPct, setMinorPct] = useState<number>(BUSINESS_RULES.SPLIT_DEFAULT_PCT);
+    const [minorPct, setMinorPct] = useState<number>(splittable[0] ? splitDefaultPct(splittable[0]) : BUSINESS_RULES.SPLIT_DEFAULT_PCT);
     // trade
     const [give, setGive] = useState<number[]>([]);
     const [get, setGet] = useState<number[]>([]);
     const [giveCash, setGiveCash] = useState(0);
     const [getCash, setGetCash] = useState(0);
     const [giveCards, setGiveCards] = useState(0);
+    const [giveFestivals, setGiveFestivals] = useState(0);
     /** Bail: whether the helper comes to the Jail as part of the deal. */
     const [bringHelper, setBringHelper] = useState(true);
     const [getCards, setGetCards] = useState(0);
+    const [getFestivals, setGetFestivals] = useState(0);
 
     const mePlayer = state.players[me];
     const otherPlayer = other === undefined ? null : state.players[other];
@@ -177,7 +179,10 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
                                 type="button"
                                 className={k === splitSet ? 'on' : undefined}
                                 style={cssVars({ '--sc': BUSINESS_SETS[k].color, '--st': BUSINESS_SETS[k].text })}
-                                onClick={() => setSplitSet(k)}
+                                onClick={() => {
+                                    setSplitSet(k);
+                                    setMinorPct(splitDefaultPct(k));
+                                }}
                             >
                                 {BUSINESS_SETS[k].name}
                             </button>
@@ -203,7 +208,7 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
             </>
         ) : (
             <p className="small center">
-                A split needs a three-city colour set where one of you holds two cities and the other holds the third.
+                A split needs a colour set held only by the two of you: two cities and one, or one each in a two-city set.
             </p>
         );
     } else if (draft.kind === 'bail') {
@@ -242,9 +247,15 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
         );
     } else if (otherPlayer) {
         // Every property is shown; the ones that cannot be traded (built on, or shared with a player) are faded.
+        // With either of you in Jail only Jail free cards (and cash) can change hands.
+        const jailTrade = mePlayer.jail > 0 || otherPlayer.jail > 0;
         const tradable = (seat: number) => ownedBy(state, seat);
         const blockedFor = (seat: number) => (i: number) => canTrade(state, seat, i);
-        terms = { kind: 'trade', give: { cash: giveCash, spaces: give, cards: giveCards }, get: { cash: getCash, spaces: get, cards: getCards } };
+        terms = {
+            kind: 'trade',
+            give: { cash: giveCash, spaces: give, cards: giveCards, festivals: giveFestivals },
+            get: { cash: getCash, spaces: get, cards: getCards, festivals: getFestivals },
+        };
         // "Send" is what leaves your hands, "ask for" is what you want back.
         body = (
             <>
@@ -253,12 +264,18 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
                         <ArrowUpRight className="lu" />
                         You send
                     </small>
-                    <SpacePicker state={state} spaces={tradable(me)} picked={give} onToggle={toggle(give, setGive)} blocked={blockedFor(me)} />
+                    {!jailTrade && <SpacePicker state={state} spaces={tradable(me)} picked={give} onToggle={toggle(give, setGive)} blocked={blockedFor(me)} />}
                     <Slider label="Cash you send" value={giveCash} display={rs(giveCash)} min={0} max={round10(mePlayer.cash)} step={10} onChange={setGiveCash} />
                     {mePlayer.jailCards > 0 && (
                         <div className="pctrow">
                             <span>Jail free cards you send</span>
                             <Stepper value={giveCards} min={0} max={mePlayer.jailCards} onChange={setGiveCards} />
+                        </div>
+                    )}
+                    {mePlayer.festivalCards > 0 && (
+                        <div className="pctrow">
+                            <span>Festival cards you send</span>
+                            <Stepper value={giveFestivals} min={0} max={mePlayer.festivalCards} onChange={setGiveFestivals} />
                         </div>
                     )}
                 </div>
@@ -267,12 +284,18 @@ export function OfferComposer({ state, me, send, draft, onClose }: ComposerProps
                         <ArrowDownLeft className="lu" />
                         You ask {otherPlayer.name} for
                     </small>
-                    <SpacePicker state={state} spaces={tradable(otherPlayer.seat)} picked={get} onToggle={toggle(get, setGet)} blocked={blockedFor(otherPlayer.seat)} />
+                    {!jailTrade && <SpacePicker state={state} spaces={tradable(otherPlayer.seat)} picked={get} onToggle={toggle(get, setGet)} blocked={blockedFor(otherPlayer.seat)} />}
                     <Slider label="Cash you ask for" value={getCash} display={rs(getCash)} min={0} max={round10(otherPlayer.cash)} step={10} onChange={setGetCash} />
                     {otherPlayer.jailCards > 0 && (
                         <div className="pctrow">
                             <span>Jail free cards you ask for</span>
                             <Stepper value={getCards} min={0} max={otherPlayer.jailCards} onChange={setGetCards} />
+                        </div>
+                    )}
+                    {otherPlayer.festivalCards > 0 && (
+                        <div className="pctrow">
+                            <span>Festival cards you ask for</span>
+                            <Stepper value={getFestivals} min={0} max={otherPlayer.festivalCards} onChange={setGetFestivals} />
                         </div>
                     )}
                 </div>

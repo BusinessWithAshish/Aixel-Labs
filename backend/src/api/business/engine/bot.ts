@@ -5,9 +5,9 @@
  *
  * Pure like `compute.ts`: reads the state, never changes it, and needs no clock.
  */
-import { BUSINESS_BOARD, BUSINESS_RULES, type BusinessSetKey } from "../constants";
+import { BUSINESS_BOARD, BUSINESS_FESTIVAL_SETS, BUSINESS_RULES, type BusinessSetKey } from "../constants";
 import type { BusinessCommand, BusinessGameState, BusinessOffer, BusinessOfferTerms } from "../types";
-import { canBuild, canMortgage, canSellHouse, houseCost, mortgageValue, ownedBy, ownsSet, setSpaces, validateOffer } from "./compute";
+import { canBuild, canHoldFestival, canMortgage, holdsSet, canSellHouse, houseCost, mortgageValue, ownedBy, ownsSet, setSpaces, validateOffer } from "./compute";
 
 /** A trade must be worth this much of what the bot gives up (105 = a 5% edge), so a coin-flip deal is refused. */
 const TRADE_MIN_RETURN_PCT = 105;
@@ -42,9 +42,11 @@ const BUILD_RESERVE = 600;
 /** Cash the bot keeps after buying the property it landed on. */
 const BUY_RESERVE = 150;
 
-type TradeSide = { cash: number; spaces: number[]; cards: number };
+type TradeSide = { cash: number; spaces: number[]; cards: number; festivals?: number };
 /** What a "get out of Jail free" card is worth to the bot in a trade. */
 const JAIL_CARD_VALUE = 150;
+/** A Festival card is worth more to a player who holds a village set to spend it on. */
+const FESTIVAL_CARD_VALUE = { withSet: 300, without: 100 } as const;
 
 function price(space: number): number {
   return BUSINESS_BOARD[space].price ?? 0;
@@ -74,8 +76,9 @@ function tradeValues(
   receive: TradeSide,
   give: TradeSide,
 ): { received: number; given: number } {
-  let received = receive.cash + receive.cards * JAIL_CARD_VALUE + receive.spaces.reduce((sum, i) => sum + propertyValue(state, i), 0);
-  let given = give.cash + give.cards * JAIL_CARD_VALUE + give.spaces.reduce((sum, i) => sum + propertyValue(state, i), 0);
+  const festivalValue = BUSINESS_FESTIVAL_SETS.some((set) => holdsSet(state, seat, set)) ? FESTIVAL_CARD_VALUE.withSet : FESTIVAL_CARD_VALUE.without;
+  let received = receive.cash + receive.cards * JAIL_CARD_VALUE + (receive.festivals ?? 0) * festivalValue + receive.spaces.reduce((sum, i) => sum + propertyValue(state, i), 0);
+  let given = give.cash + give.cards * JAIL_CARD_VALUE + (give.festivals ?? 0) * festivalValue + give.spaces.reduce((sum, i) => sum + propertyValue(state, i), 0);
 
   const ownerAfter = (i: number): number | undefined => {
     if (receive.spaces.includes(i)) return seat;
@@ -210,6 +213,9 @@ export function botCommand(state: BusinessGameState, seat: number): BusinessComm
         (i) => me.cash >= houseCost(i) + BUILD_RESERVE && canBuild(state, seat, i) === null,
       );
       if (build !== undefined) return { type: "build", space: build };
+      // A Festival card is spent as soon as it can be.
+      const festival = BUSINESS_FESTIVAL_SETS.find((set) => canHoldFestival(state, seat, set) === null);
+      if (festival) return { type: "festival", set: festival, mode: "rounds" };
       return { type: "roll" };
     }
     case "buy": {

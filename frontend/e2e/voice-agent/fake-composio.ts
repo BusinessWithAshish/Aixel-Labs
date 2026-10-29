@@ -65,6 +65,27 @@ const KNOWN_TOOLS: Record<string, string[]> = {
         'CALENDLY_GET_USER',
         'CALENDLY_LIST_EVENT_TYPES',
     ],
+    // Content Lab: the user's own channel / profile, read only.
+    youtube: ['YOUTUBE_LIST_CHANNELS', 'YOUTUBE_LIST_CHANNEL_VIDEOS', 'YOUTUBE_UPLOAD_VIDEO'],
+    instagram: ['INSTAGRAM_GET_USER_INFO', 'INSTAGRAM_GET_IG_USER_MEDIA', 'INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH'],
+};
+
+/** The YouTube channel every connected YouTube account owns unless a test says otherwise. */
+export const FAKE_YOUTUBE_CHANNEL = {
+    id: 'UCe2eKitchenLab000000000',
+    title: 'My Kitchen Lab',
+    customUrl: '@mykitchenlab',
+    avatarUrl: 'https://yt3.ggpht.com/e2e-kitchen-lab=s240',
+    subscribers: 48_200,
+};
+
+/** The Instagram business profile every connected Instagram account is unless a test says otherwise. */
+export const FAKE_INSTAGRAM_USER = {
+    id: '17841400000000001',
+    username: 'mykitchenlab.ig',
+    name: 'My Kitchen Lab',
+    avatarUrl: 'https://scontent.cdninstagram.com/e2e-kitchen-lab.jpg',
+    followers: 9_100,
 };
 
 /** What every session must say: the direct tools preset (no connection manager, sandbox, search, multi-execute). */
@@ -78,6 +99,8 @@ const PRESET: Json = {
 
 const notFound = (message: string) => ({ error: { message, code: 404, slug: 'NotFound', status: 404 } });
 const badRequest = (message: string) => ({ error: { message, code: 400, slug: 'BadRequest', status: 400 } });
+/** One auth config id per toolkit, so a fake started again mid-run matches what the app cached from the last one. */
+const authConfigIdFor = (toolkit: string) => `ac_e2e_${toolkit}`;
 
 /** Cal.com's event types unless a test says otherwise. */
 export const CAL_EVENT_TYPES = [{ id: 1234, title: '30 min consultation', lengthInMinutes: 30 }];
@@ -196,8 +219,8 @@ export class FakeComposio {
         }
         if (path === '/auth_configs' && request.method === 'POST') {
             const toolkit = String((body?.toolkit as Json | undefined)?.slug ?? '');
-            const config = { id: `ac_${randomBytes(6).toString('hex')}`, toolkit };
-            this.authConfigs.push(config);
+            const config = { id: authConfigIdFor(toolkit), toolkit };
+            if (!this.authConfigs.some((c) => c.id === config.id)) this.authConfigs.push(config);
             return send(res, 201, {
                 toolkit: { slug: toolkit },
                 auth_config: { id: config.id, auth_scheme: 'OAUTH2', is_composio_managed: true },
@@ -340,7 +363,10 @@ export class FakeComposio {
                 badRequest('A connected account is already defined for this toolkit in the session configuration'),
             );
         }
-        const config = this.authConfigs.find((c) => c.id === session.authConfigId && c.toolkit === session.toolkit);
+        // A fake restarted mid-run (Playwright replaces a worker after a failure) still knows the id the app has cached.
+        const config =
+            this.authConfigs.find((c) => c.id === session.authConfigId && c.toolkit === session.toolkit) ??
+            (session.authConfigId === authConfigIdFor(session.toolkit) ? { id: session.authConfigId, toolkit: session.toolkit } : undefined);
         if (!config) return send(res, 404, notFound('No auth config exists for the toolkit'));
         const id = `ca_${randomBytes(6).toString('hex')}`;
         const token = randomBytes(8).toString('hex');
@@ -419,6 +445,34 @@ export class FakeComposio {
                         users: [{ id: 7, username: account.label }],
                     })),
                 });
+            case 'YOUTUBE_LIST_CHANNELS': {
+                const c = FAKE_YOUTUBE_CHANNEL;
+                return ok({
+                    items: [
+                        {
+                            kind: 'youtube#channel',
+                            id: c.id,
+                            snippet: {
+                                title: c.title,
+                                customUrl: c.customUrl,
+                                description: 'Quick high-protein meals',
+                                thumbnails: { default: { url: c.avatarUrl } },
+                            },
+                            statistics: { subscriberCount: String(c.subscribers), videoCount: '112' },
+                        },
+                    ],
+                });
+            }
+            case 'INSTAGRAM_GET_USER_INFO': {
+                const u = FAKE_INSTAGRAM_USER;
+                return ok({
+                    id: u.id,
+                    username: u.username,
+                    name: u.name,
+                    profile_picture_url: u.avatarUrl,
+                    followers_count: u.followers,
+                });
+            }
             case 'GOOGLECALENDAR_DELETE_EVENT':
             case 'OUTLOOK_CANCEL_EVENT':
             case 'CAL_CANCEL_BOOKING_VIA_UID':

@@ -22,6 +22,7 @@ import {
   resolveYoutubeGeo,
   viewsTextToNumber,
 } from "../helpers";
+import { withSharedClientVersion } from "../client-version-cache";
 import { extractNestedContinuationToken } from "../innertube-continuation";
 import {
   hasChannelRenderer,
@@ -238,6 +239,62 @@ export async function fetchYoutubeSearch(
   params: YOUTUBE_SEARCH_REQUEST,
 ): Promise<YOUTUBE_SEARCH_RESPONSE> {
   return withDirectFirst("search", (direct) => fetchYoutubeSearchVia(params, direct));
+}
+
+export type YOUTUBE_SEARCH_BATCH_REQUEST = {
+  query: string;
+  country?: string;
+  /** Decoded `sp` (e.g. `YOUTUBE_SEARCH_SORT_SP.POPULAR_THIS_MONTH`); first page only. */
+  sp?: string;
+  /** Token from a previous batch; when set, `query` / `sp` are ignored. */
+  continuation?: string | null;
+  filter?: YT_SEARCH_FILTER;
+};
+
+export type YOUTUBE_SEARCH_BATCH_RESPONSE = {
+  items: YOUTUBE_SEARCH_RESPONSE_ITEM[];
+  /** Null when the results end here. */
+  continuationToken: string | null;
+};
+
+/**
+ * One page of results (~20) straight from InnerTube `POST /search`: the first
+ * page for `query` + `sp`, or the page after `continuation`. No results HTML
+ * (~1.2 MB) and the cached client version, so a page takes ~0.5 s, and the
+ * returned token lets a caller page on later (e.g. in a cursor).
+ */
+export async function fetchYoutubeSearchBatch(
+  params: YOUTUBE_SEARCH_BATCH_REQUEST,
+): Promise<YOUTUBE_SEARCH_BATCH_RESPONSE> {
+  const { query, country, sp, continuation, filter = YT_SEARCH_FILTER.VIDEO } = params;
+  const { gl } = resolveYoutubeGeo({ country });
+
+  return withDirectFirst("search", async (direct) => {
+    const openSession = () => createYoutubeFetchSession({ country }, { direct });
+    const session = await openSession();
+    try {
+      const { result } = await withSharedClientVersion(openSession, async (clientVersion) => {
+        if (continuation) {
+          return fetchSearchContinuation(session, gl, clientVersion, continuation);
+        }
+        const data = await postInnertube<Partial<YOUTUBE_SEARCH_RAW_RESPONSE>>(
+          session,
+          YOUTUBE_INNERTUBE_SEARCH_URL,
+          { context: buildInnertubeContext(clientVersion, gl), query, ...(sp ? { params: sp } : {}) },
+          "YouTube search",
+        );
+        const sectionItems =
+          data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents ?? [];
+        return { sectionItems, continuationToken: extractNestedContinuationToken(sectionItems) };
+      });
+      return {
+        items: extractSearchItems(result.sectionItems, filter),
+        continuationToken: result.continuationToken,
+      };
+    } finally {
+      await closeUrlFetchSession(session);
+    }
+  });
 }
 
 async function fetchYoutubeSearchVia(

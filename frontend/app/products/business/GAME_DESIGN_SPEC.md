@@ -35,23 +35,28 @@ Net worth = cash + property prices (a bank-mortgaged property counts half)
 
 Clockwise from Launch. Corners: Launch (0), Jail (12), Take a Break (24), Go to Jail (36).
 
+Places in Pune and Pimpri-Chinchwad, priced as they are in real life: the three cheap
+sets are well-known villages and hill towns around Pune (Mulshi, Dehu, Alandi, Lonavala…),
+orange and red are PCMC towns, and the rest are Pune's areas, up to Boat Club and
+Koregaon (Park).
+
 | Set | Cities and prices | House cost |
 |---|---|---:|
-| Brown | Gaya 60, Puri 60 | 50 |
-| Sky | Shimla 80, Leh 80, Ooty 100 | 50 |
-| Pink | Ajmer 120, Kota 120, Jaipur 140 | 50 |
-| Orange | Agra 160, Patna 160, Kanpur 180 | 100 |
-| Red | Nagpur 200, Bhopal 200, Indore 220 | 100 |
-| Yellow | Goa 240, Mysuru 240, Kochi 260 | 150 |
-| Green | Ranchi 280, Surat 280, Mohali 300 | 150 |
-| Blue | Thane 320, Nashik 320, Rajkot 340 | 200 |
-| Purple | Pune 360, Noida 360, Vizag 380 | 200 |
-| Black | Delhi 400, Mumbai 400 | 200 |
+| Brown | Mulshi 80, Kamshet 100 (rent 1.5× the usual for the price) | 50 |
+| Sky | Dehu 80, Alandi 80, Jejuri 100 | 50 |
+| Pink | Lavasa 120, Khandala 120, Lonavala 140 | 50 |
+| Orange | Akurdi 160, Nigdi 160, Pimpri 180 | 100 |
+| Red | Ravet 200, Saudagar (Pimple Saudagar) 200, Wakad 220 | 100 |
+| Yellow | Katraj 240, Warje 240, Wagholi 260 | 150 |
+| Green | Pashan 280, Kharadi 280, Kothrud 300 | 150 |
+| Blue | Aundh 320, Viman 320, Baner 340 | 200 |
+| Purple | Camp 360, Deccan 360, Kalyani 380 | 200 |
+| Black | Boat Club 400, Koregaon 400 | 200 |
 
-- **Railways and airport** (North Rail, Coast Rail, Metro,
-  Airport): ₹200 each. Rent 25 / 50 / 100 / 200 for 1 / 2 / 3 / 4 owned,
-  plus ₹5 for every house standing anywhere on the board (a hotel counts as
-  five), the same whether the owner has one railway or four.
+- **Railways and airport** (Pune Station, Pimpri Station, Swargate metro, Lohegaon
+  Airport): ₹200 each. Rent is a toll on the cash the lander holds:
+  10% / 20% / 30% / 40% for an owner of 1 / 2 / 3 / 4, never less than ₹50
+  (the levy floor).
 - **Utilities** (Power, Telecom): ₹150 each. Rent is the dice total times 4
   with one and 10 with both; every house on the board adds 1 to that number
   (a hotel counts as five). With 8 houses built: 12 × and 18 ×.
@@ -200,6 +205,19 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   sold in a trade like cash. A drawn card is shown as a playing card in the
   colour of what it does (green collects, red pays, blue moves, gold is kept).
   Under the amount it shows the sum, such as "10% of ₹4,200".
+- **Festival cards:** the deck also holds 5 Festival cards, and one more is shuffled
+  in every 8 rounds (up to 10 in the deck), so a long match sees more festivals
+  than a short one, timed or not. A Festival card is kept and
+  can be traded like a Jail card (also with a player in Jail). Its holder
+  spends it on their turn on a whole village set (brown, sky or pink) that is
+  theirs, alone or as a partner in a split of it: every city in that set
+  charges **3× rent** while the festival lasts (split rent is shared as usual).
+  The holder picks how long when they start it: **6 rounds**, **1 lap** (until
+  they next pass Launch) or **15 minutes** (paused with the match); the three
+  run for about the same share of a match. One festival per set at a time; a second
+  card can go on another village set. A festival ends early if the set stops being
+  theirs. Everyone gets a one-time banner as it starts; while it runs its tiles
+  show a ×3 flag, and the property card says how long is left.
 - **Market:** a player who owns a property may stake ₹10–₹1,000 (never more
   than their cash) and two dice are rolled: 2–5 loses the whole stake, 6–8
   nothing, 9–12 wins the stake again. The two outer ranges are equally likely
@@ -242,15 +260,19 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
 
 - **Bank mortgage:** receive half the price. The property earns no rent.
   Redeem for 55% of the price. Not allowed while the colour set has houses.
-- **Split property** (replaces mortgaging to a player): a three-city colour
-  set held two-and-one by two players can be split between them. Either of
-  them offers it; the other accepts or rejects. The player with one city gets
-  an agreed share, 10% to 90% in steps of 5 (33% by default), and the player
-  with two gets the rest. While split:
+- **Split property** (replaces mortgaging to a player): a colour set held
+  only by two players can be split between them: two-and-one in a three-city
+  set, or one each in a two-city set (brown, black). Either of them offers it;
+  the other accepts or rejects. The minor partner gets an agreed share, 10% to
+  90% in steps of 5, and the major partner the rest. In a three-city set the
+  major partner holds two cities (33% to the minor by default); in a two-city
+  set it is whoever holds the dearer city, or at equal prices the later one on
+  the board, e.g. Kamshet over Mulshi, Koregaon over Boat Club (50% by default).
+  While split:
   - Each city keeps its owner, and the set counts as complete: full-set rent.
-  - Rent from any of the three cities is shared by the two shares (an odd rupee
-    goes to the partner with two cities). The partners pay no rent there.
-  - Only the partner with two cities builds and sells houses, on all three.
+  - Rent from any city of the set is shared by the two shares (an odd rupee
+    goes to the major partner). The partners pay no rent there.
+  - Only the major partner builds and sells houses, on every city of the set.
     The other partner pays their share of every house, even if it leaves them
     short (they then start their next turn raising the cash), and gets their
     share back when a house is sold.
@@ -258,7 +280,7 @@ roll → (move, salary, landing) → buy | auction | card | market | break | deb
   - Ending it: either partner offers, the other accepts or rejects. Every house
     in the set goes back to the bank at half its cost, that money is shared by
     the two shares, and rent is no longer shared.
-  - Teammates cannot split with each other. Two-city sets cannot be split yet.
+  - Teammates cannot split with each other.
 - **Cash loan:** pure cash between two players. They agree the amount, the
   interest (0–100%), the laps to repay (1–6), and when interest is paid:
   **each lap** (the interest is paid to the lender every time the borrower

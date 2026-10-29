@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { Gavel, Hammer, Handshake, Hotel, House, IndianRupee, KeyRound, Landmark as BankIcon, Receipt } from 'lucide-react';
 import {
     BUSINESS_BOARD,
+    BUSINESS_FESTIVAL_SETS,
+    BUSINESS_RAIL_TOLL_PCT,
     BUSINESS_RULES,
     BUSINESS_SETS,
     BUSINESS_UTILITY_MULTIPLIER,
@@ -20,9 +22,10 @@ import {
     isBuyable,
     mortgageValue,
     splitAt,
+    festivalAt,
+    festivalLeft,
     splitShares,
     utilityMultiplier,
-    railRent,
     redeemCost,
     rentLadder,
     rentLevel,
@@ -80,7 +83,7 @@ export function PropertyCard({ space, state, me, send, mode = 'view' }: Property
     const manage = myTurn && (state.phase === 'roll' || state.phase === 'end');
     const raise = manage || (myTurn && state.phase === 'debt');
     const split = splitAt(state, space);
-    // In a split set the partner with two cities manages the houses on all three.
+    // In a split set the major partner manages the houses on every city of it.
     const mine = prop?.owner === me || split?.major === me;
     const houseShare = split ? splitShares(split, houseCost(space)) : null;
 
@@ -88,8 +91,17 @@ export function PropertyCard({ space, state, me, send, mode = 'view' }: Property
     if (tile.kind === 'city' && tile.set) {
         const ladder = rentLadder(space);
         const level = live ? rentLevel(state, space) : -1;
+        const festival = festivalAt(state, space);
+        const village = BUSINESS_FESTIVAL_SETS.includes(tile.set);
         sections = (
             <>
+                {festival && (
+                    <div className="banner festival">
+                        <span>
+                            Festival on: {BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× rent here, {festivalLeft(state, festival, Date.now())}.
+                        </span>
+                    </div>
+                )}
                 <div className="sect">
                     <div className="sect-h">
                         <span>Rent</span>
@@ -123,6 +135,9 @@ export function PropertyCard({ space, state, me, send, mode = 'view' }: Property
                     ))}
                     <Row icons={<Hotel className="lu ht" />} label="Hotel" amount={<Rupees value={ladder[6]} />} current={level === 6} />
                 </div>
+                {village && !festival && (
+                    <p className="small center">A village set: with a Festival card, its owner can hold a festival for {BUSINESS_RULES.FESTIVAL_RENT_MULTIPLIER}× rent on the whole set.</p>
+                )}
             </>
         );
     } else if (tile.kind === 'rail') {
@@ -138,12 +153,12 @@ export function PropertyCard({ space, state, me, send, mode = 'view' }: Property
                         key={n}
                         icons={Icon ? Array.from({ length: n }, (_, k) => <Icon key={k} className="lu" />) : null}
                         label={`${n} owned`}
-                        amount={<Rupees value={railRent(state, n)} />}
+                        amount={`${BUSINESS_RAIL_TOLL_PCT[n]}% of cash`}
                         current={owned === n}
                     />
                 ))}
                 <p className="small center">
-                    Includes +{rs(BUSINESS_RULES.RAIL_RENT_PER_HOUSE)} for each of the {housesOnBoard(state)} houses on the board (a hotel counts as 5).
+                    The player who lands pays this share of the cash they hold, never less than {rs(BUSINESS_RULES.PCT_MIN)}.
                 </p>
             </div>
         );
@@ -225,7 +240,7 @@ export function PropertyCard({ space, state, me, send, mode = 'view' }: Property
                                 <Handshake className="lu" />
                                 <span>
                                     Split set: {state.players[split.major].name} {100 - split.minorPct}% · {state.players[split.minor].name} {split.minorPct}%. Rent from
-                                    all three cities is shared, and the two of them pay none here.
+                                    every city of the set is shared, and the two of them pay none here.
                                 </span>
                             </div>
                         )}

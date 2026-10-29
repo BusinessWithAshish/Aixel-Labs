@@ -12,6 +12,7 @@ import { TWITTER_API_ROUTES } from "./api/twitter/constants";
 import { REDDIT_API_ROUTES } from "./api/reddit/constants";
 import { BLUFF_ROUTES } from "./api/bluff/constants";
 import { BUSINESS_ROUTES } from "./api/business/constants";
+import { CONTENT_LAB_API_ROUTES } from "./api/content-lab/constants";
 
 export enum ENDPOINTS {
   HOME = "/",
@@ -27,6 +28,7 @@ export enum ENDPOINTS {
   MEDIA = "/media",
   SEGMENT = "/segment",
   CRAWL = "/crawl",
+  CONTENT_LAB = "/content-lab",
   BUSINESS = "/business",
   BLUFF = "/bluff",
   CHATGPT = "/chatgpt",
@@ -365,6 +367,28 @@ export const API_ENDPOINTS = {
   },
   CRAWL: {
     API: { route: "/", full: `${ENDPOINTS.CRAWL}` },
+  },
+  CONTENT_LAB: {
+    EXPLORE: {
+      route: CONTENT_LAB_API_ROUTES.EXPLORE,
+      full: `${ENDPOINTS.CONTENT_LAB}${CONTENT_LAB_API_ROUTES.EXPLORE}`,
+    },
+    BREAKDOWN: {
+      route: CONTENT_LAB_API_ROUTES.BREAKDOWN,
+      full: `${ENDPOINTS.CONTENT_LAB}${CONTENT_LAB_API_ROUTES.BREAKDOWN}`,
+    },
+    CHECK: {
+      route: CONTENT_LAB_API_ROUTES.CHECK,
+      full: `${ENDPOINTS.CONTENT_LAB}${CONTENT_LAB_API_ROUTES.CHECK}`,
+    },
+    CREATOR: {
+      route: CONTENT_LAB_API_ROUTES.CREATOR,
+      full: `${ENDPOINTS.CONTENT_LAB}${CONTENT_LAB_API_ROUTES.CREATOR}`,
+    },
+    SUGGEST: {
+      route: CONTENT_LAB_API_ROUTES.SUGGEST,
+      full: `${ENDPOINTS.CONTENT_LAB}${CONTENT_LAB_API_ROUTES.SUGGEST}`,
+    },
   },
   BUSINESS: {
     ROOM: { route: BUSINESS_ROUTES.ROOM, full: `${ENDPOINTS.BUSINESS}${BUSINESS_ROUTES.ROOM}` },

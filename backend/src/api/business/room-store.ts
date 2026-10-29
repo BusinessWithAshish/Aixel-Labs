@@ -169,6 +169,7 @@ export function setPaused(room: BusinessRoom, seat: number, on: boolean, now: nu
   if (s.endsAt !== null) s.endsAt += lost;
   if (s.pending?.type === "auction") s.pending.endsAt += lost;
   for (const offer of s.offers) offer.expiresAt += lost;
+  for (const festival of s.festivals) if (festival.mode === "minutes") festival.until += lost;
   if (s.hold) {
     s.hold.at += lost;
     s.hold.until += lost;

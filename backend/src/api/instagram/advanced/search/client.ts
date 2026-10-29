@@ -1,12 +1,21 @@
 import { fetchGsearch } from "../../../gsearch";
 import { runWithConcurrency } from "../../../youtube/concurrency";
+import {
+  closeUrlFetchSession,
+  createUrlFetchSession,
+} from "../../../../utils/node-tls-client-session-handler";
 import { fetchFromEntities } from "../../client";
-import { IG_GRAPHQL_CONCURRENCY } from "../../constants";
+import {
+  IG_GRAPHQL_CONCURRENCY,
+  IG_GRAPHQL_HEADERS,
+  INSTAGRAM_BASE_URL,
+} from "../../constants";
 import { fetchLoggedOutMedia } from "../../graphql";
 import {
   IG_ADVANCED_SEARCH_ERROR_MESSAGES,
   IG_ADVANCED_SEARCH_LIMITS,
   IG_CONTENT_KIND,
+  IG_TAGS_SEARCH_PATH,
   type IgContentKind,
 } from "./constants";
 import {
@@ -15,6 +24,7 @@ import {
   mediaIdFromShortcode,
 } from "./compute/classify-url";
 import type {
+  IG_HASHTAG,
   IG_ADVANCED_CONTENT_HIT,
   IG_ADVANCED_SEARCH_REQUEST,
   IG_ADVANCED_SEARCH_RESPONSE,
@@ -135,4 +145,33 @@ export async function fetchInstagramAdvancedSearch(
       uniqueHandles: usernames.length,
     },
   };
+}
+
+type IgTagSearchResponse = {
+  results?: Array<{ name?: string; media_count?: number }>;
+};
+
+/**
+ * Hashtags matching a phrase, biggest first, from `GET /api/v1/tags/search/`
+ * — the one Instagram search endpoint that still answers a guest (direct,
+ * ~1 s, checked 2026-10-28; user search and hashtag pages redirect to login).
+ * Names and post counts only; never throws (empty on any failure).
+ */
+export async function searchInstagramHashtags(
+  query: string,
+): Promise<IG_HASHTAG[]> {
+  const session = await createUrlFetchSession({ useProxy: false });
+  try {
+    const url = `${INSTAGRAM_BASE_URL}${IG_TAGS_SEARCH_PATH}?q=${encodeURIComponent(query.trim())}`;
+    const res = await session.get(url, { headers: IG_GRAPHQL_HEADERS });
+    if (!res.ok) return [];
+    const body = JSON.parse(await res.text()) as IgTagSearchResponse;
+    return (body.results ?? [])
+      .flatMap((r) => (r.name ? [{ name: r.name, mediaCount: r.media_count ?? null }] : []))
+      .sort((a, b) => (b.mediaCount ?? 0) - (a.mediaCount ?? 0));
+  } catch {
+    return [];
+  } finally {
+    await closeUrlFetchSession(session);
+  }
 }
