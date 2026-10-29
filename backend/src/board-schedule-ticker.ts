@@ -9,6 +9,8 @@
  * Off unless both env vars are set. Started by `server.ts` in the `api` service only.
  */
 
+import { fetch } from "undici";
+
 const TICK_MS = 5 * 60_000;
 /** The route answers within its 5-minute limit. */
 const REQUEST_TIMEOUT_MS = 310_000;
