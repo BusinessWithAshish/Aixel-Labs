@@ -303,6 +303,7 @@ test.describe('with seeded calls', () => {
 
         await page.getByRole('combobox', { name: 'Type' }).click();
         await page.getByRole('option', { name: 'Inbound' }).click();
+        await expect(page).toHaveURL(/\?kind=inbound$/);
         await expect(cards).toHaveCount(1);
         await expect(cards.first()).toContainText('Caller hung up');
 
@@ -312,10 +313,13 @@ test.describe('with seeded calls', () => {
         await expect(cards).toHaveCount(5);
         await page.getByRole('searchbox', { name: 'Search calls' }).fill('your hours');
         await page.getByRole('searchbox', { name: 'Search calls' }).press('Enter');
+        await expect(page).toHaveURL(/q=your\+hours/);
         await expect(cards).toHaveCount(1);
         await expect(cards.first()).toContainText('Front desk');
         await page.getByRole('searchbox', { name: 'Search calls' }).fill('415 555 0123');
         await page.getByRole('searchbox', { name: 'Search calls' }).press('Enter');
+        // One card before and after, so wait for the search itself: a filter opened while it loads is disabled under it.
+        await expect(page).toHaveURL(/q=415\+555\+0123/);
         await expect(cards).toHaveCount(1);
         await expect(cards.first()).toContainText('Said goodbye');
 
