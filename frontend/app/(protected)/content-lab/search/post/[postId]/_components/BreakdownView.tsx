@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 import { PostBadges } from '../../../_components/PostCard';
 import { PostThumb } from '../../../_components/PostThumb';
 import { POST_BOARD_TEMPLATE } from '../../../_hooks/use-post-actions';
-import { compactNumber, creatorLabel, formatMultiple, formatSeconds } from '../../../_utils/format';
+import { compactNumber, creatorLabel, formatSeconds, timesUsual } from '../../../_utils/format';
 import type { UseBreakdownPageReturn } from '../_hooks/use-breakdown-page';
 
 /** Long video, short vertical video, or slides/caption: each gets its own words and layout. */
@@ -94,7 +94,7 @@ function Numbers({ breakdown }: { breakdown: CONTENT_LAB_BREAKDOWN_RESPONSE }) {
     const { post } = breakdown;
     const rows: [string, string][] = [
         [post.views == null ? 'Likes' : 'Views', compactNumber(post.views ?? post.likes)],
-        ['Their usual', compactNumber(post.usualViews)],
+        ['A normal post of theirs', compactNumber(post.usualViews)],
         ['Likes', compactNumber(post.likes)],
         ['Comments', compactNumber(post.comments)],
     ];
@@ -135,7 +135,7 @@ function Breakdown({ breakdown }: { breakdown: CONTENT_LAB_BREAKDOWN_RESPONSE })
                     <span>· {who}</span>
                     {post.multiple != null ? (
                         <span>
-                            · <b className="text-primary text-lg">{formatMultiple(post.multiple)}</b> their usual views
+                            · <b className="text-emerald-700 dark:text-emerald-400">{timesUsual(post.multiple, post.views == null ? 'likes' : 'views')}</b>
                         </span>
                     ) : null}
                     <a href={post.url} target="_blank" rel="noreferrer" className="text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline">

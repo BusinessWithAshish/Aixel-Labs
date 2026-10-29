@@ -13,7 +13,7 @@ import {
   LINKEDIN_BY_PEOPLE_RESPONSE,
 } from "../api/linkedin/types";
 import type { CRAWL_RESPONSE } from "../api/crawl";
-import type { ContentLabFormat, ContentLabPlatform } from "../api/content-lab/types";
+import type { CONTENT_LAB_CHECK_RESPONSE, ContentLabFormat, ContentLabPlatform } from "../api/content-lab/types";
 import voiceCallRates from "./voice-call-rates.json";
 
 export enum TenantType {
@@ -41,6 +41,8 @@ export enum MongoCollections {
   /** One per user: their own handles (for "my voice" / "compare with mine") and defaults. */
   CONTENT_LAB_PROFILES = "content_lab_profiles",
   CONTENT_LAB_BOARDS = "content_lab_boards",
+  /** One per scheduled run of a board: what each node did and the drafts it wrote. Last 20 per board. */
+  CONTENT_LAB_BOARD_RUNS = "content_lab_board_runs",
   /** One per (user, platform, handle) the user watches, with its latest standout posts. */
   CONTENT_LAB_WATCHLIST = "content_lab_watchlist",
 }
@@ -1468,23 +1470,96 @@ export type ContentLabBoardDoc<Id = ObjectId> = {
   templateId: string | null;
   nodes: ContentLabBoardNode[];
   edges: ContentLabBoardEdge[];
+  /** Absent = never scheduled (same as off). */
+  schedule?: ContentLabBoardSchedule;
+  /** When the scheduler runs it next; null when off or paused. */
+  nextRunAt?: Date | null;
+  /** A scheduler run holds the board until then, so two never run it at once. */
+  runLeaseUntil?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
-export type ContentLabBoard = Omit<ContentLabBoardDoc<string>, "createdAt" | "updatedAt"> & {
+export type ContentLabBoard = Omit<ContentLabBoardDoc<string>, "createdAt" | "updatedAt" | "nextRunAt" | "runLeaseUntil"> & {
+  nextRunAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type ContentLabStandout = {
+export const CONTENT_LAB_SCHEDULE_REPEATS = ["off", "daily", "weekdays", "hours"] as const;
+export type ContentLabScheduleRepeat = (typeof CONTENT_LAB_SCHEDULE_REPEATS)[number];
+
+/** "Every N hours" choices; each divides a day, so runs land at the same clock times daily. */
+export const CONTENT_LAB_SCHEDULE_EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12] as const;
+
+/** When a board runs by itself on the server, in the owner's timezone. */
+export type ContentLabBoardSchedule = {
+  repeat: ContentLabScheduleRepeat;
+  /** "HH:MM" (24h), for daily and weekdays. */
+  time: string;
+  /** For weekdays. */
+  days: VoiceWeekday[];
+  /** For hours: one of CONTENT_LAB_SCHEDULE_EVERY_HOURS, counted from midnight. */
+  everyHours: number;
+  /** IANA zone, e.g. "Asia/Kolkata". */
+  timezone: string;
+  paused: boolean;
+};
+
+export type ContentLabNodeRunItem = { label: string; detail?: string; url?: string; multiple?: number | null };
+
+/** What one node did in a run, as it is shown inside the node. */
+export type ContentLabNodeRunResult = {
+  status: "done" | "error";
+  error?: string;
+  summary?: string;
+  /** E.g. "Ad library not connected yet". */
+  notice?: string;
+  items?: ContentLabNodeRunItem[];
+  lines?: string[];
+  check?: Pick<CONTENT_LAB_CHECK_RESPONSE, "score" | "checks">;
+  /** What it sent along its wires, counted: "12 top posts". */
+  sent?: string;
+};
+
+export type ContentLabBoardRunStatus = "running" | "done" | "partial" | "failed";
+
+export type ContentLabBoardRunDoc<Id = ObjectId> = {
+  _id?: Id;
+  boardId: Id;
+  userId: Id;
+  trigger: "schedule";
+  status: ContentLabBoardRunStatus;
+  /** Plain words: "Wrote 2 drafts", "2 of 7 nodes had a problem". */
+  summary: string;
+  nodes: ({ nodeId: string } & ContentLabNodeRunResult)[];
+  /** The drafts this run wrote, by Output node (also written onto the board). */
+  outputs: { nodeId: string; format: ContentLabWriteFormat; text: string }[];
+  startedAt: Date;
+  finishedAt: Date | null;
+};
+
+export type ContentLabBoardRun = Omit<ContentLabBoardRunDoc<string>, "startedAt" | "finishedAt"> & {
+  startedAt: string;
+  finishedAt: string | null;
+};
+
+/** One of a watched creator's recent posts, as the Watching card shows it. */
+export type ContentLabWatchPost = {
   postId: string;
   title: string;
   url: string;
   format: ContentLabFormat;
-  multiple: number;
+  /** Views ÷ the creator's usual views; null when there is too little to compare with. */
+  multiple: number | null;
   publishedAt: string | null;
+  /** Missing on watches saved before thumbnails were kept. */
+  thumbnailUrl?: string | null;
+  views?: number | null;
 };
+
+/** A recent post at or above the outlier multiple. */
+export type ContentLabStandout = ContentLabWatchPost & { multiple: number };
 
 export type ContentLabWatchDoc<Id = ObjectId> = {
   _id?: Id;
@@ -1494,7 +1569,14 @@ export type ContentLabWatchDoc<Id = ObjectId> = {
   handle: string;
   name: string | null;
   followers: number | null;
+  /** Profile picture, channel description / bio and profile link, as of the last check. Missing on older watches. */
+  avatarUrl?: string | null;
+  bio?: string | null;
+  profileUrl?: string | null;
+  /** The creator's usual (median) views per post. */
   usualViews: number | null;
+  /** Their latest posts, newest first (at most a dozen). Missing on older watches. */
+  recent?: ContentLabWatchPost[];
   /** Posts at or above the outlier multiple, newest first. */
   standouts: ContentLabStandout[];
   lastCheckedAt: Date | null;
@@ -1509,16 +1591,105 @@ export type ContentLabWatch = Omit<ContentLabWatchDoc<string>, "lastCheckedAt" |
 export const CONTENT_LAB_BETA_PLATFORMS = ["x", "linkedin"] as const;
 export type ContentLabBetaPlatform = (typeof CONTENT_LAB_BETA_PLATFORMS)[number];
 
+/** AI providers Content Lab writes with, on the user's own key. Gemini only for now. */
+export const CONTENT_LAB_AI_PROVIDERS = ["gemini"] as const;
+export type ContentLabAiProvider = (typeof CONTENT_LAB_AI_PROVIDERS)[number];
+
+/**
+ * Content Lab's own AI key, separate from Voice agent's keys (`VoiceAccountDoc.keys`): checked with
+ * the provider before it is saved, sealed like voice keys (frontend/server/voice-agent/engine.ts).
+ */
+export type ContentLabAiKeyDoc = {
+  /** Never sent to the client. */
+  keySealed: string;
+  last4: string;
+  status: VoiceKeyStatus;
+  /** The provider's own words when status is not OK. */
+  statusMessage: string | null;
+  /** When the status was learned: the save's check, "Check again", or a write the provider refused. */
+  checkedAt: Date;
+  savedAt: Date;
+};
+
+/** Client view of Content Lab's AI key for one provider (never the key). */
+export type ContentLabAiKeyView = {
+  provider: ContentLabAiProvider;
+  set: boolean;
+  last4: string | null;
+  status: VoiceKeyStatus | null;
+  statusMessage: string | null;
+  checkedAt: string | null;
+};
+
+/** Platforms the user can connect their own account for (through Composio). */
+export const CONTENT_LAB_CONNECT_PLATFORMS = ["youtube", "instagram"] as const satisfies readonly ContentLabPlatform[];
+export type ContentLabConnectPlatform = (typeof CONTENT_LAB_CONNECT_PLATFORMS)[number];
+
+export enum ContentLabConnectionStatus {
+  /** Sent to Composio's Connect Link; not back yet. */
+  PENDING = "PENDING",
+  ACTIVE = "ACTIVE",
+  /** The sign-in failed, or Composio no longer has it: connect again. */
+  FAILED = "FAILED",
+}
+
+/**
+ * What a connection may be used for. Only "read" today (who the account is, its posts). "publish"
+ * (auto-posting scheduled content) will need its own consent and toolkit tools when it ships.
+ */
+export type ContentLabConnectionAccess = "read" | "publish";
+
+/** Who the connected account is, read from the platform when it was connected. */
+export type ContentLabConnectedAccount = {
+  /** YouTube channel id / Instagram user id. */
+  id: string;
+  /** Without the @. */
+  handle: string | null;
+  name: string | null;
+  avatarUrl: string | null;
+  followers: number | null;
+  url: string | null;
+};
+
+/** One of the user's own accounts, connected through Composio (managed auth), in ContentLabProfileDoc.connections. */
+export type ContentLabConnectionDoc<Id = ObjectId> = {
+  _id: Id;
+  platform: ContentLabConnectPlatform;
+  /** Composio connected account id ("ca_..."), under Composio user_id = our user's _id. */
+  connectedAccountId: string;
+  authConfigId: string;
+  /** The Composio session its tools run in (direct tools preset, pinned to this account). Server-side only. */
+  composioSessionId?: string | null;
+  status: ContentLabConnectionStatus;
+  access: ContentLabConnectionAccess[];
+  /** Null until it is ACTIVE and the account could be read. */
+  account: ContentLabConnectedAccount | null;
+  statusReason?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ContentLabConnection = Omit<
+  ContentLabConnectionDoc<string>,
+  "createdAt" | "updatedAt" | "composioSessionId" | "authConfigId"
+> & { createdAt: string; updatedAt: string };
+
 export type ContentLabProfileDoc<Id = ObjectId> = {
   _id?: Id;
   userId: Id;
-  /** The user's own accounts, by platform (public handles; no login needed). */
+  /** The user's own accounts, by platform: the connected account's handle, else a public handle they typed. */
   handles: Partial<Record<ContentLabPlatform, string>>;
   /** X and LinkedIn handles: stored now, used once those platforms leave beta (no data source yet). */
   betaHandles?: Partial<Record<ContentLabBetaPlatform, string>>;
   country: string;
   language: string;
+  /** Content Lab's own AI keys, one per provider. Absent = none. */
+  aiKeys?: Partial<Record<ContentLabAiProvider, ContentLabAiKeyDoc>>;
+  /** Connected accounts (at most one per platform once ACTIVE; PENDING / FAILED attempts too). Absent = none. */
+  connections?: ContentLabConnectionDoc<Id>[];
   updatedAt: Date;
 };
 
-export type ContentLabProfile = Omit<ContentLabProfileDoc<string>, "updatedAt"> & { updatedAt: string };
+export type ContentLabProfile = Omit<ContentLabProfileDoc<string>, "updatedAt" | "aiKeys" | "connections"> & {
+  updatedAt: string;
+};

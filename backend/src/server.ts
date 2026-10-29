@@ -9,7 +9,8 @@ import morgan from "morgan";
 import path from "path";
 import type { IncomingMessage } from "http";
 import type { Socket } from "net";
-import { AIXEL_LABS_SERVICE, registerRoutes, servesGames } from "./routes";
+import { AIXEL_LABS_SERVICE, registerRoutes, servesApi, servesGames } from "./routes";
+import { startBoardScheduleTicker } from "./board-schedule-ticker";
 import { attachGameSockets } from "./api/game-sockets";
 import { closeMcpStreams } from "./mcp/router";
 import type { Express } from "express";
@@ -259,6 +260,8 @@ if (!process.env.VERCEL) {
   // The games (Big Business, Bluff) each play over a WebSocket on this same HTTP
   // server. They need a long-lived process, so they are attached here and never on Vercel.
   const drainGames = servesGames ? attachGameSockets(server) : undefined;
+  // Content Lab scheduled boards: this long-lived process is the clock that calls the frontend runner.
+  const stopBoardTicker = servesApi ? startBoardScheduleTicker() : undefined;
 
   server.requestTimeout = 60 * 60 * 1000;
   server.headersTimeout = 60 * 60 * 1000 - 1000;
@@ -280,6 +283,7 @@ if (!process.env.VERCEL) {
   // games process, every running match has ended.
   process.once("SIGTERM", () => {
     console.log(`[server] SIGTERM: draining before exit (${AIXEL_LABS_SERVICE ?? "all services"})`);
+    stopBoardTicker?.();
     server.close(() => process.exit(0));
     // close() shuts only the connections idle at that moment. One whose request
     // finishes later would stay open on keep-alive (Caddy pools them), and one

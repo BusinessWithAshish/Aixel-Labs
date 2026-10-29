@@ -58,7 +58,7 @@ export const CONTENT_LAB_HOME_EXAMPLE = {
 
 /** Explore's platform toggle (`?platform=`). */
 export const CONTENT_LAB_PLATFORM_FILTERS = [
-    { value: 'both', label: 'YouTube + Instagram' },
+    { value: 'both', label: 'All' },
     { value: 'youtube', label: 'YouTube' },
     { value: 'instagram', label: 'Instagram' },
 ] as const;
@@ -77,7 +77,7 @@ export const CONTENT_LAB_POST_FORMAT_LABELS: Record<ContentLabFormat, string> = 
 export const CONTENT_LAB_SMART_BOX_HINTS = {
     topic: 'shows what is working in this niche',
     link: 'breaks down this video or reel',
-    creator: 'shows their posts that beat their usual',
+    creator: 'shows their posts that did better than usual',
 } as const;
 
 export const CONTENT_LAB_SMART_BOX_EXAMPLES = ['protein breakfast', 'https://youtu.be/abc123xyz', '@hostelkitchen'] as const;
@@ -140,29 +140,77 @@ type NodeMeta = {
     givesOutput: boolean;
     /** Order in the mobile Flow view: inputs → Hooks → Write → Outputs → Check. */
     stage: number;
+    /** What travels along its wires before a run counts it ("top posts"); null when it sends nothing. */
+    sends: string | null;
+    /** Takes input: what to plug in, said on its empty input. */
+    needs?: string;
 };
 
 export const CONTENT_LAB_NODE_META: Record<ContentLabNodeKind, NodeMeta> = {
-    [ContentLabNodeKind.VOICE]: { label: 'My voice', tag: 'auto', hint: 'Your own recent posts, from Settings', acceptsInput: false, givesOutput: true, stage: 0 },
-    [ContentLabNodeKind.WORKING]: { label: "What's working", tag: 'live', hint: 'Outliers for a topic', acceptsInput: false, givesOutput: true, stage: 0 },
-    [ContentLabNodeKind.CREATOR]: { label: 'Creator', tag: 'live', hint: "One creator's standout posts", acceptsInput: false, givesOutput: true, stage: 0 },
-    [ContentLabNodeKind.WATCHING]: { label: 'Watching', tag: 'live', hint: 'Standouts from your watchlist', acceptsInput: false, givesOutput: true, stage: 0 },
-    [ContentLabNodeKind.POST]: { label: 'Post', tag: 'auto', hint: "One post's breakdown", acceptsInput: false, givesOutput: true, stage: 0 },
-    [ContentLabNodeKind.ADS]: { label: 'Competitor ads', tag: 'live', hint: 'Ads running for a topic', acceptsInput: false, givesOutput: true, stage: 0 },
-    [ContentLabNodeKind.NOTE]: { label: 'Note', tag: 'you', hint: 'Your angle, in your words', acceptsInput: false, givesOutput: true, stage: 0 },
-    [ContentLabNodeKind.HOOKS]: { label: 'Hooks, structure, CTAs', tag: 'auto', hint: 'Patterns from the posts wired in', acceptsInput: true, givesOutput: true, stage: 1 },
-    [ContentLabNodeKind.WRITE]: { label: 'Write', tag: 'you', hint: 'Drafts on your own Gemini key', acceptsInput: true, givesOutput: true, stage: 2 },
-    [ContentLabNodeKind.OUTPUT]: { label: 'Output', tag: 'you', hint: 'An editable draft', acceptsInput: true, givesOutput: true, stage: 3 },
-    [ContentLabNodeKind.CHECK]: { label: 'Check before posting', tag: 'auto', hint: 'Scores the draft vs niche winners', acceptsInput: true, givesOutput: false, stage: 4 },
+    [ContentLabNodeKind.VOICE]: {
+        label: 'Your tone',
+        tag: 'auto',
+        hint: 'Learns how you write from your own recent posts, so drafts sound like you',
+        acceptsInput: false,
+        givesOutput: true,
+        stage: 0,
+        sends: 'your tone',
+    },
+    [ContentLabNodeKind.WORKING]: { label: "What's working", tag: 'live', hint: 'The top posts for a topic right now', acceptsInput: false, givesOutput: true, stage: 0, sends: 'top posts' },
+    [ContentLabNodeKind.CREATOR]: { label: 'Creator', tag: 'live', hint: "One creator's best posts", acceptsInput: false, givesOutput: true, stage: 0, sends: 'their best posts' },
+    [ContentLabNodeKind.WATCHING]: { label: 'Watching', tag: 'live', hint: 'Standout posts from creators you watch', acceptsInput: false, givesOutput: true, stage: 0, sends: 'standout posts' },
+    [ContentLabNodeKind.POST]: { label: 'Post', tag: 'auto', hint: 'One post broken down: hook, structure, call to action', acceptsInput: false, givesOutput: true, stage: 0, sends: 'post breakdown' },
+    [ContentLabNodeKind.ADS]: { label: 'Competitor ads', tag: 'live', hint: 'Ads running for a topic', acceptsInput: false, givesOutput: true, stage: 0, sends: 'competitor ads' },
+    [ContentLabNodeKind.NOTE]: { label: 'Note', tag: 'you', hint: 'Your angle, in your words', acceptsInput: false, givesOutput: true, stage: 0, sends: 'your note' },
+    [ContentLabNodeKind.HOOKS]: {
+        label: 'Hooks, structure, CTAs',
+        tag: 'auto',
+        hint: 'Finds what the posts wired in have in common',
+        acceptsInput: true,
+        givesOutput: true,
+        stage: 1,
+        sends: 'hooks + examples',
+        needs: "Plug in posts to learn from: What's working, Creator, Post, Watching or Competitor ads",
+    },
+    [ContentLabNodeKind.WRITE]: {
+        label: 'Write',
+        tag: 'you',
+        hint: 'Puts everything wired in into one brief for the drafts',
+        acceptsInput: true,
+        givesOutput: true,
+        stage: 2,
+        sends: 'writing brief',
+        needs: 'Plug in Hooks, Your tone and a Note. With nothing plugged in it writes from the topic only',
+    },
+    [ContentLabNodeKind.OUTPUT]: {
+        label: 'Output',
+        tag: 'you',
+        hint: 'Writes the draft on your AI key; you can edit it',
+        acceptsInput: true,
+        givesOutput: true,
+        stage: 3,
+        sends: 'draft',
+        needs: 'Plug in a Write node to write this draft, or type your own',
+    },
+    [ContentLabNodeKind.CHECK]: {
+        label: 'Check before posting',
+        tag: 'auto',
+        hint: 'Scores the draft against the top posts on its platform',
+        acceptsInput: true,
+        givesOutput: false,
+        stage: 4,
+        sends: null,
+        needs: 'Plug in an Output: its draft gets scored',
+    },
 };
 
 /** Inputs bring ideas in, steps read them and write, outputs are what you post (and its check). */
 export type ContentLabNodeRole = 'input' | 'step' | 'output';
 
 export const CONTENT_LAB_NODE_ROLES: Record<ContentLabNodeRole, { label: string; plural: string; hint: string }> = {
-    input: { label: 'Input', plural: 'Inputs', hint: 'Where ideas come from: top posts, creators, ads, your voice' },
-    step: { label: 'Step', plural: 'Steps', hint: 'AI reads what is wired in, finds the patterns and writes' },
-    output: { label: 'Output', plural: 'Outputs', hint: 'The drafts you post, each checked against the winners' },
+    input: { label: 'Input', plural: 'Inputs', hint: 'Where ideas come from: top posts, creators, ads, your tone' },
+    step: { label: 'Step', plural: 'Steps', hint: 'Reads what is wired in, finds what works and builds a brief' },
+    output: { label: 'Output', plural: 'Outputs', hint: 'The drafts you post, each checked against the top posts' },
 };
 
 export const CONTENT_LAB_NODE_ROLE_ORDER: ContentLabNodeRole[] = ['input', 'step', 'output'];
@@ -185,7 +233,8 @@ export type ContentLabBoardTemplate = {
 };
 
 const COL = 320;
-const ROW = 230;
+// Room for a node with its "Gets / Sends" lines and notes, so template nodes never overlap.
+const ROW = 360;
 const node = (id: string, kind: ContentLabNodeKind, col: number, row: number, data: ContentLabNodeData = {}): ContentLabBoardNode => ({
     id,
     kind,
@@ -202,7 +251,7 @@ const output = (format: ContentLabWriteFormat) => ({ format, text: '' });
 export const CONTENT_LAB_BOARD_TEMPLATES: ContentLabBoardTemplate[] = [
     {
         id: 'reel-from-outliers',
-        title: 'Reel from niche outliers',
+        title: 'Reel from top posts',
         description: 'Top reels in a niche → hooks → your reel script.',
         nodes: [
             node('voice', ContentLabNodeKind.VOICE, 0, 0),
@@ -218,7 +267,7 @@ export const CONTENT_LAB_BOARD_TEMPLATES: ContentLabBoardTemplate[] = [
     {
         id: 'youtube-script',
         title: 'YouTube script',
-        description: 'Your voice + top videos on the topic → a full script.',
+        description: 'Your tone + top videos on the topic → a full script.',
         nodes: [
             node('voice', ContentLabNodeKind.VOICE, 0, 0),
             node('working', ContentLabNodeKind.WORKING, 0, 1, { query: '', platforms: ['youtube'], country: 'IN' }),

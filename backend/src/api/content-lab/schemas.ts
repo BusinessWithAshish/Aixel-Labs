@@ -19,6 +19,14 @@ export const CONTENT_LAB_EXPLORE_REQUEST_SCHEMA = z.object({
   platforms: z.array(PLATFORM_SCHEMA).min(1).default([...CONTENT_LAB_PLATFORMS]).describe(D.platforms),
   country: COUNTRY_SCHEMA,
   limit: z.number().int().min(1).max(CONTENT_LAB_LIMITS.maxPosts).default(CONTENT_LAB_LIMITS.defaultPosts).describe(D.limit),
+  // ~2-3 KB on page 2 (three YouTube continuation tokens + seen ids), growing ~0.2 KB a page.
+  cursor: z.string().max(CONTENT_LAB_LIMITS.maxCursorChars).optional().describe(D.cursor),
+});
+
+export const CONTENT_LAB_SUGGEST_REQUEST_SCHEMA = z.object({
+  platform: PLATFORM_SCHEMA.describe(D.platform),
+  query: z.string().trim().min(1).max(CONTENT_LAB_LIMITS.maxSuggestQueryChars).describe(D.suggestQuery),
+  country: COUNTRY_SCHEMA,
 });
 
 export const CONTENT_LAB_BREAKDOWN_REQUEST_SCHEMA = z.object({

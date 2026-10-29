@@ -8,6 +8,8 @@ import type {
     CONTENT_LAB_CREATOR_RESPONSE,
     CONTENT_LAB_EXPLORE_REQUEST,
     CONTENT_LAB_EXPLORE_RESPONSE,
+    CONTENT_LAB_SUGGEST_REQUEST,
+    CONTENT_LAB_SUGGEST_RESPONSE,
 } from '@aixellabs/backend/content-lab/types';
 import type { ContentLabWriteFormat } from '@aixellabs/backend/db/types';
 import { CONTENT_LAB_API_ROUTES } from '@/config/app-config';
@@ -72,6 +74,9 @@ export const contentLabApi = {
         post<CONTENT_LAB_CHECK_REQUEST, CONTENT_LAB_CHECK_RESPONSE>(CONTENT_LAB_API_ROUTES.CHECK, body, signal),
     creator: (body: CONTENT_LAB_CREATOR_REQUEST, signal?: AbortSignal) =>
         post<CONTENT_LAB_CREATOR_REQUEST, CONTENT_LAB_CREATOR_RESPONSE>(CONTENT_LAB_API_ROUTES.CREATOR, body, signal),
+    /** Type-ahead creators for what was typed so far; pass a fresh signal per keystroke. */
+    suggest: (body: CONTENT_LAB_SUGGEST_REQUEST, signal?: AbortSignal) =>
+        post<CONTENT_LAB_SUGGEST_REQUEST, CONTENT_LAB_SUGGEST_RESPONSE>(CONTENT_LAB_API_ROUTES.SUGGEST, body, signal),
     write: (body: CONTENT_LAB_WRITE_REQUEST, signal?: AbortSignal) =>
         post<CONTENT_LAB_WRITE_REQUEST, CONTENT_LAB_WRITE_RESPONSE>(CONTENT_LAB_API_ROUTES.WRITE, body, signal),
     ads: (body: CONTENT_LAB_ADS_REQUEST, signal?: AbortSignal) =>

@@ -1,19 +1,25 @@
 'use client';
 
+import { memo, type ReactNode } from 'react';
 import Link from 'next/link';
-import { AlertCircle, Check, CheckCircle2, Copy, Loader2, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Check, CheckCircle2, Copy, Loader2, Plug, Settings, X } from 'lucide-react';
 import { CONTENT_LAB_PLATFORMS } from '@aixellabs/backend/content-lab/constants';
 import type { ContentLabPlatform } from '@aixellabs/backend/content-lab/types';
-import { CONTENT_LAB_WRITE_FORMATS, ContentLabNodeKind, type ContentLabWriteFormat } from '@aixellabs/backend/db/types';
+import {
+    CONTENT_LAB_SUB_MODULES,
+    CONTENT_LAB_WRITE_FORMATS,
+    ContentLabNodeKind,
+    type ContentLabNodeData,
+    type ContentLabProfile,
+    type ContentLabWriteFormat,
+} from '@aixellabs/backend/db/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { CONTENT_LAB_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { SubModuleUrls } from '@/config/app-config';
-import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import {
     CONTENT_LAB_COUNTRIES,
@@ -24,8 +30,10 @@ import {
     CONTENT_LAB_PLATFORM_LABELS,
     type ContentLabNodeTag,
 } from '../../../_constants';
-import type { UseBoardPageReturn } from '../_hooks/use-board-page';
-import type { BoardNodeRun } from '../_utils/run-board';
+import { PlatformIcon } from '../../../_components/PlatformIcon';
+import { toneAccounts } from '../../_utils/flow';
+import type { BoardNodeRun } from '../../_utils/run-board';
+import type { BoardNodeActions, NodeView } from '../_hooks/use-board-page';
 
 const TAG_CLASS: Record<ContentLabNodeTag, string> = {
     auto: 'bg-primary/10 text-primary',
@@ -33,10 +41,20 @@ const TAG_CLASS: Record<ContentLabNodeTag, string> = {
     you: 'bg-muted text-muted-foreground',
 };
 
+const TAG_TITLE: Record<ContentLabNodeTag, string> = {
+    auto: 'Fills itself from our data when the board runs',
+    live: 'Fetches fresh posts every time the board runs',
+    you: 'You fill this in',
+};
+
 export function NodeTagBadge({ kind }: { kind: ContentLabNodeKind }) {
     const { tag } = CONTENT_LAB_NODE_META[kind];
     return (
-        <Badge variant="outline" className={cn('border-transparent font-mono text-[10px] uppercase tracking-wider', TAG_CLASS[tag])}>
+        <Badge
+            variant="outline"
+            title={TAG_TITLE[tag]}
+            className={cn('border-transparent font-mono text-[10px] uppercase tracking-wider', TAG_CLASS[tag])}
+        >
             {CONTENT_LAB_NODE_TAG_LABELS[tag]}
         </Badge>
     );
@@ -50,7 +68,10 @@ export function NodeStatusIcon({ run }: { run?: BoardNodeRun }) {
 }
 
 export const MultipleChip = ({ multiple }: { multiple: number }) => (
-    <span className="shrink-0 rounded-full bg-orange-500/15 px-2 py-0.5 text-xs font-semibold tabular-nums text-orange-700 dark:text-orange-300">
+    <span
+        title={`${multiple} times its creator's usual views`}
+        className="shrink-0 rounded-full bg-orange-500/15 px-2 py-0.5 text-xs font-semibold tabular-nums text-orange-700 dark:text-orange-300"
+    >
         {multiple}x
     </span>
 );
@@ -58,7 +79,7 @@ export const MultipleChip = ({ multiple }: { multiple: number }) => (
 const SETTINGS_URL = SubModuleUrls[CONTENT_LAB_SUB_MODULES.SETTINGS];
 const WATCHING_URL = SubModuleUrls[CONTENT_LAB_SUB_MODULES.WATCHING];
 
-type FieldProps = { id: string; label: string; children: React.ReactNode };
+type FieldProps = { id: string; label: string; children: ReactNode };
 const Field = ({ id, label, children }: FieldProps) => (
     <div className="grid gap-1">
         <label htmlFor={id} className="text-muted-foreground text-xs font-medium">
@@ -68,6 +89,8 @@ const Field = ({ id, label, children }: FieldProps) => (
     </div>
 );
 
+type Option<T extends string> = { value: T; label: string; icon?: ReactNode };
+
 function OptionSelect<T extends string>({
     id,
     value,
@@ -76,7 +99,7 @@ function OptionSelect<T extends string>({
 }: {
     id: string;
     value: T | undefined;
-    options: readonly { value: T; label: string }[];
+    options: readonly Option<T>[];
     onChange: (value: T) => void;
 }) {
     return (
@@ -87,6 +110,7 @@ function OptionSelect<T extends string>({
             <SelectContent>
                 {options.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
+                        {option.icon}
                         {option.label}
                     </SelectItem>
                 ))}
@@ -98,14 +122,25 @@ function OptionSelect<T extends string>({
 const COUNTRY_OPTIONS = CONTENT_LAB_COUNTRIES.map(({ code, label }) => ({ value: code as string, label }));
 const LANGUAGE_OPTIONS = CONTENT_LAB_LANGUAGES.map((language) => ({ value: language as string, label: language }));
 const FORMAT_OPTIONS = CONTENT_LAB_WRITE_FORMATS.map((format) => ({ value: format, label: CONTENT_LAB_FORMAT_LABELS[format] }));
-const PLATFORM_OPTIONS = CONTENT_LAB_PLATFORMS.map((platform) => ({ value: platform, label: CONTENT_LAB_PLATFORM_LABELS[platform] }));
+const PLATFORM_OPTIONS: Option<ContentLabPlatform>[] = CONTENT_LAB_PLATFORMS.map((platform) => ({
+    value: platform,
+    label: CONTENT_LAB_PLATFORM_LABELS[platform],
+    icon: <PlatformIcon platform={platform} />,
+}));
 
 function RunResult({ run }: { run: BoardNodeRun }) {
     if (run.status === 'running') return <p className="text-muted-foreground text-xs">Running…</p>;
-    if (run.status === 'error') return <p className="text-destructive text-xs" role="alert">{run.error}</p>;
+    if (run.status === 'error') {
+        return (
+            <p className="text-destructive text-xs" role="alert">
+                {run.error}
+            </p>
+        );
+    }
     return (
         <div className="grid gap-1.5 text-xs" data-testid="node-result">
             {run.notice ? <p className="bg-muted text-muted-foreground rounded-md px-2 py-1.5">{run.notice}</p> : null}
+            {run.summary ? <p className="font-medium">{run.summary}</p> : null}
             {run.items?.map((item, index) => (
                 <div key={index} className="flex min-w-0 items-center justify-between gap-2">
                     <div className="min-w-0">
@@ -151,49 +186,123 @@ function RunResult({ run }: { run: BoardNodeRun }) {
                     </ul>
                 </div>
             ) : null}
-            {run.summary ? <p className="text-muted-foreground">{run.summary}</p> : null}
         </div>
     );
 }
 
-/** A box's settings and, after a run, what it found. Shared by the canvas node and the Flow card. */
-export function BoardNodeBody({ id }: { id: string }) {
-    const page = usePage<UseBoardPageReturn>();
-    const node = page.nodes.find((item) => item.id === id);
-    if (!node) return null;
-    const { kind, settings } = node.data;
-    const run = page.runs[id];
-    const set = (patch: Parameters<UseBoardPageReturn['updateSettings']>[1]) => page.updateSettings(id, patch);
+/** "Your tone": which of your accounts it reads, or how to connect them. */
+function ToneSource({ profile }: { profile: ContentLabProfile }) {
+    const accounts = toneAccounts(profile);
+    if (!accounts.length) {
+        return (
+            <div className="grid gap-2 rounded-md border border-dashed p-2 text-xs" data-testid="tone-empty">
+                <p>
+                    <span className="font-medium">No accounts connected yet.</span> Connect your YouTube or Instagram and this node reads
+                    your recent posts to learn how you write. Until then, drafts use a plain tone.
+                </p>
+                <Button asChild size="sm" variant="outline" className="nodrag w-fit">
+                    <Link href={SETTINGS_URL}>
+                        <Settings /> Connect accounts
+                    </Link>
+                </Button>
+            </div>
+        );
+    }
+    return (
+        <div className="grid gap-1 text-xs" data-testid="tone-accounts">
+            <p className="text-muted-foreground">Reads your latest posts on:</p>
+            <ul className="grid gap-1">
+                {accounts.map(({ platform, handle }) => (
+                    <li key={platform} className="flex min-w-0 items-center gap-1.5">
+                        <PlatformIcon platform={platform} />
+                        <span className="truncate font-medium">@{handle}</span>
+                        <span className="text-muted-foreground">{CONTENT_LAB_PLATFORM_LABELS[platform]}</span>
+                    </li>
+                ))}
+            </ul>
+            <Link href={SETTINGS_URL} className="text-primary nodrag w-fit font-medium hover:underline">
+                Change accounts
+            </Link>
+        </div>
+    );
+}
+
+/**
+ * What comes in on a node's wires ("Gets: hooks from Hooks, your tone from Your tone"), or, with
+ * nothing plugged in, what to plug in. Then what it sends on and to where.
+ */
+export const NodeWiring = memo(function NodeWiring({ view }: { view: NodeView }) {
+    const meta = CONTENT_LAB_NODE_META[view.kind];
+    return (
+        <div className="grid gap-1.5 text-xs">
+            {meta.acceptsInput ? (
+                view.gets.length ? (
+                    <div className="bg-muted/60 rounded-md px-2 py-1.5" data-testid="node-gets">
+                        <p className="flex items-center gap-1 font-medium">
+                            <ArrowLeft className="size-3" aria-hidden /> Gets
+                        </p>
+                        <ul className="grid gap-0.5 pl-4">
+                            {view.gets.map((input) => (
+                                <li key={input.id}>
+                                    <span className="font-medium">{input.what ?? 'input'}</span>
+                                    <span className="text-muted-foreground"> from {input.label}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : (
+                    <p
+                        className="flex gap-1.5 rounded-md border border-dashed border-amber-500/60 bg-amber-500/10 px-2 py-1.5 text-amber-900 dark:text-amber-200"
+                        data-testid="node-needs"
+                    >
+                        <Plug className="mt-0.5 size-3 shrink-0" aria-hidden />
+                        <span>Nothing plugged in. {meta.needs}.</span>
+                    </p>
+                )
+            ) : null}
+            {meta.givesOutput && view.sends ? (
+                <p className="text-muted-foreground flex gap-1.5" data-testid="node-sends">
+                    <ArrowRight className="mt-0.5 size-3 shrink-0" aria-hidden />
+                    {view.sendsTo.length ? (
+                        <span>
+                            Sends <span className="text-foreground font-medium">{view.sends}</span> to {view.sendsTo.map((to) => to.label).join(', ')}
+                        </span>
+                    ) : (
+                        <span>
+                            Sends <span className="text-foreground font-medium">{view.sends}</span>, but is not wired to anything yet
+                        </span>
+                    )}
+                </p>
+            ) : null}
+        </div>
+    );
+});
+
+type BoardNodeBodyProps = {
+    id: string;
+    kind: ContentLabNodeKind;
+    settings: ContentLabNodeData;
+    run?: BoardNodeRun;
+    profile: ContentLabProfile;
+    actions: BoardNodeActions;
+};
+
+/** A node's settings and, after a run, what it found. Shared by the canvas node and the Flow card. */
+export const BoardNodeBody = memo(function BoardNodeBody({ id, kind, settings, run, profile, actions }: BoardNodeBodyProps) {
+    const set = (patch: Partial<ContentLabNodeData>) => actions.updateSettings(id, patch);
     const field = (name: string) => `${id}-${name}`;
 
     return (
         <div className="grid gap-2.5">
-            {kind === ContentLabNodeKind.VOICE ? (
-                <p className="text-muted-foreground text-xs">
-                    {Object.values(page.profile.handles).some(Boolean) ? (
-                        <>
-                            From{' '}
-                            {(Object.entries(page.profile.handles) as [ContentLabPlatform, string][])
-                                .filter(([, handle]) => handle)
-                                .map(([platform, handle]) => `@${handle} (${CONTENT_LAB_PLATFORM_LABELS[platform]})`)
-                                .join(', ')}
-                        </>
-                    ) : (
-                        <>
-                            Add your own accounts in{' '}
-                            <Link href={SETTINGS_URL} className="text-primary nodrag font-medium hover:underline">
-                                Settings
-                            </Link>
-                        </>
-                    )}
-                </p>
-            ) : null}
+            <p className="text-muted-foreground text-xs">{CONTENT_LAB_NODE_META[kind].hint}.</p>
+
+            {kind === ContentLabNodeKind.VOICE ? <ToneSource profile={profile} /> : null}
 
             {kind === ContentLabNodeKind.WATCHING ? (
                 <p className="text-muted-foreground text-xs">
-                    Standouts from{' '}
+                    From{' '}
                     <Link href={WATCHING_URL} className="text-primary nodrag font-medium hover:underline">
-                        creators you watch
+                        the creators you watch
                     </Link>
                 </p>
             ) : null}
@@ -223,7 +332,8 @@ export function BoardNodeBody({ id }: { id: string }) {
                         onValueChange={(value) => value.length && set({ platforms: value as ContentLabPlatform[] })}
                     >
                         {PLATFORM_OPTIONS.map((option) => (
-                            <ToggleGroupItem key={option.value} value={option.value} className="flex-1 text-xs">
+                            <ToggleGroupItem key={option.value} value={option.value} className="flex-1 gap-1.5 text-xs">
+                                {option.icon}
                                 {option.label}
                             </ToggleGroupItem>
                         ))}
@@ -240,12 +350,7 @@ export function BoardNodeBody({ id }: { id: string }) {
             {kind === ContentLabNodeKind.CREATOR ? (
                 <>
                     <Field id={field('platform')} label="Platform">
-                        <OptionSelect
-                            id={field('platform')}
-                            value={settings.platform}
-                            options={PLATFORM_OPTIONS}
-                            onChange={(platform) => set({ platform })}
-                        />
+                        <OptionSelect id={field('platform')} value={settings.platform} options={PLATFORM_OPTIONS} onChange={(platform) => set({ platform })} />
                     </Field>
                     <Field id={field('handle')} label="Handle">
                         <Input
@@ -290,12 +395,7 @@ export function BoardNodeBody({ id }: { id: string }) {
 
             {kind === ContentLabNodeKind.WRITE || kind === ContentLabNodeKind.OUTPUT ? (
                 <Field id={field('format')} label="Format">
-                    <OptionSelect<ContentLabWriteFormat>
-                        id={field('format')}
-                        value={settings.format}
-                        options={FORMAT_OPTIONS}
-                        onChange={(format) => set({ format })}
-                    />
+                    <OptionSelect<ContentLabWriteFormat> id={field('format')} value={settings.format} options={FORMAT_OPTIONS} onChange={(format) => set({ format })} />
                 </Field>
             ) : null}
 
@@ -322,7 +422,7 @@ export function BoardNodeBody({ id }: { id: string }) {
                         variant="outline"
                         className="nodrag w-fit"
                         disabled={!settings.text?.trim()}
-                        onClick={() => page.copyOutput(id)}
+                        onClick={() => actions.copyText(settings.text ?? '')}
                     >
                         <Copy /> Copy
                     </Button>
@@ -332,8 +432,8 @@ export function BoardNodeBody({ id }: { id: string }) {
             {run ? (
                 <RunResult run={run} />
             ) : kind === ContentLabNodeKind.HOOKS || kind === ContentLabNodeKind.CHECK ? (
-                <p className="text-muted-foreground text-xs">{CONTENT_LAB_NODE_META[kind].hint}. Run the board to fill it.</p>
+                <p className="text-muted-foreground text-xs">Fills in when you run the board.</p>
             ) : null}
         </div>
     );
-}
+});

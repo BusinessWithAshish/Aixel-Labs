@@ -1,7 +1,13 @@
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
 import type {
+    CONTENT_LAB_BREAKDOWN_REQUEST,
     CONTENT_LAB_BREAKDOWN_RESPONSE,
+    CONTENT_LAB_CHECK_REQUEST,
     CONTENT_LAB_CHECK_RESPONSE,
+    CONTENT_LAB_CREATOR_REQUEST,
+    CONTENT_LAB_CREATOR_RESPONSE,
+    CONTENT_LAB_EXPLORE_REQUEST,
+    CONTENT_LAB_EXPLORE_RESPONSE,
     CONTENT_LAB_POST,
     CONTENT_LAB_TEXT_SIGNALS,
     ContentLabPlatform,
@@ -11,12 +17,21 @@ import {
     ContentLabNodeKind,
     type ContentLabBoardEdge,
     type ContentLabBoardNode,
+    type ContentLabNodeRunResult,
     type ContentLabProfile,
+    type ContentLabStandout,
     type ContentLabWriteFormat,
 } from '@aixellabs/backend/db/types';
-import { listContentLabWatches } from '@/app/actions/content-lab-actions';
-import { contentLabApi, type ContentLabWriteContext, type ContentLabWriteExample } from '@/helpers/content-lab-api';
-import { CONTENT_LAB_DEFAULT_LANGUAGE, CONTENT_LAB_PLATFORM_LABELS } from '../../../_constants';
+import type {
+    CONTENT_LAB_ADS_REQUEST,
+    CONTENT_LAB_ADS_RESPONSE,
+    CONTENT_LAB_WRITE_REQUEST,
+    CONTENT_LAB_WRITE_RESPONSE,
+    ContentLabWriteContext,
+    ContentLabWriteExample,
+} from '@/helpers/content-lab-api';
+import { CONTENT_LAB_DEFAULT_LANGUAGE, CONTENT_LAB_PLATFORM_LABELS } from '../../_constants';
+import { counted, toneAccounts } from './flow';
 import { topoLevels } from './graph';
 
 /** What a node passes to the nodes wired from it. */
@@ -36,29 +51,38 @@ type Carry = {
     text?: string;
 };
 
-export type BoardRunItem = { label: string; detail?: string; url?: string; multiple?: number | null };
+export type BoardRunItem = NonNullable<ContentLabNodeRunResult['items']>[number];
 
-/** One node's run, shown inside it. Not persisted. */
-export type BoardNodeRun = {
-    status: 'running' | 'done' | 'error';
-    error?: string;
-    summary?: string;
-    /** E.g. "Ad library not connected yet". */
-    notice?: string;
-    items?: BoardRunItem[];
-    lines?: string[];
-    check?: CONTENT_LAB_CHECK_RESPONSE;
+/** One node's run, shown inside it: what a stored run keeps, plus "running" and what it hands on. */
+export type BoardNodeRun = Omit<ContentLabNodeRunResult, 'status'> & {
+    status: 'running' | ContentLabNodeRunResult['status'];
     carry?: Partial<Carry>;
+};
+
+/**
+ * Where a run gets its data and drafts. The browser passes the BFF (`contentLabApi`, signed-in
+ * session); the scheduler passes server-side calls on the board owner's behalf. Same answers either way.
+ */
+export type BoardRunDeps = {
+    explore: (body: CONTENT_LAB_EXPLORE_REQUEST, signal: AbortSignal) => Promise<ALApiResponse<CONTENT_LAB_EXPLORE_RESPONSE>>;
+    breakdown: (body: CONTENT_LAB_BREAKDOWN_REQUEST, signal: AbortSignal) => Promise<ALApiResponse<CONTENT_LAB_BREAKDOWN_RESPONSE>>;
+    check: (body: CONTENT_LAB_CHECK_REQUEST, signal: AbortSignal) => Promise<ALApiResponse<CONTENT_LAB_CHECK_RESPONSE>>;
+    creator: (body: CONTENT_LAB_CREATOR_REQUEST, signal: AbortSignal) => Promise<ALApiResponse<CONTENT_LAB_CREATOR_RESPONSE>>;
+    write: (body: CONTENT_LAB_WRITE_REQUEST, signal: AbortSignal) => Promise<ALApiResponse<CONTENT_LAB_WRITE_RESPONSE>>;
+    ads: (body: CONTENT_LAB_ADS_REQUEST, signal: AbortSignal) => Promise<ALApiResponse<CONTENT_LAB_ADS_RESPONSE>>;
+    /** The owner's watchlist: each watched creator's standout posts. */
+    watches: () => Promise<ALApiResponse<{ handle: string; standouts: ContentLabStandout[] }[]>>;
 };
 
 export type RunBoardInput = {
     nodes: ContentLabBoardNode[];
     edges: ContentLabBoardEdge[];
-    profile: ContentLabProfile;
+    profile: Pick<ContentLabProfile, 'handles' | 'country'>;
+    deps: BoardRunDeps;
     signal: AbortSignal;
     onNode: (id: string, run: BoardNodeRun) => void;
-    /** A Write fan-out finished one Output's draft (saved with the board). */
-    onOutputText: (id: string, text: string) => void;
+    /** A Write fan-out finished one Output's draft (it belongs on the board). */
+    onOutputText: (id: string, text: string, format: ContentLabWriteFormat) => void;
 };
 
 const EXAMPLES_PER_INPUT = 6;
@@ -110,7 +134,7 @@ const postItem = (post: CONTENT_LAB_POST): BoardRunItem => ({
 
 const postExample = (post: CONTENT_LAB_POST): ContentLabWriteExample => ({ title: post.title, url: post.url });
 
-/** Which platform's winners a draft is checked against. */
+/** Which platform's top posts a draft is checked against. */
 const CHECK_PLATFORM: Partial<Record<ContentLabWriteFormat, ContentLabPlatform>> = {
     'youtube-script': 'youtube',
     reel: 'instagram',
@@ -139,16 +163,19 @@ const firstLine = (text: string) =>
     (text.split('\n').find((line) => line.trim()) ?? '').trim().slice(0, CONTENT_LAB_LIMITS.maxCheckTextChars);
 
 /**
- * Runs a board in wiring order: inputs (explore / creator / breakdown / ads / watchlist / own voice)
- * → Hooks (patterns from the posts wired in) → Write (context from everything wired in) → each Output
+ * Runs a board in wiring order: inputs (explore / creator / breakdown / ads / watchlist / own tone)
+ * → Hooks (patterns from the posts wired in) → Write (a brief from everything wired in) → each Output
  * wired from it, drafted in its own format → Check (scores that Output). A failed node shows its error;
- * the nodes after it still run on what the others found.
+ * the nodes after it still run on what the others found. Each node says what it `sent` down its wires.
+ * Runs in the browser (Run board) and on the server (scheduled runs) with different `deps`.
  */
-export async function runBoard({ nodes, edges, profile, signal, onNode, onOutputText }: RunBoardInput): Promise<void> {
+export async function runBoard({ nodes, edges, profile, deps, signal, onNode, onOutputText }: RunBoardInput): Promise<void> {
     const byId = new Map(nodes.map((node) => [node.id, node]));
     const done = new Map<string, Partial<Carry>>();
     const inputsOf = (id: string) =>
-        edges.filter((edge) => edge.target === id).map((edge) => ({ node: byId.get(edge.source)!, carry: done.get(edge.source) }));
+        edges
+            .filter((edge) => edge.target === id && byId.has(edge.source))
+            .map((edge) => ({ node: byId.get(edge.source)!, carry: done.get(edge.source) }));
     const country = profile.country;
 
     async function runNode(node: ContentLabBoardNode): Promise<BoardNodeRun | null> {
@@ -158,25 +185,24 @@ export async function runBoard({ nodes, edges, profile, signal, onNode, onOutput
 
         switch (node.kind) {
             case ContentLabNodeKind.VOICE: {
-                const own = (Object.entries(profile.handles) as [ContentLabPlatform, string | undefined][]).filter(
-                    (entry): entry is [ContentLabPlatform, string] => !!entry[1],
-                );
-                if (!own.length) throw new Error('Add your own YouTube or Instagram handle in Content Lab settings');
+                const own = toneAccounts(profile);
+                if (!own.length) throw new Error('No accounts to learn your tone from. Connect yours in Content Lab Settings.');
                 const results = await Promise.all(
-                    own.map(async ([platform, handle]) => ({
+                    own.map(async ({ platform, handle }) => ({
                         platform,
                         handle,
-                        data: unwrap(await contentLabApi.creator({ platform, handle, country, limit: 12 }, signal)),
+                        data: unwrap(await deps.creator({ platform, handle, country, limit: 12 }, signal)),
                     })),
                 );
                 const voice = results.flatMap((result) => result.data.posts.slice(0, VOICE_POSTS).map((post) => post.title));
                 return {
                     status: 'done',
-                    summary: `Learned from ${voice.length} of your posts`,
+                    summary: `Learned your tone from ${counted(voice.length, 'of your posts', 'of your posts')}`,
                     items: results.map((result) => ({
                         label: `@${result.handle}`,
-                        detail: `${CONTENT_LAB_PLATFORM_LABELS[result.platform]} · ${result.data.posts.length} recent posts`,
+                        detail: `${CONTENT_LAB_PLATFORM_LABELS[result.platform]} · ${counted(result.data.posts.length, 'recent post', 'recent posts')}`,
                     })),
+                    sent: `your tone (${counted(voice.length, 'post', 'posts')})`,
                     carry: { voice },
                 };
             }
@@ -184,7 +210,7 @@ export async function runBoard({ nodes, edges, profile, signal, onNode, onOutput
                 const query = data.query?.trim();
                 if (!query) throw new Error('Type a topic first');
                 const result = unwrap(
-                    await contentLabApi.explore(
+                    await deps.explore(
                         { query, platforms: data.platforms?.length ? data.platforms : undefined, country: data.country || country },
                         signal,
                     ),
@@ -192,47 +218,53 @@ export async function runBoard({ nodes, edges, profile, signal, onNode, onOutput
                 const posts = result.posts.slice(0, 12);
                 return {
                     status: 'done',
-                    summary: `${result.niche.outlierCount} outliers in ${result.niche.postCount} posts`,
+                    summary: `${counted(result.niche.outlierCount, 'standout post', 'standout posts')} out of ${result.niche.postCount} looked at`,
                     items: posts.slice(0, 3).map(postItem),
+                    sent: counted(posts.length, 'top post', 'top posts'),
                     carry: { posts, examples: posts.slice(0, EXAMPLES_PER_INPUT).map(postExample), topic: query },
                 };
             }
             case ContentLabNodeKind.CREATOR: {
                 const handle = data.handle?.trim();
                 if (!handle) throw new Error('Type a creator handle first');
-                const result = unwrap(await contentLabApi.creator({ platform: data.platform ?? 'youtube', handle, country }, signal));
+                const result = unwrap(await deps.creator({ platform: data.platform ?? 'youtube', handle, country }, signal));
                 const ranked = [...result.posts].sort((a, b) => (b.multiple ?? 0) - (a.multiple ?? 0));
                 const standouts = ranked.filter((post) => (post.multiple ?? 0) >= CONTENT_LAB_OUTLIER_MULTIPLE);
                 const posts = (standouts.length ? standouts : ranked).slice(0, EXAMPLES_PER_INPUT);
                 return {
                     status: 'done',
-                    summary: `${standouts.length} standout posts`,
+                    summary: `${counted(standouts.length, 'post', 'posts')} beat their usual views`,
                     items: posts.slice(0, 3).map(postItem),
+                    sent: counted(posts.length, 'best post', 'best posts'),
                     carry: { posts, examples: posts.map(postExample) },
                 };
             }
             case ContentLabNodeKind.WATCHING: {
-                const watches = unwrap(await listContentLabWatches());
+                const watches = unwrap(await deps.watches());
                 const standouts = watches
                     .flatMap((watch) => watch.standouts.map((standout) => ({ ...standout, handle: watch.handle })))
                     .sort((a, b) => b.multiple - a.multiple)
                     .slice(0, EXAMPLES_PER_INPUT);
                 return {
                     status: 'done',
-                    summary: watches.length ? `${standouts.length} standouts from ${watches.length} creators` : 'You are not watching anyone yet',
+                    summary: watches.length
+                        ? `${counted(standouts.length, 'standout post', 'standout posts')} from ${counted(watches.length, 'creator', 'creators')}`
+                        : 'You are not watching anyone yet',
                     items: standouts.slice(0, 3).map((s) => ({ label: s.title, detail: `@${s.handle}`, url: s.url, multiple: s.multiple })),
+                    sent: counted(standouts.length, 'standout post', 'standout posts'),
                     carry: { examples: standouts.map((s) => ({ title: s.title, url: s.url })) },
                 };
             }
             case ContentLabNodeKind.POST: {
                 const url = data.url?.trim();
                 if (!url) throw new Error('Paste a YouTube or Instagram link first');
-                const breakdown = unwrap(await contentLabApi.breakdown({ url, country }, signal));
+                const breakdown = unwrap(await deps.breakdown({ url, country }, signal));
                 const { post } = breakdown;
                 return {
                     status: 'done',
-                    summary: post.multiple ? `${post.multiple}x its creator's usual` : post.title,
+                    summary: post.multiple ? `${post.multiple}x its creator's usual views` : post.title,
                     lines: [...(breakdown.hook.text ? [`Hook: “${breakdown.hook.text}”`] : []), ...breakdown.whyItWorked.slice(0, 3)],
+                    sent: 'hook, structure and call to action',
                     carry: {
                         breakdowns: [breakdown],
                         examples: [
@@ -252,29 +284,32 @@ export async function runBoard({ nodes, edges, profile, signal, onNode, onOutput
             case ContentLabNodeKind.ADS: {
                 const query = data.query?.trim();
                 if (!query) throw new Error('Type a topic or competitor first');
-                const result = unwrap(await contentLabApi.ads({ query, region: data.country || country, limit: 12 }, signal));
-                if (!result.available) return { status: 'done', notice: 'Ad library not connected yet', carry: { topic: query } };
+                const result = unwrap(await deps.ads({ query, region: data.country || country, limit: 12 }, signal));
+                if (!result.available) return { status: 'done', notice: 'Ad library not connected yet', sent: 'no ads yet', carry: { topic: query } };
                 const ads = result.ads.filter((ad) => ad.text);
+                const sent = ads.slice(0, EXAMPLES_PER_INPUT);
                 return {
                     status: 'done',
-                    summary: `${ads.length} ads`,
+                    summary: counted(ads.length, 'ad', 'ads'),
                     items: ads.slice(0, 3).map((ad) => ({ label: ad.text!, detail: ad.advertiser, url: ad.url ?? undefined })),
-                    carry: { examples: ads.slice(0, EXAMPLES_PER_INPUT).map((ad) => ({ title: ad.text!, url: ad.url ?? undefined })), topic: query },
+                    sent: counted(sent.length, 'ad', 'ads'),
+                    carry: { examples: sent.map((ad) => ({ title: ad.text!, url: ad.url ?? undefined })), topic: query },
                 };
             }
             case ContentLabNodeKind.NOTE: {
                 const text = data.text?.trim();
-                return { status: 'done', carry: { notes: text ? [text] : [] } };
+                return { status: 'done', sent: text ? 'your note' : 'nothing (empty note)', carry: { notes: text ? [text] : [] } };
             }
             case ContentLabNodeKind.HOOKS: {
                 if (!carried.posts.length && !carried.breakdowns.length && !carried.examples.length) {
-                    throw new Error("Wire posts into this box first (What's working, Creator, Post…)");
+                    throw new Error("Nothing to learn from yet. Plug in What's working, Creator, Post or Watching.");
                 }
                 const patterns = buildHookPatterns(carried.posts, carried.breakdowns);
                 return {
                     status: 'done',
-                    summary: `From ${carried.examples.length} posts`,
+                    summary: `What ${counted(carried.examples.length, 'post', 'posts')} have in common`,
                     lines: patterns,
+                    sent: `${counted(patterns.length, 'hook pattern', 'hook patterns')} + ${counted(carried.examples.length, 'example', 'examples')}`,
                     carry: { ...carried, patterns },
                 };
             }
@@ -287,14 +322,15 @@ export async function runBoard({ nodes, edges, profile, signal, onNode, onOutput
                     note: carried.notes.join('\n') || undefined,
                 };
                 const uses = [
-                    context.voice?.length ? 'your voice' : null,
-                    context.examples?.length ? `${context.examples.length} examples` : null,
-                    context.patterns?.length ? `${context.patterns.length} patterns` : null,
+                    context.voice?.length ? 'your tone' : null,
+                    context.examples?.length ? counted(context.examples.length, 'example', 'examples') : null,
+                    context.patterns?.length ? counted(context.patterns.length, 'hook pattern', 'hook patterns') : null,
                     context.note ? 'your note' : null,
-                ].filter(Boolean);
+                ].filter((use): use is string => !!use);
                 return {
                     status: 'done',
-                    summary: uses.length ? `Uses ${uses.join(', ')}` : 'Nothing wired in: writing from the topic only',
+                    summary: uses.length ? `Brief built from ${uses.join(', ')}` : 'Nothing plugged in: writing from the topic only',
+                    sent: uses.length ? `brief: ${uses.join(', ')}` : 'brief: topic only',
                     carry: { context, language: data.language || CONTENT_LAB_DEFAULT_LANGUAGE, format: data.format, topic: carried.topic },
                 };
             }
@@ -302,29 +338,35 @@ export async function runBoard({ nodes, edges, profile, signal, onNode, onOutput
                 const writer = inputs.find((input) => input.carry?.context)?.carry;
                 if (!writer?.context) {
                     // Not fed by a Write node: the user's own text is the draft.
-                    return data.text?.trim() ? { status: 'done', carry: { text: data.text, format: data.format, topic: carried.topic } } : null;
+                    return data.text?.trim()
+                        ? { status: 'done', sent: 'your draft', carry: { text: data.text, format: data.format, topic: carried.topic } }
+                        : null;
                 }
                 const format = data.format ?? writer.format ?? 'reel';
                 const result = unwrap(
-                    await contentLabApi.write(
+                    await deps.write(
                         { mode: 'draft', format, language: writer.language ?? CONTENT_LAB_DEFAULT_LANGUAGE, context: writer.context },
                         signal,
                     ),
                 );
                 if (!('text' in result)) throw new Error('The writer did not return a draft');
-                onOutputText(node.id, result.text);
-                return { status: 'done', carry: { text: result.text, format, topic: writer.topic } };
+                onOutputText(node.id, result.text, format);
+                const words = result.text.split(/\s+/).filter(Boolean).length;
+                return {
+                    status: 'done',
+                    summary: `Draft written (${counted(words, 'word', 'words')})`,
+                    sent: 'draft',
+                    carry: { text: result.text, format, topic: writer.topic },
+                };
             }
             case ContentLabNodeKind.CHECK: {
                 const draft = inputs.find((input) => input.carry?.text)?.carry;
-                if (!draft?.text) throw new Error('Wire an Output with a draft into this box');
+                if (!draft?.text) throw new Error('No draft to score. Plug in an Output that has a draft.');
                 const platform = draft.format ? CHECK_PLATFORM[draft.format] : 'instagram';
                 if (!platform) throw new Error('Checks score YouTube and Instagram drafts for now');
                 const text = firstLine(draft.text);
-                const check = unwrap(
-                    await contentLabApi.check({ text, platform, query: draft.topic || carried.topic || text, country }, signal),
-                );
-                return { status: 'done', check, carry: {} };
+                const check = unwrap(await deps.check({ text, platform, query: draft.topic || carried.topic || text, country }, signal));
+                return { status: 'done', check: { score: check.score, checks: check.checks }, carry: {} };
             }
         }
     }
@@ -357,4 +399,11 @@ export async function runBoard({ nodes, edges, profile, signal, onNode, onOutput
         await Promise.all(level.filter((id) => byId.get(id)!.kind !== ContentLabNodeKind.OUTPUT).map(runOne));
         for (const id of level.filter((id) => byId.get(id)!.kind === ContentLabNodeKind.OUTPUT)) await runOne(id);
     }
+}
+
+/** A finished node's run as stored with a scheduled run (no carry, nothing still running). */
+export function storedNodeRun({ status, error, summary, notice, items, lines, check, sent }: BoardNodeRun): ContentLabNodeRunResult {
+    const fields = { error, summary, notice, items, lines, check, sent };
+    const set = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as Partial<typeof fields>;
+    return { ...set, status: status === 'error' ? 'error' : 'done' };
 }

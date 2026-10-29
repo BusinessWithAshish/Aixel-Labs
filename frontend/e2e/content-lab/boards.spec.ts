@@ -9,6 +9,7 @@ import { E2E_USER } from '../support/users';
 import {
     BOARDS_URL,
     enableContentLab,
+    SETTINGS_URL,
     expect,
     expectNoSidewaysScroll,
     FAKE_BREAKDOWN,
@@ -42,6 +43,17 @@ async function openBoard(page: Page, boardId: string): Promise<void> {
 
 async function expectSaved(page: Page): Promise<void> {
     await expect(page.getByTestId('save-state')).toHaveText('Saved');
+}
+
+/** Saves with the toolbar's Save button and waits for it to finish. */
+async function save(page: Page): Promise<void> {
+    await page.getByTestId('save-board').click();
+    await expectSaved(page);
+}
+
+/** A reload with unsaved edits asks first (beforeunload): accept it. */
+function acceptLeaving(page: Page): void {
+    page.on('dialog', (dialog) => void dialog.accept());
 }
 
 /** Ticks or unticks `targetLabel` in the "Connect to…" sheet of `sourceLabel`. */
@@ -135,33 +147,254 @@ for (const viewport of VIEWPORTS) {
             expect(await lab.getBoard(id)).toBeNull();
         });
 
-        test('edits autosave and survive a reload', async ({ page, lab }) => {
+        test('edits apply at once and are saved only with Save or Ctrl+S', async ({ page, lab }) => {
             const { nodes, edges } = template('reel-from-outliers');
             const id = await lab.insertBoard(E2E_USER, { title: 'Reel board', templateId: 'reel-from-outliers', nodes, edges });
             await openBoard(page, id);
             await expectSaved(page);
+            await expect(page.getByTestId('save-board')).toBeDisabled();
 
             await page.locator('#working-query').fill('hostel cooking');
             await page.locator('#note-text').fill('Keep it under 40 seconds');
             await expect(page.getByTestId('save-state')).toHaveText('Unsaved changes');
+            // No autosave: nothing reaches the database until Save.
+            await page.waitForTimeout(1_500);
+            expect((await lab.getBoard(id))?.nodes.find((node) => node.id === 'working')?.data.query).toBe('');
+
+            await page.keyboard.press('ControlOrMeta+s');
             await expectSaved(page);
+            expect((await lab.getBoard(id))?.nodes.find((node) => node.id === 'working')?.data.query).toBe('hostel cooking');
+
+            // Switching platforms is instant and only marks the board unsaved.
+            const youtube = box(page, 'working').getByRole('button', { name: 'YouTube' });
+            await youtube.click();
+            await expect(youtube).toHaveAttribute('data-state', 'off');
+            await expect(page.getByTestId('save-state')).toHaveText('Unsaved changes');
+            await save(page);
             await expect
-                .poll(async () => (await lab.getBoard(id))?.nodes.find((node) => node.id === 'working')?.data.query)
-                .toBe('hostel cooking');
+                .poll(async () => (await lab.getBoard(id))?.nodes.find((node) => node.id === 'working')?.data.platforms)
+                .toEqual(['instagram']);
 
             await page.reload();
             await waitForHydration(page, '[role="toolbar"] button');
             await expect(page.locator('#working-query')).toHaveValue('hostel cooking');
             await expect(page.locator('#note-text')).toHaveValue('Keep it under 40 seconds');
+            await expect(page.getByTestId('draft-notice')).toHaveCount(0);
         });
 
-        test('boxes can be added, wired and removed', async ({ page, lab }) => {
+        test('unsaved edits survive a reload as a local draft, and offline is said', async ({ page, context, lab }) => {
+            const { nodes, edges } = template('reel-from-outliers');
+            const id = await lab.insertBoard(E2E_USER, { title: 'Reel board', templateId: 'reel-from-outliers', nodes, edges });
+            await openBoard(page, id);
+            acceptLeaving(page);
+
+            // Offline: told so, Save waits, the edits stay.
+            await context.setOffline(true);
+            await expect(page.getByTestId('offline-notice')).toBeVisible();
+            await page.locator('#note-text').fill('Written on a train');
+            await expect(page.getByTestId('save-state')).toHaveText('Offline: not saved');
+            await expect(page.getByTestId('save-board')).toBeDisabled();
+            await context.setOffline(false);
+            await expect(page.getByTestId('offline-notice')).toHaveCount(0);
+            await expect(page.getByTestId('save-state')).toHaveText('Unsaved changes');
+
+            // Reload without saving: the draft is offered back.
+            await page.waitForTimeout(800);
+            await page.reload();
+            await waitForHydration(page, '[role="toolbar"] button');
+            await expect(page.locator('#note-text')).toHaveValue('');
+            await expect(page.getByTestId('draft-notice')).toBeVisible();
+            await page.getByRole('button', { name: 'Restore my edits' }).click();
+            await expect(page.locator('#note-text')).toHaveValue('Written on a train');
+            await save(page);
+            await expect
+                .poll(async () => (await lab.getBoard(id))?.nodes.find((node) => node.id === 'note')?.data.text)
+                .toBe('Written on a train');
+
+            // Discarding a draft drops it for good.
+            await page.locator('#note-text').fill('Not this one');
+            await page.waitForTimeout(800);
+            await page.reload();
+            await waitForHydration(page, '[role="toolbar"] button');
+            await page.getByRole('button', { name: 'Discard them' }).click();
+            await expect(page.getByTestId('draft-notice')).toHaveCount(0);
+            await page.reload();
+            await waitForHydration(page, '[role="toolbar"] button');
+            await expect(page.getByTestId('draft-notice')).toHaveCount(0);
+            await expect(page.locator('#note-text')).toHaveValue('Written on a train');
+        });
+
+        test('a save never wipes drafts a scheduled run wrote meanwhile', async ({ page, lab }) => {
+            const { nodes, edges } = template('reel-from-outliers');
+            const id = await lab.insertBoard(E2E_USER, { title: 'Reel board', templateId: 'reel-from-outliers', nodes, edges });
+            await openBoard(page, id);
+
+            // The tab is open; a scheduled run writes a draft; then the user saves their own edit.
+            await lab.writeScheduledDraft(id, 'output', 'HOOK: written by the schedule');
+            await page.locator('#note-text').fill('My angle');
+            await page.getByTestId('save-board').click();
+            await expect(page.getByTestId('save-conflict')).toBeVisible();
+            await expect(page.getByTestId('save-state')).toHaveText('Not saved: board changed');
+            expect((await lab.getBoard(id))?.nodes.find((node) => node.id === 'note')?.data.text).toBe('');
+            await expect(page.locator('#note-text')).toHaveValue('My angle');
+
+            await page.getByRole('button', { name: 'Keep my edits and add the new drafts' }).click();
+            await expectSaved(page);
+            await expect(page.getByTestId('save-conflict')).toHaveCount(0);
+            await expect(page.locator('#output-draft')).toHaveValue('HOOK: written by the schedule');
+            const saved = await lab.getBoard(id);
+            expect(saved?.nodes.find((node) => node.id === 'note')?.data.text).toBe('My angle');
+            expect(saved?.nodes.find((node) => node.id === 'output')?.data.text).toBe('HOOK: written by the schedule');
+
+            // Taking the latest instead drops the local edit.
+            await lab.writeScheduledDraft(id, 'output', 'HOOK: second scheduled draft');
+            await page.locator('#note-text').fill('Not kept');
+            await page.keyboard.press('ControlOrMeta+s');
+            await expect(page.getByTestId('save-conflict')).toBeVisible();
+            await page.getByRole('button', { name: 'Load the latest board (drop my edits)' }).click();
+            await expectSaved(page);
+            await expect(page.locator('#note-text')).toHaveValue('My angle');
+            await expect(page.locator('#output-draft')).toHaveValue('HOOK: second scheduled draft');
+        });
+
+        test('Flow / Canvas is a two-way toggle', async ({ page, lab }) => {
+            const { nodes, edges } = template('youtube-script');
+            const id = await lab.insertBoard(E2E_USER, { title: 'Toggle board', templateId: 'youtube-script', nodes, edges });
+            await openBoard(page, id);
+            const toggle = page.getByRole('radiogroup', { name: 'View' });
+            await expect(toggle.getByRole('radio', { name: canvas ? 'Canvas' : 'Flow' })).toHaveAttribute('data-state', 'on');
+
+            await toggle.getByRole('radio', { name: 'Flow' }).click();
+            await expect(page.getByTestId('flow-card')).toHaveCount(nodes.length);
+            await expectNoSidewaysScroll(page);
+            await toggle.getByRole('radio', { name: 'Canvas' }).click();
+            await expect(page.getByTestId('board-node')).toHaveCount(nodes.length);
+            await expectNoSidewaysScroll(page);
+        });
+
+        test('each node says what it gets and sends, and the board explains how it runs', async ({ page, lab }) => {
+            const { nodes, edges } = template('reel-from-outliers');
+            const id = await lab.insertBoard(E2E_USER, { title: 'Reel board', templateId: 'reel-from-outliers', nodes, edges });
+            await openBoard(page, id);
+
+            await expect(box(page, 'hooks').getByTestId('node-gets')).toContainText("top posts from What's working");
+            await expect(box(page, 'write').getByTestId('node-gets')).toContainText('your tone from Your tone');
+            await expect(box(page, 'write').getByTestId('node-gets')).toContainText('your note from Note');
+            await expect(box(page, 'working').getByTestId('node-sends')).toContainText('Sends top posts to Hooks');
+
+            // "Your tone" with no accounts says how to connect them.
+            await expect(box(page, 'voice').getByTestId('tone-empty')).toBeVisible();
+            await expect(box(page, 'voice').getByRole('link', { name: 'Connect accounts' })).toHaveAttribute('href', SETTINGS_URL);
+
+            // Inputs, Hooks, Write, Output, Check, then what you do with the draft.
+            const howItRuns = page.getByTestId('how-it-runs');
+            await expect(howItRuns.locator('ol > li')).toHaveCount(6);
+            await expect(howItRuns).toContainText("What's working finds the top posts for your topic");
+            await expect(howItRuns).toContainText('Write puts');
+
+            // A node with nothing plugged in says what to plug in.
+            await page.getByRole('button', { name: 'Add node' }).click();
+            await page.getByRole('menuitem', { name: /^Check before posting/ }).click();
+            const check = page.locator('[data-kind="check"]:not([data-node-id="check"])');
+            await expect(check.getByTestId('node-needs')).toContainText('Plug in an Output');
+            await expectNoSidewaysScroll(page);
+        });
+
+        test('Your tone lists the accounts it reads', async ({ page, lab }) => {
+            await lab.setProfile(E2E_USER, { handles: { youtube: 'mykitchenlab', instagram: 'mykitchen.ig' } });
+            const { nodes, edges } = template('youtube-script');
+            const id = await lab.insertBoard(E2E_USER, { title: 'Script', templateId: 'youtube-script', nodes, edges });
+            await openBoard(page, id);
+            const accounts = box(page, 'voice').getByTestId('tone-accounts');
+            await expect(accounts).toContainText('@mykitchenlab');
+            await expect(accounts).toContainText('@mykitchen.ig');
+            await expect(page.getByTestId('how-it-runs')).toContainText(
+                'Your tone reads your recent posts (@mykitchenlab on YouTube and @mykitchen.ig on Instagram)',
+            );
+        });
+
+        test('a board can be scheduled, paused and resumed, and shows its scheduled runs', async ({ page, lab }) => {
+            const { nodes, edges } = template('reel-from-outliers');
+            const id = await lab.insertBoard(E2E_USER, { title: 'Daily reel', templateId: 'reel-from-outliers', nodes, edges });
+            await lab.insertBoardRun(E2E_USER, id, {
+                status: 'partial',
+                summary: 'Wrote 1 draft. 1 of 7 nodes had a problem.',
+                nodes: [
+                    { nodeId: 'working', status: 'done', summary: '3 standout posts out of 24 looked at', sent: '12 top posts' },
+                    { nodeId: 'voice', status: 'error', error: 'No accounts to learn your tone from. Connect yours in Content Lab Settings.' },
+                ],
+                outputs: [{ nodeId: 'output', format: 'reel', text: 'HOOK: a scheduled draft' }],
+            });
+            await openBoard(page, id);
+
+            // The last scheduled run's results are on the board, with real counts on the wires.
+            await expect(page.getByTestId('shown-run')).toBeVisible();
+            await expect(box(page, 'hooks').getByTestId('node-gets')).toContainText("12 top posts from What's working");
+
+            await page.getByTestId('open-schedule').click();
+            const sheet = page.getByTestId('schedule-sheet');
+            await expect(sheet.getByTestId('schedule-status')).toContainText('Not scheduled');
+            await expect(sheet.getByTestId('schedule-run')).toHaveCount(1);
+            await expectNoSidewaysScroll(page);
+
+            // Monday to Friday is pre-ticked; add Saturday.
+            await sheet.getByRole('radio', { name: 'Some days' }).click();
+            await sheet.getByRole('button', { name: 'Saturday' }).click();
+            await sheet.getByLabel('At', { exact: true }).fill('07:30');
+            await expect(sheet.getByTestId('schedule-preview')).toContainText('Mon, Tue, Wed, Thu, Fri, Sat at 7:30 AM');
+            await sheet.getByRole('button', { name: 'Save schedule' }).click();
+            await expect(sheet.getByTestId('schedule-status')).toContainText('Mon, Tue, Wed, Thu, Fri, Sat at 7:30 AM');
+            await expect(sheet.getByTestId('schedule-next')).toContainText('Next run:');
+            await expect
+                .poll(async () => {
+                    const saved = await lab.getBoard(id);
+                    return [saved?.schedule?.repeat, saved?.schedule?.time, saved?.schedule?.days.length, saved?.nextRunAt instanceof Date];
+                })
+                .toEqual(['weekdays', '07:30', 6, true]);
+            expect((await lab.getBoard(id))!.nextRunAt!.getTime()).toBeGreaterThan(Date.now());
+
+            await sheet.getByRole('button', { name: 'Pause', exact: true }).click();
+            await expect(sheet.getByTestId('schedule-status')).toContainText('Paused');
+            await expect
+                .poll(async () => {
+                    const saved = await lab.getBoard(id);
+                    return [saved?.schedule?.paused, saved?.nextRunAt];
+                })
+                .toEqual([true, null]);
+            await sheet.getByRole('button', { name: 'Resume', exact: true }).click();
+            await expect(sheet.getByTestId('schedule-next')).toContainText('Next run:');
+            await expect.poll(async () => (await lab.getBoard(id))?.nextRunAt instanceof Date).toBe(true);
+
+            await sheet.getByRole('radio', { name: 'Every few hours' }).click();
+            await expect(sheet.getByTestId('schedule-preview')).toContainText('Every 6 hours');
+            await sheet.getByRole('button', { name: 'Save schedule' }).click();
+            await expect(sheet.getByTestId('schedule-status')).toContainText('Every 6 hours');
+
+            // A run's drafts can be put back on the board from the history.
+            const run = sheet.getByTestId('schedule-run');
+            await run.getByRole('button').first().click();
+            await expect(run).toContainText('HOOK: a scheduled draft');
+            await run.getByRole('button', { name: 'Show on the board' }).click();
+            await expect(sheet).toBeHidden();
+            await expect(page.locator('#output-draft')).toHaveValue('HOOK: a scheduled draft');
+            await save(page);
+
+            await page.goto(BOARDS_URL);
+            await expect(page.getByTestId('board-schedule')).toHaveText('Scheduled: Every 6 hours');
+        });
+
+        test('the scheduled runner refuses callers without the secret', async ({ request }) => {
+            const response = await request.post('/api/content-lab/boards/run-due');
+            expect([401, 503]).toContain(response.status());
+        });
+
+        test('nodes can be added, wired and removed, and saved', async ({ page, lab }) => {
             const { nodes, edges } = template('youtube-script');
             const id = await lab.insertBoard(E2E_USER, { title: 'Script board', templateId: 'youtube-script', nodes, edges });
             await openBoard(page, id);
 
             if (viewport.name === 'desktop') {
-                // A real drag from My voice's output handle to the Hooks box's input handle.
+                // A real drag from Your tone's output handle to the Hooks node's input handle.
                 const from = box(page, 'voice').locator('.react-flow__handle.source');
                 const to = box(page, 'hooks').locator('.react-flow__handle.target');
                 const [a, b] = [await from.boundingBox(), await to.boundingBox()];
@@ -169,12 +402,13 @@ for (const viewport of VIEWPORTS) {
                 await page.mouse.down();
                 await page.mouse.move(b!.x + b!.width / 2, b!.y + b!.height / 2, { steps: 12 });
                 await page.mouse.up();
+                await save(page);
                 await expect
                     .poll(async () => (await lab.getBoard(id))?.edges.some((edge) => edge.source === 'voice' && edge.target === 'hooks'))
                     .toBe(true);
             }
 
-            await page.getByRole('button', { name: 'Add box' }).click();
+            await page.getByRole('button', { name: 'Add node' }).click();
             await page.getByRole('menuitem', { name: /^Note/ }).click();
             const note = page.locator('[data-kind="note"]');
             await expect(note).toHaveCount(1);
@@ -182,6 +416,8 @@ for (const viewport of VIEWPORTS) {
 
             await toggleWire(page, 'Note', 'Write');
             if (!canvas) await expect(box(page, noteId).getByTestId('feeds-chip')).toHaveText(['feeds Write']);
+            await expect(box(page, noteId).getByTestId('node-sends')).toContainText('Sends your note to Write');
+            await save(page);
             await expect
                 .poll(async () => (await lab.getBoard(id))?.edges.some((edge) => edge.source === noteId && edge.target === 'write'))
                 .toBe(true);
@@ -189,6 +425,7 @@ for (const viewport of VIEWPORTS) {
 
             await page.getByRole('button', { name: 'Delete Note' }).click();
             await expect(note).toHaveCount(0);
+            await save(page);
             await expect
                 .poll(async () => {
                     const saved = await lab.getBoard(id);
@@ -233,6 +470,11 @@ for (const viewport of VIEWPORTS) {
             await expect(box(page, 'check')).toContainText('81/100');
             await expect(box(page, 'check')).toContainText('Number in hook');
 
+            // The wires now say how much travelled along them.
+            await expect(box(page, 'hooks').getByTestId('node-gets')).toContainText("3 top posts from What's working");
+            await expect(box(page, 'write').getByTestId('node-gets')).toContainText('your tone (2 posts) from Your tone');
+            await expect(box(page, 'check').getByTestId('node-gets')).toContainText('draft from Output · Reel');
+
             // One write per Output, each in its own format, with everything wired into Write.
             const writes = calls.WRITE.map((request) => request.postDataJSON() as Extract<CONTENT_LAB_WRITE_REQUEST, { mode: 'draft' }>);
             expect(writes.map((body) => [body.mode, body.format, body.language])).toEqual([
@@ -252,8 +494,9 @@ for (const viewport of VIEWPORTS) {
                 expect.objectContaining({ text: 'HOOK: ₹40, 25g protein (reel)', platform: 'instagram', query: 'protein breakfast' }),
             ]);
 
-            // Drafts are saved with the board; results are not.
-            await expectSaved(page);
+            // The drafts are on the board and saved with it on Save; the results are not saved.
+            await expect(page.getByTestId('save-state')).toHaveText('Unsaved changes');
+            await save(page);
             await expect
                 .poll(async () => (await lab.getBoard(id))?.nodes.filter((node) => node.kind === 'output').map((node) => node.data.text))
                 .toEqual([draftFor('reel'), draftFor('linkedin-post')]);
@@ -271,12 +514,15 @@ for (const viewport of VIEWPORTS) {
 
                 await toggleWire(page, 'Write', 'Output · X thread');
                 await expect(box(page, 'write').getByTestId('feeds-chip')).toHaveCount(3);
+                await save(page);
                 await expect.poll(async () => (await lab.getBoard(id))?.edges.some((edge) => edge.target === 'x')).toBe(false);
 
                 await toggleWire(page, 'Write', 'Output · X thread');
                 await expect(box(page, 'write').getByTestId('feeds-chip')).toHaveCount(4);
+                await save(page);
                 await expect.poll(async () => (await lab.getBoard(id))?.edges.some((edge) => edge.target === 'x')).toBe(true);
 
+                await expect(box(page, 'x').getByTestId('node-gets')).toContainText('writing brief from Write');
                 await page.getByRole('radio', { name: 'Canvas' }).click();
                 await expect(page.getByTestId('board-canvas')).toBeVisible();
                 await expect(page.getByTestId('board-node')).toHaveCount(nodes.length);

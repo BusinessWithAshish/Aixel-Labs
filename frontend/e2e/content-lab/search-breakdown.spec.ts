@@ -28,7 +28,7 @@ for (const { name, use } of VIEWPORTS) {
             await expect(page.getByText('CTA · at 92%')).toBeVisible();
             await expect(page.getByText('Thumbnail', { exact: true })).toBeVisible();
             await expect(page.getByText('A concrete number up front sets the stakes.')).toBeVisible();
-            await expect(page.getByText('14x', { exact: true })).toBeVisible();
+            await expect(page.getByText('14 times their usual views', { exact: true })).toBeVisible();
             await expect(page.getByRole('button', { name: 'Write my version' })).toBeVisible();
             expect(breakdown.requests[0]).toMatchObject({ url: VIDEO_URL, country: 'IN' });
             await expectNoHorizontalOverflow(page);

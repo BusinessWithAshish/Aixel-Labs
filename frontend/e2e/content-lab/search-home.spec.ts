@@ -75,7 +75,7 @@ for (const { name, use } of VIEWPORTS) {
         test('an @creator says so and shows their standouts on both platforms', async ({ page }) => {
             const creator = await mockContentLab(page, 'CREATOR', (body) => ok(creatorResponse(body.platform as 'youtube' | 'instagram')));
             await page.locator(SMART_BOX).fill('@hostelkitchen');
-            await expect(page.getByText('Looks like a creator → shows their posts that beat their usual')).toBeVisible();
+            await expect(page.getByText('Looks like a creator → shows their posts that did better than usual')).toBeVisible();
             await page.getByRole('button', { name: 'Go', exact: true }).click();
 
             await page.waitForURL(`**${CONTENT_LAB_EXPLORE_ROUTE}?creator=hostelkitchen`);

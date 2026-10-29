@@ -33,3 +33,10 @@ export type IG_ADVANCED_SEARCH_RESPONSE = {
     uniqueHandles: number;
   };
 };
+
+/** A hashtag from the guest tag search. */
+export type IG_HASHTAG = {
+  /** Without the `#`. */
+  name: string;
+  mediaCount: number | null;
+};

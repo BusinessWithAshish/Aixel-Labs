@@ -1,6 +1,7 @@
 import { MongoClient, type Db, type ObjectId } from 'mongodb';
 import {
     MongoCollections,
+    type ContentLabProfileDoc,
     type ModuleAccess,
     type TenantDoc,
     type UserDoc,
@@ -549,6 +550,37 @@ export class E2eDb {
         await this.setVoiceKeys(
             user,
             key ? [{ keySealed: sealForE2e(key), last4: key.slice(-4), label: 'Main', ...fields }] : [],
+        );
+    }
+
+    /**
+     * Saves `key` as the user's Content Lab Gemini key the way Content Lab > Settings does (sealed, checked
+     * OK), separate from the voice keys; `null` removes it.
+     */
+    async setContentLabGeminiKey(user: E2eUser, key: string | null): Promise<void> {
+        const { _id: userId } = await this.getUser(user);
+        const profiles = this.db.collection<ContentLabProfileDoc>(MongoCollections.CONTENT_LAB_PROFILES);
+        const now = new Date();
+        if (!key) {
+            await profiles.updateOne({ userId }, { $unset: { 'aiKeys.gemini': '' } });
+            return;
+        }
+        await profiles.updateOne(
+            { userId },
+            {
+                $set: {
+                    'aiKeys.gemini': {
+                        keySealed: sealForE2e(key),
+                        last4: key.slice(-4),
+                        status: VoiceKeyStatus.OK,
+                        statusMessage: null,
+                        checkedAt: now,
+                        savedAt: now,
+                    },
+                },
+                $setOnInsert: { handles: {}, country: 'IN', language: 'English', updatedAt: now },
+            },
+            { upsert: true },
         );
     }
 

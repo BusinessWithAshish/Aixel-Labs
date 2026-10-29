@@ -95,7 +95,7 @@ function ExampleThumb({ platform, multiple, className }: { platform: 'youtube' |
             )}
         >
             <Play className="size-6 fill-white text-white" />
-            <span className="bg-background/90 absolute top-1.5 left-1.5 rounded-full px-2 py-0.5 text-xs font-bold">{multiple}</span>
+            <span className="bg-background/90 absolute top-1.5 left-1.5 rounded-full px-2 py-0.5 text-xs font-bold">{multiple} usual</span>
         </div>
     );
 }

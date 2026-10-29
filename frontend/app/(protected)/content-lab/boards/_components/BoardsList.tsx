@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
-import { Loader2, Pencil, Plus, Trash2, Workflow } from 'lucide-react';
+import { CalendarClock, Loader2, Pencil, Plus, Trash2, Workflow } from 'lucide-react';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { contentLabBoardRoute } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
 import { CONTENT_LAB_BOARD_TEMPLATES } from '../../_constants';
 import type { UseBoardsPageReturn } from '../_hooks/use-boards-page';
+import { describeSchedule } from '../_utils/schedule';
 import { BoardLegend, TemplatePipeline } from './NodeRole';
 
 const templateTitle = (templateId: string | null) =>
@@ -31,9 +32,10 @@ export function BoardsList() {
                         How a board works
                     </h2>
                     <p className="text-muted-foreground max-w-prose text-sm">
-                        A board is a recipe for one piece of content. Boxes on the left bring ideas in, the middle ones read them and write,
-                        and the ones on the right are what you post. Wires carry what a box found to the next one; press Run board and it all
-                        fills in.
+                        A board is a recipe for one piece of content. Nodes on the left bring ideas in (top posts, a creator, your tone),
+                        the middle ones find what works and build a brief, and the ones on the right are the drafts you post. Each wire
+                        carries what one node found to the next, and says so: “12 top posts”, “hooks”, “your tone”. Press Run board and
+                        it all fills in, or schedule it to run by itself.
                     </p>
                 </div>
                 <BoardLegend detailed />
@@ -45,7 +47,7 @@ export function BoardsList() {
                         New board
                     </h2>
                     <p className="text-muted-foreground text-sm">
-                        Pick a template: it comes already wired. Fill in the topic or link, then run it. Writing uses your own Gemini key.
+                        Pick a template: it comes already wired. Fill in the topic or link, save, then run it. Drafts are written on your own AI key.
                     </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
@@ -81,7 +83,7 @@ export function BoardsList() {
                     <EmptyState
                         icon={<Workflow />}
                         title="No boards yet"
-                        description="Start one from a template above. Boards save as you edit."
+                        description="Start one from a template above. Save your edits with the Save button or Ctrl+S."
                     />
                 ) : (
                     <ul className="grid gap-3 sm:grid-cols-2" aria-label="Your boards">
@@ -98,8 +100,14 @@ export function BoardsList() {
                                             </Link>
                                         </CardTitle>
                                         <CardDescription>
-                                            {templateTitle(board.templateId)} · {board.nodeCount} boxes · edited{' '}
+                                            {templateTitle(board.templateId)} · {board.nodeCount} nodes · edited{' '}
                                             {formatDistanceToNow(new Date(board.updatedAt), { addSuffix: true })}
+                                            {board.schedule && board.schedule.repeat !== 'off' ? (
+                                                <span className="mt-1 flex items-center gap-1" data-testid="board-schedule">
+                                                    <CalendarClock className="size-3.5" aria-hidden />
+                                                    {board.schedule.paused ? 'Schedule paused' : `Scheduled: ${describeSchedule(board.schedule)}`}
+                                                </span>
+                                            ) : null}
                                         </CardDescription>
                                     </CardHeader>
                                     <CardFooter className="gap-2 px-4">

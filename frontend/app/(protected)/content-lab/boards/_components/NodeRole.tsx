@@ -4,9 +4,9 @@ import {
     FileText,
     Link2,
     Megaphone,
-    Mic,
     PenLine,
     ShieldCheck,
+    Signature,
     Sparkles,
     StickyNote,
     TrendingUp,
@@ -24,7 +24,7 @@ import {
 } from '../../_constants';
 
 export const NODE_ICON: Record<ContentLabNodeKind, LucideIcon> = {
-    [ContentLabNodeKind.VOICE]: Mic,
+    [ContentLabNodeKind.VOICE]: Signature,
     [ContentLabNodeKind.WORKING]: TrendingUp,
     [ContentLabNodeKind.CREATOR]: UserRound,
     [ContentLabNodeKind.WATCHING]: Eye,

@@ -41,7 +41,7 @@ export function computeDraftCheck(
     checks.push({
       label: signalCopy(key, noun).label,
       passed: draft[key],
-      detail: `${hits} of ${n} winners ${signalCopy(key, noun).winners}; yours ${draft[key] ? "does too" : "doesn't"}.`,
+      detail: `${hits} of the ${n} top posts ${signalCopy(key, noun).winners}. ${draft[key] ? "Yours does too." : "Yours doesn't."}`,
     });
   }
 
@@ -53,7 +53,7 @@ export function computeDraftCheck(
   checks.push({
     label: "Length",
     passed: lengthPassed,
-    detail: `Winners' ${noun}s run about ${Math.round(target)} characters; yours is ${draft.length}.`,
+    detail: `Top posts' ${noun}s are about ${Math.round(target)} characters long. Yours is ${draft.length}.`,
   });
 
   const signalScore = total > 0 ? earned / total : 1;

@@ -8,7 +8,9 @@ import {
     enableContentLab,
     expectNoHorizontalOverflow,
     exploreResponse,
+    EXPLORE_POSTS,
     fail,
+    makePost,
     mockContentLab,
     ok,
     SMART_BOX,
@@ -27,24 +29,28 @@ for (const { name, use } of VIEWPORTS) {
             await enableContentLab(context);
         });
 
-        test('shows takeaways, the niche snapshot and ranked cards; a failed platform says so', async ({ page }) => {
+        test('shows what the winners share, a plain summary and cards per platform; a failed platform says so', async ({ page }) => {
             await mockContentLab(page, 'EXPLORE', ok(exploreResponse({ errors: { instagram: 'Instagram blocked the search for now' } })));
             await page.goto(TOPIC_URL);
 
-            await expect(page.getByRole('heading', { name: 'In one glance' })).toBeVisible();
-            await expect(page.getByText('5 of 6', { exact: true })).toBeVisible();
-            const snapshot = page.getByRole('region', { name: 'Niche snapshot' });
-            await expect(snapshot).toContainText('48');
-            await expect(snapshot).toContainText('Videos on YouTube, Reels on Instagram');
+            const glance = page.getByRole('region', { name: 'What the top posts have in common' });
+            await expect(glance).toBeVisible();
+            await expect(glance.getByText('5 of 6', { exact: true })).toBeVisible();
+            await expect(glance).toContainText('We checked 48 posts. 9 got at least twice the views their creator usually gets.');
+            await expect(glance).toContainText('Best right now: videos on YouTube and reels on Instagram.');
             await expect(page.getByRole('alert').filter({ hasText: 'Instagram results did not load' })).toContainText('Instagram blocked the search for now');
 
             const cards = page.getByTestId('content-lab-post-card');
             await expect(cards).toHaveCount(3);
+            // Phones show one platform at a time (the other lane is hidden), so count by attribute, not by visible region.
+            await expect(cards.and(page.locator('[data-platform="youtube"]'))).toHaveCount(2);
+            await expect(cards.and(page.locator('[data-platform="instagram"]'))).toHaveCount(1);
             const first = cards.first();
-            await expect(first).toContainText('YouTube · Video');
-            await expect(first).toContainText('14x');
-            await expect(first).toContainText('their usual views');
-            await expect(first).toContainText('@fitwithriya · 1.2M views (usually 85K)');
+            await expect(first).toHaveAttribute('data-platform', 'youtube');
+            await expect(first).toContainText('14x usual');
+            await expect(first).toContainText('14 times their usual views');
+            await expect(first).toContainText('@fitwithriya · 1.2M views');
+            await expect(first).toContainText('11:42');
             await expect(first).toContainText('Why: Number + 30-day test');
             await expect(first.getByRole('button', { name: 'Watch creator' })).toBeVisible();
             await expect(first.getByRole('button', { name: 'Use on a board' })).toBeVisible();
@@ -57,7 +63,7 @@ for (const { name, use } of VIEWPORTS) {
             await expect(page.getByTestId('content-lab-post-card')).toHaveCount(3);
             await waitForSmartBox(page);
 
-            await page.getByRole('radio', { name: 'YouTube', exact: true }).click();
+            await page.getByRole('radiogroup', { name: 'Platforms' }).getByRole('radio', { name: 'YouTube', exact: true }).click();
             await expect.poll(() => explore.requests.at(-1)?.platforms).toEqual(['youtube']);
             await expect(page).toHaveURL(/platform=youtube/);
 
@@ -74,14 +80,36 @@ for (const { name, use } of VIEWPORTS) {
                 (body.platforms as string[]).length === 2 ? 'hang' : ok(exploreResponse({ posts: exploreResponse().posts.slice(0, 1) })),
             );
             await page.goto(TOPIC_URL);
-            await expect(page.getByText('Finding posts that beat their usual…')).toBeVisible();
+            await expect(page.getByText('Finding posts that are doing better than usual…')).toBeVisible();
             await waitForSmartBox(page);
 
-            await page.getByRole('radio', { name: 'YouTube', exact: true }).click();
+            await page.getByRole('radiogroup', { name: 'Platforms' }).getByRole('radio', { name: 'YouTube', exact: true }).click();
             await expect(page.getByTestId('content-lab-post-card')).toHaveCount(1);
             expect(explore.requests.at(-1)?.platforms).toEqual(['youtube']);
             // Dev mode's strict effects may abort one more; every hung request must have been aborted.
             await expect.poll(() => aborted.length).toBeGreaterThanOrEqual(1);
+        });
+
+        test('scrolling to the end loads the next page once, without repeats, until there is no more', async ({ page }) => {
+            const page2 = [
+                EXPLORE_POSTS[0],
+                makePost({ id: 'youtube:vidEEEEEE5', title: 'High protein poha, 3 ways' }),
+                makePost({ id: 'instagram:reelFFFFF6', platform: 'instagram', format: 'reel', title: 'Paneer toast in 5 minutes' }),
+            ];
+            const explore = await mockContentLab(page, 'EXPLORE', (body) =>
+                ok(body.cursor === 'page-2' ? exploreResponse({ posts: page2, takeaways: [], nextCursor: null }) : exploreResponse({ nextCursor: 'page-2' })),
+            );
+            await page.goto(TOPIC_URL);
+            await expect(page.getByTestId('content-lab-post-card')).toHaveCount(3);
+
+            // Scroll the page to its end, as a reader would; the list's end swaps elements as it loads, so no locator to scroll to.
+            await page.evaluate(() => document.getElementById('page-children-container')?.scrollTo(0, 1e6));
+            await expect(page.getByTestId('content-lab-post-card')).toHaveCount(5);
+            await expect(page.getByText("That's everything we found for this search.")).toBeVisible();
+            const paged = explore.requests.filter((body) => body.cursor === 'page-2');
+            expect(paged).toHaveLength(1);
+            expect(paged[0]).toMatchObject({ query: 'protein breakfast', country: 'IN' });
+            await expectNoHorizontalOverflow(page);
         });
 
         test('no posts shows the empty state', async ({ page }) => {

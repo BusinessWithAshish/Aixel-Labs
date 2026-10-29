@@ -16,12 +16,22 @@ import {
   computeTextSignals,
   computeWhyItWorked,
   firstLine,
+  isTooOld,
+  matchesTopic,
   median,
+  meetsFloor,
   pickWinners,
   postMetric,
+  rankPosts,
+  rankScore,
   relativeTimeToIso,
   scorePost,
+  takeWithPlatformShare,
+  timesPhrase,
+  topicWords,
+  volumeOf,
 } from "./index";
+import { decodeCursor, encodeCursor, exploreKey, hashId } from "../cursor";
 import { interleaveBy } from "../helpers";
 
 // ─── signals ────────────────────────────────────────────────────────────────
@@ -89,10 +99,14 @@ const reasons = computeReasons({
   multiple: 14.2,
   signals: s("3 breakfasts under ₹50"),
 });
-assert.deepEqual(reasons, ["14x their usual", "Reel", "₹ price in the first line", "Listicle"]);
+assert.deepEqual(reasons, ["14 times their usual views", "Reel", "Mentions a ₹ price in the first line", "A list, like \"7 ways\""]);
 assert.deepEqual(
   computeReasons({ platform: "youtube", format: "video", title: "Day 7", multiple: 1.2, signals: s("Day 7") }),
-  ["Long video", "Number in the title"],
+  ["Long video", "Has a number in the title"],
+);
+assert.equal(
+  computeReasons({ platform: "instagram", format: "carousel", title: "hi", multiple: 2.5, signals: s("hi") })[0],
+  "2.5 times their usual likes",
 );
 const why = computeWhyItWorked({
   platform: "youtube",
@@ -105,7 +119,7 @@ const why = computeWhyItWorked({
   slideCount: 0,
 });
 assert.equal(why.length, 3);
-assert.match(why[0]!, /5\.5x/);
+assert.equal(why[0], "Got 6 times more views than this creator usually gets");
 assert.match(why[1]!, /question/);
 assert.ok(computeWhyItWorked({ platform: "instagram", format: "post", title: "hi", multiple: null, signals: s("hi"), hookType: null, cta: null, slideCount: 0 }).length === 1);
 
@@ -156,22 +170,30 @@ assert.deepEqual(stats.bestFormat, { instagram: "reel", youtube: "short" });
 
 const takeaways = computeTakeaways(niche);
 assert.equal(takeaways.length, 3);
-assert.equal(takeaways[0]!.headline, "4 of 5");
-assert.match(takeaways[0]!.detail, /number/);
+assert.equal(takeaways[0]!.headline, "4 of 5 top posts");
+assert.equal(takeaways[0]!.detail, "4 of the 5 top posts put a number in the title.");
 assert.match(takeaways[1]!.headline, /Reels on Instagram/);
 assert.match(takeaways[1]!.headline, /Shorts on YouTube/);
-assert.match(takeaways[2]!.headline, /^Gap: Listicle/);
+assert.match(takeaways[1]!.detail, /^On Instagram, reels do best: they got about 6 times the views their creator usually gets\. Carousels got about 1\.7 times the likes/);
+assert.equal(takeaways[2]!.headline, "Try: a list");
 assert.deepEqual(computeTakeaways([]), []);
+// No jargon reaches the UI.
+const jargon = /\b(multiple|median|baseline|outlier|winners?)\b|\dx\b/i;
+for (const t of takeaways) assert.doesNotMatch(`${t.headline} ${t.detail}`, jargon);
+for (const r of [...reasons, ...why]) assert.doesNotMatch(r, jargon);
+assert.equal(timesPhrase(1, "reel"), "about the same views as");
+assert.equal(timesPhrase(0.4, "post"), "fewer likes than");
 
 // ─── check ──────────────────────────────────────────────────────────────────
 const strong = computeDraftCheck("5 protein breakfasts under ₹50", "instagram", winners);
 const weak = computeDraftCheck("My protein breakfast routine that I really love so much every day", "instagram", winners);
 assert.ok(strong.score > weak.score, `${strong.score} should beat ${weak.score}`);
 assert.ok(strong.score >= 0 && strong.score <= 100 && weak.score >= 0);
-const numberCheck = strong.checks.find((c) => c.label === "Number")!;
+const numberCheck = strong.checks.find((c) => c.label === "A number")!;
 assert.equal(numberCheck.passed, true);
-assert.match(numberCheck.detail, /^4 of 5 winners/);
-assert.equal(weak.checks.find((c) => c.label === "Number")!.passed, false);
+assert.equal(numberCheck.detail, "4 of the 5 top posts put a number in the first line. Yours does too.");
+for (const c of [...strong.checks, ...weak.checks]) assert.doesNotMatch(c.detail, jargon);
+assert.equal(weak.checks.find((c) => c.label === "A number")!.passed, false);
 assert.equal(weak.checks.at(-1)!.label, "Length");
 assert.deepEqual(computeDraftCheck("x", "youtube", []), { score: 0, checks: [] });
 
@@ -181,5 +203,67 @@ assert.deepEqual(
   ["p1", "r1", "p2", "r2", "p3"],
 );
 assert.deepEqual(interleaveBy([], (x: string) => x), []);
+
+// ─── rank ───────────────────────────────────────────────────────────────────
+const at = Date.parse("2026-10-28T00:00:00.000Z");
+const daysAgo = (d: number) => new Date(at - d * 86_400_000).toISOString();
+type R = Parameters<typeof rankScore>[0] & { id: string; platform: ContentLabPlatform };
+const r = (id: string, platform: ContentLabPlatform, format: ContentLabFormat, views: number | null, likes: number | null, multiple: number | null, age: number | null): R =>
+  ({ id, platform, format, views, likes, multiple, publishedAt: age === null ? null : daysAgo(age) });
+const bigRecent = r("big", "youtube", "video", 2_000_000, null, 4, 10);
+const tinyOutlier = r("tiny", "youtube", "video", 300, null, 3, 5);
+const oldHit = r("old", "youtube", "video", 2_000_000, null, 4, 300);
+const smallBeat = r("small", "youtube", "short", 20_000, null, 6, 10);
+assert.ok(rankScore(bigRecent, at) > rankScore(smallBeat, at));
+assert.ok(rankScore(bigRecent, at) > rankScore(oldHit, at));
+assert.equal(meetsFloor(tinyOutlier), false);
+assert.equal(meetsFloor(r("photo", "instagram", "carousel", null, 150, 2, 3)), true);
+assert.equal(volumeOf(r("photo", "instagram", "post", null, 100, 2, 3)), 2_500);
+assert.deepEqual(rankPosts([tinyOutlier, oldHit, smallBeat, bigRecent], at).map((p) => p.id), ["big", "small", "old", "tiny"]);
+assert.equal(isTooOld(daysAgo(730), at), true);
+assert.equal(isTooOld(daysAgo(365), at), false);
+assert.equal(isTooOld(null, at), false);
+const mixed = [
+  ...Array.from({ length: 10 }, (_, i) => r(`y${i}`, "youtube", "video", 1e6, null, 5, 5)),
+  ...Array.from({ length: 5 }, (_, i) => r(`i${i}`, "instagram", "reel", 1e4, null, 2, 5)),
+];
+const share = takeWithPlatformShare(rankPosts(mixed, at), 10);
+assert.equal(share.length, 10);
+assert.equal(share.filter((p) => p.platform === "instagram").length, 3); // floor(10 × 0.35)
+assert.deepEqual(share.slice(0, 7).map((p) => p.platform), Array(7).fill("youtube")); // rank order kept
+const tinyIg = [...mixed.slice(0, 10), ...Array.from({ length: 5 }, (_, i) => r(`t${i}`, "instagram", "reel", 300, null, 2, 5))];
+assert.equal(takeWithPlatformShare(rankPosts(tinyIg, at), 10).filter((p) => p.platform === "instagram").length, 0); // no place held for tiny posts
+
+// ─── topic ──────────────────────────────────────────────────────────────────
+assert.deepEqual(topicWords("skincare for men"), ["skincare", "men"]);
+assert.deepEqual(topicWords("Protein Breakfast"), ["protein", "breakfast"]);
+assert.equal(matchesTopic("5 High Protein Breakfasts", topicWords("protein breakfast")), true);
+assert.equal(matchesTopic("My protein shake", topicWords("protein breakfast")), true); // half the words is enough
+assert.equal(matchesTopic("Morning vlog", topicWords("protein breakfast")), false);
+assert.equal(matchesTopic("anything", []), false);
+
+// ─── cursor ─────────────────────────────────────────────────────────────────
+const key = exploreKey("Protein breakfast", "IN");
+assert.equal(key, exploreKey(" protein BREAKFAST ", "IN"));
+assert.notEqual(key, exploreKey("protein breakfast", "US"));
+const cursor = { v: 1 as const, k: key, yt: { s: [{ t: "tok", o: 3 }, null] }, ig: null, seen: [hashId("youtube:abc")] };
+assert.deepEqual(decodeCursor(encodeCursor(cursor), key), cursor);
+assert.throws(() => decodeCursor(encodeCursor(cursor), exploreKey("other", "IN")));
+assert.throws(() => decodeCursor("not-a-cursor", key));
+assert.notEqual(hashId("youtube:abc"), hashId("youtube:abd"));
+// Carried items survive a round trip, and an oversized cursor drops carried items (last first), never the streams.
+// Hash-made ids and titles, so the test cursor compresses like a real one.
+const noise = (seed: string, words: number) => Array.from({ length: words }, (_, k) => hashId(`${seed}:${k}`)).join(" ");
+const pendingHit = (i: number) => ({ v: noise(`v${i}`, 2).slice(0, 11), c: `UC${noise(`c${i}`, 4).replace(/ /g, "")}`.slice(0, 24), t: noise(`t${i}`, 14).slice(0, 100), n: 1000 + i * 7919, d: 60 + i, p: 1_790_000_000 + i * 3_607, a: 1 });
+const carry = { ...cursor, yt: { s: [{ t: "tok".repeat(200), o: 3, f: 1 }, null], p: [pendingHit(0)] }, ig: { i: 4, r: [1], tags: ["proteinbreakfast"], p: [["DUNRxWVgU5P", 2]] as Array<[string, number]> } };
+assert.deepEqual(decodeCursor(encodeCursor(carry), key), carry);
+const huge = { ...carry, yt: { ...carry.yt, p: Array.from({ length: 400 }, (_, i) => pendingHit(i)) } };
+const hugeEncoded = encodeCursor(huge);
+assert.ok(hugeEncoded.length <= 12_000, `cursor ${hugeEncoded.length} chars`);
+const hugeBack = decodeCursor(hugeEncoded, key);
+assert.ok(hugeBack.yt!.p!.length > 0 && hugeBack.yt!.p!.length < 400);
+assert.deepEqual(hugeBack.yt!.p![0], pendingHit(0)); // best (first) kept
+assert.deepEqual(hugeBack.yt!.s, huge.yt.s);
+assert.equal(huge.yt.p.length, 400); // the caller's cursor isn't mutated
 
 console.log("content-lab compute selfcheck: ok");

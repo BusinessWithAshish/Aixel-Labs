@@ -2,7 +2,7 @@ import { CONTENT_LAB_DEFAULT_COUNTRY } from '@aixellabs/backend/content-lab/cons
 import PageLayout from '@/components/common/PageLayout';
 import { PageProvider } from '@/contexts/PageStore';
 import { getCurrentUserObjectId } from '@/server/auth';
-import { hasOwnerGeminiKey } from '@/server/content-lab/gemini';
+import { hasContentLabAiKey } from '@/server/content-lab/ai-key';
 import { CheckView } from './_components/CheckView';
 import { type CheckPageData, useCheckPage } from './_hooks/use-check-page';
 
@@ -19,7 +19,7 @@ export default async function ContentLabCheckPage({ searchParams }: CheckPagePro
         query: one(params.q),
         text: one(params.text),
         country: /^[a-z]{2}$/i.test(country) ? country.toUpperCase() : CONTENT_LAB_DEFAULT_COUNTRY,
-        hasGeminiKey: userId ? await hasOwnerGeminiKey(userId) : false,
+        hasGeminiKey: userId ? await hasContentLabAiKey(userId) : false,
     };
 
     return (

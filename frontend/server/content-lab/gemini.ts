@@ -1,39 +1,17 @@
 import 'server-only';
 
-import type { MongoObjectId } from '@aixellabs/backend/db';
 import type { ContentLabWriteFormat } from '@aixellabs/backend/db/types';
 import { MEDIA_GEMINI_MODEL } from '@aixellabs/backend/media/constants';
 import type { CONTENT_LAB_WRITE_REQUEST, ContentLabWriteContext } from '@/helpers/content-lab-api';
-import { voiceAccountsCollection } from '@/server/voice-agent/accounts';
-import { openSecret } from '@/server/voice-agent/engine';
+import { geminiApiBase } from '@/server/voice-agent/gemini-key';
 
 /**
- * Content Lab writes on the owner's own Gemini key: the same sealed key Voice agent uses
- * (`VoiceAccountDoc.gemini`), so one key in Settings covers both.
- * `GEMINI_API_BASE` points the calls at a fake in tests (default: Google's API).
+ * Content Lab writes on the owner's own Content Lab Gemini key (`loadContentLabAiKey` in ./ai-key,
+ * not Voice agent's key). `GEMINI_API_BASE` points the calls at a fake in tests (default: Google's API).
  */
-
-export const CONTENT_LAB_GEMINI_KEY_MISSING =
-    'Add your Gemini API key first, under Content Lab > Settings. Writing runs on your own key.';
 
 const GENERATE_TIMEOUT_MS = 120_000;
 const EXAMPLE_TEXT_CHARS = 1_500;
-
-function geminiApiBase(): string {
-    return (process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
-}
-
-export async function hasOwnerGeminiKey(userId: MongoObjectId): Promise<boolean> {
-    const accounts = await voiceAccountsCollection();
-    return (await accounts.countDocuments({ userId, gemini: { $type: 'object' } }, { limit: 1 })) > 0;
-}
-
-export async function loadOwnerGeminiKey(userId: MongoObjectId): Promise<string | null> {
-    const accounts = await voiceAccountsCollection();
-    const doc = await accounts.findOne({ userId }, { projection: { 'gemini.keySealed': 1 } });
-    const sealed = doc?.gemini?.keySealed;
-    return sealed ? openSecret(sealed) : null;
-}
 
 const FORMAT_BRIEF: Record<ContentLabWriteFormat, string> = {
     'youtube-script':

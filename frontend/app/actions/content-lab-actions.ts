@@ -9,10 +9,17 @@ import {
     type ContentLabBoardDoc,
     type ContentLabBoardEdge,
     type ContentLabBoardNode,
+    type ContentLabBoardRun,
+    type ContentLabBoardRunDoc,
+    type ContentLabBoardSchedule,
+    CONTENT_LAB_SCHEDULE_EVERY_HOURS,
+    CONTENT_LAB_SCHEDULE_REPEATS,
+    VOICE_WEEKDAYS,
     type ContentLabProfile,
     type ContentLabProfileDoc,
     type ContentLabStandout,
     type ContentLabWatch,
+    type ContentLabWatchPost,
     type ContentLabWatchDoc,
 } from '@aixellabs/backend/db';
 import {
@@ -23,7 +30,9 @@ import {
 } from '@aixellabs/backend/content-lab/constants';
 import type { ContentLabPlatform, CONTENT_LAB_CREATOR_RESPONSE } from '@aixellabs/backend/content-lab/types';
 import { requireUserObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
+import { isIanaTimezone } from '@/helpers/voice-time';
 import {
+    contentLabBoardRunsCollection,
     contentLabBoardsCollection,
     contentLabProfilesCollection,
     contentLabWatchlistCollection,
@@ -33,10 +42,13 @@ import {
     CONTENT_LAB_BOARD_TEMPLATES,
     CONTENT_LAB_DEFAULT_LANGUAGE,
 } from '@/app/(protected)/content-lab/_constants';
+import { nextScheduledRun } from '@/app/(protected)/content-lab/boards/_utils/schedule';
 
 const MAX_NODES = 60;
 const MAX_EDGES = 200;
 const MAX_STANDOUTS = 10;
+/** Recent posts kept per watch, for the card's thumbnails. */
+const MAX_RECENT = 12;
 
 /** Parses at the trust boundary; the first issue becomes the action's error. */
 function parse<T extends z.ZodTypeAny>(schema: T, input: unknown): z.output<T> {
@@ -62,7 +74,7 @@ const LANGUAGE_SCHEMA = z.string().trim().min(1).max(40);
 
 // ─── Boards ──────────────────────────────────────────────────────────────────
 
-export type ContentLabBoardSummary = Pick<ContentLabBoard, '_id' | 'title' | 'templateId' | 'updatedAt'> & {
+export type ContentLabBoardSummary = Pick<ContentLabBoard, '_id' | 'title' | 'templateId' | 'updatedAt' | 'schedule' | 'nextRunAt'> & {
     nodeCount: number;
 };
 
@@ -96,7 +108,7 @@ const GRAPH_SCHEMA = z
     .refine(({ nodes, edges }) => {
         const ids = new Set(nodes.map((node) => node.id));
         return ids.size === nodes.length && edges.every((edge) => ids.has(edge.source) && ids.has(edge.target));
-    }, 'Every wire must join two boxes on this board');
+    }, 'Every wire must join two nodes on this board');
 
 const TITLE_SCHEMA = z.string().trim().min(1, 'Give the board a name').max(120);
 
@@ -115,6 +127,8 @@ function mapBoard(doc: ContentLabBoardDoc): ContentLabBoard {
         templateId: doc.templateId,
         nodes: doc.nodes,
         edges: doc.edges,
+        schedule: doc.schedule,
+        nextRunAt: doc.nextRunAt?.toISOString() ?? null,
         createdAt: doc.createdAt.toISOString(),
         updatedAt: doc.updatedAt.toISOString(),
     };
@@ -125,7 +139,10 @@ export const listContentLabBoards = async (): Promise<ALApiResponse<ContentLabBo
     runAuthenticatedAction(async function listContentLabBoards(userId) {
         const boards = await contentLabBoardsCollection();
         const docs = await boards
-            .find({ userId: requireUserObjectId(userId) }, { projection: { title: 1, templateId: 1, updatedAt: 1, nodes: 1 } })
+            .find(
+                { userId: requireUserObjectId(userId) },
+                { projection: { title: 1, templateId: 1, updatedAt: 1, nodes: 1, schedule: 1, nextRunAt: 1 } },
+            )
             .sort({ updatedAt: -1 })
             .toArray();
         return docs.map((doc) => ({
@@ -133,6 +150,8 @@ export const listContentLabBoards = async (): Promise<ALApiResponse<ContentLabBo
             title: doc.title,
             templateId: doc.templateId,
             updatedAt: doc.updatedAt.toISOString(),
+            schedule: doc.schedule,
+            nextRunAt: doc.nextRunAt?.toISOString() ?? null,
             nodeCount: doc.nodes?.length ?? 0,
         }));
     });
@@ -187,21 +206,41 @@ export const createContentLabBoard = async (input: {
         return { id: insertedId.toString() };
     });
 
-/** Autosave: the board's boxes (positions, settings, output text) and wires. */
+const SAVE_OPTIONS_SCHEMA = z.object({
+    /** The board's `updatedAt` the edits started from; the save is refused (conflict) when it changed since. */
+    baseUpdatedAt: z.string().datetime().optional(),
+    /** Save over whatever is there now (the user chose to after a conflict). */
+    overwrite: z.boolean().optional(),
+});
+
+export type ContentLabBoardSaveResult = { status: 'saved'; updatedAt: string } | { status: 'conflict'; updatedAt: string };
+
+/**
+ * Save (the board's Save button / Ctrl+S): its nodes (positions, settings, output text) and wires.
+ * Only over the version the edits started from, so a tab opened before a scheduled run wrote its
+ * drafts cannot silently wipe them: then it answers `conflict` with the board's current `updatedAt`.
+ */
 export const saveContentLabBoard = async (
     boardId: string,
     graph: { nodes: ContentLabBoardNode[]; edges: ContentLabBoardEdge[] },
-): Promise<ALApiResponse<{ updatedAt: string }>> =>
+    options: { baseUpdatedAt?: string; overwrite?: boolean } = {},
+): Promise<ALApiResponse<ContentLabBoardSaveResult>> =>
     runAuthenticatedAction(async function saveContentLabBoard(userId) {
         const { nodes, edges } = parse(GRAPH_SCHEMA, graph);
+        const { baseUpdatedAt, overwrite } = parse(SAVE_OPTIONS_SCHEMA, options);
+        const owned = { _id: toObjectId(boardId, 'Board'), userId: requireUserObjectId(userId) };
         const updatedAt = new Date();
         const boards = await contentLabBoardsCollection();
         const { matchedCount } = await boards.updateOne(
-            { _id: toObjectId(boardId, 'Board'), userId: requireUserObjectId(userId) },
+            baseUpdatedAt && !overwrite ? { ...owned, updatedAt: new Date(baseUpdatedAt) } : owned,
             { $set: { nodes, edges, updatedAt } },
         );
-        if (!matchedCount) throw new Error('Board not found');
-        return { updatedAt: updatedAt.toISOString() };
+        if (!matchedCount) {
+            const current = await boards.findOne(owned, { projection: { updatedAt: 1 } });
+            if (!current) throw new Error('Board not found');
+            return { status: 'conflict', updatedAt: current.updatedAt.toISOString() };
+        }
+        return { status: 'saved', updatedAt: updatedAt.toISOString() };
     });
 
 export const renameContentLabBoard = async (boardId: string, title: string): Promise<ALApiResponse<{ title: string }>> =>
@@ -219,19 +258,89 @@ export const renameContentLabBoard = async (boardId: string, title: string): Pro
 export const deleteContentLabBoard = async (boardId: string): Promise<ALApiResponse<{ id: string }>> =>
     runAuthenticatedAction(async function deleteContentLabBoard(userId) {
         const boards = await contentLabBoardsCollection();
-        const { deletedCount } = await boards.deleteOne({
-            _id: toObjectId(boardId, 'Board'),
-            userId: requireUserObjectId(userId),
-        });
+        const _id = toObjectId(boardId, 'Board');
+        const { deletedCount } = await boards.deleteOne({ _id, userId: requireUserObjectId(userId) });
         if (!deletedCount) throw new Error('Board not found');
+        await (await contentLabBoardRunsCollection()).deleteMany({ boardId: _id });
         return { id: boardId };
+    });
+
+// ─── Board schedule ──────────────────────────────────────────────────────────
+
+/** Runs shown in a board's history. */
+const RUNS_LISTED = 10;
+/** A run still "running" after this died with its server call (the scheduler's lease is 10 minutes). */
+const STALE_RUN_MS = 15 * 60_000;
+
+const SCHEDULE_SCHEMA = z
+    .object({
+        repeat: z.enum(CONTENT_LAB_SCHEDULE_REPEATS),
+        time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Pick a time'),
+        days: z.array(z.enum(VOICE_WEEKDAYS)).max(7),
+        everyHours: z.number().int().refine((value) => (CONTENT_LAB_SCHEDULE_EVERY_HOURS as readonly number[]).includes(value), 'Pick how often'),
+        timezone: z.string().max(64).refine(isIanaTimezone, 'Pick a timezone'),
+        paused: z.boolean(),
+    })
+    .refine((schedule) => schedule.repeat !== 'weekdays' || schedule.days.length > 0, { message: 'Pick at least one day', path: ['days'] });
+
+function mapBoardRun(doc: ContentLabBoardRunDoc): ContentLabBoardRun {
+    const stale = doc.status === 'running' && Date.now() - doc.startedAt.getTime() > STALE_RUN_MS;
+    return {
+        _id: doc._id!.toString(),
+        boardId: doc.boardId.toString(),
+        userId: doc.userId.toString(),
+        trigger: doc.trigger,
+        status: stale ? 'failed' : doc.status,
+        summary: stale ? 'Did not finish in time' : doc.summary,
+        nodes: doc.nodes,
+        outputs: doc.outputs,
+        startedAt: doc.startedAt.toISOString(),
+        finishedAt: doc.finishedAt?.toISOString() ?? null,
+    };
+}
+
+/** Sets when the board runs by itself (or turns it off / pauses it) and works out its next run. */
+export const saveContentLabBoardSchedule = async (
+    boardId: string,
+    schedule: ContentLabBoardSchedule,
+): Promise<ALApiResponse<{ schedule: ContentLabBoardSchedule; nextRunAt: string | null }>> =>
+    runAuthenticatedAction(async function saveContentLabBoardSchedule(userId) {
+        const next = parse(SCHEDULE_SCHEMA, schedule);
+        const nextRunAt = nextScheduledRun(next, new Date());
+        const boards = await contentLabBoardsCollection();
+        const { matchedCount } = await boards.updateOne(
+            { _id: toObjectId(boardId, 'Board'), userId: requireUserObjectId(userId) },
+            { $set: { schedule: next, nextRunAt } },
+        );
+        if (!matchedCount) throw new Error('Board not found');
+        return { schedule: next, nextRunAt: nextRunAt?.toISOString() ?? null };
+    });
+
+/** The board's latest scheduled runs, newest first. */
+export const listContentLabBoardRuns = async (boardId: string): Promise<ALApiResponse<ContentLabBoardRun[]>> =>
+    runAuthenticatedAction(async function listContentLabBoardRuns(userId) {
+        const runs = await contentLabBoardRunsCollection();
+        const docs = await runs
+            .find({ boardId: toObjectId(boardId, 'Board'), userId: requireUserObjectId(userId) })
+            .sort({ startedAt: -1 })
+            .limit(RUNS_LISTED)
+            .toArray();
+        return docs.map(mapBoardRun);
     });
 
 // ─── Watching ────────────────────────────────────────────────────────────────
 
+const OPTIONAL_URL = z.string().max(2_000).nullish();
+
 /** Only the fields a watch keeps; the rest of the BFF response is dropped. */
 const CREATOR_RESPONSE_SCHEMA = z.object({
-    creator: z.object({ name: z.string().nullable(), followers: z.number().nullable() }),
+    creator: z.object({
+        name: z.string().max(300).nullable(),
+        followers: z.number().nullable(),
+        url: OPTIONAL_URL,
+        avatarUrl: OPTIONAL_URL,
+        bio: z.string().max(5_000).nullish(),
+    }),
     usualViews: z.number().nullable(),
     posts: z
         .array(
@@ -242,6 +351,8 @@ const CREATOR_RESPONSE_SCHEMA = z.object({
                 format: z.enum(CONTENT_LAB_FORMATS),
                 multiple: z.number().nullable(),
                 publishedAt: z.string().nullable(),
+                thumbnailUrl: OPTIONAL_URL,
+                views: z.number().nullish(),
             }),
         )
         .max(200),
@@ -261,27 +372,38 @@ function mapWatch(doc: ContentLabWatchDoc): ContentLabWatch {
         handle: doc.handle,
         name: doc.name,
         followers: doc.followers,
+        avatarUrl: doc.avatarUrl ?? null,
+        bio: doc.bio ?? null,
+        profileUrl: doc.profileUrl ?? null,
         usualViews: doc.usualViews,
+        recent: doc.recent ?? [],
         standouts: doc.standouts,
         lastCheckedAt: doc.lastCheckedAt?.toISOString() ?? null,
         createdAt: doc.createdAt.toISOString(),
     };
 }
 
+type CreatorPost = z.output<typeof CREATOR_RESPONSE_SCHEMA>['posts'][number];
+
+const newestFirst = (posts: CreatorPost[]) => [...posts].sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''));
+
+const toWatchPost = (post: CreatorPost): ContentLabWatchPost => ({
+    postId: post.id,
+    title: post.title,
+    url: post.url,
+    format: post.format,
+    multiple: post.multiple,
+    publishedAt: post.publishedAt,
+    thumbnailUrl: post.thumbnailUrl ?? null,
+    views: post.views ?? null,
+});
+
 /** Posts at or above the outlier multiple, newest first. */
-function standoutsOf(posts: z.output<typeof CREATOR_RESPONSE_SCHEMA>['posts']): ContentLabStandout[] {
-    return posts
+function standoutsOf(posts: CreatorPost[]): ContentLabStandout[] {
+    return newestFirst(posts)
         .filter((post) => (post.multiple ?? 0) >= CONTENT_LAB_OUTLIER_MULTIPLE)
-        .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
         .slice(0, MAX_STANDOUTS)
-        .map((post) => ({
-            postId: post.id,
-            title: post.title,
-            url: post.url,
-            format: post.format,
-            multiple: post.multiple!,
-            publishedAt: post.publishedAt,
-        }));
+        .map((post) => ({ ...toWatchPost(post), multiple: post.multiple! }));
 }
 
 export const listContentLabWatches = async (): Promise<ALApiResponse<ContentLabWatch[]>> =>
@@ -311,7 +433,11 @@ export const addContentLabWatch = async (input: {
                 $set: {
                     name: creator.creator.name,
                     followers: creator.creator.followers,
+                    avatarUrl: creator.creator.avatarUrl ?? null,
+                    bio: creator.creator.bio?.trim() || null,
+                    profileUrl: creator.creator.url ?? null,
                     usualViews: creator.usualViews,
+                    recent: newestFirst(creator.posts).slice(0, MAX_RECENT).map(toWatchPost),
                     standouts: standoutsOf(creator.posts),
                     lastCheckedAt: now,
                 },
@@ -363,7 +489,9 @@ function mapProfile(doc: ContentLabProfileDoc | null, userId: string): ContentLa
 export const getContentLabProfile = async (): Promise<ALApiResponse<ContentLabProfile>> =>
     runAuthenticatedAction(async function getContentLabProfile(userId) {
         const profiles = await contentLabProfilesCollection();
-        return mapProfile(await profiles.findOne({ userId: requireUserObjectId(userId) }), userId);
+        // The sealed AI key and connections stay out (see content-lab-settings-actions).
+        const doc = await profiles.findOne({ userId: requireUserObjectId(userId) }, { projection: { aiKeys: 0, connections: 0 } });
+        return mapProfile(doc, userId);
     });
 
 export const saveContentLabProfile = async (input: ContentLabProfileInput): Promise<ALApiResponse<ContentLabProfile>> =>
@@ -377,7 +505,7 @@ export const saveContentLabProfile = async (input: ContentLabProfileInput): Prom
                 $set: { handles: compact(handles), betaHandles: compact(betaHandles), country, language, updatedAt: new Date() },
                 $setOnInsert: { userId: uid },
             },
-            { upsert: true, returnDocument: 'after' },
+            { upsert: true, returnDocument: 'after', projection: { aiKeys: 0, connections: 0 } },
         );
         return mapProfile(doc, userId);
     });

@@ -11,24 +11,29 @@ export function textNoun(platform: ContentLabPlatform): string {
   return platform === "youtube" ? "title" : "first line";
 }
 
-/** Copy per signal: the reason chip, the check label, and the takeaway phrase ("5 of 6 winners …"). */
+/**
+ * Copy per signal: the reason chip, the check label, and the phrase that
+ * follows "3 of the 5 top posts …". Plain words a creator gets at a glance.
+ */
 export function signalCopy(key: ContentLabSignalKey, noun: string) {
   const copy: Record<ContentLabSignalKey, { reason: string; label: string; winners: string }> = {
-    hasNumber: { reason: `Number in the ${noun}`, label: "Number", winners: `put a number in the ${noun}` },
-    hasPrice: { reason: `Price in the ${noun}`, label: "Price or budget", winners: `put a price or budget in the ${noun}` },
-    hasQuestion: { reason: "Asks a question", label: "Question", winners: "ask a question" },
-    hasYear: { reason: `Year in the ${noun}`, label: "Year", winners: `mention a year in the ${noun}` },
-    isListicle: { reason: "Listicle", label: "Listicle", winners: "are listicles (7 ways, top 10)" },
-    hasPov: { reason: "POV framing", label: "POV", winners: "use POV framing" },
-    isChallenge: { reason: "Challenge or experiment", label: "Challenge", winners: "are a challenge or experiment" },
+    hasNumber: { reason: `Has a number in the ${noun}`, label: "A number", winners: `put a number in the ${noun}` },
+    hasPrice: { reason: `Mentions a price in the ${noun}`, label: "A price or budget", winners: `mention a price or budget in the ${noun}` },
+    hasQuestion: { reason: "Asks a question", label: "A question", winners: "ask a question" },
+    hasYear: { reason: `Mentions the year in the ${noun}`, label: "The year", winners: `mention the year in the ${noun}` },
+    isListicle: { reason: "A list, like \"7 ways\"", label: "A list", winners: "are lists, like \"7 ways\" or \"top 10\"" },
+    hasPov: { reason: "Starts with \"POV\"", label: "\"POV\" opener", winners: "start with \"POV\"" },
+    isChallenge: { reason: "Tries something out, like \"I tried…\"", label: "A challenge", winners: "try something out, like \"I tried…\" or \"30 days of…\"" },
   };
   return copy[key];
 }
 
-/** "14x" (whole numbers from 10x up), "2.4x" below. */
+/** "14" (whole from 3 up), "2.5" below: read as "14 times". */
 export function formatMultiple(multiple: number): string {
-  return `${multiple >= 10 ? Math.round(multiple) : multiple}x`;
+  return `${multiple >= 3 ? Math.round(multiple) : multiple}`;
 }
+
+const metricNoun = (format: ContentLabFormat) => (format === "post" || format === "carousel" ? "likes" : "views");
 
 export type ContentLabReasonInput = {
   platform: ContentLabPlatform;
@@ -42,7 +47,7 @@ export type ContentLabReasonInput = {
 export function computeReasons(post: ContentLabReasonInput): string[] {
   const reasons: string[] = [];
   if (post.multiple !== null && post.multiple >= CONTENT_LAB_OUTLIER_MULTIPLE) {
-    reasons.push(`${formatMultiple(post.multiple)} their usual`);
+    reasons.push(`${formatMultiple(post.multiple)} times their usual ${metricNoun(post.format)}`);
   }
   reasons.push(CONTENT_LAB_FORMAT_LABELS[post.format]);
 
@@ -53,7 +58,7 @@ export function computeReasons(post: ContentLabReasonInput): string[] {
     // A price, list or year already says "number"; don't repeat it.
     if (key === "hasNumber" && (s.hasPrice || s.isListicle || s.hasYear)) continue;
     if (key === "hasPrice" && post.title.includes("₹")) {
-      reasons.push(`₹ price in the ${noun}`);
+      reasons.push(`Mentions a ₹ price in the ${noun}`);
       continue;
     }
     reasons.push(signalCopy(key, noun).reason);
@@ -80,22 +85,22 @@ export type ContentLabWhyInput = ContentLabReasonInput & {
 export function computeWhyItWorked(input: ContentLabWhyInput): string[] {
   const bullets: string[] = [];
   if (input.multiple !== null && input.multiple >= 1.5) {
-    bullets.push(`Got ${formatMultiple(input.multiple)} this creator's usual ${input.format === "post" || input.format === "carousel" ? "likes" : "views"}`);
+    bullets.push(`Got ${formatMultiple(input.multiple)} times more ${metricNoun(input.format)} than this creator usually gets`);
   }
   const hook = input.hookType ? HOOK_TYPE_COPY[input.hookType] : undefined;
   if (hook) bullets.push(hook);
 
   const noun = textNoun(input.platform);
   const signalReasons = computeReasons({ ...input, multiple: null }).slice(1);
-  if (signalReasons[0]) bullets.push(`${signalReasons[0]}: concrete and easy to click`);
+  if (signalReasons[0]) bullets.push(`${signalReasons[0]}, so it's clear and easy to click`);
   if (input.cta?.text) {
-    const at = input.cta.atPercent !== null ? ` at ${Math.round(input.cta.atPercent)}%` : "";
-    bullets.push(`Clear ask${at}: "${input.cta.text}"`);
+    const at = input.cta.atPercent !== null ? ` about ${Math.round(input.cta.atPercent)}% of the way in` : "";
+    bullets.push(`Asks viewers to do something${at}: "${input.cta.text}"`);
   }
   if (input.format === "carousel" && input.slideCount > 1) {
     bullets.push(`${input.slideCount} slides keep people swiping`);
   }
   if (bullets.length < 3 && signalReasons[1]) bullets.push(signalReasons[1]);
-  if (bullets.length === 0) bullets.push(`Nothing stands out in the ${noun}; the topic itself carried it`);
+  if (bullets.length === 0) bullets.push(`Nothing special in the ${noun}: people came for the topic itself`);
   return bullets.slice(0, 3);
 }

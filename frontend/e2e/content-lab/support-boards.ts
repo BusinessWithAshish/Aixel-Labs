@@ -7,12 +7,14 @@ import type {
     CONTENT_LAB_CREATOR_RESPONSE,
     CONTENT_LAB_EXPLORE_RESPONSE,
     CONTENT_LAB_POST,
+    CONTENT_LAB_SUGGEST_RESPONSE,
     ContentLabPlatform,
 } from '@aixellabs/backend/content-lab/types';
 import {
     CONTENT_LAB_SUB_MODULES,
     MongoCollections,
     type ContentLabBoardDoc,
+    type ContentLabBoardRunDoc,
     type ContentLabProfileDoc,
     type ContentLabWatchDoc,
     type UserDoc,
@@ -72,6 +74,9 @@ export class ContentLabDb {
     get boards() {
         return this.db.collection<ContentLabBoardDoc>(MongoCollections.CONTENT_LAB_BOARDS);
     }
+    get boardRuns() {
+        return this.db.collection<ContentLabBoardRunDoc>(MongoCollections.CONTENT_LAB_BOARD_RUNS);
+    }
     get watchlist() {
         return this.db.collection<ContentLabWatchDoc>(MongoCollections.CONTENT_LAB_WATCHLIST);
     }
@@ -88,7 +93,12 @@ export class ContentLabDb {
     /** Removes the user's boards, watches and profile. */
     async reset(user: E2eUser): Promise<void> {
         const userId = await this.userId(user);
-        await Promise.all([this.boards.deleteMany({ userId }), this.watchlist.deleteMany({ userId }), this.profiles.deleteMany({ userId })]);
+        await Promise.all([
+            this.boards.deleteMany({ userId }),
+            this.boardRuns.deleteMany({ userId }),
+            this.watchlist.deleteMany({ userId }),
+            this.profiles.deleteMany({ userId }),
+        ]);
     }
 
     async insertBoard(user: E2eUser, board: Pick<ContentLabBoardDoc, 'title' | 'nodes' | 'edges'> & Partial<ContentLabBoardDoc>): Promise<string> {
@@ -101,6 +111,33 @@ export class ContentLabDb {
             ...board,
         });
         return insertedId.toString();
+    }
+
+    /** A finished scheduled run of a board, as the server's scheduler records it. */
+    async insertBoardRun(
+        user: E2eUser,
+        boardId: string,
+        run: Pick<ContentLabBoardRunDoc, 'status' | 'summary' | 'nodes' | 'outputs'> & Partial<ContentLabBoardRunDoc>,
+    ): Promise<string> {
+        const startedAt = new Date(Date.now() - 60 * 60_000);
+        const { insertedId } = await this.boardRuns.insertOne({
+            boardId: new ObjectId(boardId),
+            userId: await this.userId(user),
+            trigger: 'schedule',
+            startedAt,
+            finishedAt: new Date(startedAt.getTime() + 60_000),
+            ...run,
+        });
+        return insertedId.toString();
+    }
+
+    /** What a scheduled run does to a board: writes an Output's draft and bumps `updatedAt`. */
+    async writeScheduledDraft(boardId: string, nodeId: string, text: string): Promise<void> {
+        await this.boards.updateOne(
+            { _id: new ObjectId(boardId) },
+            { $set: { 'nodes.$[o].data.text': text, updatedAt: new Date() } },
+            { arrayFilters: [{ 'o.id': nodeId }] },
+        );
     }
 
     async getBoard(id: string) {
@@ -170,7 +207,16 @@ export function fakePost(overrides: Partial<CONTENT_LAB_POST> & { id: string; ti
 
 export function fakeCreator(handle: string, multiples: (number | null)[]): CONTENT_LAB_CREATOR_RESPONSE {
     return {
-        creator: { platform: 'youtube', id: handle, handle, name: `Name of ${handle}`, url: null, followers: 120_000 },
+        creator: {
+            platform: 'youtube',
+            id: handle,
+            handle,
+            name: `Name of ${handle}`,
+            url: `https://www.youtube.com/@${handle}`,
+            followers: 120_000,
+            avatarUrl: null,
+            bio: `Bio of ${handle}`,
+        },
         usualViews: 85_000,
         posts: multiples.map((multiple, index) =>
             fakePost({
@@ -195,6 +241,7 @@ export const FAKE_EXPLORE: CONTENT_LAB_EXPLORE_RESPONSE = {
     takeaways: [],
     niche: { postCount: 24, outlierCount: 3, medianMultiple: 1.2, bestFormat: {} },
     errors: {},
+    nextCursor: null,
 };
 
 export const FAKE_BREAKDOWN: CONTENT_LAB_BREAKDOWN_RESPONSE = {
@@ -224,6 +271,7 @@ type Handlers = {
     explore?: () => CONTENT_LAB_EXPLORE_RESPONSE;
     breakdown?: () => CONTENT_LAB_BREAKDOWN_RESPONSE;
     creator?: (body: { platform: ContentLabPlatform; handle: string }) => CONTENT_LAB_CREATOR_RESPONSE;
+    suggest?: (body: { platform: ContentLabPlatform; query: string; country?: string }) => CONTENT_LAB_SUGGEST_RESPONSE;
     write?: (body: CONTENT_LAB_WRITE_REQUEST) => { text: string };
     check?: () => CONTENT_LAB_CHECK_RESPONSE;
     ads?: () => CONTENT_LAB_ADS_RESPONSE;
@@ -233,12 +281,16 @@ type Handlers = {
 
 /** Stands in for `app/api/content-lab/*` in the browser and records what the page sent. */
 export async function mockContentLabApi(page: Page, handlers: Handlers): Promise<Record<keyof typeof CONTENT_LAB_API_ROUTES, Request[]>> {
-    const calls = { EXPLORE: [], BREAKDOWN: [], CHECK: [], CREATOR: [], WRITE: [], ADS: [] } as Record<keyof typeof CONTENT_LAB_API_ROUTES, Request[]>;
+    const calls = { EXPLORE: [], BREAKDOWN: [], CHECK: [], CREATOR: [], SUGGEST: [], WRITE: [], ADS: [] } as Record<
+        keyof typeof CONTENT_LAB_API_ROUTES,
+        Request[]
+    >;
     const answer: Record<keyof typeof CONTENT_LAB_API_ROUTES, ((body: never) => unknown) | undefined> = {
         EXPLORE: handlers.explore,
         BREAKDOWN: handlers.breakdown,
         CHECK: handlers.check,
         CREATOR: handlers.creator,
+        SUGGEST: handlers.suggest,
         WRITE: handlers.write,
         ADS: handlers.ads,
     };

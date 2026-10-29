@@ -16,7 +16,7 @@ import { SubModuleUrls } from '@/config/app-config';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import { CONTENT_LAB_LANGUAGES } from '../../../_constants';
-import { creatorLabel, formatMultiple } from '../../_utils/format';
+import { creatorLabel, timesUsual } from '../../_utils/format';
 import { postBreakdownHref } from '../../_utils/smart-box';
 import type { UseCheckPageReturn } from '../_hooks/use-check-page';
 
@@ -206,7 +206,7 @@ function Winners({ result }: { result: CONTENT_LAB_CHECK_RESPONSE }) {
                             </Link>
                             <p className="text-muted-foreground">
                                 {creatorLabel(post.creator)}
-                                {post.multiple != null ? ` · ${formatMultiple(post.multiple)} their usual` : ''}
+                                {post.multiple != null ? ` · ${timesUsual(post.multiple)}` : ''}
                             </p>
                         </li>
                     ))}

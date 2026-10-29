@@ -5,6 +5,7 @@ import type {
   CONTENT_LAB_CHECK_REQUEST_SCHEMA,
   CONTENT_LAB_CREATOR_REQUEST_SCHEMA,
   CONTENT_LAB_EXPLORE_REQUEST_SCHEMA,
+  CONTENT_LAB_SUGGEST_REQUEST_SCHEMA,
 } from "./schemas";
 
 export type ContentLabPlatform = (typeof CONTENT_LAB_PLATFORMS)[number];
@@ -40,6 +41,10 @@ export type CONTENT_LAB_CREATOR = {
   name: string | null;
   url: string | null;
   followers: number | null;
+  /** Profile picture; filled by the creator route (explore may leave it out). */
+  avatarUrl?: string | null;
+  /** Channel description / Instagram bio; filled by the creator route. */
+  bio?: string | null;
 };
 
 export type CONTENT_LAB_POST = {
@@ -77,8 +82,13 @@ export type CONTENT_LAB_EXPLORE_RESPONSE = {
   query: string;
   country: string;
   platforms: ContentLabPlatform[];
-  /** Sorted by multiple, highest first (posts without a multiple last). */
+  /**
+   * Best first: a blend of how far each post beat its creator's usual, its
+   * views and how recent it is; posts with tiny view counts last. Never repeats
+   * a post returned on an earlier page of the same search.
+   */
   posts: CONTENT_LAB_POST[];
+  /** Page 1 only; later pages return []. */
   takeaways: CONTENT_LAB_TAKEAWAY[];
   niche: {
     postCount: number;
@@ -88,6 +98,28 @@ export type CONTENT_LAB_EXPLORE_RESPONSE = {
   };
   /** Per-platform failures (e.g. Instagram blocked); the other platform's posts still return. */
   errors: Partial<Record<ContentLabPlatform, string>>;
+  /** Opaque; send it back as `cursor` for the next page of posts. Null when there are no more. */
+  nextCursor: string | null;
+};
+
+export type CONTENT_LAB_SUGGEST_REQUEST = z.input<typeof CONTENT_LAB_SUGGEST_REQUEST_SCHEMA>;
+
+/** One creator in the type-ahead list under the Watching / Creator box. */
+export type CONTENT_LAB_SUGGESTION = {
+  platform: ContentLabPlatform;
+  /** "@handle", what the creator route takes. */
+  handle: string;
+  name: string | null;
+  avatarUrl: string | null;
+  followers: number | null;
+  verified: boolean;
+  url: string;
+};
+
+export type CONTENT_LAB_SUGGEST_RESPONSE = {
+  query: string;
+  platform: ContentLabPlatform;
+  creators: CONTENT_LAB_SUGGESTION[];
 };
 
 export type CONTENT_LAB_SEGMENT = {

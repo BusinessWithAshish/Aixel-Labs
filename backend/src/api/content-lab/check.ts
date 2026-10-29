@@ -18,7 +18,7 @@ export async function contentLabCheckService(input: ContentLabCheckInput): Promi
   });
   const winners = pickWinners(explore.posts);
   if (winners.length === 0) {
-    throw withStatusCode(explore.errors[input.platform] ?? "No winners found for this topic yet", 502);
+    throw withStatusCode(explore.errors[input.platform] ?? "We couldn't find enough top posts on this topic yet", 502);
   }
   return { ...computeDraftCheck(input.text, input.platform, winners), winners };
 }

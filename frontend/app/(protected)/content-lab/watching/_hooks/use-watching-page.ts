@@ -6,42 +6,53 @@ import type { ContentLabPlatform } from '@aixellabs/backend/content-lab/types';
 import type { ContentLabWatch } from '@aixellabs/backend/db/types';
 import { addContentLabWatch, removeContentLabWatch } from '@/app/actions/content-lab-actions';
 import { contentLabApi } from '@/helpers/content-lab-api';
+import { useCreatorSuggest } from './use-creator-suggest';
 
-export type WatchingPageData = { watches: ContentLabWatch[] };
+export type WatchingPageData = { watches: ContentLabWatch[]; country: string };
 
-/** Asks the BFF for the creator's recent posts, then saves the watch with its standouts. */
+/** A creator to add: typed, or picked from the suggestions (which already know their name and picture). */
+export type WatchPick = { handle: string; name?: string | null; avatarUrl?: string | null };
+
+/** Asks the BFF for the creator's recent posts, then saves the watch with them. */
 async function fetchAndSave(platform: ContentLabPlatform, handle: string) {
     const creator = await contentLabApi.creator({ platform, handle });
     if (!creator.success || !creator.data) return { error: creator.error ?? 'Could not find that creator' };
     const saved = await addContentLabWatch({ platform, handle, creator: creator.data });
-    if (!saved.success || !saved.data) return { error: saved.error ?? 'Could not save the watch' };
+    if (!saved.success || !saved.data) return { error: saved.error ?? 'Could not save the creator' };
     return { watch: saved.data };
 }
 
-/** Watching: add a creator (platform + @handle), refresh one or all (one at a time, with progress), remove. */
-export function useWatchingPage({ watches: initial }: WatchingPageData) {
+const bare = (handle: string) => handle.trim().replace(/^@+/, '');
+
+/**
+ * Watching: find a creator as you type (or type their handle) and add them; refresh one or all
+ * (one at a time, with progress); remove.
+ */
+export function useWatchingPage({ watches: initial, country }: WatchingPageData) {
     const [watches, setWatches] = useState(initial);
     const [platform, setPlatform] = useState<ContentLabPlatform>('youtube');
-    const [handle, setHandle] = useState('');
-    const [adding, setAdding] = useState(false);
+    const [query, setQuery] = useState('');
+    /** The creator being added, shown as a placeholder card until their posts are in. */
+    const [adding, setAdding] = useState<(WatchPick & { platform: ContentLabPlatform }) | null>(null);
     const [refreshingId, setRefreshingId] = useState<string | null>(null);
     const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+    const suggest = useCreatorSuggest(platform, query, country);
 
     const upsert = (watch: ContentLabWatch) =>
         setWatches((list) => (list.some((item) => item._id === watch._id) ? list.map((item) => (item._id === watch._id ? watch : item)) : [watch, ...list]));
 
-    const add = async () => {
-        const typed = handle.trim();
-        if (!typed) return;
-        setAdding(true);
-        const result = await fetchAndSave(platform, typed);
-        setAdding(false);
+    const add = async (pick: WatchPick) => {
+        const handle = bare(pick.handle);
+        if (!handle || adding) return;
+        setAdding({ ...pick, handle, platform });
+        setQuery('');
+        const result = await fetchAndSave(platform, `@${handle}`);
+        setAdding(null);
         if (result.error || !result.watch) {
             toast.error(result.error);
             return;
         }
         upsert(result.watch);
-        setHandle('');
         toast.success(`Watching @${result.watch.handle}`);
     };
 
@@ -58,7 +69,7 @@ export function useWatchingPage({ watches: initial }: WatchingPageData) {
         if (result.error) toast.error(`@${watch.handle}: ${result.error}`);
     };
 
-    /** One creator at a time: keeps the scrape load (and any rate limit) gentle. */
+    /** One creator at a time: keeps the load (and any rate limit) gentle. */
     const refreshAll = async () => {
         const list = watches;
         let failed = 0;
@@ -70,7 +81,7 @@ export function useWatchingPage({ watches: initial }: WatchingPageData) {
         }
         setProgress(null);
         if (failed) toast.error(`${failed} of ${list.length} could not be refreshed`);
-        else toast.success(`Refreshed ${list.length} creators`);
+        else toast.success(`Refreshed ${list.length} ${list.length === 1 ? 'creator' : 'creators'}`);
     };
 
     const remove = async (watch: ContentLabWatch) => {
@@ -87,14 +98,16 @@ export function useWatchingPage({ watches: initial }: WatchingPageData) {
         watches,
         platform,
         setPlatform,
-        handle,
-        setHandle,
+        query,
+        setQuery,
+        suggest,
         adding,
         add,
         refreshingId,
         refreshOne,
         refreshAll,
         progress,
+        busy: !!progress || !!refreshingId,
         remove,
     };
 }

@@ -52,6 +52,23 @@ export const YOUTUBE_SEARCH_FILTER_SP: Record<YT_SEARCH_FILTER, string> = {
   [YT_SEARCH_FILTER.CHANNEL]: "EgIQAg%3D%3D",
 };
 
+/**
+ * Decoded `sp` values for the web search's "Prioritize" sort + "Upload date"
+ * window, videos only (the options the results page itself links to). Plain
+ * `CAI` (upload date) no longer sorts by date. Verified live 2026-10-28
+ * ("protein breakfast", IN, first 20 results): this month → median 231k views,
+ * all ≤ 1 month old; this year → median 1.7M, all ≤ 9 months old; relevance →
+ * median 1.1M, half older than a year; popularity alone → years-old hits.
+ */
+export const YOUTUBE_SEARCH_SORT_SP = {
+  RELEVANCE: "EgIQAQ==",
+  POPULAR: "CAMSAhAB",
+  POPULAR_THIS_WEEK: "CAMSBAgDEAE=",
+  POPULAR_THIS_MONTH: "CAMSBAgEEAE=",
+  POPULAR_THIS_YEAR: "CAMSBAgFEAE=",
+  CHANNEL: "EgIQAg==",
+} as const;
+
 /** YouTube channel ID format (UC + 22 chars) */
 export const YOUTUBE_CHANNEL_ID_PATTERN = /UC[a-zA-Z0-9_-]{22}/;
 

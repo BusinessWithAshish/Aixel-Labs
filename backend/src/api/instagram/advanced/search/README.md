@@ -16,7 +16,14 @@ Working pipeline (verified `salon pune`):
    owner, likes, comments and caption
 4. Dedupe handles → optional profile enrich (`fetchFromEntities`)
 
-Also works anonymously: `GET /api/v1/tags/search/?q=` (hashtag discovery).
+Also works anonymously: `GET /api/v1/tags/search/?q=` (hashtag discovery) →
+`searchInstagramHashtags` (names + post counts, biggest first; rechecked
+2026-10-28). Still login-only for guests: `/explore/tags/{tag}/`,
+`/api/v1/tags/web_info/`, `/api/v1/users/search/` (302 to login),
+`/web/search/topsearch/` (404).
+
+A shortcode dates its post with no request: `takenAtFromMediaId(mediaIdFromShortcode(code))`
+(the pk's top bits are ms since Instagram's 2011 epoch).
 
 ## Endpoint
 

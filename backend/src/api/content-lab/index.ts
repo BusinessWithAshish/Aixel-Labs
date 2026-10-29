@@ -6,6 +6,7 @@ import {
   contentLabCheckHandler,
   contentLabCreatorHandler,
   contentLabExploreHandler,
+  contentLabSuggestHandler,
 } from "./handler";
 
 const contentLabRoutes: IRouter = Router();
@@ -14,6 +15,7 @@ contentLabRoutes.post(API_ENDPOINTS.CONTENT_LAB.EXPLORE.route, contentLabExplore
 contentLabRoutes.post(API_ENDPOINTS.CONTENT_LAB.BREAKDOWN.route, contentLabBreakdownHandler);
 contentLabRoutes.post(API_ENDPOINTS.CONTENT_LAB.CHECK.route, contentLabCheckHandler);
 contentLabRoutes.post(API_ENDPOINTS.CONTENT_LAB.CREATOR.route, contentLabCreatorHandler);
+contentLabRoutes.post(API_ENDPOINTS.CONTENT_LAB.SUGGEST.route, contentLabSuggestHandler);
 
 export default contentLabRoutes;
 
@@ -22,3 +24,4 @@ export { contentLabExploreService } from "./explore";
 export { contentLabBreakdownService } from "./breakdown";
 export { contentLabCheckService } from "./check";
 export { contentLabCreatorService } from "./creator";
+export { contentLabSuggestService } from "./suggest";

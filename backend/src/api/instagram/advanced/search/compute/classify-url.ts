@@ -95,3 +95,21 @@ export function mediaIdFromShortcode(shortcode: string): string | null {
   }
   return id > BigInt(0) ? id.toString() : null;
 }
+
+/** Instagram's id epoch (2011-08-24T21:07:01.721Z): media ids count ms from here in their top bits. */
+const IG_ID_EPOCH_MS = 1_314_220_021_721;
+
+/**
+ * When a post was created, read off its media pk (`pk >> 23` = ms since
+ * Instagram's epoch), so a shortcode alone dates a post without a request.
+ * Within a few minutes of the post query's `taken_at` (24 posts checked
+ * 2026-10-28, worst 4 min: the id is minted when the upload starts).
+ */
+export function takenAtFromMediaId(mediaId: string): number | null {
+  try {
+    const ms = Number(BigInt(mediaId) >> BigInt(23)) + IG_ID_EPOCH_MS;
+    return ms > IG_ID_EPOCH_MS ? Math.floor(ms / 1000) : null;
+  } catch {
+    return null;
+  }
+}

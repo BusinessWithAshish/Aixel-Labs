@@ -139,6 +139,7 @@ export function exploreResponse(overrides: Partial<CONTENT_LAB_EXPLORE_RESPONSE>
         ],
         niche: { postCount: 48, outlierCount: 9, medianMultiple: 1.3, bestFormat: { youtube: 'video', instagram: 'reel' } },
         errors: {},
+        nextCursor: null,
         ...overrides,
     };
 }

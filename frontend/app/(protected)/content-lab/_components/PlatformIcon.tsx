@@ -1,4 +1,4 @@
-import { Instagram, Linkedin, Youtube, type LucideProps } from 'lucide-react';
+import Image from 'next/image';
 import type { ContentLabPlatform } from '@aixellabs/backend/content-lab/types';
 import type { ContentLabBetaPlatform } from '@aixellabs/backend/db/types';
 import { cn } from '@/lib/utils';
@@ -6,21 +6,15 @@ import { CONTENT_LAB_PLATFORM_LABELS } from '../_constants';
 
 type Platform = ContentLabPlatform | ContentLabBetaPlatform;
 
-/** lucide has no X logo; the official mark, drawn at lucide's 24px grid. */
-const XLogo = ({ className, ...props }: LucideProps) => (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={cn('size-6', className)} {...props}>
-        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-);
-
-const ICON: Record<Platform, React.ComponentType<LucideProps>> = {
-    youtube: Youtube,
-    instagram: Instagram,
-    linkedin: Linkedin,
-    x: XLogo,
+/** The full-colour brand marks in `public/brand-logos`; YouTube's is wider than tall. */
+const LOGO: Record<Platform, { src: string; width: number; height: number }> = {
+    youtube: { src: '/brand-logos/youtube.png', width: 185, height: 128 },
+    instagram: { src: '/brand-logos/instagram.png', width: 128, height: 128 },
+    linkedin: { src: '/brand-logos/linkedin.png', width: 128, height: 128 },
+    x: { src: '/brand-logos/x.png', width: 128, height: 128 },
 };
 
-/** Brand colour per platform (text colour, so the icon and any label next to it match). */
+/** Brand colour per platform, for text or accents next to the logo. */
 export const CONTENT_LAB_PLATFORM_COLOR: Record<Platform, string> = {
     youtube: 'text-[#FF0000]',
     instagram: 'text-[#E1306C]',
@@ -28,12 +22,23 @@ export const CONTENT_LAB_PLATFORM_COLOR: Record<Platform, string> = {
     x: 'text-foreground',
 };
 
+/** The platform's own logo, sized by `className` (a square box; the logo keeps its shape inside it). */
 export function PlatformIcon({ platform, className }: { platform: Platform; className?: string }) {
-    const Icon = ICON[platform];
-    return <Icon aria-hidden className={cn('size-4 shrink-0', CONTENT_LAB_PLATFORM_COLOR[platform], className)} />;
+    const logo = LOGO[platform];
+    return (
+        <Image
+            src={logo.src}
+            alt=""
+            aria-hidden
+            width={logo.width}
+            height={logo.height}
+            unoptimized
+            className={cn('size-4 shrink-0 object-contain', className)}
+        />
+    );
 }
 
-/** Icon + name in a pill; `muted` for platforms we write for but do not search yet. */
+/** Logo + name in a pill; `muted` for platforms we write for but do not search yet. */
 export function PlatformPill({ platform, muted, className }: { platform: Platform; muted?: boolean; className?: string }) {
     return (
         <span
@@ -43,7 +48,7 @@ export function PlatformPill({ platform, muted, className }: { platform: Platfor
                 className,
             )}
         >
-            <PlatformIcon platform={platform} className="size-3.5" />
+            <PlatformIcon platform={platform} className={cn('size-3.5', muted && 'opacity-60')} />
             {CONTENT_LAB_PLATFORM_LABELS[platform]}
         </span>
     );

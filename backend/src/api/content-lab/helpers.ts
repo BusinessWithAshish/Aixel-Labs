@@ -65,6 +65,22 @@ export function beforeDeadline<T>(promise: Promise<T>, deadline: number): Promis
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+/** Runs at most `concurrency` of the tasks handed to it at once; the rest wait their turn. */
+export function createLimiter(concurrency: number) {
+  let active = 0;
+  const waiting: Array<() => void> = [];
+  return async function limit<T>(task: () => Promise<T>): Promise<T> {
+    if (active >= concurrency) await new Promise<void>((resolve) => waiting.push(resolve));
+    active++;
+    try {
+      return await task();
+    } finally {
+      active--;
+      waiting.shift()?.();
+    }
+  };
+}
+
 /** Alternates items by key (e.g. posts and reels) so a cap on the front of the list takes some of each. */
 export function interleaveBy<T>(items: readonly T[], key: (item: T) => string): T[] {
   const groups = new Map<string, T[]>();

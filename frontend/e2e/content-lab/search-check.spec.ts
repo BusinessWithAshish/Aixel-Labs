@@ -13,7 +13,7 @@ for (const { name, use } of VIEWPORTS) {
         test.use({ storageState: USER_STORAGE_STATE, ...use });
         test.beforeEach(async ({ db, context }) => {
             await db.resetUser(E2E_USER);
-            await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
+            await db.setContentLabGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
             await enableContentLab(context);
         });
 
@@ -73,7 +73,7 @@ for (const { name, use } of VIEWPORTS) {
         });
 
         test('without a Gemini key it still scores and points to Content Lab settings', async ({ page, db }) => {
-            await db.setVoiceGeminiKey(E2E_USER, null);
+            await db.setContentLabGeminiKey(E2E_USER, null);
             await mockContentLab(page, 'CHECK', ok(CHECK_RESPONSE));
             const write = await mockContentLab(page, 'WRITE', ok({ versions: REWRITES }));
             await page.goto(`${CONTENT_LAB_CHECK_ROUTE}?q=protein+breakfast&text=My+routine`);

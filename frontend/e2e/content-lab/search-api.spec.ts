@@ -25,7 +25,7 @@ test.describe('Content Lab BFF · signed in', () => {
     test.use({ storageState: USER_STORAGE_STATE });
     test.beforeEach(async ({ db }) => {
         await db.resetUser(E2E_USER);
-        await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
+        await db.setContentLabGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
     });
 
     test('a user without Content Lab gets 403', async ({ db, request }) => {
@@ -46,8 +46,16 @@ test.describe('Content Lab BFF · signed in', () => {
         expect((await res.json()).error).toBe('Service is temporarily unavailable');
     });
 
-    test('write without a Gemini key says where to add it', async ({ db, request }) => {
-        await db.setVoiceGeminiKey(E2E_USER, null);
+    test('suggest checks its body with the backend schema and reaches the backend', async ({ request }) => {
+        const bad = await request.post(CONTENT_LAB_API_ROUTES.SUGGEST, { data: { platform: 'tiktok', query: 'riya' } });
+        expect(bad.status()).toBe(400);
+        const down = await request.post(CONTENT_LAB_API_ROUTES.SUGGEST, { data: { platform: 'youtube', query: 'riya' } });
+        expect(down.status()).toBe(502);
+    });
+
+    test('write without a Content Lab key says where to add it, even with a voice agent key', async ({ db, request }) => {
+        await db.setContentLabGeminiKey(E2E_USER, null);
+        await db.setVoiceGeminiKey(E2E_USER, E2E_GEMINI_API_KEY);
         const res = await request.post(CONTENT_LAB_API_ROUTES.WRITE, {
             data: { mode: 'rewrites', draft: 'My routine', platform: 'youtube', language: 'English', context: {} },
         });

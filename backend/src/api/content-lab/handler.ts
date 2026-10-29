@@ -12,7 +12,9 @@ import {
   CONTENT_LAB_CHECK_REQUEST_SCHEMA,
   CONTENT_LAB_CREATOR_REQUEST_SCHEMA,
   CONTENT_LAB_EXPLORE_REQUEST_SCHEMA,
+  CONTENT_LAB_SUGGEST_REQUEST_SCHEMA,
 } from "./schemas";
+import { contentLabSuggestService } from "./suggest";
 
 /** parse → service → ALApiResponse; a service error's `statusCode` (400/404/502) is kept. */
 function createContentLabHandler<TSchema extends z.ZodTypeAny, TData>(
@@ -65,4 +67,10 @@ export const contentLabCreatorHandler = createContentLabHandler(
   CONTENT_LAB_HANDLER_LABELS.CREATOR,
   CONTENT_LAB_CREATOR_REQUEST_SCHEMA,
   contentLabCreatorService,
+);
+
+export const contentLabSuggestHandler = createContentLabHandler(
+  CONTENT_LAB_HANDLER_LABELS.SUGGEST,
+  CONTENT_LAB_SUGGEST_REQUEST_SCHEMA,
+  contentLabSuggestService,
 );

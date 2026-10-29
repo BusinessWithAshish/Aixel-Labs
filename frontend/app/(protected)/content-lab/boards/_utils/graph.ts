@@ -1,5 +1,5 @@
 import type { ContentLabBoardEdge, ContentLabNodeKind } from '@aixellabs/backend/db/types';
-import { CONTENT_LAB_NODE_META } from '../../../_constants';
+import { CONTENT_LAB_NODE_META } from '../../_constants';
 
 type Wire = Pick<ContentLabBoardEdge, 'source' | 'target'>;
 
