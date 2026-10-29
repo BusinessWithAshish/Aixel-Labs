@@ -580,6 +580,9 @@ export const MEDIA_ERROR_MESSAGES = {
   ALIGN_WORKER_MISSING:
     "Caption alignment worker is not installed on this host (run `pnpm setup:align` in backend)",
   ALIGN_WORKER_FAILED: "Caption alignment worker failed",
+  ALIGN_WORKER_TIMED_OUT: "timed out (the host was probably overloaded)",
+  ALIGN_WORKER_KILLED: "was killed by",
+  ALIGN_WORKER_OUT_OF_MEMORY: "(probably out of memory)",
   ALIGN_RESULT_INVALID: "Caption alignment worker returned unreadable timings",
   ALIGN_TOO_LONG: "Audio is too long to align in one pass",
   ALIGN_NOT_LATIN: "Too few caption words are in Latin letters to align them to the audio",
