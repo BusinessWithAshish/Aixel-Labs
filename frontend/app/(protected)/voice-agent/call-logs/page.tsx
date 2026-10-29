@@ -5,7 +5,7 @@ import { listMyCalls } from '@/app/actions/voice-call-actions';
 import { getVoiceAgentOptions } from '@/app/actions/voice-agent-actions';
 import { useCallLogsPage } from './_hooks/use-call-logs-page';
 import { CallLogsContent } from './_components/CallLogsContent';
-import { parseCallLogFilters } from './_utils/call-log-filters';
+import { callLogsQuery, parseCallLogFilters } from './_utils/call-log-filters';
 
 const PAGE_TITLE = 'Call logs';
 const CALLS_SHOWN = 100;
@@ -14,15 +14,7 @@ async function CallLogsPage({ searchParams }: { searchParams: Promise<Record<str
     const filters = parseCallLogFilters(await searchParams);
 
     const [callsRes, agentsRes] = await Promise.all([
-        listMyCalls({
-            agentId: filters.agent,
-            includeDeleted: filters.deleted,
-            kind: filters.kind,
-            success: filters.success,
-            range: filters.range,
-            search: filters.q,
-            limit: CALLS_SHOWN,
-        }),
+        listMyCalls(callLogsQuery(filters, CALLS_SHOWN)),
         getVoiceAgentOptions(),
     ]);
 

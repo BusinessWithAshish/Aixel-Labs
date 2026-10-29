@@ -307,8 +307,23 @@ test.describe('with seeded calls', () => {
         await expect(cards).toHaveCount(1);
         await expect(cards.first()).toContainText('Caller hung up');
 
+        // Back from a call keeps the filter.
+        await cards.first().click();
+        await expect(page).toHaveURL(/\/call-logs\/[0-9a-f]{24}$/);
+        await page.goBack();
+        await expect(page).toHaveURL(/\?kind=inbound$/);
+        await expect(cards).toHaveCount(1);
+        await expect(cards.first()).toContainText('Caller hung up');
+
         // Words in the transcript, then digits of a number.
         await page.getByRole('button', { name: 'Clear' }).click();
+        await expect(page).toHaveURL(CALL_LOGS_URL);
+        await expect(cards).toHaveCount(5);
+        // Back and Forward walk the filters.
+        await page.goBack();
+        await expect(page).toHaveURL(/\?kind=inbound$/);
+        await expect(cards).toHaveCount(1);
+        await page.goForward();
         await expect(page).toHaveURL(CALL_LOGS_URL);
         await expect(cards).toHaveCount(5);
         await page.getByRole('searchbox', { name: 'Search calls' }).fill('your hours');

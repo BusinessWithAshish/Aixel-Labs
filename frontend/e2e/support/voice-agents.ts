@@ -9,12 +9,20 @@ export function voiceAgentUrl(agentId: string): string {
     return `${VOICE_AGENTS_URL}/${agentId}`;
 }
 
-/** Waits until React owns the element, so clicks and typing are not lost to the server-rendered HTML. */
+/**
+ * Waits until React owns the element, so clicks and typing are not lost to the server-rendered HTML, and until no
+ * streamed part of the page is still parked in a hidden `<div id="S:…">`: React 19.2 (Next 15.5) batches those swaps,
+ * and until one lands a strict locator finds the page's controls twice.
+ */
 export async function waitForHydration(page: Page, selector: string): Promise<void> {
     await expect(page.locator(selector).first()).toBeVisible();
     await page.waitForFunction((sel) => {
         const el = document.querySelector(sel);
-        return !!el && Object.keys(el).some((key) => key.startsWith('__reactProps'));
+        return (
+            !!el &&
+            Object.keys(el).some((key) => key.startsWith('__reactProps')) &&
+            !document.querySelector('div[hidden][id^="S:"]')
+        );
     }, selector);
 }
 

@@ -1,4 +1,4 @@
-import type { CallKindFilter, CallSuccessFilter } from '@/app/actions/voice-call-actions';
+import type { CallKindFilter, CallSuccessFilter, ListMyCallsInput } from '@/app/actions/voice-call-actions';
 import { isValidObjectId } from '@/helpers/object-id';
 import { parseCallRange, type VoiceCallRange } from '@/helpers/voice-call-ranges';
 
@@ -60,4 +60,17 @@ export function callLogFiltersQuery(filters: CallLogFilters): string {
     if (filters.range !== NO_CALL_LOG_FILTERS.range) params.set('range', filters.range);
     if (filters.q) params.set('q', filters.q);
     return params.toString();
+}
+
+/** The calls these filters show, as `listMyCalls` takes them (the page's first load and every change after it). */
+export function callLogsQuery(filters: CallLogFilters, limit: number): ListMyCallsInput {
+    return {
+        agentId: filters.agent,
+        includeDeleted: filters.deleted,
+        kind: filters.kind,
+        success: filters.success,
+        range: filters.range,
+        search: filters.q,
+        limit,
+    };
 }
