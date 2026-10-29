@@ -57,6 +57,32 @@ function workerPython(): string {
  */
 let queue: Promise<unknown> = Promise.resolve();
 
+/**
+ * Why the worker stopped, in words. Node's own message is the whole command
+ * line plus all of stderr; when the worker was killed its tail was only a
+ * library warning, which then read as the cause.
+ */
+function workerFailure(err: unknown): string {
+  const e = (err ?? {}) as {
+    killed?: boolean;
+    signal?: NodeJS.Signals | null;
+    code?: number | string | null;
+    stderr?: string;
+    message?: string;
+  };
+  let why: string;
+  if (typeof e.code === "string") why = e.code;
+  else if (e.killed) why = MEDIA_ERROR_MESSAGES.ALIGN_WORKER_TIMED_OUT;
+  else if (e.signal)
+    why = `${MEDIA_ERROR_MESSAGES.ALIGN_WORKER_KILLED} ${e.signal}${
+      e.signal === "SIGKILL" ? ` ${MEDIA_ERROR_MESSAGES.ALIGN_WORKER_OUT_OF_MEMORY}` : ""
+    }`;
+  else if (typeof e.code === "number") why = `exit ${e.code}`;
+  else return (e.message ?? String(err)).slice(-300);
+  const lastSaid = (e.stderr ?? "").trim().split("\n").slice(-3).join(" | ").slice(-240);
+  return lastSaid ? `${why}; last output: ${lastSaid}` : why;
+}
+
 export function oneAtATime<T>(task: () => Promise<T>): Promise<T> {
   const run = queue.then(task, task);
   queue = run.catch(() => {});
@@ -94,8 +120,7 @@ export async function alignWordsToAudio(
         }),
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return keep(`${MEDIA_ERROR_MESSAGES.ALIGN_WORKER_FAILED}: ${message.slice(-300)}`);
+      return keep(`${MEDIA_ERROR_MESSAGES.ALIGN_WORKER_FAILED}: ${workerFailure(err)}`);
     }
 
     let parsed: z.infer<typeof ALIGN_RESULT_SCHEMA>;

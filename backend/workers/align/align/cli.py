@@ -16,12 +16,18 @@ import subprocess
 import sys
 import tempfile
 import traceback
+import warnings
 
 from . import __version__
 from .fetch_models import DEFAULT_MODELS_DIR, load_bundle
 
 SAMPLE_RATE = 16000
 STAR = "*"
+
+# torch and torchaudio are pinned to 2.8 (setup.sh) because 2.9 removes forced_align and MMS_FA.
+# 2.8 warns about that on every run; the warning was the last thing on stderr when a run was
+# killed, so the backend reported it as the failure. It is known and harmless here: hide it.
+warnings.filterwarnings("ignore", message=r"torchaudio\..* has been deprecated", category=UserWarning)
 
 
 def _log(message: str) -> None:
@@ -60,6 +66,7 @@ def align(audio_path: str, words: list[str], models_dir: str, ffmpeg: str, threa
 
     torch.set_num_threads(threads)
     bundle, model = load_bundle(models_dir)
+    _log("model loaded")
     dictionary = bundle.get_dict(star=STAR)
     # Only real letters: the dictionary also holds the blank ("-"), which is never a target.
     letters = {token for token in dictionary if re.fullmatch(r"[a-z']", token)}
@@ -70,6 +77,7 @@ def align(audio_path: str, words: list[str], models_dir: str, ffmpeg: str, threa
 
     with torch.inference_mode():
         emission, _ = model(waveform)
+    _log(f"audio scored ({duration:.1f}s)")
     tokens = [dictionary[ch] for key in keys for ch in key]
     targets = torch.tensor([tokens], dtype=torch.int32)
     if targets.size(1) > emission.size(1):
