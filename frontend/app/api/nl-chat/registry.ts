@@ -27,11 +27,14 @@ export type NlChatModule =
 // ─── Schema helpers ───────────────────────────────────────────────────────────
 
 function makePartial(schema: z.ZodTypeAny): z.ZodTypeAny {
-    if (schema instanceof z.ZodEffects) {
-        return makePartial(schema.innerType() as z.ZodTypeAny);
+    // zod 4: a transform is a pipe (refinements stay on the object itself), and deepPartial is gone.
+    if (schema instanceof z.ZodPipe) {
+        return makePartial(schema.in as z.ZodTypeAny);
     }
     if (schema instanceof z.ZodObject) {
-        return schema.deepPartial();
+        return z.object(
+            Object.fromEntries(Object.entries(schema.shape).map(([key, field]) => [key, makePartial(field as z.ZodTypeAny).optional()])),
+        );
     }
     return schema.optional();
 }

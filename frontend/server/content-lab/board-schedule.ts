@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type { Filter } from 'mongodb';
-import type { ZodType, ZodTypeDef } from 'zod';
+import type { ZodType } from 'zod';
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
 import { API_ENDPOINTS } from '@aixellabs/backend/config';
 import { CONTENT_LAB_DEFAULT_COUNTRY, CONTENT_LAB_ERROR_MESSAGES } from '@aixellabs/backend/content-lab/constants';
@@ -56,7 +56,7 @@ export const RUNS_KEPT = 20;
 type Proxy<TReq, TRes> = (body: TReq, signal: AbortSignal) => Promise<ALApiResponse<TRes>>;
 
 /** Validates like the BFF route does, then calls the backend directly (no browser session here). */
-function backendCall<TReq, TRes>(schema: ZodType<unknown, ZodTypeDef, unknown>, endpoint: string): Proxy<TReq, TRes> {
+function backendCall<TReq, TRes>(schema: ZodType<unknown, unknown>, endpoint: string): Proxy<TReq, TRes> {
     return async (body, signal) => {
         const parsed = schema.safeParse(body);
         if (!parsed.success) return { success: false, error: CONTENT_LAB_ERROR_MESSAGES.INVALID_PARAMS };

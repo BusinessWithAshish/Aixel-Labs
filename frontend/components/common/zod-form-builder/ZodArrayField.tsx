@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardAction } from '../../ui/c
 import { FieldSet, FieldLegend, FieldDescription, FieldContent, FieldGroup } from '../../ui/field';
 import { generateFieldLabel } from './helpers';
 import { getFieldSingularLabel } from '@/helpers/string-helpers';
-import { extractMetadata, parseOptionsFromDescription, enumToOptions, unwrapDefault, getDefaultValue } from './schema-utils';
+import { extractMetadata, parseOptionsFromDescription, enumToOptions, unwrapDefault, getDefaultValue, zodTypeName, enumValues, arrayElement } from './schema-utils';
 import { ZodMetaType } from './zod-meta-types';
 import { SearchableMultiSelectControlledField } from './ZodControlledFields';
 
@@ -28,13 +28,13 @@ export const ZodArrayField = ({ name, fieldInfo, description }: ZodArrayFieldPro
 
     const unwrappedFieldInfo = unwrapDefault(fieldInfo);
     const isRequired = !fieldInfo?.isOptional();
-    const elementSchema = unwrappedFieldInfo?._def?.type;
-    const elementTypeName = elementSchema?._def?.typeName;
+    const elementSchema = arrayElement(unwrappedFieldInfo);
+    const elementTypeName = zodTypeName(elementSchema);
     const { cleanDescription, metadata } = extractMetadata(description);
 
     // Handle array of enums with searchable multi-select
     if (elementTypeName === 'ZodEnum' && metadata === ZodMetaType.SEARCHABLE_MULTI_SELECT) {
-        const options = enumToOptions(elementSchema._def.values);
+        const options = enumToOptions(enumValues(elementSchema));
         return <SearchableMultiSelectControlledField name={name} description={cleanDescription} required={isRequired} metadata={metadata} options={options} />;
     }
 

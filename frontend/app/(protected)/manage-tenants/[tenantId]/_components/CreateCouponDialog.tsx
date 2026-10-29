@@ -18,7 +18,7 @@ const createCouponSchema = z.object({
         .max(64, 'Code must be at most 64 characters')
         .regex(/^[A-Za-z0-9_-]+$/, 'Only letters, numbers, hyphens, and underscores'),
     creditAmount: z.coerce
-        .number({ invalid_type_error: 'Credits must be a number' })
+        .number({ error: 'Credits must be a number' })
         .int('Credits must be a whole number')
         .min(1, 'Credits must be at least 1')
         .max(MAX_USER_CREDITS, `Credits cannot exceed ${MAX_USER_CREDITS.toLocaleString()}`),
@@ -46,7 +46,7 @@ type CreateCouponDialogProps = {
 };
 
 export function CreateCouponDialog({ open, onOpenChange, tenantName, onSuccess }: CreateCouponDialogProps) {
-    const form = useForm<CreateCouponFormValues>({
+    const form = useForm<z.input<typeof createCouponSchema>, unknown, CreateCouponFormValues>({
         resolver: zodResolver(createCouponSchema),
         defaultValues: {
             code: '',

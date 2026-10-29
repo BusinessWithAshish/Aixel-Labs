@@ -31,7 +31,7 @@ const CONTEXT_SCHEMA = z.object({
 
 const LANGUAGE_SCHEMA = text(40).min(1);
 
-export const CONTENT_LAB_WRITE_REQUEST_SCHEMA: z.ZodType<CONTENT_LAB_WRITE_REQUEST, z.ZodTypeDef, unknown> = z.discriminatedUnion('mode', [
+export const CONTENT_LAB_WRITE_REQUEST_SCHEMA: z.ZodType<CONTENT_LAB_WRITE_REQUEST, unknown> = z.discriminatedUnion('mode', [
     z.object({ mode: z.literal('draft'), format: z.enum(CONTENT_LAB_WRITE_FORMATS), language: LANGUAGE_SCHEMA, context: CONTEXT_SCHEMA }),
     z.object({
         mode: z.literal('rewrites'),

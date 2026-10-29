@@ -12,7 +12,7 @@ import { z, ZodTypeAny } from 'zod';
 import { FormProvider, useForm } from 'react-hook-form';
 import { Button } from '../../ui/button';
 import { cn } from '@/lib/utils';
-import { extractMetadata, parseOptionsFromDescription, getObjectDefaults, unwrapDefault } from './schema-utils';
+import { extractMetadata, parseOptionsFromDescription, getObjectDefaults, unwrapDefault, zodTypeName, enumValues, arrayElement } from './schema-utils';
 import { ZodMetaType } from './zod-meta-types';
 import {
     SearchableSelectControlledField,
@@ -37,7 +37,7 @@ type ZodFormFieldProps = {
  * Delegates to appropriate renderer based on inner type
  */
 const ZodDefaultField = ({ name, fieldInfo, description }: ZodFormFieldProps) => {
-    const fieldType = fieldInfo._def?.typeName;
+    const fieldType = zodTypeName(fieldInfo);
     const isRequired = !fieldInfo?.isOptional();
     const { cleanDescription, metadata } = extractMetadata(description);
 
@@ -45,7 +45,7 @@ const ZodDefaultField = ({ name, fieldInfo, description }: ZodFormFieldProps) =>
 
     switch (fieldType) {
         case 'ZodEnum':
-            const options = fieldInfo._def.values.map((value: string) => enumToTitleCase(value));
+            const options = enumValues(fieldInfo).map((value: string) => enumToTitleCase(value)) as any;
             return <EnumControlledField {...renderProps} options={options} metadata={metadata} />;
 
         case 'ZodBoolean':
@@ -65,9 +65,10 @@ const ZodDefaultField = ({ name, fieldInfo, description }: ZodFormFieldProps) =>
  * Handles all Zod field types and wrapper types (Optional, Default, Array)
  */
 export const ZodFormField = ({ name, fieldInfo, description, isRequired: isRequiredProp }: ZodFormFieldProps) => {
-    const fieldType = fieldInfo?._def?.typeName;
-    const fieldDescription = description ?? fieldInfo?.description;
-    const innerType = fieldInfo?._def?.innerType;
+    const fieldType = zodTypeName(fieldInfo);
+    const innerType = (fieldInfo as any)?._def?.innerType;
+    // zod 4 does not copy a description onto the `.default()` / `.optional()` wrapper.
+    const fieldDescription = description ?? fieldInfo?.description ?? innerType?.description;
     const { cleanDescription, metadata } = extractMetadata(fieldDescription);
     const isRequired = isRequiredProp ?? !fieldInfo?.isOptional();
 
@@ -89,7 +90,7 @@ export const ZodFormField = ({ name, fieldInfo, description, isRequired: isRequi
             return <BooleanControlledField {...renderProps} />;
 
         case 'ZodEnum':
-            const options = fieldInfo._def.values.map((value: string) => enumToTitleCase(value));
+            const options = enumValues(fieldInfo).map((value: string) => enumToTitleCase(value)) as any;
             return <EnumControlledField {...renderProps} options={options} metadata={metadata} />;
 
         case 'ZodDefault':
@@ -100,8 +101,7 @@ export const ZodFormField = ({ name, fieldInfo, description, isRequired: isRequi
 
         case 'ZodArray': {
             const unwrappedFieldInfo = unwrapDefault(fieldInfo);
-            const elementSchema = unwrappedFieldInfo?._def?.type;
-            const elementTypeName = elementSchema?._def?.typeName;
+            const elementTypeName = zodTypeName(arrayElement(unwrappedFieldInfo));
 
             // Use StringArrayControlledField for arrays of strings
             if (elementTypeName === 'ZodString') {
@@ -130,7 +130,7 @@ export const ZodFormBuilder = <T extends z.ZodObject<z.ZodRawShape>>({
     className,
     onSubmit,
 }: ZodFormBuilderProps<T>) => {
-    const form = useForm<z.infer<T>>({
+    const form = useForm<z.input<T>, unknown, z.output<T>>({
         resolver: zodResolver(schema),
         defaultValues: getObjectDefaults(schema) as any,
     });
@@ -143,7 +143,7 @@ export const ZodFormBuilder = <T extends z.ZodObject<z.ZodRawShape>>({
                 onSubmit={form.handleSubmit(onSubmit)}
             >
                 {Object.entries(schema.shape).map(([key, value]) => (
-                    <ZodFormField key={key} name={key} fieldInfo={value} />
+                    <ZodFormField key={key} name={key} fieldInfo={value as ZodTypeAny} />
                 ))}
                 <div className="flex gap-3">
                     <Button type="button" variant="outline" onClick={() => form.reset()} className="flex-1 sm:flex-none">

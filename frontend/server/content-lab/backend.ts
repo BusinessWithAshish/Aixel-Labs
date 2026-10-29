@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { NextResponse } from 'next/server';
-import type { ZodType, ZodTypeDef } from 'zod';
+import type { ZodType } from 'zod';
 import { CONTENT_LAB_SUB_MODULES, Modules } from '@aixellabs/backend/db';
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
 import { CONTENT_LAB_ERROR_MESSAGES } from '@aixellabs/backend/content-lab/constants';
@@ -32,7 +32,7 @@ export async function requireContentLabSession(): Promise<{ session: AppSession 
 /** Session + JSON body parsed with the backend's own Zod schema; else the error response to return. */
 export async function readContentLabBody<T>(
     request: Request,
-    schema: ZodType<T, ZodTypeDef, unknown>,
+    schema: ZodType<T, unknown>,
 ): Promise<{ body: T; session: AppSession } | { response: NextResponse }> {
     const auth = await requireContentLabSession();
     if ('response' in auth) return auth;
@@ -51,7 +51,7 @@ export async function forwardToBackend<TRes>(request: Request, endpoint: string,
 }
 
 /** One route: auth, validate with the backend schema, forward. */
-export async function handleContentLabProxy<T>(request: Request, schema: ZodType<T, ZodTypeDef, unknown>, endpoint: string): Promise<NextResponse> {
+export async function handleContentLabProxy<T>(request: Request, schema: ZodType<T, unknown>, endpoint: string): Promise<NextResponse> {
     const read = await readContentLabBody(request, schema);
     if ('response' in read) return read.response;
     return forwardToBackend(request, endpoint, read.body);

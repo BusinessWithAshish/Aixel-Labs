@@ -47,7 +47,7 @@ const testCallSchema = z.object({
     agentId: z.string().min(1, 'Choose the agent that calls'),
     to: z.string().trim().min(1, 'Enter your phone number'),
     /** This call's values for the agent's {{variables}}; empty ones fall back to its defaults. */
-    variables: z.record(z.string()),
+    variables: z.record(z.string(), z.string()),
 });
 
 /** VoiceLink only dials from a number set to make calls (its outgoing calls go to the AI). */

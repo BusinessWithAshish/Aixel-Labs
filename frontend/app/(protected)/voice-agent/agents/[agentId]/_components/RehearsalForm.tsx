@@ -19,7 +19,7 @@ import { CopyRow } from '@/components/common/voice-agent/CopyRow';
 const rehearsalSchema = z.object({
     numberId: z.string().min(1, 'Choose a number'),
     /** This call's values for the agent's {{variables}}; empty ones fall back to its defaults. */
-    variables: z.record(z.string()),
+    variables: z.record(z.string(), z.string()),
 });
 
 type RehearsalFormProps = {

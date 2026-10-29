@@ -36,7 +36,7 @@ const tenantSchema = z.object({
     app_logo_url: z.string().optional(),
     app_theme_color: z.string().optional(),
     defaultCredits: z.coerce
-        .number({ invalid_type_error: 'Default credits must be a number' })
+        .number({ error: 'Default credits must be a number' })
         .int('Default credits must be a whole number')
         .min(0, 'Default credits cannot be below zero')
         .max(MAX_USER_CREDITS, `Default credits cannot exceed ${MAX_USER_CREDITS.toLocaleString()}`),
@@ -64,7 +64,7 @@ export function CreateTenantDialog({ open, onOpenChange, editingTenant, onSucces
     const isEditing = Boolean(editingTenant);
     const [defaultModuleAccess, setDefaultModuleAccess] = useState<ModuleAccess>(emptyModuleAccess());
 
-    const form = useForm<TenantFormValues>({
+    const form = useForm<z.input<typeof tenantSchema>, unknown, TenantFormValues>({
         resolver: zodResolver(tenantSchema),
         defaultValues: getTenantFormValues(),
     });

@@ -54,10 +54,25 @@ export const enumToOptions = (values: string[]): OptionType[] => {
 };
 
 /**
+ * The schema's type as a zod 3 style name ('ZodString', 'ZodDefault', ...): zod 4 keeps a
+ * lower-case `type` ('string', 'default', ...) where zod 3 had `typeName`.
+ */
+export const zodTypeName = (schema: any): string | undefined => {
+    const type: string | undefined = schema?._zod?.def?.type;
+    return type ? `Zod${type[0].toUpperCase()}${type.slice(1)}` : undefined;
+};
+
+/** An enum schema's values (zod 4 keeps them as an `entries` object). */
+export const enumValues = (schema: any): string[] => Object.values(schema?._zod?.def?.entries ?? {});
+
+/** An array schema's element schema. */
+export const arrayElement = (schema: any): any => schema?._zod?.def?.element;
+
+/**
  * Unwraps ZodDefault wrapper to get the inner type
  */
-export const unwrapDefault = (fieldInfo: ZodTypeAny): ZodTypeAny => {
-    if (fieldInfo?._def?.typeName === 'ZodDefault') {
+export const unwrapDefault = (fieldInfo: any): any => {
+    if (zodTypeName(fieldInfo) === 'ZodDefault') {
         return fieldInfo._def.innerType;
     }
     return fieldInfo;
@@ -66,21 +81,21 @@ export const unwrapDefault = (fieldInfo: ZodTypeAny): ZodTypeAny => {
 /**
  * Gets the default value for a field based on its schema type
  */
-export const getDefaultValue = (schema: ZodTypeAny): any => {
+export const getDefaultValue = (schema: any): any => {
     if (!schema) return '';
 
-    const typeName = schema?._def?.typeName;
+    const typeName = zodTypeName(schema);
 
     // Handle ZodDefault first - it has the actual default
     if (typeName === 'ZodDefault') {
-        return schema._def.defaultValue?.();
+        return schema._def.defaultValue;
     }
 
     // Unwrap ZodOptional to check if there's a default inside
     if (typeName === 'ZodOptional') {
         const innerSchema = schema._def.innerType;
-        if (innerSchema._def.typeName === 'ZodDefault') {
-            return innerSchema._def.defaultValue?.();
+        if (zodTypeName(innerSchema) === 'ZodDefault') {
+            return innerSchema._def.defaultValue;
         }
         // If no default inside optional, return the primitive default
         return getDefaultValue(innerSchema);
@@ -105,10 +120,10 @@ export const getDefaultValue = (schema: ZodTypeAny): any => {
         ZodString: '',
         ZodNumber: 0,
         ZodBoolean: false,
-        ZodEnum: schema._def.values?.[0],
+        ZodEnum: enumValues(schema)[0],
     };
 
-    return defaultValueMap[typeName] ?? '';
+    return defaultValueMap[typeName ?? ''] ?? '';
 };
 
 /**
