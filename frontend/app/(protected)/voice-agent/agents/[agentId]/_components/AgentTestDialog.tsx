@@ -24,8 +24,8 @@ type AgentTestDialogProps = {
     agentId: string;
     agentName: string;
     callType: VoiceAgentCallType;
-    /** Phone tests for an agent that works on the phone, the WhatsApp chat for one on WhatsApp. */
-    channel: VoiceAgentChannel;
+    /** Phone tests for an agent on a phone line, the WhatsApp chat for one on WhatsApp (from its numbers; null: none yet). */
+    channel: VoiceAgentChannel | null;
 };
 
 /**

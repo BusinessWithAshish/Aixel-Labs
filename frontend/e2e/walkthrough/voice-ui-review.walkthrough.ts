@@ -215,7 +215,7 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
                 await waitForHydration(page, '[data-testid="new-voice-agent"]');
                 await capture('agents-list');
                 await page.getByTestId('new-voice-agent').click();
-                await expect(page.getByRole('dialog', { name: 'New voice agent' })).toBeVisible();
+                await expect(page.getByRole('dialog', { name: 'New agent' })).toBeVisible();
                 await capture('agents-create-dialog', false);
                 await page.keyboard.press('Escape');
             });

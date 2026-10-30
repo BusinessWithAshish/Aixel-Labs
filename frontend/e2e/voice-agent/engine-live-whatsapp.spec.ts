@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ObjectId } from 'mongodb';
 import type { Page } from '@playwright/test';
-import { VoiceAgentCallType, VoiceAgentChannel, VoiceCallChannel, VoiceProvider } from '@aixellabs/backend/db/types';
+import { VoiceAgentCallType, VoiceCallChannel, VoiceProvider } from '@aixellabs/backend/db/types';
 import { WHATSAPP_URL } from '@/helpers/voice-routes';
 import { expect, test } from '../support/fixtures';
 import type { E2eDb } from '../support/db';
@@ -79,7 +79,6 @@ async function setUpNumber(page: Page, db: E2eDb): Promise<{ agentId: string; nu
     const agentId = await db.insertVoiceAgent(E2E_USER, {
         name: 'Maya',
         callType: VoiceAgentCallType.INBOUND,
-        channel: VoiceAgentChannel.WHATSAPP,
         voice: 'kore',
         prompt: PROMPT,
     });

@@ -44,7 +44,7 @@ export function voiceCallBlockers({
     keys: Key[];
     /** For calls over a phone line (test calls, the browser and softphone tests): whether the agent is on a number. */
     onNumber?: boolean;
-    /** Which number `onNumber` means. */
+    /** The numbers it could go on, for what `onNumber: false` says. */
     channel?: VoiceAgentChannel;
 }): VoiceCallBlocker[] {
     const blockers: VoiceCallBlocker[] = [];

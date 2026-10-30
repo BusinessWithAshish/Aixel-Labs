@@ -314,7 +314,7 @@ export type VoiceAgentDoc<Id = ObjectId> = {
   stack?: VoiceStack<Id> | null;
   /** The voice it speaks in on a PIPELINE stack. A REALTIME stack speaks in `voice` (Gemini Live's own voices). Absent = none picked yet. */
   ttsVoice?: VoiceTtsVoice | null;
-  /** Where it talks to people: phone numbers, WhatsApp numbers, or both. Absent = PHONE (agents made before WhatsApp). */
+  /** No longer read or written: where an agent works comes from the numbers it is on. Left on agents saved before. */
   channel?: VoiceAgentChannel;
   /** How it chats on WhatsApp. Absent = VOICE_WHATSAPP_DEFAULTS. */
   whatsapp?: VoiceAgentWhatsApp | null;
@@ -323,9 +323,9 @@ export type VoiceAgentDoc<Id = ObjectId> = {
 };
 
 /**
- * Where an agent works. The app shows PHONE agents under Voice agents, WHATSAPP agents in the WhatsApp section, and
- * BOTH in both: one agent for a business whose WhatsApp number is also its phone line (one prompt, one memory).
- * A WHATSAPP or BOTH agent answers (callType INBOUND); placing calls is phone only.
+ * Where an agent works, as the numbers it is on make it (the app's `channelFromNumbers`): phone lines, WhatsApp
+ * numbers, or both (one agent, one prompt and one memory for a business whose WhatsApp number is also its phone line).
+ * Only an agent that answers (callType INBOUND) can be on a WhatsApp number.
  */
 export enum VoiceAgentChannel {
   PHONE = "PHONE",
@@ -343,7 +343,7 @@ export type VoiceAgentWhatsApp = {
   chatModel: VoiceChatModel;
   /** A voice note is answered with a voice note in the agent's voice (and its words in text); off = text only. */
   voiceReplies: boolean;
-  /** It may hand a chat to a person (the inbox shows "Needs you") when asked for one or when it cannot help. */
+  /** It may hand a chat to a person (the inbox shows "Waiting") when asked for one or when it cannot help. */
   handoff: boolean;
 };
 
@@ -575,8 +575,6 @@ export type VoiceBooking = Omit<VoiceBookingDoc<string>, "start" | "end" | "crea
 /** Client view: tools without secrets (always present, empty when the agent has none). */
 export type VoiceAgent = Omit<VoiceAgentDoc<string>, "tools" | "channel" | "createdAt" | "updatedAt"> & {
   tools: VoiceAgentToolsView;
-  /** Always set on the client view (PHONE for agents saved before WhatsApp). */
-  channel: VoiceAgentChannel;
   createdAt: string;
   updatedAt: string;
 };

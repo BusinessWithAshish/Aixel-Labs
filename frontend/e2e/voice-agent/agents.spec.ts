@@ -48,7 +48,7 @@ async function createThroughDialog(page: Page, type: RegExp, name: string): Prom
     await page.goto(VOICE_AGENTS_URL);
     await waitForHydration(page, '[data-testid="new-voice-agent"]');
     await page.getByRole('button', { name: 'New agent' }).click();
-    const dialog = page.getByRole('dialog', { name: 'New voice agent' });
+    const dialog = page.getByRole('dialog', { name: 'New agent' });
     // One step: the agent type dropdown (inbound picked) and a name; the voice is set on the agent's page.
     const callType = dialog.getByRole('combobox', { name: 'Agent type' });
     await expect(dialog.getByTestId('voice-picker-trigger')).toHaveCount(0);
@@ -84,7 +84,7 @@ function templatesDialog(page: Page) {
 
 test('a new outbound agent starts with an empty prompt: a template is read in full, then used', async ({ page, db }) => {
     await page.goto(VOICE_AGENTS_URL);
-    await expect(page.getByText('No voice agents yet')).toBeVisible();
+    await expect(page.getByText('No agents yet')).toBeVisible();
     await createThroughDialog(page, /^Outbound/, 'Sales caller');
 
     await expect(page.getByTestId('voice-agent-call-type').first()).toHaveText('Outbound · makes calls');
@@ -201,7 +201,7 @@ test('the type can be changed back in the create dialog', async ({ page, db }) =
     await page.goto(VOICE_AGENTS_URL);
     await waitForHydration(page, '[data-testid="new-voice-agent"]');
     await page.getByRole('button', { name: 'New agent' }).click();
-    const dialog = page.getByRole('dialog', { name: 'New voice agent' });
+    const dialog = page.getByRole('dialog', { name: 'New agent' });
     const callType = dialog.getByRole('combobox', { name: 'Agent type' });
     for (const type of ['Outbound', 'Inbound', 'Outbound']) {
         await callType.click();
@@ -328,7 +328,7 @@ test('the agent card shows its numbers and its Gemini key, and opens a picker of
     await db.resetVoiceTelephony(E2E_USER);
     await openVoiceAgent(page, unusedId);
     await expect(
-        page.getByTestId('agent-numbers-empty').getByRole('link', { name: 'Connect one on Phone numbers' }),
+        page.getByTestId('agent-numbers-empty').getByRole('link', { name: 'Connect one on Numbers' }),
     ).toHaveAttribute('href', '/voice-agent/phone-numbers');
 });
 
@@ -494,9 +494,13 @@ test('trying the agent (browser, Linphone, phone) needs a number; the playground
     await openVoiceAgent(page, agentId);
     const card = page.getByTestId('call-blockers');
     await expect(card).toHaveCount(1); // the agent card's; the playground has nothing to say
-    await expect(card).toContainText('It is not on a phone number yet.');
-    await expect(card.getByRole('link', { name: 'Link a phone number →' })).toHaveAttribute('href', '#agent-numbers-phone');
-    await expect(page.getByRole('button', { name: 'Call this agent' })).toBeDisabled();
+    await expect(card).toContainText('It is not on a phone or WhatsApp number yet.');
+    await expect(card.getByRole('link', { name: 'Link a phone or WhatsApp number →' })).toHaveAttribute(
+        'href',
+        '#agent-numbers-phone',
+    );
+    // Until it is on a number, it is tried in the WhatsApp test chat, which needs none.
+    await expect(page.getByRole('button', { name: 'Chat with this agent' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Start call' })).toBeEnabled();
     await expect(page.getByTestId('playground-no-number')).toHaveText(
         'Runs in your browser straight to the model: no phone number needed.',
@@ -556,7 +560,8 @@ test('Delete sits beside Save; deleting lets its numbers go, and keeps it when a
     await openVoiceAgent(page, agentId);
 
     // It answers +15550100011, whose provider account cannot be reached here: nothing is deleted.
-    await page.getByRole('button', { name: 'Delete agent' }).click();
+    await page.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete agent' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete agent' }).click();
     await expect(page.locator('[data-sonner-toast][data-type="error"]').first()).toBeVisible();
     expect((await db.getVoiceAgents(E2E_USER)).map((a) => a.name)).toEqual(['Short lived', 'Keeper']);
@@ -565,7 +570,8 @@ test('Delete sits beside Save; deleting lets its numbers go, and keeps it when a
     await db.setVoiceNumberAgents(both, { inboundAgentId: null });
     await page.reload();
     await waitForHydration(page, '#agent-prompt');
-    await page.getByRole('button', { name: 'Delete agent' }).click();
+    await page.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete agent' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete agent' }).click();
 
     await expect(page).toHaveURL(new RegExp(`${VOICE_AGENTS_URL}$`));
@@ -584,7 +590,7 @@ test("another user's agent is not found", async ({ page, db }) => {
     await expect(page.getByText('Admin only')).toHaveCount(0);
     await expect(page.locator('#agent-prompt')).toHaveCount(0);
     await page.goto(VOICE_AGENTS_URL);
-    await expect(page.getByText('No voice agents yet')).toBeVisible();
+    await expect(page.getByText('No agents yet')).toBeVisible();
 });
 
 test.describe('module access', () => {

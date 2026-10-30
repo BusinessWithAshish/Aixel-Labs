@@ -1,4 +1,3 @@
-import { WHATSAPP_AGENTS_URL, WHATSAPP_NUMBERS_URL, WHATSAPP_URL } from '@/helpers/voice-routes';
 import { FILE_UPLOADS_ROUTE, MANAGE_TENANTS_ROUTE } from './app-config';
 
 /** Admin-only paths (not in sidebar nav). Exact match or nested routes (e.g. /manage-tenants/[tenantId]) require admin. */
@@ -21,7 +20,6 @@ import {
     Mail,
     MessageCircleMore,
     UsersRound,
-    Phone,
     FacebookIcon,
     MapPinIcon,
     SearchIcon,
@@ -29,7 +27,6 @@ import {
     ListIcon,
     Globe,
     Bot,
-    Inbox,
     History,
     CalendarCheck,
     Megaphone,
@@ -38,16 +35,30 @@ import {
     Sparkles,
     Workflow,
     Eye,
+    MessagesSquare,
+    UserRoundPlus,
+    MapPinned,
+    MailCheck,
+    ShieldCheck,
+    Headset,
+    MessageCircle,
+    MessageSquareText,
+    Send,
+    MailOpen,
+    LayoutTemplate,
+    WandSparkles,
+    TextSearch,
+    SlidersHorizontal,
 } from 'lucide-react';
 
-/** Sidebar pages that live inside a sub-module (each labelled and iconed in the maps below). */
-export type SidebarPageKey = 'WHATSAPP_INBOX' | 'WHATSAPP_AGENTS' | 'WHATSAPP_NUMBERS';
+/** Sidebar pages that live inside a sub-module (each labelled and iconed in the maps below). None today. */
+export type SidebarPageKey = never;
 /** Anything the sidebar shows: a module, a sub-module, or a page inside one. */
 export type SidebarKey = Modules | SubModule | SidebarPageKey;
 
 /**
  * One sidebar entry: a page (`url`), or a folder of entries (`items`). Folders nest to any depth, each one opening
- * inside its parent (Voice Agent > WhatsApp > Inbox).
+ * inside its parent.
  */
 export type SidebarNavItem = {
     title: SidebarKey;
@@ -59,19 +70,11 @@ export type SidebarNavItem = {
  * Sub-modules that are a folder of pages instead of one page: the entries inside, in order (any of them may be a
  * folder again). Access stays the sub-module's: a user granted it sees all of it.
  */
-export const subModuleChildren: Partial<Record<SubModule, SidebarNavItem[]>> = {
-    [VOICE_AGENT_SUB_MODULES.WHATSAPP]: [
-        { title: 'WHATSAPP_INBOX', url: WHATSAPP_URL },
-        { title: 'WHATSAPP_AGENTS', url: WHATSAPP_AGENTS_URL },
-        { title: 'WHATSAPP_NUMBERS', url: WHATSAPP_NUMBERS_URL },
-    ],
-};
+export const subModuleChildren: Partial<Record<SubModule, SidebarNavItem[]>> = {};
 
 /** Sidebar labels that differ from the key's title case. */
 export const subModuleLabelMap: Partial<Record<SidebarKey, string>> = {
-    WHATSAPP_INBOX: 'Inbox',
-    WHATSAPP_AGENTS: 'Agents',
-    WHATSAPP_NUMBERS: 'Numbers',
+    [VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]: 'Numbers',
     [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: 'Bookings',
     [VOICE_AGENT_SUB_MODULES.WHATSAPP]: 'WhatsApp',
     [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: 'Analytics',
@@ -96,16 +99,13 @@ export type SidebarConfig = {
 export const modulesIconMap: Record<Modules, LucideIcon> = {
     [Modules.LEAD_GENERATION]: UsersRound,
     [Modules.VOICE_AGENT]: AudioWaveform,
-    [Modules.MESSAGING]: MessageCircleMore,
+    [Modules.MESSAGING]: MessagesSquare,
     [Modules.EMAIL]: Mail,
-    [Modules.LEAD_ENRICHMENT]: UsersRound,
+    [Modules.LEAD_ENRICHMENT]: UserRoundPlus,
     [Modules.CONTENT_LAB]: Sparkles,
 };
 
 export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: LucideIcon; color: string }> = {
-    WHATSAPP_INBOX: { icon: Inbox, color: '!text-green-600' },
-    WHATSAPP_AGENTS: { icon: Bot, color: '!text-green-600' },
-    WHATSAPP_NUMBERS: { icon: Phone, color: '!text-green-600' },
     [LEAD_GENERATION_SUB_MODULES.LEADS]: {
         icon: ListIcon,
         color: '!text-slate-600',
@@ -115,7 +115,7 @@ export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: Lucide
         color: '!text-red-500',
     },
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS_ADVANCED]: {
-        icon: MapPinIcon,
+        icon: MapPinned,
         color: '!text-orange-500',
     },
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH]: {
@@ -139,11 +139,11 @@ export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: Lucide
         color: '!text-teal-600',
     },
     [LEAD_ENRICHMENT_SUB_MODULES.EMAIL_VERIFICATION]: {
-        icon: Mail,
+        icon: MailCheck,
         color: '!text-blue-500',
     },
     [LEAD_ENRICHMENT_SUB_MODULES.PHONE_VERIFICATION]: {
-        icon: PhoneIcon,
+        icon: ShieldCheck,
         color: '!text-green-500',
     },
     [VOICE_AGENT_SUB_MODULES.AGENTS]: {
@@ -163,7 +163,7 @@ export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: Lucide
         color: '!text-green-600',
     },
     [VOICE_AGENT_SUB_MODULES.WEB_DIALER]: {
-        icon: Phone,
+        icon: Headset,
         color: '!text-green-500',
     },
     [VOICE_AGENT_SUB_MODULES.CAMPAIGNS]: {
@@ -183,31 +183,31 @@ export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: Lucide
         color: '!text-slate-600',
     },
     [MESSAGING_SUB_MODULES.WHATSAPP]: {
-        icon: MessageCircleMore,
+        icon: MessageCircle,
         color: '!text-green-500',
     },
     [MESSAGING_SUB_MODULES.SMS]: {
-        icon: MessageCircleMore,
+        icon: MessageSquareText,
         color: '!text-gray-500',
     },
     [EMAIL_SUB_MODULES.COLD_OUTREACH]: {
-        icon: Mail,
+        icon: Send,
         color: '!text-blue-500',
     },
     [EMAIL_SUB_MODULES.WARM_OUTREACH]: {
-        icon: Mail,
+        icon: MailOpen,
         color: '!text-orange-500',
     },
     [EMAIL_SUB_MODULES.TEMPLATES]: {
-        icon: Mail,
+        icon: LayoutTemplate,
         color: '!text-gray-500',
     },
     [EMAIL_SUB_MODULES.AI_REPLIES]: {
-        icon: Mail,
+        icon: WandSparkles,
         color: '!text-purple-500',
     },
     [CONTENT_LAB_SUB_MODULES.SEARCH]: {
-        icon: SearchIcon,
+        icon: TextSearch,
         color: '!text-teal-600',
     },
     [CONTENT_LAB_SUB_MODULES.BOARDS]: {
@@ -219,7 +219,7 @@ export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: Lucide
         color: '!text-amber-600',
     },
     [CONTENT_LAB_SUB_MODULES.SETTINGS]: {
-        icon: Settings,
+        icon: SlidersHorizontal,
         color: '!text-slate-600',
     },
 };

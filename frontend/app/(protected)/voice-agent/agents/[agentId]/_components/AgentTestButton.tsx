@@ -2,20 +2,23 @@
 
 import { useState } from 'react';
 import { MessageCircle, PhoneCall } from 'lucide-react';
+import { VoiceAgentCallType, VoiceAgentChannel } from '@aixellabs/backend/db/types';
 import { DisabledReason } from '@/components/wrappers/DisabledReason';
 import { Button } from '@/components/ui/button';
 import { blockerText } from '@/helpers/voice-call-readiness';
-import { channelOf, servesPhone } from '@/helpers/voice-agent-channels';
+import { servesPhone } from '@/helpers/voice-agent-channels';
 import { usePage } from '@/contexts/PageStore';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import { AgentTestDialog, agentTestTitle } from './AgentTestDialog';
 
 /** The card's one way to try the agent: in the browser, on Linphone or on the owner's phone. Green, like a call. */
 export function AgentTestButton() {
-    const { agentId, saved, phoneBlockers, callBlockers } = usePage<UseVoiceAgentEditorPageReturn>();
+    const { agentId, saved, channel, whatsapp, phoneBlockers, callBlockers } = usePage<UseVoiceAgentEditorPageReturn>();
     const [open, setOpen] = useState(false);
-    // A WhatsApp-only agent is tried in the test chat, which goes straight to the engine: no number needed.
-    const phone = servesPhone(channelOf(saved));
+    // An agent only on WhatsApp is tried in the test chat, which goes straight to the engine: no number needed. So is
+    // one that answers and is on no number yet, when the owner has WhatsApp (phone tests need a number).
+    const tried = channel ?? (whatsapp && saved.callType === VoiceAgentCallType.INBOUND ? VoiceAgentChannel.WHATSAPP : null);
+    const phone = servesPhone(tried);
     const blockers = phone ? phoneBlockers : callBlockers;
     const Icon = phone ? PhoneCall : MessageCircle;
     return (
@@ -38,7 +41,7 @@ export function AgentTestButton() {
                 agentId={agentId}
                 agentName={saved.name}
                 callType={saved.callType}
-                channel={saved.channel}
+                channel={tried}
             />
         </>
     );

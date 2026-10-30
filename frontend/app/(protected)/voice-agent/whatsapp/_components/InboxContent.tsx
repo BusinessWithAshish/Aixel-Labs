@@ -1,10 +1,13 @@
 'use client';
 
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useDefaultLayout } from 'react-resizable-panels';
 import { Bot, Hand, MessageCircleMore, Undo2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { WHATSAPP_NUMBERS_URL } from '@/helpers/voice-routes';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { VOICE_PHONE_NUMBERS_URL } from '@/helpers/voice-routes';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
 import type { UseInboxPageReturn } from '../_hooks/use-inbox-page';
@@ -20,7 +23,7 @@ const STEPS = [
     {
         icon: Hand,
         title: 'Take over',
-        body: 'Open a chat and press Take over. Chats marked Needs you are the ones where the AI asked for a person. From then on the AI stays quiet.',
+        body: 'Open a chat and press Take over. Chats marked Waiting are the ones where the AI asked for a person. From then on the AI stays quiet.',
     },
     {
         icon: Undo2,
@@ -56,7 +59,7 @@ function TakeoverGuide({ hasThreads }: { hasThreads: boolean }) {
             </ol>
             {!hasThreads ? (
                 <Button asChild variant="outline">
-                    <Link href={WHATSAPP_NUMBERS_URL}>Connect a WhatsApp number</Link>
+                    <Link href={VOICE_PHONE_NUMBERS_URL}>Connect a WhatsApp number</Link>
                 </Button>
             ) : null}
             <p className="text-muted-foreground max-w-lg text-center text-xs">
@@ -66,25 +69,81 @@ function TakeoverGuide({ hasThreads }: { hasThreads: boolean }) {
     );
 }
 
-/** WhatsApp Web's layout: the conversations on the left, the open chat on the right (one at a time when the inbox is
- * narrow: a phone, or a tablet with the sidebar open, so it goes by the inbox's own width, not the screen's). */
+/** The inbox's own width (not the screen's: a tablet with the sidebar open is narrow too), from which both panes fit
+ * side by side. Same 42rem as the `@2xl/inbox` the first render lays out with, so nothing moves when this takes over. */
+const SIDE_BY_SIDE_PX = 672;
+
+function useSideBySide() {
+    const ref = useRef<HTMLDivElement>(null);
+    const [sideBySide, setSideBySide] = useState<boolean | null>(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const observer = new ResizeObserver(([entry]) => setSideBySide(entry.contentRect.width >= SIDE_BY_SIDE_PX));
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+    return { ref, sideBySide };
+}
+
+/** Both panes with a handle between them; the width you drag the chats to is kept for next time. */
+function ResizableInbox({ list, chat }: { list: ReactNode; chat: ReactNode }) {
+    const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+        id: 'whatsapp-inbox',
+        onlySaveAfterUserInteractions: true,
+    });
+    return (
+        <ResizablePanelGroup
+            id="whatsapp-inbox"
+            defaultLayout={defaultLayout}
+            onLayoutChanged={onLayoutChanged}
+            className="min-h-0 flex-1"
+        >
+            <ResizablePanel
+                id="chats"
+                defaultSize="22rem"
+                minSize="16rem"
+                maxSize="50%"
+                groupResizeBehavior="preserve-pixel-size"
+                className="h-full"
+            >
+                {list}
+            </ResizablePanel>
+            <ResizableHandle
+                withHandle
+                aria-label="Resize the chat list"
+                className="mx-1.5 bg-transparent hover:bg-border"
+            />
+            <ResizablePanel id="chat" minSize="24rem" className="h-full">
+                {chat}
+            </ResizablePanel>
+        </ResizablePanelGroup>
+    );
+}
+
+/** WhatsApp Web's layout: the conversations on the left, the open chat on the right, resizable. One pane at a time when
+ * the inbox is narrow (a phone, or a tablet with the sidebar open). The server render lays the panes out with container
+ * queries; once the width is measured, a wide inbox switches to the resizable panes at the same sizes. */
 export function InboxContent() {
     const { thread, allCount, loadError } = usePage<UseInboxPageReturn>();
+    const { ref, sideBySide } = useSideBySide();
+    const list = <ThreadList />;
+    const chat = thread ? <ThreadPane /> : <TakeoverGuide hasThreads={allCount > 0} />;
     return (
-        <div className="@container/inbox flex h-[calc(100dvh-7.5rem)] min-h-[32rem] flex-col gap-3">
+        <div ref={ref} className="@container/inbox flex h-[calc(100dvh-7.5rem)] min-h-[32rem] flex-col gap-3">
             {loadError ? (
                 <Alert variant="destructive">
                     <AlertDescription>{loadError}</AlertDescription>
                 </Alert>
             ) : null}
-            <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3 @2xl/inbox:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
-                <div className={cn('min-h-0', thread && 'hidden @2xl/inbox:block')}>
-                    <ThreadList />
+            {sideBySide ? (
+                <ResizableInbox list={list} chat={chat} />
+            ) : (
+                <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3 @2xl/inbox:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
+                    <div className={cn('min-h-0', thread && 'hidden @2xl/inbox:block')}>{list}</div>
+                    <div className={cn('min-h-0', !thread && 'hidden @2xl/inbox:block')}>{chat}</div>
                 </div>
-                <div className={cn('min-h-0', !thread && 'hidden @2xl/inbox:block')}>
-                    {thread ? <ThreadPane /> : <TakeoverGuide hasThreads={allCount > 0} />}
-                </div>
-            </div>
+            )}
         </div>
     );
 }

@@ -10,6 +10,7 @@ import { getAgentCostTotals } from '@/app/actions/voice-call-actions';
 import { listMyNumbers } from '@/app/actions/voice-number-actions';
 import { isValidObjectId } from '@/helpers/object-id';
 import { NO_GEMINI_KEY } from '@/server/voice-agent/gemini-key';
+import { canUseWhatsApp } from '@/server/voice-agent/owner-scope';
 import { BUILT_IN_VOICES } from '@/helpers/voice-catalogue';
 import { FALLBACK_CATALOGUE } from '@/helpers/voice-stack';
 import { useVoiceAgentEditorPage } from './_hooks/use-voice-agent-editor-page';
@@ -39,6 +40,7 @@ async function VoiceAgentPage({
         memoriesResponse,
         costsResponse,
         stackOptionsResponse,
+        whatsapp,
     ] = await Promise.all([
         getVoiceAgent(agentId),
         getVoiceAgentUsage(agentId),
@@ -48,6 +50,7 @@ async function VoiceAgentPage({
         listVoiceCallerMemories(agentId),
         getAgentCostTotals(agentId),
         getAgentStackOptions(),
+        canUseWhatsApp(),
     ]);
     if (!response.success || !response.data) {
         return notFound();
@@ -75,6 +78,7 @@ async function VoiceAgentPage({
                     geminiKey: keyResponse.data ?? NO_GEMINI_KEY,
                     costTotals: costsResponse.data?.[0] ?? null,
                     stackOptions: stackOptionsResponse.data ?? NO_STACK_OPTIONS,
+                    whatsapp,
                 }}
                 usePageHook={useVoiceAgentEditorPage}
             >

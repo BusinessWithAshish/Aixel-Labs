@@ -74,7 +74,7 @@ export function WhatsAppSettings() {
                 id="whatsapp-handoff"
                 name="whatsapp.handoff"
                 label="Hand chats to a person when needed"
-                hint="When someone asks for a human, or the agent can't help, it says a team member will reply and marks the chat Needs you in the WhatsApp inbox."
+                hint="When someone asks for a human, or the agent can't help, it says a team member will reply and marks the chat Waiting in the WhatsApp inbox."
             />
         </SettingsSection>
     );

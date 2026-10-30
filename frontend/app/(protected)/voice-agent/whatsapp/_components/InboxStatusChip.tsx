@@ -5,7 +5,7 @@ import { InboxStatus } from '@/helpers/voice-inbox';
 /** Who answers a conversation right now, in one word. */
 export const INBOX_STATUS: Record<InboxStatus, { label: string; variant: 'green' | 'yellow' | 'blue'; icon: typeof Bot }> = {
     [InboxStatus.AI]: { label: 'AI', variant: 'green', icon: Bot },
-    [InboxStatus.NEEDS_YOU]: { label: 'Needs you', variant: 'yellow', icon: Hand },
+    [InboxStatus.NEEDS_YOU]: { label: 'Waiting', variant: 'yellow', icon: Hand },
     [InboxStatus.HUMAN]: { label: 'You', variant: 'blue', icon: UserRound },
 };
 

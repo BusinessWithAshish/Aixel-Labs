@@ -45,7 +45,7 @@ export function WhatsAppTestPanel({ agentId, agentName }: { agentId: string; age
         const now = new Date().toISOString();
         const notes: Line[] = res.data.toolCalls.map((t) => ({ kind: 'note', text: `${t.ok ? '✓' : '✗'} ${t.name}: ${t.result}`, at: now }));
         if (res.data.handoff) {
-            notes.push({ kind: 'note', text: `Handed to a person (${res.data.handoff}). On a real number this chat shows as Needs you in the WhatsApp inbox, and the AI goes quiet.`, at: now });
+            notes.push({ kind: 'note', text: `Handed to a person (${res.data.handoff}). On a real number this chat shows as Waiting in the WhatsApp inbox, and the AI goes quiet.`, at: now });
         }
         setLines((current) => [...current, ...notes, { kind: 'message', role: 'agent', text: res.data!.reply, at: now }]);
     };

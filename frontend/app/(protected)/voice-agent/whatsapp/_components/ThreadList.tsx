@@ -68,24 +68,33 @@ function ThreadRow({ thread, selected, onOpen }: { thread: InboxThread; selected
     );
 }
 
-const FILTERS: { value: InboxFilter; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'needs-you', label: 'Needs you' },
-    { value: 'yours', label: 'Yours' },
-    { value: 'ai', label: 'AI' },
+/** WhatsApp's filter chips, one short word each; the word matches the chip on each chat. */
+const FILTERS: { value: InboxFilter; label: string; hint: string }[] = [
+    { value: 'all', label: 'All', hint: 'Every chat' },
+    { value: 'needs-you', label: 'Waiting', hint: 'The AI asked for a person' },
+    { value: 'yours', label: 'Mine', hint: 'Chats you took over' },
+    { value: 'ai', label: 'AI', hint: 'Chats the AI is answering' },
 ];
 
-/** The conversations, latest first, as WhatsApp lists chats; "Needs you" ones carry an amber edge. */
+/** The conversations, latest first, as WhatsApp lists chats; Waiting ones carry an amber edge. */
 export function ThreadList() {
     const { threads, counts, filter, setFilter, selectedKey, openThread } = usePage<UseInboxPageReturn>();
     return (
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-white dark:bg-[#111b21]" aria-label="Conversations">
+        <aside
+            className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-white dark:bg-[#111b21]"
+            aria-label="Conversations"
+        >
             <div className="flex flex-col gap-3 border-b px-4 pt-4 pb-3">
                 <h2 className="text-lg font-semibold">Chats</h2>
                 <Tabs value={filter} onValueChange={(v) => setFilter(v as InboxFilter)}>
-                    <TabsList className="w-full" aria-label="Show">
+                    <TabsList className="h-auto w-full flex-wrap justify-start gap-1.5 bg-transparent p-0" aria-label="Show">
                         {FILTERS.map((f) => (
-                            <TabsTrigger key={f.value} value={f.value} className="min-w-0 px-1.5 text-xs">
+                            <TabsTrigger
+                                key={f.value}
+                                value={f.value}
+                                title={f.hint}
+                                className="h-7 flex-none rounded-full border-0 bg-[#f0f2f5] px-3 text-[13px] font-normal text-[#54656f] data-[state=active]:bg-[#d9fdd3] data-[state=active]:font-medium data-[state=active]:text-[#008069] data-[state=active]:shadow-none dark:bg-[#202c33] dark:text-[#aebac1] dark:data-[state=active]:bg-[#0a332c] dark:data-[state=active]:text-[#00a884]"
+                            >
                                 {f.label}
                                 {f.value === 'needs-you' && counts['needs-you'] ? (
                                     <span className="rounded-full bg-amber-400 px-1.5 text-[10px] leading-4 font-semibold text-white">

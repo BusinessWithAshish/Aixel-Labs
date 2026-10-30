@@ -9,6 +9,7 @@ import {
     VOICE_BUILTIN_VARIABLES,
     type VoiceAgent,
     VoiceAgentCallType,
+    VoiceAgentChannel,
     type VoiceBookingDestination,
     type VoiceCalendarConnection,
     VoiceCalendarConnectionStatus,
@@ -34,7 +35,7 @@ import type { VoiceAgentStackOptions } from '@/app/actions/voice-settings-action
 import { setNumberAgent, unlinkAgentNumber, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 import { estimateAgentCost } from '@/helpers/voice-call-cost';
 import { voiceCallBlockers } from '@/helpers/voice-call-readiness';
-import { channelOf } from '@/helpers/voice-agent-channels';
+import { channelFromNumbers } from '@/helpers/voice-agent-channels';
 import {
     disconnectVoiceApp,
     listVoiceAppCalendars,
@@ -85,6 +86,8 @@ export type VoiceAgentEditorData = {
     costTotals: VoiceAgentCostTotals | null;
     /** The keys, models and voices its stack can use. */
     stackOptions: VoiceAgentStackOptions;
+    /** Whether the owner may use WhatsApp: its number picker shows only then. */
+    whatsapp: boolean;
 };
 
 /** A calendar (or event type) on a connected app, as the destination picker lists it. */
@@ -114,6 +117,7 @@ export function useVoiceAgentEditorPage({
     geminiKey,
     costTotals,
     stackOptions,
+    whatsapp,
 }: VoiceAgentEditorData) {
     const router = useProgressRouter();
     const agentId = initialAgent._id ?? '';
@@ -263,6 +267,8 @@ export function useVoiceAgentEditorPage({
 
     // Numbers follow the agent's saved type: an inbound agent's answer calls, an outbound one's place them.
     const numbers = linkedNumbers(usage, saved.callType);
+    // Where it works comes from those numbers: a phone line, WhatsApp, both, or nowhere yet (null).
+    const channel = channelFromNumbers(numbers);
     const [linking, setLinking] = useState(false);
 
     /**
@@ -621,7 +627,9 @@ export function useVoiceAgentEditorPage({
         stack,
         keys: stackOptions.keys,
         onNumber: usage.inbound.length + usage.outbound.length > 0,
-        channel: channelOf(saved),
+        // The numbers it could go on: only an agent that answers can be on WhatsApp.
+        channel:
+            whatsapp && saved.callType === VoiceAgentCallType.INBOUND ? VoiceAgentChannel.BOTH : VoiceAgentChannel.PHONE,
     });
     const thinker = stack.kind === VoiceStackKind.REALTIME ? stack : stack.llm;
     const costEstimate = estimateAgentCost({
@@ -645,6 +653,8 @@ export function useVoiceAgentEditorPage({
 
     return {
         agentId,
+        whatsapp,
+        channel,
         geminiKey,
         stackOptions,
         stack,

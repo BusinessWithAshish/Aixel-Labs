@@ -19,7 +19,7 @@ import {
     LINK_UI_PENDING,
     linkNumber,
     numberRow,
-    numberUse,
+    expectSlots,
     openConnect,
     openPhoneNumbers,
     openRemove,
@@ -144,7 +144,7 @@ test('connecting VoiceLink lists the DIDs and imports without changing anything;
     await expect(page.getByText('Nothing changed in VoiceLink')).toBeVisible();
 
     const row = numberRow(page, TRUNK_NUMBER);
-    await expect(numberUse(page, TRUNK_NUMBER)).toHaveText('Not linked to an agent');
+    await expectSlots(page, TRUNK_NUMBER, {});
     await expect(row.getByTestId('number-provider-logo-VOICELINK')).toBeVisible();
     await expect(row.getByTestId('number-provider')).toHaveText('VoiceLink');
     await expect(numberRow(page, BARE_NUMBER)).toHaveCount(0);
@@ -434,7 +434,7 @@ test.describe('linking from the agent editor', () => {
         const dialog = await openRemove(page, TRUNK_NUMBER);
         await expect(dialog).toContainText('calls ring the way they did before you connected it');
         await dialog.getByRole('button', { name: 'Remove number' }).click();
-        await expect(page.getByText('No phone numbers yet')).toBeVisible();
+        await expect(page.getByText('No numbers yet')).toBeVisible();
 
         expect(writeLines()).toEqual([
             `POST /v1/call-routing/update/${TRUNK_RULE_ID}`,

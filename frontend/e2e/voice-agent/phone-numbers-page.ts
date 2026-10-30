@@ -15,9 +15,19 @@ export function numberRow(page: Page, phoneNumber: string) {
     return page.getByTestId('voice-number-row').filter({ hasText: phoneNumber });
 }
 
-/** What the row says uses the number: "Answers calls with …", "Places calls with …" or "Not linked to an agent". */
-export function numberUse(page: Page, phoneNumber: string) {
-    return numberRow(page, phoneNumber).getByTestId('number-use').getByRole('paragraph').first();
+/** A slot's agent picker in the number's row: who answers its calls, who places them, or who answers it on WhatsApp. */
+export function slotAgent(page: Page, phoneNumber: string, slot: 'answers' | 'calls' | 'whatsapp') {
+    const name =
+        slot === 'whatsapp'
+            ? `Agent for ${phoneNumber} on WhatsApp`
+            : `${slot === 'answers' ? 'Answers calls' : 'Places calls'} on ${phoneNumber}`;
+    return numberRow(page, phoneNumber).getByRole('combobox', { name });
+}
+
+/** The agents the row shows on the number's phone line (unset: no agent in that slot). */
+export async function expectSlots(page: Page, phoneNumber: string, slots: { answers?: string; calls?: string }) {
+    await expect(slotAgent(page, phoneNumber, 'answers')).toHaveText(slots.answers ?? 'No agent');
+    await expect(slotAgent(page, phoneNumber, 'calls')).toHaveText(slots.calls ?? 'No agent');
 }
 
 /** Picks the provider in the Connect a number menu; returns its connect dialog. */

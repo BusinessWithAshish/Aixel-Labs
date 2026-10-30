@@ -10,8 +10,6 @@ export const VOICE_PHONE_NUMBERS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.PHO
 /** The WhatsApp section's pages (its own group in the sidebar): the inbox, its agents and its numbers. */
 const WHATSAPP_BASE = SubModuleUrls[VOICE_AGENT_SUB_MODULES.WHATSAPP];
 export const WHATSAPP_URL = `${WHATSAPP_BASE}/inbox`;
-export const WHATSAPP_AGENTS_URL = `${WHATSAPP_BASE}/agents`;
-export const WHATSAPP_NUMBERS_URL = `${WHATSAPP_BASE}/numbers`;
 
 export const VOICE_SETTINGS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.SETTINGS];
 

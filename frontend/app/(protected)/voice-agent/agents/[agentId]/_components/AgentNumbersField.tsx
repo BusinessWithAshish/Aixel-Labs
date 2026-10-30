@@ -10,8 +10,8 @@ import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
-import { VOICE_PHONE_NUMBERS_URL, WHATSAPP_NUMBERS_URL } from '@/helpers/voice-routes';
-import { channelOf, numberInScope, servesPhone, servesWhatsApp, type AgentScope } from '@/helpers/voice-agent-channels';
+import { VOICE_PHONE_NUMBERS_URL } from '@/helpers/voice-routes';
+import { numberKind, type NumberKind } from '@/helpers/voice-agent-channels';
 import { linkedNumbers, type UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 
 /** The agent in the number's slot for this type (inbound: answers it, outbound: calls from it), if any. */
@@ -41,32 +41,43 @@ function openPrompt() {
 type Takeover = { id: string; phoneNumber: string; holder: string; holderKeepsOne: boolean };
 
 /**
- * The number this agent works on, one of the owner's (loaded with the page, refreshed after a change). A
- * number answers calls with one inbound agent and places calls for one outbound agent: a pick fills this
- * agent's slot on it at once (asking first when another agent has that slot) and lets its previous number go.
+ * Where the agent works: the numbers it is on, one of the owner's of each kind (loaded with the page, refreshed after
+ * a change). A number does one job, for one agent: a pick puts this agent on it at once (asking first when another
+ * agent has it) and lets its previous number of that kind go. An agent that answers can also answer a WhatsApp number;
+ * the same agent on a number's phone line and its WhatsApp keeps one memory of each person.
  */
 export function AgentNumbersField() {
-    const { saved } = usePage<UseVoiceAgentEditorPageReturn>();
-    const channel = channelOf(saved);
+    const { saved, whatsapp } = usePage<UseVoiceAgentEditorPageReturn>();
+    const onWhatsApp = whatsapp && saved.callType === VoiceAgentCallType.INBOUND;
     return (
-        <>
-            {servesPhone(channel) ? <NumberPicker kind="phone" /> : null}
-            {servesWhatsApp(channel) ? <NumberPicker kind="whatsapp" /> : null}
-        </>
+        <fieldset className="grid gap-3" aria-labelledby="agent-places-title">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 id="agent-places-title" className="text-sm font-medium">
+                    Where it works
+                </h3>
+                <Link href={VOICE_PHONE_NUMBERS_URL} className="text-primary text-xs underline-offset-4 hover:underline">
+                    All your numbers
+                </Link>
+            </div>
+            <div className={onWhatsApp ? 'grid gap-4 md:grid-cols-2' : 'grid gap-4'}>
+                <NumberPicker kind="phone" />
+                {onWhatsApp ? <NumberPicker kind="whatsapp" /> : null}
+            </div>
+        </fieldset>
     );
 }
 
-/** The agent's number of one kind (a phone line, or a WhatsApp number): a Phone + WhatsApp agent has one of each. */
-function NumberPicker({ kind }: { kind: AgentScope }) {
+/** The agent's number of one kind: a phone line, or a WhatsApp number. */
+function NumberPicker({ kind }: { kind: NumberKind }) {
     const page = usePage<UseVoiceAgentEditorPageReturn>();
     const { agentId, saved, form, usage, linking, linkNumbers } = page;
-    const ownedNumbers = page.ownedNumbers.filter((n) => numberInScope(n.provider, kind));
-    const numbers = page.numbers.filter((n) => numberInScope(n.provider, kind));
+    const ownedNumbers = page.ownedNumbers.filter((n) => numberKind(n.provider) === kind);
+    const numbers = page.numbers.filter((n) => numberKind(n.provider) === kind);
     const inbound = saved.callType === VoiceAgentCallType.INBOUND;
-    const stray = linkedNumbers(usage, inbound ? VoiceAgentCallType.OUTBOUND : VoiceAgentCallType.INBOUND).filter((n) =>
-        numberInScope(n.provider, kind),
+    const stray = linkedNumbers(usage, inbound ? VoiceAgentCallType.OUTBOUND : VoiceAgentCallType.INBOUND).filter(
+        (n) => numberKind(n.provider) === kind,
     );
-    const typePending = form.callType !== saved.callType || channelOf(form) !== channelOf(saved);
+    const typePending = form.callType !== saved.callType;
     const whatsapp = kind === 'whatsapp';
     const [takeover, setTakeover] = useState<Takeover | null>(null);
 
@@ -151,11 +162,8 @@ function NumberPicker({ kind }: { kind: AgentScope }) {
             ) : (
                 <p className="text-muted-foreground text-sm" data-testid="agent-numbers-empty">
                     {whatsapp ? 'No WhatsApp numbers yet.' : 'No numbers yet.'}{' '}
-                    <Link
-                        href={whatsapp ? WHATSAPP_NUMBERS_URL : VOICE_PHONE_NUMBERS_URL}
-                        className="text-primary underline-offset-4 hover:underline"
-                    >
-                        {whatsapp ? 'Connect one under WhatsApp, Numbers' : 'Connect one on Phone numbers'}
+                    <Link href={VOICE_PHONE_NUMBERS_URL} className="text-primary underline-offset-4 hover:underline">
+                        Connect one on Numbers
                     </Link>
                 </p>
             )}

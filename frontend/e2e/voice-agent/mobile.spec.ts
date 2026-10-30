@@ -6,7 +6,6 @@ import { encryptOverrides } from 'flags';
 import {
     VOICE_AGENT_SUB_MODULES,
     VoiceAgentCallType,
-    VoiceAgentChannel,
     VoiceBookingStatus,
     VoiceCallChannel,
     VoiceCallDirection,
@@ -14,7 +13,7 @@ import {
 } from '@aixellabs/backend/db/types';
 import { SubModuleUrls } from '@/config/app-config';
 import { FeatureFlagKey } from '@/flags';
-import { WHATSAPP_AGENTS_URL, WHATSAPP_NUMBERS_URL, WHATSAPP_URL } from '@/helpers/voice-routes';
+import { WHATSAPP_URL } from '@/helpers/voice-routes';
 import { expect, test } from '../support/fixtures';
 import { E2E_ARTIFACTS_DIR, E2E_BASE_URL, E2E_FLAGS_SECRET, USER_STORAGE_STATE } from '../support/env';
 import {
@@ -251,7 +250,7 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await open(VOICE_AGENTS_URL);
             await check('agents');
             await page.getByRole('button', { name: 'New agent' }).click();
-            const create = page.getByRole('dialog', { name: 'New voice agent' });
+            const create = page.getByRole('dialog', { name: 'New agent' });
             await create.getByRole('combobox', { name: 'Agent type' }).click();
             await check('create-agent-type');
             await page.getByRole('option', { name: /^Inbound/ }).click();
@@ -310,7 +309,7 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await expect(page.getByTestId('voice-number-row')).toHaveCount(2);
             await check('phone-numbers');
             await page.getByRole('button', { name: 'Connect a number' }).first().click();
-            await expect(page.getByRole('menuitem')).toHaveCount(3);
+            await expect(page.getByRole('menuitem')).toHaveCount(4);
             await check('connect-number-menu');
             await page.getByRole('menuitem', { name: /^Telnyx/ }).click();
             const connect = page.getByRole('dialog', { name: 'Connect a Telnyx number' });
@@ -356,7 +355,6 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await check('bookings-empty');
 
             // WhatsApp: the Telnyx line is on WhatsApp too, answered by the same agent; a chat a person took over.
-            await db.updateVoiceAgent(frontDesk, { channel: VoiceAgentChannel.BOTH });
             const whatsappNumber = await db.insertVoiceNumber(E2E_USER, {
                 provider: VoiceProvider.WHATSAPP,
                 phoneNumber: FAKE_WHATSAPP_NUMBER.phone,
@@ -412,24 +410,24 @@ for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
             await page.getByRole('button', { name: /Ravi Kumar/ }).click();
             await expect(page.getByRole('button', { name: 'Hand back to AI' })).toBeVisible();
             await check('whatsapp-thread');
-            await open(WHATSAPP_AGENTS_URL);
-            await check('whatsapp-agents');
-            await open(WHATSAPP_NUMBERS_URL);
-            await expect(page.getByTestId('number-twin')).toBeVisible();
-            await check('whatsapp-numbers');
-            await page.getByRole('button', { name: 'Connect a WhatsApp number' }).first().click();
+            await open(`${VOICE_AGENTS_URL}?show=whatsapp`);
+            await check('agents-whatsapp');
+            // The number's row: its phone line and its WhatsApp, each with its agents.
+            await open(PHONE_NUMBERS_URL);
+            await expect(page.getByTestId('number-whatsapp-slot')).toBeVisible();
+            await check('numbers-both');
+            await page.getByRole('button', { name: 'Connect a number' }).first().click();
+            await page.getByRole('menuitem', { name: /^WhatsApp/ }).click();
             await expect(page.getByRole('dialog', { name: 'Connect a WhatsApp number' })).toBeVisible();
             await check('whatsapp-connect');
             await page.keyboard.press('Escape');
-            await open(PHONE_NUMBERS_URL);
-            await expect(page.getByTestId('number-twin')).toBeVisible();
-            await check('phone-numbers-twin');
 
             // The agent on both: its editor, Duplicate, and the test dialog's WhatsApp chat.
             await page.goto(voiceAgentUrl(frontDesk));
             await waitForHydration(page, '#agent-prompt');
             await check('agent-editor-both');
-            await page.getByRole('button', { name: 'Duplicate' }).click();
+            await page.getByRole('button', { name: 'More actions' }).click();
+            await page.getByRole('menuitem', { name: 'Duplicate' }).click();
             await expect(page.getByRole('dialog', { name: /^Duplicate/ })).toBeVisible();
             await check('agent-duplicate');
             await page.keyboard.press('Escape');
