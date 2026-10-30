@@ -7,6 +7,7 @@ import { CONTENT_LAB_CHECK_ROUTE } from '@/config/app-config';
 import { cn } from '@/lib/utils';
 import { CONTENT_LAB_HOME_EXAMPLE, CONTENT_LAB_QUERY_KINDS, CONTENT_LAB_VS_STUDIO } from '../_constants';
 import { PlatformIcon, PlatformPill } from '../_components/PlatformIcon';
+import { RecentSearches } from './_components/RecentSearches';
 import { SmartBox } from './_components/SmartBox';
 import { exploreHref } from './_utils/smart-box';
 
@@ -188,7 +189,8 @@ export default function ContentLabSearchPage() {
                             Type what your audience would search. You get the posts that did far better than their creator&apos;s usual, on
                             YouTube and Instagram at once, and the reason in plain words.
                         </p>
-                        <SmartBox />
+                        <SmartBox pickPlatform />
+                        <RecentSearches />
                     </div>
                     <aside className="xl:pt-10">
                         <VsStudio />

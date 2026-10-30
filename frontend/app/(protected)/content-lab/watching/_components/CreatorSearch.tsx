@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { CONTENT_LAB_PLATFORM_LABELS } from '../../_constants';
 import { CreatorAvatar } from '../../_components/CreatorAvatar';
 import { compactNumber } from '../../search/_utils/format';
-import type { UseCreatorSuggestReturn } from '../_hooks/use-creator-suggest';
+import type { UseCreatorSuggestReturn } from '../../_hooks/use-creator-suggest';
 import type { WatchPick } from '../_hooks/use-watching-page';
 
 type CreatorSearchProps = {

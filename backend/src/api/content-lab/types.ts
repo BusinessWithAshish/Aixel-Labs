@@ -5,6 +5,7 @@ import type {
   CONTENT_LAB_CHECK_REQUEST_SCHEMA,
   CONTENT_LAB_CREATOR_REQUEST_SCHEMA,
   CONTENT_LAB_EXPLORE_REQUEST_SCHEMA,
+  CONTENT_LAB_KEYWORD_REQUEST_SCHEMA,
   CONTENT_LAB_SUGGEST_REQUEST_SCHEMA,
 } from "./schemas";
 
@@ -15,6 +16,7 @@ export type CONTENT_LAB_EXPLORE_REQUEST = z.input<typeof CONTENT_LAB_EXPLORE_REQ
 export type CONTENT_LAB_BREAKDOWN_REQUEST = z.input<typeof CONTENT_LAB_BREAKDOWN_REQUEST_SCHEMA>;
 export type CONTENT_LAB_CHECK_REQUEST = z.input<typeof CONTENT_LAB_CHECK_REQUEST_SCHEMA>;
 export type CONTENT_LAB_CREATOR_REQUEST = z.input<typeof CONTENT_LAB_CREATOR_REQUEST_SCHEMA>;
+export type CONTENT_LAB_KEYWORD_REQUEST = z.input<typeof CONTENT_LAB_KEYWORD_REQUEST_SCHEMA>;
 
 /** What a title / first caption line does, used for "why it worked" and for checks. */
 export type CONTENT_LAB_TEXT_SIGNALS = {
@@ -163,4 +165,34 @@ export type CONTENT_LAB_CREATOR_RESPONSE = {
   usualViews: number | null;
   /** Recent posts with their multiple, newest first. */
   posts: CONTENT_LAB_POST[];
+};
+
+/** 12 months of YouTube search interest for a keyword (Google Trends). */
+export type CONTENT_LAB_KEYWORD_TREND = {
+  /** Weekly interest, 0-100 against the year's busiest week, oldest first. */
+  weekly: number[];
+  /** Average of the last few weeks, 0-100. */
+  now: number;
+  /** Change of the last few weeks against the weeks before, in percent. */
+  change: number;
+  direction: "rising" | "steady" | "falling";
+  /** Related searches growing fastest. */
+  rising: string[];
+};
+
+/**
+ * How much a topic is searched and where it is heading. `score` (0-100) and
+ * `summary` (one plain sentence) use whatever loaded: with `trend` null (not
+ * asked for, too few searches to chart, or Trends did not answer) the score
+ * comes from `searches` alone.
+ */
+export type CONTENT_LAB_KEYWORD_RESPONSE = {
+  query: string;
+  country: string;
+  /** What people type on YouTube that starts with this, most common first (the query itself left out). */
+  searches: string[];
+  trend: CONTENT_LAB_KEYWORD_TREND | null;
+  score: number;
+  label: "strong" | "okay" | "weak";
+  summary: string;
 };

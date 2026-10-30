@@ -5,6 +5,7 @@ import type {
     CONTENT_LAB_CHECK_RESPONSE,
     CONTENT_LAB_CREATOR_RESPONSE,
     CONTENT_LAB_EXPLORE_RESPONSE,
+    CONTENT_LAB_KEYWORD_RESPONSE,
     CONTENT_LAB_POST,
     ContentLabFormat,
     ContentLabPlatform,
@@ -140,6 +141,25 @@ export function exploreResponse(overrides: Partial<CONTENT_LAB_EXPLORE_RESPONSE>
         niche: { postCount: 48, outlierCount: 9, medianMultiple: 1.3, bestFormat: { youtube: 'video', instagram: 'reel' } },
         errors: {},
         nextCursor: null,
+        ...overrides,
+    };
+}
+
+export function keywordResponse(overrides: Partial<CONTENT_LAB_KEYWORD_RESPONSE> = {}): CONTENT_LAB_KEYWORD_RESPONSE {
+    return {
+        query: 'protein breakfast',
+        country: 'IN',
+        searches: ['protein breakfast recipes', 'protein breakfast for weight loss', 'protein breakfast indian'],
+        trend: {
+            weekly: Array.from({ length: 52 }, (_, i) => 40 + (i % 7) * 5),
+            now: 68,
+            change: 23,
+            direction: 'rising',
+            rising: ['high protein poha'],
+        },
+        score: 81,
+        label: 'strong',
+        summary: 'Lots of people search this on YouTube, and interest is up 23% in the last 4 weeks.',
         ...overrides,
     };
 }

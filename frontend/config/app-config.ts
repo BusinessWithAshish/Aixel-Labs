@@ -61,6 +61,7 @@ export const CONTENT_LAB_API_ROUTES = {
     CHECK: '/api/content-lab/check',
     CREATOR: '/api/content-lab/creator',
     SUGGEST: '/api/content-lab/suggest',
+    KEYWORD: '/api/content-lab/keyword',
     WRITE: '/api/content-lab/write',
     ADS: '/api/content-lab/ads',
 } as const;

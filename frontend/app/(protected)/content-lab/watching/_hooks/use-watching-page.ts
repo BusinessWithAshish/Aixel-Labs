@@ -6,7 +6,7 @@ import type { ContentLabPlatform } from '@aixellabs/backend/content-lab/types';
 import type { ContentLabWatch } from '@aixellabs/backend/db/types';
 import { addContentLabWatch, removeContentLabWatch } from '@/app/actions/content-lab-actions';
 import { contentLabApi } from '@/helpers/content-lab-api';
-import { useCreatorSuggest } from './use-creator-suggest';
+import { useCreatorSuggest } from '../../_hooks/use-creator-suggest';
 
 export type WatchingPageData = { watches: ContentLabWatch[]; country: string };
 

@@ -4,9 +4,10 @@ Backend for the Content Lab module (PRD: `frontend/app/(protected)/content-lab/R
 Finds posts that beat their creator's usual views across a niche, breaks one post
 down, scores a draft against the niche's winners, and reads one creator.
 
-Composes the YouTube and Instagram modules' fetch / service functions directly
-(no HTTP loopback). No Mongo. The five services (`explore.ts`, `breakdown.ts`,
-`check.ts`, `creator.ts`, `suggest.ts`) are what an MCP `op` would call later.
+Composes the YouTube, Instagram and Google Trends modules' fetch / service
+functions directly (no HTTP loopback). No Mongo. The six services (`explore.ts`,
+`breakdown.ts`, `check.ts`, `creator.ts`, `suggest.ts`, `keyword.ts`) are what
+an MCP `op` would call later.
 
 ## Routes
 
@@ -17,6 +18,7 @@ Composes the YouTube and Instagram modules' fetch / service functions directly
 | `POST` | `/content-lab/check` | `API_ENDPOINTS.CONTENT_LAB.CHECK` | `contentLabCheckService` |
 | `POST` | `/content-lab/creator` | `API_ENDPOINTS.CONTENT_LAB.CREATOR` | `contentLabCreatorService` |
 | `POST` | `/content-lab/suggest` | `API_ENDPOINTS.CONTENT_LAB.SUGGEST` | `contentLabSuggestService` |
+| `POST` | `/content-lab/keyword` | `API_ENDPOINTS.CONTENT_LAB.KEYWORD` | `contentLabKeywordService` |
 
 Request Zod: `schemas.ts`. Response types: `types.ts` (both fixed contract, FE
 imports `@aixellabs/backend/content-lab/types` and `/constants`). Every route
@@ -30,6 +32,7 @@ another search, 404 post or creator not found, 502 upstream failure.
 | `{ text, platform, query, country? }` | `CONTENT_LAB_CHECK_RESPONSE` |
 | `{ platform, handle, country?, limit?: 24 }` | `CONTENT_LAB_CREATOR_RESPONSE` |
 | `{ platform, query, country? }` | `CONTENT_LAB_SUGGEST_RESPONSE` |
+| `{ query, country?, trend?: true }` | `CONTENT_LAB_KEYWORD_RESPONSE` |
 
 ## Words in the UI
 
@@ -83,26 +86,29 @@ next page. Posts older than
   `CONTENT_LAB_INSTAGRAM_SEARCHES`, in parallel (proxied, 4-16 s each
   depending on load: once the first returns the rest get 4 s more, 12 s at
   most; a search still running then counts as empty). The lookups after
-  them get 12 s. Page 1: the topic's reels
-  this month, reels this year, posts this year. Later pages, 2 at a time:
-  reels for the 3 biggest **related hashtags** (Instagram's guest tag search,
-  `searchInstagramHashtags`, looked up during page 1), then `{topic} viral`
-  reels and posts with no date limit. Shortcodes are dated from their media
+  them get 12 s. Page 1 is all reels: the topic's reels
+  this month, reels this year and `{topic} viral` reels this year. Later
+  pages, 2 at a time: reels for the 3 biggest **related hashtags**
+  (Instagram's guest tag search, `searchInstagramHashtags`, looked up during
+  page 1), then photo posts this year and with no date limit. Shortcodes are dated from their media
   id (no request) so old and seen hits drop before any lookup. Then,
   pipelined: the first 36 hits' post queries (owner, caption, likes, date; 10
   at a time, stopping 4 s before the deadline) → each owner's fetch starts as
-  soon as their first hit resolves (first 12 new owners; profile + Reels tab +
+  soon as their first hit resolves (first 24 new owners,
+  `maxInstagramCreatorsPerPage`; profile + Reels tab +
   Posts tab, ~1.5 s, 8 at a time, cached 20 min) → plays from the owner's
   Reels tab. A reel older than its owner's newest 12 uses its embed page's
   view count instead (read alongside the owner, 2 tries); with neither it is
   left out. Up to 3 of each owner's newest reels on the topic that beat their
-  usual join too.
+  usual join too. A post below its creator's usual that is also under 100K
+  views (likes × 25 for photo posts) or under the floor is dropped
+  (`isWorthShowing`): explore shows what is working, not every hit.
 - **Ranking** (`compute/rank.ts`): score = 0.40 × how far it beat the
   creator's usual (log scale, 0.5x → 0, 32x → 1; no baseline counts as 1x) +
   0.35 × volume (log scale, 1k → 0, 10M views → 1; photo posts use likes × 25)
   + 0.25 × recency (halves every 60 days; undated = 180 days old). Posts under
   5,000 views/plays (100 likes for photo posts) go after every post that
-  clears that floor. With both platforms, each keeps at least 35% of the page
+  clears that floor. With both platforms, each keeps at least half the page
   when it has that many posts over the floor (`takeWithPlatformShare`); rank
   order is kept.
 - **Paging**: send `nextCursor` back as `cursor` with the same query and
@@ -114,7 +120,7 @@ next page. Posts older than
 - **Nothing found is lost to paging** (`CONTENT_LAB_CARRY`): a post read but
   not returned (cut by `limit` or the platform share, YouTube beyond its top
   `limit`, a hit whose channel / owner / post lookup / embed count was still
-  loading at the deadline, Instagram hits past the 36-per-page or 12-owner
+  loading at the deadline, Instagram hits past the 36-per-page or 24-owner
   caps) is carried in the cursor and comes first next page: YouTube as a
   compact hit (id, channel, title, views, length, date), Instagram as its
   shortcode. Each is carried 3 times at most. With a page's worth carried
@@ -143,6 +149,23 @@ next page. Posts older than
   and for several words joined plain / with "." / with "_" (profile query,
   direct). Exact handles only: a display name like "Ranveer Singh" finds
   `@ranveersingh` only if that handle exists.
+
+**keyword**: how much a topic is searched on YouTube and where it is heading,
+for the search box (`trend: false`, ~0.3 s) and the results page (`trend: true`).
+- `searches`: YouTube's autocomplete for the topic (the endpoint the YouTube
+  search box uses, `fetchYoutubeSuggest`), the topic itself left out. Cached
+  10 min.
+- `trend`: 12 months of weekly YouTube search interest in the country (Google
+  Trends, YouTube property, ~2-4 s, cached 1 h; the current, unfinished week
+  is left out). `now` = the last 4 weeks' average (0-100 against the busiest
+  week); `change` = those 4 weeks against the 8 before; within ±15% is
+  steady. Null when fewer than 8 weeks have any searches, or when Trends takes
+  over 6 s or fails (it keeps loading into the cache for the next ask).
+- `score` (`compute/keyword.ts`, `CONTENT_LAB_KEYWORD`) = 0.40 × demand
+  (autocomplete count, 10+ = full) + 0.35 × `now` + 0.25 × momentum (−50% → 0,
+  +50% → 1). Without a trend: demand alone, at most 70. `label`: strong 65+,
+  okay 40+, else weak. `summary` says it in one sentence ("Lots of people
+  search this on YouTube, and interest is up 23% in the last 4 weeks.").
 
 **breakdown**: YouTube watch / youtu.be / shorts URL, or Instagram `/p/`, `/reel/`, `/tv/`.
 - YouTube: video details + transcript intelligence (hook = first sentences of the

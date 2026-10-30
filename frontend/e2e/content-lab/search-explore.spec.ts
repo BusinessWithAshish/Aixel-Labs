@@ -10,6 +10,7 @@ import {
     exploreResponse,
     EXPLORE_POSTS,
     fail,
+    keywordResponse,
     makePost,
     mockContentLab,
     ok,
@@ -36,8 +37,11 @@ for (const { name, use } of VIEWPORTS) {
             const glance = page.getByRole('region', { name: 'What the top posts have in common' });
             await expect(glance).toBeVisible();
             await expect(glance.getByText('5 of 6', { exact: true })).toBeVisible();
-            await expect(glance).toContainText('We checked 48 posts. 9 got at least twice the views their creator usually gets.');
-            await expect(glance).toContainText('Best right now: videos on YouTube and reels on Instagram.');
+            const stats = glance.getByTestId('explore-stats');
+            await expect(stats).toContainText('Took off9 of 48twice their usual or more');
+            await expect(stats).toContainText('Biggest jump14x usual@fitwithriya');
+            await expect(stats).toContainText('Most views2.1M@hostelkitchen');
+            await expect(stats).toContainText('Works bestVideosReels');
             await expect(page.getByRole('alert').filter({ hasText: 'Instagram results did not load' })).toContainText('Instagram blocked the search for now');
 
             const cards = page.getByTestId('content-lab-post-card');
@@ -157,6 +161,37 @@ for (const { name, use } of VIEWPORTS) {
             await page.getByTestId('content-lab-post-card').first().getByRole('button', { name: 'Watch creator' }).click();
             await expect(page.getByText('Watching @fitwithriya')).toBeVisible();
             expect(creator.requests[0]).toMatchObject({ platform: 'youtube', handle: 'fitwithriya', country: 'IN' });
+        });
+
+        test('says how strong the topic is while the posts load; a related search runs that search', async ({ page }) => {
+            await mockContentLab(page, 'EXPLORE', 'hang');
+            const keyword = await mockContentLab(page, 'KEYWORD', ok(keywordResponse()));
+            await page.goto(TOPIC_URL);
+
+            const card = page.getByTestId('keyword-card');
+            await expect(card.getByTestId('keyword-card-score')).toHaveText('81');
+            await expect(card).toContainText('Strong topic');
+            await expect(card).toContainText('Lots of people search this on YouTube, and interest is up 23% in the last 4 weeks.');
+            await expect(card).toContainText('Rising +23%');
+            await expect(page.getByText('Finding posts that are doing better than usual…')).toBeVisible();
+            // The search box above asks nothing until it is used: the card's request is the only one.
+            expect(keyword.requests.map((body) => body.trend)).not.toContain(false);
+            expect(keyword.requests.at(-1)).toMatchObject({ query: 'protein breakfast', country: 'IN', trend: true });
+
+            await mockContentLab(page, 'EXPLORE', ok(exploreResponse({ query: 'high protein poha' })));
+            await card.getByRole('link', { name: 'high protein poha' }).click();
+            await page.waitForURL(`**${CONTENT_LAB_EXPLORE_ROUTE}?q=high+protein+poha`);
+            await expect(page.getByRole('heading', { name: `What's working in "high protein poha"` })).toBeVisible();
+            await expectNoHorizontalOverflow(page);
+        });
+
+        test('a card restating the jump does not repeat it as the reason', async ({ page }) => {
+            const posts = [makePost({ id: 'youtube:vidGGGGGG7', reasons: ['14 times their usual views', 'Number in the title'] })];
+            await mockContentLab(page, 'EXPLORE', ok(exploreResponse({ posts })));
+            await page.goto(TOPIC_URL);
+            const card = page.getByTestId('content-lab-post-card').first();
+            await expect(card).toContainText('Why: Number in the title');
+            await expect(card).not.toContainText('Why: 14 times');
         });
 
         test('use on a board starts a board seeded with the post', async ({ page }) => {

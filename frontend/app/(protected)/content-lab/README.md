@@ -27,8 +27,8 @@ Agencies and social media managers (multi-client), founders and consultants doin
 
 | # | Route | Page | Sidebar item |
 |---|---|---|---|
-| 1 | `/content-lab/search` | **Search home**: one smart box (topic / link / @creator) + 3 job cards + "vs Studio" table | Search |
-| 2 | `/content-lab/search/explore?q=` | **What's working**: cross-creator outliers, YT + IG toggle, country/city/date, 3 plain-English takeaways | (from Search) |
+| 1 | `/content-lab/search` | **Search home**: one smart box (topic / link / @creator) with a platform switch, recent searches + 3 job cards + "vs Studio" table | Search |
+| 2 | `/content-lab/search/explore?q=` | **What's working**: cross-creator outliers, YT + IG toggle, country, the numbers at a glance + plain-English takeaways, how strong the topic is | (from Search) |
 | 3 | `/content-lab/search/post/[postId]` | **Breakdown**: format-aware hook/structure/CTA/thumbnail + "why it worked" | (from Search) |
 | 4 | `/content-lab/search/check` | **Check my idea**: score vs niche winners, red/green reasons, 3 rewrites | (from Search) |
 | 5 | `/content-lab/boards` | **Boards list** + 5 templates | Boards |
@@ -37,6 +37,14 @@ Agencies and social media managers (multi-client), founders and consultants doin
 | 8 | `/content-lab/settings` | **Settings**: connected accounts, AI keys (BYOK), MCP link, usage | Settings |
 
 Sidebar submodules: `SEARCH`, `BOARDS`, `WATCHING`, `SETTINGS` (values prefixed `CONTENT_LAB_`). Explore, post and check nest under `/content-lab/search` because the path ACL is prefix-based, so the Search grant covers them and no grant leaks into another page.
+
+## Searching
+
+- **The smart box** says what it understood as you type and drops a list (arrow keys, Enter, Escape): for a topic, its score and "People also search" (YouTube autocomplete) plus creators matching one or two words; for an `@handle`, matching creators on YouTube and Instagram; for a link, what it is (YouTube video / Short, Instagram reel / post, with the thumbnail for YouTube). The score shows within about a second of typing stopping, creators and searches faster (the Watching type-ahead, `_hooks/use-creator-suggest.ts`).
+- **Platform first**: Search home has an All / YouTube / Instagram switch above the box; a search runs on that choice (`?platform=`), remembered on this device.
+- **Recent searches**: the last 8 searches (topics, creators, links) on this device, in the box's list when it is empty and as chips under it; each can be removed, or all cleared. Every search counts, however it was opened. Kept in `localStorage` only.
+- **How strong is this topic?** (`POST /content-lab/keyword`): a 0-100 score from how many searches YouTube suggests for it, how busy those searches are against the year's busiest week (Google Trends, YouTube) and whether they are going up, with the sentence behind it, 12 months of searches as a line, and related searches to run next. On the results page it loads in a few seconds, before the posts.
+- **Results**: half of each page is kept for each platform when both are on. Instagram shows only posts that beat their creator's usual or are big on their own (100K+ views), reels first.
 
 ## The board
 

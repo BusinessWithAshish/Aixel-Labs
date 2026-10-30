@@ -37,6 +37,12 @@ export function meetsFloor(post: Pick<ContentLabRankInput, "format" | "views" | 
   return (post.views ?? 0) >= R.minViews;
 }
 
+/** Worth a place on Instagram explore: clears the floor and beat its creator's usual or is big on its own. */
+export function isWorthShowing(post: Pick<ContentLabRankInput, "format" | "views" | "likes" | "multiple">): boolean {
+  if (!meetsFloor(post)) return false;
+  return (post.multiple ?? 0) >= R.keepMinMultiple || (volumeOf(post) ?? 0) >= R.viralVolume;
+}
+
 /**
  * 0-1: how far the post beat its creator's usual (log2 between
  * `multipleRange`), its volume (log10 between `volumeRange`) and how recent

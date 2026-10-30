@@ -12,7 +12,8 @@ import type {
 import { contentLabApi } from '@/helpers/content-lab-api';
 import type { ContentLabPlatformFilter } from '../../../_constants';
 import { usePostActions } from '../../_hooks/use-post-actions';
-import { exploreHref } from '../../_utils/smart-box';
+import { addRecentSearch } from '../../_hooks/use-recent-searches';
+import { exploreHref, recentSearchOf } from '../../_utils/smart-box';
 
 export type ExplorePageData = {
     /** Topic mode. */
@@ -122,6 +123,14 @@ export function useExplorePage(data: ExplorePageData) {
     const [sort, setSort] = useState<ExploreSort>('jump');
     const moreController = useRef<AbortController | null>(null);
     const actions = usePostActions(country);
+
+    // Every search lands in "Recent searches", however it was opened (box, chip, shared link).
+    useEffect(() => {
+        if (query) addRecentSearch(recentSearchOf({ kind: 'topic', query }, data.platform));
+        else if (creator) addRecentSearch(recentSearchOf({ kind: 'creator', handle: creator.handle, platform: creator.platform }, data.platform));
+        // Once per search: the page remounts for a new one.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         if (!query && !creatorHandle) return;

@@ -34,6 +34,9 @@ export function PostReach({ post }: { post: CONTENT_LAB_POST }) {
 
 const unitOf = (post: CONTENT_LAB_POST) => (post.views == null ? 'likes' : 'views');
 
+/** The first reason that says more than the jump already on the card ("113 times their usual views"). */
+const whyOf = (post: CONTENT_LAB_POST) => post.reasons.find((reason) => !/\btimes\b.*\busual/i.test(reason)) ?? null;
+
 /** "12x usual" on the cover; only for posts that did clearly better than usual. */
 function JumpBadge({ post, className }: { post: CONTENT_LAB_POST; className?: string }) {
     if (post.multiple == null || post.multiple < 1.5) return null;
@@ -114,7 +117,7 @@ function LandscapeCard(props: PostCardProps) {
                         {post.multiple != null && post.multiple >= 1.5 ? (
                             <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{timesUsual(post.multiple, unitOf(post))}</p>
                         ) : null}
-                        {post.reasons[0] ? <p className="text-muted-foreground mt-auto line-clamp-2 pt-1 text-xs">Why: {post.reasons[0]}</p> : null}
+                        {whyOf(post) ? <p className="text-muted-foreground mt-auto line-clamp-2 pt-1 text-xs">Why: {whyOf(post)}</p> : null}
                     </div>
                 </div>
             </Link>
@@ -149,7 +152,7 @@ function PortraitCard(props: PostCardProps) {
                 </div>
                 <div className="flex flex-1 flex-col gap-1 p-2.5 group-hover:bg-muted/40 group-focus-visible:bg-muted/40">
                     <h3 className="line-clamp-2 text-sm leading-snug font-semibold">{post.title || 'No caption'}</h3>
-                    {post.reasons[0] ? <p className="text-muted-foreground mt-auto line-clamp-2 text-xs">Why: {post.reasons[0]}</p> : null}
+                    {whyOf(post) ? <p className="text-muted-foreground mt-auto line-clamp-2 text-xs">Why: {whyOf(post)}</p> : null}
                 </div>
             </Link>
             <CardActions {...props} compact />

@@ -4,6 +4,7 @@ export const CONTENT_LAB_API_ROUTES = {
   CHECK: "/check",
   CREATOR: "/creator",
   SUGGEST: "/suggest",
+  KEYWORD: "/keyword",
 } as const;
 
 export const CONTENT_LAB_HANDLER_LABELS = {
@@ -12,6 +13,7 @@ export const CONTENT_LAB_HANDLER_LABELS = {
   CHECK: "content-lab check",
   CREATOR: "content-lab creator",
   SUGGEST: "content-lab suggest",
+  KEYWORD: "content-lab keyword",
 } as const;
 
 export const CONTENT_LAB_PLATFORMS = ["youtube", "instagram"] as const;
@@ -23,6 +25,8 @@ export const CONTENT_LAB_LIMITS = {
   maxPosts: 60,
   /** New creators (not cached) whose baseline explore fetches per platform per page. */
   maxCreatorsPerPlatform: 12,
+  /** Instagram owners are cheap (three ~0.5 s queries) and most hits come from a new one, so more per page. */
+  maxInstagramCreatorsPerPage: 24,
   /** Recent uploads used for a creator's baseline median. */
   baselineUploads: 30,
   /** Fewer uploads than this and the baseline is not trusted (multiple = null). */
@@ -58,8 +62,19 @@ export const CONTENT_LAB_RANK = {
   minLikes: 100,
   /** Photo posts hide views; likes × this stands in for views on the volume scale. */
   likesToViews: 25,
-  /** With both platforms asked for, each keeps at least this share of a page when it has the posts. */
-  minPlatformShare: 0.35,
+  /**
+   * With both platforms asked for, each keeps at least this share of a page
+   * when it has the posts: half each, so YouTube's bigger numbers can't
+   * crowd Instagram down to a few cards.
+   */
+  minPlatformShare: 0.5,
+  /**
+   * Instagram explore shows a post only when it clears the floor and either
+   * beat its creator's usual (`keepMinMultiple`) or is big on its own
+   * (`viralVolume` views; likes × `likesToViews` for photo posts).
+   */
+  keepMinMultiple: 1,
+  viralVolume: 100_000,
 } as const;
 
 /** Explore leaves out posts older than this ("2 years ago" and older): it shows what works now. */
@@ -93,6 +108,9 @@ export const CONTENT_LAB_CACHE = {
   creatorMaxEntries: 500,
   suggestTtlMs: 10 * 60_000,
   suggestMaxEntries: 1_000,
+  /** Google Trends interest moves weekly; an hour keeps repeat searches free. */
+  trendTtlMs: 60 * 60_000,
+  trendMaxEntries: 500,
 } as const;
 
 /** Creators the suggest route returns. */
@@ -119,6 +137,32 @@ export const CONTENT_LAB_FIELD_DESCRIPTIONS = {
   handle: "Creator handle or profile URL",
   cursor: "nextCursor from the previous explore page; omit for the first page",
   suggestQuery: "What the user has typed so far: a name or part of a handle",
+  keywordQuery: "Topic to score, e.g. 'protein breakfast'",
+  keywordTrend:
+    "Also read 12 months of YouTube search interest (Google Trends, ~2 s); false returns only what people search (~0.3 s)",
+} as const;
+
+/**
+ * Keyword score (`keyword.ts`): 0-100 from how many searches YouTube
+ * completes it to (`demandSearches` or more = full marks), how busy it is
+ * now against its busiest week of the year (last `recentWeeks`), and its
+ * momentum (last `recentWeeks` against the `previousWeeks` before; within
+ * ±`steadyPercent` is steady, ±`momentumRange` % scores 0 / 1).
+ */
+export const CONTENT_LAB_KEYWORD = {
+  weights: { demand: 0.4, now: 0.35, momentum: 0.25 },
+  /** No trend data: the score is demand alone, capped here. */
+  demandOnlyMax: 70,
+  demandSearches: 10,
+  recentWeeks: 4,
+  previousWeeks: 8,
+  steadyPercent: 15,
+  momentumRange: 50,
+  /** Fewer weeks with any searches than this: too few searches to chart. */
+  minWeeks: 8,
+  rising: 5,
+  trendTimeoutMs: 6_000,
+  labels: { strong: 65, okay: 40 },
 } as const;
 
 /**
@@ -131,17 +175,18 @@ export const CONTENT_LAB_YOUTUBE_STREAMS = ["POPULAR_THIS_MONTH", "POPULAR_THIS_
 /**
  * Instagram GSearch searches explore runs, in order; each page takes the next
  * `perPage` of them. `{q}` is the topic, `{tag}` a related hashtag from
- * Instagram's tag search (biggest first). Reels first: they carry play counts.
+ * Instagram's tag search (biggest first). Reels first (page 1 is all reels,
+ * the most-viral search among them): they carry play counts. Photo posts last.
  */
 export const CONTENT_LAB_INSTAGRAM_SEARCHES = {
   first: [
     { kind: "reel", text: "{q}", time: "month" },
     { kind: "reel", text: "{q}", time: "year" },
-    { kind: "post", text: "{q}", time: "year" },
+    { kind: "reel", text: "{q} viral", time: "year" },
   ],
   perTag: { kind: "reel", text: "{tag}", time: "year" },
   last: [
-    { kind: "reel", text: "{q} viral", time: "year" },
+    { kind: "post", text: "{q}", time: "year" },
     { kind: "post", text: "{q}", time: undefined },
   ],
   /** Related hashtags turned into searches. */

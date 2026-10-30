@@ -17,6 +17,7 @@ import {
   computeWhyItWorked,
   firstLine,
   isTooOld,
+  isWorthShowing,
   matchesTopic,
   median,
   meetsFloor,
@@ -24,6 +25,8 @@ import {
   postMetric,
   rankPosts,
   rankScore,
+  scoreKeyword,
+  summarizeTrend,
   relativeTimeToIso,
   scorePost,
   takeWithPlatformShare,
@@ -219,6 +222,11 @@ assert.ok(rankScore(bigRecent, at) > rankScore(oldHit, at));
 assert.equal(meetsFloor(tinyOutlier), false);
 assert.equal(meetsFloor(r("photo", "instagram", "carousel", null, 150, 2, 3)), true);
 assert.equal(volumeOf(r("photo", "instagram", "post", null, 100, 2, 3)), 2_500);
+assert.equal(isWorthShowing(r("beat", "instagram", "reel", 20_000, null, 1.2, 3)), true); // beat their usual
+assert.equal(isWorthShowing(r("viral", "instagram", "reel", 800_000, null, 0.4, 3)), true); // big on its own
+assert.equal(isWorthShowing(r("weak", "instagram", "reel", 50_000, null, 0.2, 3)), false); // below usual and small
+assert.equal(isWorthShowing(r("nobase", "instagram", "carousel", null, 1_100, null, 3)), false); // no usual, ~27K
+assert.equal(isWorthShowing(r("tiny", "instagram", "reel", 1_000, null, 5, 3)), false); // under the floor
 assert.deepEqual(rankPosts([tinyOutlier, oldHit, smallBeat, bigRecent], at).map((p) => p.id), ["big", "small", "old", "tiny"]);
 assert.equal(isTooOld(daysAgo(730), at), true);
 assert.equal(isTooOld(daysAgo(365), at), false);
@@ -229,10 +237,30 @@ const mixed = [
 ];
 const share = takeWithPlatformShare(rankPosts(mixed, at), 10);
 assert.equal(share.length, 10);
-assert.equal(share.filter((p) => p.platform === "instagram").length, 3); // floor(10 × 0.35)
-assert.deepEqual(share.slice(0, 7).map((p) => p.platform), Array(7).fill("youtube")); // rank order kept
+assert.equal(share.filter((p) => p.platform === "instagram").length, 5); // floor(10 × 0.5)
+assert.deepEqual(share.slice(0, 5).map((p) => p.platform), Array(5).fill("youtube")); // rank order kept
 const tinyIg = [...mixed.slice(0, 10), ...Array.from({ length: 5 }, (_, i) => r(`t${i}`, "instagram", "reel", 300, null, 2, 5))];
 assert.equal(takeWithPlatformShare(rankPosts(tinyIg, at), 10).filter((p) => p.platform === "instagram").length, 0); // no place held for tiny posts
+
+// ─── keyword ────────────────────────────────────────────────────────────────
+const flat = Array(52).fill(50);
+assert.equal(summarizeTrend(Array(52).fill(0), []), null); // too few searches to chart
+assert.equal(summarizeTrend([...Array(48).fill(0), 10, 10, 10, 10], []), null);
+assert.equal(summarizeTrend(flat, [])?.direction, "steady");
+const up = summarizeTrend([...Array(40).fill(40), ...Array(8).fill(40), 60, 60, 60, 60], ["a", "b", "c", "d", "e", "f"])!;
+assert.equal(up.direction, "rising");
+assert.equal(up.change, 50);
+assert.equal(up.now, 60);
+assert.equal(up.rising.length, 5);
+assert.equal(summarizeTrend([...Array(44).fill(80), 40, 40, 40, 40, 40, 40, 40, 40], [])?.direction, "falling");
+const strongKeyword = scoreKeyword(14, up);
+assert.equal(strongKeyword.label, "strong");
+assert.ok(strongKeyword.score > scoreKeyword(14, summarizeTrend(flat, [])).score);
+assert.equal(strongKeyword.summary, "Lots of people search this on YouTube, and interest is up 50% in the last 4 weeks.");
+assert.equal(scoreKeyword(0, null).score, 0);
+assert.equal(scoreKeyword(0, null).label, "weak");
+assert.equal(scoreKeyword(14, null).score, 70); // demand alone is capped
+assert.equal(scoreKeyword(4, null).summary, "Some people search this on YouTube.");
 
 // ─── topic ──────────────────────────────────────────────────────────────────
 assert.deepEqual(topicWords("skincare for men"), ["skincare", "men"]);

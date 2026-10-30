@@ -7,11 +7,13 @@ import { contentLabCheckService } from "./check";
 import { CONTENT_LAB_ERROR_MESSAGES, CONTENT_LAB_HANDLER_LABELS } from "./constants";
 import { contentLabCreatorService } from "./creator";
 import { contentLabExploreService } from "./explore";
+import { contentLabKeywordService } from "./keyword";
 import {
   CONTENT_LAB_BREAKDOWN_REQUEST_SCHEMA,
   CONTENT_LAB_CHECK_REQUEST_SCHEMA,
   CONTENT_LAB_CREATOR_REQUEST_SCHEMA,
   CONTENT_LAB_EXPLORE_REQUEST_SCHEMA,
+  CONTENT_LAB_KEYWORD_REQUEST_SCHEMA,
   CONTENT_LAB_SUGGEST_REQUEST_SCHEMA,
 } from "./schemas";
 import { contentLabSuggestService } from "./suggest";
@@ -73,4 +75,10 @@ export const contentLabSuggestHandler = createContentLabHandler(
   CONTENT_LAB_HANDLER_LABELS.SUGGEST,
   CONTENT_LAB_SUGGEST_REQUEST_SCHEMA,
   contentLabSuggestService,
+);
+
+export const contentLabKeywordHandler = createContentLabHandler(
+  CONTENT_LAB_HANDLER_LABELS.KEYWORD,
+  CONTENT_LAB_KEYWORD_REQUEST_SCHEMA,
+  contentLabKeywordService,
 );

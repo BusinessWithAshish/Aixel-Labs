@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import {
     AlertTriangleIcon,
     ArrowDownWideNarrowIcon,
     CheckCircle2Icon,
+    EyeIcon,
+    FlameIcon,
     GlobeIcon,
     LayoutDashboardIcon,
     Loader2Icon,
@@ -12,6 +14,8 @@ import {
     SearchXIcon,
     SparklesIcon,
     TrendingUpIcon,
+    TrophyIcon,
+    RocketIcon,
 } from 'lucide-react';
 import { CONTENT_LAB_ERROR_MESSAGES, CONTENT_LAB_OUTLIER_MULTIPLE, CONTENT_LAB_PLATFORMS } from '@aixellabs/backend/content-lab/constants';
 import type { CONTENT_LAB_POST, ContentLabPlatform } from '@aixellabs/backend/content-lab/types';
@@ -33,9 +37,11 @@ import {
 import { PlatformIcon } from '../../../_components/PlatformIcon';
 import { SegmentedSwitch } from '../../../_components/SegmentedSwitch';
 import { PostCard } from '../../_components/PostCard';
+import { KeywordCard } from '../../_components/KeywordScore';
+import { RecentSearches } from '../../_components/RecentSearches';
 import { SmartBox } from '../../_components/SmartBox';
 import { TOPIC_BOARD_TEMPLATE, POST_BOARD_TEMPLATE } from '../../_hooks/use-post-actions';
-import { compactNumber, creatorLabel } from '../../_utils/format';
+import { compactNumber, creatorLabel, formatMultiple } from '../../_utils/format';
 import { EXPLORE_SORTS, sortPosts, type ExploreResult, type ExploreSort, type UseExplorePageReturn } from '../_hooks/use-explore-page';
 
 /** Grids per platform: YouTube 16:9, Instagram a denser 9:16, like each platform's own. `lane` = half the width, beside the other. */
@@ -125,25 +131,28 @@ function SkeletonCards({ platform, count, lane }: { platform: ContentLabPlatform
     );
 }
 
-function LoadingResults() {
+function LoadingBanner() {
+    return (
+        <div aria-busy="true" className="bg-muted/50 flex items-start gap-3 rounded-xl border p-4">
+            <Loader2Icon className="text-primary mt-0.5 size-5 shrink-0 animate-spin" />
+            <div>
+                <p className="font-medium">Finding posts that are doing better than usual…</p>
+                <p className="text-muted-foreground text-sm">
+                    This can take up to a minute: each post is compared with its creator&apos;s other recent posts.
+                </p>
+            </div>
+        </div>
+    );
+}
+
+function LoadingPosts() {
     const { platform } = usePage<UseExplorePageReturn>();
     const platforms = platform === 'both' ? CONTENT_LAB_PLATFORMS : [platform];
     return (
-        <div aria-busy="true" className="flex flex-col gap-4">
-            <div className="bg-muted/50 flex items-start gap-3 rounded-xl border p-4">
-                <Loader2Icon className="text-primary mt-0.5 size-5 shrink-0 animate-spin" />
-                <div>
-                    <p className="font-medium">Finding posts that are doing better than usual…</p>
-                    <p className="text-muted-foreground text-sm">
-                        This can take up to a minute: each post is compared with its creator&apos;s other recent posts.
-                    </p>
-                </div>
-            </div>
-            <div className={cn('grid gap-6', platforms.length > 1 && 'lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]')}>
-                {platforms.map((p) => (
-                    <SkeletonCards key={p} platform={p} count={p === 'instagram' ? 6 : 4} lane={platforms.length > 1} />
-                ))}
-            </div>
+        <div aria-busy="true" className={cn('grid gap-6', platforms.length > 1 && 'lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]')}>
+            {platforms.map((p) => (
+                <SkeletonCards key={p} platform={p} count={p === 'instagram' ? 6 : 4} lane={platforms.length > 1} />
+            ))}
         </div>
     );
 }
@@ -164,35 +173,82 @@ function PlatformErrors({ errors }: { errors: ExploreResult['errors'] }) {
     );
 }
 
-/** "We checked 48 posts. 17 got at least twice …. Reels did best on Instagram." */
-function summaryLine(niche: NonNullable<ExploreResult['niche']>): string {
-    const best = (Object.entries(niche.bestFormat) as [ContentLabPlatform, keyof typeof CONTENT_LAB_POST_FORMAT_LABELS][]).map(
-        ([platform, format]) => `${CONTENT_LAB_POST_FORMAT_LABELS[format].toLowerCase()}s on ${CONTENT_LAB_PLATFORM_LABELS[platform]}`,
+const TIMES = CONTENT_LAB_OUTLIER_MULTIPLE === 2 ? 'twice' : `${CONTENT_LAB_OUTLIER_MULTIPLE} times`;
+
+function StatTile({ label, value, hint, icon }: { label: string; value: ReactNode; hint?: ReactNode; icon?: ReactNode }) {
+    return (
+        <div className="bg-card flex min-w-0 flex-col gap-0.5 rounded-lg border px-3 py-2.5">
+            <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
+                {icon}
+                {label}
+            </p>
+            <p className="truncate text-lg leading-tight font-bold tabular-nums">{value}</p>
+            {hint ? <p className="text-muted-foreground truncate text-xs">{hint}</p> : null}
+        </div>
     );
-    const times = CONTENT_LAB_OUTLIER_MULTIPLE === 2 ? 'twice' : `${CONTENT_LAB_OUTLIER_MULTIPLE} times`;
-    return [
-        `We checked ${niche.postCount} posts.`,
-        `${niche.outlierCount} got at least ${times} the views their creator usually gets.`,
-        best.length ? `Best right now: ${best.join(' and ')}.` : '',
-    ]
-        .filter(Boolean)
-        .join(' ');
 }
 
-/** The patterns the winning posts share, in a few plain lines. */
+/** The numbers at a glance: how many took off, the biggest jump, the most views, the format doing best per platform. */
+function StatTiles({ result }: { result: ExploreResult }) {
+    const { niche, posts } = result;
+    if (!niche) return null;
+    const biggest = posts.reduce<CONTENT_LAB_POST | null>((top, p) => ((p.multiple ?? 0) > (top?.multiple ?? 0) ? p : top), null);
+    const mostSeen = posts.reduce<CONTENT_LAB_POST | null>((top, p) => ((p.views ?? 0) > (top?.views ?? 0) ? p : top), null);
+    const best = Object.entries(niche.bestFormat) as [ContentLabPlatform, keyof typeof CONTENT_LAB_POST_FORMAT_LABELS][];
+    return (
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4" data-testid="explore-stats">
+            <StatTile
+                label="Took off"
+                icon={<RocketIcon className="size-3.5" />}
+                value={`${niche.outlierCount} of ${niche.postCount}`}
+                hint={`${TIMES} their usual or more`}
+            />
+            {biggest?.multiple ? (
+                <StatTile
+                    label="Biggest jump"
+                    icon={<FlameIcon className="size-3.5" />}
+                    value={`${formatMultiple(biggest.multiple)} usual`}
+                    hint={creatorLabel(biggest.creator)}
+                />
+            ) : null}
+            {mostSeen?.views ? (
+                <StatTile label="Most views" icon={<EyeIcon className="size-3.5" />} value={compactNumber(mostSeen.views)} hint={creatorLabel(mostSeen.creator)} />
+            ) : null}
+            {best.length ? (
+                <StatTile
+                    label="Works best"
+                    icon={<TrophyIcon className="size-3.5" />}
+                    value={
+                        <span className="flex items-center gap-2 text-base">
+                            {best.map(([platform, format]) => (
+                                <span key={platform} className="flex items-center gap-1">
+                                    <PlatformIcon platform={platform} className="size-4" />
+                                    {CONTENT_LAB_POST_FORMAT_LABELS[format]}s
+                                </span>
+                            ))}
+                        </span>
+                    }
+                    hint="right now, by format"
+                />
+            ) : null}
+        </div>
+    );
+}
+
+/** The numbers, then the patterns the winning posts share in a few plain lines. */
 function Takeaways({ result }: { result: ExploreResult }) {
-    const { takeaways, niche } = result;
+    const { niche } = result;
+    // "69 of 85 took off" is already the first tile.
+    const takeaways = niche ? result.takeaways.filter((t) => !t.headline.startsWith(`${niche.outlierCount} of ${niche.postCount}`)) : result.takeaways;
     if (!takeaways.length && !niche) return null;
     return (
-        <section aria-labelledby="explore-glance" className="bg-muted/40 flex flex-col gap-3 rounded-xl border p-4">
-            <div className="flex flex-col gap-0.5">
-                <h2 id="explore-glance" className="flex items-center gap-2 font-semibold">
-                    <SparklesIcon className="text-primary size-4" /> What the top posts have in common
-                </h2>
-                {niche ? <p className="text-muted-foreground text-sm">{summaryLine(niche)}</p> : null}
-            </div>
+        <section aria-labelledby="explore-glance" className="bg-muted/40 flex min-w-0 flex-col gap-3 rounded-xl border p-4">
+            <h2 id="explore-glance" className="flex items-center gap-2 font-semibold">
+                <SparklesIcon className="text-primary size-4" /> What the top posts have in common
+            </h2>
+            <StatTiles result={result} />
             {takeaways.length ? (
-                <ul className="grid gap-2 md:grid-cols-3">
+                <ul className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
                     {takeaways.map((takeaway) => (
                         <li key={takeaway.headline + takeaway.detail} className="bg-card flex items-start gap-2 rounded-lg border p-3 text-sm">
                             <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-emerald-600" />
@@ -247,9 +303,11 @@ function Lane({ platform, posts, lane }: { platform: ContentLabPlatform; posts: 
     return (
         <section aria-label={`From ${CONTENT_LAB_PLATFORM_LABELS[platform]}`} className="flex min-w-0 flex-col gap-3">
             <div className="flex items-center gap-2">
-                <PlatformIcon platform={platform} className="size-5" />
+                <span className="bg-card grid size-8 shrink-0 place-items-center rounded-lg border shadow-xs">
+                    <PlatformIcon platform={platform} className="size-4.5" />
+                </span>
                 <h3 className="font-semibold">Working on {CONTENT_LAB_PLATFORM_LABELS[platform]}</h3>
-                <span className="text-muted-foreground text-sm">· {posts.length}</span>
+                <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium tabular-nums">{posts.length}</span>
                 {lane ? (
                     <Button variant="link" size="sm" className="ml-auto h-auto px-0" onClick={() => setPlatform(platform)}>
                         Only {CONTENT_LAB_PLATFORM_LABELS[platform]}
@@ -329,12 +387,13 @@ function MorePosts() {
     );
 }
 
-function Results() {
-    const { state, query, retry, platform, sort } = usePage<UseExplorePageReturn>();
-    const [phoneLane, setPhoneLane] = useState<ContentLabPlatform>('youtube');
-    if (state.status === 'loading') return <LoadingResults />;
-    if (state.status === 'error') {
-        return (
+/** Status and summary on the left; on a topic, how strong it is on the right (it loads in seconds, before the posts). */
+function Overview() {
+    const { state, query, retry, country, platform } = usePage<UseExplorePageReturn>();
+    const summary =
+        state.status === 'loading' ? (
+            <LoadingBanner />
+        ) : state.status === 'error' ? (
             <Alert variant="destructive">
                 <AlertTriangleIcon className="size-4" />
                 <AlertTitle>Results did not load</AlertTitle>
@@ -345,63 +404,77 @@ function Results() {
                     </Button>
                 </AlertDescription>
             </Alert>
-        );
-    }
+        ) : state.status === 'done' ? (
+            <>
+                <PlatformErrors errors={state.result.errors} />
+                <CreatorSummary result={state.result} />
+                <Takeaways result={state.result} />
+            </>
+        ) : null;
+
+    if (!query) return <div className="flex flex-col gap-4">{summary}</div>;
+    return (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:items-start">
+            <div className="flex min-w-0 flex-col gap-4 max-lg:order-2">{summary}</div>
+            <KeywordCard query={query} country={country} platform={platform} className="max-lg:order-1" />
+        </div>
+    );
+}
+
+function Posts() {
+    const { state, query, platform, sort } = usePage<UseExplorePageReturn>();
+    const [phoneLane, setPhoneLane] = useState<ContentLabPlatform>('youtube');
+    if (state.status === 'loading') return <LoadingPosts />;
     if (state.status !== 'done') return null;
-    const { result } = state;
-    const posts = sortPosts(result.posts, sort);
+    const posts = sortPosts(state.result.posts, sort);
     const shown = (platform === 'both' ? CONTENT_LAB_PLATFORMS : [platform]).filter((p) => postsOn(posts, p).length || platform !== 'both');
     const lanes = shown.length > 1;
     const visibleLane = shown.includes(phoneLane) ? phoneLane : shown[0];
 
+    if (!posts.length) {
+        return (
+            <EmptyState
+                icon={<SearchXIcon />}
+                title={query ? `No posts found for "${query}"` : 'No posts found for this creator'}
+                description="Try a broader topic, another country or the other platform."
+            />
+        );
+    }
     return (
-        <div className="flex flex-col gap-6">
-            <PlatformErrors errors={result.errors} />
-            <CreatorSummary result={result} />
-            <Takeaways result={result} />
-            {posts.length ? (
-                <section aria-labelledby="explore-posts" className="flex flex-col gap-3">
-                    <h2 id="explore-posts" className="sr-only">
-                        The posts
-                    </h2>
-                    {lanes ? (
-                        // Phones and tablets show one platform at a time; wide screens put them side by side.
-                        <SegmentedSwitch
-                            className="lg:hidden"
-                            aria-label="Show posts from"
-                            value={visibleLane}
-                            onValueChange={setPhoneLane}
-                            options={shown.map((p) => ({
-                                value: p,
-                                label: CONTENT_LAB_PLATFORM_LABELS[p],
-                                icon: <PlatformIcon platform={p} />,
-                                count: postsOn(posts, p).length,
-                            }))}
-                        />
-                    ) : null}
-                    <div className={cn('grid gap-8', lanes && 'lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]')}>
-                        {shown.map((p) => (
-                            <div key={p} className={cn('min-w-0', lanes && p !== visibleLane && 'hidden lg:block')}>
-                                <Lane platform={p} posts={postsOn(posts, p)} lane={lanes} />
-                            </div>
-                        ))}
-                    </div>
-                    {query ? <MorePosts /> : null}
-                </section>
-            ) : (
-                <EmptyState
-                    icon={<SearchXIcon />}
-                    title={query ? `No posts found for "${query}"` : 'No posts found for this creator'}
-                    description="Try a broader topic, another country or the other platform."
+        <section aria-labelledby="explore-posts" className="flex flex-col gap-3">
+            <h2 id="explore-posts" className="sr-only">
+                The posts
+            </h2>
+            {lanes ? (
+                // Phones and tablets show one platform at a time; wide screens put them side by side.
+                <SegmentedSwitch
+                    className="lg:hidden"
+                    aria-label="Show posts from"
+                    value={visibleLane}
+                    onValueChange={setPhoneLane}
+                    options={shown.map((p) => ({
+                        value: p,
+                        label: CONTENT_LAB_PLATFORM_LABELS[p],
+                        icon: <PlatformIcon platform={p} />,
+                        count: postsOn(posts, p).length,
+                    }))}
                 />
-            )}
-        </div>
+            ) : null}
+            <div className={cn('grid gap-8', lanes && 'lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]')}>
+                {shown.map((p) => (
+                    <div key={p} className={cn('min-w-0', lanes && p !== visibleLane && 'hidden lg:block')}>
+                        <Lane platform={p} posts={postsOn(posts, p)} lane={lanes} />
+                    </div>
+                ))}
+            </div>
+            {query ? <MorePosts /> : null}
+        </section>
     );
 }
 
 /** What's working: smart box, a sticky filter bar, what the winners share, then each platform's posts with more on scroll. */
 export function ExploreView() {
-    const { query, creator, unsupported, country } = usePage<UseExplorePageReturn>();
+    const { query, creator, unsupported, country, platform } = usePage<UseExplorePageReturn>();
     const searching = !!(query || creator);
     const title = query ? `What's working in "${query}"` : creator ? `Standouts from @${creator.handle}` : "What's working";
     const subtitle = creator
@@ -414,13 +487,15 @@ export function ExploreView() {
                 <h1 className="text-2xl font-bold tracking-tight break-words text-balance sm:text-3xl">{title}</h1>
                 {searching ? <p className="text-muted-foreground">{subtitle}</p> : null}
             </header>
-            <SmartBox size="default" defaultValue={query ?? (creator ? `@${creator.handle}` : '')} />
+            <SmartBox size="default" defaultValue={query ?? (creator ? `@${creator.handle}` : '')} platform={platform} country={country} />
             {searching ? (
                 <>
                     <Toolbar />
-                    <Results />
+                    <Overview />
+                    <Posts />
                 </>
             ) : (
+                <>
                 <EmptyState
                     icon={unsupported ? <SearchXIcon /> : <TrendingUpIcon />}
                     title={unsupported ? 'That link cannot be broken down' : 'Search a topic, link or @creator'}
@@ -430,6 +505,8 @@ export function ExploreView() {
                             : 'See the posts doing far better than usual for their creator, on YouTube and Instagram.'
                     }
                 />
+                <RecentSearches />
+                </>
             )}
         </div>
     );

@@ -8,6 +8,8 @@ import type {
     CONTENT_LAB_CREATOR_RESPONSE,
     CONTENT_LAB_EXPLORE_REQUEST,
     CONTENT_LAB_EXPLORE_RESPONSE,
+    CONTENT_LAB_KEYWORD_REQUEST,
+    CONTENT_LAB_KEYWORD_RESPONSE,
     CONTENT_LAB_SUGGEST_REQUEST,
     CONTENT_LAB_SUGGEST_RESPONSE,
 } from '@aixellabs/backend/content-lab/types';
@@ -77,6 +79,9 @@ export const contentLabApi = {
     /** Type-ahead creators for what was typed so far; pass a fresh signal per keystroke. */
     suggest: (body: CONTENT_LAB_SUGGEST_REQUEST, signal?: AbortSignal) =>
         post<CONTENT_LAB_SUGGEST_REQUEST, CONTENT_LAB_SUGGEST_RESPONSE>(CONTENT_LAB_API_ROUTES.SUGGEST, body, signal),
+    /** What people search for a topic, and (with `trend`) its 0-100 score from YouTube search interest. */
+    keyword: (body: CONTENT_LAB_KEYWORD_REQUEST, signal?: AbortSignal) =>
+        post<CONTENT_LAB_KEYWORD_REQUEST, CONTENT_LAB_KEYWORD_RESPONSE>(CONTENT_LAB_API_ROUTES.KEYWORD, body, signal),
     write: (body: CONTENT_LAB_WRITE_REQUEST, signal?: AbortSignal) =>
         post<CONTENT_LAB_WRITE_REQUEST, CONTENT_LAB_WRITE_RESPONSE>(CONTENT_LAB_API_ROUTES.WRITE, body, signal),
     ads: (body: CONTENT_LAB_ADS_REQUEST, signal?: AbortSignal) =>
