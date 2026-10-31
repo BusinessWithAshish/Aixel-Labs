@@ -7,6 +7,7 @@ import {
     EMAIL_SUB_MODULES,
     LEAD_ENRICHMENT_SUB_MODULES,
     LEAD_GENERATION_SUB_MODULES,
+    LINE_FINDER_SUB_MODULES,
     MESSAGING_SUB_MODULES,
     Modules,
     SubModule,
@@ -49,6 +50,8 @@ import {
     WandSparkles,
     TextSearch,
     SlidersHorizontal,
+    Quote,
+    UserSearch,
 } from 'lucide-react';
 
 /** Sidebar pages that live inside a sub-module (each labelled and iconed in the maps below). None today. */
@@ -82,6 +85,9 @@ export const subModuleLabelMap: Partial<Record<SidebarKey, string>> = {
     [CONTENT_LAB_SUB_MODULES.BOARDS]: 'Boards',
     [CONTENT_LAB_SUB_MODULES.WATCHING]: 'Watching',
     [CONTENT_LAB_SUB_MODULES.SETTINGS]: 'Settings',
+    [Modules.LINE_FINDER]: 'LineFinder',
+    [LINE_FINDER_SUB_MODULES.SEARCH]: 'Find a line',
+    [LINE_FINDER_SUB_MODULES.PEOPLE]: 'People',
 };
 
 export type SidebarUser = {
@@ -103,6 +109,7 @@ export const modulesIconMap: Record<Modules, LucideIcon> = {
     [Modules.EMAIL]: Mail,
     [Modules.LEAD_ENRICHMENT]: UserRoundPlus,
     [Modules.CONTENT_LAB]: Sparkles,
+    [Modules.LINE_FINDER]: Quote,
 };
 
 export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: LucideIcon; color: string }> = {
@@ -221,6 +228,14 @@ export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: Lucide
     [CONTENT_LAB_SUB_MODULES.SETTINGS]: {
         icon: SlidersHorizontal,
         color: '!text-slate-600',
+    },
+    [LINE_FINDER_SUB_MODULES.SEARCH]: {
+        icon: TextSearch,
+        color: '!text-teal-600',
+    },
+    [LINE_FINDER_SUB_MODULES.PEOPLE]: {
+        icon: UserSearch,
+        color: '!text-violet-500',
     },
 };
 

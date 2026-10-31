@@ -14,6 +14,11 @@ import {
 } from "../api/linkedin/types";
 import type { CRAWL_RESPONSE } from "../api/crawl";
 import type { CONTENT_LAB_CHECK_RESPONSE, ContentLabFormat, ContentLabPlatform } from "../api/content-lab/types";
+import type {
+  LINE_FINDER_PERSON_STATUS_VALUE,
+  LINE_FINDER_SPEAKER_VALUE,
+  LINE_FINDER_VIDEO_STATUS_VALUE,
+} from "../api/line-finder/types";
 import voiceCallRates from "./voice-call-rates.json";
 
 export enum TenantType {
@@ -47,6 +52,14 @@ export enum MongoCollections {
   CONTENT_LAB_BOARD_RUNS = "content_lab_board_runs",
   /** One per (user, platform, handle) the user watches, with its latest standout posts. */
   CONTENT_LAB_WATCHLIST = "content_lab_watchlist",
+  /** Who LineFinder can search, and how collecting their videos is going. */
+  LINE_FINDER_PEOPLE = "line_finder_people",
+  /** One per YouTube video, shared by everyone it's collected for. */
+  LINE_FINDER_VIDEOS = "line_finder_videos",
+  /** One per caption line. */
+  LINE_FINDER_LINES = "line_finder_lines",
+  /** Who is speaking at a moment: the speaker check's answer or an admin's mark. */
+  LINE_FINDER_SPEAKER_LABELS = "line_finder_speaker_labels",
 }
 
 export enum Modules {
@@ -56,6 +69,7 @@ export enum Modules {
   EMAIL = "EMAIL",
   LEAD_ENRICHMENT = "LEAD_ENRICHMENT",
   CONTENT_LAB = "CONTENT_LAB",
+  LINE_FINDER = "LINE_FINDER",
 }
 
 export enum LEAD_GENERATION_SUB_MODULES {
@@ -107,13 +121,20 @@ export enum CONTENT_LAB_SUB_MODULES {
   SETTINGS = "CONTENT_LAB_SETTINGS",
 }
 
+export enum LINE_FINDER_SUB_MODULES {
+  SEARCH = "LINE_FINDER_SEARCH",
+  /** Who is searchable and how collection is going. Admins in practice: its actions require `isAdmin`. */
+  PEOPLE = "LINE_FINDER_PEOPLE",
+}
+
 export type SubModule =
   | LEAD_GENERATION_SUB_MODULES
   | VOICE_AGENT_SUB_MODULES
   | MESSAGING_SUB_MODULES
   | EMAIL_SUB_MODULES
   | LEAD_ENRICHMENT_SUB_MODULES
-  | CONTENT_LAB_SUB_MODULES;
+  | CONTENT_LAB_SUB_MODULES
+  | LINE_FINDER_SUB_MODULES;
 
 export type ModuleAccess = {
   [Modules.LEAD_GENERATION]?: LEAD_GENERATION_SUB_MODULES[];
@@ -122,6 +143,7 @@ export type ModuleAccess = {
   [Modules.EMAIL]?: EMAIL_SUB_MODULES[];
   [Modules.LEAD_ENRICHMENT]?: LEAD_ENRICHMENT_SUB_MODULES[];
   [Modules.CONTENT_LAB]?: CONTENT_LAB_SUB_MODULES[];
+  [Modules.LINE_FINDER]?: LINE_FINDER_SUB_MODULES[];
 };
 
 export type LeadData =
@@ -1846,4 +1868,61 @@ export type ContentLabProfileDoc<Id = ObjectId> = {
 
 export type ContentLabProfile = Omit<ContentLabProfileDoc<string>, "updatedAt" | "aiKeys" | "connections"> & {
   updatedAt: string;
+};
+
+// ─── LineFinder ──────────────────────────────────────────────────────────────
+
+export type LineFinderPersonDoc<IdType = string> = {
+  _id?: IdType;
+  name: string;
+  spellings: string[];
+  handle: string | null;
+  status: LINE_FINDER_PERSON_STATUS_VALUE;
+  /** Why collection stopped itself, in words a person can read. */
+  stopReason: string | null;
+  /** Set once their videos have been looked for. A resumed person isn't looked for again. */
+  discoveredAt: Date | null;
+  /** Held by whichever `run-due` call is collecting them, so two never do at once. */
+  leaseUntil: Date | null;
+  createdAt: Date;
+};
+
+export type LineFinderVideoDoc<IdType = string> = {
+  _id?: IdType;
+  videoId: string;
+  personIds: IdType[];
+  title: string | null;
+  channelId: string | null;
+  channelName: string | null;
+  channelUrl: string | null;
+  durationSeconds: number | null;
+  views: number | null;
+  status: LINE_FINDER_VIDEO_STATUS_VALUE;
+  language: string | null;
+  isAuto: boolean | null;
+  error: string | null;
+  collectedAt: Date | null;
+};
+
+export type LineFinderLineDoc<IdType = string> = {
+  _id?: IdType;
+  videoId: string;
+  idx: number;
+  startMs: number;
+  text: string;
+  /** When each word is said. Null when the caption track has no word timing. */
+  wordMs: number[] | null;
+  /** What this line is found by. See `compute/captions.ts`. */
+  keys: string[];
+};
+
+export type LineFinderSpeakerLabelDoc<IdType = string> = {
+  _id?: IdType;
+  personId: IdType;
+  videoId: string;
+  startMs: number;
+  label: LINE_FINDER_SPEAKER_VALUE;
+  /** A mark is never overwritten by the check. */
+  source: "check" | "mark";
+  createdAt: Date;
 };

@@ -13,6 +13,7 @@ import { REDDIT_API_ROUTES } from "./api/reddit/constants";
 import { BLUFF_ROUTES } from "./api/bluff/constants";
 import { BUSINESS_ROUTES } from "./api/business/constants";
 import { CONTENT_LAB_API_ROUTES } from "./api/content-lab/constants";
+import { LINE_FINDER_API_ROUTES } from "./api/line-finder/constants";
 
 export enum ENDPOINTS {
   HOME = "/",
@@ -29,6 +30,7 @@ export enum ENDPOINTS {
   SEGMENT = "/segment",
   CRAWL = "/crawl",
   CONTENT_LAB = "/content-lab",
+  LINE_FINDER = "/line-finder",
   BUSINESS = "/business",
   BLUFF = "/bluff",
   CHATGPT = "/chatgpt",
@@ -367,6 +369,20 @@ export const API_ENDPOINTS = {
   },
   CRAWL: {
     API: { route: "/", full: `${ENDPOINTS.CRAWL}` },
+  },
+  LINE_FINDER: {
+    DISCOVER: {
+      route: LINE_FINDER_API_ROUTES.DISCOVER,
+      full: `${ENDPOINTS.LINE_FINDER}${LINE_FINDER_API_ROUTES.DISCOVER}`,
+    },
+    CAPTIONS: {
+      route: LINE_FINDER_API_ROUTES.CAPTIONS,
+      full: `${ENDPOINTS.LINE_FINDER}${LINE_FINDER_API_ROUTES.CAPTIONS}`,
+    },
+    CHECK_SPEAKER: {
+      route: LINE_FINDER_API_ROUTES.CHECK_SPEAKER,
+      full: `${ENDPOINTS.LINE_FINDER}${LINE_FINDER_API_ROUTES.CHECK_SPEAKER}`,
+    },
   },
   CONTENT_LAB: {
     EXPLORE: {

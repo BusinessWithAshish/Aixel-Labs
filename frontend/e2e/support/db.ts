@@ -139,6 +139,40 @@ export class E2eDb {
     }
 
     /** Moves this user's daily spending count to another day. */
+    /** Clears LineFinder and adds one person with one searchable video, one video with no captions and these lines. */
+    async seedLineFinder(lines: { startMs: number; text: string; keys: string[] }[]): Promise<ObjectId> {
+        const people = this.db.collection(MongoCollections.LINE_FINDER_PEOPLE);
+        const videos = this.db.collection(MongoCollections.LINE_FINDER_VIDEOS);
+        const lineDocs = this.db.collection(MongoCollections.LINE_FINDER_LINES);
+        await Promise.all([
+            people.deleteMany({}),
+            videos.deleteMany({}),
+            lineDocs.deleteMany({}),
+            this.db.collection(MongoCollections.LINE_FINDER_SPEAKER_LABELS).deleteMany({}),
+        ]);
+        const { insertedId: personId } = await people.insertOne({
+            name: 'Puneet Superstar',
+            spellings: [],
+            handle: null,
+            status: 'done',
+            stopReason: null,
+            discoveredAt: new Date(),
+            leaseUntil: null,
+            createdAt: new Date(),
+        });
+        const video = { personIds: [personId], channelId: 'c1', channelName: '@chillhour', channelUrl: 'https://www.youtube.com/@chillhour', durationSeconds: 3600, language: 'hi', isAuto: true, error: null, collectedAt: new Date() };
+        await videos.insertMany([
+            { ...video, videoId: 'vid_one', title: 'The Chill Hour', views: 44080, status: 'done' },
+            { ...video, videoId: 'vid_two', title: 'No captions here', views: 10, status: 'no_captions' },
+        ]);
+        await lineDocs.insertMany(lines.map((line, idx) => ({ videoId: 'vid_one', idx, wordMs: null, ...line })));
+        return personId;
+    }
+
+    async getLineFinderLabels() {
+        return this.db.collection(MongoCollections.LINE_FINDER_SPEAKER_LABELS).find().toArray();
+    }
+
     async setCreditsDay(user: E2eUser, day: string): Promise<void> {
         const doc = await this.getUser(user);
         await this.users.updateOne({ _id: doc._id }, { $set: { dailyCreditsDay: day } });

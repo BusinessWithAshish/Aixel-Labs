@@ -1,6 +1,7 @@
 import { flag } from 'flags/next';
 import {
     CONTENT_LAB_SUB_MODULES,
+    LINE_FINDER_SUB_MODULES,
     EMAIL_SUB_MODULES,
     LEAD_ENRICHMENT_SUB_MODULES,
     LEAD_GENERATION_SUB_MODULES,
@@ -29,6 +30,7 @@ export enum FeatureFlagKey {
     EMAIL = 'email',
     LEAD_ENRICHMENT = 'lead-enrichment',
     CONTENT_LAB = 'content-lab',
+    LINE_FINDER = 'line-finder',
 }
 
 export const nlChatGoogleMapsFlag = flag<boolean>({
@@ -83,6 +85,7 @@ export const messagingFlag = pageFlag(FeatureFlagKey.MESSAGING, 'Messaging modul
 export const emailFlag = pageFlag(FeatureFlagKey.EMAIL, 'Email module', false);
 export const leadEnrichmentFlag = pageFlag(FeatureFlagKey.LEAD_ENRICHMENT, 'Lead enrichment module', false);
 export const contentLabFlag = pageFlag(FeatureFlagKey.CONTENT_LAB, 'Content Lab module', false);
+export const lineFinderFlag = pageFlag(FeatureFlagKey.LINE_FINDER, 'LineFinder module', true);
 
 const FLAG_BY_KEY = {
     [FeatureFlagKey.NL_CHAT_GOOGLE_MAPS]: nlChatGoogleMapsFlag,
@@ -95,6 +98,7 @@ const FLAG_BY_KEY = {
     [FeatureFlagKey.EMAIL]: emailFlag,
     [FeatureFlagKey.LEAD_ENRICHMENT]: leadEnrichmentFlag,
     [FeatureFlagKey.CONTENT_LAB]: contentLabFlag,
+    [FeatureFlagKey.LINE_FINDER]: lineFinderFlag,
 } as const satisfies Record<FeatureFlagKey, ReturnType<typeof flag<boolean>>>;
 
 export async function evaluateFlag(key: FeatureFlagKey): Promise<boolean> {
@@ -112,6 +116,7 @@ export const SUB_MODULE_FLAG_KEY: Partial<Record<SubModule, FeatureFlagKey>> = {
     ...wholeModule(EMAIL_SUB_MODULES, FeatureFlagKey.EMAIL),
     ...wholeModule(LEAD_ENRICHMENT_SUB_MODULES, FeatureFlagKey.LEAD_ENRICHMENT),
     ...wholeModule(CONTENT_LAB_SUB_MODULES, FeatureFlagKey.CONTENT_LAB),
+    ...wholeModule(LINE_FINDER_SUB_MODULES, FeatureFlagKey.LINE_FINDER),
 };
 
 /** Tenant where admins see every page, flagged or not, to try unfinished work before it ships. */

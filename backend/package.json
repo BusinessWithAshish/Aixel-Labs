@@ -218,6 +218,26 @@
       "types": "./src/api/business/engine/compute.ts",
       "default": "./src/api/business/engine/compute.ts"
     },
+    "./line-finder/constants": {
+      "types": "./src/api/line-finder/constants.ts",
+      "default": "./src/api/line-finder/constants.ts"
+    },
+    "./line-finder/schemas": {
+      "types": "./src/api/line-finder/schemas.ts",
+      "default": "./src/api/line-finder/schemas.ts"
+    },
+    "./line-finder/compute/match": {
+      "types": "./src/api/line-finder/compute/match.ts",
+      "default": "./src/api/line-finder/compute/match.ts"
+    },
+    "./line-finder/compute/sound": {
+      "types": "./src/api/line-finder/compute/sound.ts",
+      "default": "./src/api/line-finder/compute/sound.ts"
+    },
+    "./line-finder/types": {
+      "types": "./src/api/line-finder/types.ts",
+      "default": "./src/api/line-finder/types.ts"
+    },
     "./bluff/constants": {
       "types": "./src/api/bluff/constants.ts",
       "default": "./src/api/bluff/constants.ts"

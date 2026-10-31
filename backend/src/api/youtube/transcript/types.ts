@@ -62,7 +62,8 @@ export type INNERTUBE_PLAYER_RESPONSE = {
 export type JSON3_EVENT = {
   tStartMs?: number;
   dDurationMs?: number;
-  segs?: Array<{ utf8?: string }>;
+  /** `tOffsetMs` is each word's offset from `tStartMs`, on auto-generated tracks. */
+  segs?: Array<{ utf8?: string; tOffsetMs?: number }>;
 };
 
 export type JSON3_RESPONSE = {

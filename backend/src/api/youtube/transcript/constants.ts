@@ -26,6 +26,15 @@ export const YOUTUBE_PLAYER_PLAYABILITY_OK_STATUSES = [
   "LIVE_STREAM_OFFLINE",
 ] as const;
 
+/**
+ * `X-Goog-FieldMask` for `/player`: only what `fetchPlayerCaptionTracks` reads.
+ * The full response carries every streaming format, so this is what makes the
+ * call cheap on the metered proxy: 433 KB down to 17 KB across 11 videos
+ * (measured 2026-10-31).
+ */
+export const YOUTUBE_PLAYER_CAPTIONS_FIELD_MASK =
+  "playabilityStatus.status,playabilityStatus.reason,captions.playerCaptionsTracklistRenderer.captionTracks";
+
 // ─── Default request values ────────────────────────────────────────────────────
 
 /** Default InnerTube `hl` for transcript requests. */

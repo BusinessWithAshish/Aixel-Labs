@@ -7,6 +7,7 @@ import {
 } from "../constants";
 import type { UrlFetchSession } from "../../../utils/node-tls-client-session-handler";
 import {
+  YOUTUBE_PLAYER_CAPTIONS_FIELD_MASK,
   YOUTUBE_PLAYER_PLAYABILITY_OK_STATUSES,
   YOUTUBE_TIMEDTEXT_FORMAT,
   YOUTUBE_TRANSCRIPT_DEFAULT_HL,
@@ -61,6 +62,7 @@ export async function fetchPlayerCaptionTracks(
   const response = await session.post(playerUrl(), {
     headers: {
       "Content-Type": "application/json",
+      "X-Goog-FieldMask": YOUTUBE_PLAYER_CAPTIONS_FIELD_MASK,
       ...iosRequestHeaders(),
     },
     body: JSON.stringify(body),
@@ -100,12 +102,12 @@ export async function fetchPlayerCaptionTracks(
   return tracks;
 }
 
-/** GETs `baseUrl + &fmt=json3` and parses the timedtext JSON3 payload. */
-export async function fetchTimedTextJson3(
+/** GETs `baseUrl + &fmt=json3` and returns the raw timedtext JSON3, word timing included. */
+export async function fetchTimedTextJson3Raw(
   session: UrlFetchSession,
   track: INNERTUBE_CAPTION_TRACK,
   videoId: string,
-): Promise<YOUTUBE_TRANSCRIPT_LINE[]> {
+): Promise<JSON3_RESPONSE> {
   const transcriptUrl = `${stripFmtParam(track.baseUrl)}&fmt=${YOUTUBE_TIMEDTEXT_FORMAT}`;
 
   const response = await session.get(transcriptUrl, {
@@ -130,5 +132,14 @@ export async function fetchTimedTextJson3(
     throw new Error("timedtext returned non-JSON response");
   }
 
-  return parseJson3Events(parsed);
+  return parsed;
+}
+
+/** Same fetch, flattened to transcript lines. */
+export async function fetchTimedTextJson3(
+  session: UrlFetchSession,
+  track: INNERTUBE_CAPTION_TRACK,
+  videoId: string,
+): Promise<YOUTUBE_TRANSCRIPT_LINE[]> {
+  return parseJson3Events(await fetchTimedTextJson3Raw(session, track, videoId));
 }

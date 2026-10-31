@@ -1,5 +1,6 @@
 import {
     CONTENT_LAB_SUB_MODULES,
+    LINE_FINDER_SUB_MODULES,
     EMAIL_SUB_MODULES,
     LEAD_ENRICHMENT_SUB_MODULES,
     LEAD_GENERATION_SUB_MODULES,
@@ -45,6 +46,8 @@ export const SubModuleUrls: Record<SubModule, string> = {
     [CONTENT_LAB_SUB_MODULES.BOARDS]: '/content-lab/boards',
     [CONTENT_LAB_SUB_MODULES.WATCHING]: '/content-lab/watching',
     [CONTENT_LAB_SUB_MODULES.SETTINGS]: '/content-lab/settings',
+    [LINE_FINDER_SUB_MODULES.SEARCH]: '/line-finder/search',
+    [LINE_FINDER_SUB_MODULES.PEOPLE]: '/line-finder/people',
 };
 
 /** Content Lab pages under Search; nested so the Search grant covers them (path ACL is prefix-based). */
@@ -75,6 +78,9 @@ export const TENANT_TYPE_OPTIONS = [
     { value: TenantType.EXTERNAL, label: 'External' },
     { value: TenantType.PRODUCT, label: 'Product' },
 ];
+
+/** Called by the backend's ticker to collect the next batch of videos. */
+export const LINE_FINDER_COLLECT_API_ROUTE = '/api/line-finder/collect/run-due';
 
 export const DEFAULT_HOME_PAGE_ROUTE = '/';
 export const TENANT_HOME_PAGE_ROUTE = '/home';
