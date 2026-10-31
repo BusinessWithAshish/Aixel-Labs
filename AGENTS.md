@@ -49,18 +49,15 @@ Docs: [Rules / AGENTS.md](https://cursor.com/docs/rules.md), [Skills](https://cu
 |---------|------|
 | `frontend/` | Next.js app (port 3003) — UI, auth, credits, lead-gen, BFF |
 | `backend/` | Express scrapers + intelligence + MCP; Mongo schema SSOT in `src/db` |
-| `browser-worker/` | Optional Puppeteer worker (not required for current `/gsearch`) |
-| `scraper/` | Legacy/sidecar Python Botasaurus service |
 
 Schema SSOT for persisted data: `backend/src/db` → skill `backend-db`.
 
 ## Commands
 
 ```bash
-pnpm installAll          # frontend + backend + browser-worker
+pnpm installAll          # frontend + backend
 pnpm --filter frontend dev
 pnpm --filter backend run dev
-pnpm --filter browser-worker run dev
 ```
 
 Align `BE_API` with the backend listen port (default **8002** unless overridden).

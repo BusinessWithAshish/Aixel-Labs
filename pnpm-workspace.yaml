@@ -1,5 +1,3 @@
 packages:
   - "frontend"
   - "backend"
-  - "scraper"
-  - "browser-worker"

@@ -10,7 +10,7 @@ const CRAWL_OPS: Record<string, DomainOp> = {
   },
 };
 
-const CRAWL_DESCRIPTION = `Turn company domains / website URLs into published contact profiles (emails, phones, socials, light meta/address). Sync TLS crawl — no browser-worker/Botasaurus/Playwright. Raw only — no intelligence overlay.
+const CRAWL_DESCRIPTION = `Turn company domains / website URLs into published contact profiles (emails, phones, socials, light meta/address). Sync TLS crawl — no Puppeteer/Botasaurus/Playwright. Raw only — no intelligence overlay.
 
 Call with { op, layer?, input }. layer must be omitted or raw.
 

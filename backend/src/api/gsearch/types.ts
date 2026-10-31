@@ -31,7 +31,7 @@ export type GSEARCH_AUTHOR = {
 /**
  * A single organic web result (also the lead-gen persistable shape).
  * `id` is the canonical result URL (`createUserLeads` / Mongo `sourceId`).
- * Superset of the browser-worker's `{ url, title, snippet, index }`, enriched
+ * Superset of `src/browser/gsearch`'s `{ url, title, snippet, index }`, enriched
  * with CSE richSnippet metadata.
  */
 export type GSEARCH_RESULT = {

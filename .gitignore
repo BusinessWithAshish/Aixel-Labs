@@ -123,8 +123,6 @@ Thumbs.db
 /backend/_temp/
 /backend/storage/
 /backend/releases/
-/scraper/venv
-/scraper/output/
 
 # Python packaging metadata (setuptools local install)
 *.egg-info/

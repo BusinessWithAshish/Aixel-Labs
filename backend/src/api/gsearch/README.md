@@ -6,7 +6,7 @@ through the Evomi residential proxy (country-targeted; region best-effort).
 
 This is the **productionized** version of the research in
 `backend/experiments/google-search/` (see its `FINDINGS.md`). It mirrors the
-`browser-worker` `gsearch` handler's request shape but fetches results over HTTP.
+`src/browser/gsearch` handler's request shape but fetches results over HTTP.
 
 > **Competitor analysis:** See [`COMPETITORS_FINDINGS.md`](../../../experiments/google-search/COMPETITORS_FINDINGS.md) for a
 > deep-dive into how Serper.dev and SearchApi.io scrape Google. **v2** (`POST /gsearch/v2`)
@@ -49,7 +49,7 @@ results are **close to but not byte-identical** to organic `google.com/search`.
 | Proxy `_region-*`                     | limited Evomi coverage    | not used (country proxy only)           |
 
 City/state precision is achieved by appending the location to the query text (the same
-trick `browser-worker` uses) plus country proxy routing. Both city and state →
+trick `src/browser/gsearch` uses) plus country proxy routing. Both city and state →
 `"q in City, State"`; city only → `"q in City"`; state only → `"q in State"`.
 `uule`/`near` are silently ignored by this endpoint.
 
@@ -104,7 +104,7 @@ result rows. Each row includes `id` (canonical URL) for `createUserLeads`.
 }
 ```
 
-### Fields beyond the browser-worker `{url,title,snippet,index}`
+### Fields beyond the browser scraper's `{url,title,snippet,index}`
 
 `displayUrl`, `thumbnail`, `image`, `siteName`, `metaDescription`, `modifiedTime` — all
 extracted from the CSE result's `visibleUrl` and `richSnippet` (OpenGraph metatags). The
@@ -161,10 +161,10 @@ gsearch/
   If it dies, see **[`RECOVERY.md`](./RECOVERY.md)** — a full diagnose-and-rebuild playbook
   with references, code snippets, and a fallback ladder.
 - **Web only.** No AI Overview, People-Also-Ask, images, maps, or knowledge panel — use
-  `browser-worker/src/handlers/gsearch` for full SERP features.
+  `backend/src/browser/gsearch` for full SERP features.
 
 ## If this breaks
 
 Read **[`RECOVERY.md`](./RECOVERY.md)**. It has failure-signature diagnosis, the exact
 two requests, all SearXNG/knitsail references, and an ordered fallback ladder (new `cx` →
-official CSE JSON API → SearXNG's next fix → 4get → browser-worker → paid SERP APIs).
+official CSE JSON API → SearXNG's next fix → 4get → `src/browser` → paid SERP APIs).

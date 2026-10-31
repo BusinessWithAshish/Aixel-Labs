@@ -3,7 +3,7 @@
 Sync TLS crawl that turns company **domains / website URLs** into published
 contact profiles: emails, phones, socials, light meta/address.
 
-Uses `node-tls-client` + Evomi only — **no** browser-worker, Botasaurus, or
+Uses `node-tls-client` + Evomi only — **no** Puppeteer, Botasaurus, or
 Playwright. Per-domain failures return an empty profile with `status`; the
 batch does not fail.
 

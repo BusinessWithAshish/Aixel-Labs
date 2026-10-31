@@ -49,6 +49,8 @@ for mounts/boot, **db** for anything persisted, then the folder you are editing.
 - MCP: one tool per domain (`op` / `layer` / `input`) calling the same
   **services** as HTTP — no loopback. Catalog: `backend/src/mcp/README.md`.
 
+- Puppeteer: `src/browser/` — real-Chrome Google Search and Maps scraping, parked and
+  unmounted as the fallback when TLS + Evomi gets blocked. Read its README before wiring it.
 - Python worker: `workers/reframe/` — speaker-following crop plans for `media`
   op=`cut` (`reframe: "speaker"`). Own venv + models via `pnpm setup:reframe`,
   spawned per clip from `src/api/media/cut/reframe.ts`; analysis only, the

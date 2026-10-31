@@ -49,7 +49,7 @@ export async function fetchGsearch(
   // Proxy is routed by COUNTRY only. Evomi has limited per-city region coverage,
   // and an unsupported `_region-*` value fails the tunnel — so city/state
   // precision comes from the query text (`buildLocationQuery`), matching the
-  // browser-worker's `${query} in ${city}` + `_country-XX` pattern.
+  // `src/browser/gsearch`'s `${query} in ${city}` + `_country-XX` pattern.
   const proxyUrl = buildEvomiProxyUrl({
     sessionId,
     countryCode: country,

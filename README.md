@@ -25,8 +25,6 @@ Canonical product description in app config: *“Agentic Lead management system�
 |---------|------|----------------|
 | [`frontend/`](frontend/) | Next.js 15 app (UI, BFF, server actions) | **3003** |
 | [`backend/`](backend/) | Express scrapers, intelligence, MCP, Mongo **schema SSOT** (`src/db`) | **8002** |
-| [`browser-worker/`](browser-worker/) | Optional Puppeteer worker (`/gsearch`, `/gmaps/scrape`) | **8080** |
-| [`scraper/`](scraper/) | Python FastAPI + Botasaurus (legacy/sidecar; not in root `devAll`) | — |
 
 Frontend imports shared types/schemas via `@aixellabs/backend/*`. Scrapers do **not**
 write Mongo; the Next.js app persists leads/credits/tenants.
@@ -48,9 +46,8 @@ write Mongo; the Next.js app persists leads/credits/tenants.
 | Email / lead enrichment | Module enums + sidebar URLs; no pages |
 | Voice agent (beyond dialer) | Placeholder parent page; inquiry/analytics URLs unused |
 | NL chat on scrapers | Code present; feature flags default **off** |
-| browser-worker as primary SERP | Optional; production `/gsearch` is browserless CSE; research docs under `backend/src/api/gsearch/` |
+| Puppeteer SERP/Maps (`backend/src/browser/`) | Parked and unmounted; production `/gsearch` is browserless CSE; research docs under `backend/src/api/gsearch/` |
 | `SAMPLE` endpoint | In config; not mounted |
-| Python `scraper/` | Workspace member; not required for current IG/Maps paths |
 
 ## Architecture (short)
 
@@ -69,23 +66,19 @@ Agent conventions: [`AGENTS.md`](AGENTS.md), [`.cursor/`](.cursor/).
 ## Local development
 
 ```bash
-# Install (frontend + backend + browser-worker)
+# Install (frontend + backend)
 pnpm installAll
 
 # Preferred per-package (align BE_API with backend port)
 pnpm --filter frontend dev            # http://localhost:3003
 pnpm --filter backend run dev         # http://localhost:8002
-pnpm --filter browser-worker run dev  # optional (:8080)
 ```
 
-Root shortcuts: `pnpm devFE` / `devBE` / `devBW` (and `prodFE` / `prodBE` /
-`prodBW`) call the same filter scripts. Package READMEs:
-[`frontend/`](frontend/README.md), [`backend/`](backend/README.md),
-[`browser-worker/`](browser-worker/README.md), [`scraper/`](scraper/README.md).
+Root shortcuts: `pnpm devFE` / `devBE` (and `prodFE` / `prodBE`) call the same filter scripts. Package READMEs:
+[`frontend/`](frontend/README.md), [`backend/`](backend/README.md).
 
 **Secrets:** Firebase + Mongo for the app; backend needs scrape/proxy env (e.g.
-`EVOMI_PROXY_*`). See `frontend/.env.example`, `browser-worker/.env.example`,
-`scraper/.env.example`, and local `backend/.env`.
+`EVOMI_PROXY_*`). See `frontend/.env.example` and local `backend/.env`.
 
 ## Stack
 

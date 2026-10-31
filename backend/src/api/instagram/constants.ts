@@ -143,7 +143,7 @@ export const IG_PAGE_HEADERS: Record<string, string> = {
 
 export const INSTAGRAM_QUERY_LIMITS = {
   maxEntities: 100,
-  /** Google query word cap (same as legacy browser-worker gsearch). */
+  /** Google query word cap (same as `src/browser/gsearch`). */
   maxQueryWords: 30,
 } as const;
 

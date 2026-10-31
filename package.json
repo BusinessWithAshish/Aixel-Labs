@@ -5,14 +5,11 @@
     "scripts": {
         "installFE": "pnpm --filter frontend install",
         "installBE": "pnpm --filter backend install",
-        "installBW": "pnpm --filter browser-worker install",
-        "installAll": "pnpm installFE && pnpm installBE && pnpm installBW",
-        "devAll": "pnpm devFE && pnpm devBE && pnpm devBW",
+        "installAll": "pnpm installFE && pnpm installBE",
+        "devAll": "pnpm devFE && pnpm devBE",
         "devFE": "pnpm --filter frontend dev",
         "devBE": "pnpm --filter backend run dev",
-        "devBW": "pnpm --filter browser-worker run dev",
         "prodBE": "pnpm --filter backend run prod",
-        "prodBW": "pnpm --filter browser-worker run prod",
         "prodFE": "pnpm --filter frontend run prod"
     },
     "pnpm": {

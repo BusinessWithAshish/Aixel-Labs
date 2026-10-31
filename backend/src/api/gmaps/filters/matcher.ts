@@ -46,7 +46,7 @@ const inRange = (
 };
 
 /**
- * Normalize unknown lead payloads (legacy browser-worker + current API)
+ * Normalize unknown lead payloads (`src/browser/gmaps` + current API)
  * into the canonical place fields the matcher expects.
  */
 export const toGmapsPlace = (data: unknown): GmapsPlaceFields => {

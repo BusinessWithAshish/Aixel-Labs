@@ -1,10 +1,7 @@
 import { Browser, LaunchOptions, Page } from "puppeteer-core";
 import { getBrowserOptions, getPuppeteer } from "./browser";
-import { config } from "dotenv";
 import { Response } from "express";
-import { DEFAULT_PAGE_LOAD_TIMEOUT } from "./constants";
-
-config();
+import { DEFAULT_PAGE_LOAD_TIMEOUT } from "../../utils/constants";
 
 // Configuration constants
 const MAX_BROWSER_SESSIONS = Number(process.env.MAX_BROWSER_SESSIONS) || 10;

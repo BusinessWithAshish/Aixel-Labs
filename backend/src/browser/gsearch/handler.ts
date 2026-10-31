@@ -1,11 +1,11 @@
 import { Request, Response } from "express";
 import { readFileSync } from "fs";
-import { join } from "path";
+import { resolve } from "path";
 import type { Page } from "puppeteer-core";
 
-import { BrowserBatchHandler } from "../../browser/browser-batch-handler";
-import { PROXY_CONFIG } from "../../browser/constants";
-import { pageStealther } from "../../browser/stealth-handlers";
+import { BrowserBatchHandler } from "../core/browser-batch-handler";
+import { PROXY_CONFIG } from "../../utils/constants";
+import { pageStealther } from "../core/stealth-handlers";
 import { toAlpha2CountryCode } from "../../utils/country";
 
 import {
@@ -25,7 +25,8 @@ import {
 
 // ── Load the inspector script once at module level (not on every request) ──
 const INSPECTOR_SCRIPT = readFileSync(
-  join(__dirname, "gsearch-injector.js"),
+  // tsc doesn't copy .js files, so src/ and dist/ both read the copy in src/.
+  resolve(__dirname, "../../../src/browser/gsearch/gsearch-injector.js"),
   "utf-8",
 );
 
