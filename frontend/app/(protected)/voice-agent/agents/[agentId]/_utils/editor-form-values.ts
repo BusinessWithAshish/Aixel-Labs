@@ -1,4 +1,10 @@
-import { VOICE_WEEKDAYS, VoiceStackKind, type VoiceAgent, type VoiceAgentBookingTool } from '@aixellabs/backend/db/types';
+import {
+    VOICE_WEEKDAYS,
+    VOICE_WHATSAPP_DEFAULTS,
+    VoiceStackKind,
+    type VoiceAgent,
+    type VoiceAgentBookingTool,
+} from '@aixellabs/backend/db/types';
 import { DEFAULT_VOICE_BOOKING_HOURS, defaultVoiceBookingTool } from '@/helpers/voice-agent-defaults';
 import { callSettingsOf } from '@/helpers/voice-agent-features';
 import type { BookingFormValues, VoiceAgentCallSettingsInput, VoiceAgentInput } from '@/helpers/voice-schemas';
@@ -43,7 +49,7 @@ export function bookingFormValues(booking: VoiceAgentBookingTool | null, timezon
 
 /** Call settings as the editor holds them: a choice field's answers typed as one comma-separated line. */
 export function callSettingsFormValues(
-    agent: Pick<VoiceAgent, 'voicemail' | 'analysis' | 'memory' | 'speech'>,
+    agent: Pick<VoiceAgent, 'voicemail' | 'analysis' | 'memory' | 'speech'> & Partial<Pick<VoiceAgent, 'whatsapp'>>,
 ): VoiceAgentCallSettingsInput {
     const { voicemail, analysis, memory, speech } = callSettingsOf(agent);
     return {
@@ -54,5 +60,6 @@ export function callSettingsFormValues(
         },
         memory,
         speech: { ...speech },
+        whatsapp: { ...VOICE_WHATSAPP_DEFAULTS, ...agent.whatsapp },
     };
 }

@@ -19,6 +19,7 @@ import asyncio
 import base64
 import hashlib
 import hmac
+import json
 import os
 import re
 import time
@@ -66,13 +67,13 @@ def sign(*parts: str) -> str:
 
 
 def sig_ok(sig: str | None, *parts: str) -> bool:
-    return bool(VOICELAB_KEY and sig) and hmac.compare_digest(sig, sign(*parts))
+    return bool(VOICELAB_KEY and sig) and hmac.compare_digest(sig.encode(), sign(*parts).encode())  # bytes: any text compares
 
 
 def bearer_ok(header: str | None) -> bool:
     """The app talking to us server to server: `Authorization: Bearer <VOICELAB_KEY>`."""
     scheme, _, secret = (header or "").partition(" ")
-    return bool(VOICELAB_KEY) and scheme.lower() == "bearer" and hmac.compare_digest(secret.strip(), VOICELAB_KEY)
+    return bool(VOICELAB_KEY) and scheme.lower() == "bearer" and hmac.compare_digest(secret.strip().encode(), VOICELAB_KEY.encode())
 
 
 # --- Customer keys at rest: AES-256-GCM, "v1." + base64url(iv + ciphertext + tag) ---------------
@@ -135,6 +136,18 @@ def find_number(number_id) -> dict | None:
     if not account or not account.get("numbers"):
         return None
     return {**account["numbers"][0], "userId": account["userId"], "tenantId": account["tenantId"]}
+
+
+def whatsapp_numbers(app_id: str) -> list[dict]:
+    """Every WhatsApp number on one Meta app, whoever owns it (one app's webhook carries them all), each
+    with its owner's `userId` and `tenantId` as find_number gives them."""
+    if not app_id:
+        return []
+    found = []
+    for account in db().voice_accounts.find({"numbers.whatsapp.appId": app_id}, {"numbers": 1, "userId": 1, "tenantId": 1}):
+        found += [{**n, "userId": account["userId"], "tenantId": account["tenantId"]} for n in account.get("numbers") or []
+                  if n.get("provider") == "WHATSAPP" and (n.get("whatsapp") or {}).get("appId") == app_id]
+    return found
 
 
 def load_number(number_id, direction: str = "INBOUND", agent_id=None) -> tuple[dict | None, dict | None]:
@@ -235,6 +248,27 @@ def note_key_problem(user_id, sealed: str, status: str, words: str, google: str)
         )
     except Exception as e:
         logger.error(f"could not note the Gemini key problem of owner {user_id}: {e}")
+
+
+async def gemini_generate(key: str, model: str, body: dict, timeout: float = 30.0) -> dict:
+    """One generateContent call on `key` (one retry when Google is busy): Google's whole answer, or raises
+    with what Google said."""
+    import aiohttp
+
+    url = f"{GEMINI_API_BASE}/v1beta/models/{model}:generateContent"
+    for attempt in (1, 2):
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=body, headers={"x-goog-api-key": key},
+                                    timeout=aiohttp.ClientTimeout(total=timeout)) as r:
+                status, text = r.status, await r.text()
+        if status in (429, 500, 503) and attempt == 1:
+            await asyncio.sleep(2)
+            continue
+        if status >= 300:
+            problem = gemini_key_problem(text)
+            raise RuntimeError(f"Gemini refused the request: {problem[1] if problem else f'HTTP {status}'} ({text[:200]})")
+        return json.loads(text)
+    raise RuntimeError("unreachable")
 
 
 async def check_gemini_key(key: str) -> tuple[str, str, str] | None:
@@ -405,9 +439,10 @@ def voicemail_message(agent: dict, values: dict[str, str]) -> str | None:
 
 
 def memory_phone(ctx: dict) -> str | None:
-    """The number a phone call's memory is kept under: the person, whichever way the call went."""
+    """The number a phone call's (or WhatsApp chat's) memory is kept under: the person, whichever way it went.
+    One memory per person and agent, whether they called or chatted."""
     doc = ctx.get("doc") or {}
-    return normalize_number(ctx.get("customer_phone")) if doc.get("channel") == "PHONE" else None
+    return normalize_number(ctx.get("customer_phone")) if doc.get("channel") in ("PHONE", "WHATSAPP") else None
 
 
 def load_memory(doc: dict, phone: str) -> dict | None:
@@ -476,14 +511,16 @@ def _finish_ctx(ctx: dict, agent: dict) -> dict:
 # owner fields of the voice_calls document written when it ends.
 
 
-def phone_call(number: dict, agent: dict, direction: str, other: str | None) -> dict:
+def phone_call(number: dict, agent: dict, direction: str, other: str | None, channel: str = "PHONE") -> dict:
     """A call on a customer's number. `other` is the person: who called in, or who we dial.
+    `channel` "WHATSAPP" is a WhatsApp chat with the number instead (whatsapp.py): the same agent, tools and memory.
     Refused (CallRefused) without a prompt or the owner's Gemini key: call it off the event loop.
 
     `api_key` is the customer's Telnyx key (hang-up, recording). A VoiceLink call needs none
     while it runs: it is hung up by closing its socket, and VoiceLink records it. A Twilio
     call's `api_key` is the API key secret (or Auth Token), and `twilio` says how to use it
-    (twilio.creds_of: account, key SID, whether Twilio's own signatures can be checked).
+    (twilio.creds_of: account, key SID, whether Twilio's own signatures can be checked). A WhatsApp
+    call's `api_key` is the system-user access token, and `whatsapp` names the number for the Graph API.
     """
     ours = number.get("phoneNumber")
     provider = number.get("provider") or "TELNYX"
@@ -493,6 +530,8 @@ def phone_call(number: dict, agent: dict, direction: str, other: str | None) -> 
         import twilio  # imports this module: loaded on first use
 
         extra["twilio"] = twilio.creds_of(number, api_key)
+    elif provider == "WHATSAPP":
+        extra["whatsapp"] = {"phone_number_id": number["providerNumberId"]}
     return _finish_ctx({
         **extra,
         # A booking's phone when the caller gives none: theirs on a call in, the callee's on one we place.
@@ -506,7 +545,7 @@ def phone_call(number: dict, agent: dict, direction: str, other: str | None) -> 
             "userId": number["userId"],
             "agentId": agent["_id"],
             "numberId": number["_id"],
-            "channel": "PHONE",
+            "channel": channel,
             "direction": direction,
             "from": other if direction == "INBOUND" else ours,
             "to": ours if direction == "INBOUND" else other,

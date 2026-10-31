@@ -19,6 +19,16 @@
     "estimateSource": "A typical 3-minute call: about 1,000 transcript tokens plus 500 of instructions in; summary, fields and memory note out.",
     "estimateTokens": { "textIn": 1500, "textOut": 300 }
   },
+  "chat": {
+    "model": "gemini-3.5-flash-lite",
+    "source": "ai-gateway.vercel.sh/v1/models (read 2026-10-26): google/gemini-3.5-flash-lite input 0.0000003, output 0.0000025 a token; google/gemini-3.5-flash input 0.0000015, output 0.000009. Thinking bills as text out. The free tier is free of charge. `model` is the default (VOICE_WHATSAPP_DEFAULTS.chatModel).",
+    "models": {
+      "gemini-3.5-flash-lite": { "usdPerMillionTokens": { "textIn": 0.3, "textOut": 2.5 } },
+      "gemini-3.5-flash": { "usdPerMillionTokens": { "textIn": 1.5, "textOut": 9.0 } }
+    },
+    "estimateSource": "One WhatsApp reply: the agent's prompt, what she remembers and the chat so far in (about 3,000 tokens), one short message out.",
+    "estimateTokens": { "textIn": 3000, "textOut": 120 }
+  },
   "providers": {
     "TELNYX": {
       "source": "telnyx.com/pricing/call-control (Voice API 0.002, media streaming 0.0035, recording 0.002) + telnyx.com/pricing/elastic-sip (US local in from 0.0032, out from 0.005). Telnyx publishes no India rates (/pricing/elastic-sip/in and /pricing/call-control/in list none, checked 2026-10-22): calls to India show without Telnyx's charge. SIP (a softphone test, either way): the same without the phone-network leg, 0.0075.",
@@ -29,6 +39,11 @@
       "source": "twilio.com/en-us/voice/pricing/us ('current as of August 2026': local in 0.0085, out 0.014, Media Streams 0.0044) + /pricing/in (checked 2026-10-22: to Indian mobiles 0.0496, landlines 0.0699; OUTBOUND_IN is the mobile rate, most leads are mobiles); recording 0.0025.",
       "usdPerMinute": { "INBOUND": 0.0085, "OUTBOUND": 0.014, "OUTBOUND_IN": 0.0496 },
       "extrasUsdPerMinute": 0.0069
+    },
+    "WHATSAPP": {
+      "source": "developers.facebook.com/documentation/business-messaging/whatsapp/pricing (read 2026-10-24): user-initiated calls are free in every country; Meta bills the customer's own WABA directly, nothing goes through us.",
+      "usdPerMinute": { "INBOUND": 0 },
+      "extrasUsdPerMinute": 0
     }
   },
   "providersWithoutRates": {
@@ -38,7 +53,7 @@
     "readAt": "2026-10-23",
     "note": "What the engine bills each part of a PIPELINE stack on (costs.pipeline_cost), by model. stt: the whole call's minutes (the stream is open from start to end); llm: tokens in and out (thinking counts as out); tts: characters sent, or minutes of audio made for the token-billed ones (Gemini about 1,500 audio tokens a minute, 25 a second).",
     "stt": {
-      "nova-3": { "usdPerMinute": 0.0048, "source": "deepgram.com/pricing (read 2026-10-23): Nova-3 Monolingual streaming, pay as you go (the engine asks for English; Multilingual is $0.0058)." },
+      "nova-3": { "usdPerMinute": 0.0058, "source": "deepgram.com/pricing (read 2026-10-23): Nova-3 Multilingual streaming, pay as you go (the engine asks for language=multi since 2026-10-28; Monolingual is $0.0048)." },
       "nova-2": { "usdPerMinute": 0.0058, "source": "deepgram.com/pricing (read 2026-10-23), FAQ: Nova-2 streaming $0.35 an hour." },
       "nova-2-phonecall": { "usdPerMinute": 0.0058, "source": "deepgram.com/pricing (read 2026-10-23), FAQ: Nova-2 streaming $0.35 an hour." },
       "gemini-3.5-transcribe-live": { "usdPerMinute": 0.009, "source": "ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22): $0.005/min audio in + $0.004/min text out." },

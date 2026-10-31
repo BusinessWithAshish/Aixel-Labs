@@ -23,7 +23,7 @@ import {
     LINK_UI_PENDING,
     linkNumber,
     numberRow,
-    numberUse,
+    expectSlots,
     openConnect,
     openPhoneNumbers,
     openRemove,
@@ -52,10 +52,6 @@ const FIRST_NUMBER = '+13473703925';
 const FIRST_NUMBER_ID = '1293384261075731499';
 const SECOND_NUMBER = '+13475550142';
 const SECOND_NUMBER_ID = '1293384261075731500';
-
-const answers = (agent: string) => `Answers calls with ${agent}`;
-const places = (agent: string) => `Places calls with ${agent}`;
-const NOT_LINKED = 'Not linked to an agent';
 
 async function chooseOption(page: Page, combobox: string, option: string): Promise<void> {
     await page.getByRole('combobox', { name: combobox }).click();
@@ -133,10 +129,10 @@ test.beforeEach(async ({ db }) => {
 
 test('importing a number changes nothing in Telnyx and the key never reaches the browser', async ({ page, db }) => {
     await openPhoneNumbers(page);
-    await expect(page.getByText('No phone numbers yet')).toBeVisible();
+    await expect(page.getByText('No numbers yet')).toBeVisible();
 
     await connectAndImport(page, [FIRST_NUMBER]);
-    await expect(numberUse(page, FIRST_NUMBER)).toHaveText(NOT_LINKED);
+    await expectSlots(page, FIRST_NUMBER, {});
     await expect(numberRow(page, FIRST_NUMBER).getByTestId('number-provider')).toHaveText('Telnyx');
     await expect(numberRow(page, FIRST_NUMBER).getByTestId('number-provider-logo-TELNYX')).toBeVisible();
     await expect(numberRow(page, SECOND_NUMBER)).toHaveCount(0);
@@ -172,6 +168,7 @@ test('connect is a menu of providers, each opening its own dialog and its own se
         /^TelnyxUS and international numbers/,
         /^TwilioUS and international numbers/,
         /^VoiceLinkIndian numbers \(\+91\)/,
+        /^WhatsAppWhatsApp Business numbers/,
     ]);
     await page.keyboard.press('Escape');
 
@@ -199,13 +196,13 @@ test('each row says which agent uses the number and how, links to it, and has no
     await seedNumber(db, SECOND_NUMBER, { outboundAgentId: new ObjectId(sales) });
     await openPhoneNumbers(page);
 
-    await expect(numberUse(page, FIRST_NUMBER)).toHaveText(answers('Front desk'));
-    await expect(numberRow(page, FIRST_NUMBER).getByRole('link', { name: 'Front desk' })).toHaveAttribute(
+    await expectSlots(page, FIRST_NUMBER, { answers: 'Front desk' });
+    await expect(numberRow(page, FIRST_NUMBER).getByRole('link', { name: 'Open Front desk' })).toHaveAttribute(
         'href',
         voiceAgentUrl(frontDesk),
     );
-    await expect(numberUse(page, SECOND_NUMBER)).toHaveText(places('Sales outreach'));
-    await expect(numberRow(page, SECOND_NUMBER).getByRole('link', { name: 'Sales outreach' })).toHaveAttribute(
+    await expectSlots(page, SECOND_NUMBER, { calls: 'Sales outreach' });
+    await expect(numberRow(page, SECOND_NUMBER).getByRole('link', { name: 'Open Sales outreach' })).toHaveAttribute(
         'href',
         voiceAgentUrl(sales),
     );
@@ -216,7 +213,7 @@ test('each row says which agent uses the number and how, links to it, and has no
         await expect(row.getByRole('button', { name: `Remove ${phone}` })).toBeVisible();
     }
 
-    await numberRow(page, FIRST_NUMBER).getByRole('link', { name: 'Front desk' }).click();
+    await numberRow(page, FIRST_NUMBER).getByRole('link', { name: 'Open Front desk' }).click();
     await expect(page).toHaveURL(new RegExp(`${voiceAgentUrl(frontDesk)}$`));
 });
 
@@ -227,14 +224,13 @@ test('numbers set up before the agent decided the job say what to fix', async ({
     await seedNumber(db, SECOND_NUMBER, { inboundAgentId: new ObjectId(sales) });
     await openPhoneNumbers(page);
 
-    const both = numberRow(page, FIRST_NUMBER).getByTestId('number-use');
-    await expect(both).toContainText(answers('Front desk'));
-    await expect(both).toContainText(places('Sales outreach'));
-    await expect(both).not.toContainText('Link it again');
+    await expectSlots(page, FIRST_NUMBER, { answers: 'Front desk', calls: 'Sales outreach' });
+    await expect(numberRow(page, FIRST_NUMBER).getByTestId('number-status')).not.toContainText('Pick an agent again');
 
-    const swapped = numberRow(page, SECOND_NUMBER).getByTestId('number-use');
-    await expect(swapped).toContainText(answers('Sales outreach'));
-    await expect(swapped).toContainText('Sales outreach is now an agent that makes calls. Link the number again from it.');
+    await expectSlots(page, SECOND_NUMBER, { answers: 'Sales outreach' });
+    await expect(numberRow(page, SECOND_NUMBER).getByTestId('number-status')).toHaveText(
+        'Sales outreach is now an agent that makes calls. Pick an agent again.',
+    );
     // Nothing changed on its own.
     expect((await db.getVoiceNumbers(E2E_USER)).find((n) => n.phoneNumber === FIRST_NUMBER)).toMatchObject({
         inboundAgentId: new ObjectId(frontDesk),
@@ -295,7 +291,7 @@ test("a test call makes the one Call Control app every number shares, and at the
 
     // Removing the number leaves their app alone.
     await (await openRemove(page, FIRST_NUMBER)).getByRole('button', { name: 'Remove number' }).click();
-    await expect(page.getByText('No phone numbers yet')).toBeVisible();
+    await expect(page.getByText('No numbers yet')).toBeVisible();
     expect(telnyx.callControlApps.has(theirs)).toBe(true);
     expect(telnyx.find('DELETE', /call_control_applications/)).toHaveLength(0);
 });
@@ -334,7 +330,7 @@ test('a test call names the chosen agent, prices a minute by where it goes, and 
     await expect(numberRow(page, FIRST_NUMBER).getByTestId('number-cost-estimate')).toHaveText(
         'About $0.074 a minute to the US',
     );
-    await expect(numberUse(page, FIRST_NUMBER)).toHaveText(places('Sales outreach'));
+    await expectSlots(page, FIRST_NUMBER, { calls: 'Sales outreach' });
 
     await numberRow(page, FIRST_NUMBER).getByRole('button', { name: 'Test call' }).click();
     const dialog = page.getByRole('dialog', { name: 'Test call' });
@@ -438,7 +434,7 @@ test('removing a number the AI never answered leaves its routing alone', async (
     telnyx.clear();
 
     await (await openRemove(page, FIRST_NUMBER)).getByRole('button', { name: 'Remove number' }).click();
-    await expect(page.getByText('No phone numbers yet')).toBeVisible();
+    await expect(page.getByText('No numbers yet')).toBeVisible();
     expect(telnyxWrites().map((r) => `${r.method} ${r.path}`)).toEqual([
         `DELETE /v2/call_control_applications/${callControlAppId}`,
     ]);
@@ -480,7 +476,7 @@ test.describe('linking from the agent editor', () => {
         expect(stored.inboundAgentId).toBeNull();
         expect(stored.texmlAppId).toBeUndefined();
         await openPhoneNumbers(page);
-        await expect(numberUse(page, FIRST_NUMBER)).toHaveText(places('Sales outreach'));
+        await expectSlots(page, FIRST_NUMBER, { calls: 'Sales outreach' });
 
         await unlinkNumber(page, sales, FIRST_NUMBER);
         expect((await db.getVoiceNumbers(E2E_USER))[0].outboundAgentId).toBeNull();
@@ -609,9 +605,7 @@ test.describe('linking from the agent editor', () => {
         expect(stored.inboundAgentId?.toString()).toBe(afterHours);
         expect(stored.outboundAgentId?.toString()).toBe(sales);
         await openPhoneNumbers(page);
-        const uses = numberRow(page, FIRST_NUMBER).getByTestId('number-use');
-        await expect(uses).toContainText(answers('After hours'));
-        await expect(uses).toContainText(places('Sales outreach'));
+        await expectSlots(page, FIRST_NUMBER, { answers: 'After hours', calls: 'Sales outreach' });
 
         // Follow-ups wants the outbound slot: the picker says what the number does, and asks before taking it.
         await openVoiceAgent(page, followUps);
@@ -649,7 +643,7 @@ test.describe('linking from the agent editor', () => {
         const dialog = await openRemove(page, FIRST_NUMBER);
         await expect(dialog).toContainText('calls ring the way they did before you connected it');
         await dialog.getByRole('button', { name: 'Remove number' }).click();
-        await expect(page.getByText('No phone numbers yet')).toBeVisible();
+        await expect(page.getByText('No numbers yet')).toBeVisible();
 
         const calls = telnyx.requests.map((r) => `${r.method} ${r.path}`);
         expect(calls.slice(0, 2)).toEqual([

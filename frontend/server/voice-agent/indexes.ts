@@ -30,12 +30,16 @@ export async function ensureVoiceAgentIndexes(): Promise<void> {
     const campaigns = await getCollection<VoiceCampaignDoc>(MongoCollections.VOICE_CAMPAIGNS);
     const contacts = await getCollection<VoiceCampaignContactDoc>(MongoCollections.VOICE_CAMPAIGN_CONTACTS);
 
+    // A number was once unique on its own; now once per provider (the same number may be a phone line and on
+    // WhatsApp). The old index would refuse the second, so it goes first. Missing (a new database) is fine.
+    await accounts.dropIndex('numbers.phoneNumber_1').catch(() => undefined);
+
     await Promise.all([
         accounts.createIndex({ userId: 1 }, { unique: true }),
-        // A number or a connected app belongs to one account. Partial: accounts without any would
+        // A number (per provider) or a connected app belongs to one account. Partial: accounts without any would
         // all index the missing value and collide.
         accounts.createIndex(
-            { 'numbers.phoneNumber': 1 },
+            { 'numbers.phoneNumber': 1, 'numbers.provider': 1 },
             { unique: true, partialFilterExpression: { 'numbers.phoneNumber': { $exists: true } } },
         ),
         accounts.createIndex(
@@ -44,6 +48,11 @@ export async function ensureVoiceAgentIndexes(): Promise<void> {
         ),
         // The engine finds a call's number (and so its owner and key) by the number's id.
         accounts.createIndex({ 'numbers._id': 1 }),
+        // A WhatsApp webhook names its Meta app: the engine finds the app's numbers (and its secret) by it.
+        accounts.createIndex(
+            { 'numbers.whatsapp.appId': 1 },
+            { partialFilterExpression: { 'numbers.whatsapp.appId': { $exists: true } } },
+        ),
         // Linphone's one-time setup link finds its softphone by the link's token.
         accounts.createIndex(
             { 'softphone.provisioning.tokenHash': 1 },
@@ -84,6 +93,11 @@ export async function ensureVoiceAgentIndexes(): Promise<void> {
         calls.createIndex(
             { agentId: 1, startedAt: -1 },
             { name: 'memory_list', partialFilterExpression: { 'memory.current': true } },
+        ),
+        // WhatsApp chats still open: the engine adds each message to one, and closes those gone quiet.
+        calls.createIndex(
+            { numberId: 1, callerPhone: 1, 'chat.lastMessageAt': -1 },
+            { name: 'chat_open', partialFilterExpression: { 'chat.open': true } },
         ),
     ]);
 

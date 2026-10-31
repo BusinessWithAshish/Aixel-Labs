@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronDown, Info, PhoneIcon, Plus } from 'lucide-react';
+import { VoiceProvider } from '@aixellabs/backend/db/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItems, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -13,13 +14,13 @@ import { NUMBER_PROVIDER_ORDER, numberProviderInfo } from '@/helpers/voice-numbe
 import type { UsePhoneNumbersPageReturn } from '../_hooks/use-phone-numbers-page';
 import { setupGuideFor } from '../_utils/setup-guides';
 import { ConnectNumberDialog } from './ConnectNumberDialog';
-import { PhoneNumberRow } from './PhoneNumberRow';
+import { NumberRow } from './NumberRow';
 import { SetupGuideDialog } from '@/components/common/voice-agent/SetupGuideDialog';
 import { RemoveNumberDialog } from './RemoveNumberDialog';
 
 /** Picks the provider, then opens its connect dialog (its setup guide is one click from there). */
 function ConnectNumberMenu() {
-    const { openConnect } = usePage<UsePhoneNumbersPageReturn>();
+    const { openConnect, whatsapp } = usePage<UsePhoneNumbersPageReturn>();
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -31,20 +32,22 @@ function ConnectNumberMenu() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-60">
                 <DropdownMenuItems
-                    options={NUMBER_PROVIDER_ORDER.map((provider) => {
-                        const { label, region } = numberProviderInfo(provider);
-                        return {
-                            key: provider,
-                            icon: <NumberProviderLogo provider={provider} />,
-                            label: (
-                                <span className="grid">
-                                    {label}
-                                    <span className="text-muted-foreground text-xs">{region}</span>
-                                </span>
-                            ),
-                            onSelect: () => openConnect(provider),
-                        };
-                    })}
+                    options={NUMBER_PROVIDER_ORDER.filter((provider) => whatsapp || provider !== VoiceProvider.WHATSAPP).map(
+                        (provider) => {
+                            const { label, region } = numberProviderInfo(provider);
+                            return {
+                                key: provider,
+                                icon: <NumberProviderLogo provider={provider} />,
+                                label: (
+                                    <span className="grid">
+                                        {label}
+                                        <span className="text-muted-foreground text-xs">{region}</span>
+                                    </span>
+                                ),
+                                onSelect: () => openConnect(provider),
+                            };
+                        },
+                    )}
                 />
             </DropdownMenuContent>
         </DropdownMenu>
@@ -78,7 +81,7 @@ function ProviderSetupGuide() {
 }
 
 export function PhoneNumbersContent() {
-    const { numbers, loadError, geminiKey } = usePage<UsePhoneNumbersPageReturn>();
+    const { numbers, lines, loadError, geminiKey, whatsapp } = usePage<UsePhoneNumbersPageReturn>();
 
     return (
         <>
@@ -93,8 +96,12 @@ export function PhoneNumbersContent() {
             {numbers.length === 0 ? (
                 <EmptyState
                     icon={<PhoneIcon />}
-                    title="No phone numbers yet"
-                    description="Bring a number you already have with Telnyx, Twilio or VoiceLink. Nothing changes until an agent uses it."
+                    title="No numbers yet"
+                    description={
+                        whatsapp
+                            ? 'Bring a number you already have with Telnyx, Twilio or VoiceLink, or your WhatsApp Business number through your own Meta app. Nothing changes until you give it an agent.'
+                            : 'Bring a number you already have with Telnyx, Twilio or VoiceLink. Nothing changes until you give it an agent.'
+                    }
                 >
                     <ConnectNumberMenu />
                 </EmptyState>
@@ -102,14 +109,15 @@ export function PhoneNumbersContent() {
                 <>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="text-muted-foreground max-w-3xl text-sm">
-                            Link a number to an agent from the agent&rsquo;s page. Until then, its calls ring the way they
-                            always have.
+                            {whatsapp
+                                ? 'Each number does its work through an agent: pick who answers its calls (or places calls from it) and who answers it on WhatsApp. The same agent on both keeps one memory of each person.'
+                                : 'Each number does its work through an agent: pick who answers its calls, or who places calls from it. Until then, its calls ring the way they always have.'}
                         </p>
                         <ConnectNumberMenu />
                     </div>
-                    <ul className="bg-card divide-y rounded-lg border" aria-label="Your phone numbers">
-                        {numbers.map((number) => (
-                            <PhoneNumberRow key={number._id} number={number} />
+                    <ul className="bg-card divide-y rounded-lg border" aria-label="Your numbers">
+                        {lines.map((line) => (
+                            <NumberRow key={line.phoneNumber} line={line} />
                         ))}
                     </ul>
                     <p className="text-muted-foreground flex items-start gap-1.5 text-xs">

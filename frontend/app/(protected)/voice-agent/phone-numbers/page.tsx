@@ -5,16 +5,19 @@ import { listMyNumbers } from '@/app/actions/voice-number-actions';
 import { getVoiceAgentOptions } from '@/app/actions/voice-agent-actions';
 import { getGeminiKeyStatus } from '@/app/actions/voice-settings-actions';
 import { NO_GEMINI_KEY } from '@/server/voice-agent/gemini-key';
+import { canUseWhatsApp } from '@/server/voice-agent/owner-scope';
 import { usePhoneNumbersPage } from './_hooks/use-phone-numbers-page';
 import { PhoneNumbersContent } from './_components/PhoneNumbersContent';
 
-const PAGE_TITLE = 'Phone numbers';
+const PAGE_TITLE = 'Numbers';
 
+/** Every number the owner connected, phone lines and WhatsApp alike, each with the agents that work it. */
 async function PhoneNumbersPage() {
-    const [numbersRes, agentsRes, keyRes] = await Promise.all([
+    const [numbersRes, agentsRes, keyRes, whatsapp] = await Promise.all([
         listMyNumbers(),
         getVoiceAgentOptions(),
         getGeminiKeyStatus(),
+        canUseWhatsApp(),
     ]);
 
     return (
@@ -25,6 +28,7 @@ async function PhoneNumbersPage() {
                     agents: agentsRes.success && agentsRes.data ? agentsRes.data : [],
                     loadError: numbersRes.success ? null : (numbersRes.error ?? 'Could not load your numbers'),
                     geminiKey: keyRes.data ?? NO_GEMINI_KEY,
+                    whatsapp,
                 }}
                 usePageHook={usePhoneNumbersPage}
             >

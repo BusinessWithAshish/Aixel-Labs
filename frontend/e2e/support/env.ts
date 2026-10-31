@@ -90,6 +90,13 @@ const geminiApiBase = (worker: number) => `http://127.0.0.1:${7879 + shift(worke
 export const E2E_GEMINI_API_BASE = geminiApiBase(WORKER);
 export const E2E_GEMINI_API_KEY = process.env.E2E_GEMINI_API_KEY || 'AIzaE2eSeededFakeGeminiKey000000000000';
 
+/**
+ * Meta's Graph API (WhatsApp Cloud API) is replaced by a local fake on 7880 (`WHATSAPP_GRAPH_BASE`), for the app
+ * and the engine both: the customer's Meta app, its numbers, webhooks it signs, media, messages and call actions.
+ */
+const whatsappGraphBase = (worker: number) => `http://127.0.0.1:${7880 + shift(worker)}`;
+export const E2E_WHATSAPP_GRAPH_BASE = whatsappGraphBase(WORKER);
+
 /** Lets a spec turn a feature flag on for its own browser (`vercel-flag-overrides` cookie). Test-only key. */
 export const E2E_FLAGS_SECRET = 'u0ZfEr2WbJ1xqk6c3aT9yLmN8pQvHs4dG7oKiXeA5Bw';
 
@@ -119,6 +126,7 @@ export function e2eServerEnv(worker: number): Record<string, string> {
         TELNYX_API_BASE: telnyxApiBase(worker),
         VOICELINK_API_BASE: voicelinkApiBase(worker),
         TWILIO_API_BASE: twilioApiBase(worker),
+        WHATSAPP_GRAPH_BASE: whatsappGraphBase(worker),
         COMPOSIO_API_BASE: composioApiBase(worker),
         COMPOSIO_API_KEY: E2E_COMPOSIO_API_KEY,
         GEMINI_API_BASE: geminiApiBase(worker),

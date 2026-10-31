@@ -22,7 +22,7 @@ import { SelectControlledField, StringControlledField } from '@/components/commo
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SubModuleUrls } from '@/config/app-config';
-import { numberProviderInfo } from '@/helpers/voice-number-providers';
+import { numberProviderInfo, placesCalls } from '@/helpers/voice-number-providers';
 import { GeminiKeyNotice } from '@/components/common/voice-agent/GeminiKeyNotice';
 import { PhoneNumberControlledField } from '@/components/common/voice-agent/PhoneNumberSelect';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
@@ -35,6 +35,7 @@ const PROVIDER_NOTE: Record<VoiceProvider, string> = {
     [VoiceProvider.TWILIO]:
         'On a Twilio trial account, calls only go to numbers you have verified in Twilio (Phone Numbers, Verified Caller IDs), and you hear a short Twilio message and press a key before the agent speaks.',
     [VoiceProvider.VOICELINK]: 'The call is charged to your VoiceLink balance, like any other call.',
+    [VoiceProvider.WHATSAPP]: 'A WhatsApp number answers calls and chats, and cannot place calls yet: call or message it from WhatsApp to test it.',
 };
 
 const AGENT_JOB: Record<VoiceAgentCallType, string> = {
@@ -50,8 +51,9 @@ const testCallSchema = z.object({
     variables: z.record(z.string(), z.string()),
 });
 
-/** VoiceLink only dials from a number set to make calls (its outgoing calls go to the AI). */
+/** VoiceLink only dials from a number set to make calls (its outgoing calls go to the AI). WhatsApp only answers. */
 export function canPlaceCalls(number: VoiceNumberListItem): boolean {
+    if (!placesCalls(number.provider)) return false;
     return number.provider !== VoiceProvider.VOICELINK || !!number.outboundAgentId;
 }
 

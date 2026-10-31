@@ -5,6 +5,7 @@ import type {
     CONTENT_LAB_CHECK_RESPONSE,
     CONTENT_LAB_CREATOR_RESPONSE,
     CONTENT_LAB_EXPLORE_RESPONSE,
+    CONTENT_LAB_KEYWORD_RESPONSE,
     CONTENT_LAB_POST,
     ContentLabFormat,
     ContentLabPlatform,
@@ -39,6 +40,15 @@ export const SMART_BOX = 'input[aria-label="Topic, link or @creator"]';
 
 export async function waitForSmartBox(page: Page): Promise<void> {
     await waitForHydration(page, SMART_BOX);
+}
+
+/** Ticks (or unticks) one source in the search bar's source picker, then closes it. */
+export async function toggleSource(page: Page, label: 'YouTube' | 'Instagram'): Promise<void> {
+    await page.getByRole('button', { name: /^Sources:/ }).click();
+    await page.getByRole('menuitemcheckbox', { name: new RegExp(`^${label}`) }).click();
+    await page.keyboard.press('Escape');
+    // A click while it is still closing would be taken as a click outside it.
+    await expect(page.getByRole('menu')).toHaveCount(0);
 }
 
 type BffKey = keyof typeof CONTENT_LAB_API_ROUTES;
@@ -140,6 +150,25 @@ export function exploreResponse(overrides: Partial<CONTENT_LAB_EXPLORE_RESPONSE>
         niche: { postCount: 48, outlierCount: 9, medianMultiple: 1.3, bestFormat: { youtube: 'video', instagram: 'reel' } },
         errors: {},
         nextCursor: null,
+        ...overrides,
+    };
+}
+
+export function keywordResponse(overrides: Partial<CONTENT_LAB_KEYWORD_RESPONSE> = {}): CONTENT_LAB_KEYWORD_RESPONSE {
+    return {
+        query: 'protein breakfast',
+        country: 'IN',
+        searches: ['protein breakfast recipes', 'protein breakfast for weight loss', 'protein breakfast indian'],
+        trend: {
+            weekly: Array.from({ length: 52 }, (_, i) => 40 + (i % 7) * 5),
+            now: 68,
+            change: 23,
+            direction: 'rising',
+            rising: ['high protein poha'],
+        },
+        score: 81,
+        label: 'strong',
+        summary: 'Lots of people search this on YouTube, and interest is up 23% in the last 4 weeks.',
         ...overrides,
     };
 }

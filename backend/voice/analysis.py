@@ -20,7 +20,6 @@ import json
 import os
 import re
 
-import aiohttp
 from loguru import logger
 from pymongo.errors import DuplicateKeyError
 
@@ -75,7 +74,8 @@ def transcript(doc: dict) -> str:
         runs.setdefault(int(t.get("afterTurn") or 0), []).append(line)
     lines = list(runs.get(0, []))
     for i, turn in enumerate(doc.get("turns") or [], start=1):
-        lines.append(f"{'Agent' if turn['role'] == 'agent' else 'Caller'}: {turn['text']}")
+        speaker = {"agent": "Agent", "human": "Team member"}.get(turn["role"], "Caller")
+        lines.append(f"{speaker}{' (voice note)' if turn.get('voice') else ''}: {turn['text']}")
         lines += runs.get(i, [])
     text = "\n".join(lines)
     return text[-TRANSCRIPT_MAX:]
@@ -203,27 +203,14 @@ def parse(raw: str, cfg: dict, memory: bool) -> tuple[dict, str | None]:
 
 
 async def generate(key: str, body: dict) -> tuple[str, dict]:
-    """One generateContent call (one retry when Google is busy). The JSON text and the tokens it billed
+    """One generateContent call on the analysis model. The JSON text and the tokens it billed
     (`usageMetadata`), or raises."""
-    url = f"{product.GEMINI_API_BASE}/v1beta/models/{MODEL}:generateContent"
-    for attempt in (1, 2):
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=body, headers={"x-goog-api-key": key},
-                                    timeout=aiohttp.ClientTimeout(total=TIMEOUT)) as r:
-                status, text = r.status, await r.text()
-        if status in (429, 500, 503) and attempt == 1:
-            await asyncio.sleep(2)
-            continue
-        if status >= 300:
-            problem = product.gemini_key_problem(text)
-            raise RuntimeError(f"Gemini refused the analysis: {problem[1] if problem else f'HTTP {status}'} ({text[:200]})")
-        data = json.loads(text)
-        parts = (((data.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [])
-        out = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-        if not out.strip():
-            raise RuntimeError(f"Gemini gave no answer ({str(data.get('promptFeedback') or data)[:200]})")
-        return out, data.get("usageMetadata") or {}
-    raise RuntimeError("unreachable")
+    data = await product.gemini_generate(key, MODEL, body, TIMEOUT)
+    parts = (((data.get("candidates") or [{}])[0].get("content") or {}).get("parts") or [])
+    out = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+    if not out.strip():
+        raise RuntimeError(f"Gemini gave no answer ({str(data.get('promptFeedback') or data)[:200]})")
+    return out, data.get("usageMetadata") or {}
 
 
 def _store(ctx: dict, doc: dict, result: dict, brief: str | None, cost: dict):

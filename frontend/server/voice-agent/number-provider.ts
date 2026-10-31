@@ -5,6 +5,7 @@ import type { Owned } from '@/server/voice-agent/accounts';
 import { telnyxNumbers } from '@/server/voice-agent/telnyx-numbers';
 import { twilioNumbers } from '@/server/voice-agent/twilio-numbers';
 import { voicelinkNumbers } from '@/server/voice-agent/voicelink-numbers';
+import { whatsappNumbers } from '@/server/voice-agent/whatsapp-numbers';
 
 /** A number (an item of its owner's `voice_accounts.numbers`) with its owner's ids. */
 export type OwnedNumberDoc = Owned<VoiceNumberDoc>;
@@ -43,6 +44,7 @@ const PROVIDERS: Record<VoiceProvider, NumberProvider> = {
     [VoiceProvider.TELNYX]: telnyxNumbers,
     [VoiceProvider.VOICELINK]: voicelinkNumbers,
     [VoiceProvider.TWILIO]: twilioNumbers,
+    [VoiceProvider.WHATSAPP]: whatsappNumbers,
 };
 
 export function providerOf(doc: VoiceNumberDoc): NumberProvider {

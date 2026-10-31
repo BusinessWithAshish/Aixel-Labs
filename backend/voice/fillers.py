@@ -31,6 +31,9 @@ SHIPPED = HERE / "fillers"
 CACHE = HERE / "cache"
 SAMPLE_RATE = 24000  # what the Live API sends, so no resampling
 TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
+# WhatsApp voice replies: about twice as fast as TTS_MODEL (2.5 s against 5 s for two sentences, 2026-10-28) and priced
+# in voice-call-rates.json, so voice notes cost what they cost.
+VOICE_NOTE_MODEL = os.getenv("GEMINI_VOICE_NOTE_TTS_MODEL", "gemini-3.8-flash-lite-tts")
 MAX_SECONDS = 0.7
 
 # Spoken flat and unstressed. Anything longer starts to sound like an answer.
@@ -55,7 +58,8 @@ def _trim(pcm: bytes, floor: int = 300, max_seconds: float = MAX_SECONDS) -> byt
     return samples.astype(np.int16).tobytes()
 
 
-def _generate(voice: str, text: str = FILLER_TEXT, max_seconds: float = MAX_SECONDS, api_key: str | None = None) -> bytes:
+def _generate(voice: str, text: str = FILLER_TEXT, max_seconds: float = MAX_SECONDS, api_key: str | None = None,
+              model: str = TTS_MODEL) -> bytes:
     # A customer's call passes its owner's key; None is ours, for Ashish's own line only.
     key = api_key or os.environ["GEMINI_API_KEY"]
     body = json.dumps(
@@ -70,7 +74,7 @@ def _generate(voice: str, text: str = FILLER_TEXT, max_seconds: float = MAX_SECO
         }
     ).encode()
     req = urllib.request.Request(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{TTS_MODEL}:generateContent",
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         data=body,
         headers={"Content-Type": "application/json", "x-goog-api-key": key},
     )
@@ -144,22 +148,23 @@ VOICEMAIL_TEXT = (
 
 # A customer agent's own lines (its voicemail message, the line said while a tool works, variables
 # filled in) differ per call, so they are made per call and only the last few are kept, in memory.
-_MESSAGES: dict[tuple[str, str], bytes] = {}
+_MESSAGES: dict[tuple[str, str, str], bytes] = {}
 MESSAGES_KEPT = 32
 
 
-def get_line(voice: str, text: str, api_key: str | None = None, max_seconds: float = 30.0) -> bytes | None:
+def get_line(voice: str, text: str, api_key: str | None = None, max_seconds: float = 30.0, model: str = TTS_MODEL) -> bytes | None:
     """`text` said in this call's own voice (on `api_key`, as get_filler), at most `max_seconds`."""
-    if (voice.lower(), text) in _MESSAGES:
-        return _MESSAGES[(voice.lower(), text)]
+    kept = (voice.lower(), text, model)
+    if kept in _MESSAGES:
+        return _MESSAGES[kept]
     try:
-        pcm = _generate(voice, text, max_seconds=max_seconds, api_key=api_key)
+        pcm = _generate(voice, text, max_seconds=max_seconds, api_key=api_key, model=model)
     except Exception as e:
         logger.error(f"could not generate a line for {voice}: {e}")
         return None
     while len(_MESSAGES) >= MESSAGES_KEPT:
         _MESSAGES.pop(next(iter(_MESSAGES)))
-    _MESSAGES[(voice.lower(), text)] = pcm
+    _MESSAGES[kept] = pcm
     logger.info(f"line for {voice}: {len(pcm) / 2 / SAMPLE_RATE:.1f}s ({len(text)} characters)")
     return pcm
 

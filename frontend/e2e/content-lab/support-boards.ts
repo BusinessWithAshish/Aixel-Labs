@@ -7,6 +7,7 @@ import type {
     CONTENT_LAB_CREATOR_RESPONSE,
     CONTENT_LAB_EXPLORE_RESPONSE,
     CONTENT_LAB_POST,
+    CONTENT_LAB_KEYWORD_RESPONSE,
     CONTENT_LAB_SUGGEST_RESPONSE,
     ContentLabPlatform,
 } from '@aixellabs/backend/content-lab/types';
@@ -272,6 +273,7 @@ type Handlers = {
     breakdown?: () => CONTENT_LAB_BREAKDOWN_RESPONSE;
     creator?: (body: { platform: ContentLabPlatform; handle: string }) => CONTENT_LAB_CREATOR_RESPONSE;
     suggest?: (body: { platform: ContentLabPlatform; query: string; country?: string }) => CONTENT_LAB_SUGGEST_RESPONSE;
+    keyword?: (body: { query: string; country?: string; trend?: boolean }) => CONTENT_LAB_KEYWORD_RESPONSE;
     write?: (body: CONTENT_LAB_WRITE_REQUEST) => { text: string };
     check?: () => CONTENT_LAB_CHECK_RESPONSE;
     ads?: () => CONTENT_LAB_ADS_RESPONSE;
@@ -281,7 +283,7 @@ type Handlers = {
 
 /** Stands in for `app/api/content-lab/*` in the browser and records what the page sent. */
 export async function mockContentLabApi(page: Page, handlers: Handlers): Promise<Record<keyof typeof CONTENT_LAB_API_ROUTES, Request[]>> {
-    const calls = { EXPLORE: [], BREAKDOWN: [], CHECK: [], CREATOR: [], SUGGEST: [], WRITE: [], ADS: [] } as Record<
+    const calls = { EXPLORE: [], BREAKDOWN: [], CHECK: [], CREATOR: [], SUGGEST: [], KEYWORD: [], WRITE: [], ADS: [] } as Record<
         keyof typeof CONTENT_LAB_API_ROUTES,
         Request[]
     >;
@@ -291,6 +293,7 @@ export async function mockContentLabApi(page: Page, handlers: Handlers): Promise
         CHECK: handlers.check,
         CREATOR: handlers.creator,
         SUGGEST: handlers.suggest,
+        KEYWORD: handlers.keyword,
         WRITE: handlers.write,
         ADS: handlers.ads,
     };

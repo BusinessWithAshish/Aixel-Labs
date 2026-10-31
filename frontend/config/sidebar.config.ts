@@ -20,7 +20,6 @@ import {
     Mail,
     MessageCircleMore,
     UsersRound,
-    Phone,
     FacebookIcon,
     MapPinIcon,
     SearchIcon,
@@ -36,24 +35,53 @@ import {
     Sparkles,
     Workflow,
     Eye,
+    MessagesSquare,
+    UserRoundPlus,
+    MapPinned,
+    MailCheck,
+    ShieldCheck,
+    Headset,
+    MessageCircle,
+    MessageSquareText,
+    Send,
+    MailOpen,
+    LayoutTemplate,
+    WandSparkles,
+    TextSearch,
+    SlidersHorizontal,
 } from 'lucide-react';
 
-/** Sidebar labels that differ from the enum's title case. */
-export const subModuleLabelMap: Partial<Record<SubModule, string>> = {
+/** Sidebar pages that live inside a sub-module (each labelled and iconed in the maps below). None today. */
+export type SidebarPageKey = never;
+/** Anything the sidebar shows: a module, a sub-module, or a page inside one. */
+export type SidebarKey = Modules | SubModule | SidebarPageKey;
+
+/**
+ * One sidebar entry: a page (`url`), or a folder of entries (`items`). Folders nest to any depth, each one opening
+ * inside its parent.
+ */
+export type SidebarNavItem = {
+    title: SidebarKey;
+    url?: string;
+    items?: SidebarNavItem[];
+};
+
+/**
+ * Sub-modules that are a folder of pages instead of one page: the entries inside, in order (any of them may be a
+ * folder again). Access stays the sub-module's: a user granted it sees all of it.
+ */
+export const subModuleChildren: Partial<Record<SubModule, SidebarNavItem[]>> = {};
+
+/** Sidebar labels that differ from the key's title case. */
+export const subModuleLabelMap: Partial<Record<SidebarKey, string>> = {
+    [VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]: 'Numbers',
     [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: 'Bookings',
+    [VOICE_AGENT_SUB_MODULES.WHATSAPP]: 'WhatsApp',
     [VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS]: 'Analytics',
     [CONTENT_LAB_SUB_MODULES.SEARCH]: 'Search',
     [CONTENT_LAB_SUB_MODULES.BOARDS]: 'Boards',
     [CONTENT_LAB_SUB_MODULES.WATCHING]: 'Watching',
     [CONTENT_LAB_SUB_MODULES.SETTINGS]: 'Settings',
-};
-
-export type SidebarNavItem = {
-    title: string;
-    items?: {
-        title: string;
-        url: string;
-    }[];
 };
 
 export type SidebarUser = {
@@ -71,13 +99,13 @@ export type SidebarConfig = {
 export const modulesIconMap: Record<Modules, LucideIcon> = {
     [Modules.LEAD_GENERATION]: UsersRound,
     [Modules.VOICE_AGENT]: AudioWaveform,
-    [Modules.MESSAGING]: MessageCircleMore,
+    [Modules.MESSAGING]: MessagesSquare,
     [Modules.EMAIL]: Mail,
-    [Modules.LEAD_ENRICHMENT]: UsersRound,
+    [Modules.LEAD_ENRICHMENT]: UserRoundPlus,
     [Modules.CONTENT_LAB]: Sparkles,
 };
 
-export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: string }> = {
+export const subModuleIconMap: Record<SubModule | SidebarPageKey, { icon: LucideIcon; color: string }> = {
     [LEAD_GENERATION_SUB_MODULES.LEADS]: {
         icon: ListIcon,
         color: '!text-slate-600',
@@ -87,7 +115,7 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
         color: '!text-red-500',
     },
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_MAPS_ADVANCED]: {
-        icon: MapPinIcon,
+        icon: MapPinned,
         color: '!text-orange-500',
     },
     [LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH]: {
@@ -111,11 +139,11 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
         color: '!text-teal-600',
     },
     [LEAD_ENRICHMENT_SUB_MODULES.EMAIL_VERIFICATION]: {
-        icon: Mail,
+        icon: MailCheck,
         color: '!text-blue-500',
     },
     [LEAD_ENRICHMENT_SUB_MODULES.PHONE_VERIFICATION]: {
-        icon: PhoneIcon,
+        icon: ShieldCheck,
         color: '!text-green-500',
     },
     [VOICE_AGENT_SUB_MODULES.AGENTS]: {
@@ -130,8 +158,12 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
         icon: History,
         color: '!text-blue-500',
     },
+    [VOICE_AGENT_SUB_MODULES.WHATSAPP]: {
+        icon: MessageCircleMore,
+        color: '!text-green-600',
+    },
     [VOICE_AGENT_SUB_MODULES.WEB_DIALER]: {
-        icon: Phone,
+        icon: Headset,
         color: '!text-green-500',
     },
     [VOICE_AGENT_SUB_MODULES.CAMPAIGNS]: {
@@ -151,31 +183,31 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
         color: '!text-slate-600',
     },
     [MESSAGING_SUB_MODULES.WHATSAPP]: {
-        icon: MessageCircleMore,
+        icon: MessageCircle,
         color: '!text-green-500',
     },
     [MESSAGING_SUB_MODULES.SMS]: {
-        icon: MessageCircleMore,
+        icon: MessageSquareText,
         color: '!text-gray-500',
     },
     [EMAIL_SUB_MODULES.COLD_OUTREACH]: {
-        icon: Mail,
+        icon: Send,
         color: '!text-blue-500',
     },
     [EMAIL_SUB_MODULES.WARM_OUTREACH]: {
-        icon: Mail,
+        icon: MailOpen,
         color: '!text-orange-500',
     },
     [EMAIL_SUB_MODULES.TEMPLATES]: {
-        icon: Mail,
+        icon: LayoutTemplate,
         color: '!text-gray-500',
     },
     [EMAIL_SUB_MODULES.AI_REPLIES]: {
-        icon: Mail,
+        icon: WandSparkles,
         color: '!text-purple-500',
     },
     [CONTENT_LAB_SUB_MODULES.SEARCH]: {
-        icon: SearchIcon,
+        icon: TextSearch,
         color: '!text-teal-600',
     },
     [CONTENT_LAB_SUB_MODULES.BOARDS]: {
@@ -187,7 +219,7 @@ export const subModuleIconMap: Record<SubModule, { icon: LucideIcon; color: stri
         color: '!text-amber-600',
     },
     [CONTENT_LAB_SUB_MODULES.SETTINGS]: {
-        icon: Settings,
+        icon: SlidersHorizontal,
         color: '!text-slate-600',
     },
 };

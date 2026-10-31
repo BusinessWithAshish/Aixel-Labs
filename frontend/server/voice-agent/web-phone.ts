@@ -44,6 +44,7 @@ const NEW_CREDENTIAL_DELAY_MS = 5000;
 /** Why a number cannot call from the browser, or null when it can. */
 export function webPhoneProblem(doc: Pick<OwnedNumberDoc, 'provider' | 'twilio'>): string | null {
     if (doc.provider === VoiceProvider.VOICELINK) return 'VoiceLink numbers cannot call from the browser.';
+    if (doc.provider === VoiceProvider.WHATSAPP) return 'WhatsApp numbers cannot call from the browser.';
     if (doc.provider === VoiceProvider.TWILIO && !doc.twilio?.apiKeySid) {
         return 'This Twilio number was connected with the Auth Token. Connect it again with an API key to call from the browser.';
     }

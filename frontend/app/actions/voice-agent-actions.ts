@@ -25,6 +25,7 @@ import { ALApiResponse } from '@aixellabs/backend/api/types';
 import { requireUserObjectId, runAuthenticatedAction, toObjectId } from '@/helpers/server-action-helpers';
 import { DEFAULT_VOICE_AGENT_NAME, DEFAULT_VOICE_AGENT_VOICE } from '@/helpers/voice-agent-defaults';
 import { customVariableNames } from '@/helpers/voice-agent-features';
+import { slotProblem } from '@/helpers/voice-agent-channels';
 import {
     bookingToolSchema,
     callSettingsSchema,
@@ -40,7 +41,7 @@ import {
     webhookToolSchema,
 } from '@/helpers/voice-schemas';
 import { assertRateLimit } from '@/server/rate-limit';
-import { openSecret, playgroundSocketUrl, sealSecret } from '@/server/voice-agent/engine';
+import { engineFetch, openSecret, playgroundSocketUrl, sealSecret } from '@/server/voice-agent/engine';
 import { assertCallReady } from '@/server/voice-agent/call-readiness';
 import { stackView } from '@/server/voice-agent/provider-keys';
 import { pricedStack } from '@/server/voice-agent/voice-catalogue';
@@ -73,7 +74,9 @@ export type VoiceAgentNumberUse = { id: string; phoneNumber: string; provider: V
 export type VoiceAgentUsage = { inbound: VoiceAgentNumberUse[]; outbound: VoiceAgentNumberUse[] };
 
 /** The signed-in owner, after checking they were granted the Agents page (writes only; reads filter by owner). */
-const agentOwner = (userId: string) => requireVoiceOwner(userId, VOICE_AGENT_SUB_MODULES.AGENTS);
+// Agents are edited from Agents and from WhatsApp's Agents page.
+const agentOwner = (userId: string) =>
+    requireVoiceOwner(userId, [VOICE_AGENT_SUB_MODULES.AGENTS, VOICE_AGENT_SUB_MODULES.WHATSAPP]);
 
 /** Agents saved before call types existed were all cold-callers. */
 function callTypeOf(doc: Pick<VoiceAgentDoc, 'callType'>): VoiceAgentCallType {
@@ -137,6 +140,7 @@ function mapVoiceAgentDocToVoiceAgent(doc: VoiceAgentDoc): VoiceAgent {
         analysis: doc.analysis ?? null,
         memory: doc.memory === true,
         speech: doc.speech ?? null,
+        whatsapp: doc.whatsapp ?? null,
         createdAt: doc.createdAt.toISOString(),
         updatedAt: doc.updatedAt.toISOString(),
     };
@@ -193,6 +197,22 @@ export type CreateVoiceAgentInput = Partial<Pick<VoiceAgentInput, 'name' | 'voic
     callType: VoiceAgentCallType;
 };
 
+/** An agent turning to placing calls may not keep a WhatsApp number, which only answers. */
+async function assertSlotsFit(
+    uid: MongoObjectId,
+    agentId: MongoObjectId,
+    agent: { name: string; callType: VoiceAgentCallType },
+) {
+    const misfit = (await listItems('numbers', uid)).find(
+        (n) => [n.inboundAgentId, n.outboundAgentId].some((id) => id?.equals(agentId)) && slotProblem(agent, n.provider),
+    );
+    if (misfit) {
+        throw new Error(
+            `It still answers WhatsApp on ${misfit.phoneNumber}, and a WhatsApp number only answers. Take it off that number first.`,
+        );
+    }
+}
+
 /**
  * Creates an agent of the given call type with an empty prompt: the editor offers templates, and
  * neither a save nor the playground goes ahead without a prompt.
@@ -212,7 +232,6 @@ export const createVoiceAgent = async (input: CreateVoiceAgentInput): Promise<AL
             },
             'Invalid agent',
         );
-
         const now = new Date();
         const doc: VoiceAgentDoc = { tenantId, userId: uid, ...fields, prompt: '', createdAt: now, updatedAt: now };
         const agents = await agentsCollection();
@@ -225,6 +244,7 @@ export const updateVoiceAgent = async (agentId: string, input: VoiceAgentInput):
         const { userId: uid } = await agentOwner(userId);
         const id = toObjectId(agentId, 'Agent ID');
         const { stack, ...fields } = parseOrThrow(voiceAgentSchema, input, 'Invalid agent');
+        await assertSlotsFit(uid, id, fields);
         const accounts = await voiceAccountsCollection();
         const keys = stack ? ((await accounts.findOne({ userId: uid }, { projection: { keys: 1 } }))?.keys ?? []) : [];
 
@@ -235,6 +255,19 @@ export const updateVoiceAgent = async (agentId: string, input: VoiceAgentInput):
             { returnDocument: 'after' },
         );
         if (!doc) throw new Error('Agent not found');
+        return mapVoiceAgentDocToVoiceAgent(doc);
+    });
+
+/** An agent's copy (prompt, voice, stack, tools, settings; not its numbers or memories) under another name. */
+export const duplicateVoiceAgent = async (agentId: string, input: { name: string }): Promise<ALApiResponse<VoiceAgent>> =>
+    runAuthenticatedAction(async function duplicateVoiceAgent(userId) {
+        const { userId: uid } = await agentOwner(userId);
+        assertRateLimit(`voice-agent-copy:${uid}`, 20);
+        const source = await findOwnedAgent(uid, agentId);
+        const { name } = parseOrThrow(voiceAgentSchema.pick({ name: true }), input, 'Check the name');
+        const now = new Date();
+        const doc: VoiceAgentDoc = { ...source, _id: new MongoObjectId(), name, createdAt: now, updatedAt: now };
+        await (await agentsCollection()).insertOne(doc);
         return mapVoiceAgentDocToVoiceAgent(doc);
     });
 
@@ -303,6 +336,54 @@ export const getPlaygroundSocketUrl = async (agentId: string): Promise<ALApiResp
         const id = toObjectId(agentId, 'Agent ID');
         await assertCallReady(uid, id);
         return { url: playgroundSocketUrl(id.toString(), uid.toString()) };
+    });
+
+/** One message of a test chat, as the browser keeps it. */
+export type TestChatTurn = { role: 'caller' | 'agent'; text: string };
+
+export type TestChatReply = {
+    reply: string;
+    /** Tools it ran for this reply, in words the chat shows. */
+    toolCalls: { name: string; result: string; ok: boolean }[];
+    /** Set when it handed the chat to a person (on a real number: Waiting in the inbox). */
+    handoff: string | null;
+};
+
+const TEST_CHAT_MAX = { turns: 200, chars: 4000 };
+
+/**
+ * The agent's next WhatsApp reply to a test chat kept in the browser: the engine runs the saved agent exactly as on a
+ * WhatsApp number (prompt, tools, chat model, hand-off) on the owner's own key, and stores nothing.
+ */
+export const sendTestChatMessage = async (agentId: string, turns: TestChatTurn[]): Promise<ALApiResponse<TestChatReply>> =>
+    runAuthenticatedAction(async function sendTestChatMessage(userId) {
+        const { userId: uid } = await agentOwner(userId);
+        assertRateLimit(`voice-test-chat:${uid}`, 30);
+        const id = toObjectId(agentId, 'Agent ID');
+        const clean = Array.isArray(turns)
+            ? turns
+                  .filter((t) => (t?.role === 'caller' || t?.role === 'agent') && typeof t.text === 'string' && t.text.trim())
+                  .slice(-TEST_CHAT_MAX.turns)
+                  .map((t) => ({ role: t.role, text: t.text.trim().slice(0, TEST_CHAT_MAX.chars) }))
+            : [];
+        if (clean.at(-1)?.role !== 'caller') throw new Error('Write a message first');
+        await assertCallReady(uid, id);
+        try {
+            const res = await engineFetch<Partial<TestChatReply> & { reply: string }>('/chat', {
+                agentId: id.toString(),
+                userId: uid.toString(),
+                turns: clean,
+            });
+            return {
+                reply: res.reply,
+                toolCalls: (res.toolCalls ?? []).map((t) => ({ name: t.name, result: t.result, ok: t.ok })),
+                handoff: res.handoff ?? null,
+            };
+        } catch (error) {
+            console.error('[voice] sendTestChatMessage: engine error', error);
+            const reason = /"error"\s*:\s*"((?:[^"\\]|\\.)*)/.exec(error instanceof Error ? error.message : '')?.[1];
+            throw new Error(reason ?? 'The voice engine could not answer. Try again in a moment.');
+        }
     });
 
 // ---------------------------------------------------------------------------

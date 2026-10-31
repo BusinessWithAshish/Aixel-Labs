@@ -13,7 +13,7 @@ import { SUGGESTED_VOICEMAIL_MESSAGE } from '@/helpers/voice-agent-features';
 import type { E2eDb } from '../support/db';
 import { expect, test } from '../support/fixtures';
 import { E2E_ARTIFACTS_DIR, USER_STORAGE_STATE } from '../support/env';
-import { openVoiceAgent, waitForHydration } from '../support/voice-agents';
+import { closeFilters, openFilters, openVoiceAgent, waitForHydration } from '../support/voice-agents';
 import { E2E_USER } from '../support/users';
 import {
     CALL_LOGS_URL,
@@ -388,6 +388,7 @@ test('call logs show each call’s summary and verdicts, and filter by success',
     await expect(summaries.nth(0)).toHaveText('Ravi agreed to a demo on Thursday at 2 pm and asked for pricing by email.');
     await shot(page, 'call-logs-desktop');
 
+    await openFilters(page, 'Filter calls');
     await page.getByRole('combobox', { name: 'Outcome' }).click();
     await page.getByRole('option', { name: 'Successful', exact: true }).click();
     await expect(page).toHaveURL(/\?success=yes$/);
@@ -410,6 +411,7 @@ test('call logs show each call’s summary and verdicts, and filter by success',
     await page.getByRole('option', { name: 'All outcomes' }).click();
     await expect(page).toHaveURL(/\?agent=[0-9a-f]{24}$/);
     await expect(cards).toHaveCount(4);
+    await closeFilters(page);
 
     // Phone: the same cards carry the summary and badges too.
     await page.setViewportSize({ width: 390, height: 844 });

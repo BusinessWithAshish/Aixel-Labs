@@ -14,7 +14,7 @@ import {
 import { expect, LOCAL_FETCH, test } from '../support/fixtures';
 import { voiceCallRecordingApiRoute } from '@/config/app-config';
 import { E2E_BASE_URL, E2E_TELNYX_API_BASE, USER_STORAGE_STATE } from '../support/env';
-import { waitForHydration } from '../support/voice-agents';
+import { closeFilters, openFilters, waitForHydration } from '../support/voice-agents';
 import { E2E_ADMIN, E2E_USER } from '../support/users';
 import {
     CALL_LOGS_URL,
@@ -227,6 +227,7 @@ test.describe('with seeded calls', () => {
         await openCallLogs(page);
         const firstCost = page.getByTestId('call-card').first().getByTestId('call-cost');
         await expect(firstCost).toHaveText('$0.045 est.');
+        await openFilters(page, 'Filter calls');
         await page.getByRole('combobox', { name: 'Currency' }).click();
         await page.getByRole('option', { name: 'INR', exact: true }).click();
         await expect(firstCost).toHaveText(/^₹\d\.\d{1,3} est\.$/);
@@ -239,6 +240,7 @@ test.describe('with seeded calls', () => {
 
     test('filters by agent through the URL', async ({ page }) => {
         await openCallLogs(page);
+        await openFilters(page, 'Filter calls');
         await page.getByRole('combobox', { name: 'Agent' }).click();
         await page.getByRole('option', { name: 'Sales', exact: true }).click();
         await expect(page).toHaveURL(new RegExp(`\\?agent=${salesId}$`));
@@ -266,6 +268,7 @@ test.describe('with seeded calls', () => {
         await expect(cards).toHaveCount(4);
         await expect(cards.filter({ hasText: 'Deleted agent' })).toHaveCount(0);
 
+        await openFilters(page, 'Filter calls');
         await page.getByRole('switch', { name: 'Show deleted agents' }).click();
         await expect(page).toHaveURL(/\?deleted=1$/);
         await expect(cards).toHaveCount(5);
@@ -278,7 +281,10 @@ test.describe('with seeded calls', () => {
         );
     });
 
-    test('one toolbar filters by type, search and period, and clears back to every call', async ({ page, db }) => {
+    test('the filter sheet and the search filter by type, words and period, and reset back to every call', async ({
+        page,
+        db,
+    }) => {
         await db.insertVoiceCalls(E2E_USER, [
             call({
                 agentId: new ObjectId(frontDeskId),
@@ -294,6 +300,7 @@ test.describe('with seeded calls', () => {
         await expect(cards).toHaveCount(5);
 
         // Test calls carry their tag and no phone number.
+        const filters = await openFilters(page, 'Filter calls');
         await page.getByRole('combobox', { name: 'Type' }).click();
         await page.getByRole('option', { name: 'Test calls' }).click();
         await expect(page).toHaveURL(/\?kind=test$/);
@@ -303,30 +310,59 @@ test.describe('with seeded calls', () => {
 
         await page.getByRole('combobox', { name: 'Type' }).click();
         await page.getByRole('option', { name: 'Inbound' }).click();
+        await expect(page).toHaveURL(/\?kind=inbound$/);
+        await expect(cards).toHaveCount(1);
+        await expect(cards.first()).toContainText('Caller hung up');
+
+        // Back from a call keeps the filter.
+        await closeFilters(page);
+        await expect(page.getByRole('button', { name: 'Filter calls' })).toHaveText('Filters1');
+        await cards.first().click();
+        await expect(page).toHaveURL(/\/call-logs\/[0-9a-f]{24}$/);
+        await page.goBack();
+        await expect(page).toHaveURL(/\?kind=inbound$/);
         await expect(cards).toHaveCount(1);
         await expect(cards.first()).toContainText('Caller hung up');
 
         // Words in the transcript, then digits of a number.
-        await page.getByRole('button', { name: 'Clear' }).click();
+        await (await openFilters(page, 'Filter calls')).getByRole('button', { name: 'Reset filters' }).click();
+        await expect(page).toHaveURL(CALL_LOGS_URL);
+        await closeFilters(page);
+        await expect(cards).toHaveCount(5);
+        // Back and Forward walk the filters.
+        await page.goBack();
+        await expect(page).toHaveURL(/\?kind=inbound$/);
+        await expect(cards).toHaveCount(1);
+        await page.goForward();
         await expect(page).toHaveURL(CALL_LOGS_URL);
         await expect(cards).toHaveCount(5);
         await page.getByRole('searchbox', { name: 'Search calls' }).fill('your hours');
         await page.getByRole('searchbox', { name: 'Search calls' }).press('Enter');
+        await expect(page).toHaveURL(/q=your\+hours/);
         await expect(cards).toHaveCount(1);
         await expect(cards.first()).toContainText('Front desk');
         await page.getByRole('searchbox', { name: 'Search calls' }).fill('415 555 0123');
         await page.getByRole('searchbox', { name: 'Search calls' }).press('Enter');
+        // One card before and after, so wait for the search itself: a filter opened while it loads is disabled under it.
+        await expect(page).toHaveURL(/q=415\+555\+0123/);
         await expect(cards).toHaveCount(1);
         await expect(cards.first()).toContainText('Said goodbye');
 
+        await openFilters(page, 'Filter calls');
         await page.getByRole('combobox', { name: 'Period' }).click();
         await page.getByRole('option', { name: 'Last 7 days' }).click();
         await expect(page).toHaveURL(/range=7/);
         await expect(cards).toHaveCount(1);
 
-        await page.getByRole('button', { name: 'Clear' }).click();
+        // Reset puts the sheet's filters back and keeps the search, which sits beside it.
+        await filters.getByRole('button', { name: 'Reset filters' }).click();
+        await expect(page).toHaveURL(/\?q=415\+555\+0123$/);
+        await expect(filters.getByRole('button', { name: 'Reset filters' })).toBeDisabled();
+        await closeFilters(page);
+        await page.getByRole('searchbox', { name: 'Search calls' }).fill('');
+        await page.getByRole('searchbox', { name: 'Search calls' }).press('Enter');
+        await expect(page).toHaveURL(CALL_LOGS_URL);
         await expect(cards).toHaveCount(5);
-        await expect(page.getByRole('searchbox', { name: 'Search calls' })).toHaveValue('');
     });
 
     test('a call shows its transcript, per-turn gaps, flags and the recording', async ({ page }) => {

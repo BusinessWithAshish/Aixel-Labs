@@ -28,6 +28,7 @@ import {
   computeWhyItWorked,
   firstLine,
   isTooOld,
+  isWorthShowing,
   matchesTopic,
   meetsFloor,
   rankPosts,
@@ -328,20 +329,22 @@ const GONE = "gone" as const;
  * 1. Shortcodes carried from the last page come first. With a page's worth
  *    (CONTENT_LAB_INSTAGRAM_HITS_PER_PAGE) of them, no search runs this page.
  * 2. Otherwise the searches to retry plus this page's new GSearch searches,
- *    in parallel (page 1: the topic's reels this month and this year, posts
- *    this year, plus a tag search for related hashtags; later pages: hashtag
- *    reels, then wider searches). A search that failed or was too slow is
+ *    in parallel (page 1: the topic's reels this month and this year, and
+ *    "{topic} viral" reels this year; later pages: reels for related
+ *    hashtags, then photo posts). A search that failed or was too slow is
  *    retried once, next page.
  * 3. Shortcodes dated by their media id: seen and too-old ones are dropped
  *    before any request.
  * 4. Up to HITS_PER_PAGE hits' post queries (owner, caption, likes, date),
  *    each owner's fetch starting as their first hit resolves
- *    (`fetchExploreCreator`, the first `maxCreatorsPerPlatform` new ones;
+ *    (`fetchExploreCreator`, the first `maxInstagramCreatorsPerPage` new ones;
  *    cached owners are free), then plays from each owner's Reels tab (else
  *    the embed page). A hit that was late, past the cap, or whose owner was
  *    late or past the owner cap is carried to the next page; one that is
  *    gone is dropped.
  * 5. Each owner's other on-topic reels that beat their usual.
+ * Posts below their creator's usual that are also small on their own
+ * (`isWorthShowing`) are dropped, not carried.
  */
 export async function exploreInstagram(
   query: string,
@@ -400,7 +403,7 @@ export async function exploreInstagram(
   const startOwner = (owner: string, name: string | null): boolean => {
     if (owners.has(owner)) return true;
     const isNew = !exploreCreatorCache.has(owner);
-    if (isNew && newOwners >= CONTENT_LAB_LIMITS.maxCreatorsPerPlatform) return false;
+    if (isNew && newOwners >= CONTENT_LAB_LIMITS.maxInstagramCreatorsPerPage) return false;
     if (isNew) newOwners++;
     owners.set(
       owner,
@@ -469,7 +472,8 @@ export async function exploreInstagram(
     }
     return toContentLabPost({ ...post, shortcode: code }, creator.creator, baselines);
   });
-  const built = posts.filter((p): p is CONTENT_LAB_POST => p !== null);
+  // Below their usual and small on their own: not what "what's working" is for.
+  const built = posts.filter((p): p is CONTENT_LAB_POST => p !== null && isWorthShowing(p));
   const loadedCreators = [...creators.values()].filter((c): c is InstagramExploreCreator => Boolean(c) && c !== GONE);
   console.log(
     `[content-lab] instagram page: ${searches.length} searches ${searchedAt - startedAt} ms → ${hits.length} hits, ` +

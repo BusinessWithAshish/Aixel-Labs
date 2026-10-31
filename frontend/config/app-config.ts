@@ -29,6 +29,7 @@ export const SubModuleUrls: Record<SubModule, string> = {
     [VOICE_AGENT_SUB_MODULES.AGENTS]: '/voice-agent/agents',
     [VOICE_AGENT_SUB_MODULES.PHONE_NUMBERS]: '/voice-agent/phone-numbers',
     [VOICE_AGENT_SUB_MODULES.CALL_LOGS]: '/voice-agent/call-logs',
+    [VOICE_AGENT_SUB_MODULES.WHATSAPP]: '/voice-agent/whatsapp',
     [VOICE_AGENT_SUB_MODULES.WEB_DIALER]: '/voice-agent/web-dialer',
     [VOICE_AGENT_SUB_MODULES.INQUIRY_BOOKINGS]: '/voice-agent/bookings',
     [VOICE_AGENT_SUB_MODULES.CAMPAIGNS]: '/voice-agent/campaigns',
@@ -60,6 +61,7 @@ export const CONTENT_LAB_API_ROUTES = {
     CHECK: '/api/content-lab/check',
     CREATOR: '/api/content-lab/creator',
     SUGGEST: '/api/content-lab/suggest',
+    KEYWORD: '/api/content-lab/keyword',
     WRITE: '/api/content-lab/write',
     ADS: '/api/content-lab/ads',
 } as const;

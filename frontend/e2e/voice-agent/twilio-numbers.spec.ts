@@ -34,7 +34,7 @@ import {
     LINK_UI_PENDING,
     linkNumber,
     numberRow,
-    numberUse,
+    expectSlots,
     openConnect,
     openPhoneNumbers,
     openRemove,
@@ -162,7 +162,7 @@ test('connecting Twilio with an API key lists every page of numbers and imports 
     await expect(page.getByText('Imported 2 numbers. Nothing changed in Twilio')).toBeVisible();
 
     await expect(numberRow(page, WEBHOOK_NUMBER).getByTestId('number-provider')).toHaveText('Twilio');
-    await expect(numberUse(page, WEBHOOK_NUMBER)).toHaveText('Not linked to an agent');
+    await expectSlots(page, WEBHOOK_NUMBER, {});
     await expect(numberRow(page, APP_NUMBER)).toHaveCount(1);
     await expect(numberRow(page, TRUNK_NUMBER)).toHaveCount(0);
 
@@ -243,7 +243,7 @@ test('a number whose credentials Twilio no longer accepts can still be removed',
     await seedTwilioNumber(db, WEBHOOK_NUMBER, { apiKeySealed: sealForE2e('a-revoked-secret') });
     await openPhoneNumbers(page);
     await (await openRemove(page, WEBHOOK_NUMBER)).getByRole('button', { name: 'Remove number' }).click();
-    await expect(page.getByText('No phone numbers yet')).toBeVisible();
+    await expect(page.getByText('No numbers yet')).toBeVisible();
     expect(await db.getVoiceNumbers(E2E_USER)).toHaveLength(0);
 });
 
@@ -409,7 +409,7 @@ test.describe('linking from the agent editor', () => {
             trunkSid: '',
         });
         await openPhoneNumbers(page);
-        await expect(numberUse(page, WEBHOOK_NUMBER)).toHaveText('Answers calls with After hours');
+        await expectSlots(page, WEBHOOK_NUMBER, { answers: 'After hours' });
 
         // Another inbound agent: nothing changes at Twilio, and the saved webhook is still theirs.
         twilio.clear();
@@ -536,7 +536,7 @@ test.describe('linking from the agent editor', () => {
         const dialog = await openRemove(page, APP_NUMBER);
         await expect(dialog).toContainText('its Twilio voice settings are put back exactly');
         await dialog.getByRole('button', { name: 'Remove number' }).click();
-        await expect(page.getByText('No phone numbers yet')).toBeVisible();
+        await expect(page.getByText('No numbers yet')).toBeVisible();
         expect(writeBodies()).toEqual([
             {
                 path: `/IncomingPhoneNumbers/${sidOf(102)}.json`,

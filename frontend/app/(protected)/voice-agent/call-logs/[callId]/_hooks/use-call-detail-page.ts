@@ -29,7 +29,9 @@ export function useCallDetailPage({ call, memory: initialMemory }: CallDetailDat
                   reason:
                       call.channel === VoiceCallChannel.PLAYGROUND
                           ? 'Playground calls are not recorded.'
-                          : 'This call has no phone-provider call id, so there is no recording to fetch.',
+                          : call.channel === VoiceCallChannel.WHATSAPP
+                            ? 'A WhatsApp chat has no recording: its messages are below.'
+                            : 'This call has no phone-provider call id, so there is no recording to fetch.',
               },
     );
 

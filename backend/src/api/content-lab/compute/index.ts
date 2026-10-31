@@ -7,3 +7,4 @@ export * from "./signals";
 export * from "./takeaways";
 export * from "./time";
 export * from "./topic";
+export * from "./keyword";

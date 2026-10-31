@@ -69,6 +69,22 @@ export function numberWebhookUrl(
     return `${voiceEngineUrl()}${path}?n=${numberId}&sig=${signParts('number', numberId)}`;
 }
 
+/**
+ * Where a customer's Meta app sends its WhatsApp webhooks (`<engine>/whatsapp?app=…&sig=…`, one for all
+ * the app's numbers), and the token Meta echoes when it checks that callback.
+ */
+export function whatsappWebhook(appId: string): { callbackUrl: string; verifyToken: string } {
+    return {
+        callbackUrl: `${voiceEngineUrl()}/whatsapp?app=${encodeURIComponent(appId)}&sig=${signParts('whatsapp', appId)}`,
+        verifyToken: signParts('whatsapp-verify', appId),
+    };
+}
+
+/** Whether a webhook callback is this engine's WhatsApp one (whatever app it names). */
+export function isWhatsAppWebhook(url: string | undefined): boolean {
+    return !!url && url.startsWith(`${voiceEngineUrl()}/whatsapp?`);
+}
+
 /** The media socket a VoiceLink number's bot streams calls in to: `wss://<engine>/voicelink?n=…&sig=…`. */
 export function voicelinkSocketUrl(numberId: string): string {
     const base = voiceEngineUrl().replace(/^http/, 'ws');
@@ -87,6 +103,22 @@ export async function engineFetch<T>(path: string, body: unknown): Promise<T> {
     // The whole body goes into the error: callers read its JSON `error` (cutting it broke the parse).
     if (!res.ok) throw new Error(`Voice engine ${path}: HTTP ${res.status} ${text.slice(0, 2000)}`);
     return JSON.parse(text) as T;
+}
+
+/** A voice note recorded in the browser (WebM/MP4) as the OGG/Opus WhatsApp plays as one, and its seconds (engine `/voice-note`). */
+export async function engineVoiceNote(
+    audio: Uint8Array<ArrayBuffer>,
+    mime: string,
+): Promise<{ ogg: Uint8Array<ArrayBuffer>; secs: number }> {
+    const res = await fetch(`${voiceEngineUrl()}/voice-note`, {
+        method: 'POST',
+        headers: { 'Content-Type': mime, Authorization: `Bearer ${engineSecret()}` },
+        body: audio,
+        cache: 'no-store',
+        signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) throw new Error(`Voice engine /voice-note: HTTP ${res.status} ${(await res.text()).slice(0, 300)}`);
+    return { ogg: new Uint8Array(await res.arrayBuffer()), secs: Number(res.headers.get('X-Duration-Secs')) || 0 };
 }
 
 /**

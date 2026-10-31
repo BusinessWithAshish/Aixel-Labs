@@ -17,6 +17,8 @@ import { AnalysisSettings } from './AnalysisSettings';
 import { CallerMemorySettings } from './CallerMemorySettings';
 import { PersonalitySettings } from './PersonalitySettings';
 import { SpeechSettings } from './SpeechSettings';
+import { WhatsAppSettings } from './WhatsAppSettings';
+import { servesWhatsApp } from '@/helpers/voice-agent-channels';
 
 const VOICEMAIL_CHOICES = [
     { value: VoiceVoicemailAction.HANG_UP, title: 'Hang up', description: 'End the call as soon as a recording answers.' },
@@ -81,7 +83,7 @@ function VoicemailSettings() {
  * one call to the next (memory).
  */
 export function CallSettingsCard() {
-    const { form, settingsForm, settingsDirty, settingsError, savingSettings, saveSettings } =
+    const { form, channel, settingsForm, settingsDirty, settingsError, savingSettings, saveSettings } =
         usePage<UseVoiceAgentEditorPageReturn>();
     const places = form.callType !== VoiceAgentCallType.INBOUND;
 
@@ -124,6 +126,12 @@ export function CallSettingsCard() {
                     <AnalysisSettings />
                     <Separator />
                     <CallerMemorySettings />
+                    {servesWhatsApp(channel) ? (
+                        <>
+                            <Separator />
+                            <WhatsAppSettings />
+                        </>
+                    ) : null}
                 </CardContent>
             </FormProvider>
         </Card>

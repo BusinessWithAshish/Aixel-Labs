@@ -1,4 +1,5 @@
 import {
+    VoiceAgentChannel,
     VoiceKeyProvider,
     voiceKeyFor,
     voiceStackFor,
@@ -22,7 +23,12 @@ type Key = { _id: unknown; provider: VoiceKeyProvider; tier?: VoiceGeminiKeyTier
 
 const PROMPT_HREF = '#agent-prompt';
 const STACK_HREF = '#agent-stack-title';
-const NUMBERS_HREF = '#agent-numbers';
+/** The number an agent of each channel needs, and its picker on the agent page. */
+const NUMBER_WORDS: Record<VoiceAgentChannel, { kind: string; href: string }> = {
+    [VoiceAgentChannel.PHONE]: { kind: 'phone', href: '#agent-numbers-phone' },
+    [VoiceAgentChannel.WHATSAPP]: { kind: 'WhatsApp', href: '#agent-numbers-whatsapp' },
+    [VoiceAgentChannel.BOTH]: { kind: 'phone or WhatsApp', href: '#agent-numbers-phone' },
+};
 
 const and = (words: string[]) => words.join(' and ');
 
@@ -31,16 +37,20 @@ export function voiceCallBlockers({
     stack,
     keys,
     onNumber,
+    channel = VoiceAgentChannel.PHONE,
 }: {
     prompt: string;
     stack?: VoiceStack<unknown> | null;
     keys: Key[];
     /** For calls over a phone line (test calls, the browser and softphone tests): whether the agent is on a number. */
     onNumber?: boolean;
+    /** The numbers it could go on, for what `onNumber: false` says. */
+    channel?: VoiceAgentChannel;
 }): VoiceCallBlocker[] {
     const blockers: VoiceCallBlocker[] = [];
     if (onNumber === false) {
-        blockers.push({ message: 'It is not on a phone number yet.', fix: 'Link a phone number', href: NUMBERS_HREF });
+        const { kind, href } = NUMBER_WORDS[channel];
+        blockers.push({ message: `It is not on a ${kind} number yet.`, fix: `Link a ${kind} number`, href });
     }
     if (!prompt.trim()) {
         blockers.push({

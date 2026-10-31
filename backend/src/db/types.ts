@@ -73,6 +73,8 @@ export enum VOICE_AGENT_SUB_MODULES {
   AGENTS = "AGENTS",
   PHONE_NUMBERS = "PHONE_NUMBERS",
   CALL_LOGS = "CALL_LOGS",
+  /** The WhatsApp section: its inbox (chats and calls, where a person can take over from the AI), agents and numbers. */
+  WHATSAPP = "VOICE_WHATSAPP",
   WEB_DIALER = "WEB_DIALER",
   INQUIRY_BOOKINGS = "INQUIRY_BOOKINGS",
   CAMPAIGNS = "CAMPAIGNS",
@@ -327,8 +329,43 @@ export type VoiceAgentDoc<Id = ObjectId> = {
   stack?: VoiceStack<Id> | null;
   /** The voice it speaks in on a PIPELINE stack. A REALTIME stack speaks in `voice` (Gemini Live's own voices). Absent = none picked yet. */
   ttsVoice?: VoiceTtsVoice | null;
+  /** No longer read or written: where an agent works comes from the numbers it is on. Left on agents saved before. */
+  channel?: VoiceAgentChannel;
+  /** How it chats on WhatsApp. Absent = VOICE_WHATSAPP_DEFAULTS. */
+  whatsapp?: VoiceAgentWhatsApp | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+/**
+ * Where an agent works, as the numbers it is on make it (the app's `channelFromNumbers`): phone lines, WhatsApp
+ * numbers, or both (one agent, one prompt and one memory for a business whose WhatsApp number is also its phone line).
+ * Only an agent that answers (callType INBOUND) can be on a WhatsApp number.
+ */
+export enum VoiceAgentChannel {
+  PHONE = "PHONE",
+  WHATSAPP = "WHATSAPP",
+  BOTH = "BOTH",
+}
+
+/** The text models a WhatsApp chat can run on (prices: voice-call-rates.json `chat.models`), cheapest first. */
+export const VOICE_CHAT_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash"] as const;
+export type VoiceChatModel = (typeof VOICE_CHAT_MODELS)[number];
+
+/** An agent's WhatsApp chat settings. */
+export type VoiceAgentWhatsApp = {
+  /** The text model its replies run on (the owner's Gemini key). */
+  chatModel: VoiceChatModel;
+  /** A voice note is answered with a voice note in the agent's voice (and its words in text); off = text only. */
+  voiceReplies: boolean;
+  /** It may hand a chat to a person (the inbox shows "Waiting") when asked for one or when it cannot help. */
+  handoff: boolean;
+};
+
+export const VOICE_WHATSAPP_DEFAULTS: VoiceAgentWhatsApp = {
+  chatModel: "gemini-3.5-flash-lite",
+  voiceReplies: true,
+  handoff: true,
 };
 
 /** Days of the week as stored, Monday first (booking hours, campaign calling days). */
@@ -551,7 +588,7 @@ export type VoiceBooking = Omit<VoiceBookingDoc<string>, "start" | "end" | "crea
 };
 
 /** Client view: tools without secrets (always present, empty when the agent has none). */
-export type VoiceAgent = Omit<VoiceAgentDoc<string>, "tools" | "createdAt" | "updatedAt"> & {
+export type VoiceAgent = Omit<VoiceAgentDoc<string>, "tools" | "channel" | "createdAt" | "updatedAt"> & {
   tools: VoiceAgentToolsView;
   createdAt: string;
   updatedAt: string;
@@ -563,6 +600,8 @@ export enum VoiceProvider {
   VOICELINK = "VOICELINK",
   /** US and international numbers in the customer's own Twilio account (twilio.com). */
   TWILIO = "TWILIO",
+  /** WhatsApp Business numbers (any country) on the customer's own Meta app, through the WhatsApp Cloud API. */
+  WHATSAPP = "WHATSAPP",
 }
 
 /** A VoiceLink DID's routing rule, as VoiceLink stores it (one rule covers both directions). */
@@ -622,18 +661,55 @@ export type TwilioNumberState = {
   previousRouting?: TwilioVoiceRouting;
 };
 
+/**
+ * The part of a WhatsApp number's calling settings (`/{phone-number-id}/settings`, `calling`) that AI
+ * answering changes, in Meta's own field names. Nothing else (call hours, SIP...) is ever touched.
+ */
+export type WhatsAppCallingSettings = {
+  /** "ENABLED" | "DISABLED" */
+  status: string;
+  /** "DEFAULT" | "DISABLE_ALL"; absent when Meta had none. */
+  call_icon_visibility?: string;
+};
+
+/**
+ * How we reach a customer's own Meta app and WhatsApp Business Account (WABA) for one number. The
+ * access token (a system user's, never expiring) is `apiKeySealed`. The app's webhook (fields `calls`,
+ * `messages`) points at the engine's `/whatsapp?app=…&sig=…` once AI answering is on.
+ */
+export type WhatsAppNumberState = {
+  /** The customer's Meta app: every webhook is signed with its secret. */
+  appId: string;
+  /** The app secret, sealed like `apiKeySealed`: the engine checks each webhook's X-Hub-Signature-256 with it. */
+  appSecretSealed: string;
+  /** The WABA the number is in (its webhooks are subscribed per WABA). */
+  wabaId: string;
+  /**
+   * The number's calling settings before AI answering first turned calling on. Absent = we never changed
+   * them. Saved on the first change only; put back, then dropped, when AI answering goes off or the number is removed.
+   */
+  previousCalling?: WhatsAppCallingSettings;
+  /**
+   * Whether Meta turned calling on for the number when AI answering went on. Chats never depend on it:
+   * a number below Meta's 2,000 messaging limit still chats (calling is refused, 138015). Absent = not tried yet.
+   */
+  calling?: { on: boolean; problem?: string | null } | null;
+};
+
 /** A number the customer brought, in their own provider account. Kept in its owner's VoiceAccountDoc.numbers. */
 export type VoiceNumberDoc<Id = ObjectId> = {
   /** Calls, campaigns and campaign contacts point at it (`numberId`). */
   _id: Id;
   provider: VoiceProvider;
-  /** E.164, e.g. "+13473703925". Unique across owners: a number is connected to one account. */
+  /** E.164, e.g. "+13473703925". Unique per provider across owners: a number is connected to one account, once as a
+   * phone line and once more as WhatsApp when the business uses the same number for both. */
   phoneNumber: string;
-  /** The provider's id for the number (Telnyx phone_number id, VoiceLink DID id, Twilio IncomingPhoneNumber SID "PN…"). */
+  /** The provider's id for the number (Telnyx phone_number id, VoiceLink DID id, Twilio IncomingPhoneNumber SID "PN…", WhatsApp phone number id). */
   providerNumberId: string;
   /**
-   * The customer's API key (Telnyx), API token (VoiceLink), or API key secret / Auth Token (Twilio, see
-   * `twilio.apiKeySid`), sealed (AES-256-GCM, see frontend/server/voice-agent/engine.ts). Never sent to the client.
+   * The customer's API key (Telnyx), API token (VoiceLink), API key secret / Auth Token (Twilio, see
+   * `twilio.apiKeySid`), or system-user access token (WhatsApp), sealed (AES-256-GCM, see
+   * frontend/server/voice-agent/engine.ts). Never sent to the client.
    */
   apiKeySealed: string;
   /** Telnyx TeXML application we created in their account for calls coming in. */
@@ -662,14 +738,27 @@ export type VoiceNumberDoc<Id = ObjectId> = {
   voicelink?: VoiceLinkNumberState;
   /** Twilio numbers only. */
   twilio?: TwilioNumberState;
+  /** WhatsApp numbers only. */
+  whatsapp?: WhatsAppNumberState;
   createdAt: Date;
   updatedAt: Date;
 };
 
-/** Client view: no sealed key. */
-export type VoiceNumber = Omit<VoiceNumberDoc<string>, "apiKeySealed" | "createdAt" | "updatedAt"> & {
-  tenantId: string;
-  userId: string;
+/** Client view: no sealed key (the WhatsApp state holds the sealed app secret, so it stays on the server too). */
+/** A number as the browser gets it: no secrets, and none of the provider's or our internal ids it has no use for. */
+export type VoiceNumber = Omit<
+  VoiceNumberDoc<string>,
+  | "apiKeySealed"
+  | "whatsapp"
+  | "createdAt"
+  | "updatedAt"
+  | "tenantId"
+  | "userId"
+  | "providerNumberId"
+  | "texmlAppId"
+  | "callControlAppId"
+  | "previousConnectionId"
+> & {
   createdAt: string;
   updatedAt: string;
 };
@@ -677,6 +766,8 @@ export type VoiceNumber = Omit<VoiceNumberDoc<string>, "apiKeySealed" | "created
 export enum VoiceCallChannel {
   PHONE = "PHONE",
   PLAYGROUND = "PLAYGROUND",
+  /** A WhatsApp text chat with a customer's WhatsApp number: one document per conversation (`chat`). */
+  WHATSAPP = "WHATSAPP",
 }
 
 /**
@@ -722,11 +813,55 @@ export enum VoiceCallEndReason {
   GEMINI_KEY_ERROR = "gemini_key_error",
   /** The caller stayed silent after she checked in (`speech.silenceSecs`). */
   SILENCE = "silence",
+  /** A WhatsApp chat still going: no quiet spell long enough to close it yet (`chat.open`). */
+  CHAT_OPEN = "chat_open",
+  /** A WhatsApp chat closed after a quiet spell (VOICE_CHAT_LIMITS.idleMinutes). */
+  CHAT_ENDED = "chat_ended",
 }
 
+export const VOICE_CHAT_LIMITS = {
+  /** A WhatsApp chat closes this long after its last message; the next message starts a new one. */
+  idleMinutes: 15,
+  /** A voice note a person records in the inbox: its length, and the most the app takes. Two minutes at 32 kbps is
+   * about 0.5 MB, under Next's 1 MB server-action body. */
+  voiceNoteSecs: 120,
+  voiceNoteBytes: 900 * 1024,
+} as const;
+
+/** A WhatsApp chat's own state, on its voice_calls document (channel WHATSAPP). */
+export type VoiceCallChat<Id = ObjectId> = {
+  /** True until the chat goes quiet and the engine closes it (analysis and caller memory follow). */
+  open: boolean;
+  lastMessageAt: Date;
+  /** Tokens the chat model used so far, every reply added (its cost is worked out when it closes). */
+  tokens: { textIn: number; textOut: number };
+  /** Seconds of voice notes heard (and the speech-to-text model), and of voice replies spoken, for the cost. */
+  voice?: { sttSecs: number; ttsSecs: number; sttModel?: string };
+  /**
+   * A team member took the conversation over: the AI stays quiet until they hand it back. Carried to
+   * the person's next chat while it is set (the takeover belongs to the conversation, not one chat).
+   */
+  human?: { since: Date; userId: Id; name: string } | null;
+  /** The AI asked for a person (the person wanted one, or it could not help): shown in the inbox until someone takes over. */
+  needsHuman?: { since: Date; reason: string } | null;
+  /** The person's messages nobody has opened in the inbox yet. */
+  unread?: number;
+  /** Their WhatsApp profile name, as Meta sends it with their messages. */
+  name?: string | null;
+  /** The text model this chat's replies ran on (the agent's `whatsapp.chatModel` when it started), for its cost. */
+  model?: VoiceChatModel;
+};
+
 export type VoiceCallTurn = {
-  role: "agent" | "caller";
+  /** caller = the person; agent = the AI; human = a team member who took over a WhatsApp chat. */
+  role: "agent" | "caller" | "human";
   text: string;
+  /** WhatsApp chats only: when it was sent. */
+  at?: Date;
+  /** WhatsApp chats only: it was a voice note (its `text` is what was said). */
+  voice?: boolean;
+  /** A team member's message: their name. */
+  by?: string;
 };
 
 /** Written by the voice engine when a call ends, however it ended. */
@@ -776,6 +911,8 @@ export type VoiceCallDoc<Id = ObjectId> = {
   memory?: VoiceCallMemory | null;
   /** What the call cost the owner, written by the engine when the call ends (absent on calls before 2026-10-21). */
   cost?: VoiceCallCost | null;
+  /** WhatsApp chats only (channel WHATSAPP). */
+  chat?: VoiceCallChat<Id> | null;
 };
 
 /**
@@ -814,6 +951,8 @@ export type VoiceCallCost = {
   providerUsd: number;
   /** True: the provider's own charge for the call. False: minutes × its list rate, until that charge arrives. */
   providerExact: boolean;
+  /** WhatsApp chats: voice notes heard (speech-to-text) and voice replies spoken (TTS), on the owner's keys. */
+  voiceNotesUsd?: number;
 };
 
 /**
@@ -837,7 +976,7 @@ export type VoiceCallToolCall = {
   bookingId?: string | null;
 };
 
-export type VoiceCall = Omit<VoiceCallDoc<string>, "startedAt" | "endedAt" | "memoryUsed" | "recordingUrl"> & {
+export type VoiceCall = Omit<VoiceCallDoc<string>, "startedAt" | "endedAt" | "memoryUsed" | "recordingUrl" | "chat"> & {
   startedAt: string;
   endedAt: string;
   memoryUsed?: { brief: string; lastCallAt: string } | null;

@@ -6,6 +6,7 @@ import {
   contentLabCheckHandler,
   contentLabCreatorHandler,
   contentLabExploreHandler,
+  contentLabKeywordHandler,
   contentLabSuggestHandler,
 } from "./handler";
 
@@ -16,6 +17,7 @@ contentLabRoutes.post(API_ENDPOINTS.CONTENT_LAB.BREAKDOWN.route, contentLabBreak
 contentLabRoutes.post(API_ENDPOINTS.CONTENT_LAB.CHECK.route, contentLabCheckHandler);
 contentLabRoutes.post(API_ENDPOINTS.CONTENT_LAB.CREATOR.route, contentLabCreatorHandler);
 contentLabRoutes.post(API_ENDPOINTS.CONTENT_LAB.SUGGEST.route, contentLabSuggestHandler);
+contentLabRoutes.post(API_ENDPOINTS.CONTENT_LAB.KEYWORD.route, contentLabKeywordHandler);
 
 export default contentLabRoutes;
 
@@ -25,3 +27,4 @@ export { contentLabBreakdownService } from "./breakdown";
 export { contentLabCheckService } from "./check";
 export { contentLabCreatorService } from "./creator";
 export { contentLabSuggestService } from "./suggest";
+export { contentLabKeywordService } from "./keyword";

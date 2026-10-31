@@ -685,7 +685,7 @@ test('several keys, and each agent its own stack: one voice model or three steps
     await expect.poll(async () => (await db.getVoiceAgentDoc(inbound)).stack?.kind).toBe('PIPELINE');
     const pipeline = (await db.getVoiceAgentDoc(inbound)).stack;
     expect(pipeline).toMatchObject({
-        stt: { provider: 'deepgram', model: 'nova-3', keyId: null, price: { usdPerMinute: 0.0048 } },
+        stt: { provider: 'deepgram', model: 'nova-3', keyId: null, price: { usdPerMinute: 0.0058 } },
         llm: { provider: 'gemini', model: 'gemini-3.5-flash-lite', keyId: null },
         tts: { provider: 'cartesia', model: 'sonic-3.6', keyId: null, price: { usdPerMillionChars: 39 } },
     });

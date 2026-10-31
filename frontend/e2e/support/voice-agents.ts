@@ -9,12 +9,20 @@ export function voiceAgentUrl(agentId: string): string {
     return `${VOICE_AGENTS_URL}/${agentId}`;
 }
 
-/** Waits until React owns the element, so clicks and typing are not lost to the server-rendered HTML. */
+/**
+ * Waits until React owns the element, so clicks and typing are not lost to the server-rendered HTML, and until no
+ * streamed part of the page is still parked in a hidden `<div id="S:…">`: React 19.2 (Next 15.5) batches those swaps,
+ * and until one lands a strict locator finds the page's controls twice.
+ */
 export async function waitForHydration(page: Page, selector: string): Promise<void> {
     await expect(page.locator(selector).first()).toBeVisible();
     await page.waitForFunction((sel) => {
         const el = document.querySelector(sel);
-        return !!el && Object.keys(el).some((key) => key.startsWith('__reactProps'));
+        return (
+            !!el &&
+            Object.keys(el).some((key) => key.startsWith('__reactProps')) &&
+            !document.querySelector('div[hidden][id^="S:"]')
+        );
     }, selector);
 }
 
@@ -24,6 +32,21 @@ export async function openVoiceAgent(page: Page, agentId: string): Promise<void>
 }
 
 /** Opens one tool's settings in the editor's Tools list (one is open at a time) and returns its row. */
+/** Opens a page's filter sheet (Call logs, Analytics) by its button's name, unless it is open; returns the sheet. */
+export async function openFilters(page: Page, label: string): Promise<Locator> {
+    const sheet = page.getByRole('dialog', { name: 'Filters' });
+    if (!(await sheet.isVisible())) await page.getByRole('button', { name: label }).click();
+    await expect(sheet).toBeVisible();
+    return sheet;
+}
+
+/** Closes the filter sheet with Done. */
+export async function closeFilters(page: Page): Promise<void> {
+    const sheet = page.getByRole('dialog', { name: 'Filters' });
+    await sheet.getByRole('button', { name: 'Done' }).click();
+    await expect(sheet).toBeHidden();
+}
+
 export async function openVoiceTool(page: Page, name: string): Promise<Locator> {
     const row = page.getByTestId('voice-agent-tools').locator(`li[data-tool="${name}"]`);
     const trigger = row.locator('[data-slot="collapsible-trigger"]').first();

@@ -1,6 +1,6 @@
 import { type ModuleAccess, Modules, type SubModule } from '@aixellabs/backend/db/types';
 import { SubModuleUrls, ALWAYS_ALLOWED_PATHS, DEFAULT_HOME_PAGE_ROUTE } from '@/config/app-config';
-import { SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS } from '@/config/sidebar.config';
+import { SidebarConfig, SidebarNavItem, ADMIN_ONLY_PATHS, subModuleChildren } from '@/config/sidebar.config';
 import { getHiddenSubModules } from '@/flags';
 import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 import type { AppSessionUser } from '@/lib/auth/types';
@@ -24,10 +24,11 @@ function buildSidebarFromModuleAccess(moduleAccess: ModuleAccess, hidden: Readon
 
         navMain.push({
             title: module,
-            items: subModules.map((subModule) => ({
-                title: subModule,
-                url: SubModuleUrls[subModule],
-            })),
+            // A sub-module with pages of its own (WhatsApp) is a folder inside its module.
+            items: subModules.map((subModule) => {
+                const children = subModuleChildren[subModule];
+                return children ? { title: subModule, items: children } : { title: subModule, url: SubModuleUrls[subModule] };
+            }),
         });
     }
 
@@ -54,14 +55,12 @@ export async function generateSidebarConfig(user: AccessUser): Promise<SidebarCo
  */
 export async function getAccessiblePaths(user: AccessUser): Promise<Set<string>> {
     const config = await generateSidebarConfig(user);
-    const paths = new Set<string>();
+    return new Set(sidebarUrls(config.navMain));
+}
 
-    for (const item of config.navMain) {
-        for (const sub of item.items ?? []) {
-            paths.add(sub.url);
-        }
-    }
-    return paths;
+/** Every page in these entries, however deep their folders go. */
+export function sidebarUrls(items: SidebarNavItem[]): string[] {
+    return items.flatMap((item) => [...(item.url ? [item.url] : []), ...sidebarUrls(item.items ?? [])]);
 }
 
 /**

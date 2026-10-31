@@ -309,10 +309,51 @@ const VOICELINK_GUIDE: SetupGuide = {
     ],
 };
 
+/** Step ids other components open the WhatsApp guide at. */
+export const WHATSAPP_GUIDE_STEP = {
+    APP: 'app',
+    TOKEN: 'token',
+    CONNECT: 'connect',
+} as const;
+
+// shortcut: text-only steps; add 1400x875 screenshots under public/voice-agent/guides/whatsapp/ from a real Meta app before release.
+const WHATSAPP_GUIDE: SetupGuide = {
+    title: 'Set up WhatsApp calls for your voice agents',
+    steps: [
+        {
+            id: WHATSAPP_GUIDE_STEP.APP,
+            title: 'Create a Meta app for Aixel Labs and add your number',
+            body: [
+                'In Meta for Developers, click Create app, choose Business, then add the WhatsApp product. Use a new app just for Aixel Labs. In WhatsApp, API Setup, add your business number and add a payment method: Meta needs one even though calls people make to you are free.',
+                'No business number yet? Every new Meta app comes with a free test number (WhatsApp, API Setup): add your own phone as a recipient and chat with your agent through it. Chats work on any number; calls need a number that can message 2,000 people a day (verify your business in Meta Business Settings), and Meta allows them on test numbers.',
+            ],
+            link: { href: 'https://developers.facebook.com/apps/creation/', label: 'Create a Meta app' },
+        },
+        {
+            id: WHATSAPP_GUIDE_STEP.TOKEN,
+            title: 'Generate a token, and copy the App ID and App secret',
+            body: [
+                'In Business Settings, open System users, add an admin system user, and assign it your app and your WhatsApp account. Click Generate token, pick your app, choose Never expires, and tick whatsapp_business_management and whatsapp_business_messaging. Copy the token.',
+                'Then in your app, open App settings, Basic, and copy the App ID and the App secret (click Show).',
+            ],
+            link: { href: 'https://business.facebook.com/settings/system-users', label: 'Open System users' },
+        },
+        {
+            id: WHATSAPP_GUIDE_STEP.CONNECT,
+            title: 'Paste them here, pick your number and give it an agent',
+            body: [
+                'On this page, open Connect a number, choose WhatsApp, paste the three and click Find my numbers. Import your number, then give it an agent that answers calls: it answers WhatsApp messages too, and remembers each person across both.',
+                'That is the moment we change things at Meta: your app’s webhook points at Aixel Labs and calling is turned on for the number, with the call button shown. Unlink the agent or remove the number and its calling settings go back as they were.',
+            ],
+        },
+    ],
+};
+
 const SETUP_GUIDES: Record<VoiceProvider, SetupGuide> = {
     [VoiceProvider.TELNYX]: TELNYX_GUIDE,
     [VoiceProvider.TWILIO]: TWILIO_GUIDE,
     [VoiceProvider.VOICELINK]: VOICELINK_GUIDE,
+    [VoiceProvider.WHATSAPP]: WHATSAPP_GUIDE,
 };
 
 /** Every provider's step-by-step setup guide (the setup-guide spec opens each one). */

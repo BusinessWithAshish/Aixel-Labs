@@ -3,10 +3,9 @@
 import type { FormEvent } from 'react';
 import { format } from 'date-fns';
 import { Controller, FormProvider } from 'react-hook-form';
-import { Loader2, Save, Trash2 } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import { VOICE_AGENT_LIMITS, VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
-import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,9 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
 import { VOICE_AGENT_CALL_TYPES, VOICE_AGENT_PROMPT_TEMPLATES } from '@/helpers/voice-agent-defaults';
+import { servesPhone } from '@/helpers/voice-agent-channels';
+import { AgentMoreMenu } from './AgentMoreMenu';
+import { DeleteAgentDialog } from '../../_components/DeleteAgentDialog';
 import { VoiceAgentCallTypeBadge } from '../../_components/VoiceAgentCallTypeBadge';
 import { VoiceAgentCallTypeSelect } from '../../_components/VoiceAgentCallTypeSelect';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
@@ -69,6 +71,7 @@ export function VoiceAgentEditor() {
         deleting,
         confirmDelete,
         phoneBlockers,
+        channel,
     } = usePage<UseVoiceAgentEditorPageReturn>();
 
     const onNumbers = usage.inbound.length + usage.outbound.length > 0;
@@ -116,26 +119,19 @@ export function VoiceAgentEditor() {
                                     </Button>
                                 ) : null}
                                 <AgentTestButton />
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive"
-                                    onClick={() => setDeleteOpen(true)}
-                                    aria-label="Delete agent"
-                                >
-                                    <Trash2 className="size-4" />
-                                    Delete
-                                </Button>
                                 <Button type="submit" size="sm" disabled={!canSaveAgent}>
                                     {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                                     Save
                                 </Button>
+                                <AgentMoreMenu />
                             </CardAction>
                         </CardHeader>
 
                         <CardContent className="grid gap-5">
-                            <CallBlockers blockers={phoneBlockers} />
+                            <CallBlockers
+                                blockers={phoneBlockers}
+                                title={servesPhone(channel) ? undefined : 'It can’t answer chats or calls yet'}
+                            />
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <StringControlledField
                                     name="name"
@@ -163,9 +159,9 @@ export function VoiceAgentEditor() {
                                 />
                             </div>
 
-                            <AgentStackSection />
-
                             <AgentNumbersField />
+
+                            <AgentStackSection />
 
                             <Controller
                                 control={agentForm.control}
@@ -284,18 +280,13 @@ export function VoiceAgentEditor() {
                     </DialogContent>
                 </Dialog>
 
-                <ConfirmDialog
+                <DeleteAgentDialog
                     open={deleteOpen}
                     onOpenChange={setDeleteOpen}
-                    title={`Delete ${saved.name}?`}
-                    alertMessage={
-                        onNumbers
-                            ? 'The agent is removed and its numbers are let go: they stop answering or calling with it until you pick another agent. Past call logs stay.'
-                            : 'The agent is removed. Past call logs stay.'
-                    }
-                    confirmText="Delete agent"
+                    name={saved.name}
+                    onNumbers={onNumbers}
                     onConfirm={() => void confirmDelete()}
-                    isLoading={deleting}
+                    deleting={deleting}
                 />
             </Card>
             <VoiceAgentToolsCard />

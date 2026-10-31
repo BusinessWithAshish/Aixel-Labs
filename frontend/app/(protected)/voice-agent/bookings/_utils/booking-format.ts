@@ -43,5 +43,6 @@ export function zoneLabel(timeZone: string): string {
 }
 
 export function channelLabel(channel: VoiceCallChannel): string {
+    if (channel === VoiceCallChannel.WHATSAPP) return 'WhatsApp chat';
     return channel === VoiceCallChannel.PLAYGROUND ? 'Playground' : 'Phone call';
 }

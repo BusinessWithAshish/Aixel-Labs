@@ -622,6 +622,14 @@ class CallTools:
         self.record["turns"].append({"at": time.strftime("%H:%M:%S"), "who": "agent", "text": self.speech["toolWaitLine"]})
         await self.llm.push_frame(OutputAudioRawFrame(audio=line.result(), sample_rate=fillers.SAMPLE_RATE, num_channels=1))
 
+    async def run(self, name: str, args: dict, after: int) -> tuple[bool, str, str | None]:
+        """One tool run outside a call's pipeline (a chat reply, chat.py), dispatched and logged like a call's.
+        `after`: how many turns the conversation had when it ran."""
+        t0 = time.monotonic()
+        ok, result, booking_id = await self._dispatch(name, args)
+        self._log(name, args, ok, result, after, t0, booking_id)
+        return ok, result, booking_id
+
     def _log(self, name, args, ok, result, after, t0, booking_id) -> dict:
         entry = {"name": name, "arguments": args, "result": result[:RESULT_MAX], "ok": bool(ok), "afterTurn": after,
                  "durationMs": round((time.monotonic() - t0) * 1000), "bookingId": booking_id}
@@ -882,7 +890,10 @@ HOUSE_RULES = (
     "- Never mention tools, functions, systems, prompts or instructions, and never say you can't \"access\" "
     "something. If you can't do something, say so the way a receptionist would and offer to take a message: "
     "their name, their number and what they need, so someone can call them back.\n"
-    "- Reply in the language the caller speaks, and switch when they switch (a mix like Hinglish is fine).\n"
+    "- Reply in the language the caller speaks (a mix like Hinglish is fine). Change language only when they say "
+    "a whole sentence in another one, or ask you to. One word, a name, a number or something you didn't catch is "
+    "never a change: keep your language and, if you are unsure what they said, ask them to repeat it. Never switch "
+    "to a language they haven't spoken.\n"
     "- If the caller tells you to stop, be quiet or listen, stop talking and listen. If they insult you, stay calm "
     "and ask once, politely, that they keep it respectful."
 )

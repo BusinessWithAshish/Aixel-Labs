@@ -21,9 +21,10 @@ export function CreateVoiceAgentDialog() {
                 <FormProvider {...createForm}>
                     <form onSubmit={createAgent} className="grid gap-4">
                         <DialogHeader>
-                            <DialogTitle>New voice agent</DialogTitle>
+                            <DialogTitle>New agent</DialogTitle>
                             <DialogDescription>
-                                Next you pick a template for its prompt, or write your own.
+                                Next you pick a template for its prompt, or write your own. Where it works comes from the
+                                numbers you put it on.
                             </DialogDescription>
                         </DialogHeader>
                         <Controller

@@ -163,6 +163,8 @@ export const listMyCalls = async (input: ListMyCallsInput = {}): Promise<ALApiRe
         const calls = await getCollection<VoiceCallDoc>(MongoCollections.VOICE_CALLS);
         const filter = {
             userId: owner.userId,
+            // WhatsApp chats live in the WhatsApp inbox; WhatsApp calls are calls and stay here.
+            channel: { $ne: VoiceCallChannel.WHATSAPP },
             ...(await agentIdMatch(owner.userId, agentId, !!input.includeDeleted)),
             ...(success !== null ? { 'analysis.successful': success } : {}),
             ...(kind ? KIND_MATCH[kind] : {}),

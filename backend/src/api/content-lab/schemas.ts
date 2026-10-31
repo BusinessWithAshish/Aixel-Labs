@@ -29,6 +29,12 @@ export const CONTENT_LAB_SUGGEST_REQUEST_SCHEMA = z.object({
   country: COUNTRY_SCHEMA,
 });
 
+export const CONTENT_LAB_KEYWORD_REQUEST_SCHEMA = z.object({
+  query: z.string().trim().min(1).max(CONTENT_LAB_LIMITS.maxQueryChars).describe(D.keywordQuery),
+  country: COUNTRY_SCHEMA,
+  trend: z.boolean().default(true).describe(D.keywordTrend),
+});
+
 export const CONTENT_LAB_BREAKDOWN_REQUEST_SCHEMA = z.object({
   url: z.string().trim().min(1).max(500).describe(D.url),
   country: COUNTRY_SCHEMA,

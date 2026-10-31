@@ -49,7 +49,11 @@ export function useVoiceAnalyticsPage(data: VoiceAnalyticsPageData) {
         setAgentFilter: (agent: string | null) => applyFilters({ agent }),
         setRange: (range: VoiceCallRange) => applyFilters({ range }),
         setIncludeDeleted: (deleted: boolean) => applyFilters({ deleted }),
-        filtersSet: !!data.agentFilter || data.includeDeleted || data.range !== DEFAULT_ANALYTICS_RANGE,
+        agentFilterName: data.agentFilter
+            ? (data.agents.find((a) => a.id === data.agentFilter)?.name ?? 'Deleted agent')
+            : null,
+        /** How many filters are not at their default. */
+        filtersSet: [data.agentFilter, data.includeDeleted, data.range !== DEFAULT_ANALYTICS_RANGE].filter(Boolean).length,
         clearFilters: () => applyFilters({ agent: null, deleted: false, range: DEFAULT_ANALYTICS_RANGE }),
     };
 }

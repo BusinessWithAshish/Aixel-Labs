@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+    VOICE_CHAT_MODELS,
     VOICE_AGENT_FEATURE_LIMITS,
     VOICE_AGENT_LIMITS,
     VOICE_AGENT_VOICES,
@@ -250,9 +251,20 @@ const speechSchema = z
         path: ['toolWaitLine'],
     });
 
-/** How the agent behaves around a call: on voicemail, after it (analysis), from one call to the next (memory), and how it speaks. */
+/** How it chats on WhatsApp: the reply model, voice-note replies, handing a chat to a person. */
+const whatsappSettingsSchema = z
+    .object({ chatModel: z.enum(VOICE_CHAT_MODELS), voiceReplies: z.boolean(), handoff: z.boolean() })
+    .strict();
+
+/** How the agent behaves around a call: on voicemail, after it (analysis), from one call to the next (memory), how it speaks, and on WhatsApp. */
 export const callSettingsSchema = z
-    .object({ voicemail: voicemailSchema, analysis: analysisSchema, memory: z.boolean(), speech: speechSchema })
+    .object({
+        voicemail: voicemailSchema,
+        analysis: analysisSchema,
+        memory: z.boolean(),
+        speech: speechSchema,
+        whatsapp: whatsappSettingsSchema,
+    })
     .strict();
 
 export type VoiceAgentCallSettingsInput = z.input<typeof callSettingsSchema>;

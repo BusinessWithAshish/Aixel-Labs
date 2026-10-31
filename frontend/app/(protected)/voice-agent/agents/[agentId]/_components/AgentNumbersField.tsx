@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { usePage } from '@/contexts/PageStore';
 import { VOICE_PHONE_NUMBERS_URL } from '@/helpers/voice-routes';
+import { numberKind, type NumberKind } from '@/helpers/voice-agent-channels';
 import { linkedNumbers, type UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 
 /** The agent in the number's slot for this type (inbound: answers it, outbound: calls from it), if any. */
@@ -40,16 +41,44 @@ function openPrompt() {
 type Takeover = { id: string; phoneNumber: string; holder: string; holderKeepsOne: boolean };
 
 /**
- * The number this agent works on, one of the owner's (loaded with the page, refreshed after a change). A
- * number answers calls with one inbound agent and places calls for one outbound agent: a pick fills this
- * agent's slot on it at once (asking first when another agent has that slot) and lets its previous number go.
+ * Where the agent works: the numbers it is on, one of the owner's of each kind (loaded with the page, refreshed after
+ * a change). A number does one job, for one agent: a pick puts this agent on it at once (asking first when another
+ * agent has it) and lets its previous number of that kind go. An agent that answers can also answer a WhatsApp number;
+ * the same agent on a number's phone line and its WhatsApp keeps one memory of each person.
  */
 export function AgentNumbersField() {
-    const { agentId, saved, form, usage, ownedNumbers, numbers, linking, linkNumbers } =
-        usePage<UseVoiceAgentEditorPageReturn>();
+    const { saved, whatsapp } = usePage<UseVoiceAgentEditorPageReturn>();
+    const onWhatsApp = whatsapp && saved.callType === VoiceAgentCallType.INBOUND;
+    return (
+        <fieldset className="grid gap-3" aria-labelledby="agent-places-title">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 id="agent-places-title" className="text-sm font-medium">
+                    Where it works
+                </h3>
+                <Link href={VOICE_PHONE_NUMBERS_URL} className="text-primary text-xs underline-offset-4 hover:underline">
+                    All your numbers
+                </Link>
+            </div>
+            <div className={onWhatsApp ? 'grid gap-4 md:grid-cols-2' : 'grid gap-4'}>
+                <NumberPicker kind="phone" />
+                {onWhatsApp ? <NumberPicker kind="whatsapp" /> : null}
+            </div>
+        </fieldset>
+    );
+}
+
+/** The agent's number of one kind: a phone line, or a WhatsApp number. */
+function NumberPicker({ kind }: { kind: NumberKind }) {
+    const page = usePage<UseVoiceAgentEditorPageReturn>();
+    const { agentId, saved, form, usage, linking, linkNumbers } = page;
+    const ownedNumbers = page.ownedNumbers.filter((n) => numberKind(n.provider) === kind);
+    const numbers = page.numbers.filter((n) => numberKind(n.provider) === kind);
     const inbound = saved.callType === VoiceAgentCallType.INBOUND;
-    const stray = linkedNumbers(usage, inbound ? VoiceAgentCallType.OUTBOUND : VoiceAgentCallType.INBOUND);
+    const stray = linkedNumbers(usage, inbound ? VoiceAgentCallType.OUTBOUND : VoiceAgentCallType.INBOUND).filter(
+        (n) => numberKind(n.provider) === kind,
+    );
     const typePending = form.callType !== saved.callType;
+    const whatsapp = kind === 'whatsapp';
     const [takeover, setTakeover] = useState<Takeover | null>(null);
 
     // The server refuses a number for an agent with no saved prompt (it would answer with nothing): say so first.
@@ -75,14 +104,18 @@ export function AgentNumbersField() {
     };
 
     const hint = typePending
-        ? 'Save the new agent type first.'
+        ? 'Save the agent first.'
         : numbers.length > 0
-          ? inbound
-              ? 'Calls to this number are answered by this agent.'
-              : 'This agent calls from this number.'
-          : inbound
-            ? 'No number yet: pick the one it answers.'
-            : 'No number yet: pick the one it calls from.';
+          ? whatsapp
+              ? 'Chats, voice notes and calls to this WhatsApp number are answered by this agent.'
+              : inbound
+                ? 'Calls to this number are answered by this agent.'
+                : 'This agent calls from this number.'
+          : whatsapp
+            ? 'No WhatsApp number yet: pick the one it answers.'
+            : inbound
+              ? 'No number yet: pick the one it answers.'
+              : 'No number yet: pick the one it calls from.';
 
     const pick = (id: string | null) => {
         if (id === shown) return;
@@ -96,15 +129,15 @@ export function AgentNumbersField() {
     };
 
     return (
-        <Field data-testid="agent-numbers">
-            <FieldLabel htmlFor="agent-numbers">
-                Phone number
+        <Field data-testid={whatsapp ? 'agent-whatsapp-numbers' : 'agent-numbers'}>
+            <FieldLabel htmlFor={`agent-numbers-${kind}`}>
+                {whatsapp ? 'WhatsApp number' : 'Phone number'}
                 {linking || waiting ? <Loader2 className="text-muted-foreground size-3.5 animate-spin" /> : null}
             </FieldLabel>
             {ownedNumbers.length > 0 ? (
                 <PhoneNumberSelect
-                    id="agent-numbers"
-                    data-testid="agent-numbers-select"
+                    id={`agent-numbers-${kind}`}
+                    data-testid={whatsapp ? 'agent-whatsapp-numbers-select' : 'agent-numbers-select'}
                     numbers={ownedNumbers.map((n) => {
                         const mine = numbers.some((x) => x.id === n._id);
                         return {
@@ -116,15 +149,21 @@ export function AgentNumbersField() {
                     })}
                     value={shown}
                     onChange={pick}
-                    placeholder={inbound ? 'Pick the number it answers' : 'Pick the number it calls from'}
+                    placeholder={
+                        whatsapp
+                            ? 'Pick the WhatsApp number it answers'
+                            : inbound
+                              ? 'Pick the number it answers'
+                              : 'Pick the number it calls from'
+                    }
                     noneLabel="No number"
                     disabled={typePending || noPrompt || linking}
                 />
             ) : (
                 <p className="text-muted-foreground text-sm" data-testid="agent-numbers-empty">
-                    No numbers yet.{' '}
+                    {whatsapp ? 'No WhatsApp numbers yet.' : 'No numbers yet.'}{' '}
                     <Link href={VOICE_PHONE_NUMBERS_URL} className="text-primary underline-offset-4 hover:underline">
-                        Connect one on Phone numbers
+                        Connect one on Numbers
                     </Link>
                 </p>
             )}
