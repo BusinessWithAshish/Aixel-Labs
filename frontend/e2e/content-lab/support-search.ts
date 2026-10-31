@@ -42,6 +42,15 @@ export async function waitForSmartBox(page: Page): Promise<void> {
     await waitForHydration(page, SMART_BOX);
 }
 
+/** Ticks (or unticks) one source in the search bar's source picker, then closes it. */
+export async function toggleSource(page: Page, label: 'YouTube' | 'Instagram'): Promise<void> {
+    await page.getByRole('button', { name: /^Sources:/ }).click();
+    await page.getByRole('menuitemcheckbox', { name: new RegExp(`^${label}`) }).click();
+    await page.keyboard.press('Escape');
+    // A click while it is still closing would be taken as a click outside it.
+    await expect(page.getByRole('menu')).toHaveCount(0);
+}
+
 type BffKey = keyof typeof CONTENT_LAB_API_ROUTES;
 type Reply = { status?: number; body: { success: boolean; data?: unknown; error?: string } } | 'hang';
 

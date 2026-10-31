@@ -27,13 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePage } from '@/contexts/PageStore';
 import { cn } from '@/lib/utils';
-import {
-    CONTENT_LAB_COUNTRIES,
-    CONTENT_LAB_PLATFORM_FILTERS,
-    CONTENT_LAB_PLATFORM_LABELS,
-    CONTENT_LAB_POST_FORMAT_LABELS,
-    type ContentLabPlatformFilter,
-} from '../../../_constants';
+import { CONTENT_LAB_COUNTRIES, CONTENT_LAB_PLATFORM_LABELS, CONTENT_LAB_POST_FORMAT_LABELS } from '../../../_constants';
 import { PlatformIcon } from '../../../_components/PlatformIcon';
 import { SegmentedSwitch } from '../../../_components/SegmentedSwitch';
 import { PostCard } from '../../_components/PostCard';
@@ -57,31 +51,13 @@ const countryName = (code: string) => CONTENT_LAB_COUNTRIES.find((c) => c.code =
 
 const postsOn = (posts: CONTENT_LAB_POST[], platform: ContentLabPlatform) => posts.filter((post) => post.platform === platform);
 
-/** Both logos, overlapped, for "All". */
-function BothLogos() {
-    return (
-        <span className="flex -space-x-1">
-            <PlatformIcon platform="youtube" className="size-4" />
-            <PlatformIcon platform="instagram" className="size-4" />
-        </span>
-    );
-}
-
+/** Country, order and "Use on a board", under the search bar. */
 function Toolbar() {
-    const { platform, setPlatform, country, setCountry, sort, setSort, query, busy, startBoard, state } = usePage<UseExplorePageReturn>();
-    const posts = state.status === 'done' ? state.result.posts : null;
-    const options = CONTENT_LAB_PLATFORM_FILTERS.map((filter) => ({
-        value: filter.value as ContentLabPlatformFilter,
-        label: filter.label,
-        icon: filter.value === 'both' ? <BothLogos /> : <PlatformIcon platform={filter.value} />,
-        count: posts && filter.value !== 'both' && platform === 'both' ? postsOn(posts, filter.value).length : undefined,
-    }));
-
+    const { country, setCountry, sort, setSort, query, busy, startBoard } = usePage<UseExplorePageReturn>();
     return (
-        <div className="bg-background/90 supports-[backdrop-filter]:bg-background/75 sticky top-0 z-20 -mx-1 flex flex-wrap items-center gap-2 border-b px-1 py-2 backdrop-blur sm:-mx-2 sm:px-2">
-            <SegmentedSwitch options={options} value={platform} onValueChange={setPlatform} aria-label="Platforms" />
+        <div className="flex items-center gap-2">
             <Select value={country} onValueChange={setCountry}>
-                <SelectTrigger aria-label="Country" className="w-auto min-w-36 gap-1.5">
+                <SelectTrigger aria-label="Country" className="w-auto gap-1.5 xl:h-10">
                     <GlobeIcon className="text-muted-foreground size-4" />
                     <SelectValue />
                 </SelectTrigger>
@@ -94,7 +70,7 @@ function Toolbar() {
                 </SelectContent>
             </Select>
             <Select value={sort} onValueChange={(value) => setSort(value as ExploreSort)}>
-                <SelectTrigger aria-label="Sort by" className="w-auto min-w-36 gap-1.5">
+                <SelectTrigger aria-label="Sort by" className="w-auto gap-1.5 xl:h-10">
                     <ArrowDownWideNarrowIcon className="text-muted-foreground size-4" />
                     <SelectValue />
                 </SelectTrigger>
@@ -107,8 +83,16 @@ function Toolbar() {
                 </SelectContent>
             </Select>
             {query ? (
-                <Button size="sm" className="h-9 sm:ml-auto" disabled={!!busy} onClick={() => startBoard(TOPIC_BOARD_TEMPLATE, { query })}>
-                    {busy === `board:${query}` ? <Loader2Icon className="animate-spin" /> : <LayoutDashboardIcon />} Use on a board
+                <Button
+                    className="ml-auto xl:h-10"
+                    aria-label="Use on a board"
+                    disabled={!!busy}
+                    onClick={() => startBoard(TOPIC_BOARD_TEMPLATE, { query })}
+                >
+                    {busy === `board:${query}` ? <Loader2Icon className="animate-spin" /> : <LayoutDashboardIcon />}
+                    {/* Short on phones, so the filters keep to one row under the search bar. */}
+                    <span className="sm:hidden">Board</span>
+                    <span className="hidden sm:inline">Use on a board</span>
                 </Button>
             ) : null}
         </div>
@@ -472,9 +456,31 @@ function Posts() {
     );
 }
 
-/** What's working: smart box, a sticky filter bar, what the winners share, then each platform's posts with more on scroll. */
+/** The search bar (sources at its start) and the filters, pinned to the top while the results scroll under them. */
+function SearchBar() {
+    const { query, creator, country, platform, setPlatform } = usePage<UseExplorePageReturn>();
+    const searching = !!(query || creator);
+    return (
+        <div
+            data-testid="explore-search-bar"
+            className="bg-background sticky top-0 z-20 -mx-1 flex flex-col gap-2 border-b px-1 pt-1 pb-3 sm:-mx-2 sm:px-2 xl:flex-row xl:items-center xl:gap-3"
+        >
+            <SmartBox
+                className="xl:flex-1"
+                size="default"
+                defaultValue={query ?? (creator ? `@${creator.handle}` : '')}
+                platform={platform}
+                onPlatformChange={setPlatform}
+                country={country}
+            />
+            {searching ? <Toolbar /> : null}
+        </div>
+    );
+}
+
+/** What's working: the sticky search bar, what the winners share, then each source's posts with more on scroll. */
 export function ExploreView() {
-    const { query, creator, unsupported, country, platform } = usePage<UseExplorePageReturn>();
+    const { query, creator, unsupported, country } = usePage<UseExplorePageReturn>();
     const searching = !!(query || creator);
     const title = query ? `What's working in "${query}"` : creator ? `Standouts from @${creator.handle}` : "What's working";
     const subtitle = creator
@@ -487,25 +493,24 @@ export function ExploreView() {
                 <h1 className="text-2xl font-bold tracking-tight break-words text-balance sm:text-3xl">{title}</h1>
                 {searching ? <p className="text-muted-foreground">{subtitle}</p> : null}
             </header>
-            <SmartBox size="default" defaultValue={query ?? (creator ? `@${creator.handle}` : '')} platform={platform} country={country} />
+            <SearchBar />
             {searching ? (
                 <>
-                    <Toolbar />
                     <Overview />
                     <Posts />
                 </>
             ) : (
                 <>
-                <EmptyState
-                    icon={unsupported ? <SearchXIcon /> : <TrendingUpIcon />}
-                    title={unsupported ? 'That link cannot be broken down' : 'Search a topic, link or @creator'}
-                    description={
-                        unsupported
-                            ? CONTENT_LAB_ERROR_MESSAGES.UNSUPPORTED_URL
-                            : 'See the posts doing far better than usual for their creator, on YouTube and Instagram.'
-                    }
-                />
-                <RecentSearches />
+                    <EmptyState
+                        icon={unsupported ? <SearchXIcon /> : <TrendingUpIcon />}
+                        title={unsupported ? 'That link cannot be broken down' : 'Search a topic, link or @creator'}
+                        description={
+                            unsupported
+                                ? CONTENT_LAB_ERROR_MESSAGES.UNSUPPORTED_URL
+                                : 'See the posts doing far better than usual for their creator, on the sources you pick.'
+                        }
+                    />
+                    <RecentSearches />
                 </>
             )}
         </div>

@@ -12,7 +12,6 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { CONTENT_LAB_EXPLORE_ROUTE } from '@/config/app-config';
 import { cn } from '@/lib/utils';
 import {
-    CONTENT_LAB_PLATFORM_FILTERS,
     CONTENT_LAB_PLATFORM_LABELS,
     CONTENT_LAB_SMART_BOX_EXAMPLES,
     CONTENT_LAB_SMART_BOX_HINTS,
@@ -20,22 +19,21 @@ import {
 } from '../../_constants';
 import { CreatorAvatar } from '../../_components/CreatorAvatar';
 import { PlatformIcon } from '../../_components/PlatformIcon';
-import { SegmentedSwitch } from '../../_components/SegmentedSwitch';
 import { useCreatorSuggest } from '../../_hooks/use-creator-suggest';
 import { useKeyword } from '../_hooks/use-keyword';
 import { useRecentSearches, useSearchPlatform } from '../_hooks/use-recent-searches';
 import { compactNumber } from '../_utils/format';
 import { detectQuery, exploreHref, recentSearchOf, type RecentSearch, smartQueryHref } from '../_utils/smart-box';
 import { KeywordBadge } from './KeywordScore';
+import { SourcePicker } from './SourcePicker';
 
 type SmartBoxProps = {
     defaultValue?: string;
     /** `lg` on Search home, `default` above results. */
     size?: 'lg' | 'default';
-    /** Platforms a new search runs on. Ignored with `pickPlatform`. */
+    /** Sources a search runs on, picked at the start of the bar. Without it (Search home) the choice is remembered on this device. */
     platform?: ContentLabPlatformFilter;
-    /** Show the All / YouTube / Instagram switch above the box (Search home); the choice is remembered on this device. */
-    pickPlatform?: boolean;
+    onPlatformChange?: (platform: ContentLabPlatformFilter) => void;
     country?: string;
     className?: string;
 };
@@ -48,22 +46,28 @@ const MAX_CREATORS = 5;
 
 const bareHandle = (creator: CONTENT_LAB_SUGGESTION) => creator.handle.replace(/^@+/, '');
 
+/** An example as shown on its chip: links without their https://. */
+const exampleText = (value: string) => value.replace(/^https?:\/\//, '');
+
 /**
- * One box for a topic, a YouTube/Instagram link or an @creator. As you type, a list drops down with what it
- * understood: a topic's score and what people also search, creators matching the name, or a preview of the
- * pasted link; with nothing typed, your recent searches. Arrow keys move, Enter opens, Escape closes.
- * A plain GET form underneath, so it works before hydration (the explore page re-routes links and creators).
+ * One bar for a topic, a niche, a YouTube/Instagram link or an @creator, with the sources to search at its start.
+ * As you type, a list drops down with what it understood: a topic's score and what people also search, creators
+ * matching the name, or a preview of the pasted link; with nothing typed, your recent searches. Arrow keys move,
+ * Enter opens, Escape closes. A plain GET form underneath, so it works before hydration (the explore page re-routes
+ * links and creators).
  */
-export function SmartBox({ defaultValue = '', size = 'lg', platform: platformProp = 'both', pickPlatform, country = CONTENT_LAB_DEFAULT_COUNTRY, className }: SmartBoxProps) {
+export function SmartBox({ defaultValue = '', size = 'lg', platform: platformProp, onPlatformChange, country = CONTENT_LAB_DEFAULT_COUNTRY, className }: SmartBoxProps) {
     const router = useRouter();
     const hintId = useId();
     const anchor = useRef<HTMLDivElement>(null);
+    const input = useRef<HTMLInputElement>(null);
     const [value, setValue] = useState(defaultValue);
     const [focused, setFocused] = useState(false);
     // Nothing is looked up until the box is first used (the results page fills it with the search already run).
     const [engaged, setEngaged] = useState(false);
     const [storedPlatform, setStoredPlatform] = useSearchPlatform();
-    const platform = pickPlatform ? storedPlatform : platformProp;
+    const platform = platformProp ?? storedPlatform;
+    const setPlatform = onPlatformChange ?? setStoredPlatform;
     const { recent, add, remove, clear } = useRecentSearches();
 
     const detected = detectQuery(value);
@@ -128,29 +132,6 @@ export function SmartBox({ defaultValue = '', size = 'lg', platform: platformPro
 
     return (
         <form action={CONTENT_LAB_EXPLORE_ROUTE} onSubmit={submit} className={cn('flex min-w-0 flex-col gap-2', className)}>
-            {pickPlatform ? (
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted-foreground text-xs font-medium">Search on</span>
-                    <SegmentedSwitch
-                        aria-label="Search on"
-                        value={platform}
-                        onValueChange={setStoredPlatform}
-                        options={CONTENT_LAB_PLATFORM_FILTERS.map((filter) => ({
-                            value: filter.value,
-                            label: filter.label,
-                            icon:
-                                filter.value === 'both' ? (
-                                    <span className="flex -space-x-1">
-                                        <PlatformIcon platform="youtube" className="size-4" />
-                                        <PlatformIcon platform="instagram" className="size-4" />
-                                    </span>
-                                ) : (
-                                    <PlatformIcon platform={filter.value} />
-                                ),
-                        }))}
-                    />
-                </div>
-            ) : null}
             {platform !== 'both' ? <input type="hidden" name="platform" value={platform} /> : null}
             <Command
                 shouldFilter={false}
@@ -165,12 +146,15 @@ export function SmartBox({ defaultValue = '', size = 'lg', platform: platformPro
                             <div
                                 ref={anchor}
                                 className={cn(
-                                    'border-input dark:bg-input/30 focus-within:border-ring focus-within:ring-ring/50 bg-background flex min-w-0 flex-1 items-center gap-2 rounded-md border px-3 shadow-xs transition-[color,box-shadow] focus-within:ring-[3px]',
-                                    size === 'lg' ? 'h-12' : 'h-9',
+                                    'border-input dark:bg-input/30 focus-within:border-ring focus-within:ring-ring/50 bg-background flex min-w-0 flex-1 items-center rounded-lg border shadow-xs transition-[color,box-shadow] focus-within:ring-[3px]',
+                                    size === 'lg' ? 'h-12 shadow-sm' : 'h-10',
                                 )}
                             >
-                                <SearchIcon className="text-muted-foreground size-4 shrink-0" aria-hidden />
+                                <SourcePicker value={platform} onValueChange={setPlatform} />
+                                <span className="bg-border h-6 w-px shrink-0" aria-hidden />
+                                <SearchIcon className="text-muted-foreground mr-2 ml-3 size-4 shrink-0" aria-hidden />
                                 <CommandPrimitive.Input
+                                    ref={input}
                                     name="q"
                                     value={value}
                                     onValueChange={setValue}
@@ -192,9 +176,9 @@ export function SmartBox({ defaultValue = '', size = 'lg', platform: platformPro
                                     maxLength={500}
                                     aria-label="Topic, link or @creator"
                                     aria-describedby={hintId}
-                                    placeholder="protein breakfast · youtube.com/watch?v=… · @creator"
+                                    placeholder="A topic, niche, reel link or @creator"
                                     className={cn(
-                                        'placeholder:text-muted-foreground w-0 min-w-0 flex-1 bg-transparent outline-hidden',
+                                        'placeholder:text-muted-foreground w-0 min-w-0 flex-1 bg-transparent pr-3 outline-hidden',
                                         size === 'lg' ? 'text-base' : 'text-base md:text-sm',
                                     )}
                                 />
@@ -203,7 +187,7 @@ export function SmartBox({ defaultValue = '', size = 'lg', platform: platformPro
                                         type="button"
                                         onClick={() => setValue('')}
                                         onMouseDown={(event) => event.preventDefault()}
-                                        className="text-muted-foreground hover:text-foreground shrink-0"
+                                        className="text-muted-foreground hover:text-foreground mr-3 shrink-0"
                                         aria-label="Clear"
                                     >
                                         <XIcon className="size-4" />
@@ -214,7 +198,7 @@ export function SmartBox({ defaultValue = '', size = 'lg', platform: platformPro
                         <Button
                             type="submit"
                             size={size === 'lg' ? 'lg' : 'default'}
-                            className={cn(size === 'lg' && 'h-12')}
+                            className={cn(size === 'lg' ? 'h-12 px-5' : 'h-10')}
                             disabled={!!detected && !href}
                         >
                             <SearchIcon /> Go
@@ -319,30 +303,36 @@ export function SmartBox({ defaultValue = '', size = 'lg', platform: platformPro
                     </PopoverContent>
                 </Popover>
             </Command>
-            <p id={hintId} aria-live="polite" className="text-muted-foreground text-sm">
-                {!detected ? (
-                    <>
-                        Try:{' '}
-                        {CONTENT_LAB_SMART_BOX_EXAMPLES.map((example, index) => (
-                            <span key={example}>
-                                {index > 0 ? (index === CONTENT_LAB_SMART_BOX_EXAMPLES.length - 1 ? ' or ' : ', ') : null}
-                                <button
-                                    type="button"
-                                    onClick={() => setValue(example)}
-                                    className="text-foreground font-medium break-all underline-offset-2 hover:underline"
-                                >
-                                    {example}
-                                </button>
-                            </span>
-                        ))}
-                    </>
-                ) : detected.kind === 'unsupported' ? (
+            {size === 'lg' && !detected ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-muted-foreground mr-1 text-sm">Try</span>
+                    {CONTENT_LAB_SMART_BOX_EXAMPLES.map((example) => {
+                        const Icon = RECENT_ICON[example.kind];
+                        return (
+                            <button
+                                key={example.value}
+                                type="button"
+                                onClick={() => {
+                                    setValue(example.value);
+                                    input.current?.focus();
+                                }}
+                                className="bg-muted hover:bg-primary/10 hover:text-primary inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors"
+                            >
+                                <Icon className="size-3.5 shrink-0 opacity-60" aria-hidden />
+                                <span className="truncate">{exampleText(example.value)}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            ) : null}
+            <p id={hintId} aria-live="polite" className="text-muted-foreground text-sm empty:hidden">
+                {detected?.kind === 'unsupported' ? (
                     <span className="text-destructive">{CONTENT_LAB_ERROR_MESSAGES.UNSUPPORTED_URL}</span>
-                ) : (
+                ) : detected && size === 'lg' ? (
                     <>
                         Looks like a <b className="text-foreground">{detected.kind}</b> → {CONTENT_LAB_SMART_BOX_HINTS[detected.kind]}
                     </>
-                )}
+                ) : null}
             </p>
         </form>
     );

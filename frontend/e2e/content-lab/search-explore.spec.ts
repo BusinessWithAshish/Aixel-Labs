@@ -15,6 +15,7 @@ import {
     mockContentLab,
     ok,
     SMART_BOX,
+    toggleSource,
     trackAborted,
     VIEWPORTS,
     waitForSmartBox,
@@ -61,21 +62,26 @@ for (const { name, use } of VIEWPORTS) {
             await expectNoHorizontalOverflow(page);
         });
 
-        test('platform and country re-run the search and stay in the URL', async ({ page }) => {
+        test('sources and country re-run the search and stay in the URL; the search bar stays in view', async ({ page }) => {
             const explore = await mockContentLab(page, 'EXPLORE', ok(exploreResponse()));
             await page.goto(TOPIC_URL);
             await expect(page.getByTestId('content-lab-post-card')).toHaveCount(3);
             await waitForSmartBox(page);
 
-            await page.getByRole('radiogroup', { name: 'Platforms' }).getByRole('radio', { name: 'YouTube', exact: true }).click();
+            await toggleSource(page, 'Instagram');
             await expect.poll(() => explore.requests.at(-1)?.platforms).toEqual(['youtube']);
             await expect(page).toHaveURL(/platform=youtube/);
+            await expect(page.getByRole('button', { name: 'Sources: YouTube' })).toBeVisible();
 
             await page.getByRole('combobox', { name: 'Country' }).click();
             await page.getByRole('option', { name: 'United States' }).click();
             await expect.poll(() => explore.requests.at(-1)?.country).toBe('US');
             await expect(page).toHaveURL(/country=US/);
             await expectNoHorizontalOverflow(page);
+
+            await page.locator('#page-children-container').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+            await expect(page.locator(SMART_BOX)).toBeInViewport();
+            await expect(page.locator(SMART_BOX)).toHaveValue('protein breakfast');
         });
 
         test('a newer search cancels the one in flight', async ({ page }) => {
@@ -87,7 +93,7 @@ for (const { name, use } of VIEWPORTS) {
             await expect(page.getByText('Finding posts that are doing better than usual…')).toBeVisible();
             await waitForSmartBox(page);
 
-            await page.getByRole('radiogroup', { name: 'Platforms' }).getByRole('radio', { name: 'YouTube', exact: true }).click();
+            await toggleSource(page, 'Instagram');
             await expect(page.getByTestId('content-lab-post-card')).toHaveCount(1);
             expect(explore.requests.at(-1)?.platforms).toEqual(['youtube']);
             // Dev mode's strict effects may abort one more; every hung request must have been aborted.

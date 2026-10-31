@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
-import { CONTENT_LAB_DEFAULT_COUNTRY, CONTENT_LAB_PLATFORMS } from '@aixellabs/backend/content-lab/constants';
+import { CONTENT_LAB_DEFAULT_COUNTRY } from '@aixellabs/backend/content-lab/constants';
 import type {
     CONTENT_LAB_CREATOR_RESPONSE,
     CONTENT_LAB_EXPLORE_RESPONSE,
@@ -13,7 +13,7 @@ import { contentLabApi } from '@/helpers/content-lab-api';
 import type { ContentLabPlatformFilter } from '../../../_constants';
 import { usePostActions } from '../../_hooks/use-post-actions';
 import { addRecentSearch } from '../../_hooks/use-recent-searches';
-import { exploreHref, recentSearchOf } from '../../_utils/smart-box';
+import { exploreHref, platformsOf, recentSearchOf } from '../../_utils/smart-box';
 
 export type ExplorePageData = {
     /** Topic mode. */
@@ -52,9 +52,6 @@ export const EXPLORE_SORTS = [
     { value: 'newest', label: 'Newest' },
 ] as const;
 export type ExploreSort = (typeof EXPLORE_SORTS)[number]['value'];
-
-const platformsOf = (filter: ContentLabPlatformFilter): ContentLabPlatform[] =>
-    filter === 'both' ? [...CONTENT_LAB_PLATFORMS] : [filter];
 
 const byMultiple = (a: CONTENT_LAB_POST, b: CONTENT_LAB_POST) => (b.multiple ?? -1) - (a.multiple ?? -1);
 const time = (post: CONTENT_LAB_POST) => (post.publishedAt ? Date.parse(post.publishedAt) || 0 : 0);

@@ -1,3 +1,4 @@
+import { CONTENT_LAB_PLATFORMS } from '@aixellabs/backend/content-lab/constants';
 import type { CONTENT_LAB_POST, ContentLabPlatform } from '@aixellabs/backend/content-lab/types';
 import { CONTENT_LAB_EXPLORE_ROUTE, contentLabPostRoute } from '@/config/app-config';
 import type { ContentLabPlatformFilter } from '../../_constants';
@@ -83,6 +84,14 @@ export function exploreHref(params: { q?: string; creator?: string; platform?: s
     const qs = search.toString();
     return qs ? `${CONTENT_LAB_EXPLORE_ROUTE}?${qs}` : CONTENT_LAB_EXPLORE_ROUTE;
 }
+
+/** The platforms a filter searches. */
+export const platformsOf = (filter: ContentLabPlatformFilter): ContentLabPlatform[] =>
+    filter === 'both' ? [...CONTENT_LAB_PLATFORMS] : [filter];
+
+/** The filter for a set of platforms; all of them (or none) is `both`. */
+export const filterOf = (platforms: readonly ContentLabPlatform[]): ContentLabPlatformFilter =>
+    platforms.length === 1 ? platforms[0] : 'both';
 
 /** `?platform=` for a filter: none for both. */
 export const platformParam = (platform: ContentLabPlatformFilter | null | undefined) => (platform && platform !== 'both' ? platform : undefined);

@@ -8,55 +8,21 @@ import {
     type ContentLabWriteFormat,
 } from '@aixellabs/backend/db/types';
 
-/** What the Search box takes, each with what it gives back. Topic examples run a search when clicked. */
-export const CONTENT_LAB_QUERY_KINDS = [
-    {
-        kind: 'topic',
-        title: 'A topic, niche or keyword',
-        examples: ['protein breakfast', 'skincare for men', 'Pune cafes'],
-        gives: "Posts that got far more views than their creator's usual, on YouTube and Instagram, and why.",
-    },
-    {
-        kind: 'link',
-        title: 'A YouTube or Instagram link',
-        examples: ['youtu.be/…', 'instagram.com/reel/…'],
-        gives: 'That post broken down: hook, structure, CTA and thumbnail, ready to write your own version.',
-    },
-    {
-        kind: 'creator',
-        title: 'A creator',
-        examples: ['@hostelkitchen'],
-        gives: 'Their posts that beat their own usual, so you see what works for them.',
-    },
-] as const;
+/** The sources a search can run on, each with what it brings back (the picker in the search bar). */
+export const CONTENT_LAB_SOURCES = [
+    { platform: 'youtube', label: 'YouTube', gives: 'Videos and Shorts' },
+    { platform: 'instagram', label: 'Instagram', gives: 'Reels and posts' },
+] as const satisfies readonly { platform: ContentLabPlatform; label: string; gives: string }[];
 
-/** Why use this when YouTube Studio / Instagram insights exist: the short version, for the side card. */
+/** Why use this when YouTube Studio / Instagram Insights exist: the comparison band on Search home. */
 export const CONTENT_LAB_VS_STUDIO = [
-    { label: 'Whose posts', studio: 'Only yours', lab: "Anyone's" },
-    { label: 'When', studio: 'After you post', lab: 'Before you post' },
-    { label: 'You get', studio: 'Charts', lab: 'Why it worked + drafts' },
+    { label: 'Whose posts', studio: 'Only yours', lab: "Anyone's, from creators in your niche" },
+    { label: 'When it helps', studio: 'After you post', lab: 'Before you make the next one' },
+    { label: 'What it tells you', studio: 'How your post did', lab: 'Why their post did far better than usual' },
+    { label: 'What you leave with', studio: 'Charts', lab: 'Hooks, scripts and captions to post' },
 ] as const;
 
-/**
- * The worked example on Search home: one topic, a winner on each platform, the pattern they share
- * and that hook rewritten per platform. Illustrative (labelled "Example"), not live data.
- */
-export const CONTENT_LAB_HOME_EXAMPLE = {
-    query: 'protein breakfast',
-    country: 'India',
-    youtube: { title: 'I ate a 30g protein breakfast for 30 days', multiple: '12x', creator: '@fitwithriya' },
-    instagram: { title: '30g protein. 5 minutes. No eggs.', multiple: '8x', creator: '@hostelkitchen' },
-    pattern: 'A number and a result in the first words',
-    evidence: '14 of 18 winners put a number in the title',
-    hooks: [
-        { platform: 'youtube', label: 'YouTube title', text: 'I tried 5 high-protein breakfasts (30g each)' },
-        { platform: 'instagram', label: 'Reel, first line', text: '30g protein before 9am. No eggs.' },
-        { platform: 'linkedin', label: 'LinkedIn opener', text: 'One number fixed my 3pm slump: 30g.' },
-        { platform: 'x', label: 'X thread opener', text: '30g of protein at breakfast changed my workday. The 5-minute version 🧵' },
-    ],
-} as const;
-
-/** Explore's platform toggle (`?platform=`). */
+/** Which sources a search runs on (`?platform=`); `both` is every source. */
 export const CONTENT_LAB_PLATFORM_FILTERS = [
     { value: 'both', label: 'All' },
     { value: 'youtube', label: 'YouTube' },
@@ -80,7 +46,13 @@ export const CONTENT_LAB_SMART_BOX_HINTS = {
     creator: 'shows their posts that did better than usual',
 } as const;
 
-export const CONTENT_LAB_SMART_BOX_EXAMPLES = ['protein breakfast', 'https://youtu.be/abc123xyz', '@hostelkitchen'] as const;
+/** "Try" chips under the box on Search home: one of each kind it takes. */
+export const CONTENT_LAB_SMART_BOX_EXAMPLES = [
+    { kind: 'topic', value: 'protein breakfast' },
+    { kind: 'topic', value: 'skincare for men' },
+    { kind: 'link', value: 'https://youtu.be/abc123xyz' },
+    { kind: 'creator', value: '@hostelkitchen' },
+] as const;
 
 // ─── Boards ──────────────────────────────────────────────────────────────────
 

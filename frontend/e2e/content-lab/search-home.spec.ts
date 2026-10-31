@@ -1,7 +1,7 @@
 import { CONTENT_LAB_ERROR_MESSAGES } from '@aixellabs/backend/content-lab/constants';
 import { CONTENT_LAB_SUB_MODULES } from '@aixellabs/backend/db/types';
 import { CONTENT_LAB_CHECK_ROUTE, CONTENT_LAB_EXPLORE_ROUTE, SubModuleUrls } from '@/config/app-config';
-import { CONTENT_LAB_HOME_EXAMPLE, CONTENT_LAB_QUERY_KINDS } from '@/app/(protected)/content-lab/_constants';
+import { CONTENT_LAB_VS_STUDIO } from '@/app/(protected)/content-lab/_constants';
 import { expect, test } from '../support/fixtures';
 import { USER_STORAGE_STATE } from '../support/env';
 import { E2E_USER } from '../support/users';
@@ -15,6 +15,7 @@ import {
     mockContentLab,
     ok,
     SMART_BOX,
+    toggleSource,
     VIEWPORTS,
     waitForSmartBox,
 } from './support-search';
@@ -31,22 +32,22 @@ for (const { name, use } of VIEWPORTS) {
             await waitForSmartBox(page);
         });
 
-        test('shows the box, what it takes, the worked example and the vs Studio card without sideways scroll', async ({ page }) => {
+        test('shows the search bar with its sources, the check-an-idea link and what you get vs Studio, without sideways scroll', async ({ page }) => {
             await expect(page.getByRole('heading', { name: "Find what's already working. Then make your version." })).toBeVisible();
-            for (const kind of CONTENT_LAB_QUERY_KINDS) await expect(page.getByRole('heading', { name: kind.title })).toBeVisible();
-            await expect(page.getByRole('heading', { name: 'One search, every platform' })).toBeVisible();
-            for (const hook of CONTENT_LAB_HOME_EXAMPLE.hooks) await expect(page.getByText(hook.text, { exact: true })).toBeVisible();
-            await expect(page.getByRole('heading', { name: 'Already have YouTube Studio and Instagram insights?' })).toBeVisible();
-            await expect(page.getByRole('link', { name: /Already have an idea\? Check it/ })).toHaveAttribute('href', CONTENT_LAB_CHECK_ROUTE);
+            await expect(page.getByRole('button', { name: 'Sources: YouTube and Instagram' })).toBeVisible();
             await expect(page.getByRole('button', { name: 'Go', exact: true })).toBeVisible();
+            await expect(page.getByRole('link', { name: /Have an idea already\?\s*Check it before you post/ })).toHaveAttribute('href', CONTENT_LAB_CHECK_ROUTE);
+            const vsStudio = page.getByRole('region', { name: "What you get here that Studio and Insights don't show" });
+            await expect(vsStudio).toBeVisible();
+            // A table from tablets up, a list on phones: whichever is showing has every point.
+            for (const row of CONTENT_LAB_VS_STUDIO) await expect(vsStudio.getByText(row.lab).locator('visible=true')).toHaveCount(1);
             await expectNoHorizontalOverflow(page);
         });
 
-        test('a topic example runs that search', async ({ page }) => {
-            await mockContentLab(page, 'EXPLORE', ok(exploreResponse()));
-            await page.getByRole('link', { name: 'skincare for men' }).click();
-            await page.waitForURL(`**${CONTENT_LAB_EXPLORE_ROUTE}?q=skincare+for+men`);
-            await expect(page.getByRole('heading', { name: `What's working in "skincare for men"` })).toBeVisible();
+        test('a link example fills the box and previews what it would do', async ({ page }) => {
+            await page.getByRole('button', { name: 'youtu.be/abc123xyz' }).click();
+            await expect(page.locator(SMART_BOX)).toHaveValue('https://youtu.be/abc123xyz');
+            await expect(page.getByTestId('smart-box-list').getByRole('option', { name: /Break down this video/ })).toBeVisible();
         });
 
         test('a topic says so and opens what is working', async ({ page }) => {
@@ -97,10 +98,13 @@ for (const { name, use } of VIEWPORTS) {
             await expect(page.locator(SMART_BOX)).toHaveValue('@hostelkitchen');
         });
 
-        test('a platform picked before searching runs the search there and is remembered', async ({ page }) => {
+        test('sources picked before searching run the search there and are remembered; the last one cannot be unticked', async ({ page }) => {
             const explore = await mockContentLab(page, 'EXPLORE', ok(exploreResponse({ platforms: ['instagram'] })));
-            const picker = page.getByRole('radiogroup', { name: 'Search on' });
-            await picker.getByRole('radio', { name: 'Instagram', exact: true }).click();
+            await toggleSource(page, 'YouTube');
+            await expect(page.getByRole('button', { name: 'Sources: Instagram' })).toBeVisible();
+            await page.getByRole('button', { name: 'Sources: Instagram' }).click();
+            await expect(page.getByRole('menuitemcheckbox', { name: /^Instagram/ })).toBeDisabled();
+            await page.keyboard.press('Escape');
             await page.locator(SMART_BOX).fill('protein breakfast');
             await page.getByRole('button', { name: 'Go', exact: true }).click();
 
@@ -109,7 +113,7 @@ for (const { name, use } of VIEWPORTS) {
 
             await page.goto(SEARCH_URL);
             await waitForSmartBox(page);
-            await expect(page.getByRole('radiogroup', { name: 'Search on' }).getByRole('radio', { name: 'Instagram', exact: true })).toBeChecked();
+            await expect(page.getByRole('button', { name: 'Sources: Instagram' })).toBeVisible();
         });
 
         test('typing a topic lists its score, what people also search and matching creators', async ({ page }) => {
