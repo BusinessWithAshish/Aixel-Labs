@@ -75,7 +75,7 @@ export async function getOrCreateMembership(
             .find({ firebaseUid: identity.uid })
             .project<{ isAdmin: boolean }>({ isAdmin: 1 })
             .toArray();
-        const decision = decideCreateMembership(existingForUid);
+        const decision = decideCreateMembership(existingForUid, tenantName);
 
         if (!decision.allow) {
             return { ok: false, error: authErrorMessage(decision.reason), status: 403 };

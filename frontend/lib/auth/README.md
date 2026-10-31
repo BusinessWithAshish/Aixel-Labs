@@ -68,8 +68,9 @@ Find membership (uid, thisTenant)
   → found → update profile (fingerprint stays sticky from signup)
   → missing → if fingerprint already used by another uid on tenant → DEVICE_IN_USE_ON_TENANT
        → else list memberships for uid
-       → none → create (isAdmin: false, moduleAccess: tenant.defaultModuleAccess, deviceFingerprint)
        → any isAdmin → create (isAdmin: true, moduleAccess: {}, deviceFingerprint)
+       → admin-only tenant (`test`) → deny ADMIN_ONLY_TENANT
+       → none → create (isAdmin: false, moduleAccess: tenant.defaultModuleAccess, deviceFingerprint)
        → only non-admin elsewhere → deny WRONG_TENANT
 ```
 
@@ -96,12 +97,14 @@ Session never falls back to another tenant’s membership. New tenant host requi
 | S2 | Same uid, same tenant | Update profile (fingerprint unchanged) |
 | S3 | Admin uid, new tenant | Create admin membership + fingerprint |
 | S4 | Non-admin uid, other tenant | Deny |
+| S5 | Non-admin uid, admin-only tenant (`test`) | Deny (`ADMIN_ONLY_TENANT`) |
 
 ### Server / Mongo (`AUTH_ERRORS`)
 
 | Key | When |
 | --- | --- |
 | `WRONG_TENANT` | Non-admin already belongs to another org |
+| `ADMIN_ONLY_TENANT` | Non-admin signs up on an admin-only tenant (`test`) |
 | `DEVICE_IN_USE_ON_TENANT` | Another account already signed up from this device on this tenant |
 | `EMAIL_IN_USE_ON_TENANT` | Mongo unique email conflict on this tenant |
 | `EMAIL_REQUIRED` / `MISSING_DEVICE_FINGERPRINT` / `MISSING_ID_TOKEN` | Missing Google email, fingerprint, or id token |

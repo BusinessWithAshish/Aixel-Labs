@@ -17,6 +17,7 @@ export const AUTH_ERRORS = {
     EMAIL_REQUIRED: 'A Google account with an email address is required.',
     WRONG_TENANT:
         'This account belongs to a different organization. Sign in from that organization, or ask an admin for access.',
+    ADMIN_ONLY_TENANT: 'This is a private workspace for Aixel Labs admins. Sign in from your own organization’s link instead.',
     DEVICE_IN_USE_ON_TENANT:
         'Looks like you already signed up from this device with a different account. Sign in with that account instead.',
     EMAIL_IN_USE_ON_TENANT: 'This email is already used by another account on this organization.',
