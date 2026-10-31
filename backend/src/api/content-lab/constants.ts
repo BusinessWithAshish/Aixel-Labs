@@ -140,6 +140,7 @@ export const CONTENT_LAB_FIELD_DESCRIPTIONS = {
   keywordQuery: "Topic to score, e.g. 'protein breakfast'",
   keywordTrend:
     "Also read 12 months of YouTube search interest (Google Trends, ~2 s); false returns only what people search (~0.3 s)",
+  keywordPlatforms: "Platforms to score the topic on: youtube, instagram (default both)",
 } as const;
 
 /**
@@ -163,6 +164,20 @@ export const CONTENT_LAB_KEYWORD = {
   rising: 5,
   trendTimeoutMs: 6_000,
   labels: { strong: 65, okay: 40 },
+  /**
+   * Instagram (guest hashtag search, ~0.5 s): `depth` from the posts on the
+   * topic's own hashtag (or the biggest one starting with it) on a log scale,
+   * `minPosts` = 0 and `maxPosts` = full marks; `breadth` from how many
+   * related hashtags have `busyPosts` or more (`busyTags` = full marks).
+   */
+  instagram: {
+    weights: { depth: 0.8, breadth: 0.2 },
+    minPosts: 100,
+    maxPosts: 10_000_000,
+    busyPosts: 1_000,
+    busyTags: 10,
+    hashtags: 8,
+  },
 } as const;
 
 /**

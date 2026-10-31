@@ -200,6 +200,9 @@ export type ContentLabBoardTemplate = {
     id: ContentLabBoardTemplateId;
     title: string;
     description: string;
+    /** What you fill in, and what you leave with: shown on the template's card. */
+    takes: string;
+    gives: string;
     nodes: ContentLabBoardNode[];
     edges: ContentLabBoardEdge[];
 };
@@ -224,6 +227,8 @@ export const CONTENT_LAB_BOARD_TEMPLATES: ContentLabBoardTemplate[] = [
     {
         id: 'reel-from-outliers',
         title: 'Reel from top posts',
+        takes: 'A topic',
+        gives: 'A reel script',
         description: 'Top reels in a niche → hooks → your reel script.',
         nodes: [
             node('voice', ContentLabNodeKind.VOICE, 0, 0),
@@ -239,6 +244,8 @@ export const CONTENT_LAB_BOARD_TEMPLATES: ContentLabBoardTemplate[] = [
     {
         id: 'youtube-script',
         title: 'YouTube script',
+        takes: 'A topic',
+        gives: 'A full YouTube script',
         description: 'Your tone + top videos on the topic → a full script.',
         nodes: [
             node('voice', ContentLabNodeKind.VOICE, 0, 0),
@@ -253,6 +260,8 @@ export const CONTENT_LAB_BOARD_TEMPLATES: ContentLabBoardTemplate[] = [
     {
         id: 'repurpose',
         title: 'Repurpose one video',
+        takes: 'One video link',
+        gives: '4 posts, one per platform',
         description: 'One long video → Reel, carousel, LinkedIn post and X thread.',
         nodes: [
             node('voice', ContentLabNodeKind.VOICE, 0, 0),
@@ -277,6 +286,8 @@ export const CONTENT_LAB_BOARD_TEMPLATES: ContentLabBoardTemplate[] = [
     {
         id: 'why-it-won',
         title: 'Why did it win?',
+        takes: 'Any post link',
+        gives: 'What to copy, and your version',
         description: 'Any post vs its creator’s usual → what to copy.',
         nodes: [
             node('post', ContentLabNodeKind.POST, 0, 1, { url: '' }),
@@ -291,6 +302,8 @@ export const CONTENT_LAB_BOARD_TEMPLATES: ContentLabBoardTemplate[] = [
     {
         id: 'ad-hooks',
         title: 'Ad hooks from competitors',
+        takes: 'A topic',
+        gives: 'An ad script',
         description: 'Competitor ads on a topic → their hooks → your ad script.',
         nodes: [
             node('voice', ContentLabNodeKind.VOICE, 0, 0),

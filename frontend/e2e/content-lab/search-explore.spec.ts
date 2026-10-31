@@ -13,6 +13,7 @@ import {
     keywordResponse,
     makePost,
     mockContentLab,
+    openInsights,
     ok,
     SMART_BOX,
     toggleSource,
@@ -31,11 +32,13 @@ for (const { name, use } of VIEWPORTS) {
             await enableContentLab(context);
         });
 
-        test('shows what the winners share, a plain summary and cards per platform; a failed platform says so', async ({ page }) => {
+        test('shows what the winners share in the insights, both platforms in one list, and a failed platform says so', async ({ page }) => {
             await mockContentLab(page, 'EXPLORE', ok(exploreResponse({ errors: { instagram: 'Instagram blocked the search for now' } })));
             await page.goto(TOPIC_URL);
+            await expect(page.getByTestId('content-lab-post-card')).toHaveCount(3);
 
-            const glance = page.getByRole('region', { name: 'What the top posts have in common' });
+            const insights = await openInsights(page);
+            const glance = insights.getByRole('region', { name: 'What the top posts have in common' });
             await expect(glance).toBeVisible();
             await expect(glance.getByText('5 of 6', { exact: true })).toBeVisible();
             const stats = glance.getByTestId('explore-stats');
@@ -43,13 +46,14 @@ for (const { name, use } of VIEWPORTS) {
             await expect(stats).toContainText('Biggest jump14x usual@fitwithriya');
             await expect(stats).toContainText('Most views2.1M@hostelkitchen');
             await expect(stats).toContainText('Works bestVideosReels');
+            if ((page.viewportSize()?.width ?? 0) < 1024) await page.keyboard.press('Escape');
             await expect(page.getByRole('alert').filter({ hasText: 'Instagram results did not load' })).toContainText('Instagram blocked the search for now');
 
+            // One list: the videos, then a row of reels under them.
             const cards = page.getByTestId('content-lab-post-card');
             await expect(cards).toHaveCount(3);
-            // Phones show one platform at a time (the other lane is hidden), so count by attribute, not by visible region.
             await expect(cards.and(page.locator('[data-platform="youtube"]'))).toHaveCount(2);
-            await expect(cards.and(page.locator('[data-platform="instagram"]'))).toHaveCount(1);
+            await expect(page.getByTestId('reel-shelf').getByTestId('content-lab-post-card')).toHaveCount(1);
             const first = cards.first();
             await expect(first).toHaveAttribute('data-platform', 'youtube');
             await expect(first).toContainText('14x usual');
@@ -58,8 +62,15 @@ for (const { name, use } of VIEWPORTS) {
             await expect(first).toContainText('11:42');
             await expect(first).toContainText('Why: Number + 30-day test');
             await expect(first.getByRole('button', { name: 'Watch creator' })).toBeVisible();
-            await expect(first.getByRole('button', { name: 'Use on a board' })).toBeVisible();
+            await expect(first.getByRole('button', { name: 'Write my version' })).toBeVisible();
             await expectNoHorizontalOverflow(page);
+
+            // Only one platform's posts, without a new search.
+            await page.getByRole('radio', { name: 'Instagram (1)' }).click();
+            await expect(cards).toHaveCount(1);
+            await expect(cards.first()).toHaveAttribute('data-platform', 'instagram');
+            await page.getByRole('radio', { name: 'All (3)' }).click();
+            await expect(cards).toHaveCount(3);
         });
 
         test('sources and country re-run the search and stay in the URL; the search bar stays in view', async ({ page }) => {
@@ -169,23 +180,28 @@ for (const { name, use } of VIEWPORTS) {
             expect(creator.requests[0]).toMatchObject({ platform: 'youtube', handle: 'fitwithriya', country: 'IN' });
         });
 
-        test('says how strong the topic is while the posts load; a related search runs that search', async ({ page }) => {
+        test('says how strong the topic is on each platform while the posts load; a related search runs that search', async ({ page }) => {
             await mockContentLab(page, 'EXPLORE', 'hang');
             const keyword = await mockContentLab(page, 'KEYWORD', ok(keywordResponse()));
             await page.goto(TOPIC_URL);
-
-            const card = page.getByTestId('keyword-card');
-            await expect(card.getByTestId('keyword-card-score')).toHaveText('81');
-            await expect(card).toContainText('Strong topic');
-            await expect(card).toContainText('Lots of people search this on YouTube, and interest is up 23% in the last 4 weeks.');
-            await expect(card).toContainText('Rising +23%');
             await expect(page.getByText('Finding posts that are doing better than usual…')).toBeVisible();
-            // The search box above asks nothing until it is used: the card's request is the only one.
+
+            const insights = await openInsights(page);
+            const card = insights.getByTestId('keyword-card');
+            await expect(card.getByRole('img', { name: 'Score 71 of 100: YouTube 81, Instagram 60' })).toBeVisible();
+            await expect(card.getByTestId('keyword-card-score')).toContainText('Strong topic');
+            await expect(card).toContainText('Strong on YouTube, decent on Instagram.');
+            await expect(card.locator('[data-testid="platform-score"][data-platform="youtube"]')).toContainText(
+                'Lots of people search this on YouTube, and interest is up 23% in the last 4 weeks.',
+            );
+            await expect(card.locator('[data-testid="platform-score"][data-platform="instagram"]')).toContainText('60');
+            await expect(card).toContainText('Rising +23%');
+            // The search box above asks nothing until it is used: the panel's request is the only kind.
             expect(keyword.requests.map((body) => body.trend)).not.toContain(false);
-            expect(keyword.requests.at(-1)).toMatchObject({ query: 'protein breakfast', country: 'IN', trend: true });
+            expect(keyword.requests.at(-1)).toMatchObject({ query: 'protein breakfast', country: 'IN', trend: true, platforms: ['youtube', 'instagram'] });
 
             await mockContentLab(page, 'EXPLORE', ok(exploreResponse({ query: 'high protein poha' })));
-            await card.getByRole('link', { name: 'high protein poha' }).click();
+            await insights.getByRole('link', { name: 'high protein poha' }).click();
             await page.waitForURL(`**${CONTENT_LAB_EXPLORE_ROUTE}?q=high+protein+poha`);
             await expect(page.getByRole('heading', { name: `What's working in "high protein poha"` })).toBeVisible();
             await expectNoHorizontalOverflow(page);
@@ -200,10 +216,10 @@ for (const { name, use } of VIEWPORTS) {
             await expect(card).not.toContainText('Why: 14 times');
         });
 
-        test('use on a board starts a board seeded with the post', async ({ page }) => {
+        test('write my version starts a board seeded with the post', async ({ page }) => {
             await mockContentLab(page, 'EXPLORE', ok(exploreResponse()));
             await page.goto(TOPIC_URL);
-            await page.getByTestId('content-lab-post-card').first().getByRole('button', { name: 'Use on a board' }).click();
+            await page.getByTestId('content-lab-post-card').first().getByRole('button', { name: 'Write my version' }).click();
             await page.waitForURL(/\/content-lab\/boards\/[a-f0-9]{24}$/);
         });
     });

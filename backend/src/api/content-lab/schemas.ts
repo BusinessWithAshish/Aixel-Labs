@@ -33,6 +33,7 @@ export const CONTENT_LAB_KEYWORD_REQUEST_SCHEMA = z.object({
   query: z.string().trim().min(1).max(CONTENT_LAB_LIMITS.maxQueryChars).describe(D.keywordQuery),
   country: COUNTRY_SCHEMA,
   trend: z.boolean().default(true).describe(D.keywordTrend),
+  platforms: z.array(PLATFORM_SCHEMA).min(1).default([...CONTENT_LAB_PLATFORMS]).describe(D.keywordPlatforms),
 });
 
 export const CONTENT_LAB_BREAKDOWN_REQUEST_SCHEMA = z.object({

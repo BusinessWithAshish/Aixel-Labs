@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { EyeIcon, FlameIcon, LayoutDashboardIcon, Loader2Icon, PlayIcon } from 'lucide-react';
+import { EyeIcon, FlameIcon, Loader2Icon, PenLineIcon, PlayIcon } from 'lucide-react';
 import type { CONTENT_LAB_POST } from '@aixellabs/backend/content-lab/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -72,19 +72,19 @@ type PostCardProps = {
     onBoard: () => void;
 };
 
-/** Watch the creator / start a board; icon-only on the narrow portrait card. */
+/** Watch the creator / write my version (a board seeded with the post); icon-only on the narrow portrait card. */
 function CardActions({ post, busy, onWatch, onBoard, compact }: PostCardProps & { compact?: boolean }) {
     const watching = busy === `watch:${post.creator.id}`;
     const boarding = busy === `board:${post.url}`;
     return (
-        <div className={cn('flex gap-1 border-t px-2 py-1.5', compact && 'justify-around px-1 py-1')}>
+        <div className={cn('flex justify-between gap-1 border-t px-2 py-1.5', compact && 'justify-around px-1 py-1')}>
             <Button variant="ghost" size={compact ? 'icon' : 'sm'} onClick={onWatch} disabled={!!busy} aria-label="Watch creator" title="Watch creator">
                 {watching ? <Loader2Icon className="animate-spin" /> : <EyeIcon />}
-                {compact ? null : 'Watch creator'}
+                {compact ? null : 'Watch'}
             </Button>
-            <Button variant="ghost" size={compact ? 'icon' : 'sm'} onClick={onBoard} disabled={!!busy} aria-label="Use on a board" title="Use on a board">
-                {boarding ? <Loader2Icon className="animate-spin" /> : <LayoutDashboardIcon />}
-                {compact ? null : 'Use on a board'}
+            <Button variant="ghost" size={compact ? 'icon' : 'sm'} onClick={onBoard} disabled={!!busy} aria-label="Write my version" title="Write my version: a board that turns this post into your own">
+                {boarding ? <Loader2Icon className="animate-spin" /> : <PenLineIcon />}
+                {compact ? null : 'Write my version'}
             </Button>
         </div>
     );

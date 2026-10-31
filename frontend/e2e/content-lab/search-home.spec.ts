@@ -116,10 +116,20 @@ for (const { name, use } of VIEWPORTS) {
             await expect(page.getByRole('button', { name: 'Sources: Instagram' })).toBeVisible();
         });
 
-        test('typing a topic lists its score, what people also search and matching creators', async ({ page }) => {
-            const keyword = await mockContentLab(page, 'KEYWORD', (body) =>
-                ok(body.trend ? keywordResponse() : keywordResponse({ trend: null, score: 70, summary: 'Lots of people search this on YouTube.' })),
-            );
+        test('typing a topic scores it per source, lists searches, hashtags and real-sized accounts, and follows the sources', async ({ page }) => {
+            // Answers for the sources asked for, like the backend.
+            const keyword = await mockContentLab(page, 'KEYWORD', (body) => {
+                const full = keywordResponse(body.trend ? {} : { trend: null });
+                const only = body.platforms as string[];
+                const platforms = full.platforms.filter((part) => only.includes(part.platform));
+                return ok({
+                    ...full,
+                    platforms,
+                    searches: only.includes('youtube') ? full.searches : [],
+                    hashtags: only.includes('instagram') ? full.hashtags : [],
+                    ...(platforms.length === 1 ? { score: platforms[0].score, label: platforms[0].label, summary: platforms[0].summary } : {}),
+                });
+            });
             await mockContentLab(page, 'SUGGEST', (body) =>
                 ok({
                     query: body.query,
@@ -127,24 +137,40 @@ for (const { name, use } of VIEWPORTS) {
                     creators:
                         body.platform === 'youtube'
                             ? [{ platform: 'youtube', handle: '@fitwithriya', name: 'Fit with Riya', avatarUrl: null, followers: 410_000, verified: true, url: null }]
-                            : [],
+                            : [{ platform: 'instagram', handle: '@proteinbreakfast', name: 'Tiny account', avatarUrl: null, followers: 7, verified: false, url: null }],
                 }),
             );
             const explore = await mockContentLab(page, 'EXPLORE', ok(exploreResponse()));
             await page.locator(SMART_BOX).fill('protein breakfast');
 
             const list = page.getByTestId('smart-box-list');
-            await expect(list.getByTestId('keyword-score')).toContainText('81');
-            await expect(list.getByTestId('keyword-score')).toContainText('Strong topic');
-            await expect(list).toContainText('Lots of people search this on YouTube, and interest is up 23% in the last 4 weeks.');
+            const topic = list.getByTestId('smart-box-topic');
+            await expect(topic).toContainText('Topic');
+            await expect(topic.getByRole('img', { name: 'Score 71 of 100: YouTube 81, Instagram 60' })).toBeVisible();
+            await expect(topic.locator('[data-testid="platform-score"][data-platform="youtube"]')).toContainText('81');
+            await expect(topic.locator('[data-testid="platform-score"][data-platform="youtube"]')).toContainText('Strong');
+            await expect(topic.locator('[data-testid="platform-score"][data-platform="instagram"]')).toContainText('#proteinbreakfast is on 254K Instagram posts.');
             await expect(list.getByRole('option', { name: 'protein breakfast for weight loss' })).toBeVisible();
+            // The topic's own hashtag is the first row already; the others are listed with their post counts.
+            await expect(list.getByTestId('smart-box-hashtag')).toHaveCount(1);
+            await expect(list.getByTestId('smart-box-hashtag')).toContainText('proteinbreakfastideas');
+            await expect(list.getByTestId('smart-box-hashtag')).toContainText('2.5K posts');
+            // A 7-follower account named like the topic is noise.
+            await expect(list.getByTestId('smart-box-creator')).toHaveCount(1);
             await expect(list.getByTestId('smart-box-creator')).toContainText('Fit with Riya');
             await expectNoHorizontalOverflow(page);
+            expect(keyword.requests.some((body) => body.trend === false)).toBe(true);
+
+            await toggleSource(page, 'Instagram');
+            await page.locator(SMART_BOX).click();
+            await expect(topic.getByRole('img', { name: 'Score 81 of 100' })).toBeVisible();
+            await expect(topic.getByTestId('platform-score')).toHaveCount(1);
+            await expect(list.getByTestId('smart-box-hashtag')).toHaveCount(0);
+            expect(keyword.requests.at(-1)?.platforms).toEqual(['youtube']);
 
             await list.getByRole('option', { name: 'protein breakfast for weight loss' }).click();
-            await page.waitForURL(`**${CONTENT_LAB_EXPLORE_ROUTE}?q=protein+breakfast+for+weight+loss`);
+            await page.waitForURL(`**${CONTENT_LAB_EXPLORE_ROUTE}?q=protein+breakfast+for+weight+loss&platform=youtube`);
             await expect.poll(() => explore.requests.at(-1)?.query).toBe('protein breakfast for weight loss');
-            expect(keyword.requests.some((body) => body.trend === false)).toBe(true);
         });
 
         test('picking a creator from the list shows their standouts on that platform', async ({ page }) => {

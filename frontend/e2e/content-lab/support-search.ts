@@ -51,6 +51,14 @@ export async function toggleSource(page: Page, label: 'YouTube' | 'Instagram'): 
     await expect(page.getByRole('menu')).toHaveCount(0);
 }
 
+/** Results page insights: beside the posts from `lg` (1024px), behind the "Insights" button in a bottom sheet below it. */
+export async function openInsights(page: Page) {
+    if ((page.viewportSize()?.width ?? 0) >= 1024) return page.getByTestId('explore-insights');
+    await waitForSmartBox(page);
+    await page.getByTestId('insights-summary').getByRole('button', { name: 'Insights' }).click();
+    return page.getByRole('dialog', { name: 'Insights' });
+}
+
 type BffKey = keyof typeof CONTENT_LAB_API_ROUTES;
 type Reply = { status?: number; body: { success: boolean; data?: unknown; error?: string } } | 'hang';
 
@@ -166,9 +174,17 @@ export function keywordResponse(overrides: Partial<CONTENT_LAB_KEYWORD_RESPONSE>
             direction: 'rising',
             rising: ['high protein poha'],
         },
-        score: 81,
+        hashtags: [
+            { name: 'proteinbreakfast', posts: 253_695 },
+            { name: 'proteinbreakfastideas', posts: 2_459 },
+        ],
+        platforms: [
+            { platform: 'youtube', score: 81, label: 'strong', summary: 'Lots of people search this on YouTube, and interest is up 23% in the last 4 weeks.' },
+            { platform: 'instagram', score: 60, label: 'okay', summary: '#proteinbreakfast is on 254K Instagram posts.' },
+        ],
+        score: 71,
         label: 'strong',
-        summary: 'Lots of people search this on YouTube, and interest is up 23% in the last 4 weeks.',
+        summary: 'Strong on YouTube, decent on Instagram.',
         ...overrides,
     };
 }

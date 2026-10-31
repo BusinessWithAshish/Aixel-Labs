@@ -25,8 +25,12 @@ import {
   postMetric,
   rankPosts,
   rankScore,
+  combineKeyword,
+  hashtagOf,
+  scoreInstagramTopic,
   scoreKeyword,
   summarizeTrend,
+  topicHashtags,
   relativeTimeToIso,
   scorePost,
   takeWithPlatformShare,
@@ -261,6 +265,26 @@ assert.equal(scoreKeyword(0, null).score, 0);
 assert.equal(scoreKeyword(0, null).label, "weak");
 assert.equal(scoreKeyword(14, null).score, 70); // demand alone is capped
 assert.equal(scoreKeyword(4, null).summary, "Some people search this on YouTube.");
+const igTags = [
+  { name: "proteinbreakfastideas", posts: 2_459 },
+  { name: "proteinbreakfast", posts: 253_695 },
+  { name: "proteinbreakfasts", posts: 1_989 },
+];
+assert.equal(hashtagOf("Protein breakfast!"), "proteinbreakfast");
+assert.equal(topicHashtags("protein breakfast", igTags)[0].name, "proteinbreakfast"); // its own hashtag first
+const igStrong = scoreInstagramTopic("protein breakfast", topicHashtags("protein breakfast", igTags));
+assert.equal(igStrong.platform, "instagram");
+assert.equal(igStrong.score, 60); // 0.8 × log-scaled 254K posts + 0.2 × 3 busy tags of 10
+assert.equal(igStrong.summary, "#proteinbreakfast is on 254K Instagram posts.");
+const igTiny = scoreInstagramTopic("claude motion", [{ name: "claudemotion", posts: 454 }]);
+assert.equal(igTiny.label, "weak");
+assert.equal(igTiny.summary, "Only 454 Instagram posts use #claudemotion.");
+assert.equal(scoreInstagramTopic("zzqx", []).score, 0);
+assert.equal(scoreInstagramTopic("zzqx", []).summary, "No Instagram hashtag matches this yet.");
+const both = combineKeyword([strongKeyword, igTiny]);
+assert.equal(both.score, Math.round((strongKeyword.score + igTiny.score) / 2));
+assert.equal(both.summary, "Strong on YouTube, weak on Instagram.");
+assert.equal(combineKeyword([igTiny]).summary, igTiny.summary);
 
 // ─── topic ──────────────────────────────────────────────────────────────────
 assert.deepEqual(topicWords("skincare for men"), ["skincare", "men"]);

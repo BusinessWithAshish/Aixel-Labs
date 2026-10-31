@@ -12,6 +12,7 @@ import type {
 import { contentLabApi } from '@/helpers/content-lab-api';
 import type { ContentLabPlatformFilter } from '../../../_constants';
 import { usePostActions } from '../../_hooks/use-post-actions';
+import { useKeyword } from '../../_hooks/use-keyword';
 import { addRecentSearch } from '../../_hooks/use-recent-searches';
 import { exploreHref, platformsOf, recentSearchOf } from '../../_utils/smart-box';
 
@@ -52,6 +53,9 @@ export const EXPLORE_SORTS = [
     { value: 'newest', label: 'Newest' },
 ] as const;
 export type ExploreSort = (typeof EXPLORE_SORTS)[number]['value'];
+
+/** Which loaded posts are shown: all of them mixed, or one platform's (no new search). */
+export type ExploreView = 'all' | ContentLabPlatform;
 
 const byMultiple = (a: CONTENT_LAB_POST, b: CONTENT_LAB_POST) => (b.multiple ?? -1) - (a.multiple ?? -1);
 const time = (post: CONTENT_LAB_POST) => (post.publishedAt ? Date.parse(post.publishedAt) || 0 : 0);
@@ -118,8 +122,11 @@ export function useExplorePage(data: ExplorePageData) {
     const [state, setState] = useState<ExploreLoadState>({ status: query || creator ? 'loading' : 'idle' });
     const [more, setMore] = useState<ExploreMoreState>({ status: 'idle' });
     const [sort, setSort] = useState<ExploreSort>('jump');
+    const [view, setView] = useState<ExploreView>('all');
     const moreController = useRef<AbortController | null>(null);
     const actions = usePostActions(country);
+    // How strong the topic is on each source: shared by the side panel and the phone summary.
+    const keyword = useKeyword(query, country, { trend: true, delayMs: 0, platforms: platformsOf(platform) });
 
     // Every search lands in "Recent searches", however it was opened (box, chip, shared link).
     useEffect(() => {
@@ -201,6 +208,7 @@ export function useExplorePage(data: ExplorePageData) {
 
     const setPlatform = (next: ContentLabPlatformFilter) => {
         setPlatformState(next);
+        setView('all');
         syncUrl({ platform: next, country });
     };
     const setCountry = (next: string) => {
@@ -220,6 +228,9 @@ export function useExplorePage(data: ExplorePageData) {
         retry: () => setAttempt((n) => n + 1),
         sort,
         setSort,
+        view,
+        setView,
+        keyword,
         hasMore: !!nextCursor,
         more,
         loadMore,

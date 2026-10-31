@@ -180,19 +180,38 @@ export type CONTENT_LAB_KEYWORD_TREND = {
   rising: string[];
 };
 
+export type ContentLabKeywordLabel = "strong" | "okay" | "weak";
+
+/** An Instagram hashtag and how many posts use it. */
+export type CONTENT_LAB_HASHTAG = { name: string; posts: number | null };
+
+/** How strong a topic is on one platform: 0-100, its label and the plain sentence behind it. */
+export type CONTENT_LAB_KEYWORD_PLATFORM = {
+  platform: ContentLabPlatform;
+  score: number;
+  label: ContentLabKeywordLabel;
+  summary: string;
+};
+
 /**
- * How much a topic is searched and where it is heading. `score` (0-100) and
- * `summary` (one plain sentence) use whatever loaded: with `trend` null (not
- * asked for, too few searches to chart, or Trends did not answer) the score
- * comes from `searches` alone.
+ * How much a topic is searched / posted about and where it is heading, per
+ * platform asked for. YouTube: autocomplete (`searches`) and, with `trend`,
+ * 12 months of search interest; with `trend` null (not asked for, too few
+ * searches to chart, or Trends did not answer) its score comes from
+ * `searches` alone. Instagram: the hashtags that start with it and their post
+ * counts. `score` / `label` / `summary` are for all of them together.
  */
 export type CONTENT_LAB_KEYWORD_RESPONSE = {
   query: string;
   country: string;
-  /** What people type on YouTube that starts with this, most common first (the query itself left out). */
+  /** What people type on YouTube that starts with this, most common first (the query itself left out); empty without YouTube. */
   searches: string[];
   trend: CONTENT_LAB_KEYWORD_TREND | null;
+  /** Instagram hashtags for the topic: its own one first when it exists, then the most-used; empty without Instagram. */
+  hashtags: CONTENT_LAB_HASHTAG[];
+  /** One per platform asked for, in `CONTENT_LAB_PLATFORMS` order. */
+  platforms: CONTENT_LAB_KEYWORD_PLATFORM[];
   score: number;
-  label: "strong" | "okay" | "weak";
+  label: ContentLabKeywordLabel;
   summary: string;
 };

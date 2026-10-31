@@ -150,8 +150,14 @@ next page. Posts older than
   direct). Exact handles only: a display name like "Ranveer Singh" finds
   `@ranveersingh` only if that handle exists.
 
-**keyword**: how much a topic is searched on YouTube and where it is heading,
-for the search box (`trend: false`, ~0.3 s) and the results page (`trend: true`).
+**keyword**: how strong a topic is on each platform in `platforms` (default
+both), for the search box (`trend: false`, ~0.5 s) and the results page
+(`trend: true`, ~1 s). All lookups run in parallel. `platforms` holds one
+`{ platform, score, label, summary }` per platform asked for; the top-level
+`score` is their average and `summary` says it per platform ("Strong on
+YouTube, weak on Instagram."), or is the one platform's sentence.
+
+YouTube:
 - `searches`: YouTube's autocomplete for the topic (the endpoint the YouTube
   search box uses, `fetchYoutubeSuggest`), the topic itself left out. Cached
   10 min.
@@ -166,6 +172,27 @@ for the search box (`trend: false`, ~0.3 s) and the results page (`trend: true`)
   +50% → 1). Without a trend: demand alone, at most 70. `label`: strong 65+,
   okay 40+, else weak. `summary` says it in one sentence ("Lots of people
   search this on YouTube, and interest is up 23% in the last 4 weeks.").
+
+Instagram:
+- `hashtags`: the guest tag search (`searchInstagramHashtags`, direct, ~0.5 s,
+  cached 10 min): hashtags starting with the topic and their post counts, the
+  topic's own one (`proteinbreakfast`) first when it exists, then the
+  most-used, 8 at most. Empty when the search fails. Counts for very big tags
+  look capped, and a one-word topic sometimes leaves its own tag out.
+- `score` (`CONTENT_LAB_KEYWORD.instagram`) = 0.8 × depth (posts on the own
+  tag, or the most-used one starting with it, on a log scale: 100 posts → 0,
+  10M → 1) + 0.2 × breadth (related tags with 1K+ posts, 10 = full). Same
+  labels as YouTube. `summary`: "#proteinbreakfast is on 254K Instagram
+  posts.", "Only 454 Instagram posts use #claudemotion." or "No Instagram
+  hashtag matches this yet."
+
+X and LinkedIn are not scored or searched (checked 2026-10-31). X: keyword
+search is login-walled for guests; the official API is pay-per-use (about
+$5 per 1,000 posts read, $0.005 per `counts/recent` call) and would give both
+posts with views and a 7-day volume. LinkedIn: no API searches other people's
+posts, views are private to the author (only reactions and comments are
+public), and hashtag follower counts are gone, so there is nothing to rank by
+views or to score volume with.
 
 **breakdown**: YouTube watch / youtu.be / shorts URL, or Instagram `/p/`, `/reel/`, `/tv/`.
 - YouTube: video details + transcript intelligence (hook = first sentences of the
