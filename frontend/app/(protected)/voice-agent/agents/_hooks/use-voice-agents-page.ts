@@ -6,8 +6,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { type VoiceAgent, VoiceAgentCallType, type VoiceProvider } from '@aixellabs/backend/db/types';
-import { createVoiceAgent } from '@/app/actions/voice-agent-actions';
-import type { VoiceNumberListItem } from '@/app/actions/voice-number-actions';
+import { createVoiceAgent, deleteVoiceAgent } from '@/app/actions/voice-agent-actions';
+import { unlinkAgentNumber, type VoiceNumberListItem } from '@/app/actions/voice-number-actions';
 import { DEFAULT_VOICE_AGENT_NAME } from '@/helpers/voice-agent-defaults';
 import { numberKind } from '@/helpers/voice-agent-channels';
 import { voiceAgentUrl } from '@/helpers/voice-routes';
@@ -51,6 +51,9 @@ export function useVoiceAgentsPage({ agents: allAgents, numbers, whatsapp, show 
     /** Set once the agent exists, while the browser goes to it. */
     const [opening, setOpening] = useState(false);
     const creating = createForm.formState.isSubmitting || opening;
+    /** The agent whose delete is being confirmed from its card. */
+    const [toDelete, setToDelete] = useState<VoiceAgent | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const placesOf = (agentId: string): AgentPlace[] =>
         numbers.flatMap((n): AgentPlace[] => {
@@ -76,6 +79,41 @@ export function useVoiceAgentsPage({ agents: allAgents, numbers, whatsapp, show 
         [creating],
     );
 
+    const onDeleteOpenChange = useCallback(
+        (open: boolean) => {
+            if (!open && !deleting) setToDelete(null);
+        },
+        [deleting],
+    );
+
+    const confirmDelete = async () => {
+        const id = toDelete?._id;
+        if (!id) return;
+        setDeleting(true);
+        // The server keeps an agent that still answers a number (its callers would ring into nothing): let those go first.
+        for (const n of numbers.filter((n) => n.inboundAgentId === id)) {
+            const response = await unlinkAgentNumber(id, n._id ?? '').catch((e: Error) => ({
+                success: false as const,
+                error: e.message,
+            }));
+            if (!response.success) {
+                setDeleting(false);
+                toast.error(response.error ?? 'Could not change the number');
+                router.refresh();
+                return;
+            }
+        }
+        const response = await deleteVoiceAgent(id);
+        setDeleting(false);
+        if (!response.success) {
+            toast.error(response.error ?? 'Could not delete the agent');
+            return;
+        }
+        setToDelete(null);
+        toast.success('Agent deleted');
+        router.refresh();
+    };
+
     const createAgent = createForm.handleSubmit(async (values) => {
         const response = await createVoiceAgent(values);
         if (!response.success || !response.data?._id) {
@@ -99,6 +137,12 @@ export function useVoiceAgentsPage({ agents: allAgents, numbers, whatsapp, show 
         createForm,
         creating,
         createAgent,
+        toDelete,
+        toDeleteOnNumbers: !!toDelete && placesOf(toDelete._id ?? '').length > 0,
+        askDelete: setToDelete,
+        onDeleteOpenChange,
+        deleting,
+        confirmDelete,
     };
 }
 

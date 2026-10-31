@@ -499,8 +499,9 @@ test('trying the agent (browser, Linphone, phone) needs a number; the playground
         'href',
         '#agent-numbers-phone',
     );
-    // Until it is on a number, it is tried in the WhatsApp test chat, which needs none.
-    await expect(page.getByRole('button', { name: 'Chat with this agent' })).toBeEnabled();
+    // On no number it is neither a phone nor a WhatsApp agent yet: the call waits for a number.
+    await expect(page.getByRole('button', { name: 'Call this agent' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Test on WhatsApp' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Start call' })).toBeEnabled();
     await expect(page.getByTestId('playground-no-number')).toHaveText(
         'Runs in your browser straight to the model: no phone number needed.',
@@ -582,6 +583,45 @@ test('Delete sits beside Save; deleting lets its numbers go, and keeps it when a
     const byPhone = (phone: string) => numbers.find((n) => n.phoneNumber === phone);
     expect(byPhone('+15550100012')?.inboundAgentId?.toString()).toBe(keepId);
     expect(byPhone('+15550100012')?.outboundAgentId).toBeNull();
+});
+
+test('a card deletes its agent from the list, the same way the agent page does', async ({ page, db }) => {
+    const agentId = await db.insertVoiceAgent(E2E_USER, { name: 'Short lived' });
+    const keepId = await db.insertVoiceAgent(E2E_USER, { name: 'Keeper' });
+    const both = await seedNumber(db, '+15550100011');
+    const mixed = await seedNumber(db, '+15550100012');
+    await db.setVoiceNumberAgents(both, { inboundAgentId: agentId });
+    await db.setVoiceNumberAgents(mixed, { inboundAgentId: keepId, outboundAgentId: agentId });
+    await page.goto(VOICE_AGENTS_URL);
+    await waitForHydration(page, '#header');
+    const deleteButton = page.getByRole('button', { name: 'Delete Short lived' });
+
+    // Cancel keeps it.
+    await deleteButton.click();
+    const dialog = page.getByRole('dialog', { name: 'Delete Short lived?' });
+    await expect(dialog).toContainText('its numbers are let go');
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page).toHaveURL(new RegExp(`${VOICE_AGENTS_URL}$`));
+
+    // It answers +15550100011, whose provider account cannot be reached here: nothing is deleted.
+    await deleteButton.click();
+    await dialog.getByRole('button', { name: 'Delete agent' }).click();
+    await expect(page.locator('[data-sonner-toast][data-type="error"]').first()).toBeVisible();
+    expect((await db.getVoiceAgents(E2E_USER)).map((a) => a.name)).toEqual(['Short lived', 'Keeper']);
+
+    // Once nothing answers with it, it goes, and it is taken off the numbers it called from.
+    await db.setVoiceNumberAgents(both, { inboundAgentId: null });
+    await page.reload();
+    await waitForHydration(page, '#header');
+    await deleteButton.click();
+    await dialog.getByRole('button', { name: 'Delete agent' }).click();
+    await expect(page.getByText('Agent deleted')).toBeVisible();
+    await expect(page.getByTestId('voice-agent-card')).toHaveCount(1);
+    await expect(page.getByTestId('voice-agent-card')).toContainText('Keeper');
+    expect((await db.getVoiceAgents(E2E_USER)).map((a) => a.name)).toEqual(['Keeper']);
+    const numbers = await db.getVoiceNumbers(E2E_USER);
+    expect(numbers.find((n) => n.phoneNumber === '+15550100012')?.outboundAgentId).toBeNull();
 });
 
 test("another user's agent is not found", async ({ page, db }) => {

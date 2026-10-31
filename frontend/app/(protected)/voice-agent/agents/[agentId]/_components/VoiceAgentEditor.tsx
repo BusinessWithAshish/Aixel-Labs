@@ -6,7 +6,6 @@ import { Controller, FormProvider } from 'react-hook-form';
 import { Loader2, Save } from 'lucide-react';
 import { VOICE_AGENT_LIMITS, VoiceAgentCallType } from '@aixellabs/backend/db/types';
 import { StringControlledField } from '@/components/common/zod-form-builder/ZodControlledFields';
-import { ConfirmDialog } from '@/components/wrappers/ConfirmDialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ import { usePage } from '@/contexts/PageStore';
 import { VOICE_AGENT_CALL_TYPES, VOICE_AGENT_PROMPT_TEMPLATES } from '@/helpers/voice-agent-defaults';
 import { servesPhone } from '@/helpers/voice-agent-channels';
 import { AgentMoreMenu } from './AgentMoreMenu';
+import { DeleteAgentDialog } from '../../_components/DeleteAgentDialog';
 import { VoiceAgentCallTypeBadge } from '../../_components/VoiceAgentCallTypeBadge';
 import { VoiceAgentCallTypeSelect } from '../../_components/VoiceAgentCallTypeSelect';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
@@ -280,18 +280,13 @@ export function VoiceAgentEditor() {
                     </DialogContent>
                 </Dialog>
 
-                <ConfirmDialog
+                <DeleteAgentDialog
                     open={deleteOpen}
                     onOpenChange={setDeleteOpen}
-                    title={`Delete ${saved.name}?`}
-                    alertMessage={
-                        onNumbers
-                            ? 'The agent is removed and its numbers are let go: they stop answering or calling with it until you pick another agent. Past call logs stay.'
-                            : 'The agent is removed. Past call logs stay.'
-                    }
-                    confirmText="Delete agent"
+                    name={saved.name}
+                    onNumbers={onNumbers}
                     onConfirm={() => void confirmDelete()}
-                    isLoading={deleting}
+                    deleting={deleting}
                 />
             </Card>
             <VoiceAgentToolsCard />

@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/common/EmptyState';
-import { FilterSelect, FilterToolbar } from '@/components/common/FilterToolbar';
+import { FilterSelect, FilterSheet } from '@/components/common/FilterToolbar';
 import { AgentFilter } from '@/components/common/voice-agent/AgentFilter';
 import { CurrencySelect } from '@/components/common/voice-agent/CurrencySelect';
 import { usePage } from '@/contexts/PageStore';
@@ -28,7 +28,7 @@ function CallSearch() {
     return (
         <form
             role="search"
-            className="relative col-span-2 sm:w-56"
+            className="relative min-w-0 flex-1 sm:max-w-sm"
             onSubmit={(event) => {
                 event.preventDefault();
                 setFilter('q', text.trim());
@@ -76,8 +76,20 @@ function OptionalFilter<V extends string>({
 }
 
 export function CallLogsContent() {
-    const { calls, agents, filters, filtersSet, setFilter, clearFilters, agentFilterName, limit, loadError, filtering } =
-        usePage<UseCallLogsPageReturn>();
+    const {
+        calls,
+        agents,
+        filters,
+        filtersSet,
+        sheetFiltersSet,
+        setFilter,
+        clearFilters,
+        resetSheetFilters,
+        agentFilterName,
+        limit,
+        loadError,
+        filtering,
+    } = usePage<UseCallLogsPageReturn>();
     const set =
         <K extends keyof CallLogFilters>(key: K) =>
         (value: CallLogFilters[K]) =>
@@ -85,42 +97,44 @@ export function CallLogsContent() {
 
     return (
         <>
-            <FilterToolbar label="Filter calls" onClear={filtersSet ? clearFilters : null}>
+            <div className="flex items-center gap-2">
                 <CallSearch />
-                <AgentFilter
-                    id="call-logs-agent-filter"
-                    agents={agents}
-                    agentId={filters.agent}
-                    includeDeleted={filters.deleted}
-                    disabled={filtering}
-                    onAgentChange={set('agent')}
-                    onIncludeDeletedChange={set('deleted')}
-                />
-                <OptionalFilter
-                    label="Type"
-                    allLabel="All types"
-                    options={KIND_OPTIONS}
-                    value={filters.kind}
-                    onChange={set('kind')}
-                    disabled={filtering}
-                />
-                <OptionalFilter
-                    label="Outcome"
-                    allLabel="All outcomes"
-                    options={SUCCESS_OPTIONS}
-                    value={filters.success}
-                    onChange={set('success')}
-                    disabled={filtering}
-                />
-                <FilterSelect
-                    label="Period"
-                    value={filters.range}
-                    options={CALL_RANGES}
-                    disabled={filtering}
-                    onChange={(value) => setFilter('range', value as VoiceCallRange)}
-                />
-                <CurrencySelect />
-            </FilterToolbar>
+                <FilterSheet label="Filter calls" active={sheetFiltersSet} onReset={resetSheetFilters}>
+                    <AgentFilter
+                        id="call-logs-agent-filter"
+                        agents={agents}
+                        agentId={filters.agent}
+                        includeDeleted={filters.deleted}
+                        disabled={filtering}
+                        onAgentChange={set('agent')}
+                        onIncludeDeletedChange={set('deleted')}
+                    />
+                    <OptionalFilter
+                        label="Type"
+                        allLabel="All types"
+                        options={KIND_OPTIONS}
+                        value={filters.kind}
+                        onChange={set('kind')}
+                        disabled={filtering}
+                    />
+                    <OptionalFilter
+                        label="Outcome"
+                        allLabel="All outcomes"
+                        options={SUCCESS_OPTIONS}
+                        value={filters.success}
+                        onChange={set('success')}
+                        disabled={filtering}
+                    />
+                    <FilterSelect
+                        label="Period"
+                        value={filters.range}
+                        options={CALL_RANGES}
+                        disabled={filtering}
+                        onChange={(value) => setFilter('range', value as VoiceCallRange)}
+                    />
+                    <CurrencySelect />
+                </FilterSheet>
+            </div>
 
             <CallCostSummary />
 

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { MessageCircle, PhoneCall } from 'lucide-react';
-import { VoiceAgentCallType, VoiceAgentChannel } from '@aixellabs/backend/db/types';
 import { DisabledReason } from '@/components/wrappers/DisabledReason';
 import { Button } from '@/components/ui/button';
 import { blockerText } from '@/helpers/voice-call-readiness';
@@ -11,14 +10,16 @@ import { usePage } from '@/contexts/PageStore';
 import type { UseVoiceAgentEditorPageReturn } from '../_hooks/use-voice-agent-editor-page';
 import { AgentTestDialog, agentTestTitle } from './AgentTestDialog';
 
-/** The card's one way to try the agent: in the browser, on Linphone or on the owner's phone. Green, like a call. */
+/**
+ * The card's one way to try the agent, as its numbers make it: on a phone line, a call (in the browser, on Linphone or on
+ * the owner's phone); only on WhatsApp, the test chat; on both, both. On no number yet it is a call that waits for one
+ * (the playground below tries it without). Green, like a call.
+ */
 export function AgentTestButton() {
-    const { agentId, saved, channel, whatsapp, phoneBlockers, callBlockers } = usePage<UseVoiceAgentEditorPageReturn>();
+    const { agentId, saved, channel, phoneBlockers, callBlockers } = usePage<UseVoiceAgentEditorPageReturn>();
     const [open, setOpen] = useState(false);
-    // An agent only on WhatsApp is tried in the test chat, which goes straight to the engine: no number needed. So is
-    // one that answers and is on no number yet, when the owner has WhatsApp (phone tests need a number).
-    const tried = channel ?? (whatsapp && saved.callType === VoiceAgentCallType.INBOUND ? VoiceAgentChannel.WHATSAPP : null);
-    const phone = servesPhone(tried);
+    // The test chat goes straight to the engine; the phone tests need the agent on a phone line.
+    const phone = servesPhone(channel);
     const blockers = phone ? phoneBlockers : callBlockers;
     const Icon = phone ? PhoneCall : MessageCircle;
     return (
@@ -32,7 +33,7 @@ export function AgentTestButton() {
                     disabled={blockers.length > 0}
                 >
                     <Icon className="size-4" />
-                    {phone ? agentTestTitle(saved.name, saved.callType) : 'Chat with this agent'}
+                    {phone ? agentTestTitle(saved.name, saved.callType) : 'Test on WhatsApp'}
                 </Button>
             </DisabledReason>
             <AgentTestDialog
@@ -41,7 +42,7 @@ export function AgentTestButton() {
                 agentId={agentId}
                 agentName={saved.name}
                 callType={saved.callType}
-                channel={tried}
+                channel={channel}
             />
         </>
     );

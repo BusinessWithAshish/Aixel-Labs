@@ -113,18 +113,20 @@ test('a WhatsApp number connects with the customer’s own Meta app on Numbers: 
     expect(chatDesk.channel).toBeUndefined();
 
     await waitForHydration(page, '#agent-prompt');
-    // Where it works: a phone number and a WhatsApp number; on neither yet, it is tried in the test chat.
+    // Where it works: a phone number and a WhatsApp number; on neither yet, it cannot be tried as either.
     await expect(page.getByTestId('agent-numbers')).toBeVisible();
     await expect(page.getByTestId('call-blockers').first()).toContainText('It is not on a phone or WhatsApp number yet.');
     await page
         .locator('#agent-prompt')
         .fill('You are Maya, the front desk of Sunrise Dental. Answer in one short sentence.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Chat with this agent' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Call this agent' })).toBeDisabled();
     const select = page.getByTestId('agent-whatsapp-numbers-select');
     await select.click();
     await page.getByRole('option', { name: /347/ }).click();
     await expect(select).toContainText('347');
+    // Only on WhatsApp now: it is tried in the test chat, which needs no phone line.
+    await expect(page.getByRole('button', { name: 'Test on WhatsApp' })).toBeEnabled();
 
     // Meta now sends the app's webhooks to the engine, the app is on the WhatsApp account, and calling was asked
     // for and refused (a new business is below the 2,000 limit): chats work, the row says why calls do not.

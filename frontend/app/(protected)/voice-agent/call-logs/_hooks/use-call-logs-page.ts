@@ -118,6 +118,11 @@ export function useCallLogsPage(data: CallLogsPageData) {
         agents: data.agents,
         filters,
         filtersSet: callLogFiltersQuery(filters) !== '',
+        /** How many of the sheet's filters are set (the search sits on the page, beside it). */
+        sheetFiltersSet: [filters.agent, filters.deleted, filters.kind, filters.success, filters.range !== 'all'].filter(
+            Boolean,
+        ).length,
+        resetSheetFilters: () => pushFilters({ ...NO_CALL_LOG_FILTERS, q: filters.q }),
         setFilter: <K extends keyof CallLogFilters>(key: K, value: CallLogFilters[K]) =>
             pushFilters({ ...filters, [key]: value }),
         clearFilters: () => pushFilters(NO_CALL_LOG_FILTERS),

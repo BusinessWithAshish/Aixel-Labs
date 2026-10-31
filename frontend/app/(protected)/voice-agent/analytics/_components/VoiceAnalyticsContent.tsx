@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { CurrencySelect } from '@/components/common/voice-agent/CurrencySelect';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AgentFilter } from '@/components/common/voice-agent/AgentFilter';
-import { FilterSelect, FilterToolbar } from '@/components/common/FilterToolbar';
+import { FilterSelect, FilterSheet } from '@/components/common/FilterToolbar';
 import { useDisplayCurrency } from '@/contexts/DisplayCurrency';
 import { usePage } from '@/contexts/PageStore';
 import { costPartLabel, formatMoney } from '@/helpers/voice-call-cost';
@@ -27,6 +27,7 @@ export function VoiceAnalyticsContent() {
         includeDeleted,
         range,
         rangeLabel,
+        agentFilterName,
         loadError,
         filtering,
         setAgentFilter,
@@ -40,25 +41,30 @@ export function VoiceAnalyticsContent() {
 
     return (
         <>
-            <FilterToolbar label="Filter analytics" onClear={filtersSet ? clearFilters : null}>
-                <AgentFilter
-                    id="analytics-agent"
-                    agents={agents}
-                    agentId={agentFilter}
-                    includeDeleted={includeDeleted}
-                    disabled={filtering}
-                    onAgentChange={setAgentFilter}
-                    onIncludeDeletedChange={setIncludeDeleted}
-                />
-                <FilterSelect
-                    label="Period"
-                    value={range}
-                    options={CALL_RANGES}
-                    disabled={filtering}
-                    onChange={(value) => setRange(value as VoiceCallRange)}
-                />
-                <CurrencySelect />
-            </FilterToolbar>
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-muted-foreground min-w-0 truncate text-sm" data-testid="analytics-showing">
+                    {rangeLabel} · {agentFilterName ?? (includeDeleted ? 'All agents, deleted too' : 'All agents')}
+                </p>
+                <FilterSheet label="Filter analytics" active={filtersSet} onReset={clearFilters}>
+                    <AgentFilter
+                        id="analytics-agent"
+                        agents={agents}
+                        agentId={agentFilter}
+                        includeDeleted={includeDeleted}
+                        disabled={filtering}
+                        onAgentChange={setAgentFilter}
+                        onIncludeDeletedChange={setIncludeDeleted}
+                    />
+                    <FilterSelect
+                        label="Period"
+                        value={range}
+                        options={CALL_RANGES}
+                        disabled={filtering}
+                        onChange={(value) => setRange(value as VoiceCallRange)}
+                    />
+                    <CurrencySelect />
+                </FilterSheet>
+            </div>
 
             {loadError ? (
                 <Alert variant="destructive">

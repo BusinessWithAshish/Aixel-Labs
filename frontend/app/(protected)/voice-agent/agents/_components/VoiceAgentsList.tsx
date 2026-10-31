@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { usePage } from '@/contexts/PageStore';
 import type { AgentFilter, UseVoiceAgentsPageReturn } from '../_hooks/use-voice-agents-page';
 import { CreateVoiceAgentDialog } from './CreateVoiceAgentDialog';
+import { DeleteAgentDialog } from './DeleteAgentDialog';
 import { VoiceAgentCard } from './VoiceAgentCard';
 
 const FILTERS: { value: AgentFilter; label: string; whatsapp?: boolean }[] = [
@@ -24,7 +25,20 @@ const EMPTY_FILTER: Record<AgentFilter, string> = {
 };
 
 export function VoiceAgentsList() {
-    const { total, agents, whatsapp, filter, setFilter, openCreate } = usePage<UseVoiceAgentsPageReturn>();
+    const {
+        total,
+        agents,
+        whatsapp,
+        filter,
+        setFilter,
+        openCreate,
+        toDelete,
+        toDeleteOnNumbers,
+        askDelete,
+        onDeleteOpenChange,
+        deleting,
+        confirmDelete,
+    } = usePage<UseVoiceAgentsPageReturn>();
     const newAgentButton = (
         <Button onClick={openCreate} data-testid="new-voice-agent">
             <Plus className="size-4" />
@@ -65,13 +79,26 @@ export function VoiceAgentsList() {
                     ) : (
                         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                             {agents.map(({ agent, places }) => (
-                                <VoiceAgentCard key={agent._id} agent={agent} places={places} />
+                                <VoiceAgentCard
+                                    key={agent._id}
+                                    agent={agent}
+                                    places={places}
+                                    onDelete={() => askDelete(agent)}
+                                />
                             ))}
                         </div>
                     )}
                 </>
             )}
             <CreateVoiceAgentDialog />
+            <DeleteAgentDialog
+                open={!!toDelete}
+                onOpenChange={onDeleteOpenChange}
+                name={toDelete?.name ?? ''}
+                onNumbers={toDeleteOnNumbers}
+                onConfirm={() => void confirmDelete()}
+                deleting={deleting}
+            />
         </>
     );
 }

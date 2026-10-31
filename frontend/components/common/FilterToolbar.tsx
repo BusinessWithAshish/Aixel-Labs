@@ -1,11 +1,25 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { createContext, useContext, useId, useState, type ReactNode } from 'react';
+import { ListFilter, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+
+/** Set inside a `FilterSheet`: each filter stands on its own line, full width, with its name above it. */
+const FilterStack = createContext(false);
 
 /**
  * A page's filters in one compact row (two columns on a phone), every control the same small height,
@@ -40,6 +54,58 @@ export function FilterToolbar({
     );
 }
 
+/**
+ * A page's filters in a side sheet, like the lead lists' filters: a "Filters" button (with how many are set) opens
+ * it, a change applies at once, "Reset filters" puts them back. Filters drive the URL; this only lays them out.
+ */
+export function FilterSheet({
+    label,
+    active,
+    onReset,
+    children,
+}: {
+    /** The button's name for screen readers ("Filter calls"). */
+    label: string;
+    /** How many filters are not at their default. */
+    active: number;
+    onReset: () => void;
+    children: ReactNode;
+}) {
+    const [open, setOpen] = useState(false);
+    return (
+        <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
+                <Button variant="outline" size="sm" aria-label={label} className="shrink-0">
+                    <ListFilter aria-hidden />
+                    Filters
+                    {active > 0 ? (
+                        <Badge className="h-4 min-w-4 rounded-full px-1 tabular-nums" aria-hidden>
+                            {active}
+                        </Badge>
+                    ) : null}
+                </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="flex flex-col gap-0 p-0 sm:max-w-sm">
+                <SheetHeader className="border-b p-4">
+                    <SheetTitle>Filters</SheetTitle>
+                    <SheetDescription>A change applies right away.</SheetDescription>
+                </SheetHeader>
+                <div role="group" aria-label={label} className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 py-5">
+                    <FilterStack.Provider value={true}>{children}</FilterStack.Provider>
+                </div>
+                <SheetFooter className="flex-row border-t p-4">
+                    <Button variant="outline" className="flex-1" disabled={active === 0} onClick={onReset}>
+                        Reset filters
+                    </Button>
+                    <Button className="flex-1" onClick={() => setOpen(false)}>
+                        Done
+                    </Button>
+                </SheetFooter>
+            </SheetContent>
+        </Sheet>
+    );
+}
+
 export type FilterOption = { value: string; label: string };
 
 /** One filter: a small select named `label` for screen readers; the picked option says what it shows ("All agents"). */
@@ -62,14 +128,17 @@ export function FilterSelect({
     className?: string;
     title?: string;
 }) {
-    return (
+    const stacked = useContext(FilterStack);
+    const fallbackId = useId();
+    const triggerId = id ?? fallbackId;
+    const select = (
         <Select value={value} disabled={disabled} onValueChange={onChange}>
             <SelectTrigger
-                id={id}
-                size="sm"
+                id={triggerId}
+                size={stacked ? 'default' : 'sm'}
                 aria-label={label}
                 title={title}
-                className={cn('w-full sm:w-auto sm:min-w-32', className)}
+                className={cn('w-full sm:w-auto sm:min-w-32', className, stacked && 'sm:w-full sm:min-w-0 sm:max-w-none')}
             >
                 <SelectValue />
             </SelectTrigger>
@@ -81,6 +150,13 @@ export function FilterSelect({
                 ))}
             </SelectContent>
         </Select>
+    );
+    if (!stacked) return select;
+    return (
+        <Field className="gap-2">
+            <FieldLabel htmlFor={triggerId}>{label}</FieldLabel>
+            {select}
+        </Field>
     );
 }
 

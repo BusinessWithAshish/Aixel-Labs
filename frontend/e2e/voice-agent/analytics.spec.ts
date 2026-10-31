@@ -11,7 +11,7 @@ import { SubModuleUrls } from '@/config/app-config';
 import { FeatureFlagKey } from '@/flags';
 import { expect, test } from '../support/fixtures';
 import { E2E_BASE_URL, E2E_FLAGS_SECRET, USER_STORAGE_STATE } from '../support/env';
-import { waitForHydration } from '../support/voice-agents';
+import { openFilters, waitForHydration } from '../support/voice-agents';
 import { E2E_USER } from '../support/users';
 
 const ANALYTICS_URL = SubModuleUrls[VOICE_AGENT_SUB_MODULES.CUSTOM_AGENT_ANALYTICS];
@@ -74,15 +74,19 @@ test('counts current agents only, unless deleted agents are included; every cost
     const stats = page.getByTestId('analytics-stats');
     await expect(stats).toContainText('1 of 1 calls');
     await expect(page.getByText('Call analysis', { exact: true })).toBeVisible();
+    const showing = page.getByTestId('analytics-showing');
 
+    await openFilters(page, 'Filter analytics');
     await page.getByRole('switch', { name: 'Show deleted agents' }).click();
     await expect(page).toHaveURL(/[?&]deleted=1/);
     await expect(stats).toContainText('1 of 2 calls');
     await expect(stats).toContainText('50%');
+    await expect(showing).toContainText('All agents, deleted too');
 
     // One agent picked: the switch has nothing to add.
     await page.getByRole('combobox', { name: 'Agent' }).click();
     await page.getByRole('option', { name: 'Sales', exact: true }).click();
     await expect(stats).toContainText('1 of 1 calls');
     await expect(page.getByRole('switch', { name: 'Show deleted agents' })).toBeDisabled();
+    await expect(showing).toContainText('Sales');
 });
