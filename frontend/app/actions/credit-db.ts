@@ -2,7 +2,10 @@ import 'server-only';
 
 import { getCollection, MongoCollections, MongoObjectId, type UserDoc } from '@aixellabs/backend/db';
 import {
-    DAILY_FREE_CREDITS,
+    creditsDayKey,
+    DAILY_LEAD_CAP,
+    DAILY_LIMIT_MESSAGE,
+    MONTHLY_FREE_CREDITS,
     getNextCreditsRefillAt,
     isCreditsRefillDue,
     normalizeCredits,
@@ -13,7 +16,7 @@ type RefillFields = Pick<UserDoc, '_id' | 'credits' | 'creditsRefilledAt'>;
 type RefilledBalance = { credits: number; refilledAt: Date };
 
 /**
- * Tops a member's balance back up to `DAILY_FREE_CREDITS` once per refill
+ * Tops a member's balance back up to `MONTHLY_FREE_CREDITS` once per refill
  * period, lazily — on the first balance read after it falls due, so no
  * scheduler is involved. Returns the balance after any refill and when that
  * refill happened.
@@ -34,7 +37,7 @@ async function refillCreditsIfDue(user: RefillFields): Promise<RefilledBalance> 
             _id: user._id,
             creditsRefilledAt: user.creditsRefilledAt ?? { $exists: false },
         },
-        { $set: { credits: Math.max(balance, DAILY_FREE_CREDITS), creditsRefilledAt: refilledAt } },
+        { $set: { credits: Math.max(balance, MONTHLY_FREE_CREDITS), creditsRefilledAt: refilledAt } },
         { returnDocument: 'after', projection: { credits: 1 } },
     );
     if (updated) return { credits: normalizeCredits(updated.credits), refilledAt };
@@ -49,25 +52,30 @@ export async function getUserCreditsState(userId: string | MongoObjectId): Promi
     const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
     const user = await usersCollection.findOne(
         { _id: oid },
-        { projection: { credits: 1, isAdmin: 1, creditsRefilledAt: 1 } },
+        { projection: { credits: 1, isAdmin: 1, creditsRefilledAt: 1, dailyCreditsUsed: 1, dailyCreditsDay: 1 } },
     );
     if (!user) {
         throw new Error('User not found');
     }
     if (user.isAdmin === true) {
-        return { credits: normalizeCredits(user.credits), exempt: true };
+        const credits = normalizeCredits(user.credits);
+        return { credits, spendable: credits, exempt: true };
     }
 
     const { credits, refilledAt } = await refillCreditsIfDue(user);
-    return { credits, exempt: false, refillsAt: getNextCreditsRefillAt(refilledAt) };
-}
-
-export async function getUserCredits(userId: string | MongoObjectId): Promise<number> {
-    return (await getUserCreditsState(userId)).credits;
+    const usedToday = user.dailyCreditsDay === creditsDayKey() ? normalizeCredits(user.dailyCreditsUsed) : 0;
+    const dailyRemaining = Math.max(0, DAILY_LEAD_CAP - usedToday);
+    return {
+        credits,
+        spendable: Math.min(credits, dailyRemaining),
+        dailyRemaining,
+        exempt: false,
+        refillsAt: getNextCreditsRefillAt(refilledAt),
+    };
 }
 
 /**
- * Atomically deducts `cost` credits when the user has enough balance.
+ * Atomically deducts `cost` credits when the user has enough balance and today's cap allows it.
  * Admins are never charged. Missing `credits` is treated as 0.
  */
 export async function assertAndDebitCredits(userId: string | MongoObjectId, cost: number): Promise<number> {
@@ -82,15 +90,31 @@ export async function assertAndDebitCredits(userId: string | MongoObjectId, cost
     }
 
     const usersCollection = await getCollection<UserDoc>(MongoCollections.USERS);
+    const today = creditsDayKey();
+    const isToday = { $eq: ['$dailyCreditsDay', today] };
     const updated = await usersCollection.findOneAndUpdate(
-        { _id: oid, credits: { $gte: cost }, isAdmin: { $ne: true } },
-        { $inc: { credits: -cost } },
+        {
+            _id: oid,
+            credits: { $gte: cost },
+            isAdmin: { $ne: true },
+            $or: [{ dailyCreditsDay: { $ne: today } }, { dailyCreditsUsed: { $lte: DAILY_LEAD_CAP - cost } }],
+        },
+        [
+            {
+                $set: {
+                    credits: { $subtract: ['$credits', cost] },
+                    dailyCreditsUsed: { $cond: [isToday, { $add: [{ $ifNull: ['$dailyCreditsUsed', 0] }, cost] }, cost] },
+                    dailyCreditsDay: today,
+                },
+            },
+        ],
         { returnDocument: 'after', projection: { credits: 1 } },
     );
 
     if (!updated) {
-        const current = await getUserCredits(oid);
-        throw new Error(current < cost ? `Insufficient credits: need ${cost}, have ${current}` : 'Insufficient credits');
+        const current = await getUserCreditsState(oid);
+        if (current.credits < cost) throw new Error(`Insufficient credits: need ${cost}, have ${current.credits}`);
+        throw new Error(DAILY_LIMIT_MESSAGE);
     }
 
     return normalizeCredits(updated.credits);

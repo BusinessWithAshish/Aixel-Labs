@@ -13,8 +13,10 @@ import { ACCOUNT_SETTINGS_ROUTE } from '@/config/app-config';
 /** Canonical credits icon. */
 export const CreditsIcon = Coins;
 
+type BadgeState = Pick<UserCreditsState, 'credits' | 'exempt'>;
+
 /** Survives PageLayout remounts so navigation does not flash empty. */
-let cached: UserCreditsState | null = null;
+let cached: BadgeState | null = null;
 
 /** Update header badge after a debit (and notify any mounted badge). */
 export function setCreditsBadgeCache(credits: number): void {
@@ -34,7 +36,7 @@ type CreditsBadgeProps = {
  * No skeleton — avoids an empty/loader flash for admins and on navigation.
  */
 export function CreditsBadge({ credits: creditsProp, className }: CreditsBadgeProps) {
-    const [state, setState] = useState<UserCreditsState | null>(() => {
+    const [state, setState] = useState<BadgeState | null>(() => {
         if (creditsProp !== undefined) return { credits: creditsProp, exempt: false };
         return cached;
     });

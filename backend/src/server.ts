@@ -120,6 +120,11 @@ app.use(express.static(path.join(process.cwd(), "public")));
 // it arrives through Caddy with TRUST_PROXY=1, so `req.ip` resolves to the real
 // client from X-Forwarded-For (which Caddy sets, so it cannot be spoofed to
 // loopback), and the server itself only listens on 127.0.0.1.
+//
+// A caller with the API secret is also outside it: every signed-in user reaches
+// this API through the frontend, so they all arrive from a few Vercel addresses
+// and would share one bucket. The frontend limits each user itself
+// (`frontend/server/leads/run-limits.ts`).
 const LOOPBACK_IPS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 
 app.use(
@@ -128,7 +133,7 @@ app.use(
     limit: Number(process.env.RATE_LIMIT_MAX) || 100,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => LOOPBACK_IPS.has(req.ip ?? ""),
+    skip: (req) => LOOPBACK_IPS.has(req.ip ?? "") || hasValidApiSecret(req),
   }),
 );
 
@@ -191,6 +196,11 @@ function matchesApiSecret(presented: string, secret: string): boolean {
   return timingSafeEqual(digest(presented), digest(secret));
 }
 
+function hasValidApiSecret(req: express.Request): boolean {
+  const presented = presentedApiSecret(req);
+  return !!API_SECRET && !!presented && matchesApiSecret(presented, API_SECRET);
+}
+
 app.use((req, res, next) => {
   if (
     !API_SECRET ||
@@ -200,10 +210,55 @@ app.use((req, res, next) => {
   ) {
     return next();
   }
-  const presented = presentedApiSecret(req);
-  if (presented && matchesApiSecret(presented, API_SECRET)) return next();
+  if (hasValidApiSecret(req)) return next();
   res.status(401).json({ success: false, error: "Unauthorized" });
 });
+
+// ===================
+// 6.2 Scrape Capacity
+// ===================
+// A scraper keeps working after its caller disconnects, so count a scrape until
+// its handler answers rather than until the socket closes. The timer is for a
+// handler that never answers. Callers on this host have their own schedules.
+const MAX_REMOTE_SCRAPES = Number(process.env.MAX_REMOTE_SCRAPES) || 30;
+const REMOTE_SCRAPE_RELEASE_MS = 15 * 60 * 1000;
+let remoteScrapes = 0;
+
+app.post(
+  [
+    `${ENDPOINTS.GMAPS}/*splat`,
+    ENDPOINTS.GSEARCH,
+    ENDPOINTS.INSTAGRAM,
+    ENDPOINTS.FACEBOOK,
+    ENDPOINTS.LINKEDIN,
+    ENDPOINTS.CRAWL,
+  ],
+  (req, res, next) => {
+    if (isLocalCaller(req)) return next();
+    if (remoteScrapes >= MAX_REMOTE_SCRAPES) {
+      res.status(503).json({
+        success: false,
+        error: "We're handling a lot of searches right now. Try again in a few minutes.",
+      });
+      return;
+    }
+
+    remoteScrapes++;
+    const release = () => {
+      clearTimeout(timer);
+      res.end = end;
+      remoteScrapes--;
+    };
+    const timer = setTimeout(release, REMOTE_SCRAPE_RELEASE_MS);
+    timer.unref();
+    const end = res.end;
+    res.end = function (this: express.Response, ...args: Parameters<typeof end>) {
+      release();
+      return end.apply(this, args);
+    } as typeof res.end;
+    next();
+  },
+);
 
 // ===================
 // 7. Feature Routes

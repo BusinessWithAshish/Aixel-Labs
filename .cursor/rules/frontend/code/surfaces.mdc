@@ -14,7 +14,7 @@ Shared governor for Next API routes and app routing config. Skills: `.cursor/ski
 
 - Prefer server actions for UI CRUD/debit; routes for abortable fetch, proxies, middleware, or streaming.
 - Authenticated JSON: `getAppSession` → 401 if missing; honor `AbortSignal` on long BE calls.
-- `lead-gen/scrape` must not debit — debit only in `createUserLeads` (`mutations.mdc` / lead-gen business).
+- `lead-gen/scrape` scrapes, debits and saves in one request (`saveScrapedLeads`); it returns what was saved, never the scraped leads (`mutations.mdc` / lead-gen business).
 - Public routes (`tenant`, image proxies, health) must not import firebase-admin / break middleware.
 - Image proxies: allowlist CDN URLs only (no open proxy / SSRF).
 - Browser calls go through `appApiClient` + `app-config` path constants.

@@ -76,7 +76,7 @@ Returns `CreateSessionActionResult` / `void` — not `ALApiResponse`.
 
 | Export | Notes |
 |--------|-------|
-| `createUserLeads` | Debit + upsert shared leads + memberships; requires `listName`; returns `CreateUserLeadsResult` |
+| `saveScrapedLeads` (`server/leads/`, not an action) | Debit + upsert shared leads + memberships; requires `listName`; returns `CreateUserLeadsResult` |
 | `getUserLeadsForList` | Owner list → joined `Lead[]` |
 | `deleteUserLeads` | Removes memberships in one list only |
 | `createUserLeadListFromLeadIds` | Copies owned leads into a new list |

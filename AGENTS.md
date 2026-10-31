@@ -79,5 +79,5 @@ Align `BE_API` with the backend listen port (default **8002** unless overridden)
 
 - Do not invent FE Doc / `LeadData` / module enums — change `backend/src/db/types.ts` first.
 - Do not put Mongo writes in `backend/src/api` scrapers.
-- Do not debit credits on scrape BFF — only in `createUserLeads` after success.
+- Scrape, debit and save happen together on the server (`POST /api/lead-gen/scrape`). Never accept leads or enrichment data from a browser: `leads` is shared across tenants.
 - Prefer existing skills over inventing parallel conventions.

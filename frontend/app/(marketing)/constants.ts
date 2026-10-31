@@ -1,5 +1,7 @@
 /** Marketing home SSOT — URLs, labels, brand assets, section anchors, motion. */
 
+import { DAILY_LEAD_CAP, MONTHLY_FREE_CREDITS } from '@/helpers/credits';
+
 const IS_DEV = process.env.NODE_ENV === 'development';
 
 /** SaaS app origin — local tenant vs production. */
@@ -101,6 +103,7 @@ export const LABELS = {
 } as const;
 
 export const TRUST = {
+    monthlyAllowance: `${MONTHLY_FREE_CREDITS.toLocaleString('en-US')} free leads a month, up to ${DAILY_LEAD_CAP} a day`,
     noCard: 'No credit card required',
     welcomePrefix: '1,000 free leads with',
     codeUnlocks: 'Code unlocks 1,000 free leads',
@@ -108,6 +111,7 @@ export const TRUST = {
 } as const;
 
 export const HERO_TRUST = [
+    { label: TRUST.monthlyAllowance, highlight: null },
     { label: TRUST.noCard, highlight: null },
     { label: TRUST.welcomePrefix, highlight: WELCOME_CODE },
     { label: TRUST.agencyAnytime, highlight: null },

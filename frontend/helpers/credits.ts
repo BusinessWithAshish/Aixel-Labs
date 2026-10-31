@@ -13,9 +13,13 @@ export const CREDIT_COST_PER_ITEM: Partial<Record<LEAD_GENERATION_SUB_MODULES, n
 
 export type UserCreditsState = {
     credits: number;
+    /** What can be spent right now: the balance, or less when today's cap is nearer. */
+    spendable: number;
+    /** Left of `DAILY_LEAD_CAP` today. Absent for exempt users. */
+    dailyRemaining?: number;
     /** Admins are outside the credits system. */
     exempt: boolean;
-    /** When the balance is next topped back up to `DAILY_FREE_CREDITS`. Absent for exempt users. */
+    /** When the balance is next topped back up to `MONTHLY_FREE_CREDITS`. Absent for exempt users. */
     refillsAt?: Date;
 };
 
@@ -55,20 +59,36 @@ export function creditsToneClassName(credits: number): string {
     }
 }
 
-/** Free credits every member's balance is topped back up to each refill period. */
-export const DAILY_FREE_CREDITS = 1000;
+/** Free credits every member's balance is topped back up to each refill period: 5,000 leads a month. */
+export const MONTHLY_FREE_CREDITS = 5_000;
 
 /**
- * How often a member's balance is topped back up to `DAILY_FREE_CREDITS`.
+ * How often a member's balance is topped back up to `MONTHLY_FREE_CREDITS`.
  * A refill never lowers a balance, so credits from a coupon or an admin
  * survive it.
  */
-export const CREDITS_REFILL_PERIOD_DAYS = 1;
+export const CREDITS_REFILL_PERIOD_DAYS = 30;
 
 const CREDITS_REFILL_PERIOD_MS = CREDITS_REFILL_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 
+/**
+ * Most credits one member can spend in a day, coupon credits included, so a month's allowance
+ * cannot all land on the backend at once. Two default Maps searches (200 leads each) and some left over.
+ */
+export const DAILY_LEAD_CAP = 500;
+
+const INDIA_UTC_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+/** The day a spend counts towards, as `YYYY-MM-DD` in India time. */
+export function creditsDayKey(now: Date = new Date()): string {
+    return new Date(now.getTime() + INDIA_UTC_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** Shown when a run is refused because today's cap is used up. */
+export const DAILY_LIMIT_MESSAGE = `You've reached today's limit of ${DAILY_LEAD_CAP} leads. It resets at midnight India time.`;
+
 /** Shown when a run is refused because the balance is empty. */
-export const NO_CREDITS_MESSAGE = `No credits left. Your free credits refill to ${DAILY_FREE_CREDITS.toLocaleString('en-US')} every 24 hours.`;
+export const NO_CREDITS_MESSAGE = `No credits left. Your free credits refill to ${MONTHLY_FREE_CREDITS.toLocaleString('en-US')} every ${CREDITS_REFILL_PERIOD_DAYS} days.`;
 
 /** When a balance last refilled at `refilledAt` is topped up next. */
 export function getNextCreditsRefillAt(refilledAt: Date): Date {

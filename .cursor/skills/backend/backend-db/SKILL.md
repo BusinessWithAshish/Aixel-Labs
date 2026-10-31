@@ -53,6 +53,7 @@ Scrapers never write Mongo. Persistence is frontend-owned; shapes are backend-ow
 | `LEAD_LISTS` | `lead_lists` | `UserLeadListDoc` |
 | `COUPONS` | `coupons` | `CouponDoc` |
 | `COUPON_REDEMPTIONS` | `coupon_redemptions` | `CouponRedemptionDoc` |
+| `LEAD_GEN_RUNS` | `lead_gen_runs` | `LeadGenRunDoc` — per-user scrape limits; expires by TTL, so no cascade delete |
 | `VOICE_ACCOUNTS` | `voice_accounts` | `VoiceAccountDoc` — one per owner: Gemini key, `numbers[]`, `calendars[]` |
 | `VOICE_AGENTS` | `voice_agents` | `VoiceAgentDoc` |
 | `VOICE_CALLS` | `voice_calls` | `VoiceCallDoc` — engine-written; caller memory is `memory` on the call |
@@ -73,7 +74,7 @@ Always use `MongoCollections.*` — never raw collection name strings in new cod
 - `Modules`, `*_SUB_MODULES`, `SubModule`, `ModuleAccess` live **only** in `types.ts`.
 - Full-access runtime grant for admins: FE `getDefaultModuleAccess()` — admins store `moduleAccess: {}`.
 - Tenant defaults: `TenantDoc.defaultModuleAccess` / `defaultCredits` (create-time). Every member's balance is also
-  topped back up to the FE `DAILY_FREE_CREDITS` each refill period (`UserDoc.creditsRefilledAt`).
+  topped back up to the FE `MONTHLY_FREE_CREDITS` each refill period (`UserDoc.creditsRefilledAt`), and spending is capped per day (`UserDoc.dailyCreditsUsed` / `dailyCreditsDay`).
 
 ## Leads contract
 

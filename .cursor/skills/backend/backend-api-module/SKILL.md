@@ -25,7 +25,7 @@ HTTP POST  →  Zod safeParse  →  client/helpers (+ compute)  →  ALApiRespon
 |-------|------|------------------|
 | `backend/src/api/**` | Scrape / fetch / enrich; Zod request; response **types** | Mongo reads/writes, credits debit |
 | `backend/src/db/**` | **Schema SSOT** — Doc types, `LeadData`, modules, Mongo client | Scraping |
-| Frontend | `createUserLeads`, credits, lead lists (I/O) | BE scrape internals; parallel Doc types |
+| Frontend | `saveScrapedLeads`, credits, lead lists (I/O) | BE scrape internals; parallel Doc types |
 
 API handlers **must not** import `getCollection` / `mongo-client`. Persistence
 happens after a successful scrape on the frontend. Lead-shaped APIs still
@@ -106,7 +106,7 @@ When a new lead product API ships:
 1. Response type with `id` lives under `api/<module>/types.ts`.
 2. Extend `LeadData` + `LeadSource` + `LEAD_GENERATION_SUB_MODULES` in
    `backend/src/db/types.ts` (**schema SSOT** — `backend-db` skill).
-3. FE wires `lead-gen-api.ts` + submodule + `createUserLeads` (frontend skill).
+3. FE wires `lead-gen-api.ts` + submodule + `requestSchema` in `scrape-request.ts` (frontend skill).
 
 `LeadDoc.data` stores that JSON; scrapers never write it.
 

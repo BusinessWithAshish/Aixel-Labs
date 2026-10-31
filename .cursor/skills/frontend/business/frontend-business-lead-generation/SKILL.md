@@ -22,9 +22,10 @@ page.tsx
         → form fields (*QueryForm via ZodControlledFields)
   → FormPresetScraperActions saves/loads preset, then prepareLeadGenListName + onSubmit
   → useLeadGenScraper(subModule).submitLeadGenScraperForm
-  → POST /api/lead-gen/scrape { subModule, body }   // abortable; no debit
-  → helpers/lead-gen-api.generateLeads → BE product API
-  → createUserLeads(subModule, LeadData[], { listName })  // debit + Mongo
+  → POST /api/lead-gen/scrape { subModule, body, listName }   // abortable
+      access, schema and credit checks → run limits (server/leads/run-limits.ts)
+      → helpers/lead-gen-api.generateLeads → BE product API
+      → saveScrapedLeads  // debit + Mongo; the browser only gets what was saved
 ```
 
 Preset is required before run. List name comes from the loaded/saved preset via `prepareLeadGenListName` (`{presetName} · Sat 6:10 PM`).
@@ -40,7 +41,9 @@ Preset is required before run. List name comes from the loaded/saved preset via 
 | Scrape BFF | `app/api/lead-gen/scrape/route.ts` |
 | BE dispatch | `helpers/lead-gen-api.ts` |
 | Credit costs | `helpers/credits.ts` |
-| Debit + Mongo | `app/actions/user-lead-actions.ts` (`createUserLeads`) |
+| Debit + Mongo | `server/leads/save-scraped-leads.ts`, `server/leads/enrich-leads.ts` |
+| Request checks and caps | `server/leads/scrape-request.ts` |
+| Per-user limits | `server/leads/run-limits.ts` |
 | Field primitives | `components/common/zod-form-builder/ZodControlledFields.tsx` |
 | Result cards | `components/common/lead-card/*` → wire in `leads/[listId]/_components/LeadListItem.tsx` |
 | Routes / scrape path | `config/app-config.ts` (`SubModuleUrls`, `LEAD_GEN_SCRAPE_API_ROUTE`) |
@@ -149,13 +152,14 @@ Dual-form modules (LinkedIn): pass `moduleSegment` (`"people"` / `"company"`) so
 ## Credits rules
 
 - Admins / `creditsExempt` never see cost UI or exhausted dialogs (`CreditCostNotice` self-hides).
-- Charge = `itemCount * getCreditCostPerItem(subModule)` inside `createUserLeads` only — never on the scrape route.
+- Charge = `itemCount * getCreditCostPerItem(subModule)` inside `saveScrapedLeads` only, on the server, after the scrape. New lead sources go in `requestSchema` (`scrape-request.ts`) too.
+- A member can spend at most `DAILY_LEAD_CAP` a day, coupon credits included (`UserDoc.dailyCreditsUsed`, enforced in `assertAndDebitCredits`). Runs wait up to 45 seconds for a free place (`run-limits.ts`).
 - After success, only show `CreditsExhaustedDialog` when `!creditsExempt && remainingCredits === 0`.
 - Abort cancels scrape via `AbortSignal`; if aborted after scrape, skip debit/save.
 
 ## Do not
 
-- Invent a second submit/debit path outside `useLeadGenScraper` + `createUserLeads`.
+- Invent a second submit/debit path outside `useLeadGenScraper` + the scrape route, or accept leads from a browser.
 - Unwrap BE envelopes in `lead-gen-api.ts`.
 - Build lead-gen forms without `LeadFormWrapper` / `FormPresetScraperActions`.
 - Duplicate Zod request schemas on the FE.

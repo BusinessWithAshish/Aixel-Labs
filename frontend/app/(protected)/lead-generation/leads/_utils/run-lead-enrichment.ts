@@ -1,19 +1,15 @@
 'use client';
 
 import type { ALApiResponse } from '@aixellabs/backend/api/types';
-import type { CRAWL_RESPONSE } from '@aixellabs/backend/crawl/types';
 import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
-import {
-    applyLeadEnrichment,
-    resolveEnrichmentTargets,
-    type EnrichmentTarget,
-} from '@/app/actions/user-lead-actions';
-import { LEAD_GEN_SCRAPE_API_ROUTE } from '@/config/app-config';
+import { resolveEnrichmentTargets } from '@/app/actions/user-lead-actions';
+import type { EnrichLeadsResult } from '@/server/leads/enrich-leads';
+import { LEAD_GEN_ENRICH_API_ROUTE } from '@/config/app-config';
 import {
     ENRICH_BATCH_SIZE,
     ENRICH_BULK_DOMAIN_CAP,
     ENRICH_SELECTED_DOMAIN_CAP,
-    websiteDedupeKey,
+    groupTargetsByDomain,
 } from '@/helpers/lead-website';
 import appApiClient, { isAbortOrCancel } from '@/lib/app-api-client';
 import { getCreditCostPerItem } from '@/helpers/credits';
@@ -40,18 +36,6 @@ function capForMode(mode: RunLeadEnrichmentMode): number {
     return mode === 'selected' ? ENRICH_SELECTED_DOMAIN_CAP : ENRICH_BULK_DOMAIN_CAP;
 }
 
-function groupTargetsByDomain(targets: EnrichmentTarget[]): Map<string, EnrichmentTarget[]> {
-    const map = new Map<string, EnrichmentTarget[]>();
-    for (const target of targets) {
-        const key = websiteDedupeKey(target.domain);
-        if (!key) continue;
-        const list = map.get(key) ?? [];
-        list.push(target);
-        map.set(key, list);
-    }
-    return map;
-}
-
 function chunk<T>(items: T[], size: number): T[][] {
     const out: T[][] = [];
     for (let i = 0; i < items.length; i += size) {
@@ -61,8 +45,8 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 /**
- * Client orchestrator: resolve → scrape BFF batches → applyLeadEnrichment (server action).
- * Mongo mutations live in `user-lead-actions`; this only sequences UI + HTTP + toasts.
+ * Client orchestrator: resolve → enrich route batches, which crawl, charge and save on the server.
+ * This only sequences UI + HTTP + toasts.
  */
 export async function runLeadEnrichment(
     options: RunLeadEnrichmentOptions,
@@ -114,18 +98,11 @@ export async function runLeadEnrichment(
         }
 
         const batchKeys = batches[i]!;
-        const domains = batchKeys.map((key) => byDomain.get(key)![0]!.domain);
+        const leadIds = batchKeys.flatMap((key) => (byDomain.get(key) ?? []).map((target) => target.leadId));
 
-        let scrapeRes: ALApiResponse<CRAWL_RESPONSE[]>;
+        let enrichRes: ALApiResponse<EnrichLeadsResult>;
         try {
-            scrapeRes = await appApiClient.post<CRAWL_RESPONSE[]>(
-                LEAD_GEN_SCRAPE_API_ROUTE,
-                {
-                    subModule: LEAD_GENERATION_SUB_MODULES.CRAWL,
-                    body: { domains },
-                },
-                { signal },
-            );
+            enrichRes = await appApiClient.post<EnrichLeadsResult>(LEAD_GEN_ENRICH_API_ROUTE, { leadIds }, { signal });
         } catch (error) {
             if (isAbortOrCancel(error) || signal?.aborted) {
                 toast.message('Enrichment stopped', {
@@ -137,53 +114,21 @@ export async function runLeadEnrichment(
             break;
         }
 
-        if (!scrapeRes.success || !scrapeRes.data?.length) {
-            toast.error(scrapeRes.error ?? `Crawl batch ${i + 1} failed`);
+        if (!enrichRes.success || !enrichRes.data) {
+            toast.error(enrichRes.error ?? `Crawl batch ${i + 1} failed`);
             break;
         }
 
-        const profileByKey = new Map<string, CRAWL_RESPONSE>();
-        for (const profile of scrapeRes.data) {
-            const profileKey = websiteDedupeKey(profile.domain);
-            if (profileKey) profileByKey.set(profileKey, profile);
-        }
-
-        const findProfile = (targetKey: string): CRAWL_RESPONSE | undefined => {
-            const exact = profileByKey.get(targetKey);
-            if (exact) return exact;
-            for (const [profileKey, profile] of profileByKey) {
-                if (targetKey === profileKey || targetKey.endsWith(`.${profileKey}`)) {
-                    return profile;
-                }
-            }
-            return undefined;
-        };
-
-        const patches: { leadId: string; enriched: CRAWL_RESPONSE }[] = [];
-        for (const key of batchKeys) {
-            const profile = findProfile(key);
-            if (!profile) continue;
-            for (const target of byDomain.get(key) ?? []) {
-                patches.push({ leadId: target.leadId, enriched: profile });
-            }
-        }
-
-        if (!patches.length) {
+        if (!enrichRes.data.matchedCount) {
             toast.message(`Crawl batch ${i + 1} returned no matching profiles`, {
                 description: 'Domains may have failed to crawl — try again or pick different leads.',
             });
             continue;
         }
 
-        const applyRes = await applyLeadEnrichment(patches);
-        if (!applyRes.success || !applyRes.data) {
-            toast.error(applyRes.error ?? 'Failed to save enrichment');
-            break;
-        }
-
-        patched += applyRes.data.patchedCount;
-        remainingCredits = applyRes.data.remainingCredits;
-        creditsExempt = applyRes.data.creditsExempt;
+        patched += enrichRes.data.patchedCount;
+        remainingCredits = enrichRes.data.remainingCredits;
+        creditsExempt = enrichRes.data.creditsExempt;
     }
 
     if (patched > 0) {

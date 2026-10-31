@@ -30,6 +30,8 @@ export enum MongoCollections {
   LEAD_LISTS = "lead_lists",
   COUPONS = "coupons",
   COUPON_REDEMPTIONS = "coupon_redemptions",
+  /** One per lead-gen scrape or enrich run: per-user limits. Expires after a few days. */
+  LEAD_GEN_RUNS = "lead_gen_runs",
   /** One per owner: their Gemini key, connected booking apps and phone numbers. */
   VOICE_ACCOUNTS = "voice_accounts",
   VOICE_AGENTS = "voice_agents",
@@ -140,7 +142,7 @@ export type TenantDoc<Id = ObjectId> = {
   app_theme_color?: string;
   app_description?: string;
   defaultModuleAccess?: ModuleAccess;
-  /** Credits a new member starts with (never below the daily free allowance). */
+  /** Credits a new member starts with (never below the monthly free allowance). */
   defaultCredits?: number;
 };
 
@@ -159,7 +161,11 @@ export type UserDoc<Id = ObjectId> = {
   tenantName: string;
   moduleAccess?: ModuleAccess;
   credits?: number;
-  /** When the balance was last topped back up to the daily free allowance. */
+  /** Credits spent on `dailyCreditsDay`, for the per-user daily cap. Stale once the day changes. */
+  dailyCreditsUsed?: number;
+  /** Day `dailyCreditsUsed` counts, as `YYYY-MM-DD` in India time. */
+  dailyCreditsDay?: string;
+  /** When the balance was last topped back up to the monthly free allowance. */
   creditsRefilledAt?: Date;
 };
 
@@ -249,6 +255,15 @@ export type CouponRedemptionDoc<Id = ObjectId> = {
 
 export type CouponRedemption = Omit<CouponRedemptionDoc<string>, "createdAt"> & {
   createdAt: string;
+};
+
+export type LeadGenRunDoc<Id = ObjectId> = {
+  _id?: Id;
+  userId: Id;
+  subModule: LEAD_GENERATION_SUB_MODULES;
+  startedAt: Date;
+  /** Set while the run is in progress; unique per user, so it caps a user's simultaneous runs. */
+  activeSlot?: number;
 };
 
 // ---------------------------------------------------------------------------

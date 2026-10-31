@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAppSession } from '@/server/auth';
 import { extractUsername, INSTAGRAM_USERNAME_REGEX, INSTAGRAM_URL_REGEX, fetchInstagramProfile } from '../helpers';
 
 export async function GET(request: NextRequest) {
+    const session = await getAppSession();
+    if (!session?.user?.id) {
+        return NextResponse.json({ success: false, error: 'Sign in to look up an account' }, { status: 401 });
+    }
+
     const raw = request.nextUrl.searchParams.get('username') ?? '';
 
     if (!raw.trim()) {

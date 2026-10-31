@@ -79,6 +79,7 @@ export const TENANT_HOME_PAGE_ROUTE = '/home';
 export const PATHNAME_HEADER_KEY = 'x-pathname';
 export const API_ROUTE_PREFIX = '/api';
 export const LEAD_GEN_SCRAPE_API_ROUTE = `${API_ROUTE_PREFIX}/lead-gen/scrape`;
+export const LEAD_GEN_ENRICH_API_ROUTE = `${API_ROUTE_PREFIX}/lead-gen/enrich`;
 /** A call's recording, streamed through the app (fresh provider link, seekable). `download` asks for an attachment. */
 export const voiceCallRecordingApiRoute = (callId: string, download = false) =>
     `${API_ROUTE_PREFIX}/voice-agent/calls/${callId}/recording${download ? '?download=1' : ''}`;

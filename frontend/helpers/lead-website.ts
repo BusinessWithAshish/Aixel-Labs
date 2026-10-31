@@ -131,3 +131,16 @@ export function extractLeadWebsite(lead: Pick<Lead, 'source' | 'data' | 'enriche
 export function isLeadEnrichable(lead: Pick<Lead, 'source' | 'data' | 'enriched'>): boolean {
     return extractLeadWebsite(lead) != null;
 }
+
+/** Groups enrichment targets by website, so each website is crawled and charged once. */
+export function groupTargetsByDomain<T extends { domain: string }>(targets: T[]): Map<string, T[]> {
+    const map = new Map<string, T[]>();
+    for (const target of targets) {
+        const key = websiteDedupeKey(target.domain);
+        if (!key) continue;
+        const list = map.get(key) ?? [];
+        list.push(target);
+        map.set(key, list);
+    }
+    return map;
+}

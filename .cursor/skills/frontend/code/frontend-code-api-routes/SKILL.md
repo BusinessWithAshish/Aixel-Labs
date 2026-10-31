@@ -19,7 +19,7 @@ Governor: `.cursor/rules/frontend/code/surfaces.mdc`.
 
 | Route | Role | Owner skill |
 |-------|------|-------------|
-| `lead-gen/scrape` | Abortable scrape BFF → `generateLeads`; **no debit** | `frontend-business-lead-generation` |
+| `lead-gen/scrape` | Abortable scrape → `generateLeads` → `saveScrapedLeads` (**debit + save**); `lead-gen/enrich` likewise | `frontend-business-lead-generation` |
 | `auth/session` | Set/clear session cookie | `frontend-auth-session` |
 | `tenant` | Public tenant by subdomain (middleware-safe) | `frontend-code-config` / `frontend-mutations-server-actions` (`getTenantByNamePublic`) |
 | `nl-chat` | Multi-turn agent; session + rate limit + flag | this skill + `frontend-code-feature-flags` |
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 ## Related
 
 - Scrape pipeline → `frontend-business-lead-generation`
-- Debit/save → `frontend-mutations-server-actions` (`createUserLeads`)
+- Debit/save → `server/leads/save-scraped-leads.ts`, called only by the scrape route
 - Session cookie semantics → `frontend-auth-session`
 - Flags on NL chat → `frontend-code-feature-flags`
 - Path constants → `frontend-code-config`

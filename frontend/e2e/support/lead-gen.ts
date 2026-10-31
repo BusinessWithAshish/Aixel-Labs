@@ -6,7 +6,9 @@ import type { GSEARCH_RESPONSE } from '@aixellabs/backend/gsearch/types';
 import type { INSTAGRAM_RESPONSE } from '@aixellabs/backend/instagram';
 import { LINKEDIN_SEARCH_TYPE } from '@aixellabs/backend/linkedin/schemas';
 import type { LINKEDIN_BY_COMPANY_RESPONSE } from '@aixellabs/backend/linkedin/types';
+import { createServer } from 'node:http';
 import { LEAD_GEN_SCRAPE_API_ROUTE, SubModuleUrls } from '@/config/app-config';
+import { E2E_BE_API } from './env';
 
 export const GOOGLE_ADVANCED_SEARCH_URL = SubModuleUrls[LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH];
 export const LEADS_URL = SubModuleUrls[LEAD_GENERATION_SUB_MODULES.LEADS];
@@ -121,17 +123,51 @@ export function linkedinCompanyLeads(count: number): LINKEDIN_BY_COMPANY_RESPONS
 
 type ScrapeReply = { status?: number; body: { success: boolean; data?: unknown[]; error?: string } };
 
+let scrapeReply: ScrapeReply | 'hang' = 'hang';
+let fakeBackend: Promise<void> | undefined;
+/** What this worker's app server sent the backend, oldest first. */
+export const backendRequests: { url: string; body: any }[] = [];
+
+/** The backend's scrapers, for this worker's app server: answers every request with `scrapeReply`. */
+function startFakeBackend(): Promise<void> {
+    fakeBackend ??= new Promise((resolve, reject) => {
+        const server = createServer((req, res) => {
+            let raw = '';
+            req.on('data', (chunk) => (raw += chunk));
+            req.on('end', () => {
+                backendRequests.push({ url: req.url ?? '', body: JSON.parse(raw || 'null') });
+                const reply = scrapeReply;
+                if (reply === 'hang') return;
+                res.writeHead(reply.status ?? 200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(reply.body));
+            });
+        });
+        server.once('error', reject);
+        server.listen(Number(new URL(E2E_BE_API).port), '127.0.0.1', resolve);
+        server.unref();
+    });
+    return fakeBackend;
+}
+
+/** Sets what the fake backend answers from now on, for specs that call the routes directly. */
+export async function mockBackend(reply: ScrapeReply | 'hang'): Promise<void> {
+    scrapeReply = reply;
+    backendRequests.length = 0;
+    await startFakeBackend();
+}
+
 /**
- * Replaces the scrape BFF in the browser so no test triggers a real scrape. Everything after it
- * (`createUserLeads`: access check, debit, Mongo save) still runs for real on the server.
- * Pass `'hang'` to leave the request in flight.
+ * Replaces the backend's scrapers so no test triggers a real scrape. The scrape route itself
+ * (access check, debit, Mongo save) still runs for real on the server. `requests` records what
+ * the browser asked for. Pass `'hang'` to leave the request in flight.
  */
 export async function mockScrape(page: Page, reply: ScrapeReply | 'hang') {
+    await mockBackend(reply);
     const requests: unknown[] = [];
     await page.route(`**${LEAD_GEN_SCRAPE_API_ROUTE}`, async (route) => {
-        requests.push(route.request().postDataJSON());
-        if (reply === 'hang') return;
-        await route.fulfill({ status: reply.status ?? 200, json: reply.body });
+        const { subModule, body } = route.request().postDataJSON() as { subModule: unknown; body: unknown };
+        requests.push({ subModule, body });
+        await route.continue();
     });
     return { requests };
 }

@@ -18,7 +18,7 @@ Canonical patterns for `frontend/app/actions/`. UI-specific flows live in siblin
 |------|------|--------------|
 | `auth-actions.ts` | Session cookie create / sign-out | Custom (cookies + `@/server/auth`) |
 | `theme-actions.ts` | Theme color cookie + `revalidatePath` | None (cookie-only, void) |
-| `credit-db.ts` | Credits read + atomic debit + lazy daily refill to `DAILY_FREE_CREDITS` (`CREDITS_REFILL_PERIOD_DAYS`) | **Not** `'use server'` — `import 'server-only'` |
+| `credit-db.ts` | Credits read + atomic debit + lazy monthly refill to `MONTHLY_FREE_CREDITS` (`CREDITS_REFILL_PERIOD_DAYS`) | **Not** `'use server'` — `import 'server-only'` |
 | `tenant-actions.ts` | Tenant CRUD + public lookup by name | `runAuthenticatedAction` / `runPublicAction` |
 | `user-actions.ts` | Admin user CRUD/bulk + self name/credits | `runAuthenticatedAction` |
 | `coupon-actions.ts` | Admin coupon CRUD + user redeem | `runAuthenticatedAction` |
@@ -87,7 +87,7 @@ export const myAction = async (input: string): Promise<ALApiResponse<MyResult>> 
 3. **`credit-db.ts` stays `server-only`**, not `'use server'`. Import it only from other server actions / server code — never from client components.
 4. **Admin tenant mutations** target the tenant/user/coupon in the request (`assertCallerIsAdmin` + slug/`_id`). See `frontend-business-tenants` skill.
 5. **Shared `leads` docs are never cascade-deleted** with user/tenant/list cleanup — only user-owned memberships (`USER_LEADS` / `LEAD_LISTS`). Use `deleteUserOwnedLeadData` for user/tenant deletes.
-6. **Lead save order in `createUserLeads`:** access/credits check → cap by balance → **debit first** → create list → upsert leads/memberships. Debit before list so a failed charge cannot orphan a list.
+6. **Lead save order in `saveScrapedLeads`** (`server/leads/`, called by the scrape route, never a server action): credits check → cap by balance → **debit first** → create list → upsert leads/memberships. Debit before list so a failed charge cannot orphan a list.
 7. **Types from `@aixellabs/backend/db`** — schema SSOT is `backend/src/db` (`.cursor/skills/backend/backend-db/SKILL.md`). Do not duplicate `UserDoc` / `TenantDoc` / `CouponDoc` / `LeadData` / module enums on the FE; change `types.ts` first when the schema evolves.
 8. **Public tenant lookup** (`getTenantByNamePublic`) must stay free of auth imports so middleware/subdomain routing does not pull firebase-admin.
 
@@ -131,7 +131,7 @@ export const myAction = async (input: string): Promise<ALApiResponse<MyResult>> 
 1. Prefer extending `user-lead-actions.ts` / `user-lead-lists-actions.ts`.
 2. Scope queries with `{ userId: uid }` (and `listId` when list-scoped).
 3. Membership is per list — same lead may exist in multiple lists; delete membership ≠ delete shared `leads` doc.
-4. After scrape, save only through `createUserLeads` (see frontend-business-lead-generation skill).
+4. After scrape, save only through `saveScrapedLeads`, on the server (see frontend-business-lead-generation skill).
 
 ### Cascade delete
 

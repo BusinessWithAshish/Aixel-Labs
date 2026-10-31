@@ -38,7 +38,7 @@ Schema SSOT for Docs / `LeadData` / modules: `@aixellabs/backend` (`backend/src/
 
 Under `app/(protected)/lead-generation/`: Google Maps (+ advanced), Google
 Advanced Search, Instagram Search, Facebook, LinkedIn (company; people behind a
-flag), lead lists. Credits debit only after successful save (`createUserLeads`).
+flag), lead lists. Credits debit on the server after a successful scrape, in the same request (`saveScrapedLeads`).
 
 Incomplete relative to backend: Instagram content search, website-contacts wiring,
 YouTube / Trends product UI.

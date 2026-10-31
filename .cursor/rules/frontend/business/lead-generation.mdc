@@ -15,6 +15,6 @@ Product governor for scrapers and credits. Executor: `.cursor/skills/frontend/bu
 - `lead-gen-api` switch cases are direct `apiClient.post` calls (same shape as Maps / Instagram / LinkedIn).
 - Always pass `creditModule` into `LeadFormWrapper`.
 - Register costs only in `CREDIT_COST_PER_ITEM` / `getCreditCostPerItem`.
-- Debit only in `createUserLeads` after a successful scrape.
+- Debit only in `saveScrapedLeads`, called by the scrape route after a successful scrape. The route checks credits and `server/leads/run-limits.ts` first.
 - Hide credits UI for admins / `creditsExempt` users.
 - Colocate form defaults and select option arrays in the route `_constants.ts`.

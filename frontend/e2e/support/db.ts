@@ -10,6 +10,7 @@ import {
 } from '@aixellabs/backend/db/types';
 import { getDefaultModuleAccess } from '@/helpers/module-access-helpers';
 import { E2E_DB_NAME, E2E_GEMINI_API_KEY, E2E_MONGODB_URI, E2E_TENANT } from './env';
+import { creditsDayKey } from '@/helpers/credits';
 import { DEFAULT_USER_CREDITS, E2E_ADMIN, E2E_USER, type E2eUser } from './users';
 // Voice agents (e2e/voice-agent/agents + playground specs).
 import { VoiceAgentCallType, type VoiceAgentDoc, type VoiceAgentVoice } from '@aixellabs/backend/db/types';
@@ -110,16 +111,17 @@ export class E2eDb {
 
     /**
      * Puts a user back to a known balance / access and removes the lead lists they own.
-     * The daily refill is marked as just done unless `refilledHoursAgo` says otherwise,
+     * The monthly refill is marked as just done unless `refilledHoursAgo` says otherwise,
      * so a test's starting balance is not topped up underneath it.
      */
     async resetUser(
         user: E2eUser,
-        overrides: { credits?: number; moduleAccess?: ModuleAccess; refilledHoursAgo?: number } = {},
+        overrides: { credits?: number; moduleAccess?: ModuleAccess; refilledHoursAgo?: number; usedToday?: number } = {},
     ): Promise<void> {
         const doc = await this.getUser(user);
         await this.db.collection<UserLeadDoc>(MongoCollections.USER_LEADS).deleteMany({ userId: doc._id });
         await this.db.collection<UserLeadListDoc>(MongoCollections.LEAD_LISTS).deleteMany({ userId: doc._id });
+        await this.db.collection(MongoCollections.LEAD_GEN_RUNS).deleteMany({ userId: doc._id });
 
         if (user.isAdmin) return;
         await this.users.updateOne(
@@ -129,9 +131,32 @@ export class E2eDb {
                     credits: overrides.credits ?? DEFAULT_USER_CREDITS,
                     creditsRefilledAt: new Date(Date.now() - (overrides.refilledHoursAgo ?? 0) * 60 * 60 * 1000),
                     moduleAccess: overrides.moduleAccess ?? getDefaultModuleAccess(),
+                    dailyCreditsUsed: overrides.usedToday ?? 0,
+                    dailyCreditsDay: creditsDayKey(),
                 },
             },
         );
+    }
+
+    /** Moves this user's daily spending count to another day. */
+    async setCreditsDay(user: E2eUser, day: string): Promise<void> {
+        const doc = await this.getUser(user);
+        await this.users.updateOne({ _id: doc._id }, { $set: { dailyCreditsDay: day } });
+    }
+
+    /** Ids of the shared leads on this user's lists. */
+    async getOwnedLeadIds(user: E2eUser): Promise<string[]> {
+        const doc = await this.getUser(user);
+        const owned = await this.db.collection<UserLeadDoc>(MongoCollections.USER_LEADS).find({ userId: doc._id }).toArray();
+        return owned.map((membership) => membership.leadId.toString());
+    }
+
+    /** Pretends this user already started `count` runs in the last few minutes, all finished. */
+    async seedRecentRuns(user: E2eUser, count: number): Promise<void> {
+        const doc = await this.getUser(user);
+        await this.db
+            .collection(MongoCollections.LEAD_GEN_RUNS)
+            .insertMany(Array.from({ length: count }, () => ({ userId: doc._id, subModule: 'CRAWL', startedAt: new Date() })));
     }
 
     /** Adds `user` as another member of the e2e tenant (for specs that delete one); returns its id. */

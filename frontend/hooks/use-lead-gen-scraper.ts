@@ -1,12 +1,10 @@
 'use client';
 
 import { useCallback } from 'react';
-import { type LeadData, LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
-import {
-    createUserLeads,
-    type CreateUserLeadsResult,
-} from '@/app/actions/user-lead-actions';
+import { LEAD_GENERATION_SUB_MODULES } from '@aixellabs/backend/db/types';
+import type { CreateUserLeadsResult } from '@/server/leads/save-scraped-leads';
 import { toast } from 'sonner';
+import { DAILY_LEAD_CAP } from '@/helpers/credits';
 import { ALApiResponse } from '@aixellabs/backend/api/types';
 import useLocalStorageState from 'use-local-storage-state';
 import { generateLocalStorageKey } from '@/helpers/generate-local-storage-key';
@@ -69,7 +67,7 @@ export type SubmitLeadGenScraperFormOptions<TRequest> = {
 
 /**
  * Lead-gen scraper forms: in-memory loading state scoped by submodule hook instance.
- * Scrape uses `LEAD_GEN_SCRAPE_API_ROUTE` (abortable); debit/save uses `createUserLeads` only after scrape succeeds.
+ * `LEAD_GEN_SCRAPE_API_ROUTE` (abortable) scrapes, charges and saves on the server, and returns only the saved result.
  */
 export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
     const key = generateLocalStorageKey('lead-gen-scraper-loading', subModule);
@@ -116,27 +114,11 @@ export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
 
             setLoading(true);
             try {
-                const scrapeResult = await appApiClient.post<LeadData[]>(
+                const result = await appApiClient.post<CreateUserLeadsResult>(
                     LEAD_GEN_SCRAPE_API_ROUTE,
-                    { subModule, body },
+                    { subModule, body, listName },
                     { signal: controller.signal },
                 );
-
-                if (controller.signal.aborted) {
-                    return false;
-                }
-
-                if (!scrapeResult.success || !scrapeResult.data?.length) {
-                    toast.error(scrapeResult.error ?? errorMessage ?? 'Failed to generate leads');
-                    return false;
-                }
-
-                // Skip debit/save if the user aborted after scrape finished.
-                if (controller.signal.aborted) {
-                    return false;
-                }
-
-                const result = await createUserLeads(subModule, scrapeResult.data, { listName });
 
                 if (controller.signal.aborted) {
                     return false;
@@ -147,7 +129,7 @@ export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
                     return false;
                 }
 
-                const { leads, remainingCredits, creditsExempt } = result.data;
+                const { leads, remainingCredits, creditsExempt, dailyLimitReached } = result.data;
                 if (!creditsExempt) {
                     setCreditsBadgeCache(remainingCredits);
                 }
@@ -157,7 +139,7 @@ export function useLeadGenScraper(subModule: LEAD_GENERATION_SUB_MODULES) {
                 } else {
                     toast.success(defaultSuccessToast.message, {
                         ...defaultSuccessToast.options,
-                        description: `Saved ${leads.length} leads. ${defaultSuccessToast.options.description}`,
+                        description: `Saved ${leads.length} leads. ${dailyLimitReached ? `That's today's limit of ${DAILY_LEAD_CAP} leads. ` : ''}${defaultSuccessToast.options.description}`,
                     });
                 }
 

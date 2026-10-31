@@ -41,8 +41,12 @@ export const E2E_DB_NAME = e2eDbName(WORKER);
 export const E2E_FIREBASE_PROJECT_ID = 'demo-aixel-e2e';
 export const E2E_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 
-/** Closed port: an unmocked scrape fails fast instead of reaching a real backend. */
-const E2E_BE_API = 'http://127.0.0.1:1';
+/**
+ * The scrapers are a local fake on 7880, started by `mockScrape`. Until a spec does, the port is
+ * closed and a scrape fails fast instead of reaching a real backend.
+ */
+const beApi = (worker: number) => `http://127.0.0.1:${7880 + shift(worker)}`;
+export const E2E_BE_API = beApi(WORKER);
 
 /**
  * Voice agents. A spec that needs the real engine starts `phone.py --port 7862` against the e2e
@@ -109,7 +113,7 @@ export function e2eServerEnv(worker: number): Record<string, string> {
     return {
         MONGODB_URI: E2E_MONGODB_URI,
         MONGODB_DB_NAME: e2eDbName(worker),
-        BE_API: E2E_BE_API,
+        BE_API: beApi(worker),
         VOICE_ENGINE_URL: voiceEngineUrl(worker),
         VOICE_ENGINE_SECRET: E2E_VOICE_ENGINE_SECRET,
         TELNYX_API_BASE: telnyxApiBase(worker),

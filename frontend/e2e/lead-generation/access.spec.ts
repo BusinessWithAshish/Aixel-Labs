@@ -16,7 +16,7 @@ test.describe('signed out', () => {
 
     test('cannot call the scrape API', async ({ request }) => {
         const res = await request.post(LEAD_GEN_SCRAPE_API_ROUTE, {
-            data: { subModule: LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH, body: {} },
+            data: { subModule: LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH, body: {}, listName: 'Refused' },
         });
         expect(res.status()).toBe(401);
     });
@@ -43,7 +43,7 @@ test.describe('user without the submodule', () => {
 
     test('is refused by the scrape API', async ({ request }) => {
         const res = await request.post(LEAD_GEN_SCRAPE_API_ROUTE, {
-            data: { subModule: LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH, body: {} },
+            data: { subModule: LEAD_GENERATION_SUB_MODULES.GOOGLE_ADVANCED_SEARCH, body: {}, listName: 'Refused' },
         });
         expect(res.status()).toBe(403);
     });

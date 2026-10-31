@@ -28,7 +28,10 @@ export const getTenantByNamePublic = async (name: string): Promise<ALApiResponse
         async function getTenantByNamePublic() {
             const tenantsCollection = await getCollection<TenantDoc>(MongoCollections.TENANTS);
             const tenant = await tenantsCollection.findOne({ name: name.toLowerCase() });
-            return tenant ? mapMongoDocToClient(tenant) : null;
+            if (!tenant) return null;
+            // Anyone can read this: what a new member receives stays with admins.
+            const { defaultModuleAccess: _access, defaultCredits: _credits, ...publicTenant } = tenant;
+            return mapMongoDocToClient(publicTenant);
         },
         {
             logLabel: 'Error fetching tenant by name (public):',

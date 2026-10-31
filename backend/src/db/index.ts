@@ -10,6 +10,7 @@ export type LeadDoc = import("./types").LeadDoc<ObjectId>;
 export type UserLeadDoc = import("./types").UserLeadDoc<ObjectId>;
 export type CouponDoc = import("./types").CouponDoc<ObjectId>;
 export type CouponRedemptionDoc = import("./types").CouponRedemptionDoc<ObjectId>;
+export type LeadGenRunDoc = import("./types").LeadGenRunDoc<ObjectId>;
 export type VoiceAgentDoc = import("./types").VoiceAgentDoc<ObjectId>;
 export type VoiceAccountDoc = import("./types").VoiceAccountDoc<ObjectId>;
 export type VoiceNumberDoc = import("./types").VoiceNumberDoc<ObjectId>;

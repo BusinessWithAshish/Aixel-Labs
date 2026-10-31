@@ -17,4 +17,4 @@ Shared governor for DB-backed server actions and lead/coupon server helpers. Exe
 - Admin mutations: `assertCallerIsAdmin`; target tenant/user/coupon by id or slug.
 - Public actions must not import firebase-admin / `@/server/auth` at top level.
 - Cascade deletes use `deleteUserOwnedLeadData` — never delete shared `leads` docs.
-- Scrape HTTP stays on `POST /api/lead-gen/scrape`; actions only debit + persist.
+- Scrape, debit and save run together in `POST /api/lead-gen/scrape` (`server/leads/save-scraped-leads.ts`); enrich in `POST /api/lead-gen/enrich`. No server action takes leads or enrichment data from a browser — every `'use server'` export is a public endpoint.
