@@ -23,6 +23,8 @@ export const CRAWL = {
   DOMAIN_CONCURRENCY: 20,
   PAGE_CONCURRENCY: 4,
   FETCH_RETRIES: 2,
+  /** Parsed from each page; the HTML parser runs on the main thread. */
+  MAX_HTML_CHARS: 1_000_000,
   DOMAIN_ID_HEX_LEN: 16,
   MIN_TEL_DIGITS: 7,
   PRIORITY_KEYWORD_SCORE: 20,
@@ -207,7 +209,8 @@ export const CRAWL_JSONLD_TYPES = [
 
 /** Shared regex / matchers (SSOT). */
 export const CRAWL_PATTERNS = {
-  EMAIL: /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g,
+  // Bounded: unbounded, 100 KB of text with no "@" held the event loop for 27 s.
+  EMAIL: /[a-zA-Z0-9._%+\-]{1,64}@[a-zA-Z0-9.\-]{1,255}\.[a-zA-Z]{2,}/g,
   ASSET_EXT: /\.(pdf|png|jpe?g|gif|svg|webp|css|js|zip|xml|rss)$/i,
   DNS_FAIL: /ENOTFOUND|getaddrinfo|NXDOMAIN|ERR_NAME_NOT_RESOLVED|dns/i,
   TIMEOUT: /timeout|ETIMEDOUT|AbortError|timed out/i,

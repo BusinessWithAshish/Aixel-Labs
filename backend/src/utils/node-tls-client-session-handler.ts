@@ -8,6 +8,7 @@ import {
 } from "node-tls-client";
 import type { IncomingHttpHeaders } from "node:http";
 import { withTimeout } from "./async-helpers";
+import { withFetchSlot } from "./fetch-scope";
 import {
   DEFAULT_HTML_HEADERS,
   FETCH_URLS_REQUEST_TIMEOUT_MS,
@@ -89,6 +90,32 @@ async function shutdownTls(): Promise<void> {
   tlsInitPromise = null;
 }
 
+/**
+ * A fetch waits for a slot and refuses to start once its request is cancelled. The native
+ * side recreates a closed session when a fetch using it runs, so a session closed with
+ * fetches still running is closed again after the last one.
+ */
+class ScopedSession extends Session {
+  private running = 0;
+  private closed = false;
+
+  protected override execute(...args: Parameters<Session["execute"]>) {
+    return withFetchSlot(async () => {
+      this.running++;
+      try {
+        return await super.execute(...args);
+      } finally {
+        if (--this.running === 0 && this.closed) super.close().catch(() => {});
+      }
+    });
+  }
+
+  override async close() {
+    this.closed = true;
+    if (this.running === 0) return super.close();
+  }
+}
+
 export type UrlFetchSession = InstanceType<typeof Session>;
 
 export type CreateUrlFetchSessionOptions = {
@@ -154,7 +181,7 @@ export async function createUrlFetchSession(
     ...(proxyUrl ? { proxy: proxyUrl } : {}),
   };
 
-  return new Session(sessionOpts);
+  return new ScopedSession(sessionOpts);
 }
 
 export async function closeUrlFetchSession(
@@ -263,10 +290,12 @@ export async function fetchUrls<T = unknown>(
           }
 
           try {
-            const response = await withTimeout(
-              session!.get(url, { followRedirects: true }),
-              FETCH_URLS_REQUEST_TIMEOUT_MS,
-              `${pos} attempt ${attempt}`,
+            const response = await withFetchSlot(() =>
+              withTimeout(
+                session!.get(url, { followRedirects: true }),
+                FETCH_URLS_REQUEST_TIMEOUT_MS,
+                `${pos} attempt ${attempt}`,
+              ),
             );
 
             const elapsed = Date.now() - startMs;

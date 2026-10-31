@@ -21,6 +21,12 @@ batch does not fail.
 Schema: `schemas.ts` → `CRAWL_REQUEST_SCHEMA`.
 Limits: `constants.ts` → `CRAWL`.
 
+`maxPages` counts pages kept. Fetches per domain stop at `maxPages` + the
+well-known paths, however many links fail, and a site that fails a whole first
+batch is dropped. Only the first `MAX_HTML_CHARS` of a page is parsed, because
+the parser runs on the main thread. The download itself cannot be capped:
+`node-tls-client` buffers the whole body, up to the 15 s timeout.
+
 ## Response — `ALApiResponse<CRAWL_RESPONSE[]>`
 
 One item per input domain. `id` is a stable hash of the registrable domain

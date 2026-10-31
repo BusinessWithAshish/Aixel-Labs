@@ -52,8 +52,9 @@ API_ENDPOINTS.FACEBOOK.API.full = "/facebook"  // FE / apiClient path
 7. Global `rateLimit` (`RATE_LIMIT_MAX` or 100 / 15m) — loopback callers (127.0.0.1 / ::1: local agents, cron, MCP on this host) are exempt via `skip`; public traffic arrives through Caddy with `TRUST_PROXY=1`, so `req.ip` is the real client and cannot be spoofed to loopback
 8. `GET API_ENDPOINTS.PING` (`/v1/ping`) — extra-tight limit
 9. API secret gate — with `AIXEL_API_SECRET` set, remote callers must send it (`API_SECRET_HEADER`, `Authorization: Bearer`, or `/mcp?key=`); callers on this host and `API_SECRET_EXEMPT_PATHS` (token-gated upload steps) pass. Unset = open (local dev only)
-10. `registerRoutes(app)` — mounts only what this process serves (`AIXEL_LABS_SERVICE`, see Services)
-11. `export = app`; if not `VERCEL`, `listen(PORT || 8002)` and a SIGTERM handler that drains (see Deploy)
+10. Scrape capacity — every request is one party in the outbound fetch limit (`utils/fetch-scope.ts`), callers on this host and MCP included. `SCRAPE_ROUTES` also stop fetching when the caller disconnects, when the handler has answered, or at the deadline (4 min remote, 15 min local), and remote callers are capped at `MAX_REMOTE_SCRAPES` at once (503 beyond it)
+11. `registerRoutes(app)` — mounts only what this process serves (`AIXEL_LABS_SERVICE`, see Services)
+12. `export = app`; if not `VERCEL`, `listen(PORT || 8002)` and a SIGTERM handler that drains (see Deploy)
 
 **`import "dotenv/config"` must be first** so `PROXY_CONFIG` and other env-baked
 constants see variables.
@@ -84,6 +85,8 @@ Default stays `/mcp`. Extra servers: path-split under the MCP router **or** new
 | _(browser host)_ | **No env var.** The `chatgpt`/`gemini` modules (headful Chrome/CDP) are gated by `assertBrowserRuntime` in `config.ts`, which auto-detects a usable host: an X display must be present (Xvfb socket at `/tmp/.X11-unix/X<n>` for the module's `DISPLAY`, default `:99`) and it must not be Vercel. The VPS's `aixel-xvfb` unit provides that display, so nothing is configured; Vercel and any host without an X server refuse browser ops on their own. Replaced the old hand-set `AIXEL_VPS=1` flag. **Not** used by `claude` — that module shells to the `claude` CLI, which runs on any machine it's installed and authenticated on and fails with a plain error otherwise. |
 | `TRUST_PROXY` | Override trust proxy |
 | `RATE_LIMIT_MAX` | Global limiter |
+| `MAX_REMOTE_SCRAPES` | Scrapes at once from outside this host (default 30) |
+| `MAX_OUTBOUND_FETCHES` | Scrape fetches at once in this process (default 6). Keep it under `node-tls-client`'s thread count, 2 x CPUs |
 | `AIXEL_MEDIA_ROOT` | **Single root for every on-disk media path** (`src/media.ts`, `AIXEL_MEDIA` const). Unset → `cwd/storage` (local/dev). VPS systemd: `/home/ubuntu/media`. Every subdir — `media` `cut`/`condense`/`fetch` output, `youtube` `video_download`, `chatgpt`'s staged reference images (`refs/`) — is a fixed subpath derived from this one root; none of them has its own override env var. Repoint the whole tree by changing this one var, not by adding a new one. |
 | `AIXEL_MEDIA_PUBLIC_BASE` | Public URL prefix for staged files (default `https://hermes.aixellabs.in/media`) |
 | `CHANNEL_API_KEYS_DIR` | Folder of per-channel `<slug>.json` Gemini/Groq key files (`src/channel-keys.ts`), outside the repo. Unset → the `channel` field is ignored and the shared keys are used. VPS systemd sets it. |

@@ -27,6 +27,7 @@ by the frontend (no `@aixellabs/backend/utils` package export).
 |------|------|
 | `node-tls-client-session-handler.ts` | Primary HTTP: sessions, `fetchUrls`, `tlsGet`, sticky proxy, retries |
 | `fetch-session-common.ts` | Shared options, `buildEvomiProxyUrl`, presets, retry/skip, timeouts |
+| `fetch-scope.ts` | Process-wide limit on outbound fetches (`MAX_OUTBOUND_FETCHES`, default 6; `node-tls-client` has 2 x CPUs threads), one turn per request so one big request cannot starve the others, and cancellation: fetches refuse to run once the request's signal aborts. Every session from `createUrlFetchSession` goes through it, proxied or direct. A caller racing its own timeout wraps the race in `withFetchSlot` so time in line does not count. **Fetch through these sessions; a raw `fetch` in a scraper is outside the limit** |
 | `evomi-budget.ts` | Global Evomi spend cap — `assertEvomiBudget()` runs inside `buildEvomiProxyUrl`; throws 503 once rolling-24h usage ≥ `EVOMI_DAILY_CAP_MB`. Fail-open; gates new proxy URLs only |
 | `constants.ts` | Browser timeouts + `PROXY_CONFIG` from `EVOMI_PROXY_*` (after `dotenv` in `server.ts`) |
 | `location-schema.ts` | Shared Zod: `LOCATION_FIELDS_SCHEMA`, ISO country, state/city |

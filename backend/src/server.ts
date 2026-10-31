@@ -14,6 +14,7 @@ import { startBoardScheduleTicker } from "./board-schedule-ticker";
 import { startLineFinderTicker } from "./line-finder-ticker";
 import { attachGameSockets } from "./api/game-sockets";
 import { closeMcpStreams } from "./mcp/router";
+import { runInFetchScope } from "./utils/fetch-scope";
 import type { Express } from "express";
 import {
   ALLOWED_ORIGINS_DEV_REGEX,
@@ -218,22 +219,51 @@ app.use((req, res, next) => {
 // ===================
 // 6.2 Scrape Capacity
 // ===================
-// A scraper keeps working after its caller disconnects, so count a scrape until
-// its handler answers rather than until the socket closes. The timer is for a
+// Every request is one party in the process-wide limit on outbound fetches
+// (`utils/fetch-scope.ts`), MCP calls included, wherever the caller is.
+app.use((_req, _res, next) => runInFetchScope(next));
+
+const SCRAPE_ROUTES = [
+  `${ENDPOINTS.GMAPS}/*splat`,
+  API_ENDPOINTS.GSEARCH.SEARCH.full,
+  API_ENDPOINTS.GSEARCH.SEARCH_V2.full,
+  API_ENDPOINTS.INSTAGRAM.API.full,
+  API_ENDPOINTS.INSTAGRAM.ADVANCED_POSTS.full,
+  API_ENDPOINTS.INSTAGRAM.ADVANCED_SEARCH.full,
+  API_ENDPOINTS.FACEBOOK.API.full,
+  API_ENDPOINTS.LINKEDIN.API.full,
+  API_ENDPOINTS.CRAWL.API.full,
+];
+
+// A scrape stops fetching once its caller is gone, its time is up or it has answered
+// (a failed `Promise.all` answers while its other workers still run). On a deadline
+// it answers with what it has. The remote deadline leaves time inside the frontend's
+// 300 s route limit, which may already have waited 45 s for a place in line.
+const REMOTE_SCRAPE_DEADLINE_MS = 4 * 60 * 1000;
+const LOCAL_SCRAPE_DEADLINE_MS = 15 * 60 * 1000;
+
+app.post(SCRAPE_ROUTES, (req, res, next) => {
+  const cancel = new AbortController();
+  const deadline = setTimeout(
+    () => cancel.abort(),
+    isLocalCaller(req) ? LOCAL_SCRAPE_DEADLINE_MS : REMOTE_SCRAPE_DEADLINE_MS,
+  );
+  res.once("close", () => {
+    clearTimeout(deadline);
+    cancel.abort();
+  });
+  runInFetchScope(next, cancel.signal);
+});
+
+// Count a scrape until its handler answers rather than until the socket closes:
+// a cancelled one still finishes the fetches already running. The timer is for a
 // handler that never answers. Callers on this host have their own schedules.
 const MAX_REMOTE_SCRAPES = Number(process.env.MAX_REMOTE_SCRAPES) || 30;
 const REMOTE_SCRAPE_RELEASE_MS = 15 * 60 * 1000;
 let remoteScrapes = 0;
 
 app.post(
-  [
-    `${ENDPOINTS.GMAPS}/*splat`,
-    ENDPOINTS.GSEARCH,
-    ENDPOINTS.INSTAGRAM,
-    ENDPOINTS.FACEBOOK,
-    ENDPOINTS.LINKEDIN,
-    ENDPOINTS.CRAWL,
-  ],
+  SCRAPE_ROUTES,
   (req, res, next) => {
     if (isLocalCaller(req)) return next();
     if (remoteScrapes >= MAX_REMOTE_SCRAPES) {

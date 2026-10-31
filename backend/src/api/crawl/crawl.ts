@@ -5,6 +5,7 @@ import {
 } from "../../utils/node-tls-client-session-handler";
 import { FETCH_URLS_REQUEST_TIMEOUT_MS } from "../../utils/fetch-session-common";
 import { jitter, sleep, withTimeout } from "../../utils/async-helpers";
+import { FetchAbortedError, withFetchSlot } from "../../utils/fetch-scope";
 import { runWithConcurrency } from "../youtube/concurrency";
 import {
   CRAWL,
@@ -34,7 +35,10 @@ async function fetchPage(
 ): Promise<{ status: number; body: string }> {
   const response = await session.get(url, { followRedirects: true });
   const body = await response.text();
-  return { status: response.status, body };
+  return {
+    status: response.status,
+    body: body.slice(0, CRAWL.MAX_HTML_CHARS),
+  };
 }
 
 async function fetchWithRetry(
@@ -47,10 +51,12 @@ async function fetchWithRetry(
   for (let attempt = 1; attempt <= CRAWL.FETCH_RETRIES + 1; attempt++) {
     try {
       const session = await getSession();
-      const result = await withTimeout(
-        fetchPage(session, url),
-        FETCH_URLS_REQUEST_TIMEOUT_MS,
-        `fetch ${url}`,
+      const result = await withFetchSlot(() =>
+        withTimeout(
+          fetchPage(session, url),
+          FETCH_URLS_REQUEST_TIMEOUT_MS,
+          `fetch ${url}`,
+        ),
       );
 
       if (result.status === 403 || result.status === 429) {
@@ -64,6 +70,7 @@ async function fetchWithRetry(
       }
       return result;
     } catch (err) {
+      if (err instanceof FetchAbortedError) throw err;
       lastErr = err instanceof Error ? err : new Error(String(err));
       if (attempt <= CRAWL.FETCH_RETRIES) {
         await closeAndReplace().then(setSession);
@@ -119,15 +126,24 @@ export async function crawlDomain(
   try {
     await openSession();
 
-    while (queue.length > 0 && pagesCrawled.length < maxPages) {
+    // maxPages counts pages kept; this also stops a site whose links all fail.
+    let fetchesLeft = maxPages + CRAWL_WELL_KNOWN_PATHS.length;
+
+    while (
+      queue.length > 0 &&
+      pagesCrawled.length < maxPages &&
+      fetchesLeft > 0
+    ) {
       queue.sort((a, b) => b.score - a.score);
 
       const batchSize = Math.min(
         CRAWL.PAGE_CONCURRENCY,
         maxPages - pagesCrawled.length,
         queue.length,
+        fetchesLeft,
       );
       const batch = queue.splice(0, batchSize);
+      fetchesLeft -= batchSize;
 
       const batchResults = await runWithConcurrency(
         batch,
@@ -207,6 +223,9 @@ export async function crawlDomain(
           }
         }
       }
+
+      // A site that failed a whole batch and gave us nothing is down: stop spending slots on it.
+      if (pagesCrawled.length === 0 && batchResults.every((r) => r.error)) break;
 
       if (!thorough) {
         const merged = mergeExtracts(extracts);
