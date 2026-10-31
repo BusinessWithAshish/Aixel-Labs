@@ -52,8 +52,12 @@ function isTokenRejected(error: unknown): boolean {
     return error instanceof WhatsAppApiError && (error.status === 401 || error.code === 190);
 }
 
-/** The WhatsApp accounts the token may manage, refused in plain words when it is not right for this app. */
-async function checkedAccounts(auth: WhatsAppAuth): Promise<string[]> {
+/**
+ * The WhatsApp accounts to list: `wabaId` when the customer named one, else the ones the token names. Refused in plain
+ * words when the token is not right for this app. An admin system user's token "applies to all objects": Meta then names
+ * no accounts in debug_token, and may list none assigned to it either, though the token can open them.
+ */
+async function checkedAccounts(auth: WhatsAppAuth, wabaId?: string): Promise<string[]> {
     let info;
     try {
         info = await debugToken(auth);
@@ -70,18 +74,18 @@ async function checkedAccounts(auth: WhatsAppAuth): Promise<string[]> {
     }
     const missing = SCOPES.filter((scope) => !info.scopes?.includes(scope));
     if (missing.length) throw new Error(`The access token is missing ${missing.join(' and ')}. Generate it again with both.`);
+    if (wabaId) return [wabaId];
     const accounts = new Set(
         (info.granular_scopes ?? [])
             .filter((g) => g.scope === 'whatsapp_business_management')
             .flatMap((g) => g.target_ids ?? []),
     );
-    // An admin system user's token "applies to all objects": Meta names no accounts, so ask which are assigned to it.
     if (accounts.size === 0) {
         for (const wabaId of await listAssignedWabas(auth)) accounts.add(wabaId);
     }
     if (accounts.size === 0) {
         throw new Error(
-            'This access token reaches no WhatsApp account. In Business Settings, assign your WhatsApp account to the system user, then generate the token again.',
+            'Meta does not say which WhatsApp account this token is for. Paste your WhatsApp Business Account ID below (your Meta app: WhatsApp, API Setup), then try again.',
         );
     }
     return [...accounts];
@@ -99,12 +103,18 @@ async function assertAppFree(auth: WhatsAppAuth): Promise<void> {
 }
 
 /** Checks the credentials, then lists every number in the WhatsApp accounts the token reaches. */
-export async function listWhatsAppAccountNumbers(auth: WhatsAppAuth): Promise<WhatsAppAccountNumber[]> {
-    const accounts = await checkedAccounts(auth);
+export async function listWhatsAppAccountNumbers(auth: WhatsAppAuth, named?: string): Promise<WhatsAppAccountNumber[]> {
+    const accounts = await checkedAccounts(auth, named);
     await assertAppFree(auth);
     const numbers: WhatsAppAccountNumber[] = [];
     for (const wabaId of accounts) {
-        for (const n of await listPhoneNumbers(auth, wabaId)) {
+        const found = await listPhoneNumbers(auth, wabaId).catch((error: unknown) => {
+            if (named && error instanceof WhatsAppApiError && error.status >= 400 && error.status < 500 && !isTokenRejected(error)) {
+                throw new Error(`This token cannot open WhatsApp account ${named}. Check the ID (your Meta app: WhatsApp, API Setup), and that the account is assigned to the system user.`);
+            }
+            throw error;
+        });
+        for (const n of found) {
             numbers.push({
                 providerNumberId: n.id,
                 phoneNumber: e164(n.display_phone_number),

@@ -80,9 +80,14 @@ export function whatsappWebhook(appId: string): { callbackUrl: string; verifyTok
     };
 }
 
-/** Whether a webhook callback is this engine's WhatsApp one (whatever app it names). */
+/**
+ * Whether a webhook callback is one of ours (`/whatsapp?app=…&sig=…`), on this engine or an address it had before:
+ * turning AI answering on points it here. Anything else is an integration the customer runs.
+ */
 export function isWhatsAppWebhook(url: string | undefined): boolean {
-    return !!url && url.startsWith(`${voiceEngineUrl()}/whatsapp?`);
+    if (!url || !URL.canParse(url)) return false;
+    const { pathname, searchParams } = new URL(url);
+    return pathname.endsWith('/whatsapp') && /^\d+$/.test(searchParams.get('app') ?? '') && /^[0-9a-f]{32}$/.test(searchParams.get('sig') ?? '');
 }
 
 /** The media socket a VoiceLink number's bot streams calls in to: `wss://<engine>/voicelink?n=…&sig=…`. */

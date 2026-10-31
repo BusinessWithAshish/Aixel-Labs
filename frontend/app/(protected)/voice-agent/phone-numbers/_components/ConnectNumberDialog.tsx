@@ -58,6 +58,7 @@ const credentialsSchema = z
         appId: z.string().trim(),
         appSecret: z.string().trim(),
         accessToken: z.string().trim(),
+        wabaId: z.string().trim(),
     })
     .superRefine((c, ctx) => {
         const missing = (field: keyof typeof c, message: string) =>
@@ -90,6 +91,7 @@ const NO_CREDENTIALS: Credentials = {
     appId: '',
     appSecret: '',
     accessToken: '',
+    wabaId: '',
 };
 
 function twilioCredentials(c: Credentials): TwilioCredentials {
@@ -97,7 +99,7 @@ function twilioCredentials(c: Credentials): TwilioCredentials {
 }
 
 function whatsappCredentials(c: Credentials): WhatsAppCredentials {
-    return { appId: c.appId, appSecret: c.appSecret, token: c.accessToken };
+    return { appId: c.appId, appSecret: c.appSecret, token: c.accessToken, wabaId: c.wabaId };
 }
 
 /** Each provider's server actions, fed from the form: check the credentials and list the numbers, then import. */
@@ -364,6 +366,13 @@ function ConnectNumberContent({ provider }: { provider: VoiceProvider }) {
                                     secret
                                     placeholder="EA…"
                                     hint="Business Settings, System users: a token that never expires, with whatsapp_business_management and whatsapp_business_messaging."
+                                />
+                                <CredentialField
+                                    name="wabaId"
+                                    id="whatsapp-waba-id"
+                                    label="WhatsApp Business Account ID (optional)"
+                                    inputMode="numeric"
+                                    hint="Only if Meta will not say which account your token is for: your Meta app, WhatsApp, API Setup."
                                 />
                             </>
                         ) : isVoiceLink ? (

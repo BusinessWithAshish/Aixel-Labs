@@ -88,6 +88,8 @@ export type WhatsAppCredentials = {
     appId: string;
     appSecret: string;
     token: string;
+    /** Only when Meta will not say which WhatsApp account the token is for. */
+    wabaId?: string;
 };
 
 export type VoiceNumberListItem = VoiceNumber & {
@@ -173,6 +175,14 @@ function assertWhatsAppCredentials(credentials: WhatsAppCredentials): WhatsAppAu
         throw new Error('That does not look like a Meta access token (it starts with EA)');
     }
     return { appId, appSecret, token };
+}
+
+function assertWabaId(credentials: WhatsAppCredentials): string | undefined {
+    const wabaId = typeof credentials?.wabaId === 'string' ? credentials.wabaId.trim() : '';
+    if (wabaId && !/^\d{5,20}$/.test(wabaId)) {
+        throw new Error('The WhatsApp Business Account ID is a number: your Meta app, WhatsApp, API Setup');
+    }
+    return wabaId || undefined;
 }
 
 /**
@@ -490,7 +500,7 @@ export const connectWhatsApp = async (credentials: WhatsAppCredentials): Promise
         const owner = await requireVoiceOwner(userId, WHATSAPP_SUB_MODULE);
         assertRateLimit(`voice-check:${owner.userId}`, 30);
         const auth = assertWhatsAppCredentials(credentials);
-        const numbers = await withImportState(owner, VoiceProvider.WHATSAPP, await listWhatsAppAccountNumbers(auth));
+        const numbers = await withImportState(owner, VoiceProvider.WHATSAPP, await listWhatsAppAccountNumbers(auth, assertWabaId(credentials)));
         // The WhatsApp account id stays here: import reads it from Meta again.
         return numbers.map((n) => {
             const view: AccountNumber & { wabaId?: string } = { ...n, cannotImport: whatsappNumberProblem(n) };
@@ -515,7 +525,7 @@ export const importWhatsAppNumbers = async (
         const appSecretSealed = sealSecret(auth.appSecret);
         return importNumbers(owner, {
             provider: VoiceProvider.WHATSAPP,
-            accountNumbers: await listWhatsAppAccountNumbers(auth),
+            accountNumbers: await listWhatsAppAccountNumbers(auth, assertWabaId(credentials)),
             wantedIds: providerNumberIds,
             apiKeySealed: sealSecret(auth.token),
             providerName: whatsappNumbers.label,
