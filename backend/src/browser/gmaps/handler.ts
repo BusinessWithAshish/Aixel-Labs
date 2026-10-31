@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { BrowserBatchHandler } from "../../browser/browser-batch-handler";
+import { BrowserBatchHandler } from "../core/browser-batch-handler";
 import { GMAPS_SCRAPE_RESPONSE } from "./types";
 import { GMAPS_REQUEST_SCHEMA } from "./schemas";
 import {

@@ -165,8 +165,8 @@ Try in order; each is a distinct browserless-ish strategy. Full research context
 4. **4get engine** (https://github.com/cra88y/4get-hijacked) — an actively maintained
    Google scraper; can be run as a sidecar and queried over HTTP.
 
-5. **browser-worker (real Chrome + stealth + Evomi)** — `browser-worker/src/handlers/
-   gsearch/`. This DOES get the full HTML SERP (incl. PAA/AI Overview) when the IP is
+5. **`src/browser` (real Chrome + stealth + Evomi)** — `backend/src/browser/
+   gsearch/`, parked and unmounted (see its README). This DOES get the full HTML SERP (incl. PAA/AI Overview) when the IP is
    clean. Slower, heavier, but the most durable. Use for full SERP features regardless.
 
 6. **HTML `/search` + SG_SS** — only if someone publishes a real knitsail deobfuscator

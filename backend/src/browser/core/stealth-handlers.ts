@@ -1,12 +1,10 @@
 import { readFileSync } from "fs";
-import { join } from "path";
-import { Page } from "puppeteer";
-import { config } from "dotenv";
-
-config();
+import { resolve } from "path";
+import { Page } from "puppeteer-core";
 
 const BOT_STEALTH_INJECT_SCRIPT = readFileSync(
-  join(__dirname, "bot-stealth-inject.js"),
+  // tsc doesn't copy .js files, so src/ and dist/ both read the copy in src/.
+  resolve(__dirname, "../../../src/browser/core/bot-stealth-inject.js"),
   "utf-8",
 );
 

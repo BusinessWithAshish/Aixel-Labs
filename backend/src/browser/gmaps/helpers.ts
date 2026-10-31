@@ -1,12 +1,17 @@
 import { GMAPS_SCRAPE_LEAD_INFO, GMAPS_SCRAPE_REQUEST } from "./types";
-import { Page } from "puppeteer";
-import { pageStealther } from "../../browser/stealth-handlers";
+import { Page } from "puppeteer-core";
+import { pageStealther } from "../core/stealth-handlers";
 import {
   DEFAULT_PAGE_LOAD_TIMEOUT,
   DEFAULT_ELEMENT_LOAD_TIMEOUT,
-} from "../../browser/constants";
-import { browserDebugger } from "../../browser/browser-batch-handler";
+} from "../../utils/constants";
+import { browserDebugger } from "../core/browser-batch-handler";
 import { DEFAULT_GOOGLE_MAPS_URL } from "./constants";
+
+// page.evaluate() bodies run in the browser, and the backend has no DOM lib.
+declare const document: any;
+type HTMLAnchorElement = any;
+type HTMLElement = any;
 
 export const scrapeLinks = async (
   url: string,
@@ -80,7 +85,7 @@ export const scrapeLinks = async (
       const anchors = document.querySelectorAll('a[href*="/maps/place/"]');
       const uniqueLinks = new Set<string>();
 
-      anchors.forEach((anchor) => {
+      anchors.forEach((anchor: any) => {
         const href = anchor.getAttribute("href");
         if (href) {
           uniqueLinks.add(

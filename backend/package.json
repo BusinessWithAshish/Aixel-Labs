@@ -287,6 +287,7 @@
     "mongodb": "^6.17.0",
     "morgan": "^1.11.0",
     "node-tls-client": "^2.1.0",
+    "puppeteer-core": "^24.40.0",
     "sharp": "^0.35.5",
     "simple-statistics": "^7.9.3",
     "tldts": "^7.4.11",

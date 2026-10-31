@@ -32,7 +32,6 @@ by the frontend (no `@aixellabs/backend/utils` package export).
 | `location-schema.ts` | Shared Zod: `LOCATION_FIELDS_SCHEMA`, ISO country, state/city |
 | `country.ts` | `toAlpha2CountryCode` for proxy `_country-XX` / Google `gl` |
 | `async-helpers.ts` | `sleep`, `jitter`, `withTimeout`, header merge, `shortUrl` |
-| `browser-worker.ts` | Optional remote Chrome via `BROWSER_WORKER_URL` — **no live api/ importers** today |
 | `guerrilla-mail.ts` | Temp inbox helper — **no live importers** today |
 | `google-consent.ts` | Solves Google's GDPR/EU consent interstitial (`consent.google.com`) once per TLS session by replaying its own accept-all form — no browser. Used by `gmaps` and `google-trends`; reach for it any time a `google.com` property starts redirecting instead of serving content |
 
@@ -80,8 +79,9 @@ duplicate country/state/city Zod in each module.
 | Proxy / TLS / geo primitives | Product-specific URL builders (module `constants`) |
 | Generic async/retry helpers | Intelligence enrich math (`compute/`) |
 
-Dead helpers (`browser-worker`, `guerrilla-mail`): don’t revive without a live
-caller and a module README note.
+Dead helper (`guerrilla-mail`): don’t revive without a live caller and a module
+README note. Real-Chrome scraping is parked in `backend/src/browser/` (see its
+README), not here.
 
 ## Env (read via utils / server)
 
@@ -89,7 +89,6 @@ caller and a module README note.
 |-----|---------|
 | `EVOMI_PROXY_*` | `PROXY_CONFIG` |
 | `EVOMI_DAILY_CAP_MB` + `EVOMI_PUBLIC_API_KEY` | `evomi-budget.ts` — cap is off unless both are set |
-| `BROWSER_WORKER_URL` | `browser-worker.ts` |
 | `FETCH_URLS_DEBUG_PROXY` | proxy debug |
 
 `dotenv/config` must load in `server.ts` **before** modules that freeze env into

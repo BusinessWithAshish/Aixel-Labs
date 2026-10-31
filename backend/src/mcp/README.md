@@ -40,7 +40,7 @@ domain**. Every tool takes the same top-level shape:
 | `gmaps`         | `search`, `details`, `advanced`                                                                                                                | raw only. `search` is the primary Maps lead search (query/placeType across cities, `countryCode` always required); `urls` is not implemented on `search` — use `advanced` for a batch of place URLs. `details` resolves one place (placeId/featureId/url). |
 | `facebook`      | `search`                                                                                                                                        | raw only. Discovers Pages via Google CSE (`site:facebook.com`) and/or enriches known Page vanities/URLs from Page HTML. |
 | `linkedin`      | `people`, `company`                                                                                                                             | raw only. Google CSE discovery + guest-view profile/company scrape; `searchType` in `input` must match the op. |
-| `crawl`         | `scrape`                                                                                                                                        | raw only. Sync TLS crawl of a company's own domain/URL into an emails/phones/socials contact profile — no browser-worker/Botasaurus. |
+| `crawl`         | `scrape`                                                                                                                                        | raw only. Sync TLS crawl of a company's own domain/URL into an emails/phones/socials contact profile — no Puppeteer/Botasaurus. |
 
 ### Instagram discovery — which op
 
