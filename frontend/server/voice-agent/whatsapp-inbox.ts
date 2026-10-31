@@ -169,6 +169,10 @@ export async function getThread(owner: VoiceOwnerScope, key: string): Promise<In
                 items.push({ kind: 'message', role: turn.role, text: turn.text, at: at.toISOString(), voice: !!turn.voice, by: turn.by === myName ? null : (turn.by ?? null) });
             }
         } else if (doc._id) {
+            // A call they made opens the 24-hour window too (Meta: "messages you or calls you"), answered or not.
+            if (doc.direction === VoiceCallDirection.INBOUND && (!lastCallerAt || doc.startedAt > lastCallerAt)) {
+                lastCallerAt = doc.startedAt;
+            }
             items.push({
                 kind: 'call',
                 id: doc._id.toString(),

@@ -312,7 +312,7 @@ test('an account without an outbound voice profile gets a clear error and no app
     telnyx.outboundVoiceProfiles = [];
     await openPhoneNumbers(page);
 
-    await testCall(page, FIRST_NUMBER, '+14155550123', 'Your Telnyx account has no outbound voice profile');
+    await testCall(page, FIRST_NUMBER, '+14155550123', 'Your Telnyx account has no enabled outbound voice profile');
     expect(telnyxWrites()).toHaveLength(0);
     expect(engine.requests).toHaveLength(0);
     expect((await db.getVoiceNumbers(E2E_USER))[0].callControlAppId).toBeUndefined();

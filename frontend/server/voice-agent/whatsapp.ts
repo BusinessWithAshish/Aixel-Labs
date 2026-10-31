@@ -29,7 +29,7 @@ export type WhatsAppTokenInfo = {
     is_valid?: boolean;
     app_id?: string;
     scopes?: string[];
-    /** Per permission, the WhatsApp accounts (WABA ids) it was granted on. */
+    /** Per permission, the WhatsApp accounts (WABA ids) it was granted on; none when it "applies to all objects". */
     granular_scopes?: { scope: string; target_ids?: string[] }[];
 };
 
@@ -68,7 +68,11 @@ const KNOWN_ERRORS: Record<number, string> = {
     10: 'The access token is missing a permission. Generate it again with whatsapp_business_management and whatsapp_business_messaging, for this app and this WhatsApp account.',
     200: 'The access token is missing a permission. Generate it again with whatsapp_business_management and whatsapp_business_messaging, for this app and this WhatsApp account.',
     4: 'Meta is getting too many requests from this app right now. Try again in a few minutes.',
+    80007: 'Meta is getting too many requests from this WhatsApp account right now. Try again in a few minutes.',
     80008: 'Meta is getting too many requests from this WhatsApp account right now. Try again in a few minutes.',
+    130429: 'This number is sending more messages than Meta allows per second right now. Try again in a moment.',
+    131056: 'Too many messages went to this person in a short time. Wait a little, then send again.',
+    131042: 'Meta refused because of your WhatsApp account’s payment method. Check Payment settings in WhatsApp Manager, then try again.',
     131044: 'Your WhatsApp account has no payment method, and Meta needs one before calls work (even calls coming in, which are free). Add one in WhatsApp Manager (Payment settings), then try again.',
     138015: 'Meta turns on calling only for numbers that can message at least 2,000 people a day. Verify your business in Meta Business Settings (Security Center) to raise the limit, then try again.',
     138018: 'Meta could not see this app subscribed to calls yet. Wait a minute and try again.',
@@ -134,6 +138,21 @@ export async function debugToken(auth: WhatsAppAuth): Promise<WhatsAppTokenInfo>
     const query = new URLSearchParams({ input_token: auth.token });
     const res = await graphRequest<{ data?: WhatsAppTokenInfo }>(appToken(auth), 'GET', `/debug_token?${query}`);
     return res.data ?? {};
+}
+
+/** `GET /me/assigned_whatsapp_business_accounts`: the WhatsApp accounts (WABA ids) assigned to the token's system user, every page. */
+export async function listAssignedWabas(auth: WhatsAppAuth): Promise<string[]> {
+    const ids: string[] = [];
+    let after: string | null = null;
+    for (let page = 0; page < MAX_PAGES; page++) {
+        const query = new URLSearchParams({ fields: 'id', limit: '100', ...(after ? { after } : {}) });
+        const res: { data?: { id: string }[]; paging?: { cursors?: { after?: string }; next?: string } } =
+            await graphRequest(auth.token, 'GET', `/me/assigned_whatsapp_business_accounts?${query}`);
+        ids.push(...(res.data ?? []).map((w) => w.id));
+        after = res.paging?.next ? (res.paging.cursors?.after ?? null) : null;
+        if (!after) break;
+    }
+    return ids;
 }
 
 /** `GET /{waba-id}/phone_numbers`, every page. */

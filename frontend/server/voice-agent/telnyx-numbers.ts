@@ -12,10 +12,10 @@ import {
     deleteTexmlApplication,
     getPhoneNumber,
     listCallControlApplications,
-    listOutboundVoiceProfiles,
     listPhoneNumbers,
     setPhoneNumberConnection,
     TelnyxApiError,
+    usableOutboundVoiceProfileId,
     type TelnyxPhoneNumber,
 } from '@/server/voice-agent/telnyx';
 
@@ -55,13 +55,7 @@ async function ensureCallControlApp(doc: OwnedNumberDoc, key: string): Promise<s
         await setNumberFields(doc, { callControlAppId: ours.id });
         return ours.id;
     }
-    const profiles = await listOutboundVoiceProfiles(key);
-    const outboundVoiceProfileId = profiles[0]?.id;
-    if (!outboundVoiceProfileId) {
-        throw new Error(
-            'Your Telnyx account has no outbound voice profile. Create one in the Telnyx portal (Voice, Outbound Voice Profiles), then try again.',
-        );
-    }
+    const outboundVoiceProfileId = await usableOutboundVoiceProfileId(key);
     let appId: string;
     try {
         appId = (

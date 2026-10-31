@@ -245,6 +245,8 @@ function runnable(part: VoiceStackPartName, provider: VoiceKeyProvider, m: Gatew
         return provider !== VoiceKeyProvider.OPENAI || !/-pro\b|codex/.test(id);
     }
     if (part === 'stt') return (provider === VoiceKeyProvider.GEMINI) === tags.includes('websocket-transcription');
+    // A live model's -thinking variant runs every tool without waiting (Pipecat forces it), untested here.
+    if (part === 'realtime') return !/-thinking\b/.test(id);
     return true;
 }
 

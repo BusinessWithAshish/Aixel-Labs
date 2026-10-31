@@ -161,6 +161,28 @@ test('a WhatsApp number connects with the customer’s own Meta app on Numbers: 
     await expect(page.getByText('Phone desk')).toHaveCount(0);
 });
 
+test('a token that applies to all WhatsApp accounts finds them through its system user', async ({ page }) => {
+    // An admin system user's token: Meta's debug_token says "applies to all objects" and names no account.
+    meta.grantsAll = true;
+    meta.assignedWabas = [];
+
+    await open(page, PHONE_NUMBERS_URL);
+    await page.getByRole('button', { name: 'Connect a number' }).first().click();
+    await page.getByRole('menuitem', { name: /^WhatsApp/ }).click();
+    const connect = page.getByRole('dialog', { name: 'Connect a WhatsApp number' });
+    await connect.getByLabel('App ID').fill(FAKE_META_APP_ID);
+    await connect.getByLabel('App secret').fill(FAKE_META_APP_SECRET);
+    await connect.getByLabel('Access token').fill(FAKE_META_TOKEN);
+    // No account assigned to the system user either: the same plain refusal as before.
+    await connect.getByRole('button', { name: 'Find my numbers' }).click();
+    await expect(connect).toContainText('This access token reaches no WhatsApp account.');
+
+    meta.assignedWabas = [FAKE_WABA_ID];
+    await connect.getByRole('button', { name: 'Find my numbers' }).click();
+    await expect(connect.getByRole('checkbox')).toHaveCount(2);
+    await expect(connect).not.toContainText('reaches no WhatsApp account');
+});
+
 test('the same number as a phone line and on WhatsApp shares one agent, with one memory, picked on Numbers', async ({
     page,
     db,

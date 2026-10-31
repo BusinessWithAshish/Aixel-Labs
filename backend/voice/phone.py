@@ -140,8 +140,8 @@ PREPARED: dict[str, dict] = {}
 RING_SECS = 30
 # A voice note recorded in the inbox (/voice-note): two minutes of browser Opus is about 0.5 MB, so this is plenty.
 VOICE_NOTE_MAX_BYTES = 2 * 1024 * 1024
-# A WhatsApp webhook (/whatsapp): Meta's own are a few KB.
-WEBHOOK_MAX_BYTES = 1024 * 1024
+# A WhatsApp webhook (/whatsapp): most are a few KB, but Meta allows up to 3 MB (a refused one is retried for days).
+WEBHOOK_MAX_BYTES = 3 * 1024 * 1024
 # Her opening line is made while the phone rings and kept back until pickup, so
 # it is heard with no wait on the model. An unanswered dial then
 # still costs one short reply (nothing on the free tier, about $0.004 on a paid key).
@@ -993,7 +993,7 @@ def make_app() -> FastAPI:
         if draining():  # as /texml
             logger.warning("twiml: draining, the caller hears nobody can take the call")
             return Response(content=UNAVAILABLE_XML, media_type="application/xml")
-        form = dict(parse_qsl((await request.body()).decode(errors="replace"))) if request.method == "POST" else {}
+        form = dict(parse_qsl((await request.body()).decode(errors="replace"), keep_blank_values=True)) if request.method == "POST" else {}
         params = {**dict(request.query_params), **form}
         reject = Response(content=twilio.REJECT, media_type="application/xml")
         try:
@@ -1103,7 +1103,7 @@ def make_app() -> FastAPI:
         number_id, agent_id = q.get("n") or "", q.get("a") or ""
         if not product.sig_ok(q.get("sig"), "twilio-events", number_id, agent_id):
             return Response(status_code=403)
-        form = dict(parse_qsl((await request.body()).decode(errors="replace")))
+        form = dict(parse_qsl((await request.body()).decode(errors="replace"), keep_blank_values=True))
         creds = None
         try:
             number = await asyncio.to_thread(product.find_number, number_id)

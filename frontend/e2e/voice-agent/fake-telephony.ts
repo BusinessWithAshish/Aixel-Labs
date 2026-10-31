@@ -325,7 +325,16 @@ export class FakeTelnyx extends FakeHttpServer {
         }
         if (req.method === 'POST' && req.path === '/v2/telephony_credentials') {
             const id = this.newId();
-            const credential = { id, record_type: 'credential', ...req.body, sip_username: `gencred${id}`, expired: false };
+            // Like Telnyx: the connection comes back as `resource_id`, never as the `connection_id` that was sent.
+            const { connection_id: connectionId, ...body } = req.body ?? {};
+            const credential = {
+                id,
+                record_type: 'credential',
+                ...body,
+                resource_id: `connection:${String(connectionId)}`,
+                sip_username: `gencred${id}`,
+                expired: false,
+            };
             this.telephonyCredentials.set(id, credential);
             send(res, 201, { data: credential });
             return;
@@ -971,6 +980,10 @@ export class FakeMeta extends FakeHttpServer {
     refuseCalling = true;
     /** Whether `POST /{app}/subscriptions` calls the callback first, as Meta does (needs the real engine up). */
     verifyCallbacks = false;
+    /** An admin system user's token: its permissions "apply to all objects", so debug_token names no WhatsApp account. */
+    grantsAll = false;
+    /** The WhatsApp accounts assigned to the token's system user (`/me/assigned_whatsapp_business_accounts`). */
+    assignedWabas: string[] = [FAKE_WABA_ID];
     /** Media by id: voice notes people sent (served) and the ones the business uploaded. */
     readonly media = new Map<string, { bytes: Buffer; mime: string }>();
     readonly sent: WhatsAppSent[] = [];
@@ -1003,6 +1016,8 @@ export class FakeMeta extends FakeHttpServer {
         this.calling.clear();
         this.refuseCalling = true;
         this.verifyCallbacks = false;
+        this.grantsAll = false;
+        this.assignedWabas = [FAKE_WABA_ID];
         this.media.clear();
         this.sent.length = 0;
         this.reads.length = 0;
@@ -1043,7 +1058,9 @@ export class FakeMeta extends FakeHttpServer {
                     is_valid: valid,
                     app_id: FAKE_META_APP_ID,
                     scopes: valid ? scopes : [],
-                    granular_scopes: valid ? scopes.map((scope) => ({ scope, target_ids: [FAKE_WABA_ID] })) : [],
+                    granular_scopes: valid
+                        ? scopes.map((scope) => (this.grantsAll ? { scope } : { scope, target_ids: [FAKE_WABA_ID] }))
+                        : [],
                 },
             });
         }
@@ -1076,6 +1093,9 @@ export class FakeMeta extends FakeHttpServer {
             return send(res, 200, { success: true });
         }
         if (!tokenAuth) return fail(401, 190, 'Invalid OAuth access token');
+        if (path === '/me/assigned_whatsapp_business_accounts') {
+            return send(res, 200, { data: this.assignedWabas.map((id) => ({ id, tasks: ['MANAGE'] })) });
+        }
         if (first === FAKE_WABA_ID && second === 'subscribed_apps') {
             this.wabaSubscribed = true;
             return send(res, 200, { success: true });

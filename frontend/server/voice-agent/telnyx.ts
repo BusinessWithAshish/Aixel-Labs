@@ -24,6 +24,8 @@ export type TelnyxPhoneNumber = {
 export type TelnyxOutboundVoiceProfile = {
     id: string;
     name: string;
+    /** Telnyx: whether the profile can be used (default true). A disabled one fails every call placed with it. */
+    enabled?: boolean;
 };
 
 export type TelnyxRecording = {
@@ -147,6 +149,17 @@ export function listOutboundVoiceProfiles(apiKey: string): Promise<TelnyxOutboun
     return listAllPages<TelnyxOutboundVoiceProfile>(apiKey, '/v2/outbound_voice_profiles');
 }
 
+/** The account's first enabled outbound voice profile, refused in plain words when there is none. */
+export async function usableOutboundVoiceProfileId(apiKey: string): Promise<string> {
+    const profile = (await listOutboundVoiceProfiles(apiKey)).find((p) => p.enabled !== false);
+    if (!profile) {
+        throw new Error(
+            'Your Telnyx account has no enabled outbound voice profile. Create or enable one in the Telnyx portal (Voice, Outbound Voice Profiles), then try again.',
+        );
+    }
+    return profile.id;
+}
+
 /** `POST /v2/texml_applications` — Telnyx fetches TeXML from `voiceUrl` when a call comes in. */
 export async function createTexmlApplication(
     apiKey: string,
@@ -233,7 +246,8 @@ export type TelnyxTelephonyCredential = {
     name?: string | null;
     /** "gencred…": calls to `sip:<sip_username>@sip.telnyx.com` ring the browser signed in with it. */
     sip_username?: string | null;
-    connection_id?: string | null;
+    /** The connection it signs in on, as `connection:<id>` (Telnyx returns no `connection_id`). */
+    resource_id?: string | null;
     expired?: boolean;
 };
 

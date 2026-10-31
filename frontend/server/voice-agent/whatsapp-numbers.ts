@@ -9,6 +9,7 @@ import {
     debugToken,
     getAppSubscriptions,
     getCallingSettings,
+    listAssignedWabas,
     listPhoneNumbers,
     setCallingSettings,
     subscribeApp,
@@ -74,6 +75,10 @@ async function checkedAccounts(auth: WhatsAppAuth): Promise<string[]> {
             .filter((g) => g.scope === 'whatsapp_business_management')
             .flatMap((g) => g.target_ids ?? []),
     );
+    // An admin system user's token "applies to all objects": Meta names no accounts, so ask which are assigned to it.
+    if (accounts.size === 0) {
+        for (const wabaId of await listAssignedWabas(auth)) accounts.add(wabaId);
+    }
     if (accounts.size === 0) {
         throw new Error(
             'This access token reaches no WhatsApp account. In Business Settings, assign your WhatsApp account to the system user, then generate the token again.',

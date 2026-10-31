@@ -123,6 +123,8 @@ test('outbound, in this browser: the agent rings the signed-in browser, which an
     expect(engine.find('POST', '/calls').map((r) => r.body)).toEqual([
         { numberId, to: `sip:${credential.sip_username}@sip.telnyx.com`, agentId },
     ]);
+    // The agent rings the identity the browser signed in with: found again, not a second one.
+    expect(telnyx.find('POST', '/v2/telephony_credentials')).toHaveLength(1);
     // The browser's SIP URI takes the account's own calls (the agent's) only.
     expect([...telnyx.credentialConnections.values()][0]).toMatchObject({ sip_uri_calling_preference: 'internal' });
 

@@ -55,6 +55,12 @@ function refusal(httpStatus: number, body: GoogleError): VoiceKeyError {
             VoiceKeyStatus.INVALID,
         );
     }
+    if (/leaked/i.test(message)) {
+        return new VoiceKeyError(
+            'Google blocked this key because it was reported as leaked. Create a new one in Google AI Studio (aistudio.google.com/apikey).',
+            VoiceKeyStatus.INVALID,
+        );
+    }
     if (httpStatus === 400 || reasons.includes('API_KEY_INVALID')) {
         return new VoiceKeyError(
             'Google says this is not a valid API key. Copy it again from Google AI Studio (aistudio.google.com/apikey).',
@@ -71,6 +77,12 @@ function refusal(httpStatus: number, body: GoogleError): VoiceKeyError {
         return new VoiceKeyError(
             'This key is not allowed to use the Gemini API (its API restrictions block it). Allow the "Generative Language API" on the key in Google Cloud, or create a new key in Google AI Studio.',
             VoiceKeyStatus.API_DISABLED,
+        );
+    }
+    if (httpStatus === 402) {
+        return new VoiceKeyError(
+            'Google says the prepaid credit of this key’s project is used up. Add credit in Google AI Studio, then try again.',
+            VoiceKeyStatus.QUOTA,
         );
     }
     if (httpStatus === 429) {

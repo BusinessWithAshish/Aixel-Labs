@@ -10,9 +10,9 @@ import {
     createTelephonyCredential,
     createTelephonyCredentialToken,
     listCredentialConnections,
-    listOutboundVoiceProfiles,
     listTelephonyCredentials,
     type TelnyxTelephonyCredential,
+    usableOutboundVoiceProfileId,
 } from '@/server/voice-agent/telnyx';
 import { listApplications, saveApplication } from '@/server/voice-agent/twilio';
 import { twilioAuthOf } from '@/server/voice-agent/twilio-numbers';
@@ -56,12 +56,7 @@ export async function ensureTelnyxConnection(key: string): Promise<string> {
     const connections = await listCredentialConnections(key);
     const ours = connections.find((c) => c.connection_name === WEB_PHONE_LABEL);
     if (ours) return ours.id;
-    const outboundVoiceProfileId = (await listOutboundVoiceProfiles(key))[0]?.id;
-    if (!outboundVoiceProfileId) {
-        throw new Error(
-            'Your Telnyx account has no outbound voice profile. Create one in the Telnyx portal (Voice, Outbound Voice Profiles), then try again.',
-        );
-    }
+    const outboundVoiceProfileId = await usableOutboundVoiceProfileId(key);
     // Only tokens sign in; Telnyx still wants a SIP username (alphanumeric, unique) and password.
     const created = await createCredentialConnection(key, {
         connectionName: WEB_PHONE_LABEL,
@@ -80,7 +75,7 @@ export async function ensureTelnyxCredential(
     const connectionId = await ensureTelnyxConnection(key);
     const name = `${WEB_PHONE_LABEL} ${doc.phoneNumber}`;
     let credential = (await listTelephonyCredentials(key, name)).find(
-        (c) => c.name === name && c.connection_id === connectionId && !c.expired,
+        (c) => c.name === name && c.resource_id === `connection:${connectionId}` && !c.expired,
     );
     if (!credential) {
         credential = await createTelephonyCredential(key, { connectionId, name });

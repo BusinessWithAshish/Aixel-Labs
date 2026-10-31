@@ -83,13 +83,15 @@ def module_tests():
                   {"id": "wamid.2", "from": "919876543210", "type": "interactive",
                    "interactive": {"type": "button_reply", "button_reply": {"id": "b1", "title": "Book a visit"}}},
                   {"id": "wamid.3", "from": "919876543210", "type": "audio", "audio": {"id": "m1"}},
-                  {"id": "wamid.4", "type": "text"}, "junk"],
+                  {"id": "wamid.4", "type": "text"},
+                  {"id": "wamid.5", "from": "919876543210", "type": "reaction", "reaction": {"message_id": "wamid.out", "emoji": "👍"}},
+                  {"id": "wamid.6", "from": "919876543210", "type": "system", "system": {"body": "changed number"}}, "junk"],
         statuses=[{"id": "wamid.out", "status": "delivered"}])
     got = whatsapp.messages_in(texts)
     ok("messages: text and a tapped button read as text, a voice note as no text, with the sender's name",
        [(m["id"], m["text"], m["name"]) for m in got]
        == [("wamid.1", "Hi there", "Ravi"), ("wamid.2", "Book a visit", "Ravi"), ("wamid.3", None, "Ravi")], str(got))
-    ok("messages: delivery receipts and call events are not messages",
+    ok("messages: delivery receipts, reactions, system notices and call events are not messages",
        whatsapp.messages_in(webhook("p1", CONNECT)) == [] and whatsapp.calls_in(texts) == [])
     ok("verify token: the app's signParts('whatsapp-verify', appId)",
        whatsapp.verify_ok(APP, product.sign("whatsapp-verify", APP)) and not whatsapp.verify_ok(OTHER_APP, product.sign("whatsapp-verify", APP)))

@@ -381,11 +381,11 @@ class TalkOverGate(FrameProcessor):
 # Live socket's close reason ("1007 None. API key not valid. Please pass a valid API key.").
 GEMINI_KEY_PROBLEMS = (
     ("INVALID", "it is not a valid API key",
-     re.compile(r"api key not valid|api_key_invalid|api key expired|api_key_expired|unregistered callers", re.I)),
+     re.compile(r"api key not valid|api_key_invalid|api key expired|api_key_expired|unregistered callers|leaked", re.I)),
     ("API_DISABLED", "the Gemini API is turned off for its Google Cloud project, or the key may not use it",
-     re.compile(r"has not been used in project|service_disabled|it is disabled|api_key_service_blocked|permission[_ ]denied", re.I)),
+     re.compile(r"has not been used in project|service_disabled|it is disabled|api_key_service_blocked|permission[_ ]denied|denied access", re.I)),
     ("QUOTA", "it is out of quota, or billing is not set up for it",
-     re.compile(r"quota|resource[_ ]exhausted|billing|\b429\b", re.I)),
+     re.compile(r"quota|resource[_ ]exhausted|billing|prepay|credit balance|payment[_ ]required|\b429\b|\b402\b", re.I)),
 )
 
 

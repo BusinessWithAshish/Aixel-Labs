@@ -353,7 +353,9 @@ async def test_rest(port, agents, numbers):
 async def test_twiml(port, agents, numbers):
     print("\n== /twiml ==")
     n = numbers["token"]; nid = str(n["_id"]); q = f"/twiml?n={nid}&sig={product.sign('number', nid)}"
-    form = {"CallSid": "CA" + uuid.uuid4().hex, "AccountSid": AC_TOK, "From": CALLER, "To": n["phoneNumber"], "Direction": "inbound", "CallStatus": "ringing"}
+    # Twilio signs blank values too (it sends CallerCity, FromZip … empty for many callers).
+    form = {"CallSid": "CA" + uuid.uuid4().hex, "AccountSid": AC_TOK, "From": CALLER, "To": n["phoneNumber"], "Direction": "inbound", "CallStatus": "ringing",
+            "CallerCity": "", "FromZip": ""}
     st, _ = await ahttp("POST", f"http://127.0.0.1:{port}/twiml?n={nid}&sig=0123456789abcdef0123456789abcdef", form=form)
     ok("bad signature -> 403", st == 403, f"HTTP {st}")
     st, _ = await ahttp("POST", f"http://127.0.0.1:{port}/twiml?n={nid}", form=form)
@@ -484,7 +486,7 @@ async def test_events(port, agents, numbers):
     # Auth Token numbers: X-Twilio-Signature is checked on callbacks too.
     t = numbers["token"]; tid = str(t["_id"])
     tpath = f"/twilio-events?n={tid}&a={aid}&sig={product.sign('twilio-events', tid, aid)}"
-    s3 = "CA" + uuid.uuid4().hex; form = {**base, "AccountSid": AC_TOK, "CallSid": s3, "From": t["phoneNumber"], "CallStatus": "busy"}
+    s3 = "CA" + uuid.uuid4().hex; form = {**base, "AccountSid": AC_TOK, "CallSid": s3, "From": t["phoneNumber"], "CallStatus": "busy", "CalledCity": "", "ToZip": ""}
     st, _ = await ahttp("POST", f"http://127.0.0.1:{port}{tpath}", form=form)
     ok("Auth Token number: callback without X-Twilio-Signature -> 403", st == 403, f"HTTP {st}")
     st, _ = await ahttp("POST", f"http://127.0.0.1:{port}{tpath}", form=form, headers={"X-Twilio-Signature": twilio_sig(AUTH_TOKEN, tpath, form)})

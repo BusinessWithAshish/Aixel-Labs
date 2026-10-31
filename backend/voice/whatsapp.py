@@ -124,10 +124,16 @@ def calls_in(payload: dict) -> list[dict]:
     return events
 
 
+# Not something a person wrote to the business: a reaction (or its removal), an edit or delete of an earlier
+# message, a system notice, the "opened the chat" welcome request. Answering them would send "I can only read text".
+NOT_MESSAGES = {"reaction", "edit", "revoke", "system", "request_welcome"}
+
+
 def messages_in(payload: dict) -> list[dict]:
     """The messages people sent in one webhook body (field `messages`), each as
     {phone_number_id, id, from, name, type, text, media_id, mime}. `text` is what they typed or tapped (a button,
-    a list row), None for anything else; a voice note carries its `media_id`. Delivery receipts (`statuses`) are left out."""
+    a list row), None for anything else; a voice note carries its `media_id`. Delivery receipts (`statuses`) and
+    NOT_MESSAGES are left out."""
     found = []
     for value in _values(payload, "messages"):
         names = {str(c.get("wa_id")): str((c.get("profile") or {}).get("name") or "")
@@ -136,6 +142,8 @@ def messages_in(payload: dict) -> list[dict]:
             if not isinstance(m, dict) or not m.get("id") or not m.get("from"):
                 continue
             kind = str(m.get("type") or "")
+            if kind in NOT_MESSAGES:
+                continue
             interactive = m.get("interactive") if isinstance(m.get("interactive"), dict) else {}
             picked = interactive.get("button_reply") or interactive.get("list_reply") or {}
             text = ((m.get("text") or {}).get("body") if kind == "text"
